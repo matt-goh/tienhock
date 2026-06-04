@@ -1,5 +1,5 @@
 // src/pages/Payroll/PinjamListPage.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { format } from "date-fns";
 import {
   IconPlus,
@@ -13,6 +13,8 @@ import {
   IconSquare,
   IconSquareCheckFilled,
   IconSquareMinusFilled,
+  IconSearch,
+  IconX,
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -69,6 +71,15 @@ interface PinjamSummary {
   };
 }
 
+// Default to the previous month during the first week (1st-7th), else current month
+const getDefaultPinjamMonth = (
+  today: Date = new Date()
+): { year: number; month: number } => {
+  const monthOffset = today.getDate() <= 7 ? -1 : 0;
+  const d = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+  return { year: d.getFullYear(), month: d.getMonth() + 1 };
+};
+
 const PinjamListPage: React.FC = () => {
   // State
   const [pinjamRecords, setPinjamRecords] = useState<PinjamRecord[]>([]);
@@ -92,14 +103,60 @@ const PinjamListPage: React.FC = () => {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   // Filters
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
+  const [currentYear, setCurrentYear] = useState(
+    () => getDefaultPinjamMonth().year
+  );
+  const [currentMonth, setCurrentMonth] = useState(
+    () => getDefaultPinjamMonth().month
+  );
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   // Create Date object for MonthNavigator
   const selectedMonth = useMemo(
     () => new Date(currentYear, currentMonth - 1, 1),
     [currentYear, currentMonth]
   );
+
+  // Start typing anywhere to focus the search box and begin filtering
+  useEffect(() => {
+    const isEditableTarget = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) return false;
+
+      const tagName = target.tagName.toLowerCase();
+      return (
+        tagName === "input" ||
+        tagName === "textarea" ||
+        tagName === "select" ||
+        target.isContentEditable
+      );
+    };
+
+    const handleSearchTypingShortcut = (event: KeyboardEvent): void => {
+      if (
+        event.defaultPrevented ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey ||
+        event.key.length !== 1 ||
+        !searchInputRef.current ||
+        showAddModal ||
+        showDeleteDialog ||
+        isEditableTarget(event.target)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      searchInputRef.current?.focus();
+      setSearchQuery((prev) => `${prev}${event.key}`);
+    };
+
+    document.addEventListener("keydown", handleSearchTypingShortcut);
+    return () => {
+      document.removeEventListener("keydown", handleSearchTypingShortcut);
+    };
+  }, [showAddModal, showDeleteDialog]);
 
   // Load data on mount and filter changes
   useEffect(() => {
@@ -214,12 +271,23 @@ const PinjamListPage: React.FC = () => {
       .sort((a, b) => a.employee_name.localeCompare(b.employee_name));
   }, [midMonthPayrolls, pinjamSummary, employeePayrolls]);
 
-  // Calculate totals
-  const totalMidMonthPinjam = employeeData.reduce(
+  // Filter employees by name / staff ID (case-insensitive)
+  const filteredEmployeeData = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return employeeData;
+    return employeeData.filter(
+      (emp) =>
+        emp.employee_name.toLowerCase().includes(q) ||
+        emp.employee_id.toLowerCase().includes(q)
+    );
+  }, [employeeData, searchQuery]);
+
+  // Calculate totals (reflect the filtered/visible set)
+  const totalMidMonthPinjam = filteredEmployeeData.reduce(
     (sum, emp) => sum + emp.midMonthPinjam,
     0
   );
-  const totalMonthlyPinjam = employeeData.reduce(
+  const totalMonthlyPinjam = filteredEmployeeData.reduce(
     (sum, emp) => sum + emp.monthlyPinjam,
     0
   );
@@ -236,20 +304,28 @@ const PinjamListPage: React.FC = () => {
   };
 
   const handleSelectAll = (isSelected: boolean) => {
-    if (isSelected) {
-      const allEmployeeIds = new Set(
-        employeeData.map((emp) => emp.employee_id)
-      );
-      setSelectedEmployees(allEmployeeIds);
-    } else {
-      setSelectedEmployees(new Set());
-    }
+    // Only affect the currently filtered/visible employees; preserve any
+    // selections that fall outside the active search.
+    setSelectedEmployees((prev) => {
+      const next = new Set(prev);
+      filteredEmployeeData.forEach((emp) => {
+        if (isSelected) {
+          next.add(emp.employee_id);
+        } else {
+          next.delete(emp.employee_id);
+        }
+      });
+      return next;
+    });
   };
 
   const isAllSelected =
-    employeeData.length > 0 && selectedEmployees.size === employeeData.length;
+    filteredEmployeeData.length > 0 &&
+    filteredEmployeeData.every((emp) => selectedEmployees.has(emp.employee_id));
   const isPartiallySelected =
-    selectedEmployees.size > 0 && selectedEmployees.size < employeeData.length;
+    filteredEmployeeData.some((emp) =>
+      selectedEmployees.has(emp.employee_id)
+    ) && !isAllSelected;
 
   // PDF generation function
   const generatePDFForSelected = async (action: "download" | "print") => {
@@ -317,54 +393,14 @@ const PinjamListPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col md:flex-row justify-between items-center">
-        <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-          Pinjam System
-        </h1>
-        <div className="flex space-x-3 mt-4 md:mt-0">
-          <Button
-            onClick={fetchAllData}
-            icon={IconRefresh}
-            variant="outline"
-            disabled={isLoading}
-          >
-            Refresh
-          </Button>
-          <div className="flex space-x-2">
-            <Button
-              onClick={() => generatePDFForSelected("print")}
-              icon={IconPrinter}
-              color="green"
-              variant="outline"
-              disabled={selectedEmployees.size === 0 || isGeneratingPDF}
-            >
-              Print ({selectedEmployees.size})
-            </Button>
-            <Button
-              onClick={() => generatePDFForSelected("download")}
-              icon={IconDownload}
-              color="blue"
-              variant="outline"
-              disabled={selectedEmployees.size === 0 || isGeneratingPDF}
-            >
-              Download ({selectedEmployees.size})
-            </Button>
-          </div>
-          <Button
-            onClick={() => setShowAddModal(true)}
-            icon={IconPlus}
-            color="sky"
-            variant="filled"
-          >
-            Record Pinjam
-          </Button>
-        </div>
-      </div>
-
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm p-4">
         <div className="flex flex-col md:flex-row gap-4 items-end justify-between">
           <div className="flex gap-4 items-end">
+            <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100 self-center">
+              Pinjam System
+            </h1>
+            <div className="self-center h-8 border-l border-default-300 dark:border-gray-600" />
             <YearNavigator
               selectedYear={currentYear}
               onChange={setCurrentYear}
@@ -379,84 +415,141 @@ const PinjamListPage: React.FC = () => {
               showGoToCurrentButton={false}
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
-              Total Pinjam
-            </label>
-            <div className="mt-1 flex items-center px-3 h-[34px] w-full rounded-md border border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/50">
-              <span className="font-semibold text-lg text-default-800 dark:text-gray-100">
-                {formatCurrency(totalMidMonthPinjam + totalMonthlyPinjam)}
-              </span>
-            </div>
+          <div className="flex items-center gap-2 whitespace-nowrap">
+            <span className="text-sm font-medium text-default-700 dark:text-gray-200">
+              Total Pinjam:
+            </span>
+            <span className="font-semibold text-lg text-default-800 dark:text-gray-100">
+              {formatCurrency(totalMidMonthPinjam + totalMonthlyPinjam)}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Selection Controls */}
-      {employeeData.length > 0 && (
-        <div
-          className="bg-white dark:bg-gray-800 rounded-lg cursor-pointer border border-default-200 dark:border-gray-700 shadow-sm p-4"
-          onClick={() => handleSelectAll(!isAllSelected)}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4 flex-1">
-              <div className="flex items-center space-x-2">
-                {isAllSelected ? (
-                  <IconSquareCheckFilled className="text-blue-600" size={20} />
-                ) : isPartiallySelected ? (
-                  <IconSquareMinusFilled className="text-blue-600" size={20} />
-                ) : (
-                  <IconSquare
-                    className="text-default-400 group-hover:text-blue-500 transition-colors"
-                    size={20}
-                  />
-                )}
-                <span className="text-sm font-medium text-default-700 dark:text-gray-200">
-                  Select All ({employeeData.length})
-                </span>
-              </div>
-              {selectedEmployees.size > 0 && (
-                <span className="text-sm text-sky-600 dark:text-sky-400 font-medium">
-                  {selectedEmployees.size} employee
-                  {selectedEmployees.size > 1 ? "s" : ""} selected
-                </span>
+      {/* Selection Controls + Actions (sticky) */}
+      <div
+        className="bg-white dark:bg-gray-800 rounded-lg cursor-pointer border border-default-200 dark:border-gray-700 shadow-sm p-3 sticky top-1 z-20"
+        onClick={() => handleSelectAll(!isAllSelected)}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center space-x-4 min-w-0">
+            <div className="flex items-center space-x-2">
+              {isAllSelected ? (
+                <IconSquareCheckFilled className="text-blue-600" size={20} />
+              ) : isPartiallySelected ? (
+                <IconSquareMinusFilled className="text-blue-600" size={20} />
+              ) : (
+                <IconSquare
+                  className="text-default-400 group-hover:text-blue-500 transition-colors"
+                  size={20}
+                />
               )}
+              <span className="text-sm font-medium text-default-700 dark:text-gray-200">
+                Select All ({filteredEmployeeData.length})
+              </span>
             </div>
             {selectedEmployees.size > 0 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedEmployees(new Set());
-                }}
-                className="text-sm text-default-500 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-200"
-              >
-                Clear Selection
-              </button>
+              <span className="text-sm text-sky-600 dark:text-sky-400 font-medium whitespace-nowrap">
+                {selectedEmployees.size} employee
+                {selectedEmployees.size > 1 ? "s" : ""} selected
+              </span>
             )}
           </div>
+          <div
+            className="flex items-center gap-2 cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative w-52">
+              <IconSearch
+                size={15}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none"
+              />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search staff"
+                className="w-full rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 pl-8 pr-8 text-sm text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-gray-400 hover:bg-default-100 dark:text-gray-500 dark:hover:bg-gray-700"
+                  title="Clear search"
+                >
+                  <IconX size={13} />
+                </button>
+              )}
+            </div>
+            <Button
+              onClick={fetchAllData}
+              icon={IconRefresh}
+              variant="outline"
+              size="sm"
+              disabled={isLoading}
+            >
+              Refresh
+            </Button>
+            <Button
+              onClick={() => generatePDFForSelected("print")}
+              icon={IconPrinter}
+              color="green"
+              variant="outline"
+              size="sm"
+              disabled={selectedEmployees.size === 0 || isGeneratingPDF}
+            >
+              Print ({selectedEmployees.size})
+            </Button>
+            <Button
+              onClick={() => generatePDFForSelected("download")}
+              icon={IconDownload}
+              color="blue"
+              variant="outline"
+              size="sm"
+              disabled={selectedEmployees.size === 0 || isGeneratingPDF}
+            >
+              Download ({selectedEmployees.size})
+            </Button>
+            <Button
+              onClick={() => setShowAddModal(true)}
+              icon={IconPlus}
+              color="sky"
+              variant="filled"
+              size="sm"
+            >
+              Record Pinjam
+            </Button>
+          </div>
         </div>
-      )}
+      </div>
 
       {/* Individual Employee Records - Card Grid Layout */}
       <div>
-        {employeeData.length === 0 ? (
+        {filteredEmployeeData.length === 0 ? (
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
             <div className="text-center py-12 text-default-500 dark:text-gray-400">
               <IconCash className="mx-auto h-12 w-12 text-default-300 mb-4" />
-              <p className="text-lg font-medium">No employee records found</p>
-              <p>No mid-month pay or pinjam records for this period</p>
+              <p className="text-lg font-medium">
+                {searchQuery
+                  ? "No employees match your search"
+                  : "No employee records found"}
+              </p>
+              <p>
+                {searchQuery
+                  ? "Try a different name or staff ID"
+                  : "No mid-month pay or pinjam records for this period"}
+              </p>
             </div>
           </div>
         ) : (
-          <div
-            className={`grid gap-4 ${
-              employeeData.length === 1
-                ? "grid-cols-1 max-w-2xl mx-auto"
-                : "grid-cols-1 lg:grid-cols-2"
-            }`}
-          >
-            {employeeData.map((employee) => {
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {filteredEmployeeData.map((employee) => {
               const isSelected = selectedEmployees.has(employee.employee_id);
+              const hasMid = employee.midMonthPinjam > 0;
+              const hasMonthly = employee.monthlyPinjam > 0;
+              const isWide = hasMid && hasMonthly;
 
               const handleCardClick = (e: React.MouseEvent) => {
                 // Prevent navigation if clicking specifically on the checkbox icon/wrapper
@@ -498,6 +591,8 @@ const PinjamListPage: React.FC = () => {
                     isSelected
                       ? "shadow-md ring-2 ring-blue-500 dark:ring-blue-400 ring-offset-1"
                       : "shadow-sm hover:shadow-md"
+                  } ${
+                    isWide ? "sm:col-span-2 lg:col-span-2" : ""
                   } border-default-200 dark:border-gray-700 px-4 pb-4 space-y-3`}
                   onClick={handleCardClick}
                 >
@@ -534,174 +629,158 @@ const PinjamListPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Body - Horizontal layout for content sections */}
+                  {/* Body - only renders the sections that have pinjam */}
                   <div className="space-y-4">
-                    <div className="flex gap-6 divide-x divide-default-200 dark:divide-gray-700 h-full">
-                      {/* Mid-month Pay Section - Always visible */}
-                      <div className="flex-1 min-w-0 pr-6 flex flex-col">
-                        {employee.midMonthPinjam > 0 ? (
-                          <>
+                    <div
+                      className={`flex h-full ${
+                        isWide
+                          ? "gap-6 divide-x divide-default-200 dark:divide-gray-700"
+                          : ""
+                      }`}
+                    >
+                      {/* Mid-month Pay Section */}
+                      {hasMid && (
+                        <div
+                          className={`min-w-0 flex flex-col ${
+                            isWide ? "flex-1 pr-6" : "w-full"
+                          }`}
+                        >
+                          <div className="mb-3">
+                            <p
+                              className="text-sm text-default-500 dark:text-gray-400 mb-1 truncate"
+                              title="Mid-month Pay (Before Pinjam)"
+                            >
+                              Mid-Month Pay (Before Pinjam)
+                            </p>
+                            <p className="text-xl font-bold text-default-800 dark:text-gray-100">
+                              {formatCurrency(employee.midMonthPay)}
+                            </p>
+                          </div>
+
+                          {employee.midMonthPinjamDetails.length > 0 && (
                             <div className="mb-3">
-                              <p
-                                className="text-sm text-default-500 dark:text-gray-400 mb-1 truncate"
-                                title="Mid-month Pay (Before Pinjam)"
+                              <p className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
+                                Pinjam Items:
+                              </p>
+                              <div className="space-y-1 text-sm text-default-600 dark:text-gray-300">
+                                {employee.midMonthPinjamDetails.map(
+                                  (detail, index) => (
+                                    <div
+                                      key={index}
+                                      className="flex items-start"
+                                    >
+                                      <span className="text-default-400 mr-2 mt-0.5">
+                                        •
+                                      </span>
+                                      <span>{detail}</span>
+                                    </div>
+                                  )
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="text-sm">
+                            <div className="flex justify-between mb-2">
+                              <span className="text-default-600 dark:text-gray-300">
+                                Jumlah Pinjam:
+                              </span>
+                              <span className="font-semibold text-red-600">
+                                - {formatCurrency(employee.midMonthPinjam)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between font-semibold">
+                              <span
+                                className="text-default-800 dark:text-gray-100 truncate mr-2"
+                                title="Final Mid-month Pay"
                               >
-                                Mid-Month Pay (Before Pinjam)
-                              </p>
-                              <p className="text-xl font-bold text-default-800 dark:text-gray-100">
-                                {formatCurrency(employee.midMonthPay)}
-                              </p>
-                            </div>
-
-                            {employee.midMonthPinjamDetails.length > 0 && (
-                              <div className="mb-3">
-                                <p className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
-                                  Pinjam Items:
-                                </p>
-                                <div className="space-y-1 text-sm text-default-600 dark:text-gray-300">
-                                  {employee.midMonthPinjamDetails.map(
-                                    (detail, index) => (
-                                      <div
-                                        key={index}
-                                        className="flex items-start"
-                                      >
-                                        <span className="text-default-400 mr-2 mt-0.5">
-                                          •
-                                        </span>
-                                        <span>{detail}</span>
-                                      </div>
-                                    )
-                                  )}
-                                </div>
-                              </div>
-                            )}
-
-                            <div className="text-sm">
-                              <div className="flex justify-between mb-2">
-                                <span className="text-default-600 dark:text-gray-300">
-                                  Jumlah Pinjam:
-                                </span>
-                                <span className="font-semibold text-red-600">
-                                  - {formatCurrency(employee.midMonthPinjam)}
-                                </span>
-                              </div>
-                              <div className="flex justify-between font-semibold">
-                                <span
-                                  className="text-default-800 dark:text-gray-100 truncate mr-2"
-                                  title="Final Mid-month Pay"
-                                >
-                                  Final Mid-month pay:
-                                </span>
-                                <span
-                                  className="text-lg font-bold truncate text-sky-600 dark:text-sky-400"
-                                  title={formatCurrency(
-                                    employee.midMonthPay -
-                                      employee.midMonthPinjam
-                                  )}
-                                >
-                                  {formatCurrency(
-                                    employee.midMonthPay -
-                                      employee.midMonthPinjam
-                                  )}
-                                </span>
-                              </div>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="flex items-center justify-center text-default-400 h-full">
-                            <div className="text-center">
-                              <IconCash className="mx-auto h-6 w-6 text-default-300 mb-2" />
-                              <p className="text-sm font-medium text-default-500 dark:text-gray-400">
-                                Mid-Month Pay
-                              </p>
-                              <p className="text-xs text-default-400 mt-1">
-                                No pinjam recorded
-                              </p>
+                                Final Mid-month pay:
+                              </span>
+                              <span
+                                className="text-lg font-bold truncate text-sky-600 dark:text-sky-400"
+                                title={formatCurrency(
+                                  employee.midMonthPay - employee.midMonthPinjam
+                                )}
+                              >
+                                {formatCurrency(
+                                  employee.midMonthPay - employee.midMonthPinjam
+                                )}
+                              </span>
                             </div>
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
 
-                      {/* Monthly Pay Section - Always visible */}
-                      <div className="flex-1 min-w-0 pl-6 flex flex-col">
-                        {employee.monthlyPinjam > 0 ? (
-                          <>
+                      {/* Monthly Pay Section */}
+                      {hasMonthly && (
+                        <div
+                          className={`min-w-0 flex flex-col ${
+                            isWide ? "flex-1 pl-6" : "w-full"
+                          }`}
+                        >
+                          <div className="mb-3">
+                            <p
+                              className="text-sm text-default-500 dark:text-gray-400 mb-1 truncate"
+                              title="Gaji Genap (Before Pinjam)"
+                            >
+                              Gaji Genap (Before Pinjam)
+                            </p>
+                            <p className="text-xl font-bold text-default-800 dark:text-gray-100">
+                              {formatCurrency(employee.gajiGenap)}
+                            </p>
+                          </div>
+
+                          {employee.monthlyPinjamDetails.length > 0 && (
                             <div className="mb-3">
-                              <p
-                                className="text-sm text-default-500 dark:text-gray-400 mb-1 truncate"
-                                title="Gaji Genap (Before Pinjam)"
+                              <p className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
+                                Pinjam Items:
+                              </p>
+                              <div className="space-y-1 text-sm text-default-600 dark:text-gray-300">
+                                {employee.monthlyPinjamDetails.map(
+                                  (detail, index) => (
+                                    <div
+                                      key={index}
+                                      className="flex items-start"
+                                    >
+                                      <span className="text-default-400 mr-2 mt-0.5">
+                                        •
+                                      </span>
+                                      <span>{detail}</span>
+                                    </div>
+                                  )
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="text-sm">
+                            <div className="flex justify-between mb-2">
+                              <span className="text-default-600 dark:text-gray-300">
+                                Jumlah Pinjam:
+                              </span>
+                              <span className="font-semibold text-red-600">
+                                - {formatCurrency(employee.monthlyPinjam)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between font-semibold">
+                              <span
+                                className="text-default-800 dark:text-gray-100 flex items-center truncate mr-2"
+                                title="Jumlah Masuk Bank"
                               >
-                                Gaji Genap (Before Pinjam)
-                              </p>
-                              <p className="text-xl font-bold text-default-800 dark:text-gray-100">
-                                {formatCurrency(employee.gajiGenap)}
-                              </p>
-                            </div>
-
-                            {employee.monthlyPinjamDetails.length > 0 && (
-                              <div className="mb-3">
-                                <p className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
-                                  Pinjam Items:
-                                </p>
-                                <div className="space-y-1 text-sm text-default-600 dark:text-gray-300">
-                                  {employee.monthlyPinjamDetails.map(
-                                    (detail, index) => (
-                                      <div
-                                        key={index}
-                                        className="flex items-start"
-                                      >
-                                        <span className="text-default-400 mr-2 mt-0.5">
-                                          •
-                                        </span>
-                                        <span>{detail}</span>
-                                      </div>
-                                    )
-                                  )}
-                                </div>
-                              </div>
-                            )}
-
-                            <div className="text-sm">
-                              <div className="flex justify-between mb-2">
-                                <span className="text-default-600 dark:text-gray-300">
-                                  Jumlah Pinjam:
+                                <IconBuildingBank className="w-4 h-4 mr-1.5 flex-shrink-0" />
+                                <span className="truncate">
+                                  Jumlah Masuk Bank:
                                 </span>
-                                <span className="font-semibold text-red-600">
-                                  - {formatCurrency(employee.monthlyPinjam)}
-                                </span>
-                              </div>
-                              <div className="flex justify-between font-semibold">
-                                <span
-                                  className="text-default-800 dark:text-gray-100 flex items-center truncate mr-2"
-                                  title="Jumlah Masuk Bank"
-                                >
-                                  <IconBuildingBank className="w-4 h-4 mr-1.5 flex-shrink-0" />
-                                  <span className="truncate">
-                                    Jumlah Masuk Bank:
-                                  </span>
-                                </span>
-                                <span className="text-lg font-bold text-sky-600 dark:text-sky-400">
-                                  {formatCurrency(
-                                    employee.gajiGenap - employee.monthlyPinjam
-                                  )}
-                                </span>
-                              </div>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="flex items-center justify-center text-default-400 h-full">
-                            <div className="text-center">
-                              <IconBuildingBank className="mx-auto h-6 w-6 text-default-300 mb-2" />
-                              <p className="text-sm font-medium text-default-500 dark:text-gray-400">
-                                Monthly Pay
-                              </p>
-                              <p className="text-xs text-default-400 mt-1">
-                                No pinjam recorded
-                              </p>
+                              </span>
+                              <span className="text-lg font-bold text-sky-600 dark:text-sky-400">
+                                {formatCurrency(
+                                  employee.gajiGenap - employee.monthlyPinjam
+                                )}
+                              </span>
                             </div>
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
