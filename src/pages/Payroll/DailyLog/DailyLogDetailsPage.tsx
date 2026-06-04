@@ -48,7 +48,26 @@ interface EmployeeEntry {
   employee_name: string;
   job_name: string;
   following_salesman_name?: string | null;
-  activities: any[];
+  activities: DailyActivity[];
+}
+
+interface DailyActivity {
+  id: number;
+  pay_code_id: string;
+  description: string;
+  pay_type: string;
+  source?: string | null;
+  rate_unit: string;
+  rate_used: number;
+  hours_applied: number | null;
+  units_produced: number | null;
+  foc_units: number | null;
+  calculated_amount: number;
+}
+
+interface SeparatedActivities {
+  contextLinked: DailyActivity[];
+  regular: DailyActivity[];
 }
 
 interface LeaveRecord {
@@ -167,9 +186,11 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
     }));
   };
 
-  const separateActivities = (activities: any[]) => {
-    const contextLinked: any[] = [];
-    const regular: any[] = [];
+  const separateActivities = (
+    activities: DailyActivity[]
+  ): SeparatedActivities => {
+    const contextLinked: DailyActivity[] = [];
+    const regular: DailyActivity[] = [];
 
     activities.forEach((activity) => {
       const isContextLinked = jobConfig?.contextFields.some(
@@ -184,6 +205,21 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
     });
 
     return { contextLinked, regular };
+  };
+
+  const renderPayCodeLabel = (activity: DailyActivity): JSX.Element => {
+    const payCodeId: string = activity.pay_code_id.trim();
+
+    return (
+      <>
+        {activity.description}
+        {payCodeId && (
+          <span className="ml-1 font-mono text-xs font-semibold text-default-500 dark:text-gray-400">
+            ({payCodeId})
+          </span>
+        )}
+      </>
+    );
   };
 
   const formatCurrency = (amount: number) => {
@@ -219,7 +255,8 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
     (sum: number, entry: EmployeeEntry) =>
       sum +
       entry.activities.reduce(
-        (actSum: number, activity: any) => actSum + activity.calculated_amount,
+        (actSum: number, activity: DailyActivity) =>
+          actSum + activity.calculated_amount,
         0
       ),
     0
@@ -394,7 +431,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
               })
               .map((entry: EmployeeEntry) => {
                 const employeeTotal = entry.activities.reduce(
-                  (sum: number, activity: any) =>
+                  (sum: number, activity: DailyActivity) =>
                     sum + activity.calculated_amount,
                   0
                 );
@@ -500,7 +537,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-default-50 dark:divide-gray-700/50">
-                          {displayActivities.map((activity: any) => {
+                          {displayActivities.map((activity: DailyActivity) => {
                             const isContextLinkedActivity = contextLinked.some(
                               (a) => a.id === activity.id
                             );
@@ -512,7 +549,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                                 <td className="py-1.5 pr-2">
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className="font-medium text-default-700 dark:text-gray-200">
-                                      {activity.description}
+                                      {renderPayCodeLabel(activity)}
                                     </span>
                                     <span className="text-xs px-1.5 py-0.5 rounded bg-default-100 dark:bg-gray-700 text-default-500 dark:text-gray-400">
                                       {activity.pay_type}
@@ -564,12 +601,18 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                                       activity.rate_unit !== "Bill"
                                     ? (
                                       <>
-                                        {activity.foc_units > 0 && (
+                                        {(activity.foc_units ?? 0) > 0 && (
                                           <span className="text-emerald-600 dark:text-emerald-400 text-xs">
-                                            {Math.round(activity.foc_units)} FOC +{" "}
+                                            {Math.round(
+                                              activity.foc_units ?? 0
+                                            )}{" "}
+                                            FOC +{" "}
                                           </span>
                                         )}
-                                        {activity.units_produced} {activity.rate_unit === "Percent" ? "" : activity.rate_unit}
+                                        {activity.units_produced}{" "}
+                                        {activity.rate_unit === "Percent"
+                                          ? ""
+                                          : activity.rate_unit}
                                       </>
                                     )
                                     : "-"}
