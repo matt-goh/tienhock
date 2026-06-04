@@ -20,6 +20,16 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-05",
+    ms: "Pembetulan PCB: gaji dengan sen kini dipadankan kepada julat PCB yang betul, contohnya RM5,975.78 menggunakan julat RM5,976-RM5,980 supaya potongan PCB muncul dalam payslip.",
+    en: "PCB fix: salary amounts with cents now match the correct PCB range, for example RM5,975.78 uses the RM5,976-RM5,980 range so the PCB deduction appears on the payslip.",
+  },
+  {
+    date: "2026-06-05",
+    ms: "Pembetulan Sistem Pinjam: rekod pinjam kini boleh disimpan untuk ID staf yang panjang seperti JASSON_ROLL.",
+    en: "Pinjam System fix: pinjam records can now be saved for longer staff IDs such as JASSON_ROLL.",
+  },
+  {
+    date: "2026-06-05",
     ms: "Pembetulan paparan: lajur Kuantiti dalam Butiran Gaji (paparan terperinci) tidak lagi menambah '0' tambahan di belakang jam — contohnya 3 jam yang dulu dipaparkan sebagai '30' kini betul sebagai '3'. Amaun bayaran tidak berubah; ini hanya pembetulan paparan.",
     en: "Display fix: the Quantity column in Payroll Details (detailed view) no longer adds a stray '0' after the hours — e.g. 3 hours that previously showed as '30' now correctly shows as '3'. Payment amounts were never affected; this is display-only.",
   },

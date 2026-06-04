@@ -514,6 +514,17 @@ export default function (pool) {
           (r) => wage >= parseFloat(r.wage_from) && wage <= parseFloat(r.wage_to)
         ) || null;
 
+      const findIncomeTaxRateByWage = (rates, wage) => {
+        const lookupWage = Math.ceil(wage);
+        return (
+          rates.find(
+            (r) =>
+              lookupWage >= parseFloat(r.wage_from) &&
+              lookupWage <= parseFloat(r.wage_to)
+          ) || null
+        );
+      };
+
       const getEPFWageCeiling = (wageAmount) => {
         if (wageAmount <= 10) return 0;
         if (wageAmount <= 20) return 20;
@@ -796,7 +807,10 @@ export default function (pool) {
           }
 
           // Income Tax
-          const incomeTaxRate = findRateByWage(incomeTaxRates, grossPay);
+          const incomeTaxRate = findIncomeTaxRateByWage(
+            incomeTaxRates,
+            grossPay
+          );
           if (incomeTaxRate) {
             const maritalStatus = staff.marital_status || "Single";
             const spouseEmploymentStatus = staff.spouse_employment_status || null;
