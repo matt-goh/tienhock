@@ -6,6 +6,7 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { Employee } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
+import ContributionListbox from "../../components/ContributionListbox";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import {
@@ -70,6 +71,20 @@ const StaffFormPage: React.FC = () => {
     { id: "Employed", name: "Employed" },
     { id: "Unemployed", name: "Unemployed" },
   ];
+
+  // Per-staff statutory contribution overrides ("auto" sentinel maps to ""/NULL on save)
+  const contributionAgeOptions = [
+    { id: "auto", name: "Auto (from birthdate)" },
+    { id: "under_60", name: "Treat as Under 60" },
+    { id: "over_60", name: "Treat as 60 & Above" },
+    { id: "none", name: "Not Eligible" },
+  ];
+  const epfNationalityOptions = [
+    { id: "auto", name: "Auto (from nationality)" },
+    { id: "local", name: "Local" },
+    { id: "foreign", name: "Foreign" },
+  ];
+
   const [formData, setFormData] = useState<Employee>({
     id: "",
     name: "",
@@ -99,6 +114,10 @@ const StaffFormPage: React.FC = () => {
     numberOfChildren: 0,
     department: "",
     kwspNumber: "",
+    epfAgeOverride: "auto",
+    epfNationalityOverride: "auto",
+    socsoAgeOverride: "auto",
+    sipAgeOverride: "auto",
   });
   const [initialFormData, setInitialFormData] = useState<Employee>({
     ...formData,
@@ -737,6 +756,10 @@ const StaffFormPage: React.FC = () => {
         numberOfChildren: data.numberOfChildren || 0,
         department: data.department || "",
         kwspNumber: data.kwspNumber || "",
+        epfAgeOverride: data.epfAgeOverride || "auto",
+        epfNationalityOverride: data.epfNationalityOverride || "auto",
+        socsoAgeOverride: data.socsoAgeOverride || "auto",
+        sipAgeOverride: data.sipAgeOverride || "auto",
       };
 
       // Preserve modified fields from current formData
@@ -1045,6 +1068,17 @@ const StaffFormPage: React.FC = () => {
       birthdate: formData.birthdate || null,
       dateJoined: formData.dateJoined || null,
       dateResigned: formData.dateResigned || null,
+      // Map the "auto" sentinel back to "" (backend stores NULL = auto)
+      epfAgeOverride:
+        formData.epfAgeOverride === "auto" ? "" : formData.epfAgeOverride,
+      epfNationalityOverride:
+        formData.epfNationalityOverride === "auto"
+          ? ""
+          : formData.epfNationalityOverride,
+      socsoAgeOverride:
+        formData.socsoAgeOverride === "auto" ? "" : formData.socsoAgeOverride,
+      sipAgeOverride:
+        formData.sipAgeOverride === "auto" ? "" : formData.sipAgeOverride,
     };
 
     try {
@@ -1095,6 +1129,26 @@ const StaffFormPage: React.FC = () => {
       onChange={handleInputChange}
       type={type}
       disabled={isEditMode && name === "id"}
+    />
+  );
+
+  // Contribution overrides use a dedicated Headless v2 listbox (ContributionListbox)
+  // instead of the shared FormListbox, whose legacy <Transition> wrapper triggers a
+  // "Maximum update depth exceeded" option-registration loop on selection.
+  const renderContributionSelect = (
+    name: keyof Employee,
+    label: string,
+    selectOptions: SelectOption[]
+  ) => (
+    <ContributionListbox
+      name={name}
+      label={label}
+      value={(formData[name] as string) ?? ""}
+      onChange={(value) => handleListboxChange(name, value)}
+      options={selectOptions.map((o) => ({
+        id: o.id.toString(),
+        name: o.name,
+      }))}
     />
   );
 
@@ -1753,6 +1807,39 @@ const StaffFormPage: React.FC = () => {
                       "numberOfChildren",
                       "Number of Children",
                       "number"
+                    )}
+                  </div>
+                </div>
+                <div className="border-t border-default-200 dark:border-gray-700 pt-6 mt-6">
+                  <h3 className="text-base font-medium text-default-800 dark:text-gray-100 mb-1">
+                    Contribution Settings
+                  </h3>
+                  <p className="text-sm text-default-500 dark:text-gray-400 mb-4">
+                    Override how EPF, SOCSO and SIP are applied for this staff.
+                    Leave as Auto to follow the staff's birthdate and
+                    nationality. "Not Eligible" removes that contribution
+                    entirely.
+                  </p>
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                    {renderContributionSelect(
+                      "epfAgeOverride",
+                      "EPF Age",
+                      contributionAgeOptions
+                    )}
+                    {renderContributionSelect(
+                      "epfNationalityOverride",
+                      "EPF Rate Type",
+                      epfNationalityOptions
+                    )}
+                    {renderContributionSelect(
+                      "socsoAgeOverride",
+                      "SOCSO Age",
+                      contributionAgeOptions
+                    )}
+                    {renderContributionSelect(
+                      "sipAgeOverride",
+                      "SIP Age",
+                      contributionAgeOptions
                     )}
                   </div>
                 </div>

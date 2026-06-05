@@ -116,7 +116,7 @@ This is a comprehensive ERP system supporting three companies:
 
 **Staff & Employees:**
 
-- `staffs` - id (no whitespace allowed), name, telephone_no, email, gender, nationality, birthdate, address, job, location, date_joined, ic_no, bank_account_number, epf_no, income_tax_no, socso_no, document, payment_type, payment_preference, race, agama, date_resigned, password, updated_at, marital_status, spouse_employment_status, number_of_children, kwsp_number, department, head_staff_id (references staffs.id - for same-name staff, indicates who is the "Head" for location determination in salary reports)
+- `staffs` - id (no whitespace allowed), name, telephone_no, email, gender, nationality, birthdate, address, job, location, date_joined, ic_no, bank_account_number, epf_no, income_tax_no, socso_no, document, payment_type, payment_preference, race, agama, date_resigned, password, updated_at, marital_status, spouse_employment_status, number_of_children, kwsp_number, department, head_staff_id (references staffs.id - for same-name staff, indicates who is the "Head" for location determination in salary reports), epf_age_override, epf_nationality_override, socso_age_override, sip_age_override (per-staff statutory contribution overrides; NULL = auto from birthdate/nationality. age overrides: 'under_60'|'over_60'|'none' where 'none' = not eligible; epf_nationality_override: 'local'|'foreign'. Honoured by payroll EPF/SOCSO/SIP calculation)
 - `active_sessions` - session_id, staff_id, last_active, created_at, status
 - `bookmarks` - id, staff_id, name
 

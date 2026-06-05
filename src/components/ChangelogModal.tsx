@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-05",
+    ms: "Setiap pekerja kini boleh ditetapkan cara caruman EPF, SOCSO dan SIP dikira di bawah tab Documents pada borang pekerja. Contohnya, pekerja yang berumur 60 ke atas boleh diberi kadar EPF 'bawah 60', dan pekerja asing tanpa pasport Malaysia boleh ditanda 'Tidak Layak' supaya tiada caruman EPF/SOCSO/SIP dikira untuknya. Biarkan sebagai Auto untuk mengikut tarikh lahir dan kewarganegaraan seperti biasa. Payroll akan mengikut tetapan ini.",
+    en: "You can now set how EPF, SOCSO and SIP are applied for each staff under the Documents tab of the staff form. For example, a staff aged 60 or above can be given the 'under 60' EPF rate, and a foreign worker without a Malaysian passport can be marked 'Not Eligible' so no EPF/SOCSO/SIP is calculated for them. Leave it as Auto to follow birthdate and nationality as before. Payroll follows these settings.",
+  },
+  {
+    date: "2026-06-05",
     ms: "Halaman Production Entry kini membolehkan susunan kad pekerja diubah dengan menyeret pemegang pada kad. Susunan ini dikongsi untuk semua pengguna mengikut kumpulan kerja Bihun atau Mee, nilai yang sudah ditaip kekal bersama pekerja yang betul apabila kad dipindahkan, dan butang Refresh Order boleh digunakan untuk memuat semula susunan terkini.",
     en: "Production Entry now lets you reorder worker cards by dragging the handle on each card. The order is shared for all users by Bihun or Mee worker group, typed values stay with the correct worker when cards are moved, and the Refresh Order button can reload the latest order.",
   },
