@@ -20,6 +20,8 @@ import {
   IconList,
   IconListDetails,
   IconClockHour4,
+  IconBuildingBank,
+  IconWallet,
 } from "@tabler/icons-react";
 import { format } from "date-fns";
 import Button from "../../components/Button";
@@ -43,6 +45,7 @@ import {
   CommissionRecord,
   MidMonthPayroll,
   OthersRecord,
+  PinjamRecord,
 } from "../../types/types";
 import {
   DownloadPayslipButton,
@@ -133,6 +136,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     CommissionRecord[]
   >([]);
   const [othersRecords, setOthersRecords] = useState<OthersRecord[]>([]);
+  const [pinjamRecords, setPinjamRecords] = useState<PinjamRecord[]>([]);
   const [viewMode, setViewMode] = useState<PayrollDetailsViewMode>(() =>
     searchParams.get("view") === "detailed" ? "detailed" : "consolidated",
   );
@@ -189,6 +193,27 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     fetchEmployeePayrollComprehensive();
   }, [id]);
 
+  // When opened from the Pinjam page (?scrollTo=pinjam), jump to the Pinjam
+  // summary at the bottom once the page has finished loading. Runs after the
+  // scroll-restoration pass (double rAF) so it wins on a deliberate navigation.
+  useEffect(() => {
+    if (isLoading || !payroll) return;
+    if (searchParams.get("scrollTo") !== "pinjam") return;
+
+    const frame = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const target = document.getElementById("pinjam-section");
+        if (target) {
+          target.scrollIntoView({ behavior: "auto", block: "end" });
+        } else {
+          const main = document.querySelector("main");
+          if (main) main.scrollTop = main.scrollHeight;
+        }
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [isLoading, payroll, pinjamRecords, searchParams]);
+
   const fetchEmployeePayrollComprehensive = async () => {
     if (!id) return;
 
@@ -202,6 +227,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       setMonthlyLeaveRecords(response.leave_records || []);
       setCommissionRecords(response.commission_records || []);
       setOthersRecords(response.others_records || []);
+      setPinjamRecords(response.pinjam_records || []);
     } catch (error) {
       console.error("Error fetching comprehensive employee payroll:", error);
       toast.error("Failed to load employee payroll details");
@@ -443,6 +469,48 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     (record: OthersRecord) => !isOvertimeOthersRecord(record),
   );
   const mergedOthersRecords = mergeByDescription(regularOthersRecords);
+
+  // Commission advance + the rounded final pay ("Jumlah Digenapkan"). This is the
+  // same expression rendered in the Deductions column below; computed once here so
+  // the Pinjam table's monthly "before pinjam" base matches what's shown above.
+  const commissionAdvanceTotal: number = commissionRecords.reduce(
+    (sum, record) => sum + Number(record.amount),
+    0,
+  );
+  const finalPaymentBeforeRounding: number =
+    payroll.net_pay -
+    (midMonthPayroll?.amount || 0) -
+    commissionAdvanceTotal;
+  const jumlahDigenapkan: number =
+    payroll.setelah_digenapkan ?? Math.ceil(finalPaymentBeforeRounding);
+
+  // Split pinjam records by type for the bottom-of-page Pinjam summary.
+  const midMonthPinjamRecords: PinjamRecord[] = pinjamRecords.filter(
+    (record: PinjamRecord) => record.pinjam_type === "mid_month",
+  );
+  const monthlyPinjamRecords: PinjamRecord[] = pinjamRecords.filter(
+    (record: PinjamRecord) => record.pinjam_type === "monthly",
+  );
+  const midMonthPinjamTotal: number = midMonthPinjamRecords.reduce(
+    (sum, record) => sum + Number(record.amount),
+    0,
+  );
+  const monthlyPinjamTotal: number = monthlyPinjamRecords.reduce(
+    (sum, record) => sum + Number(record.amount),
+    0,
+  );
+  const hasMidMonthPinjam: boolean = midMonthPinjamRecords.length > 0;
+  const hasMonthlyPinjam: boolean = monthlyPinjamRecords.length > 0;
+  const hasBothPinjamPanels: boolean = hasMidMonthPinjam && hasMonthlyPinjam;
+  const midMonthPayBeforePinjam: number = midMonthPayroll?.amount || 0;
+  const midMonthFinalPay: number = midMonthPayBeforePinjam - midMonthPinjamTotal;
+  const monthlyFinalPay: number = jumlahDigenapkan - monthlyPinjamTotal;
+
+  // Pinjam amounts can go negative when advances/pinjam exceed earnings (the
+  // worker owes money). Show the real value but render negatives in red so it
+  // reads as owing rather than money received.
+  const pinjamAmountColor = (value: number, positiveClass: string): string =>
+    value < -0.005 ? "text-red-600 dark:text-red-400" : positiveClass;
 
   const getOthersRecordJobType = (record: OthersRecord): string | undefined => {
     const mappedJobType: string | undefined =
@@ -1677,14 +1745,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             ?.filter((d) => d.employee_amount > 0)
                             .reduce((sum, d) => sum + d.employee_amount, 0) ||
                           0;
-                        const commissionAdvance = commissionRecords.reduce(
-                          (sum, r) => sum + Number(r.amount),
-                          0,
-                        );
                         const midMonthAdvance = midMonthPayroll?.amount || 0;
                         return (
                           statutoryDeductions +
-                          commissionAdvance +
+                          commissionAdvanceTotal +
                           midMonthAdvance
                         );
                       })(),
@@ -1696,17 +1760,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
             {/* Digenapkan (Rounding) - Only show if there's an adjustment */}
             {(() => {
-              const commissionAdvance = commissionRecords.reduce(
-                (sum, r) => sum + Number(r.amount),
-                0,
-              );
-              const finalPayment =
-                payroll.net_pay -
-                (midMonthPayroll?.amount || 0) -
-                commissionAdvance;
               // Use stored rounding values if available, otherwise calculate
               const digenapkan =
-                payroll.digenapkan ?? Math.ceil(finalPayment) - finalPayment;
+                payroll.digenapkan ??
+                Math.ceil(finalPaymentBeforeRounding) -
+                  finalPaymentBeforeRounding;
 
               return digenapkan > 0.001 ? (
                 <div className="flex justify-between text-sm mt-2">
@@ -1727,22 +1785,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   Jumlah Digenapkan
                 </span>
                 <span className="text-sky-900 dark:text-sky-200 text-2xl font-bold">
-                  {formatCurrency(
-                    (() => {
-                      const commissionAdvance = commissionRecords.reduce(
-                        (sum, r) => sum + Number(r.amount),
-                        0,
-                      );
-                      const finalPayment =
-                        payroll.net_pay -
-                        (midMonthPayroll?.amount || 0) -
-                        commissionAdvance;
-                      // Use stored rounding values if available, otherwise calculate on-the-fly
-                      return (
-                        payroll.setelah_digenapkan ?? Math.ceil(finalPayment)
-                      );
-                    })(),
-                  )}
+                  {formatCurrency(jumlahDigenapkan)}
                 </span>
               </div>
             </div>
@@ -2682,7 +2725,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         )}
 
         {payroll.items.length === 0 && (
-          <div className="text-center py-8 border border-default-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
+          <div className="mb-4 text-center py-8 border border-default-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
             <p className="text-default-500 dark:text-gray-400">
               No payroll items found.
             </p>
@@ -2696,6 +2739,178 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 Add Manual Item
               </Button>
             )}
+          </div>
+        )}
+
+        {/* Pinjam Summary - Final pay after pinjam deductions.
+            Only shown when this employee has pinjam recorded this month.
+            Intentionally page-only: it is not part of the payslip PDF. */}
+        {pinjamRecords.length > 0 && (
+          <div
+            id="pinjam-section"
+            className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800"
+          >
+            <div className="px-4 py-2 bg-red-50 dark:bg-red-900/20 border-b border-red-100 dark:border-red-800/50">
+              <h3 className="text-md font-semibold text-red-800 dark:text-red-300 flex items-center gap-2">
+                <IconWallet
+                  size={18}
+                  className="text-red-600 dark:text-red-400"
+                />
+                <Link
+                  to={`/payroll/pinjam?year=${payroll.year}&month=${payroll.month}`}
+                  className="hover:underline"
+                  title="Open Pinjam System"
+                >
+                  Pinjam
+                </Link>
+              </h3>
+            </div>
+            <div className="p-4">
+              <div
+                className={`flex flex-col ${
+                  hasBothPinjamPanels
+                    ? "lg:flex-row lg:gap-6 lg:divide-x lg:divide-default-200 dark:lg:divide-gray-700"
+                    : ""
+                } gap-6`}
+              >
+                {/* Mid-Month panel */}
+                {hasMidMonthPinjam && (
+                  <div
+                    className={`min-w-0 flex flex-col ${
+                      hasBothPinjamPanels ? "flex-1 lg:pr-6" : "w-full"
+                    }`}
+                  >
+                    <div className="mb-3">
+                      <p className="text-sm text-default-500 dark:text-gray-400 mb-1">
+                        Mid-Month Pay (Before Pinjam)
+                      </p>
+                      <p
+                        className={`text-xl font-bold ${pinjamAmountColor(
+                          midMonthPayBeforePinjam,
+                          "text-default-800 dark:text-gray-100",
+                        )}`}
+                      >
+                        {formatCurrency(midMonthPayBeforePinjam)}
+                      </p>
+                    </div>
+
+                    <div className="mb-3">
+                      <p className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
+                        Pinjam Items:
+                      </p>
+                      <div className="space-y-1 text-sm text-default-600 dark:text-gray-300">
+                        {midMonthPinjamRecords.map((record) => (
+                          <div key={record.id} className="flex items-start">
+                            <span className="text-default-400 mr-2 mt-0.5">
+                              •
+                            </span>
+                            <span className="flex-1 min-w-0">
+                              {record.description}
+                            </span>
+                            <span className="ml-2 flex-shrink-0 font-medium text-default-700 dark:text-gray-200">
+                              {formatCurrency(Number(record.amount))}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-auto text-sm">
+                      <div className="flex justify-between mb-2">
+                        <span className="text-default-600 dark:text-gray-300">
+                          Jumlah Pinjam:
+                        </span>
+                        <span className="font-semibold text-red-600 dark:text-red-400">
+                          - {formatCurrency(midMonthPinjamTotal)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center font-semibold border-t border-default-200 dark:border-gray-600 pt-2">
+                        <span className="text-default-800 dark:text-gray-100">
+                          Final Mid-Month Pay
+                        </span>
+                        <span
+                          className={`text-lg font-bold ${pinjamAmountColor(
+                            midMonthFinalPay,
+                            "text-sky-600 dark:text-sky-400",
+                          )}`}
+                        >
+                          {formatCurrency(midMonthFinalPay)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Monthly panel */}
+                {hasMonthlyPinjam && (
+                  <div
+                    className={`min-w-0 flex flex-col ${
+                      hasBothPinjamPanels ? "flex-1 lg:pl-6" : "w-full"
+                    }`}
+                  >
+                    <div className="mb-3">
+                      <p className="text-sm text-default-500 dark:text-gray-400 mb-1">
+                        Gaji Genap (Before Pinjam)
+                      </p>
+                      <p
+                        className={`text-xl font-bold ${pinjamAmountColor(
+                          jumlahDigenapkan,
+                          "text-default-800 dark:text-gray-100",
+                        )}`}
+                      >
+                        {formatCurrency(jumlahDigenapkan)}
+                      </p>
+                    </div>
+
+                    <div className="mb-3">
+                      <p className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
+                        Pinjam Items:
+                      </p>
+                      <div className="space-y-1 text-sm text-default-600 dark:text-gray-300">
+                        {monthlyPinjamRecords.map((record) => (
+                          <div key={record.id} className="flex items-start">
+                            <span className="text-default-400 mr-2 mt-0.5">
+                              •
+                            </span>
+                            <span className="flex-1 min-w-0">
+                              {record.description}
+                            </span>
+                            <span className="ml-2 flex-shrink-0 font-medium text-default-700 dark:text-gray-200">
+                              {formatCurrency(Number(record.amount))}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-auto text-sm">
+                      <div className="flex justify-between mb-2">
+                        <span className="text-default-600 dark:text-gray-300">
+                          Jumlah Pinjam:
+                        </span>
+                        <span className="font-semibold text-red-600 dark:text-red-400">
+                          - {formatCurrency(monthlyPinjamTotal)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center font-semibold border-t border-default-200 dark:border-gray-600 pt-2">
+                        <span className="text-default-800 dark:text-gray-100 flex items-center gap-1.5">
+                          <IconBuildingBank className="w-4 h-4 flex-shrink-0" />
+                          Jumlah Masuk Bank
+                        </span>
+                        <span
+                          className={`text-lg font-bold ${pinjamAmountColor(
+                            monthlyFinalPay,
+                            "text-sky-600 dark:text-sky-400",
+                          )}`}
+                        >
+                          {formatCurrency(monthlyFinalPay)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
