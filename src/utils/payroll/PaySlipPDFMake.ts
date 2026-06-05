@@ -679,8 +679,6 @@ const markBaseSectionBorder = (row: TableCell[]): TableCell[] => {
 const appendBasePayRows = (
   tableBody: TableCell[][],
   consolidatedBaseItems: ConsolidatedPayrollItem[],
-  baseTotalAmount: number,
-  options: { showFinalSubtotal?: boolean } = {},
 ): void => {
   if (consolidatedBaseItems.length === 0) return;
 
@@ -743,13 +741,6 @@ const appendBasePayRows = (
     tableBody.push(createBaseSubtotalRow("Jumlah Lain-lain", otherTotalAmount));
   }
 
-  const shouldShowFinalSubtotal: boolean =
-    options.showFinalSubtotal ??
-    (otherItems.length > 0 || baseRateSummaryUnits.length !== 1);
-
-  if (shouldShowFinalSubtotal) {
-    tableBody.push(createBaseSubtotalRow("Jumlah Base", baseTotalAmount));
-  }
 };
 
 // Build main payroll page content
@@ -825,10 +816,6 @@ const buildMainPayrollPage = (
 
   // Calculate totals - use consolidated items for consistency with recalculated amounts
   const consolidatedBaseItems = groupedConsolidatedItems.Base || [];
-  const baseTotalAmount = consolidatedBaseItems.reduce(
-    (sum, item) => sum + (item.total_amount || 0),
-    0,
-  );
   const tambahanTotalAmount = (groupedConsolidatedItems.Tambahan || []).reduce(
     (sum, item) => sum + (item.total_amount || 0),
     0,
@@ -974,9 +961,7 @@ const buildMainPayrollPage = (
         tableBody.push(createJobCategoryRow("Shared", null));
       }
 
-      appendBasePayRows(tableBody, jobItems, jobTotal, {
-        showFinalSubtotal: false,
-      });
+      appendBasePayRows(tableBody, jobItems);
 
       if (jobItems.length > 0) {
         tableBody.push(
@@ -986,9 +971,9 @@ const buildMainPayrollPage = (
     });
   }
 
-  // Base subtotal row (only for single-job payrolls; combined payrolls show per-job subtotals)
+  // Base pay rows (combined payrolls show per-job subtotals)
   if (consolidatedBaseItems.length > 0 && !isGroupedPayroll) {
-    appendBasePayRows(tableBody, consolidatedBaseItems, baseTotalAmount);
+    appendBasePayRows(tableBody, consolidatedBaseItems);
   }
 
   // Tambahan Items - Using consolidated items
@@ -1471,7 +1456,6 @@ const buildMainPayrollPage = (
                 descText.endsWith("Jumlah OT") ||
                 descText === "Jumlah Cuti" ||
                 descText === "Jumlah Lain-lain" ||
-                descText === "Jumlah Base" ||
                 descText === "Jumlah Gaji Kasar")
             ) {
               return 0.5;
@@ -1582,10 +1566,6 @@ const buildIndividualJobPage = (
 
   // Calculate totals - use consolidated items for consistency with recalculated amounts
   const consolidatedBaseItems = groupedConsolidatedItems.Base || [];
-  const baseTotalAmount = consolidatedBaseItems.reduce(
-    (sum, item) => sum + (item.total_amount || 0),
-    0,
-  );
   const tambahanTotalAmount = (groupedConsolidatedItems.Tambahan || []).reduce(
     (sum, item) => sum + (item.total_amount || 0),
     0,
@@ -1697,9 +1677,9 @@ const buildIndividualJobPage = (
     },
   ]);
 
-  // Base subtotal
+  // Base pay rows
   if (consolidatedBaseItems.length > 0) {
-    appendBasePayRows(tableBody, consolidatedBaseItems, baseTotalAmount);
+    appendBasePayRows(tableBody, consolidatedBaseItems);
   }
 
   // Tambahan Items - Using consolidated items
@@ -1929,7 +1909,6 @@ const buildIndividualJobPage = (
                 descText.endsWith("Jumlah OT") ||
                 descText === "Jumlah Cuti" ||
                 descText === "Jumlah Lain-lain" ||
-                descText === "Jumlah Base" ||
                 descText.includes("Gross Pay") ||
                 descText === "Jumlah Gaji Kasar")
             ) {
