@@ -779,6 +779,8 @@ export interface CommissionRecord {
   created_by: string;
   created_at: string;
   employee_name?: string;
+  is_advance?: boolean;
+  location_code?: string | null;
 }
 
 export interface OthersRecord {

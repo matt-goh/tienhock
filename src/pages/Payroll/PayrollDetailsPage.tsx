@@ -303,6 +303,33 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     }
   };
 
+  const parseDisplayDate = (value: string | Date | null | undefined): Date | null => {
+    if (!value) return null;
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? null : value;
+    }
+
+    const trimmedValue: string = value.trim();
+    const ymdMatch: RegExpMatchArray | null = trimmedValue.match(
+      /^(\d{4})-(\d{2})-(\d{2})$/,
+    );
+    if (ymdMatch) {
+      const [, year, month, day] = ymdMatch;
+      return new Date(Number(year), Number(month) - 1, Number(day));
+    }
+
+    const parsedDate = new Date(trimmedValue);
+    return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+  };
+
+  const formatDisplayDate = (
+    value: string | Date | null | undefined,
+    fallback: string = "-",
+  ): string => {
+    const parsedDate: Date | null = parseDisplayDate(value);
+    return parsedDate ? format(parsedDate, "dd MMM yyyy") : fallback;
+  };
+
   // Helper to generate work log URL for navigation
   const getWorkLogUrl = (item: PayrollItem): string | null => {
     if (!item.work_log_id || !item.work_log_type) return null;
@@ -470,8 +497,18 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   };
   const getDescriptionKey = (description: string): string =>
     (description || "").trim().toLowerCase();
+  const isCutiTahunanCommissionRecord = (
+    record: CommissionRecord,
+  ): boolean =>
+    record.location_code === "23" ||
+    getDescriptionKey(record.description) === "cuti tahunan";
+  const cutiTahunanCommissionRecords: CommissionRecord[] =
+    commissionRecords.filter(isCutiTahunanCommissionRecord);
+  const nonCutiCommissionRecords: CommissionRecord[] = commissionRecords.filter(
+    (record: CommissionRecord) => !isCutiTahunanCommissionRecord(record),
+  );
   const commissionDescriptionKeys: Set<string> = new Set(
-    commissionRecords.map((record: CommissionRecord) =>
+    nonCutiCommissionRecords.map((record: CommissionRecord) =>
       getDescriptionKey(record.description),
     ),
   );
@@ -479,11 +516,22 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     record.pay_code_pay_type === "Tambahan" &&
     ((record.pay_code_id || "").toUpperCase() === "IXT" ||
       commissionDescriptionKeys.has(getDescriptionKey(record.description)));
+  const isIncentivePayrollItem = (item: PayrollItem): boolean =>
+    (item.pay_code_id || "").toUpperCase() === "IXT";
   const incentiveOthersRecords: OthersRecord[] = othersRecords.filter(
     isIncentiveOthersRecord,
   );
+  const incentivePayrollItems: PayrollItem[] = payroll.items.filter(
+    isIncentivePayrollItem,
+  );
+  const nonIncentivePayrollItems: PayrollItem[] = payroll.items.filter(
+    (item: PayrollItem) => !isIncentivePayrollItem(item),
+  );
+  const payrollMonthStartDate: string = `${payroll.year}-${String(
+    payroll.month,
+  ).padStart(2, "0")}-01`;
   const incentiveDisplayRecords: CommissionRecord[] = [
-    ...commissionRecords,
+    ...nonCutiCommissionRecords,
     ...incentiveOthersRecords.map((record: OthersRecord) => ({
       id: -record.id,
       employee_id: record.employee_id,
@@ -495,8 +543,34 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       employee_name: record.employee_name,
       is_advance: false,
     })),
+    ...incentivePayrollItems.map((item: PayrollItem) => ({
+      id: item.id ? -item.id : 0,
+      employee_id: item.source_employee_id || payroll.employee_id,
+      commission_date: item.source_date || payrollMonthStartDate,
+      amount: Number(item.amount) || 0,
+      description: item.description,
+      created_by: "",
+      created_at: item.source_date || payrollMonthStartDate,
+      employee_name: payroll.employee_name,
+      is_advance: false,
+    })),
   ];
   const mergedCommissionRecords = mergeByDescription(incentiveDisplayRecords);
+  const monthlyLeaveDisplayRecords: MonthlyLeaveRecord[] = [
+    ...monthlyLeaveRecords,
+    ...cutiTahunanCommissionRecords.map((record: CommissionRecord) => ({
+      id: -record.id,
+      employee_id: record.employee_id,
+      date: record.commission_date,
+      leave_type: "cuti_tahunan",
+      days_taken: 1,
+      amount_paid: Number(record.amount) || 0,
+      status: "approved",
+      work_log_id: null,
+      work_log_type: null,
+      notes: record.description,
+    })),
+  ];
   const isAdvanceCommissionRecord = (record: CommissionRecord): boolean =>
     record.is_advance !== false;
   const advanceCommissionRecords: CommissionRecord[] = commissionRecords.filter(
@@ -602,7 +676,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       ];
     });
   const payrollItemsWithTypedOthers: PayrollItem[] = [
-    ...payroll.items,
+    ...nonIncentivePayrollItems,
     ...payrollItemOthersItems,
   ];
 
@@ -1518,11 +1592,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-default-600 dark:text-gray-300">
-                  Leave Pay
+                  Cuti Pay
                 </span>
                 <span className="font-medium text-default-800 dark:text-gray-100">
                   {formatCurrency(
-                    monthlyLeaveRecords.reduce(
+                    monthlyLeaveDisplayRecords.reduce(
                       (sum, record) => sum + Number(record.amount_paid),
                       0,
                     ),
@@ -2650,7 +2724,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         )}
 
         {/* Monthly Leave Summary */}
-        {monthlyLeaveRecords.length > 0 && (
+        {monthlyLeaveDisplayRecords.length > 0 && (
           <div className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
             <div className="px-4 py-2 bg-rose-50 dark:bg-rose-900/20 border-b border-rose-100 dark:border-rose-800/50">
               <h3 className="text-md font-semibold text-rose-800 dark:text-rose-300 flex items-center gap-2">
@@ -2658,7 +2732,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   size={18}
                   className="text-rose-600 dark:text-rose-400"
                 />
-                Leave Records This Month
+                Cuti Records
               </h3>
             </div>
             <div className="overflow-x-auto">
@@ -2692,7 +2766,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                  {monthlyLeaveRecords.map((record, index) => {
+                  {monthlyLeaveDisplayRecords.map((record, index) => {
                     const getLeaveTypeDisplay = (leaveType: string) => {
                       switch (leaveType) {
                         case "cuti_umum":
@@ -2739,9 +2813,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     };
                     const leaveRecordUrl: string | null =
                       getLeaveRecordUrl(record);
-                    const leaveDateLabel: string = format(
-                      new Date(record.date.replace(/-/g, "/")),
-                      "dd MMM yyyy",
+                    const leaveDateLabel: string = formatDisplayDate(
+                      record.date,
                     );
                     return (
                       <tr
@@ -2786,7 +2859,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
                     >
                       Jumlah cuti (
-                      {monthlyLeaveRecords.reduce(
+                      {monthlyLeaveDisplayRecords.reduce(
                         (sum, r) => sum + (Number(r.days_taken) || 0),
                         0,
                       )}{" "}
@@ -2794,7 +2867,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
                       {formatCurrency(
-                        monthlyLeaveRecords.reduce(
+                        monthlyLeaveDisplayRecords.reduce(
                           (sum, r) => sum + (Number(r.amount_paid) || 0),
                           0,
                         ),
