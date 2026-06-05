@@ -49,6 +49,7 @@ import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 
 const FIRST_WEEK_DAY_OF_MONTH: number = 7;
 const EXPANDED_JOBS_STORAGE_PREFIX: string = "payroll-expanded-jobs:";
+const SEARCH_TERM_STORAGE_KEY: string = "payroll-search-term";
 
 const getDefaultPayrollMonth = (today: Date = new Date()): Date => {
   const monthOffset: number =
@@ -103,6 +104,29 @@ const saveExpandedJobsToStorage = (
   }
 };
 
+const readSearchTermFromStorage = (): string => {
+  try {
+    const storedSearchTerm: string | null =
+      sessionStorage.getItem(SEARCH_TERM_STORAGE_KEY);
+
+    return storedSearchTerm ?? "";
+  } catch {
+    return "";
+  }
+};
+
+const saveSearchTermToStorage = (searchTerm: string): void => {
+  try {
+    if (searchTerm) {
+      sessionStorage.setItem(SEARCH_TERM_STORAGE_KEY, searchTerm);
+    } else {
+      sessionStorage.removeItem(SEARCH_TERM_STORAGE_KEY);
+    }
+  } catch {
+    // Ignore storage failures so the payroll page remains usable.
+  }
+};
+
 const buildExpandedJobsState = (
   employeePayrolls: Array<Pick<EmployeePayroll, "job_type">>,
   savedExpandedJobs: Record<string, boolean> | null
@@ -150,7 +174,9 @@ const PayrollPage: React.FC = () => {
   );
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
-  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState<string>(
+    readSearchTermFromStorage
+  );
   const [selectedEmployeePayrolls, setSelectedEmployeePayrolls] = useState<
     Record<string, boolean>
   >({});
@@ -457,6 +483,10 @@ const PayrollPage: React.FC = () => {
   // Reset selections when filters change
   useEffect(() => {
     setSelectedEmployeePayrolls({});
+  }, [searchTerm]);
+
+  useEffect(() => {
+    saveSearchTermToStorage(searchTerm);
   }, [searchTerm]);
 
   useEffect(() => {
