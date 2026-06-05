@@ -5,7 +5,11 @@ import toast from "react-hot-toast";
 import WorkerEntryGrid from "./WorkerEntryGrid";
 import StyledListbox from "../StyledListbox";
 import Button from "../Button";
-import { ProductionEntry, ProductionWorker } from "../../types/types";
+import {
+  ProductionEntry,
+  ProductionWorker,
+  ProductionWorkerOrderScope,
+} from "../../types/types";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import {
   getHancurItem,
@@ -21,6 +25,7 @@ interface HancurEntrySectionProps {
   selectedDate: string;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
+  workerOrderRefreshKey?: number;
 }
 
 export interface HancurEntrySectionHandle {
@@ -31,6 +36,7 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
   selectedDate,
   searchQuery,
   onSearchChange,
+  workerOrderRefreshKey = 0,
 }, ref) => {
   // Get special item configs
   const hancurConfig = getHancurItem();
@@ -55,6 +61,7 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
   const [originalKarungValue, setOriginalKarungValue] = useState<number>(0);
 
   const [isSaving, setIsSaving] = useState(false);
+  const workerOrderScope: ProductionWorkerOrderScope = "BH_PACKING";
 
   // Get staffs cache
   const { staffs, loading: isLoadingWorkers } = useStaffsCache();
@@ -281,6 +288,8 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
           unitLabel="kg"
           searchQuery={searchQuery}
           onSearchChange={onSearchChange}
+          workerOrderScope={workerOrderScope}
+          workerOrderRefreshKey={workerOrderRefreshKey}
           hideFooter
         />
 

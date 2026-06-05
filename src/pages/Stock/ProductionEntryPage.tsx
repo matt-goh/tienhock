@@ -23,6 +23,7 @@ import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import {
   ProductionEntry,
   ProductionWorker,
+  ProductionWorkerOrderScope,
   StockProduct,
 } from "../../types/types";
 import {
@@ -133,6 +134,7 @@ const ProductionEntryPage: React.FC = () => {
   const [workerSearchQuery, setWorkerSearchQuery] = useState("");
   const [hancurSearchQuery, setHancurSearchQuery] = useState("");
   const [bundleSearchQuery, setBundleSearchQuery] = useState("");
+  const [workerOrderRefreshKey, setWorkerOrderRefreshKey] = useState(0);
   const [isMachineBroken, setIsMachineBroken] = useState(false);
   const [isLoadingMachineStatus, setIsLoadingMachineStatus] = useState(false);
 
@@ -560,6 +562,12 @@ const ProductionEntryPage: React.FC = () => {
   const isViewingStockOnlyProduct: boolean =
     selectedProductId !== null && isOthProductionProduct(selectedProductId);
   const stockOnlyQuantity: number = entries[STOCK_ONLY_WORKER_ID] || 0;
+  const workerOrderScope: ProductionWorkerOrderScope | undefined =
+    selectedProduct?.type === "MEE"
+      ? "MEE_PACKING"
+      : selectedProduct?.type === "BH"
+      ? "BH_PACKING"
+      : undefined;
 
   return (
     <div className="rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
@@ -641,6 +649,16 @@ const ProductionEntryPage: React.FC = () => {
               onClick={() => setShowHelpDialog(true)}
             >
               Help
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              icon={IconRefresh}
+              onClick={() =>
+                setWorkerOrderRefreshKey((previousKey) => previousKey + 1)
+              }
+            >
+              Refresh Order
             </Button>
             <Button
               variant="outline"
@@ -1059,6 +1077,8 @@ const ProductionEntryPage: React.FC = () => {
               isSaving={isSaving}
               searchQuery={workerSearchQuery}
               onSearchChange={setWorkerSearchQuery}
+              workerOrderScope={workerOrderScope}
+              workerOrderRefreshKey={workerOrderRefreshKey}
             />
           )}
         </>
@@ -1151,6 +1171,7 @@ const ProductionEntryPage: React.FC = () => {
             selectedDate={selectedDate}
             searchQuery={workerSearchQuery}
             onSearchChange={setWorkerSearchQuery}
+            workerOrderRefreshKey={workerOrderRefreshKey}
           />
         </>
       )}
@@ -1270,6 +1291,7 @@ const ProductionEntryPage: React.FC = () => {
             initialTab={
               specialSelection as "BUNDLE_BP" | "BUNDLE_BH" | "BUNDLE_MEE"
             }
+            workerOrderRefreshKey={workerOrderRefreshKey}
           />
         </>
       )}
