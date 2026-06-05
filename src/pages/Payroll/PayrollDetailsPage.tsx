@@ -120,6 +120,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const shouldClearSearchOnBackRef = useRef<boolean>(false);
+  const hasConsumedPinjamScrollRef = useRef<boolean>(false);
 
   const [payroll, setPayroll] = useState<EmployeePayroll | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -199,6 +200,12 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   useEffect(() => {
     if (isLoading || !payroll) return;
     if (searchParams.get("scrollTo") !== "pinjam") return;
+    if (hasConsumedPinjamScrollRef.current) return;
+
+    hasConsumedPinjamScrollRef.current = true;
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("scrollTo");
+    setSearchParams(nextParams, { replace: true });
 
     const frame = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -212,7 +219,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       });
     });
     return () => cancelAnimationFrame(frame);
-  }, [isLoading, payroll, pinjamRecords, searchParams]);
+  }, [isLoading, payroll, pinjamRecords, searchParams, setSearchParams]);
 
   const fetchEmployeePayrollComprehensive = async () => {
     if (!id) return;
