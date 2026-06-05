@@ -1,5 +1,5 @@
 // src/pages/Payroll/EmployeePayrollDetailsPage.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Link,
   useNavigate,
@@ -52,6 +52,28 @@ import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 
 type PayrollDetailsViewMode = "consolidated" | "detailed";
 
+const CLEAR_SEARCH_ON_RETURN_STORAGE_KEY: string =
+  "payroll-clear-search-on-return";
+
+const markSearchClearOnReturn = (): void => {
+  try {
+    sessionStorage.setItem(
+      CLEAR_SEARCH_ON_RETURN_STORAGE_KEY,
+      Date.now().toString()
+    );
+  } catch {
+    // Ignore storage failures so back navigation still works.
+  }
+};
+
+const clearSearchClearOnReturn = (): void => {
+  try {
+    sessionStorage.removeItem(CLEAR_SEARCH_ON_RETURN_STORAGE_KEY);
+  } catch {
+    // Ignore storage failures so back navigation still works.
+  }
+};
+
 interface PayrollItem {
   id?: number;
   pay_code_id: string;
@@ -94,6 +116,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const shouldClearSearchOnBackRef = useRef<boolean>(false);
 
   const [payroll, setPayroll] = useState<EmployeePayroll | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -140,6 +163,29 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   }, [searchParams]);
 
   useEffect(() => {
+    const handleCtrlKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== "Control" && !event.ctrlKey) return;
+
+      shouldClearSearchOnBackRef.current = true;
+      markSearchClearOnReturn();
+    };
+
+    const handleCtrlKeyUp = (event: KeyboardEvent): void => {
+      if (event.key !== "Control" && event.ctrlKey) return;
+
+      shouldClearSearchOnBackRef.current = false;
+      clearSearchClearOnReturn();
+    };
+
+    document.addEventListener("keydown", handleCtrlKeyDown);
+    document.addEventListener("keyup", handleCtrlKeyUp);
+    return () => {
+      document.removeEventListener("keydown", handleCtrlKeyDown);
+      document.removeEventListener("keyup", handleCtrlKeyUp);
+    };
+  }, []);
+
+  useEffect(() => {
     fetchEmployeePayrollComprehensive();
   }, [id]);
 
@@ -183,6 +229,12 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   };
 
   const handleBack = () => {
+    if (shouldClearSearchOnBackRef.current) {
+      markSearchClearOnReturn();
+    } else {
+      clearSearchClearOnReturn();
+    }
+
     // Navigate back with year and month params to preserve the selected month
     if (payroll) {
       navigate(
@@ -191,6 +243,12 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     } else {
       navigate("/payroll/monthly-payrolls");
     }
+  };
+
+  const handleBackMouseDown = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ): void => {
+    shouldClearSearchOnBackRef.current = event.ctrlKey;
   };
 
   const formatCurrency = (amount: number) => {
@@ -1113,7 +1171,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     <div className="space-y-3">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
         <div className="flex items-center gap-4">
-          <BackButton onClick={handleBack} />
+          <BackButton onClick={handleBack} onMouseDown={handleBackMouseDown} />
           <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
           <div>
             <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
