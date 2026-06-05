@@ -64,13 +64,14 @@ export default function (pool) {
    * Create a new incentive record.
    */
   router.post("/", async (req, res) => {
-    const { employee_id, commission_date, amount, description, created_by, location_code } =
+    const { employee_id, commission_date, amount, description, created_by, location_code, is_advance } =
       req.body;
     try {
+      const isAdvance = location_code ? true : is_advance !== false;
       const query = `
         INSERT INTO commission_records (
-          employee_id, commission_date, amount, description, created_by, location_code
-        ) VALUES ($1, $2, $3, $4, $5, $6)
+          employee_id, commission_date, amount, description, created_by, location_code, is_advance
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *;
       `;
       const result = await pool.query(query, [
@@ -80,6 +81,7 @@ export default function (pool) {
         description,
         created_by,
         location_code || null, // NULL for bonus entries, location code for commission entries
+        isAdvance,
       ]);
       res.status(201).json(result.rows[0]);
     } catch (error) {
@@ -97,12 +99,13 @@ export default function (pool) {
    */
   router.put("/:id", async (req, res) => {
     const { id } = req.params;
-    const { amount, description, commission_date, location_code } = req.body;
+    const { amount, description, commission_date, location_code, is_advance } = req.body;
     try {
+      const isAdvance = location_code ? true : is_advance !== false;
       const query = `
         UPDATE commission_records
-        SET amount = $1, description = $2, commission_date = $3, location_code = $4
-        WHERE id = $5
+        SET amount = $1, description = $2, commission_date = $3, location_code = $4, is_advance = $5
+        WHERE id = $6
         RETURNING *;
       `;
       const result = await pool.query(query, [
@@ -110,6 +113,7 @@ export default function (pool) {
         description,
         commission_date,
         location_code || null, // NULL for bonus entries
+        isAdvance,
         id,
       ]);
       if (result.rows.length === 0) {

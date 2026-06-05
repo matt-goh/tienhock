@@ -142,7 +142,7 @@ This is a comprehensive ERP system supporting three companies:
 - `payroll_deductions` - id, employee_payroll_id, deduction_type, employee_amount, employer_amount, wage_amount, rate_info, created_at
 - `mid_month_payrolls` - id, employee_id, year, month, amount, payment_method, status, created_at, updated_at, created_by, paid_at, notes
 - `pinjam_records` - id, employee_id (varchar 255, matches staffs.id), year, month, amount, description, pinjam_type, created_by, created_at, updated_at
-- `commission_records` - id, employee_id, commission_date, amount, description, created_by, created_at, updated_at, location_code (location 16-24 for commission entries, NULL for bonus)
+- `commission_records` - id, employee_id, commission_date, amount, description, created_by, created_at, updated_at, location_code (location 16-24 for commission entries, NULL for bonus), is_advance (true = deduct from net pay as an advance; false = normal bonus/earning)
 - `others_records` - id, employee_id (FK staffs), record_date, pay_code_id (FK pay_codes), description, rate, rate_unit, quantity, amount, link_id (nullable UUID; rows sharing the same link_id are "linked siblings" — same staff/paycode across multiple dates; shared fields always stay in sync; NULL = standalone record), created_by, created_at, updated_at (Others (Kerja Luar OT) entries; entry uses pay_code+rate+quantity like Add Manual Item, then is added to gross pay and deducted as advance on the payslip — same flow as commission_records)
 
 **Statutory Rates:**

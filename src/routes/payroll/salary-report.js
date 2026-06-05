@@ -179,13 +179,13 @@ export default function (pool) {
         commission_data AS (
           SELECT
             cr.employee_id,
-            cr.description,
             cr.location_code,
-            COALESCE(SUM(cr.amount), 0) as commission_amount
+            COALESCE(SUM(cr.amount), 0) as commission_amount,
+            COALESCE(SUM(CASE WHEN COALESCE(cr.is_advance, true) THEN cr.amount ELSE 0 END), 0) as advance_amount
           FROM commission_records cr
           WHERE EXTRACT(YEAR FROM cr.commission_date) = $1
             AND EXTRACT(MONTH FROM cr.commission_date) = $2
-          GROUP BY cr.employee_id, cr.description, cr.location_code
+          GROUP BY cr.employee_id, cr.location_code
         ),
         others_data AS (
           SELECT
@@ -227,7 +227,9 @@ export default function (pool) {
           ) as base_pay,
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid 
-             WHERE pid.employee_id = ebd.employee_id AND COALESCE(pid.pay_type, 'Tambahan') = 'Tambahan'), 0
+             WHERE pid.employee_id = ebd.employee_id
+               AND COALESCE(pid.pay_type, 'Tambahan') = 'Tambahan'
+               AND (pid.pay_code_id IS NULL OR pid.pay_code_id <> 'BONUS')), 0
           ) as tambahan_pay,
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid 
@@ -268,10 +270,24 @@ export default function (pool) {
              WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NOT NULL), 0
           ) as commission_total,
           COALESCE(
-            (SELECT SUM(commission_amount) FROM commission_data cd
-             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NULL), 0
+            (SELECT SUM(advance_amount) FROM commission_data cd
+             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NOT NULL), 0
+          ) as commission_advance_total,
+          (
+            COALESCE(
+              (SELECT SUM(commission_amount) FROM commission_data cd
+               WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NULL), 0
+            ) +
+            COALESCE(
+              (SELECT SUM(amount) FROM payroll_items_data pid
+               WHERE pid.employee_id = ebd.employee_id AND pid.pay_code_id = 'BONUS'), 0
+            )
           ) as bonus_total,
-          -- Others (Kerja Luar OT) data - advances deducted from net_pay just like commission
+          COALESCE(
+            (SELECT SUM(advance_amount) FROM commission_data cd
+             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NULL), 0
+          ) as bonus_advance_total,
+          -- Others (Kerja Luar OT) data - regular earnings, not advance deductions
           COALESCE(
             (SELECT SUM(others_amount) FROM others_data od
              WHERE od.employee_id = ebd.employee_id), 0
@@ -294,11 +310,11 @@ export default function (pool) {
         const gaji =
           parseFloat(row.base_pay || 0) + parseFloat(row.tambahan_pay || 0);
         const gajiKasar = parseFloat(row.gross_pay || 0);
-        // Commission and bonus from commission_records are advances already deducted from net_pay in DB.
+        // Only advance commission/bonus records are already deducted from net_pay in DB.
         // Others (Kerja Luar OT) is a regular earning, NOT an advance, so it is NOT added back here.
         const commissionAdvance =
-          parseFloat(row.commission_total || 0) +
-          parseFloat(row.bonus_total || 0);
+          parseFloat(row.commission_advance_total || 0) +
+          parseFloat(row.bonus_advance_total || 0);
         // GAJI BERSIH = net_pay + commission (add back to show true net before advances)
         const gajiBersih = parseFloat(row.net_pay || 0) + commissionAdvance;
         // JUMLAH = net_pay - mid_month (commission already deducted from net_pay)
@@ -996,12 +1012,12 @@ export default function (pool) {
         commission_data AS (
           SELECT
             cr.employee_id,
-            cr.description,
             cr.location_code,
-            COALESCE(SUM(cr.amount), 0) as commission_amount
+            COALESCE(SUM(cr.amount), 0) as commission_amount,
+            COALESCE(SUM(CASE WHEN COALESCE(cr.is_advance, true) THEN cr.amount ELSE 0 END), 0) as advance_amount
           FROM commission_records cr
           WHERE EXTRACT(YEAR FROM cr.commission_date) = $1
-          GROUP BY cr.employee_id, cr.description, cr.location_code
+          GROUP BY cr.employee_id, cr.location_code
         ),
         others_data AS (
           SELECT
@@ -1041,7 +1057,9 @@ export default function (pool) {
           ) as base_pay,
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
-             WHERE pid.employee_id = ebd.employee_id AND COALESCE(pid.pay_type, 'Tambahan') = 'Tambahan'), 0
+             WHERE pid.employee_id = ebd.employee_id
+               AND COALESCE(pid.pay_type, 'Tambahan') = 'Tambahan'
+               AND (pid.pay_code_id IS NULL OR pid.pay_code_id <> 'BONUS')), 0
           ) as tambahan_pay,
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
@@ -1082,10 +1100,24 @@ export default function (pool) {
              WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NOT NULL), 0
           ) as commission_total,
           COALESCE(
-            (SELECT SUM(commission_amount) FROM commission_data cd
-             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NULL), 0
+            (SELECT SUM(advance_amount) FROM commission_data cd
+             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NOT NULL), 0
+          ) as commission_advance_total,
+          (
+            COALESCE(
+              (SELECT SUM(commission_amount) FROM commission_data cd
+               WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NULL), 0
+            ) +
+            COALESCE(
+              (SELECT SUM(amount) FROM payroll_items_data pid
+               WHERE pid.employee_id = ebd.employee_id AND pid.pay_code_id = 'BONUS'), 0
+            )
           ) as bonus_total,
-          -- Others (Kerja Luar OT) data - advances deducted from net_pay just like commission
+          COALESCE(
+            (SELECT SUM(advance_amount) FROM commission_data cd
+             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NULL), 0
+          ) as bonus_advance_total,
+          -- Others (Kerja Luar OT) data - regular earnings, not advance deductions
           COALESCE(
             (SELECT SUM(others_amount) FROM others_data od
              WHERE od.employee_id = ebd.employee_id), 0
@@ -1108,11 +1140,11 @@ export default function (pool) {
         const gaji =
           parseFloat(row.base_pay || 0) + parseFloat(row.tambahan_pay || 0);
         const gajiKasar = parseFloat(row.gross_pay || 0);
-        // Commission and bonus from commission_records are advances already deducted from net_pay in DB.
+        // Only advance commission/bonus records are already deducted from net_pay in DB.
         // Others (Kerja Luar OT) is a regular earning, NOT an advance, so it is NOT added back here.
         const commissionAdvance =
-          parseFloat(row.commission_total || 0) +
-          parseFloat(row.bonus_total || 0);
+          parseFloat(row.commission_advance_total || 0) +
+          parseFloat(row.bonus_advance_total || 0);
         // GAJI BERSIH = net_pay + commission (add back to show true net before advances)
         const gajiBersih = parseFloat(row.net_pay || 0) + commissionAdvance;
         // JUMLAH = net_pay - mid_month (commission already deducted from net_pay)

@@ -20,11 +20,6 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-05",
-    ms: "Bonus kini boleh disimpan sebagai Advance atau bonus biasa. Bonus biasa masih masuk dalam gaji dan ruangan BONUS, tetapi tidak ditolak sebagai Advance. Paycode BONUS yang ditambah dalam payroll juga kini dipaparkan dalam ruangan BONUS di Salary Report.",
-    en: "Bonus can now be saved as Advance or as a normal bonus. Normal bonuses still count in salary and the BONUS column, but are not deducted as Advance. The BONUS paycode added in payroll now also appears in the BONUS column in Salary Report.",
-  },
-  {
-    date: "2026-06-05",
     ms: "Payroll Details dan payslip: entri IXT kini digabungkan ke bahagian Insentif Tidak Tetap, jadi jumlah pendapatan Insentif Tidak Tetap menunjukkan amaun Advance dan IXT bersama-sama, bukan lagi sebagai baris Tambahan Pay berasingan. Cuti Tahunan kekal dipaparkan di bahagian Cuti.",
     en: "Payroll Details and payslips: IXT entries now combine into the Insentif Tidak Tetap section, so the Insentif Tidak Tetap earnings amount shows the Advance and IXT amounts together instead of a separate Tambahan Pay row. Cuti Tahunan stays in the Leave section.",
   },

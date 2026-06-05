@@ -8,6 +8,7 @@ import {
   TransitionChild,
 } from "@headlessui/react";
 import Button from "../Button";
+import Checkbox from "../Checkbox";
 import { IconDeviceFloppy } from "@tabler/icons-react";
 import { FormInput, FormListbox } from "../FormComponents";
 import toast from "react-hot-toast";
@@ -28,6 +29,7 @@ interface Incentive {
   created_at: string;
   location_code?: string | null;
   location_name?: string | null;
+  is_advance?: boolean;
 }
 
 interface EditIncentiveModalProps {
@@ -50,6 +52,7 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
   const [description, setDescription] = useState("");
   const [incentiveDate, setIncentiveDate] = useState("");
   const [locationCode, setLocationCode] = useState<string | null>(null);
+  const [isAdvance, setIsAdvance] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState(false);
   const displayLabelLower: string = displayLabel.toLowerCase();
 
@@ -78,6 +81,7 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
       setDescription(incentive.description);
       setIncentiveDate(incentive.commission_date.split("T")[0]);
       setLocationCode(incentive.location_code || null);
+      setIsAdvance(incentive.is_advance !== false);
     }
   }, [incentive]);
 
@@ -108,6 +112,7 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
         description: description.trim(),
         commission_date: incentiveDate,
         location_code: isCommissionEntry ? locationCode : null,
+        is_advance: isCommissionEntry ? true : isAdvance,
       });
 
       toast.success(`${displayLabel} updated successfully!`);
@@ -213,6 +218,15 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
                       placeholder={`e.g., ${displayLabel}, Bonus`}
                       required
                     />
+
+                    {!isCommissionEntry && (
+                      <Checkbox
+                        checked={isAdvance}
+                        onChange={setIsAdvance}
+                        label="Deduct as Advance"
+                        size={18}
+                      />
+                    )}
                   </div>
 
                   <div className="flex justify-end space-x-3 mt-6 border-t border-default-200 pt-6 dark:border-gray-700">

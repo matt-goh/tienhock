@@ -1344,7 +1344,10 @@ export default function (pool) {
               ),
               client.query(
                 `
-              SELECT SUM(amount) as total FROM commission_records
+              SELECT
+                SUM(amount) as total,
+                SUM(CASE WHEN COALESCE(is_advance, true) THEN amount ELSE 0 END) as advance_total
+              FROM commission_records
               WHERE employee_id = $1 AND DATE(commission_date) >= $2 AND DATE(commission_date) <= $3
             `,
                 [primaryEmployee.employeeId, startDate, endDate],
@@ -1367,6 +1370,8 @@ export default function (pool) {
           );
           const commissionGrossPay =
             parseFloat(commissionResult.rows[0]?.total) || 0;
+          const commissionAdvancePay =
+            parseFloat(commissionResult.rows[0]?.advance_total) || 0;
           const othersGrossPay = parseFloat(othersResult.rows[0]?.total) || 0;
 
           // Exclude daily work items dated on a leave day — they pay nothing as
@@ -1611,13 +1616,13 @@ export default function (pool) {
           }
 
           // Calculate net pay
-          // Commission is deducted as advance; Others (Kerja Luar OT) is a regular earning — gross only, not an advance.
+          // Only advance commission/bonus records are deducted as advance; Others (Kerja Luar OT) is gross only.
           const totalEmployeeDeductions = deductions.reduce(
             (sum, d) => sum + d.employee_amount,
             0,
           );
           const netPay =
-            grossPay - totalEmployeeDeductions - commissionGrossPay;
+            grossPay - totalEmployeeDeductions - commissionAdvancePay;
 
           // Fetch mid-month payroll for rounding calculation
           const midMonthResult = await client.query(
