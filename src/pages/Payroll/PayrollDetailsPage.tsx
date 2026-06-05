@@ -376,13 +376,51 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     return Array.from(map.values());
   };
   const mergedCommissionRecords = mergeByDescription(commissionRecords);
-  const mergedOthersRecords = mergeByDescription(othersRecords);
+  const isOvertimeOthersRecord = (record: OthersRecord): boolean =>
+    record.pay_code_pay_type === "Overtime";
+  const overtimeOthersRecords: OthersRecord[] = othersRecords.filter(
+    isOvertimeOthersRecord,
+  );
+  const regularOthersRecords: OthersRecord[] = othersRecords.filter(
+    (record: OthersRecord) => !isOvertimeOthersRecord(record),
+  );
+  const mergedOthersRecords = mergeByDescription(regularOthersRecords);
+
+  const getOthersRecordJobType = (record: OthersRecord): string | undefined => {
+    const mappedJobType: string | undefined =
+      payroll.employee_job_mapping?.[record.employee_id];
+    if (mappedJobType) return mappedJobType;
+    return payroll.job_type.includes(",") ? undefined : payroll.job_type;
+  };
+
+  const overtimeOthersItems: PayrollItem[] = overtimeOthersRecords.map(
+    (record: OthersRecord) => ({
+      id: -record.id,
+      pay_code_id: record.pay_code_id || `OTHERS-${record.id}`,
+      description: record.description,
+      rate: Number(record.rate) || 0,
+      rate_unit: record.rate_unit,
+      quantity: Number(record.quantity) || 0,
+      amount: Number(record.amount) || 0,
+      is_manual: false,
+      pay_type: "Overtime",
+      job_type: getOthersRecordJobType(record),
+      source_employee_id: record.employee_id,
+      source_date: record.record_date,
+      work_log_id: null,
+      work_log_type: null,
+    }),
+  );
+  const payrollItemsWithOvertimeOthers: PayrollItem[] = [
+    ...payroll.items,
+    ...overtimeOthersItems,
+  ];
 
   // Hide leave-day activities from base pay — on a leave day the employee did not
   // actually work, so these rows pay nothing (quantity is 0) and the real leave
   // payment is shown separately in the Cuti section (from leave_records).
   const displayItems = filterOutLeaveDayItems(
-    payroll.items,
+    payrollItemsWithOvertimeOthers,
     payroll.leave_records,
   );
 
@@ -417,15 +455,13 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   };
 
   const directAmountFixedKeys: Set<string> = new Set(
-    payroll.items
+    payrollItemsWithOvertimeOthers
       .filter((item: PayrollItem) => {
         const amount: number = Number(item.amount) || 0;
-        const quantity: number = Number(item.quantity) || 0;
         return (
           item.rate_unit === "Fixed" &&
           Number(item.rate) === 0 &&
-          amount > 0 &&
-          isMoneyEqual(quantity, amount)
+          amount > 0
         );
       })
       .map((item: PayrollItem) => getPayrollItemKey(item)),
@@ -442,7 +478,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   ): FixedDirectAmountSummary | null => {
     if (!isDirectAmountFixedItem(item)) return null;
 
-    const matchingItems: PayrollItem[] = payroll.items.filter(
+    const matchingItems: PayrollItem[] = payrollItemsWithOvertimeOthers.filter(
       (payrollItem: PayrollItem) =>
         payrollItem.pay_code_id === item.pay_code_id &&
         payrollItem.rate === item.rate &&
@@ -459,13 +495,17 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
   // Detect if this is a combined job payroll (multiple job types)
   const uniqueJobTypes = [
-    ...new Set(payroll.items.map((item) => item.job_type).filter(Boolean)),
+    ...new Set(
+      payrollItemsWithOvertimeOthers
+        .map((item: PayrollItem) => item.job_type)
+        .filter(Boolean),
+    ),
   ];
   const isCombinedPayroll = uniqueJobTypes.length > 1;
 
   // Derive employee-to-job-types mapping from actual payroll items
   // This handles cases where one employee ID works on multiple job types
-  const derivedEmployeeJobMapping = payroll.items.reduce(
+  const derivedEmployeeJobMapping = payrollItemsWithOvertimeOthers.reduce(
     (acc, item) => {
       const empId = item.source_employee_id || payroll.employee_id;
       if (empId && item.job_type) {
