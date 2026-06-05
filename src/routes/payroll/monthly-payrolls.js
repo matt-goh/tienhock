@@ -1,6 +1,9 @@
 // src/routes/payroll/monthly-payrolls.js
 import { Router } from "express";
-import { recalculateAndUpdatePayroll } from "./employee-payrolls.js";
+import {
+  recalculateAndUpdatePayroll,
+  removeLeaveDayWorkItems,
+} from "./employee-payrolls.js";
 
 const SOCSO_SKBBK_EFFECTIVE_YEAR = 2026;
 const SOCSO_SKBBK_EFFECTIVE_MONTH = 6;
@@ -1326,11 +1329,62 @@ export default function (pool) {
             manualItemsByEmployee[primaryEmployee.employeeId] || [];
           manualItems.forEach((item) => combinedItems.push(item));
 
+          // Fetch leave, commission, and others (Kerja Luar OT) records for this
+          // employee first — the leave dates are needed to drop leave-day work
+          // items before computing gross.
+          const [leaveResult, commissionResult, othersResult] =
+            await Promise.all([
+              client.query(
+                `
+              SELECT to_char(leave_date, 'YYYY-MM-DD') as date, amount_paid
+              FROM leave_records
+              WHERE employee_id IN (
+                SELECT id FROM staffs WHERE name = $1
+              )
+                AND EXTRACT(YEAR FROM leave_date) = $2
+                AND EXTRACT(MONTH FROM leave_date) = $3
+                AND status = 'approved'
+            `,
+                [employeeName, year, month],
+              ),
+              client.query(
+                `
+              SELECT SUM(amount) as total FROM commission_records
+              WHERE employee_id = $1 AND DATE(commission_date) >= $2 AND DATE(commission_date) <= $3
+            `,
+                [primaryEmployee.employeeId, startDate, endDate],
+              ),
+              client.query(
+                `
+              SELECT SUM(amount) as total FROM others_records
+              WHERE employee_id = $1 AND DATE(record_date) >= $2 AND DATE(record_date) <= $3
+            `,
+                [primaryEmployee.employeeId, startDate, endDate],
+              ),
+            ]);
+
+          const leaveGrossPay = leaveResult.rows.reduce(
+            (sum, row) => sum + (parseFloat(row.amount_paid) || 0),
+            0,
+          );
+          const leaveDateSet = new Set(
+            leaveResult.rows.map((row) => row.date).filter(Boolean),
+          );
+          const commissionGrossPay =
+            parseFloat(commissionResult.rows[0]?.total) || 0;
+          const othersGrossPay = parseFloat(othersResult.rows[0]?.total) || 0;
+
+          // Exclude daily work items dated on a leave day — they pay nothing as
+          // work (the day is paid via leave) and would otherwise inflate gross
+          // above the sum the payslip shows. The rows are still stored (below);
+          // they are only excluded from the gross/EPF totals.
+          const grossItems = removeLeaveDayWorkItems(combinedItems, leaveDateSet);
+
           // Calculate gross pay using CONSOLIDATED approach (matches frontend display)
           // This groups items by pay_code+rate+rate_unit, sums quantities, then calculates once
           // This ensures database gross_pay matches the consolidated view exactly
           const consolidatedGroups = new Map();
-          combinedItems.forEach((item) => {
+          grossItems.forEach((item) => {
             const key = `${item.pay_code_id}_${item.rate}_${item.rate_unit}`;
             if (consolidatedGroups.has(key)) {
               const group = consolidatedGroups.get(key);
@@ -1365,41 +1419,6 @@ export default function (pool) {
           });
           const workGrossPay = workGrossPayCents / 100;
 
-          // Fetch leave, commission, and others (Kerja Luar OT) records for this employee
-          const [leaveResult, commissionResult, othersResult] =
-            await Promise.all([
-              client.query(
-                `
-              SELECT SUM(amount_paid) as total FROM leave_records
-              WHERE employee_id IN (
-                SELECT id FROM staffs WHERE name = $1
-              )
-                AND EXTRACT(YEAR FROM leave_date) = $2
-                AND EXTRACT(MONTH FROM leave_date) = $3
-                AND status = 'approved'
-            `,
-                [employeeName, year, month],
-              ),
-              client.query(
-                `
-              SELECT SUM(amount) as total FROM commission_records
-              WHERE employee_id = $1 AND DATE(commission_date) >= $2 AND DATE(commission_date) <= $3
-            `,
-                [primaryEmployee.employeeId, startDate, endDate],
-              ),
-              client.query(
-                `
-              SELECT SUM(amount) as total FROM others_records
-              WHERE employee_id = $1 AND DATE(record_date) >= $2 AND DATE(record_date) <= $3
-            `,
-                [primaryEmployee.employeeId, startDate, endDate],
-              ),
-            ]);
-
-          const leaveGrossPay = parseFloat(leaveResult.rows[0]?.total) || 0;
-          const commissionGrossPay =
-            parseFloat(commissionResult.rows[0]?.total) || 0;
-          const othersGrossPay = parseFloat(othersResult.rows[0]?.total) || 0;
           const grossPay =
             workGrossPay + leaveGrossPay + commissionGrossPay + othersGrossPay;
 
@@ -1427,9 +1446,9 @@ export default function (pool) {
           const isMalaysian =
             (staff.nationality || "").toLowerCase() === "malaysian";
 
-          // Group items by pay type for EPF calculation
+          // Group items by pay type for EPF calculation (leave-day items excluded)
           const groupedItems = { Base: [], Tambahan: [], Overtime: [] };
-          combinedItems.forEach((item) => {
+          grossItems.forEach((item) => {
             const type = item.pay_type || "Tambahan";
             if (!groupedItems[type]) groupedItems[type] = [];
             groupedItems[type].push(item);

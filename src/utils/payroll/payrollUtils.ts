@@ -5,12 +5,49 @@ import {
   EmployeePayroll,
   PayrollDeduction,
   PayrollItem,
+  PinjamRecord,
   RateUnit,
 } from "../../types/types";
 import {
-  PayrollCalculationService,
-  WorkLog,
-} from "./payrollCalculationService";
+  multiplyMoney,
+  calculatePercentage,
+  roundMoney,
+} from "./moneyUtils";
+
+/**
+ * Calculates a payroll item amount from rate × quantity, applying each rate
+ * unit's own rule (Percent = quantity% of rate; Fixed = the direct amount when
+ * quantity > 1, otherwise the rate). Used to preview manual / Others item amounts.
+ */
+export const calculateAmount = (
+  rate: number,
+  quantity: number,
+  rate_unit: RateUnit
+): number => {
+  let amount = 0;
+  switch (rate_unit) {
+    case "Hour":
+    case "Bill":
+    case "Day":
+    case "Bag":
+    case "Kg":
+    case "Karung":
+    case "Bundle":
+    case "Trip":
+      amount = multiplyMoney(rate, quantity);
+      break;
+    case "Percent":
+      amount = calculatePercentage(quantity, rate);
+      break;
+    case "Fixed":
+      // quantity > 1 means a direct amount was provided; otherwise use the rate
+      amount = quantity > 1 ? quantity : rate;
+      break;
+    default:
+      amount = 0;
+  }
+  return roundMoney(amount);
+};
 
 /**
  * Creates a new monthly payroll
@@ -127,38 +164,6 @@ export const updateMonthlyPayrollStatus = async (
 };
 
 /**
- * Calculates an employee's payroll based on work logs
- * This runs on the client side using our calculation service
- * @param workLogs Array of work logs
- * @param employeeId Employee ID
- * @param jobType Job type
- * @param section Section
- * @param month Month (1-12)
- * @param year Year
- * @param leaveRecords Array of leave records for the month (optional)
- * @returns Calculated employee payroll
- */
-export const calculateEmployeePayroll = (
-  workLogs: WorkLog[],
-  employeeId: string,
-  jobType: string,
-  section: string,
-  month: number,
-  year: number,
-  leaveRecords?: { date: string; leave_type: string; days_taken: number; amount_paid: number }[]
-): EmployeePayroll => {
-  return PayrollCalculationService.processEmployeePayroll(
-    workLogs,
-    employeeId,
-    jobType,
-    section,
-    month,
-    year,
-    leaveRecords
-  );
-};
-
-/**
  * Fetches eligible employees for a monthly payroll
  * @param id Monthly payroll ID
  * @returns API response with eligible employees
@@ -215,6 +220,31 @@ export const getEmployeePayrollComprehensive = async (id: number) => {
 };
 
 /**
+ * Fetches pinjam records for a single employee in a specific month
+ * @param employeeId Staff/employee ID
+ * @param year Year
+ * @param month Month (1-12)
+ * @returns Array of pinjam records (amounts already parsed by the backend)
+ */
+export const getEmployeePinjamRecords = async (
+  employeeId: string,
+  year: number,
+  month: number,
+): Promise<PinjamRecord[]> => {
+  try {
+    const response = await api.get(
+      `/api/pinjam-records?year=${year}&month=${month}&employee_id=${encodeURIComponent(
+        employeeId,
+      )}`,
+    );
+    return response.records || [];
+  } catch (error) {
+    console.error("Error fetching employee pinjam records:", error);
+    throw error;
+  }
+};
+
+/**
  * Fetches detailed employee payroll with items
  * @param id Employee payroll ID
  * @returns Employee payroll with items
@@ -241,7 +271,7 @@ export const addManualPayrollItem = async (
 ) => {
   try {
     // Calculate the amount using our calculation service
-    const amount = PayrollCalculationService.calculateAmount(
+    const amount = calculateAmount(
       item.rate,
       item.quantity,
       item.rate_unit as RateUnit

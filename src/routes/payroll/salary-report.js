@@ -142,6 +142,21 @@ export default function (pool) {
           JOIN payroll_items pi ON ep.id = pi.employee_payroll_id
           LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
           WHERE mp.year = $1 AND mp.month = $2
+            -- Exclude daily work items dated on a leave day: they pay nothing as
+            -- work (the day is paid via leave) and are excluded from gross_pay, so
+            -- the base/tambahan/overtime breakdown must drop them too. Matches by
+            -- staff name (siblings share leave) like the payslip filter.
+            AND NOT (
+              pi.work_log_type = 'daily'
+              AND pi.source_date IS NOT NULL
+              AND EXISTS (
+                SELECT 1 FROM leave_records lr2
+                JOIN staffs s2 ON lr2.employee_id = s2.id
+                WHERE s2.name = (SELECT name FROM staffs WHERE id = ep.employee_id)
+                  AND lr2.status = 'approved'
+                  AND lr2.leave_date = pi.source_date
+              )
+            )
         ),
         deductions_data AS (
           SELECT 
@@ -943,6 +958,19 @@ export default function (pool) {
           JOIN payroll_items pi ON ep.id = pi.employee_payroll_id
           LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
           WHERE mp.year = $1
+            -- Exclude leave-day daily work items (see comment in the monthly
+            -- payroll_items_data CTE) so the breakdown matches gross_pay.
+            AND NOT (
+              pi.work_log_type = 'daily'
+              AND pi.source_date IS NOT NULL
+              AND EXISTS (
+                SELECT 1 FROM leave_records lr2
+                JOIN staffs s2 ON lr2.employee_id = s2.id
+                WHERE s2.name = (SELECT name FROM staffs WHERE id = ep.employee_id)
+                  AND lr2.status = 'approved'
+                  AND lr2.leave_date = pi.source_date
+              )
+            )
           GROUP BY ep.employee_id, pi.pay_code_id, pi.description, pc.pay_type
         ),
         deductions_data AS (
