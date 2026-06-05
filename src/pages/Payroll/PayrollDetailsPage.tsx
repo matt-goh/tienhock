@@ -2606,7 +2606,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         (sum, r) => sum + (Number(r.days_taken) || 0),
                         0,
                       )}{" "}
-                      hari )
+                      hari)
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
                       {formatCurrency(
