@@ -2121,10 +2121,6 @@ const SalaryReportPage: React.FC = () => {
           {/* Large screens (2xl/1536px+): Single row layout */}
           <div className="hidden 2xl:flex 2xl:justify-between 2xl:items-center gap-3">
             <div className="flex items-center gap-3">
-              <h2 className="text-lg font-medium text-default-800 dark:text-gray-100">
-                Salary Report
-              </h2>
-              <span className="text-default-300 dark:text-gray-600">|</span>
               {/* Tab buttons */}
               <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
                 {tabLabels.map((label, index) => (
