@@ -100,6 +100,8 @@ interface FixedDirectAmountSummary {
   totalEntries: number;
 }
 
+type PayrollItemOthersPayType = "Tambahan" | "Overtime";
+
 interface MonthlyLeaveRecord {
   id: number;
   employee_id: string;
@@ -466,21 +468,69 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     });
     return Array.from(map.values());
   };
-  const mergedCommissionRecords = mergeByDescription(commissionRecords);
-  const isOvertimeOthersRecord = (record: OthersRecord): boolean =>
-    record.pay_code_pay_type === "Overtime";
-  const overtimeOthersRecords: OthersRecord[] = othersRecords.filter(
-    isOvertimeOthersRecord,
+  const getDescriptionKey = (description: string): string =>
+    (description || "").trim().toLowerCase();
+  const commissionDescriptionKeys: Set<string> = new Set(
+    commissionRecords.map((record: CommissionRecord) =>
+      getDescriptionKey(record.description),
+    ),
+  );
+  const isIncentiveOthersRecord = (record: OthersRecord): boolean =>
+    record.pay_code_pay_type === "Tambahan" &&
+    ((record.pay_code_id || "").toUpperCase() === "IXT" ||
+      commissionDescriptionKeys.has(getDescriptionKey(record.description)));
+  const incentiveOthersRecords: OthersRecord[] = othersRecords.filter(
+    isIncentiveOthersRecord,
+  );
+  const incentiveDisplayRecords: CommissionRecord[] = [
+    ...commissionRecords,
+    ...incentiveOthersRecords.map((record: OthersRecord) => ({
+      id: -record.id,
+      employee_id: record.employee_id,
+      commission_date: record.record_date,
+      amount: Number(record.amount) || 0,
+      description: record.description,
+      created_by: record.created_by || "",
+      created_at: record.created_at || record.record_date,
+      employee_name: record.employee_name,
+      is_advance: false,
+    })),
+  ];
+  const mergedCommissionRecords = mergeByDescription(incentiveDisplayRecords);
+  const isAdvanceCommissionRecord = (record: CommissionRecord): boolean =>
+    record.is_advance !== false;
+  const advanceCommissionRecords: CommissionRecord[] = commissionRecords.filter(
+    isAdvanceCommissionRecord,
+  );
+  const mergedAdvanceCommissionRecords =
+    mergeByDescription(advanceCommissionRecords);
+  const getPayrollItemOthersPayType = (
+    record: OthersRecord,
+  ): PayrollItemOthersPayType | null => {
+    if (
+      record.pay_code_pay_type === "Tambahan" ||
+      record.pay_code_pay_type === "Overtime"
+    ) {
+      return record.pay_code_pay_type;
+    }
+    return null;
+  };
+  const isPayrollItemOthersRecord = (record: OthersRecord): boolean =>
+    getPayrollItemOthersPayType(record) !== null;
+  const payrollItemOthersRecords: OthersRecord[] = othersRecords.filter(
+    (record: OthersRecord) =>
+      isPayrollItemOthersRecord(record) && !isIncentiveOthersRecord(record),
   );
   const regularOthersRecords: OthersRecord[] = othersRecords.filter(
-    (record: OthersRecord) => !isOvertimeOthersRecord(record),
+    (record: OthersRecord) =>
+      !isPayrollItemOthersRecord(record) && !isIncentiveOthersRecord(record),
   );
   const mergedOthersRecords = mergeByDescription(regularOthersRecords);
 
   // Commission advance + the rounded final pay ("Jumlah Digenapkan"). This is the
   // same expression rendered in the Deductions column below; computed once here so
   // the Pinjam table's monthly "before pinjam" base matches what's shown above.
-  const commissionAdvanceTotal: number = commissionRecords.reduce(
+  const commissionAdvanceTotal: number = advanceCommissionRecords.reduce(
     (sum, record) => sum + Number(record.amount),
     0,
   );
@@ -526,34 +576,41 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     return payroll.job_type.includes(",") ? undefined : payroll.job_type;
   };
 
-  const overtimeOthersItems: PayrollItem[] = overtimeOthersRecords.map(
-    (record: OthersRecord) => ({
-      id: -record.id,
-      pay_code_id: record.pay_code_id || `OTHERS-${record.id}`,
-      description: record.description,
-      rate: Number(record.rate) || 0,
-      rate_unit: record.rate_unit,
-      quantity: Number(record.quantity) || 0,
-      amount: Number(record.amount) || 0,
-      is_manual: false,
-      pay_type: "Overtime",
-      job_type: getOthersRecordJobType(record),
-      source_employee_id: record.employee_id,
-      source_date: record.record_date,
-      work_log_id: null,
-      work_log_type: null,
-    }),
-  );
-  const payrollItemsWithOvertimeOthers: PayrollItem[] = [
+  const payrollItemOthersItems: PayrollItem[] =
+    payrollItemOthersRecords.flatMap((record: OthersRecord) => {
+      const payType: PayrollItemOthersPayType | null =
+        getPayrollItemOthersPayType(record);
+      if (!payType) return [];
+
+      return [
+        {
+          id: -record.id,
+          pay_code_id: record.pay_code_id || `OTHERS-${record.id}`,
+          description: record.description,
+          rate: Number(record.rate) || 0,
+          rate_unit: record.rate_unit,
+          quantity: Number(record.quantity) || 0,
+          amount: Number(record.amount) || 0,
+          is_manual: false,
+          pay_type: payType,
+          job_type: getOthersRecordJobType(record),
+          source_employee_id: record.employee_id,
+          source_date: record.record_date,
+          work_log_id: null,
+          work_log_type: null,
+        },
+      ];
+    });
+  const payrollItemsWithTypedOthers: PayrollItem[] = [
     ...payroll.items,
-    ...overtimeOthersItems,
+    ...payrollItemOthersItems,
   ];
 
   // Hide leave-day activities from base pay — on a leave day the employee did not
   // actually work, so these rows pay nothing (quantity is 0) and the real leave
   // payment is shown separately in the Cuti section (from leave_records).
   const displayItems = filterOutLeaveDayItems(
-    payrollItemsWithOvertimeOthers,
+    payrollItemsWithTypedOthers,
     payroll.leave_records,
   );
 
@@ -588,7 +645,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   };
 
   const directAmountFixedKeys: Set<string> = new Set(
-    payrollItemsWithOvertimeOthers
+    payrollItemsWithTypedOthers
       .filter((item: PayrollItem) => {
         const amount: number = Number(item.amount) || 0;
         return (
@@ -611,7 +668,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   ): FixedDirectAmountSummary | null => {
     if (!isDirectAmountFixedItem(item)) return null;
 
-    const matchingItems: PayrollItem[] = payrollItemsWithOvertimeOthers.filter(
+    const matchingItems: PayrollItem[] = payrollItemsWithTypedOthers.filter(
       (payrollItem: PayrollItem) =>
         payrollItem.pay_code_id === item.pay_code_id &&
         payrollItem.rate === item.rate &&
@@ -629,7 +686,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   // Detect if this is a combined job payroll (multiple job types)
   const uniqueJobTypes = [
     ...new Set(
-      payrollItemsWithOvertimeOthers
+      payrollItemsWithTypedOthers
         .map((item: PayrollItem) => item.job_type)
         .filter(Boolean),
     ),
@@ -638,7 +695,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
   // Derive employee-to-job-types mapping from actual payroll items
   // This handles cases where one employee ID works on multiple job types
-  const derivedEmployeeJobMapping = payrollItemsWithOvertimeOthers.reduce(
+  const derivedEmployeeJobMapping = payrollItemsWithTypedOthers.reduce(
     (acc, item) => {
       const empId = item.source_employee_id || payroll.employee_id;
       if (empId && item.job_type) {
@@ -1648,10 +1705,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 })}
 
               {/* Commission Advance with Tooltip */}
-              {mergedCommissionRecords.length > 0 && (
+              {mergedAdvanceCommissionRecords.length > 0 && (
                 <div className="group relative flex justify-between text-sm">
                   <span className="text-default-600 dark:text-gray-300 flex items-center gap-1 cursor-help">
-                    {mergedCommissionRecords
+                    {mergedAdvanceCommissionRecords
                       .map((record) => record.description)
                       .join(" + ")}{" "}
                     Advance
@@ -1663,7 +1720,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   <span className="font-medium text-rose-600 dark:text-rose-400">
                     -{" "}
                     {formatCurrency(
-                      mergedCommissionRecords.reduce(
+                      mergedAdvanceCommissionRecords.reduce(
                         (sum, record) => sum + record.merged_amount,
                         0,
                       ),
@@ -1683,7 +1740,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           </span>
                           <span>
                             {formatCurrency(
-                              mergedCommissionRecords.reduce(
+                              mergedAdvanceCommissionRecords.reduce(
                                 (sum, record) => sum + record.merged_amount,
                                 0,
                               ),
@@ -1692,7 +1749,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-default-300">Records:</span>
-                          <span>{commissionRecords.length}</span>
+                          <span>{advanceCommissionRecords.length}</span>
                         </div>
                       </div>
                       <div className="border-t border-default-600 mt-2 pt-2 text-default-400">
