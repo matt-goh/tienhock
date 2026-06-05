@@ -51,7 +51,6 @@ const PayrollUnifiedTable: React.FC<PayrollUnifiedTableProps> = ({
     <div className="border border-default-200 dark:border-gray-700 rounded-lg shadow-sm">
       <div
         data-scroll-container="payroll-list"
-        className="max-h-[calc(100vh-150px)] overflow-y-auto"
       >
         <table className="min-w-full table-fixed">
           <thead className="bg-default-100 dark:bg-gray-800 sticky top-0 z-10">
