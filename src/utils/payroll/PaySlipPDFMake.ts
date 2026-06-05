@@ -44,6 +44,10 @@ interface AdvanceRecord {
   pay_code_pay_type?: string | null;
   employee_id?: string | null;
   record_date?: string | null;
+  commission_date?: string | null;
+  location_code?: string | number | null;
+  employee_name?: string | null;
+  is_advance?: boolean | null;
 }
 
 interface MergedAdvance {
@@ -77,6 +81,14 @@ const mergeByDescription = (rows: AdvanceRecord[] = []): MergedAdvance[] => {
   });
   return Array.from(map.values());
 };
+
+const isAdvanceRecord = (record: AdvanceRecord): boolean =>
+  record.is_advance !== false;
+
+const getCommissionQuantityLabel = (record: MergedAdvance): string =>
+  record.rows.every((row: AdvanceRecord) => row.is_advance === false)
+    ? "Bonus"
+    : "Advance";
 
 interface CombinedAdvanceDisplay {
   // Commission records with no same-description Others row — rendered as their
@@ -136,9 +148,50 @@ interface GroupedLeaveRecord {
 // Jumlah Cuti rather than Jumlah lain-lain.
 const CUTI_TAHUNAN_COMMISSION_LOCATION_CODE = "23";
 
+const getDescriptionKey = (description: string | null | undefined): string =>
+  (description || "").trim().toLowerCase();
+
+const isIxtPayCode = (payCodeId: string | null | undefined): boolean =>
+  (payCodeId || "").toUpperCase() === "IXT";
+
+const isIncentivePayrollItem = (item: PayrollItem): boolean =>
+  isIxtPayCode(item.pay_code_id);
+
+const isIncentiveOthersRecord = (record: AdvanceRecord): boolean =>
+  record.pay_code_pay_type === "Tambahan" && isIxtPayCode(record.pay_code_id);
+
 const isCutiTahunanCommission = (record: any): boolean => {
-  return record?.location_code === CUTI_TAHUNAN_COMMISSION_LOCATION_CODE;
+  return (
+    String(record?.location_code || "") ===
+      CUTI_TAHUNAN_COMMISSION_LOCATION_CODE ||
+    getDescriptionKey(record?.description) === "cuti tahunan"
+  );
 };
+
+const buildIncentiveRecordsFromOthers = (
+  records: AdvanceRecord[] = [],
+): AdvanceRecord[] =>
+  records.map((record: AdvanceRecord) => ({
+    ...record,
+    commission_date: record.record_date || null,
+    is_advance: false,
+  }));
+
+const buildIncentiveRecordsFromPayrollItems = (
+  items: PayrollItem[] = [],
+  employeeId: string | null | undefined,
+  employeeName: string | null | undefined,
+  fallbackDate: string,
+): AdvanceRecord[] =>
+  items.map((item: PayrollItem) => ({
+    id: item.id ? -Number(item.id) : null,
+    employee_id: item.source_employee_id || employeeId || null,
+    employee_name: employeeName || null,
+    commission_date: item.source_date || fallbackDate,
+    description: item.description,
+    amount: Number(item.amount) || 0,
+    is_advance: false,
+  }));
 
 interface PaySlipPDFProps {
   payroll: EmployeePayroll;
@@ -856,12 +909,26 @@ const buildMainPayrollPage = (
     return null;
   };
 
+  const payrollMonthStartDate = `${year}-${String(month).padStart(2, "0")}-01`;
+  const allPayrollItems: PayrollItem[] = payroll.items || [];
+  const incentivePayrollItems: PayrollItem[] = allPayrollItems.filter(
+    isIncentivePayrollItem,
+  );
+  const standardPayrollItems: PayrollItem[] = allPayrollItems.filter(
+    (item: PayrollItem) => !isIncentivePayrollItem(item),
+  );
   const allOthersRecords: AdvanceRecord[] =
     (payroll as any).others_records || [];
-  const overtimeOthersRecords: AdvanceRecord[] = allOthersRecords.filter(
+  const incentiveOthersRecords: AdvanceRecord[] = allOthersRecords.filter(
+    isIncentiveOthersRecord,
+  );
+  const standardOthersRecords: AdvanceRecord[] = allOthersRecords.filter(
+    (record: AdvanceRecord) => !isIncentiveOthersRecord(record),
+  );
+  const overtimeOthersRecords: AdvanceRecord[] = standardOthersRecords.filter(
     isOvertimeOthersRecord,
   );
-  const nonOvertimeOthersRecords: AdvanceRecord[] = allOthersRecords.filter(
+  const nonOvertimeOthersRecords: AdvanceRecord[] = standardOthersRecords.filter(
     (record: AdvanceRecord) => !isOvertimeOthersRecord(record),
   );
   // A non-overtime Others (Kerja Luar OT) record that matches an existing payroll
@@ -869,7 +936,7 @@ const buildMainPayrollPage = (
   // and its Kerja Luar OT entry appear as a single combined row on the payslip.
   // Records with no matching line stay in the separate Others section.
   const payrollItemsByKey: Map<string, PayrollItem> = new Map();
-  (payroll.items || []).forEach((item: PayrollItem) => {
+  standardPayrollItems.forEach((item: PayrollItem) => {
     payrollItemsByKey.set(
       buildItemKey(item.pay_code_id, item.rate, item.rate_unit),
       item,
@@ -888,7 +955,7 @@ const buildMainPayrollPage = (
       ),
   );
   const payrollItemsWithOvertimeOthers: PayrollItem[] = [
-    ...(payroll.items || []),
+    ...standardPayrollItems,
     ...buildOvertimeOthersPayrollItems(
       overtimeOthersRecords,
       employeeJobMapping,
@@ -947,20 +1014,32 @@ const buildMainPayrollPage = (
   // Commission records (merged by description so duplicate rows collapse).
   // Cuti Tahunan entries are recorded via the Others/Incentives page using
   // location_code = '23'; pull them out so they can be shown as leave rather
-  // than as a generic Advance. They still flow through as commission for the
-  // advance deduction at the bottom of the payslip.
-  const commissionRecords = payroll.commission_records || [];
+  // than as a generic Advance/Bonus row. Only records marked as advance flow
+  // through to the advance deduction at the bottom of the payslip.
+  const commissionRecords: AdvanceRecord[] = payroll.commission_records || [];
+  const advanceCommissionRecords: AdvanceRecord[] =
+    commissionRecords.filter(isAdvanceRecord);
   const cutiTahunanCommissions = commissionRecords.filter(
     isCutiTahunanCommission,
   );
   const nonCutiCommissionRecords = commissionRecords.filter(
     (record) => !isCutiTahunanCommission(record),
   );
-  const commissionTotalAmount = commissionRecords.reduce(
+  const nonCutiDisplayRecords: AdvanceRecord[] = [
+    ...nonCutiCommissionRecords,
+    ...buildIncentiveRecordsFromOthers(incentiveOthersRecords),
+    ...buildIncentiveRecordsFromPayrollItems(
+      incentivePayrollItems,
+      payroll.employee_id,
+      payroll.employee_name,
+      payrollMonthStartDate,
+    ),
+  ];
+  const commissionAdvanceTotalAmount = advanceCommissionRecords.reduce(
     (sum, record) => sum + Number(record.amount || 0),
     0,
   );
-  const nonCutiCommissionTotalAmount = nonCutiCommissionRecords.reduce(
+  const nonCutiCommissionTotalAmount = nonCutiDisplayRecords.reduce(
     (sum, record) => sum + Number(record.amount || 0),
     0,
   );
@@ -968,9 +1047,11 @@ const buildMainPayrollPage = (
     (sum, record) => sum + Number(record.amount || 0),
     0,
   );
-  const mergedCommissionRecords = mergeByDescription(commissionRecords);
+  const mergedAdvanceCommissionRecords = mergeByDescription(
+    advanceCommissionRecords,
+  );
   const mergedNonCutiCommissionRecords = mergeByDescription(
-    nonCutiCommissionRecords,
+    nonCutiDisplayRecords,
   );
 
   // Leave records — merge true leave_records together with Cuti Tahunan
@@ -1029,12 +1110,11 @@ const buildMainPayrollPage = (
   const mergedOthersRecords = mergeByDescription(othersRecords);
 
   // Mid-month and final calculations. payroll.net_pay from the comprehensive
-  // endpoint is gross - statutory only (commission is NOT deducted there), so
-  // we subtract commission here to get the true post-advance amount that lines
-  // up with the stored setelah_digenapkan.
+  // endpoint is gross - statutory only, so we subtract only advance records here
+  // to get the true post-advance amount that lines up with stored rounding.
   const midMonthPayment = midMonthPayroll ? midMonthPayroll.amount : 0;
   const finalPayment =
-    payroll.net_pay - midMonthPayment - commissionTotalAmount;
+    payroll.net_pay - midMonthPayment - commissionAdvanceTotalAmount;
 
   // Build table body
   const tableBody: TableCell[][] = [];
@@ -1100,7 +1180,7 @@ const buildMainPayrollPage = (
     (groupedConsolidatedItems.Tambahan &&
       groupedConsolidatedItems.Tambahan.length > 0) ||
     leaveRecordsArray.length > 0 ||
-    commissionRecords.length > 0 ||
+    nonCutiDisplayRecords.length > 0 ||
     othersRecords.length > 0
   ) {
     tambahanItemsByJob.forEach((jobGroup) => {
@@ -1162,7 +1242,7 @@ const buildMainPayrollPage = (
         createItemRow(
           desc,
           "",
-          "Advance",
+          getCommissionQuantityLabel(commission),
           formatCurrency(commission.merged_amount),
         ),
       );
@@ -1438,8 +1518,8 @@ const buildMainPayrollPage = (
   ]);
 
   // Commission deduction rows (merged duplicates).
-  if (mergedCommissionRecords.length > 0) {
-    mergedCommissionRecords.forEach((commission) => {
+  if (mergedAdvanceCommissionRecords.length > 0) {
+    mergedAdvanceCommissionRecords.forEach((commission) => {
       tableBody.push([
         { text: `${commission.description} (Advance)`, fontSize: 8 },
         { text: "", fontSize: 8 },
@@ -1468,7 +1548,7 @@ const buildMainPayrollPage = (
   }
 
   // Jumlah row (raw final payment before rounding)
-  if (midMonthPayroll || commissionRecords.length > 0) {
+  if (midMonthPayroll || advanceCommissionRecords.length > 0) {
     tableBody.push([
       { text: "", fontSize: 8, fillColor: "#f8f9fa" },
       { text: "", fontSize: 8, fillColor: "#f8f9fa" },
@@ -1657,17 +1737,31 @@ const buildIndividualJobPage = (
 ): Content[] => {
   const employeeJobMapping = payroll.employee_job_mapping || {};
 
+  const payrollMonthStartDate = `${year}-${String(month).padStart(2, "0")}-01`;
+  const allPayrollItems: PayrollItem[] = individualJob.items || [];
+  const incentivePayrollItems: PayrollItem[] = allPayrollItems.filter(
+    isIncentivePayrollItem,
+  );
+  const standardPayrollItems: PayrollItem[] = allPayrollItems.filter(
+    (item: PayrollItem) => !isIncentivePayrollItem(item),
+  );
   const allOthersRecords: AdvanceRecord[] = individualJob.others_records || [];
-  const overtimeOthersRecords: AdvanceRecord[] = allOthersRecords.filter(
+  const incentiveOthersRecords: AdvanceRecord[] = allOthersRecords.filter(
+    isIncentiveOthersRecord,
+  );
+  const standardOthersRecords: AdvanceRecord[] = allOthersRecords.filter(
+    (record: AdvanceRecord) => !isIncentiveOthersRecord(record),
+  );
+  const overtimeOthersRecords: AdvanceRecord[] = standardOthersRecords.filter(
     isOvertimeOthersRecord,
   );
-  const nonOvertimeOthersRecords: AdvanceRecord[] = allOthersRecords.filter(
+  const nonOvertimeOthersRecords: AdvanceRecord[] = standardOthersRecords.filter(
     (record: AdvanceRecord) => !isOvertimeOthersRecord(record),
   );
   // Fold non-overtime Others records that match an existing payroll line into that
   // line (see buildMainPayrollPage); unmatched ones stay in the Others section.
   const payrollItemsByKey: Map<string, PayrollItem> = new Map();
-  (individualJob.items || []).forEach((item: PayrollItem) => {
+  standardPayrollItems.forEach((item: PayrollItem) => {
     payrollItemsByKey.set(
       buildItemKey(item.pay_code_id, item.rate, item.rate_unit),
       item,
@@ -1686,7 +1780,7 @@ const buildIndividualJobPage = (
       ),
   );
   const payrollItemsWithOvertimeOthers: PayrollItem[] = [
-    ...(individualJob.items || []),
+    ...standardPayrollItems,
     ...buildOvertimeOthersPayrollItems(
       overtimeOthersRecords,
       employeeJobMapping,
@@ -1742,7 +1836,17 @@ const buildIndividualJobPage = (
   const nonCutiCommissionRecords = commissionRecords.filter(
     (record: any) => !isCutiTahunanCommission(record),
   );
-  const nonCutiCommissionTotalAmount = nonCutiCommissionRecords.reduce(
+  const nonCutiDisplayRecords: AdvanceRecord[] = [
+    ...nonCutiCommissionRecords,
+    ...buildIncentiveRecordsFromOthers(incentiveOthersRecords),
+    ...buildIncentiveRecordsFromPayrollItems(
+      incentivePayrollItems,
+      jobEmployeeId || payroll.employee_id,
+      staffDetails?.name || payroll.employee_name,
+      payrollMonthStartDate,
+    ),
+  ];
+  const nonCutiCommissionTotalAmount = nonCutiDisplayRecords.reduce(
     (sum: number, record: any) => sum + Number(record.amount || 0),
     0,
   );
@@ -1751,7 +1855,7 @@ const buildIndividualJobPage = (
     0,
   );
   const mergedNonCutiCommissionRecords = mergeByDescription(
-    nonCutiCommissionRecords,
+    nonCutiDisplayRecords,
   );
 
   // Leave records — merge true leave_records together with Cuti Tahunan
@@ -1843,7 +1947,7 @@ const buildIndividualJobPage = (
   if (
     consolidatedTambahanItems.length > 0 ||
     leaveRecordsArray.length > 0 ||
-    commissionRecords.length > 0 ||
+    nonCutiDisplayRecords.length > 0 ||
     othersRecords.length > 0
   ) {
     consolidatedTambahanItems.forEach((item) => {
@@ -1874,7 +1978,7 @@ const buildIndividualJobPage = (
         createItemRow(
           desc,
           "",
-          "Advance",
+          getCommissionQuantityLabel(commission),
           formatCurrency(commission.merged_amount),
         ),
       );
