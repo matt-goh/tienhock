@@ -20,6 +20,16 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-05",
+    ms: "Payslip: apabila insentif yang sama muncul sebagai Advance (commission) dan juga sebagai Others (Kerja Luar OT) dengan nama yang sama, kedua-duanya kini digabung menjadi satu baris pendapatan dengan jumlah penuh (contohnya Insentif Tidak Tetap 50 + 830 = 880). Potongan Advance di bahagian bawah payslip kekal hanya pada amaun Advance yang sebenar (50).",
+    en: "Payslip: when the same incentive appears both as an Advance (commission) and as an Others (Kerja Luar OT) entry with the same name, the two are now combined into one earnings line showing the full total (e.g. Insentif Tidak Tetap 50 + 830 = 880). The Advance deduction at the bottom of the payslip still shows only the actual Advance amount (50).",
+  },
+  {
+    date: "2026-06-05",
+    ms: "Payslip: apabila kerja yang sama muncul dalam Tambahan dan juga Others (Kerja Luar OT) dengan paycode, kadar dan unit yang sama, kedua-duanya kini digabung menjadi satu baris dengan jumlah jam dan amaun yang betul pada payslip. Halaman Payroll Details kekal memaparkannya secara berasingan.",
+    en: "Payslip: when the same work appears under Tambahan and also under Others (Kerja Luar OT) with the same paycode, rate and unit, the two are now combined into a single line with the correct total hours and amount on the payslip. The Payroll Details page still shows them separately.",
+  },
+  {
+    date: "2026-06-05",
     ms: "Setiap pekerja kini boleh ditetapkan cara caruman EPF, SOCSO dan SIP dikira di bawah tab Documents pada borang pekerja. Contohnya, pekerja yang berumur 60 ke atas boleh diberi kadar EPF 'bawah 60', dan pekerja asing tanpa pasport Malaysia boleh ditanda 'Tidak Layak' supaya tiada caruman EPF/SOCSO/SIP dikira untuknya. Biarkan sebagai Auto untuk mengikut tarikh lahir dan kewarganegaraan seperti biasa. Payroll akan mengikut tetapan ini.",
     en: "You can now set how EPF, SOCSO and SIP are applied for each staff under the Documents tab of the staff form. For example, a staff aged 60 or above can be given the 'under 60' EPF rate, and a foreign worker without a Malaysian passport can be marked 'Not Eligible' so no EPF/SOCSO/SIP is calculated for them. Leave it as Auto to follow birthdate and nationality as before. Payroll follows these settings.",
   },

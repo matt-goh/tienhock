@@ -78,6 +78,50 @@ const mergeByDescription = (rows: AdvanceRecord[] = []): MergedAdvance[] => {
   return Array.from(map.values());
 };
 
+interface CombinedAdvanceDisplay {
+  // Commission records with no same-description Others row — rendered as their
+  // own "Advance" earnings rows, exactly as before.
+  standaloneCommissions: MergedAdvance[];
+  // Each Others row paired with the commission amount folded into it (0 if none).
+  othersRows: { record: MergedAdvance; foldedCommission: number }[];
+}
+
+// Fold commission records into a same-description Others row so the incentive
+// shows as one combined earnings line (e.g. "Insentif Tidak Tetap" 50 commission
+// + 830 Others = 880). The commission's advance deduction at the bottom of the
+// payslip is built from the full commission list separately, so it is unaffected.
+const combineCommissionsIntoOthers = (
+  mergedCommissions: MergedAdvance[],
+  mergedOthers: MergedAdvance[],
+): CombinedAdvanceDisplay => {
+  const descKey = (description: string): string =>
+    (description || "").trim().toLowerCase();
+  const othersKeys = new Set(
+    mergedOthers.map((other) => descKey(other.description)),
+  );
+  const foldedByKey = new Map<string, number>();
+  const standaloneCommissions: MergedAdvance[] = [];
+
+  mergedCommissions.forEach((commission) => {
+    const key = descKey(commission.description);
+    if (othersKeys.has(key)) {
+      foldedByKey.set(
+        key,
+        (foldedByKey.get(key) || 0) + commission.merged_amount,
+      );
+    } else {
+      standaloneCommissions.push(commission);
+    }
+  });
+
+  const othersRows = mergedOthers.map((record) => ({
+    record,
+    foldedCommission: foldedByKey.get(descKey(record.description)) || 0,
+  }));
+
+  return { standaloneCommissions, othersRows };
+};
+
 interface GroupedLeaveRecord {
   leave_type: string;
   total_days: number;
@@ -510,6 +554,52 @@ const buildOvertimeOthersPayrollItems = (
   });
 };
 
+// Key used to detect when an Others (Kerja Luar OT) record lines up with an
+// existing payroll line. Matches the grouping key used by consolidatePayrollItems
+// (pay_code_id + rate + rate_unit) so a matched record folds into that same line.
+const buildItemKey = (
+  payCodeId: string | null | undefined,
+  rate: number | string | null | undefined,
+  rateUnit: string | null | undefined,
+): string => `${payCodeId ?? ""}_${Number(rate) || 0}_${rateUnit ?? ""}`;
+
+// Convert non-overtime Others records that match an existing payroll line into
+// payroll items so they consolidate into (and display as one row with) that line
+// on the payslip. The matched line is listed first during consolidation, so its
+// pay_type/job_type win for the combined row.
+const buildMergeableOthersPayrollItems = (
+  records: AdvanceRecord[] = [],
+  matchingItemsByKey: Map<string, PayrollItem>,
+  employeeJobMapping: Record<string, string> = {},
+  fallbackJobType?: string,
+): PayrollItem[] => {
+  return records.map((record: AdvanceRecord) => {
+    const employeeId: string = String(record.employee_id || "");
+    const mappedJobType: string | undefined = employeeJobMapping[employeeId];
+    const matchingItem: PayrollItem | undefined = matchingItemsByKey.get(
+      buildItemKey(record.pay_code_id, record.rate, record.rate_unit),
+    );
+
+    return {
+      id: record.id ? -Number(record.id) : undefined,
+      pay_code_id: record.pay_code_id || `OTHERS-${record.id || ""}`,
+      description: record.description || "",
+      pay_type: matchingItem?.pay_type || "Tambahan",
+      rate: Number(record.rate) || 0,
+      rate_unit: record.rate_unit || "",
+      quantity: Number(record.quantity) || 0,
+      foc_units: 0,
+      amount: Number(record.amount) || 0,
+      is_manual: false,
+      job_type: mappedJobType || matchingItem?.job_type || fallbackJobType,
+      source_employee_id: employeeId || null,
+      source_date: record.record_date || null,
+      work_log_id: null,
+      work_log_type: null,
+    };
+  });
+};
+
 const getBaseRateSummaryUnits = (
   consolidatedBaseItems: ConsolidatedPayrollItem[],
 ): BaseRateSummaryUnit[] => {
@@ -771,13 +861,42 @@ const buildMainPayrollPage = (
   const overtimeOthersRecords: AdvanceRecord[] = allOthersRecords.filter(
     isOvertimeOthersRecord,
   );
-  const regularOthersRecords: AdvanceRecord[] = allOthersRecords.filter(
+  const nonOvertimeOthersRecords: AdvanceRecord[] = allOthersRecords.filter(
     (record: AdvanceRecord) => !isOvertimeOthersRecord(record),
+  );
+  // A non-overtime Others (Kerja Luar OT) record that matches an existing payroll
+  // line (same pay code, rate and rate unit) is folded into that line so the work
+  // and its Kerja Luar OT entry appear as a single combined row on the payslip.
+  // Records with no matching line stay in the separate Others section.
+  const payrollItemsByKey: Map<string, PayrollItem> = new Map();
+  (payroll.items || []).forEach((item: PayrollItem) => {
+    payrollItemsByKey.set(
+      buildItemKey(item.pay_code_id, item.rate, item.rate_unit),
+      item,
+    );
+  });
+  const mergeableOthersRecords: AdvanceRecord[] =
+    nonOvertimeOthersRecords.filter((record: AdvanceRecord) =>
+      payrollItemsByKey.has(
+        buildItemKey(record.pay_code_id, record.rate, record.rate_unit),
+      ),
+    );
+  const regularOthersRecords: AdvanceRecord[] = nonOvertimeOthersRecords.filter(
+    (record: AdvanceRecord) =>
+      !payrollItemsByKey.has(
+        buildItemKey(record.pay_code_id, record.rate, record.rate_unit),
+      ),
   );
   const payrollItemsWithOvertimeOthers: PayrollItem[] = [
     ...(payroll.items || []),
     ...buildOvertimeOthersPayrollItems(
       overtimeOthersRecords,
+      employeeJobMapping,
+      isGroupedPayroll ? undefined : payroll.job_type,
+    ),
+    ...buildMergeableOthersPayrollItems(
+      mergeableOthersRecords,
+      payrollItemsByKey,
       employeeJobMapping,
       isGroupedPayroll ? undefined : payroll.job_type,
     ),
@@ -1026,8 +1145,15 @@ const buildMainPayrollPage = (
 
     // Commission records (merged duplicates). Cuti Tahunan commissions are
     // omitted here — they're rendered with the leave records below and rolled
-    // into Jumlah cuti / leaveTotalAmount instead of Jumlah lain-lain.
-    mergedNonCutiCommissionRecords.forEach((commission) => {
+    // into Jumlah cuti / leaveTotalAmount instead of Jumlah lain-lain. Commission
+    // records that share a description with an Others row are folded into that
+    // row (see combineCommissionsIntoOthers) so the incentive shows as one line.
+    const { standaloneCommissions, othersRows } = combineCommissionsIntoOthers(
+      mergedNonCutiCommissionRecords,
+      mergedOthersRecords,
+    );
+
+    standaloneCommissions.forEach((commission) => {
       const desc =
         commission.merged_count > 1
           ? `${commission.description} (x${commission.merged_count})`
@@ -1042,27 +1168,30 @@ const buildMainPayrollPage = (
       );
     });
 
-    // Others (Kerja Luar OT) records (merged duplicates)
-    mergedOthersRecords.forEach((other) => {
+    // Others (Kerja Luar OT) records (merged duplicates). When a commission was
+    // folded in, drop the rate column so the rate no longer mismatches the
+    // combined amount, but keep the quantity note (e.g. "Fixed").
+    othersRows.forEach(({ record: other, foldedCommission }) => {
       const desc =
         other.merged_count > 1
           ? `${other.description} (x${other.merged_count})`
           : other.description;
       const rateQuantityDisplay: RateQuantityDisplay =
         getOthersRateQuantityDisplay(other);
+      const isMerged = foldedCommission > 0;
       tableBody.push(
         createItemRow(
           desc,
-          rateQuantityDisplay.rate,
+          isMerged ? "" : rateQuantityDisplay.rate,
           rateQuantityDisplay.quantity,
-          formatCurrency(other.merged_amount),
+          formatCurrency(other.merged_amount + foldedCommission),
         ),
       );
     });
 
     const totalNonLeaveTambahanItems =
       (groupedConsolidatedItems.Tambahan?.length || 0) +
-      mergedNonCutiCommissionRecords.length +
+      standaloneCommissions.length +
       mergedOthersRecords.length;
 
     // Jumlah lain-lain (excludes cuti) — printed above the leave block so the
@@ -1532,13 +1661,40 @@ const buildIndividualJobPage = (
   const overtimeOthersRecords: AdvanceRecord[] = allOthersRecords.filter(
     isOvertimeOthersRecord,
   );
-  const regularOthersRecords: AdvanceRecord[] = allOthersRecords.filter(
+  const nonOvertimeOthersRecords: AdvanceRecord[] = allOthersRecords.filter(
     (record: AdvanceRecord) => !isOvertimeOthersRecord(record),
+  );
+  // Fold non-overtime Others records that match an existing payroll line into that
+  // line (see buildMainPayrollPage); unmatched ones stay in the Others section.
+  const payrollItemsByKey: Map<string, PayrollItem> = new Map();
+  (individualJob.items || []).forEach((item: PayrollItem) => {
+    payrollItemsByKey.set(
+      buildItemKey(item.pay_code_id, item.rate, item.rate_unit),
+      item,
+    );
+  });
+  const mergeableOthersRecords: AdvanceRecord[] =
+    nonOvertimeOthersRecords.filter((record: AdvanceRecord) =>
+      payrollItemsByKey.has(
+        buildItemKey(record.pay_code_id, record.rate, record.rate_unit),
+      ),
+    );
+  const regularOthersRecords: AdvanceRecord[] = nonOvertimeOthersRecords.filter(
+    (record: AdvanceRecord) =>
+      !payrollItemsByKey.has(
+        buildItemKey(record.pay_code_id, record.rate, record.rate_unit),
+      ),
   );
   const payrollItemsWithOvertimeOthers: PayrollItem[] = [
     ...(individualJob.items || []),
     ...buildOvertimeOthersPayrollItems(
       overtimeOthersRecords,
+      employeeJobMapping,
+      individualJob.job_type,
+    ),
+    ...buildMergeableOthersPayrollItems(
+      mergeableOthersRecords,
+      payrollItemsByKey,
       employeeJobMapping,
       individualJob.job_type,
     ),
@@ -1701,7 +1857,15 @@ const buildIndividualJobPage = (
       );
     });
 
-    mergedNonCutiCommissionRecords.forEach((commission) => {
+    // Commission records that share a description with an Others row are folded
+    // into that row (see combineCommissionsIntoOthers) so the incentive shows as
+    // one combined line; the rest render as their own "Advance" rows.
+    const { standaloneCommissions, othersRows } = combineCommissionsIntoOthers(
+      mergedNonCutiCommissionRecords,
+      mergedOthersRecords,
+    );
+
+    standaloneCommissions.forEach((commission) => {
       const desc =
         commission.merged_count > 1
           ? `${commission.description} (x${commission.merged_count})`
@@ -1716,26 +1880,27 @@ const buildIndividualJobPage = (
       );
     });
 
-    mergedOthersRecords.forEach((other) => {
+    othersRows.forEach(({ record: other, foldedCommission }) => {
       const desc =
         other.merged_count > 1
           ? `${other.description} (x${other.merged_count})`
           : other.description;
       const rateQuantityDisplay: RateQuantityDisplay =
         getOthersRateQuantityDisplay(other);
+      const isMerged = foldedCommission > 0;
       tableBody.push(
         createItemRow(
           desc,
-          rateQuantityDisplay.rate,
+          isMerged ? "" : rateQuantityDisplay.rate,
           rateQuantityDisplay.quantity,
-          formatCurrency(other.merged_amount),
+          formatCurrency(other.merged_amount + foldedCommission),
         ),
       );
     });
 
     const totalNonLeaveTambahanItems =
       consolidatedTambahanItems.length +
-      mergedNonCutiCommissionRecords.length +
+      standaloneCommissions.length +
       mergedOthersRecords.length;
 
     // Jumlah lain-lain (excludes cuti) — printed above the leave block so the
