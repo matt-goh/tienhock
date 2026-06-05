@@ -155,7 +155,7 @@ export default function (pool) {
 
         // 4. Monthly Payrolls with Employee Payrolls
         pool.query(`
-          SELECT mp.*, ep.employee_id, s.name as employee_name, ep.net_pay, ep.setelah_digenapkan
+          SELECT mp.*, ep.id as employee_payroll_id, ep.employee_id, s.name as employee_name, ep.net_pay, ep.setelah_digenapkan
           FROM monthly_payrolls mp
           LEFT JOIN employee_payrolls ep ON mp.id = ep.monthly_payroll_id
           LEFT JOIN staffs s ON ep.employee_id = s.id
@@ -189,6 +189,7 @@ export default function (pool) {
       monthlyPayrollsResult.rows.forEach(row => {
         if (row.employee_id) {
           employeePayrolls.push({
+            employee_payroll_id: row.employee_payroll_id,
             employee_id: row.employee_id,
             employee_name: row.employee_name,
             net_pay: parseFloat(row.net_pay || 0),

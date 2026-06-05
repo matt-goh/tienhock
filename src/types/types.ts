@@ -939,6 +939,20 @@ export interface MidMonthPayroll {
   default_payment_method?: string;
 }
 
+export interface PinjamRecord {
+  id: number;
+  employee_id: string;
+  employee_name?: string;
+  year: number;
+  month: number;
+  amount: number;
+  description: string;
+  pinjam_type: "mid_month" | "monthly";
+  created_by: string;
+  created_at: string;
+  updated_at: string | null;
+}
+
 // ==================== ACCOUNTING / JOURNAL SYSTEM TYPES ====================
 
 // Ledger Type (TL column from Chart of Accounts)

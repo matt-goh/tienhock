@@ -1,5 +1,6 @@
 // src/pages/Payroll/PinjamListPage.tsx
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import {
   IconPlus,
@@ -51,6 +52,7 @@ interface MidMonthPayroll {
 }
 
 interface EmployeePayrollSummary {
+  employee_payroll_id?: number;
   employee_id: string;
   employee_name: string;
   net_pay: number;
@@ -73,6 +75,7 @@ interface PinjamSummary {
 }
 
 interface EmployeePinjamData {
+  employee_payroll_id?: number;
   employee_id: string;
   employee_name: string;
   latestPinjamTime: number;
@@ -104,6 +107,8 @@ const getPinjamActivityTime = (
 };
 
 const PinjamListPage: React.FC = () => {
+  const navigate = useNavigate();
+
   // State
   const [pinjamRecords, setPinjamRecords] = useState<PinjamRecord[]>([]);
   const [pinjamSummary, setPinjamSummary] = useState<PinjamSummary[]>([]);
@@ -283,6 +288,7 @@ const PinjamListPage: React.FC = () => {
       );
 
       employeeMap.set(employeeId, {
+        employee_payroll_id: payrollRecord?.employee_payroll_id,
         employee_id: employeeId,
         employee_name: pinjamRecord.employee_name,
         latestPinjamTime: latestPinjamTimesByEmployee.get(employeeId) ?? 0,
@@ -592,6 +598,8 @@ const PinjamListPage: React.FC = () => {
               const hasMonthly = employee.monthlyPinjam > 0;
               const isWide = hasMid && hasMonthly;
 
+              const canNavigate = employee.employee_payroll_id != null;
+
               const handleCardClick = (e: React.MouseEvent) => {
                 // Prevent navigation if clicking specifically on the checkbox icon/wrapper
                 // OR the header section itself (which now handles selection)
@@ -603,7 +611,13 @@ const PinjamListPage: React.FC = () => {
                 ) {
                   return;
                 }
-                // Add any additional card click behavior here if needed
+                // Clicking the card body opens this worker's Payroll Details,
+                // scrolled down to the Pinjam summary at the bottom.
+                if (canNavigate) {
+                  navigate(
+                    `/payroll/employee-payroll/${employee.employee_payroll_id}?scrollTo=pinjam`
+                  );
+                }
               };
 
               const handleHeaderClick = (e: React.MouseEvent) => {
@@ -632,10 +646,15 @@ const PinjamListPage: React.FC = () => {
                     isSelected
                       ? "shadow-md ring-2 ring-blue-500 dark:ring-blue-400 ring-offset-1"
                       : "shadow-sm hover:shadow-md"
-                  } ${
-                    isWide ? "sm:col-span-2 lg:col-span-2" : ""
+                  } ${isWide ? "sm:col-span-2 lg:col-span-2" : ""} ${
+                    canNavigate ? "cursor-pointer" : ""
                   } border-default-200 dark:border-gray-700 px-4 pb-4 space-y-3`}
                   onClick={handleCardClick}
+                  title={
+                    canNavigate
+                      ? `View ${employee.employee_name}'s Payroll Details (Pinjam summary)`
+                      : undefined
+                  }
                 >
                   {/* Employee header - Now clickable for selection */}
                   <div
@@ -670,14 +689,24 @@ const PinjamListPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Body - only renders the sections that have pinjam */}
-                  <div className="space-y-4">
+                  {/* Body - only renders the sections that have pinjam.
+                      Clicking it opens this worker's Payroll Details (Pinjam summary). */}
+                  <div
+                    className={`employee-card-body space-y-4 ${
+                      canNavigate ? "cursor-pointer" : ""
+                    }`}
+                    title={
+                      canNavigate
+                        ? `View ${employee.employee_name}'s Payroll Details (Pinjam summary)`
+                        : undefined
+                    }
+                  >
                     <div
                       className={`flex h-full ${
                         isWide
                           ? "gap-6 divide-x divide-default-200 dark:divide-gray-700"
                           : ""
-                      }`}
+                      } ${canNavigate ? "cursor-pointer" : ""}`}
                     >
                       {/* Mid-month Pay Section */}
                       {hasMid && (
