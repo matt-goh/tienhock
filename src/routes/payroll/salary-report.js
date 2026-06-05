@@ -142,6 +142,21 @@ export default function (pool) {
           JOIN payroll_items pi ON ep.id = pi.employee_payroll_id
           LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
           WHERE mp.year = $1 AND mp.month = $2
+            -- Exclude daily work items dated on a leave day: they pay nothing as
+            -- work (the day is paid via leave) and are excluded from gross_pay, so
+            -- the base/tambahan/overtime breakdown must drop them too. Matches by
+            -- staff name (siblings share leave) like the payslip filter.
+            AND NOT (
+              pi.work_log_type = 'daily'
+              AND pi.source_date IS NOT NULL
+              AND EXISTS (
+                SELECT 1 FROM leave_records lr2
+                JOIN staffs s2 ON lr2.employee_id = s2.id
+                WHERE s2.name = (SELECT name FROM staffs WHERE id = ep.employee_id)
+                  AND lr2.status = 'approved'
+                  AND lr2.leave_date = pi.source_date
+              )
+            )
         ),
         deductions_data AS (
           SELECT 
@@ -164,13 +179,13 @@ export default function (pool) {
         commission_data AS (
           SELECT
             cr.employee_id,
-            cr.description,
             cr.location_code,
-            COALESCE(SUM(cr.amount), 0) as commission_amount
+            COALESCE(SUM(cr.amount), 0) as commission_amount,
+            COALESCE(SUM(CASE WHEN COALESCE(cr.is_advance, true) THEN cr.amount ELSE 0 END), 0) as advance_amount
           FROM commission_records cr
           WHERE EXTRACT(YEAR FROM cr.commission_date) = $1
             AND EXTRACT(MONTH FROM cr.commission_date) = $2
-          GROUP BY cr.employee_id, cr.description, cr.location_code
+          GROUP BY cr.employee_id, cr.location_code
         ),
         others_data AS (
           SELECT
@@ -212,7 +227,9 @@ export default function (pool) {
           ) as base_pay,
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid 
-             WHERE pid.employee_id = ebd.employee_id AND COALESCE(pid.pay_type, 'Tambahan') = 'Tambahan'), 0
+             WHERE pid.employee_id = ebd.employee_id
+               AND COALESCE(pid.pay_type, 'Tambahan') = 'Tambahan'
+               AND (pid.pay_code_id IS NULL OR pid.pay_code_id <> 'BONUS')), 0
           ) as tambahan_pay,
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid 
@@ -247,25 +264,44 @@ export default function (pool) {
             (SELECT SUM(employee_amount) FROM deductions_data dd 
              WHERE dd.employee_id = ebd.employee_id AND dd.deduction_type = 'income_tax'), 0
           ) as income_tax,
-          -- Commission and bonus data
+          -- Commission and bonus data (exclude location 23 = Cuti Tahunan, counted under Cuti)
           COALESCE(
             (SELECT SUM(commission_amount) FROM commission_data cd
-             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NOT NULL), 0
+             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NOT NULL AND cd.location_code <> '23'), 0
           ) as commission_total,
           COALESCE(
+            (SELECT SUM(advance_amount) FROM commission_data cd
+             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NOT NULL), 0
+          ) as commission_advance_total,
+          -- Cuti Tahunan recorded as commission (location 23) - shown under Cuti, not COMM
+          COALESCE(
             (SELECT SUM(commission_amount) FROM commission_data cd
-             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NULL), 0
+             WHERE cd.employee_id = ebd.employee_id AND cd.location_code = '23'), 0
+          ) as cuti_tahunan_commission_total,
+          (
+            COALESCE(
+              (SELECT SUM(commission_amount) FROM commission_data cd
+               WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NULL), 0
+            ) +
+            COALESCE(
+              (SELECT SUM(amount) FROM payroll_items_data pid
+               WHERE pid.employee_id = ebd.employee_id AND pid.pay_code_id = 'BONUS'), 0
+            )
           ) as bonus_total,
-          -- Others (Kerja Luar OT) data - advances deducted from net_pay just like commission
+          COALESCE(
+            (SELECT SUM(advance_amount) FROM commission_data cd
+             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NULL), 0
+          ) as bonus_advance_total,
+          -- Others (Kerja Luar OT) data - regular earnings, not advance deductions
           COALESCE(
             (SELECT SUM(others_amount) FROM others_data od
              WHERE od.employee_id = ebd.employee_id), 0
           ) as others_total,
-          -- Leave data
+          -- Leave data: combine all 4 cuti types into a single Cuti figure
           COALESCE(
             (SELECT SUM(leave_amount) FROM leave_data ld
-             WHERE ld.employee_id = ebd.employee_id AND ld.leave_type = 'cuti_tahunan'), 0
-          ) as cuti_tahunan_amount
+             WHERE ld.employee_id = ebd.employee_id), 0
+          ) as leave_total
         FROM employee_base_data ebd
         LEFT JOIN mid_month_data mmd ON ebd.employee_id = mmd.employee_id
         LEFT JOIN pinjam_monthly_data pmd ON ebd.employee_id = pmd.employee_id
@@ -276,14 +312,14 @@ export default function (pool) {
 
       // Process the data for different views
       const processedData = result.rows.map((row, index) => {
-        const gaji =
-          parseFloat(row.base_pay || 0) + parseFloat(row.tambahan_pay || 0);
+        // GAJI = base pay only. Tambahan pay is shown under COMM/INS/LAIN (Insentif).
+        const gaji = parseFloat(row.base_pay || 0);
         const gajiKasar = parseFloat(row.gross_pay || 0);
-        // Commission and bonus from commission_records are advances already deducted from net_pay in DB.
+        // Only advance commission/bonus records are already deducted from net_pay in DB.
         // Others (Kerja Luar OT) is a regular earning, NOT an advance, so it is NOT added back here.
         const commissionAdvance =
-          parseFloat(row.commission_total || 0) +
-          parseFloat(row.bonus_total || 0);
+          parseFloat(row.commission_advance_total || 0) +
+          parseFloat(row.bonus_advance_total || 0);
         // GAJI BERSIH = net_pay + commission (add back to show true net before advances)
         const gajiBersih = parseFloat(row.net_pay || 0) + commissionAdvance;
         // JUMLAH = net_pay - mid_month (commission already deducted from net_pay)
@@ -316,7 +352,17 @@ export default function (pool) {
           gaji: gaji,
           ot: parseFloat(row.overtime_pay || 0),
           bonus: parseFloat(row.bonus_total || 0),
-          comm: parseFloat(row.commission_total || 0),
+          // COMM/INS/LAIN = location commission (excl. Cuti Tahunan loc 23)
+          // + Insentif (all Tambahan payroll pay, excl. BONUS) + Others/Kerja Luar OT (incl. IXT)
+          comm:
+            parseFloat(row.commission_total || 0) +
+            parseFloat(row.tambahan_pay || 0) +
+            parseFloat(row.others_total || 0),
+          // CUTI = all 4 leave types + Cuti Tahunan recorded as commission (loc 23).
+          // Display-only: does not feed gaji_bersih/jumlah (same as comm).
+          cuti:
+            parseFloat(row.leave_total || 0) +
+            parseFloat(row.cuti_tahunan_commission_total || 0),
           gaji_kasar: gajiKasar,
           epf_majikan: parseFloat(row.epf_employer || 0),
           epf_pekerja: parseFloat(row.epf_employee || 0),
@@ -330,7 +376,6 @@ export default function (pool) {
           jumlah: jumlah,
           digenapkan: digenapkan,
           setelah_digenapkan: setelah_digenapkan,
-          cuti_tahunan_amount: parseFloat(row.cuti_tahunan_amount || 0),
           // Bank/Pinjam tab data
           gaji_genap: setelah_digenapkan,
           total_pinjam: totalPinjam,
@@ -349,6 +394,7 @@ export default function (pool) {
         ot: 0,
         bonus: 0,
         comm: 0,
+        cuti: 0,
         gaji_kasar: 0,
         epf_majikan: 0,
         epf_pekerja: 0,
@@ -379,6 +425,7 @@ export default function (pool) {
             ot: 0,
             bonus: 0,
             comm: 0,
+            cuti: 0,
             gaji_kasar: 0,
             epf_majikan: 0,
             epf_pekerja: 0,
@@ -466,6 +513,8 @@ export default function (pool) {
         const locCode = row.location_code || "18"; // Default to COMM-KILANG if no location
         const commAmount = parseFloat(row.commission_amount || 0);
         const midMonthAmount = midMonthMap.get(row.employee_id) || 0;
+        // Location 23 = Cuti Tahunan: route the amount to the Cuti column, not COMM.
+        const commField = locCode === "23" ? "cuti" : "comm";
 
         // Check if this employee exists in processedData (has regular payroll)
         const hasRegularPayroll = processedData.some(
@@ -500,7 +549,8 @@ export default function (pool) {
               gaji: 0,
               ot: 0,
               bonus: 0,
-              comm: commAmount,
+              comm: commField === "comm" ? commAmount : 0,
+              cuti: commField === "cuti" ? commAmount : 0,
               gaji_kasar: commAmount,
               epf_majikan: 0,
               epf_pekerja: 0,
@@ -523,7 +573,7 @@ export default function (pool) {
             };
 
             locationData[locCode].employees.push(commissionEmployeeData);
-            locationData[locCode].totals.comm += commAmount;
+            locationData[locCode].totals[commField] += commAmount;
             locationData[locCode].totals.gaji_kasar += commAmount;
             locationData[locCode].totals.gaji_bersih += commAmount;
             locationData[locCode].totals.setengah_bulan += midMonthAmount;
@@ -541,7 +591,7 @@ export default function (pool) {
               if (!existingCommOnly) {
                 commissionOnlyEmployees.push(commissionEmployeeData);
                 // Add to grand totals for commission-only employees
-                grandTotals.comm += commAmount;
+                grandTotals[commField] += commAmount;
                 grandTotals.gaji_kasar += commAmount;
                 grandTotals.gaji_bersih += commAmount;
                 grandTotals.setengah_bulan += midMonthAmount;
@@ -553,7 +603,7 @@ export default function (pool) {
                 const previousDigenapkan = existingCommOnly.digenapkan || 0;
                 const previousSetelahDigenapkan =
                   existingCommOnly.setelah_digenapkan || 0;
-                existingCommOnly.comm += commAmount;
+                existingCommOnly[commField] += commAmount;
                 existingCommOnly.gaji_kasar += commAmount;
                 existingCommOnly.gaji_bersih += commAmount;
                 existingCommOnly.jumlah =
@@ -570,7 +620,7 @@ export default function (pool) {
                 existingCommOnly.final_total = existingCommOnly.gaji_genap;
                 existingCommOnly.net_pay = existingCommOnly.gaji_bersih;
                 // Update grand totals
-                grandTotals.comm += commAmount;
+                grandTotals[commField] += commAmount;
                 grandTotals.gaji_kasar += commAmount;
                 grandTotals.gaji_bersih += commAmount;
                 grandTotals.jumlah += commAmount;
@@ -582,14 +632,14 @@ export default function (pool) {
               }
             }
           } else {
-            // Add to existing employee's commission
-            existingEmployee.comm += commAmount;
+            // Add to existing employee's commission (or Cuti for location 23)
+            existingEmployee[commField] += commAmount;
             existingEmployee.gaji_kasar += commAmount;
             existingEmployee.gaji_bersih += commAmount;
             existingEmployee.jumlah =
               existingEmployee.gaji_bersih - existingEmployee.setengah_bulan;
 
-            locationData[locCode].totals.comm += commAmount;
+            locationData[locCode].totals[commField] += commAmount;
             locationData[locCode].totals.gaji_kasar += commAmount;
             locationData[locCode].totals.gaji_bersih += commAmount;
             locationData[locCode].totals.jumlah += commAmount;
@@ -699,6 +749,7 @@ export default function (pool) {
             ot: emp.ot,
             bonus: emp.bonus,
             comm: emp.comm,
+            cuti: emp.cuti,
             gaji_kasar: emp.gaji_kasar,
             epf_majikan: emp.epf_majikan,
             epf_pekerja: emp.epf_pekerja,
@@ -943,6 +994,19 @@ export default function (pool) {
           JOIN payroll_items pi ON ep.id = pi.employee_payroll_id
           LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
           WHERE mp.year = $1
+            -- Exclude leave-day daily work items (see comment in the monthly
+            -- payroll_items_data CTE) so the breakdown matches gross_pay.
+            AND NOT (
+              pi.work_log_type = 'daily'
+              AND pi.source_date IS NOT NULL
+              AND EXISTS (
+                SELECT 1 FROM leave_records lr2
+                JOIN staffs s2 ON lr2.employee_id = s2.id
+                WHERE s2.name = (SELECT name FROM staffs WHERE id = ep.employee_id)
+                  AND lr2.status = 'approved'
+                  AND lr2.leave_date = pi.source_date
+              )
+            )
           GROUP BY ep.employee_id, pi.pay_code_id, pi.description, pc.pay_type
         ),
         deductions_data AS (
@@ -968,12 +1032,12 @@ export default function (pool) {
         commission_data AS (
           SELECT
             cr.employee_id,
-            cr.description,
             cr.location_code,
-            COALESCE(SUM(cr.amount), 0) as commission_amount
+            COALESCE(SUM(cr.amount), 0) as commission_amount,
+            COALESCE(SUM(CASE WHEN COALESCE(cr.is_advance, true) THEN cr.amount ELSE 0 END), 0) as advance_amount
           FROM commission_records cr
           WHERE EXTRACT(YEAR FROM cr.commission_date) = $1
-          GROUP BY cr.employee_id, cr.description, cr.location_code
+          GROUP BY cr.employee_id, cr.location_code
         ),
         others_data AS (
           SELECT
@@ -1013,7 +1077,9 @@ export default function (pool) {
           ) as base_pay,
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
-             WHERE pid.employee_id = ebd.employee_id AND COALESCE(pid.pay_type, 'Tambahan') = 'Tambahan'), 0
+             WHERE pid.employee_id = ebd.employee_id
+               AND COALESCE(pid.pay_type, 'Tambahan') = 'Tambahan'
+               AND (pid.pay_code_id IS NULL OR pid.pay_code_id <> 'BONUS')), 0
           ) as tambahan_pay,
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
@@ -1048,25 +1114,44 @@ export default function (pool) {
             (SELECT SUM(employee_amount) FROM deductions_data dd
              WHERE dd.employee_id = ebd.employee_id AND dd.deduction_type = 'income_tax'), 0
           ) as income_tax,
-          -- Commission and bonus data
+          -- Commission and bonus data (exclude location 23 = Cuti Tahunan, counted under Cuti)
           COALESCE(
             (SELECT SUM(commission_amount) FROM commission_data cd
-             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NOT NULL), 0
+             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NOT NULL AND cd.location_code <> '23'), 0
           ) as commission_total,
           COALESCE(
+            (SELECT SUM(advance_amount) FROM commission_data cd
+             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NOT NULL), 0
+          ) as commission_advance_total,
+          -- Cuti Tahunan recorded as commission (location 23) - shown under Cuti, not COMM
+          COALESCE(
             (SELECT SUM(commission_amount) FROM commission_data cd
-             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NULL), 0
+             WHERE cd.employee_id = ebd.employee_id AND cd.location_code = '23'), 0
+          ) as cuti_tahunan_commission_total,
+          (
+            COALESCE(
+              (SELECT SUM(commission_amount) FROM commission_data cd
+               WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NULL), 0
+            ) +
+            COALESCE(
+              (SELECT SUM(amount) FROM payroll_items_data pid
+               WHERE pid.employee_id = ebd.employee_id AND pid.pay_code_id = 'BONUS'), 0
+            )
           ) as bonus_total,
-          -- Others (Kerja Luar OT) data - advances deducted from net_pay just like commission
+          COALESCE(
+            (SELECT SUM(advance_amount) FROM commission_data cd
+             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NULL), 0
+          ) as bonus_advance_total,
+          -- Others (Kerja Luar OT) data - regular earnings, not advance deductions
           COALESCE(
             (SELECT SUM(others_amount) FROM others_data od
              WHERE od.employee_id = ebd.employee_id), 0
           ) as others_total,
-          -- Leave data
+          -- Leave data: combine all 4 cuti types into a single Cuti figure
           COALESCE(
             (SELECT SUM(leave_amount) FROM leave_data ld
-             WHERE ld.employee_id = ebd.employee_id AND ld.leave_type = 'cuti_tahunan'), 0
-          ) as cuti_tahunan_amount
+             WHERE ld.employee_id = ebd.employee_id), 0
+          ) as leave_total
         FROM employee_base_data ebd
         LEFT JOIN mid_month_data mmd ON ebd.employee_id = mmd.employee_id
         LEFT JOIN pinjam_yearly_data pmd ON ebd.employee_id = pmd.employee_id
@@ -1077,14 +1162,14 @@ export default function (pool) {
 
       // Process the data for different views
       const processedData = result.rows.map((row, index) => {
-        const gaji =
-          parseFloat(row.base_pay || 0) + parseFloat(row.tambahan_pay || 0);
+        // GAJI = base pay only. Tambahan pay is shown under COMM/INS/LAIN (Insentif).
+        const gaji = parseFloat(row.base_pay || 0);
         const gajiKasar = parseFloat(row.gross_pay || 0);
-        // Commission and bonus from commission_records are advances already deducted from net_pay in DB.
+        // Only advance commission/bonus records are already deducted from net_pay in DB.
         // Others (Kerja Luar OT) is a regular earning, NOT an advance, so it is NOT added back here.
         const commissionAdvance =
-          parseFloat(row.commission_total || 0) +
-          parseFloat(row.bonus_total || 0);
+          parseFloat(row.commission_advance_total || 0) +
+          parseFloat(row.bonus_advance_total || 0);
         // GAJI BERSIH = net_pay + commission (add back to show true net before advances)
         const gajiBersih = parseFloat(row.net_pay || 0) + commissionAdvance;
         // JUMLAH = net_pay - mid_month (commission already deducted from net_pay)
@@ -1114,7 +1199,17 @@ export default function (pool) {
           gaji: gaji,
           ot: parseFloat(row.overtime_pay || 0),
           bonus: parseFloat(row.bonus_total || 0),
-          comm: parseFloat(row.commission_total || 0),
+          // COMM/INS/LAIN = location commission (excl. Cuti Tahunan loc 23)
+          // + Insentif (all Tambahan payroll pay, excl. BONUS) + Others/Kerja Luar OT (incl. IXT)
+          comm:
+            parseFloat(row.commission_total || 0) +
+            parseFloat(row.tambahan_pay || 0) +
+            parseFloat(row.others_total || 0),
+          // CUTI = all 4 leave types + Cuti Tahunan recorded as commission (loc 23).
+          // Display-only: does not feed gaji_bersih/jumlah (same as comm).
+          cuti:
+            parseFloat(row.leave_total || 0) +
+            parseFloat(row.cuti_tahunan_commission_total || 0),
           gaji_kasar: gajiKasar,
           epf_majikan: parseFloat(row.epf_employer || 0),
           epf_pekerja: parseFloat(row.epf_employee || 0),
@@ -1128,7 +1223,6 @@ export default function (pool) {
           jumlah: jumlah,
           digenapkan: digenapkan,
           setelah_digenapkan: setelah_digenapkan,
-          cuti_tahunan_amount: parseFloat(row.cuti_tahunan_amount || 0),
           // Bank/Pinjam tab data
           gaji_genap: setelah_digenapkan,
           total_pinjam: totalPinjam,
@@ -1145,6 +1239,7 @@ export default function (pool) {
         ot: 0,
         bonus: 0,
         comm: 0,
+        cuti: 0,
         gaji_kasar: 0,
         epf_majikan: 0,
         epf_pekerja: 0,
@@ -1175,6 +1270,7 @@ export default function (pool) {
             ot: 0,
             bonus: 0,
             comm: 0,
+            cuti: 0,
             gaji_kasar: 0,
             epf_majikan: 0,
             epf_pekerja: 0,
@@ -1251,6 +1347,8 @@ export default function (pool) {
         const locCode = row.location_code || "18";
         const commAmount = parseFloat(row.commission_amount || 0);
         const midMonthAmount = midMonthMap.get(row.employee_id) || 0;
+        // Location 23 = Cuti Tahunan: route the amount to the Cuti column, not COMM.
+        const commField = locCode === "23" ? "cuti" : "comm";
 
         const hasRegularPayroll = processedData.some(
           (e) => e.staff_id === row.employee_id,
@@ -1277,7 +1375,8 @@ export default function (pool) {
               gaji: 0,
               ot: 0,
               bonus: 0,
-              comm: commAmount,
+              comm: commField === "comm" ? commAmount : 0,
+              cuti: commField === "cuti" ? commAmount : 0,
               gaji_kasar: commAmount,
               epf_majikan: 0,
               epf_pekerja: 0,
@@ -1299,7 +1398,7 @@ export default function (pool) {
             };
 
             locationData[locCode].employees.push(commissionEmployeeData);
-            locationData[locCode].totals.comm += commAmount;
+            locationData[locCode].totals[commField] += commAmount;
             locationData[locCode].totals.gaji_kasar += commAmount;
             locationData[locCode].totals.gaji_bersih += commAmount;
             locationData[locCode].totals.setengah_bulan += midMonthAmount;
@@ -1314,7 +1413,7 @@ export default function (pool) {
               );
               if (!existingCommOnly) {
                 commissionOnlyEmployees.push(commissionEmployeeData);
-                grandTotals.comm += commAmount;
+                grandTotals[commField] += commAmount;
                 grandTotals.gaji_kasar += commAmount;
                 grandTotals.gaji_bersih += commAmount;
                 grandTotals.setengah_bulan += midMonthAmount;
@@ -1325,7 +1424,7 @@ export default function (pool) {
                 const previousDigenapkan = existingCommOnly.digenapkan || 0;
                 const previousSetelahDigenapkan =
                   existingCommOnly.setelah_digenapkan || 0;
-                existingCommOnly.comm += commAmount;
+                existingCommOnly[commField] += commAmount;
                 existingCommOnly.gaji_kasar += commAmount;
                 existingCommOnly.gaji_bersih += commAmount;
                 existingCommOnly.jumlah =
@@ -1341,7 +1440,7 @@ export default function (pool) {
                   existingCommOnly.setelah_digenapkan;
                 existingCommOnly.final_total = existingCommOnly.gaji_genap;
                 existingCommOnly.net_pay = existingCommOnly.gaji_bersih;
-                grandTotals.comm += commAmount;
+                grandTotals[commField] += commAmount;
                 grandTotals.gaji_kasar += commAmount;
                 grandTotals.gaji_bersih += commAmount;
                 grandTotals.jumlah += commAmount;
@@ -1353,13 +1452,13 @@ export default function (pool) {
               }
             }
           } else {
-            existingEmployee.comm += commAmount;
+            existingEmployee[commField] += commAmount;
             existingEmployee.gaji_kasar += commAmount;
             existingEmployee.gaji_bersih += commAmount;
             existingEmployee.jumlah =
               existingEmployee.gaji_bersih - existingEmployee.setengah_bulan;
 
-            locationData[locCode].totals.comm += commAmount;
+            locationData[locCode].totals[commField] += commAmount;
             locationData[locCode].totals.gaji_kasar += commAmount;
             locationData[locCode].totals.gaji_bersih += commAmount;
             locationData[locCode].totals.jumlah += commAmount;
@@ -1462,6 +1561,7 @@ export default function (pool) {
             ot: emp.ot,
             bonus: emp.bonus,
             comm: emp.comm,
+            cuti: emp.cuti,
             gaji_kasar: emp.gaji_kasar,
             epf_majikan: emp.epf_majikan,
             epf_pekerja: emp.epf_pekerja,

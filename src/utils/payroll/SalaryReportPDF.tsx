@@ -24,7 +24,7 @@ const colors = {
   grandTotalBg: "#94a3b8",
 };
 
-// Styles for A4 Landscape with 19 columns
+// Styles for A4 Landscape with 20 columns
 const styles = StyleSheet.create({
   page: {
     paddingTop: 15,
@@ -153,15 +153,16 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     alignItems: "center",
   },
-  // Column definitions - 19 columns for A4 Landscape
+  // Column definitions - 20 columns for A4 Landscape
   // Regular columns: padding 2 horizontal, 1 vertical (matching px-2 py-2 scaled down)
   // EPF/SOCSO/SIP columns: padding 1 horizontal (matching px-1 py-2 scaled down)
   colBil: { width: "2.5%", textAlign: "center", paddingVertical: 1, paddingHorizontal: 1, borderRightWidth: 0.5, borderRightColor: colors.border },
-  colName: { width: "18%", textAlign: "left", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
+  colName: { width: "13.5%", textAlign: "left", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
   colGaji: { width: "5%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
   colOt: { width: "4%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
   colBonus: { width: "4.5%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
   colComm: { width: "4.5%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
+  colCuti: { width: "4.5%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
   colGajiKasar: { width: "5%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
   // EPF group - left border on MAJ to separate from previous section
   colEpfMaj: { width: "4%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 1, borderLeftWidth: 0.5, borderLeftColor: colors.border, borderRightWidth: 0.5, borderRightColor: colors.borderLight },
@@ -209,6 +210,7 @@ interface EmployeeSalaryData {
   ot: number;
   bonus: number;
   comm: number;
+  cuti: number;
   gaji_kasar: number;
   epf_majikan: number;
   epf_pekerja: number;
@@ -229,6 +231,7 @@ interface GrandTotals {
   ot: number;
   bonus: number;
   comm: number;
+  cuti: number;
   gaji_kasar: number;
   epf_majikan: number;
   epf_pekerja: number;
@@ -254,6 +257,7 @@ interface LocationSalaryData {
     ot: number;
     bonus: number;
     comm: number;
+    cuti: number;
     gaji_kasar: number;
     epf_majikan: number;
     epf_pekerja: number;
@@ -318,6 +322,7 @@ const toGrandTotals = (emp: {
   ot?: number;
   bonus?: number;
   comm?: number;
+  cuti?: number;
   gaji_kasar?: number;
   epf_majikan?: number;
   epf_pekerja?: number;
@@ -336,6 +341,7 @@ const toGrandTotals = (emp: {
   ot: emp.ot ?? 0,
   bonus: emp.bonus ?? 0,
   comm: emp.comm ?? 0,
+  cuti: emp.cuti ?? 0,
   gaji_kasar: emp.gaji_kasar ?? 0,
   epf_majikan: emp.epf_majikan ?? 0,
   epf_pekerja: emp.epf_pekerja ?? 0,
@@ -409,7 +415,10 @@ const TableHeader: React.FC<{ isLocationReport: boolean }> = ({
           <Text style={styles.headerText}>BONUS</Text>
         </View>
         <View style={styles.colComm}>
-          <Text style={styles.headerText}>COMM</Text>
+          <Text style={styles.headerTextSmall}>C/I/O</Text>
+        </View>
+        <View style={styles.colCuti}>
+          <Text style={styles.headerText}>CUTI</Text>
         </View>
         <View style={styles.colGajiKasar}>
           <Text style={styles.headerText}>G. KASAR</Text>
@@ -453,6 +462,7 @@ const TableHeader: React.FC<{ isLocationReport: boolean }> = ({
         <View style={styles.colOt}><Text style={styles.subHeaderText}></Text></View>
         <View style={styles.colBonus}><Text style={styles.subHeaderText}></Text></View>
         <View style={styles.colComm}><Text style={styles.subHeaderText}></Text></View>
+        <View style={styles.colCuti}><Text style={styles.subHeaderText}></Text></View>
         <View style={styles.colGajiKasar}><Text style={styles.subHeaderText}></Text></View>
         <View style={[styles.colEpfMaj, { textAlign: "center" }]}><Text style={styles.subHeaderText}>MAJ</Text></View>
         <View style={[styles.colEpfPkj, { textAlign: "center" }]}><Text style={styles.subHeaderText}>PKJ</Text></View>
@@ -489,6 +499,7 @@ const DataRow: React.FC<{
       <View style={styles.colOt}><Text style={textStyle}>{formatCurrency(data.ot)}</Text></View>
       <View style={styles.colBonus}><Text style={textStyle}>{formatCurrency(data.bonus)}</Text></View>
       <View style={styles.colComm}><Text style={textStyle}>{formatCurrency(data.comm)}</Text></View>
+      <View style={styles.colCuti}><Text style={textStyle}>{formatCurrency(data.cuti)}</Text></View>
       <View style={styles.colGajiKasar}><Text style={textStyle}>{formatCurrency(data.gaji_kasar)}</Text></View>
       <View style={styles.colEpfMaj}><Text style={textStyle}>{formatCurrency(data.epf_majikan)}</Text></View>
       <View style={styles.colEpfPkj}><Text style={textStyle}>{formatCurrency(data.epf_pekerja)}</Text></View>
@@ -545,6 +556,7 @@ const CarumanTotalsRow: React.FC<{ totals: GrandTotals }> = ({ totals }) => {
       <View style={styles.colOt}><Text style={styles.dataText}></Text></View>
       <View style={styles.colBonus}><Text style={styles.dataText}></Text></View>
       <View style={styles.colComm}><Text style={styles.dataText}></Text></View>
+      <View style={styles.colCuti}><Text style={styles.dataText}></Text></View>
       <View style={styles.colGajiKasar}><Text style={styles.dataText}></Text></View>
       <View style={styles.colEpfMaj}>
         <Text style={[styles.dataTextBold, { textAlign: "right" }]}>{formatCurrency(epfTotal)}</Text>
@@ -577,7 +589,7 @@ const EmployeeIndividualContent: React.FC<{
     <TableHeader isLocationReport={false} />
     {employees.slice(0, -1).map((emp, index) => {
       const fullName = `${(emp.staff_id || '').toUpperCase()} - ${(emp.staff_name || '').toUpperCase()}`;
-      const displayName = truncateName(fullName, 35);
+      const displayName = truncateName(fullName, 28);
       return (
         <DataRow
           key={index}
@@ -592,7 +604,7 @@ const EmployeeIndividualContent: React.FC<{
       {employees.length > 0 && (() => {
         const lastEmp = employees[employees.length - 1];
         const fullName = `${(lastEmp.staff_id || '').toUpperCase()} - ${(lastEmp.staff_name || '').toUpperCase()}`;
-        const displayName = truncateName(fullName, 35);
+        const displayName = truncateName(fullName, 28);
         return (
           <DataRow
             key={employees.length - 1}
@@ -645,6 +657,7 @@ const EmployeeGroupedContent: React.FC<{
         ot: acc.ot + emp.ot,
         bonus: acc.bonus + emp.bonus,
         comm: acc.comm + emp.comm,
+        cuti: acc.cuti + emp.cuti,
         gaji_kasar: acc.gaji_kasar + emp.gaji_kasar,
         epf_majikan: acc.epf_majikan + emp.epf_majikan,
         epf_pekerja: acc.epf_pekerja + emp.epf_pekerja,
@@ -660,7 +673,7 @@ const EmployeeGroupedContent: React.FC<{
         setelah_digenapkan: acc.setelah_digenapkan + emp.setelah_digenapkan,
       }),
       {
-        gaji: 0, ot: 0, bonus: 0, comm: 0, gaji_kasar: 0,
+        gaji: 0, ot: 0, bonus: 0, comm: 0, cuti: 0, gaji_kasar: 0,
         epf_majikan: 0, epf_pekerja: 0, socso_majikan: 0, socso_pekerja: 0,
         sip_majikan: 0, sip_pekerja: 0, pcb: 0, gaji_bersih: 0,
         setengah_bulan: 0, jumlah: 0, digenapkan: 0, setelah_digenapkan: 0,
@@ -693,7 +706,7 @@ const EmployeeGroupedContent: React.FC<{
             <LocationHeaderRow locationId={item.id || ""} locationName={locationName} />
             {locationData.employees.slice(0, -1).map((emp, empIdx) => {
               const fullName = `${(emp.staff_id || '').toUpperCase()} - ${(emp.staff_name || '').toUpperCase()}`;
-              const displayName = truncateName(fullName, 35);
+              const displayName = truncateName(fullName, 28);
               return (
                 <DataRow
                   key={empIdx}
@@ -708,7 +721,7 @@ const EmployeeGroupedContent: React.FC<{
               {locationData.employees.length > 0 && (() => {
                 const lastEmp = locationData.employees[locationData.employees.length - 1];
                 const fullName = `${(lastEmp.staff_id || '').toUpperCase()} - ${(lastEmp.staff_name || '').toUpperCase()}`;
-                const displayName = truncateName(fullName, 35);
+                const displayName = truncateName(fullName, 28);
                 return (
                   <DataRow
                     key={locationData.employees.length - 1}
@@ -771,7 +784,7 @@ const LocationTotalsContent: React.FC<{
 
       // Empty location row
       const emptyData: GrandTotals = {
-        gaji: 0, ot: 0, bonus: 0, comm: 0, gaji_kasar: 0,
+        gaji: 0, ot: 0, bonus: 0, comm: 0, cuti: 0, gaji_kasar: 0,
         epf_majikan: 0, epf_pekerja: 0, socso_majikan: 0, socso_pekerja: 0,
         sip_majikan: 0, sip_pekerja: 0, pcb: 0, gaji_bersih: 0,
         setengah_bulan: 0, jumlah: 0, digenapkan: 0, setelah_digenapkan: 0,

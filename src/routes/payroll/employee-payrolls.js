@@ -1,5 +1,6 @@
 // src/routes/payroll/employee-payrolls.js
 import { Router } from "express";
+import { resolveContributionContext } from "./contributionOverrides.js";
 
 const SOCSO_SKBBK_EFFECTIVE_YEAR = 2026;
 const SOCSO_SKBBK_EFFECTIVE_MONTH = 6;
@@ -13,6 +14,49 @@ const isSOCSOSKBBKEffective = (year, month) => {
       payrollMonth >= SOCSO_SKBBK_EFFECTIVE_MONTH)
   );
 };
+
+// Normalize a date value (string or Date) to a local YYYY-MM-DD string.
+// Never via toISOString — the server runs in Asia/Kuala_Lumpur (UTC+8) and that
+// would roll the date back a day.
+const toLocalYMD = (value) => {
+  if (!value) return null;
+  if (typeof value === "string") {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    return value.split("T")[0].split(" ")[0];
+  }
+  if (value instanceof Date) {
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, "0");
+    const d = String(value.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  return null;
+};
+
+// Backend mirror of filterOutLeaveDayItems (src/utils/payroll/payrollUtils.ts):
+// daily work-log items dated on a leave day pay nothing as work — the day is paid
+// via the Cuti block instead — so they must be excluded from gross pay exactly as
+// the payslip already excludes them from display. Without this, unit-based codes
+// (Bag/Tray/Bundle) that get quantity 1 on a leave day carry a real amount and
+// inflate the stored/recalculated gross above the sum the payslip shows.
+// Only work_log_type === "daily" items are affected; monthly/production items are
+// always kept, matching the frontend filter.
+const removeLeaveDayWorkItems = (items, leaveDateSet) => {
+  if (!Array.isArray(items) || items.length === 0) return items || [];
+  if (!leaveDateSet || leaveDateSet.size === 0) return items;
+  return items.filter((item) => {
+    if (item.work_log_type !== "daily" || !item.source_date) return true;
+    const ymd = toLocalYMD(item.source_date);
+    return ymd === null || !leaveDateSet.has(ymd);
+  });
+};
+
+const buildLeaveDateSet = (leaveRecords) =>
+  new Set(
+    (leaveRecords || [])
+      .map((record) => toLocalYMD(record.date))
+      .filter(Boolean),
+  );
 
 // Moved to top-level to be reusable
 const saveDeductions = async (pool, employeePayrollId, deductions) => {
@@ -73,7 +117,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
 
     // Get employee's info (birthdate, nationality, marital status, spouse employment status, number of children)
     const employeeInfoRes = await pool.query(
-      "SELECT birthdate, nationality, marital_status, spouse_employment_status, number_of_children FROM staffs WHERE id = $1",
+      "SELECT birthdate, nationality, marital_status, spouse_employment_status, number_of_children, epf_age_override, epf_nationality_override, socso_age_override, sip_age_override FROM staffs WHERE id = $1",
       [employee_id],
     );
     if (employeeInfoRes.rows.length === 0)
@@ -142,10 +186,16 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       amount_paid: parseFloat(record.amount_paid || 0),
     }));
 
+    // Exclude daily work items dated on a leave day — they pay nothing as work
+    // (the day is paid via leave) and would otherwise inflate gross, mirroring
+    // the payslip display. Used for gross + EPF base below.
+    const leaveDateSet = buildLeaveDateSet(leaveRecords);
+    const workItems = removeLeaveDayWorkItems(payrollItems, leaveDateSet);
+
     // Get commission records for this employee for the specific month/year
     const commissionRecordsRes = await pool.query(
       `
-      SELECT amount, description
+      SELECT amount, description, is_advance
       FROM commission_records
       WHERE employee_id = $1
         AND DATE(commission_date) >= $2
@@ -208,14 +258,6 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     // 2. PERFORM CALCULATIONS (Server-side implementation of client logic)
 
     // --- Calculation Helpers ---
-    const getEmployeeType = (nationality, age) => {
-      const isLocal = (nationality || "").toLowerCase() === "malaysian";
-      if (isLocal && age < 60) return "local_under_60";
-      if (isLocal && age >= 60) return "local_over_60";
-      if (!isLocal && age < 60) return "foreign_under_60";
-      return "foreign_over_60";
-    };
-
     const findEPFRate = (rates, type, wage) => {
       const applicable = rates.filter((r) => r.employee_type === type);
       if (!applicable.length) return null;
@@ -309,7 +351,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       return totalCents;
     };
 
-    const workGrossPayCents = consolidateItems(payrollItems);
+    const workGrossPayCents = consolidateItems(workItems);
     const workGrossPay = workGrossPayCents / 100;
     const leaveGrossPayCents = leaveRecords.reduce(
       (sum, record) => sum + Math.round(record.amount_paid * 100),
@@ -321,6 +363,14 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       0,
     );
     const commissionGrossPay = commissionGrossPayCents / 100;
+    const commissionAdvanceCents = commissionRecords.reduce(
+      (sum, record) =>
+        record.is_advance === false
+          ? sum
+          : sum + Math.round(record.amount * 100),
+      0,
+    );
+    const commissionAdvancePay = commissionAdvanceCents / 100;
     const othersGrossPayCents = othersRecords.reduce(
       (sum, record) => sum + Math.round(record.amount * 100),
       0,
@@ -332,7 +382,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
           100,
       ) / 100;
 
-    const groupedItems = payrollItems.reduce(
+    const groupedItems = workItems.reduce(
       (acc, item) => {
         const type = item.pay_type || "Tambahan"; // Default to Tambahan
         if (!acc[type]) acc[type] = [];
@@ -355,15 +405,14 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       (Date.now() - new Date(employeeInfo.birthdate).getTime()) /
         (365.25 * 24 * 60 * 60 * 1000),
     );
-    const employeeType = getEmployeeType(
-      employeeInfo.nationality || "Malaysian",
-      age,
-    );
+    const contributionCtx = resolveContributionContext(employeeInfo, age);
 
     const deductions = [];
 
     // Calculate EPF
-    const epfRate = findEPFRate(epfRates, employeeType, epfGrossPay);
+    const epfRate = contributionCtx.epf.eligible
+      ? findEPFRate(epfRates, contributionCtx.epf.employeeType, epfGrossPay)
+      : null;
     if (epfRate) {
       const wageCeiling = getEPFWageCeiling(epfGrossPay);
       if (wageCeiling > 0) {
@@ -389,7 +438,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
             employer_rate: epfRate.employer_rate_percentage
               ? `${epfRate.employer_rate_percentage}%`
               : `RM${epfRate.employer_fixed_amount}`,
-            age_group: employeeType,
+            age_group: contributionCtx.epf.employeeType,
             wage_ceiling_used: wageCeiling,
           },
         });
@@ -397,9 +446,11 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     }
 
     // Calculate SOCSO. SKBBK applies from June 2026 payrolls onward.
-    const socsoRate = findRateByWage(socsoRates, grossPay);
+    const socsoRate = contributionCtx.socso.eligible
+      ? findRateByWage(socsoRates, grossPay)
+      : null;
     if (socsoRate) {
-      const isOver60 = age >= 60;
+      const isOver60 = contributionCtx.socso.isOver60;
       const shouldApplySKBBK = isSOCSOSKBBKEffective(year, month);
       const skbbk =
         shouldApplySKBBK
@@ -432,9 +483,11 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     }
 
     // Calculate SIP (only for Malaysian citizens under 60)
-    const isMalaysian =
-      (employeeInfo.nationality || "").toLowerCase() === "malaysian";
-    if (age < 60 && isMalaysian) {
+    if (
+      contributionCtx.sip.eligible &&
+      contributionCtx.sip.under60 &&
+      contributionCtx.isMalaysian
+    ) {
       const sipRate = findRateByWage(sipRates, grossPay);
       if (sipRate) {
         deductions.push({
@@ -515,9 +568,9 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       (sum, d) => sum + d.employee_amount,
       0,
     );
-    // Commission amounts are deducted as advance payments.
+    // Only advance commission/bonus records are deducted as advance payments.
     // Others (Kerja Luar OT) is treated as a regular earning — included in gross/EPF only, NOT deducted from net.
-    const totalCommissionDeductions = commissionGrossPay;
+    const totalCommissionDeductions = commissionAdvancePay;
     const netPay =
       grossPay - totalEmployeeDeductions - totalCommissionDeductions;
 
@@ -558,7 +611,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
   }
 };
 
-export { recalculateAndUpdatePayroll };
+export { recalculateAndUpdatePayroll, removeLeaveDayWorkItems, buildLeaveDateSet };
 
 export default function (pool) {
   const router = Router();
@@ -773,7 +826,8 @@ export default function (pool) {
         ep.id as employee_payroll_id,
         orec.*,
         s.name as employee_name,
-        pc.description as pay_code_description
+        pc.description as pay_code_description,
+        pc.pay_type as pay_code_pay_type
       FROM employee_payrolls ep
       JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
       JOIN staffs emp_staff ON ep.employee_id = emp_staff.id
@@ -896,6 +950,7 @@ export default function (pool) {
         midMonthResult,
         commissionsResult,
         othersResult,
+        pinjamResult,
       ] = await Promise.all([
         // Get payroll items (including job_type, source_employee_id and source tracking for traceability)
         pool.query(
@@ -1041,7 +1096,8 @@ export default function (pool) {
           ? pool.query(
               `
               SELECT orec.*, s.name as employee_name,
-                     pc.description as pay_code_description
+                     pc.description as pay_code_description,
+                     pc.pay_type as pay_code_pay_type
               FROM others_records orec
               JOIN staffs s ON orec.employee_id = s.id
               LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
@@ -1059,7 +1115,8 @@ export default function (pool) {
           : pool.query(
               `
               SELECT orec.*, s.name as employee_name,
-                     pc.description as pay_code_description
+                     pc.description as pay_code_description,
+                     pc.pay_type as pay_code_pay_type
               FROM others_records orec
               JOIN staffs s ON orec.employee_id = s.id
               LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
@@ -1074,6 +1131,18 @@ export default function (pool) {
                 `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-${new Date(payrollData.year, payrollData.month, 0).getDate().toString().padStart(2, "0")}`,
               ],
             ),
+
+        // Get pinjam records for this employee for the specific month/year.
+        pool.query(
+          `
+          SELECT p.*, s.name as employee_name
+          FROM pinjam_records p
+          LEFT JOIN staffs s ON p.employee_id = s.id
+          WHERE p.employee_id = $1 AND p.year = $2 AND p.month = $3
+          ORDER BY p.year DESC, p.month DESC, p.employee_id, p.pinjam_type, p.description
+        `,
+          [payrollData.employee_id, payrollData.year, payrollData.month],
+        ),
       ]);
 
       // Parse items
@@ -1101,6 +1170,10 @@ export default function (pool) {
         amount: parseFloat(record.amount),
         rate: parseFloat(record.rate),
         quantity: parseFloat(record.quantity),
+      }));
+      const pinjamRecords = pinjamResult.rows.map((record) => ({
+        ...record,
+        amount: parseFloat(record.amount),
       }));
 
       // Recalculate gross_pay using CONSOLIDATED approach (matches frontend display)
@@ -1136,7 +1209,11 @@ export default function (pool) {
         return totalCents;
       };
 
-      const workGrossPayCents = consolidateItemsAPI(items);
+      // Exclude leave-day daily items so the recalculated gross matches the
+      // payslip display (which already filters them via filterOutLeaveDayItems).
+      const workGrossPayCents = consolidateItemsAPI(
+        removeLeaveDayWorkItems(items, buildLeaveDateSet(leaveRecords)),
+      );
       const leaveGrossPayCents = leaveRecords.reduce(
         (sum, r) => sum + Math.round(r.amount_paid * 100),
         0,
@@ -1187,6 +1264,7 @@ export default function (pool) {
             : null,
         commission_records: commissionRecords,
         others_records: othersRecords,
+        pinjam_records: pinjamRecords,
       };
 
       res.json(response);
@@ -1379,7 +1457,8 @@ export default function (pool) {
           ? pool.query(
               `
               SELECT orec.*, s.name as employee_name,
-                     pc.description as pay_code_description
+                     pc.description as pay_code_description,
+                     pc.pay_type as pay_code_pay_type
               FROM others_records orec
               JOIN staffs s ON orec.employee_id = s.id
               LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
@@ -1397,7 +1476,8 @@ export default function (pool) {
           : pool.query(
               `
               SELECT orec.*, s.name as employee_name,
-                     pc.description as pay_code_description
+                     pc.description as pay_code_description,
+                     pc.pay_type as pay_code_pay_type
               FROM others_records orec
               JOIN staffs s ON orec.employee_id = s.id
               LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
@@ -1474,7 +1554,11 @@ export default function (pool) {
         return totalCents;
       };
 
-      const workGrossPayCents = consolidateItemsAPI(items);
+      // Exclude leave-day daily items so the recalculated gross matches the
+      // payslip display (which already filters them via filterOutLeaveDayItems).
+      const workGrossPayCents = consolidateItemsAPI(
+        removeLeaveDayWorkItems(items, buildLeaveDateSet(leaveRecords)),
+      );
       const leaveGrossPayCents = leaveRecords.reduce(
         (sum, r) => sum + Math.round(r.amount_paid * 100),
         0,

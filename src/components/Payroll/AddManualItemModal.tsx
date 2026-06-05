@@ -16,8 +16,10 @@ import {
 import Button from "../Button";
 import { FormInput } from "../FormComponents";
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
-import { addManualPayrollItem } from "../../utils/payroll/payrollUtils";
-import { PayrollCalculationService } from "../../utils/payroll/payrollCalculationService";
+import {
+  addManualPayrollItem,
+  calculateAmount,
+} from "../../utils/payroll/payrollUtils";
 import { RateUnit } from "../../types/types";
 import toast from "react-hot-toast";
 import {
@@ -182,7 +184,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
   useEffect(() => {
     if (selectedPayCodeDetails) {
       try {
-        const calculatedAmount = PayrollCalculationService.calculateAmount(
+        const calculatedAmount = calculateAmount(
           parseFloat(rate || "0"),
           parseFloat(quantity || "0"),
           selectedPayCodeDetails.rate_unit

@@ -30,6 +30,7 @@ interface Bonus {
   created_at: string;
   location_code: null;
   location_name: null;
+  is_advance: boolean;
 }
 
 const BonusPage: React.FC = () => {
@@ -232,6 +233,9 @@ const BonusPage: React.FC = () => {
                     Amount
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Description
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
@@ -253,6 +257,15 @@ const BonusPage: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-default-900 dark:text-gray-100">
                       {formatCurrency(bonus.amount)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 dark:text-gray-100">
+                      <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+                        bonus.is_advance === false
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                          : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                      }`}>
+                        {bonus.is_advance === false ? "Normal" : "Advance"}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 dark:text-gray-100">
                       {bonus.description}
@@ -312,6 +325,7 @@ const BonusPage: React.FC = () => {
         }}
         onSuccess={fetchBonuses}
         incentive={editingBonus}
+        displayLabel="Bonus"
       />
 
       {/* Delete Confirmation Dialog */}

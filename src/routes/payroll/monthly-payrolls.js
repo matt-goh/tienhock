@@ -1,6 +1,10 @@
 // src/routes/payroll/monthly-payrolls.js
 import { Router } from "express";
-import { recalculateAndUpdatePayroll } from "./employee-payrolls.js";
+import {
+  recalculateAndUpdatePayroll,
+  removeLeaveDayWorkItems,
+} from "./employee-payrolls.js";
+import { resolveContributionContext } from "./contributionOverrides.js";
 
 const SOCSO_SKBBK_EFFECTIVE_YEAR = 2026;
 const SOCSO_SKBBK_EFFECTIVE_MONTH = 6;
@@ -555,7 +559,9 @@ export default function (pool) {
           // Staff data
           client.query(`
           SELECT id, name, birthdate, nationality, marital_status,
-            spouse_employment_status, number_of_children
+            spouse_employment_status, number_of_children,
+            epf_age_override, epf_nationality_override,
+            socso_age_override, sip_age_override
           FROM staffs
         `),
 
@@ -1229,14 +1235,6 @@ export default function (pool) {
       });
 
       // Helper functions for calculations
-      const getEmployeeType = (nationality, age) => {
-        const isLocal = (nationality || "").toLowerCase() === "malaysian";
-        if (isLocal && age < 60) return "local_under_60";
-        if (isLocal && age >= 60) return "local_over_60";
-        if (!isLocal && age < 60) return "foreign_under_60";
-        return "foreign_over_60";
-      };
-
       const findEPFRate = (rates, type, wage) => {
         const applicable = rates.filter((r) => r.employee_type === type);
         if (!applicable.length) return null;
@@ -1326,11 +1324,67 @@ export default function (pool) {
             manualItemsByEmployee[primaryEmployee.employeeId] || [];
           manualItems.forEach((item) => combinedItems.push(item));
 
+          // Fetch leave, commission, and others (Kerja Luar OT) records for this
+          // employee first — the leave dates are needed to drop leave-day work
+          // items before computing gross.
+          const [leaveResult, commissionResult, othersResult] =
+            await Promise.all([
+              client.query(
+                `
+              SELECT to_char(leave_date, 'YYYY-MM-DD') as date, amount_paid
+              FROM leave_records
+              WHERE employee_id IN (
+                SELECT id FROM staffs WHERE name = $1
+              )
+                AND EXTRACT(YEAR FROM leave_date) = $2
+                AND EXTRACT(MONTH FROM leave_date) = $3
+                AND status = 'approved'
+            `,
+                [employeeName, year, month],
+              ),
+              client.query(
+                `
+              SELECT
+                SUM(amount) as total,
+                SUM(CASE WHEN COALESCE(is_advance, true) THEN amount ELSE 0 END) as advance_total
+              FROM commission_records
+              WHERE employee_id = $1 AND DATE(commission_date) >= $2 AND DATE(commission_date) <= $3
+            `,
+                [primaryEmployee.employeeId, startDate, endDate],
+              ),
+              client.query(
+                `
+              SELECT SUM(amount) as total FROM others_records
+              WHERE employee_id = $1 AND DATE(record_date) >= $2 AND DATE(record_date) <= $3
+            `,
+                [primaryEmployee.employeeId, startDate, endDate],
+              ),
+            ]);
+
+          const leaveGrossPay = leaveResult.rows.reduce(
+            (sum, row) => sum + (parseFloat(row.amount_paid) || 0),
+            0,
+          );
+          const leaveDateSet = new Set(
+            leaveResult.rows.map((row) => row.date).filter(Boolean),
+          );
+          const commissionGrossPay =
+            parseFloat(commissionResult.rows[0]?.total) || 0;
+          const commissionAdvancePay =
+            parseFloat(commissionResult.rows[0]?.advance_total) || 0;
+          const othersGrossPay = parseFloat(othersResult.rows[0]?.total) || 0;
+
+          // Exclude daily work items dated on a leave day — they pay nothing as
+          // work (the day is paid via leave) and would otherwise inflate gross
+          // above the sum the payslip shows. The rows are still stored (below);
+          // they are only excluded from the gross/EPF totals.
+          const grossItems = removeLeaveDayWorkItems(combinedItems, leaveDateSet);
+
           // Calculate gross pay using CONSOLIDATED approach (matches frontend display)
           // This groups items by pay_code+rate+rate_unit, sums quantities, then calculates once
           // This ensures database gross_pay matches the consolidated view exactly
           const consolidatedGroups = new Map();
-          combinedItems.forEach((item) => {
+          grossItems.forEach((item) => {
             const key = `${item.pay_code_id}_${item.rate}_${item.rate_unit}`;
             if (consolidatedGroups.has(key)) {
               const group = consolidatedGroups.get(key);
@@ -1365,41 +1419,6 @@ export default function (pool) {
           });
           const workGrossPay = workGrossPayCents / 100;
 
-          // Fetch leave, commission, and others (Kerja Luar OT) records for this employee
-          const [leaveResult, commissionResult, othersResult] =
-            await Promise.all([
-              client.query(
-                `
-              SELECT SUM(amount_paid) as total FROM leave_records
-              WHERE employee_id IN (
-                SELECT id FROM staffs WHERE name = $1
-              )
-                AND EXTRACT(YEAR FROM leave_date) = $2
-                AND EXTRACT(MONTH FROM leave_date) = $3
-                AND status = 'approved'
-            `,
-                [employeeName, year, month],
-              ),
-              client.query(
-                `
-              SELECT SUM(amount) as total FROM commission_records
-              WHERE employee_id = $1 AND DATE(commission_date) >= $2 AND DATE(commission_date) <= $3
-            `,
-                [primaryEmployee.employeeId, startDate, endDate],
-              ),
-              client.query(
-                `
-              SELECT SUM(amount) as total FROM others_records
-              WHERE employee_id = $1 AND DATE(record_date) >= $2 AND DATE(record_date) <= $3
-            `,
-                [primaryEmployee.employeeId, startDate, endDate],
-              ),
-            ]);
-
-          const leaveGrossPay = parseFloat(leaveResult.rows[0]?.total) || 0;
-          const commissionGrossPay =
-            parseFloat(commissionResult.rows[0]?.total) || 0;
-          const othersGrossPay = parseFloat(othersResult.rows[0]?.total) || 0;
           const grossPay =
             workGrossPay + leaveGrossPay + commissionGrossPay + othersGrossPay;
 
@@ -1423,13 +1442,11 @@ export default function (pool) {
             (Date.now() - new Date(staff.birthdate).getTime()) /
               (365.25 * 24 * 60 * 60 * 1000),
           );
-          const employeeType = getEmployeeType(staff.nationality, age);
-          const isMalaysian =
-            (staff.nationality || "").toLowerCase() === "malaysian";
+          const contributionCtx = resolveContributionContext(staff, age);
 
-          // Group items by pay type for EPF calculation
+          // Group items by pay type for EPF calculation (leave-day items excluded)
           const groupedItems = { Base: [], Tambahan: [], Overtime: [] };
-          combinedItems.forEach((item) => {
+          grossItems.forEach((item) => {
             const type = item.pay_type || "Tambahan";
             if (!groupedItems[type]) groupedItems[type] = [];
             groupedItems[type].push(item);
@@ -1445,7 +1462,13 @@ export default function (pool) {
           const deductions = [];
 
           // EPF
-          const epfRate = findEPFRate(epfRates, employeeType, epfGrossPay);
+          const epfRate = contributionCtx.epf.eligible
+            ? findEPFRate(
+                epfRates,
+                contributionCtx.epf.employeeType,
+                epfGrossPay,
+              )
+            : null;
           if (epfRate) {
             const wageCeiling = getEPFWageCeiling(epfGrossPay);
             if (wageCeiling > 0) {
@@ -1472,7 +1495,7 @@ export default function (pool) {
                   employer_rate: epfRate.employer_rate_percentage
                     ? `${epfRate.employer_rate_percentage}%`
                     : `RM${epfRate.employer_fixed_amount}`,
-                  age_group: employeeType,
+                  age_group: contributionCtx.epf.employeeType,
                   wage_ceiling_used: wageCeiling,
                 },
               });
@@ -1480,9 +1503,11 @@ export default function (pool) {
           }
 
           // SOCSO. SKBBK applies from June 2026 payrolls onward.
-          const socsoRate = findRateByWage(socsoRates, grossPay);
+          const socsoRate = contributionCtx.socso.eligible
+            ? findRateByWage(socsoRates, grossPay)
+            : null;
           if (socsoRate) {
-            const isOver60 = age >= 60;
+            const isOver60 = contributionCtx.socso.isOver60;
             const shouldApplySKBBK = isSOCSOSKBBKEffective(year, month);
             const skbbk =
               shouldApplySKBBK
@@ -1519,7 +1544,11 @@ export default function (pool) {
           }
 
           // SIP (Malaysian only, under 60)
-          if (age < 60 && isMalaysian) {
+          if (
+            contributionCtx.sip.eligible &&
+            contributionCtx.sip.under60 &&
+            contributionCtx.isMalaysian
+          ) {
             const sipRate = findRateByWage(sipRates, grossPay);
             if (sipRate) {
               deductions.push({
@@ -1587,13 +1616,13 @@ export default function (pool) {
           }
 
           // Calculate net pay
-          // Commission is deducted as advance; Others (Kerja Luar OT) is a regular earning — gross only, not an advance.
+          // Only advance commission/bonus records are deducted as advance; Others (Kerja Luar OT) is gross only.
           const totalEmployeeDeductions = deductions.reduce(
             (sum, d) => sum + d.employee_amount,
             0,
           );
           const netPay =
-            grossPay - totalEmployeeDeductions - commissionGrossPay;
+            grossPay - totalEmployeeDeductions - commissionAdvancePay;
 
           // Fetch mid-month payroll for rounding calculation
           const midMonthResult = await client.query(

@@ -49,6 +49,10 @@ import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 
 const FIRST_WEEK_DAY_OF_MONTH: number = 7;
 const EXPANDED_JOBS_STORAGE_PREFIX: string = "payroll-expanded-jobs:";
+const SEARCH_TERM_STORAGE_KEY: string = "payroll-search-term";
+const CLEAR_SEARCH_ON_RETURN_STORAGE_KEY: string =
+  "payroll-clear-search-on-return";
+const CLEAR_SEARCH_ON_RETURN_WINDOW_MS: number = 10000;
 
 const getDefaultPayrollMonth = (today: Date = new Date()): Date => {
   const monthOffset: number =
@@ -103,6 +107,46 @@ const saveExpandedJobsToStorage = (
   }
 };
 
+const readSearchTermFromStorage = (): string => {
+  try {
+    const clearSearchMarkedAt: string | null = sessionStorage.getItem(
+      CLEAR_SEARCH_ON_RETURN_STORAGE_KEY
+    );
+    sessionStorage.removeItem(CLEAR_SEARCH_ON_RETURN_STORAGE_KEY);
+
+    if (clearSearchMarkedAt) {
+      const markedAt: number = Number(clearSearchMarkedAt);
+      const isRecentClearRequest: boolean =
+        Number.isFinite(markedAt) &&
+        Date.now() - markedAt <= CLEAR_SEARCH_ON_RETURN_WINDOW_MS;
+
+      if (isRecentClearRequest) {
+        sessionStorage.removeItem(SEARCH_TERM_STORAGE_KEY);
+        return "";
+      }
+    }
+
+    const storedSearchTerm: string | null =
+      sessionStorage.getItem(SEARCH_TERM_STORAGE_KEY);
+
+    return storedSearchTerm ?? "";
+  } catch {
+    return "";
+  }
+};
+
+const saveSearchTermToStorage = (searchTerm: string): void => {
+  try {
+    if (searchTerm) {
+      sessionStorage.setItem(SEARCH_TERM_STORAGE_KEY, searchTerm);
+    } else {
+      sessionStorage.removeItem(SEARCH_TERM_STORAGE_KEY);
+    }
+  } catch {
+    // Ignore storage failures so the payroll page remains usable.
+  }
+};
+
 const buildExpandedJobsState = (
   employeePayrolls: Array<Pick<EmployeePayroll, "job_type">>,
   savedExpandedJobs: Record<string, boolean> | null
@@ -150,7 +194,9 @@ const PayrollPage: React.FC = () => {
   );
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
-  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState<string>(
+    readSearchTermFromStorage
+  );
   const [selectedEmployeePayrolls, setSelectedEmployeePayrolls] = useState<
     Record<string, boolean>
   >({});
@@ -457,6 +503,10 @@ const PayrollPage: React.FC = () => {
   // Reset selections when filters change
   useEffect(() => {
     setSelectedEmployeePayrolls({});
+  }, [searchTerm]);
+
+  useEffect(() => {
+    saveSearchTermToStorage(searchTerm);
   }, [searchTerm]);
 
   useEffect(() => {

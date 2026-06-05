@@ -78,7 +78,11 @@ export default function (pool) {
            s.number_of_children as "numberOfChildren",
            s.department,
            s.kwsp_number as "kwspNumber",
-           s.head_staff_id as "headStaffId"`;
+           s.head_staff_id as "headStaffId",
+           s.epf_age_override as "epfAgeOverride",
+           s.epf_nationality_override as "epfNationalityOverride",
+           s.socso_age_override as "socsoAgeOverride",
+           s.sip_age_override as "sipAgeOverride"`;
 
       let query = `
       SELECT ${columns}
@@ -158,6 +162,10 @@ export default function (pool) {
       numberOfChildren,
       department,
       kwspNumber,
+      epfAgeOverride,
+      epfNationalityOverride,
+      socsoAgeOverride,
+      sipAgeOverride,
     } = req.body;
 
     try {
@@ -198,9 +206,10 @@ export default function (pool) {
           id, name, telephone_no, email, gender, nationality, birthdate, address,
           job, location, date_joined, ic_no, bank_account_number, epf_no,
           income_tax_no, socso_no, document, payment_type, payment_preference,
-          race, agama, date_resigned, marital_status, spouse_employment_status, number_of_children, department, kwsp_number, password, head_staff_id
+          race, agama, date_resigned, marital_status, spouse_employment_status, number_of_children, department, kwsp_number, password, head_staff_id,
+          epf_age_override, epf_nationality_override, socso_age_override, sip_age_override
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33)
         RETURNING *
       `;
 
@@ -234,6 +243,10 @@ export default function (pool) {
         kwspNumber || null,
         password,
         headStaffId,
+        epfAgeOverride || null,
+        epfNationalityOverride || null,
+        socsoAgeOverride || null,
+        sipAgeOverride || null,
       ];
 
       const result = await pool.query(query, values);
@@ -443,7 +456,11 @@ export default function (pool) {
           s.number_of_children as "numberOfChildren",
           s.department,
           s.kwsp_number as "kwspNumber",
-          s.head_staff_id as "headStaffId"
+          s.head_staff_id as "headStaffId",
+          s.epf_age_override as "epfAgeOverride",
+          s.epf_nationality_override as "epfNationalityOverride",
+          s.socso_age_override as "socsoAgeOverride",
+          s.sip_age_override as "sipAgeOverride"
         FROM
           staffs s
         WHERE
@@ -669,6 +686,10 @@ export default function (pool) {
       numberOfChildren,
       department,
       kwspNumber,
+      epfAgeOverride,
+      epfNationalityOverride,
+      socsoAgeOverride,
+      sipAgeOverride,
     } = req.body;
 
     try {
@@ -710,8 +731,9 @@ export default function (pool) {
               ic_no = $12, bank_account_number = $13, epf_no = $14, income_tax_no = $15, 
               socso_no = $16, document = $17, payment_type = $18, payment_preference = $19, 
               race = $20, agama = $21, date_resigned = $22, marital_status = $23, 
-              spouse_employment_status = $24, number_of_children = $25, department = $26, kwsp_number = $27, password = $28
-          WHERE id = $29
+              spouse_employment_status = $24, number_of_children = $25, department = $26, kwsp_number = $27, password = $28,
+              epf_age_override = $29, epf_nationality_override = $30, socso_age_override = $31, sip_age_override = $32
+          WHERE id = $33
           RETURNING *
         `;
 
@@ -744,6 +766,10 @@ export default function (pool) {
           department || null,
           kwspNumber || null,
           password,
+          epfAgeOverride || null,
+          epfNationalityOverride || null,
+          socsoAgeOverride || null,
+          sipAgeOverride || null,
           id,
         ];
 
