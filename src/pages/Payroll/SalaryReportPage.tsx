@@ -34,7 +34,34 @@ import {
 import { generateSalaryReportPDF } from "../../utils/payroll/SalaryReportPDF";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { useLocationMappingsCache } from "../../utils/catalogue/useLocationMappingsCache";
+import { groupStaffsByName } from "../../utils/payroll/groupStaffsByName";
 import toast from "react-hot-toast";
+
+// Cuti (leave) summary types for the Cuti tab
+type CutiLeaveType =
+  | "cuti_sakit"
+  | "cuti_tahunan"
+  | "cuti_umum"
+  | "cuti_rawatan";
+
+interface CutiMonthValue {
+  days: number;
+  amount: number;
+}
+
+interface CutiBatchEmployee {
+  employee: {
+    id: string;
+    name: string;
+  };
+  leaveBalance: {
+    cuti_umum_total: number;
+    cuti_tahunan_total: number;
+    cuti_sakit_total: number;
+    cuti_rawatan_total: number;
+  };
+  monthlySummary: Record<number, Record<CutiLeaveType, CutiMonthValue>>;
+}
 
 // Location order with headers
 interface LocationOrderItem {
@@ -65,6 +92,7 @@ interface EmployeeSalaryData {
   ot: number;
   bonus: number;
   comm: number;
+  cuti: number;
   gaji_kasar: number;
   epf_majikan: number;
   epf_pekerja: number;
@@ -86,6 +114,7 @@ interface GrandTotals {
   ot: number;
   bonus: number;
   comm: number;
+  cuti: number;
   gaji_kasar: number;
   epf_majikan: number;
   epf_pekerja: number;
@@ -134,7 +163,8 @@ interface LocationSalaryData {
     gaji: number; // Base Pay + Tambahan
     ot: number; // Overtime total
     bonus: number; // Bonus amount
-    comm: number; // Commission amount
+    comm: number; // Commission + Others/Kerja Luar OT (incl. IXT)
+    cuti: number; // All leave pay + Cuti Tahunan recorded as commission
     gaji_kasar: number; // Gross pay
     epf_majikan: number;
     epf_pekerja: number;
@@ -154,6 +184,7 @@ interface LocationSalaryData {
     ot: number;
     bonus: number;
     comm: number;
+    cuti: number;
     gaji_kasar: number;
     epf_majikan: number;
     epf_pekerja: number;
@@ -214,6 +245,12 @@ const SalaryReportPage: React.FC = () => {
   const [yearlyComprehensiveSalaryData, setYearlyComprehensiveSalaryData] = useState<ComprehensiveSalaryData | null>(null);
   const [isLoadingYearly, setIsLoadingYearly] = useState<boolean>(false);
 
+  // Cuti (leave) tab states - batch leave report is fetched per year
+  const [cutiEmployees, setCutiEmployees] = useState<CutiBatchEmployee[]>([]);
+  const [cutiLoading, setCutiLoading] = useState<boolean>(false);
+  const [cutiError, setCutiError] = useState<string | null>(null);
+  const [cutiFetchedYear, setCutiFetchedYear] = useState<number | null>(null);
+
   // Filters - use Date for month navigation, initialize from URL params
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
     const yearParam = searchParams.get("year");
@@ -240,9 +277,9 @@ const SalaryReportPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState(() => {
     const tabParam = searchParams.get("tab");
     const tabIndex = tabParam ? parseInt(tabParam, 10) : 0;
-    // Validate tab index (0-3 are valid)
-    return tabIndex >= 0 && tabIndex <= 3 ? tabIndex : 0;
-  }); // 0 = Employee, 1 = Salary, 2 = Bank, 3 = Pinjam
+    // Validate tab index (0-4 are valid)
+    return tabIndex >= 0 && tabIndex <= 4 ? tabIndex : 0;
+  }); // 0 = Employee, 1 = Salary, 2 = Bank, 3 = Pinjam, 4 = Cuti
 
   // Update URL params when tab, year, month, or period changes
   useEffect(() => {
@@ -381,6 +418,16 @@ const SalaryReportPage: React.FC = () => {
     }
   }, [currentYear, periodType]);
 
+  // Load Cuti (leave) report when the Cuti tab is active and the year changes.
+  // The batch report is yearly; the Monthly/Yearly toggle only changes how we
+  // aggregate the data on the client, so we don't refetch on month/period change.
+  useEffect(() => {
+    if (activeTab === 4 && currentYear !== cutiFetchedYear) {
+      fetchCutiReport();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, currentYear, staffs]);
+
   const fetchSalaryReport = async () => {
     setIsLoading(true);
     try {
@@ -413,6 +460,29 @@ const SalaryReportPage: React.FC = () => {
     }
   };
 
+  const fetchCutiReport = async () => {
+    // Multi-ID employees share one leave bucket, so dedupe by name before the call.
+    const employeeIds = groupStaffsByName(staffs).map((s) => s.id);
+    if (employeeIds.length === 0) return;
+
+    setCutiLoading(true);
+    setCutiError(null);
+    try {
+      const response = await api.post("/api/leave-management/batch-reports", {
+        employeeIds,
+        year: currentYear,
+      });
+      setCutiEmployees(response.employees || []);
+      setCutiFetchedYear(currentYear);
+    } catch (error) {
+      console.error("Error fetching cuti report:", error);
+      setCutiEmployees([]);
+      setCutiError("Failed to load leave report.");
+    } finally {
+      setCutiLoading(false);
+    }
+  };
+
   // Active data based on period type
   const activeReportData = periodType === 'yearly' ? yearlyReportData : reportData;
   const activeComprehensiveData = periodType === 'yearly' ? yearlyComprehensiveSalaryData : comprehensiveSalaryData;
@@ -432,6 +502,13 @@ const SalaryReportPage: React.FC = () => {
     ? displayedReportData?.summary.total_final ?? 0
     : displayedReportData?.employees_grand_totals?.setelah_digenapkan ?? 0;
   const refreshDisplayedReport = (): void => {
+    if (activeTab === 4) {
+      // Force a refetch even when the year is unchanged.
+      setCutiFetchedYear(null);
+      void fetchCutiReport();
+      return;
+    }
+
     if (bankPinjamTabsUseMonthlyData || periodType === 'monthly') {
       void fetchSalaryReport();
       return;
@@ -792,8 +869,11 @@ const SalaryReportPage: React.FC = () => {
               <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[70px] truncate" title="Bonus">
                 BONUS
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[70px] truncate" title="Commission">
-                COMM
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[70px] truncate" title="Commission / Insentif / Others">
+                C/I/O
+              </th>
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[70px] truncate" title="Cuti (semua jenis)">
+                CUTI
               </th>
               <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[100px] truncate" title="Gaji Kasar">
                 GAJI KASAR
@@ -839,6 +919,7 @@ const SalaryReportPage: React.FC = () => {
               </th>
             </tr>
             <tr>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
               <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
               <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
               <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
@@ -898,6 +979,9 @@ const SalaryReportPage: React.FC = () => {
                 </td>
                 <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
                   {formatCurrency(emp.comm)}
+                </td>
+                <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                  {formatCurrency(emp.cuti)}
                 </td>
                 <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
                   {formatCurrency(emp.gaji_kasar)}
@@ -963,6 +1047,9 @@ const SalaryReportPage: React.FC = () => {
                   {formatCurrency(grandTotals.comm)}
                 </td>
                 <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
+                  {formatCurrency(grandTotals.cuti)}
+                </td>
+                <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                   {formatCurrency(grandTotals.gaji_kasar)}
                 </td>
                 <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t-2 border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
@@ -1024,7 +1111,7 @@ const SalaryReportPage: React.FC = () => {
           location: '14',
           employees: [],
           totals: {
-            gaji: 0, ot: 0, bonus: 0, comm: 0, gaji_kasar: 0,
+            gaji: 0, ot: 0, bonus: 0, comm: 0, cuti: 0, gaji_kasar: 0,
             epf_majikan: 0, epf_pekerja: 0, socso_majikan: 0, socso_pekerja: 0,
             sip_majikan: 0, sip_pekerja: 0, pcb: 0, gaji_bersih: 0,
             setengah_bulan: 0, jumlah: 0, digenapkan: 0, setelah_digenapkan: 0
@@ -1056,6 +1143,7 @@ const SalaryReportPage: React.FC = () => {
               existing.ot += emp.ot;
               existing.bonus += emp.bonus;
               existing.comm += emp.comm;
+              existing.cuti += emp.cuti;
               existing.gaji_kasar += emp.gaji_kasar;
               existing.epf_majikan += emp.epf_majikan;
               existing.epf_pekerja += emp.epf_pekerja;
@@ -1122,6 +1210,7 @@ const SalaryReportPage: React.FC = () => {
                   <col className="w-[80px]" />
                   <col className="w-[80px]" />
                   <col className="w-[80px]" />
+                  <col className="w-[80px]" />
                   <col className="w-[90px]" />
                   <col className="w-[70px]" />
                   <col className="w-[70px]" />
@@ -1153,8 +1242,11 @@ const SalaryReportPage: React.FC = () => {
                     <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[70px] truncate" title="Bonus">
                       BONUS
                     </th>
-                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[70px] truncate" title="Commission">
-                      COMM
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[70px] truncate" title="Commission / Insentif / Lain-lain">
+                      COMM/INS/LAIN
+                    </th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[70px] truncate" title="Cuti (semua jenis)">
+                      CUTI
                     </th>
                     <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[100px] truncate" title="Gaji Kasar">
                       GAJI KASAR
@@ -1200,6 +1292,7 @@ const SalaryReportPage: React.FC = () => {
                     </th>
                   </tr>
                   <tr>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
                     <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
                     <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
                     <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
@@ -1259,6 +1352,9 @@ const SalaryReportPage: React.FC = () => {
                       </td>
                       <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
                         {formatCurrency(emp.comm)}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.cuti)}
                       </td>
                       <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
                         {formatCurrency(emp.gaji_kasar)}
@@ -1323,6 +1419,9 @@ const SalaryReportPage: React.FC = () => {
                       {formatCurrency(locationData.totals.comm)}
                     </td>
                     <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.cuti)}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
                       {formatCurrency(locationData.totals.gaji_kasar)}
                     </td>
                     <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
@@ -1378,6 +1477,7 @@ const SalaryReportPage: React.FC = () => {
               <col className="w-[80px]" />
               <col className="w-[80px]" />
               <col className="w-[80px]" />
+              <col className="w-[80px]" />
               <col className="w-[90px]" />
               <col className="w-[70px]" />
               <col className="w-[70px]" />
@@ -1411,6 +1511,9 @@ const SalaryReportPage: React.FC = () => {
                 </td>
                 <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
                   {formatCurrency(grandTotals.comm)}
+                </td>
+                <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.cuti)}
                 </td>
                 <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
                   {formatCurrency(grandTotals.gaji_kasar)}
@@ -1483,8 +1586,11 @@ const SalaryReportPage: React.FC = () => {
               <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[70px] truncate" title="Bonus">
                 BONUS
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[70px] truncate" title="Commission">
-                COMM
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[70px] truncate" title="Commission / Insentif / Lain-lain">
+                COMM/INS/LAIN
+              </th>
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[70px] truncate" title="Cuti (semua jenis)">
+                CUTI
               </th>
               <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[100px] truncate" title="Gaji Kasar">
                 GAJI KASAR
@@ -1537,6 +1643,7 @@ const SalaryReportPage: React.FC = () => {
               <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
               <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
               <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
               <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 MAJ
               </th>
@@ -1569,7 +1676,7 @@ const SalaryReportPage: React.FC = () => {
                 return (
                   <tr key={`header-${index}`} className="bg-default-100 dark:bg-gray-800">
                     <td
-                      colSpan={19}
+                      colSpan={20}
                       className="px-2 py-2 text-center text-xs font-medium text-default-600 dark:text-gray-300 border-t border-default-300 dark:border-gray-600"
                     >
                       {item.text}
@@ -1642,7 +1749,19 @@ const SalaryReportPage: React.FC = () => {
                         amount: e.comm,
                         link: `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
                       })) || []}
-                      label="Commission"
+                      label="Commission / Insentif / Lain-lain"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
+                  </td>
+                  <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.cuti || 0}
+                      breakdown={locationData?.employees?.filter(e => e.cuti !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.cuti,
+                        link: `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
+                      })) || []}
+                      label="Cuti"
                       formatCurrency={(v) => formatCurrency(v)}
                     />
                   </td>
@@ -1849,6 +1968,9 @@ const SalaryReportPage: React.FC = () => {
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(activeComprehensiveData.grand_totals.comm)}
+              </td>
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
+                {formatCurrency(activeComprehensiveData.grand_totals.cuti)}
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
@@ -2111,7 +2233,174 @@ const SalaryReportPage: React.FC = () => {
     </div>
   );
 
-  const tabLabels = ["Employee", "Location", "Bank", "Pinjam"];
+  // Cuti (leave) Summary Table - one row per employee, four leave-type groups
+  // each showing Days + Amount. Aggregation follows the Monthly/Yearly toggle.
+  const CutiTable = () => {
+    const cutiTypes: { key: CutiLeaveType; label: string }[] = [
+      { key: "cuti_sakit", label: "Cuti Sakit" },
+      { key: "cuti_tahunan", label: "Cuti Tahunan" },
+      { key: "cuti_umum", label: "Cuti Umum" },
+      { key: "cuti_rawatan", label: "Cuti Rawatan" },
+    ];
+
+    const emptyValue: CutiMonthValue = { days: 0, amount: 0 };
+
+    // Compute per-employee per-type {days, amount} based on the active period.
+    const rows = useMemo(() => {
+      return cutiEmployees.map((emp) => {
+        const totals: Record<CutiLeaveType, CutiMonthValue> = {
+          cuti_sakit: { days: 0, amount: 0 },
+          cuti_tahunan: { days: 0, amount: 0 },
+          cuti_umum: { days: 0, amount: 0 },
+          cuti_rawatan: { days: 0, amount: 0 },
+        };
+
+        const months =
+          periodType === "yearly"
+            ? Array.from({ length: 12 }, (_, i) => i + 1)
+            : [currentMonth];
+
+        months.forEach((m) => {
+          const monthData = emp.monthlySummary?.[m];
+          if (!monthData) return;
+          cutiTypes.forEach(({ key }) => {
+            const v = monthData[key] || emptyValue;
+            totals[key].days += Number(v.days || 0);
+            totals[key].amount += Number(v.amount || 0);
+          });
+        });
+
+        const entitlement: Record<CutiLeaveType, number> = {
+          cuti_sakit: Number(emp.leaveBalance?.cuti_sakit_total || 0),
+          cuti_tahunan: Number(emp.leaveBalance?.cuti_tahunan_total || 0),
+          cuti_umum: Number(emp.leaveBalance?.cuti_umum_total || 0),
+          cuti_rawatan: Number(emp.leaveBalance?.cuti_rawatan_total || 0),
+        };
+
+        return { employee: emp.employee, totals, entitlement };
+      });
+    }, [cutiEmployees, periodType, currentMonth]);
+
+    const grandTotals = useMemo(() => {
+      const acc: Record<CutiLeaveType, { amount: number }> = {
+        cuti_sakit: { amount: 0 },
+        cuti_tahunan: { amount: 0 },
+        cuti_umum: { amount: 0 },
+        cuti_rawatan: { amount: 0 },
+      };
+      rows.forEach((row) => {
+        cutiTypes.forEach(({ key }) => {
+          acc[key].amount += row.totals[key].amount;
+        });
+      });
+      return acc;
+    }, [rows]);
+
+    if (rows.length === 0) return null;
+
+    return (
+      <div className="overflow-auto mb-2 max-h-[75vh] border border-default-200 dark:border-gray-700 rounded-lg">
+        <table className="w-full">
+          <thead className="sticky top-0 z-20 bg-default-50 dark:bg-gray-900">
+            <tr>
+              <th
+                rowSpan={2}
+                className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 align-middle"
+                title="Bilangan"
+              >
+                BIL
+              </th>
+              <th
+                rowSpan={2}
+                className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 align-middle"
+                title="Nama Pekerja"
+              >
+                NAMA PEKERJA
+              </th>
+              {cutiTypes.map(({ key, label }) => (
+                <th
+                  key={key}
+                  colSpan={2}
+                  className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900"
+                  title={label}
+                >
+                  {label}
+                </th>
+              ))}
+            </tr>
+            <tr>
+              {cutiTypes.map(({ key }) => (
+                <React.Fragment key={key}>
+                  <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-l border-b border-default-300 dark:border-gray-600">
+                    HARI
+                  </th>
+                  <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                    AMAUN
+                  </th>
+                </React.Fragment>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
+            {rows.map((row, index) => (
+              <tr
+                key={row.employee.id}
+                className={index % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-default-25 dark:bg-gray-750"}
+              >
+                <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 text-center">
+                  {index + 1}
+                </td>
+                <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-left max-w-[160px]">
+                  <span
+                    className="block truncate"
+                    title={`${row.employee.id.toUpperCase()} - ${row.employee.name.toUpperCase()}`}
+                  >
+                    {row.employee.id.toUpperCase()} - {row.employee.name.toUpperCase()}
+                  </span>
+                </td>
+                {cutiTypes.map(({ key }) => (
+                  <React.Fragment key={key}>
+                    <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
+                      {row.totals[key].days}/{row.entitlement[key]}
+                    </td>
+                    <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                      {formatCurrency(row.totals[key].amount)}
+                    </td>
+                  </React.Fragment>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+          <tfoot className="sticky bottom-0 z-20">
+            <tr>
+              <td
+                colSpan={2}
+                className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600"
+              >
+                GRAND TOTAL:{" "}
+                {formatCurrency(
+                  cutiTypes.reduce(
+                    (sum, { key }) => sum + grandTotals[key].amount,
+                    0
+                  )
+                )}
+              </td>
+              {cutiTypes.map(({ key }) => (
+                <React.Fragment key={key}>
+                  <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t-2 border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800"></td>
+                  <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
+                    {formatCurrency(grandTotals[key].amount)}
+                  </td>
+                </React.Fragment>
+              ))}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    );
+  };
+
+  const tabLabels = ["Employee", "Location", "Bank", "Pinjam", "Cuti"];
 
   return (
     <div className="space-y-3">
@@ -2165,8 +2454,8 @@ const SalaryReportPage: React.FC = () => {
                   </div>
                 </>
               )}
-              {/* Period Toggle - only for tabs 0 (Employee) and 1 (Location) */}
-              {(activeTab === 0 || activeTab === 1) && (
+              {/* Period Toggle - for tabs 0 (Employee), 1 (Location) and 4 (Cuti) */}
+              {(activeTab === 0 || activeTab === 1 || activeTab === 4) && (
                 <>
                   <span className="text-default-300 dark:text-gray-600">|</span>
                   <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
@@ -2211,7 +2500,7 @@ const SalaryReportPage: React.FC = () => {
                   />
                 )}
               </div>
-              {displayedReportData && (
+              {displayedReportData && activeTab !== 4 && (
                 <>
                   <span className="text-default-300 dark:text-gray-600">|</span>
                   <div className="flex items-center gap-4 text-sm text-default-600 dark:text-gray-300">
@@ -2230,7 +2519,7 @@ const SalaryReportPage: React.FC = () => {
                 onClick={refreshDisplayedReport}
                 icon={IconRefresh}
                 variant="outline"
-                disabled={displayedLoading}
+                disabled={activeTab === 4 ? cutiLoading : displayedLoading}
                 size="sm"
               >
                 Refresh
@@ -2246,6 +2535,7 @@ const SalaryReportPage: React.FC = () => {
                   color="green"
                   variant="outline"
                   disabled={
+                    activeTab === 4 ||
                     !displayedReportData ||
                     displayedReportData.data.length === 0 ||
                     isGeneratingPDF
@@ -2262,7 +2552,7 @@ const SalaryReportPage: React.FC = () => {
                           setIsPrintDropdownOpen(false);
                           generatePDF("print");
                         }}
-                        disabled={!displayedReportData || displayedReportData.data.length === 0 || isGeneratingPDF}
+                        disabled={activeTab === 4 || !displayedReportData || displayedReportData.data.length === 0 || isGeneratingPDF}
                         className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Print
@@ -2272,7 +2562,7 @@ const SalaryReportPage: React.FC = () => {
                           setIsPrintDropdownOpen(false);
                           generatePDF("download");
                         }}
-                        disabled={!displayedReportData || displayedReportData.data.length === 0 || isGeneratingPDF}
+                        disabled={activeTab === 4 || !displayedReportData || displayedReportData.data.length === 0 || isGeneratingPDF}
                         className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Download PDF
@@ -2403,7 +2693,7 @@ const SalaryReportPage: React.FC = () => {
                             setIsPrintDropdownOpen(false);
                             generatePDF("print");
                           }}
-                          disabled={!displayedReportData || displayedReportData.data.length === 0 || isGeneratingPDF}
+                          disabled={activeTab === 4 || !displayedReportData || displayedReportData.data.length === 0 || isGeneratingPDF}
                           className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Print
@@ -2413,7 +2703,7 @@ const SalaryReportPage: React.FC = () => {
                             setIsPrintDropdownOpen(false);
                             generatePDF("download");
                           }}
-                          disabled={!displayedReportData || displayedReportData.data.length === 0 || isGeneratingPDF}
+                          disabled={activeTab === 4 || !displayedReportData || displayedReportData.data.length === 0 || isGeneratingPDF}
                           className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Download PDF
@@ -2454,8 +2744,8 @@ const SalaryReportPage: React.FC = () => {
 
             {/* Row 2: Period toggle + Navigators + Stats + View toggle */}
             <div className="flex flex-wrap items-center gap-3">
-              {/* Period Toggle - only for tabs 0 (Employee) and 1 (Location) */}
-              {(activeTab === 0 || activeTab === 1) && (
+              {/* Period Toggle - for tabs 0 (Employee), 1 (Location) and 4 (Cuti) */}
+              {(activeTab === 0 || activeTab === 1 || activeTab === 4) && (
                 <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
                   <button
                     onClick={() => setPeriodType('monthly')}
@@ -2496,7 +2786,7 @@ const SalaryReportPage: React.FC = () => {
                   />
                 )}
               </div>
-              {displayedReportData && (
+              {displayedReportData && activeTab !== 4 && (
                 <>
                   <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
                   <div className="flex items-center gap-2 sm:gap-4 text-sm text-default-600 dark:text-gray-300">
@@ -2513,7 +2803,30 @@ const SalaryReportPage: React.FC = () => {
           </div>
         </div>
 
-        {displayedLoading ? (
+        {activeTab === 4 ? (
+          cutiLoading ? (
+            <div className="flex justify-center py-12">
+              <LoadingSpinner />
+            </div>
+          ) : cutiError ? (
+            <div className="text-center py-12 text-rose-500 dark:text-rose-400">
+              <IconFileText className="mx-auto h-12 w-12 text-rose-300 mb-4" />
+              <p className="text-lg font-medium">{cutiError}</p>
+            </div>
+          ) : cutiEmployees.length === 0 ? (
+            <div className="text-center py-12 text-default-500 dark:text-gray-400">
+              <IconFileText className="mx-auto h-12 w-12 text-default-300 mb-4" />
+              <p className="text-lg font-medium">No leave data found</p>
+              <p>
+                No leave data available for {periodType === 'yearly' ? currentYear : `${getMonthName(currentMonth)} ${currentYear}`}
+              </p>
+            </div>
+          ) : (
+            <div className="px-6 pt-2 pb-2">
+              <CutiTable />
+            </div>
+          )
+        ) : displayedLoading ? (
           <div className="flex justify-center py-12">
             <LoadingSpinner />
           </div>

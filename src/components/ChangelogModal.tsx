@@ -20,6 +20,16 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-05",
+    ms: "Salary Report (jadual Employee/Lokasi): lajur \"COMM\" dinamakan semula kepada \"C/I/O\" dan kini menjumlahkan Commission, semua bayaran Tambahan/Insentif (termasuk IXT, kerja Ahad/penyelenggaraan, dll. — kecuali Bonus) dan Others/Kerja Luar OT. Lajur \"GAJI\" kini menunjukkan gaji asas sahaja (bayaran Tambahan telah dipindahkan ke C/I/O). Lajur baharu \"CUTI\" ditambah yang menjumlahkan semua bayaran cuti (Cuti Umum, Sakit, Tahunan, Rawatan); Cuti Tahunan yang direkod sebagai komisen (lokasi 23) kini dikira di bawah CUTI, bukan lagi C/I/O.",
+    en: "Salary Report (Employee/Location tables): the \"COMM\" column is renamed to \"C/I/O\" and now adds up Commission, all Tambahan/Insentif pay (including IXT, Sunday/maintenance work, etc. — except Bonus) and Others/Kerja Luar OT. The \"GAJI\" column now shows base salary only (Tambahan pay has moved into C/I/O). A new \"CUTI\" column is added that totals all leave pay (Cuti Umum, Sakit, Tahunan, Rawatan); Cuti Tahunan recorded as commission (location 23) now counts under CUTI instead of C/I/O.",
+  },
+  {
+    date: "2026-06-05",
+    ms: "Salary Report: tab baharu \"Cuti\" ditambah. Ia memaparkan ringkasan cuti bagi semua pekerja dengan setiap jenis cuti (Cuti Sakit, Cuti Tahunan, Cuti Umum, Cuti Rawatan) sebagai lajur, masing-masing menunjukkan hari (guna/jumlah kelayakan) dan amaun. Ia mengikut suis Bulanan/Tahunan: Bulanan menunjukkan cuti bulan dipilih, Tahunan menunjukkan jumlah setahun.",
+    en: "Salary Report: added a new \"Cuti\" tab. It shows a leave summary for all employees with each leave type (Cuti Sakit, Cuti Tahunan, Cuti Umum, Cuti Rawatan) as columns, each showing days (used/total entitlement) and amount. It follows the Monthly/Yearly toggle: Monthly shows the selected month's leave, Yearly shows the full-year totals.",
+  },
+  {
+    date: "2026-06-05",
     ms: "Payroll Details dan payslip: entri IXT kini digabungkan ke bahagian Insentif Tidak Tetap, jadi jumlah pendapatan Insentif Tidak Tetap menunjukkan amaun Advance dan IXT bersama-sama, bukan lagi sebagai baris Tambahan Pay berasingan. Cuti Tahunan kekal dipaparkan di bahagian Cuti.",
     en: "Payroll Details and payslips: IXT entries now combine into the Insentif Tidak Tetap section, so the Insentif Tidak Tetap earnings amount shows the Advance and IXT amounts together instead of a separate Tambahan Pay row. Cuti Tahunan stays in the Leave section.",
   },
