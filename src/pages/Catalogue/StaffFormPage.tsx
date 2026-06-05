@@ -6,7 +6,6 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { Employee } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
-import ContributionListbox from "../../components/ContributionListbox";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import {
@@ -990,10 +989,13 @@ const StaffFormPage: React.FC = () => {
   };
 
   const handleListboxChange = (name: keyof Employee, value: string) => {
-    setFormData((prevData) => ({
-      ...prevData,
-      [name]: value,
-    }));
+    setFormData((prevData) => {
+      if (prevData[name] === value) return prevData;
+      return {
+        ...prevData,
+        [name]: value,
+      };
+    });
   };
 
   const handleComboboxChange = useCallback(
@@ -1132,24 +1134,35 @@ const StaffFormPage: React.FC = () => {
     />
   );
 
-  // Contribution overrides use a dedicated Headless v2 listbox (ContributionListbox)
-  // instead of the shared FormListbox, whose legacy <Transition> wrapper triggers a
-  // "Maximum update depth exceeded" option-registration loop on selection.
   const renderContributionSelect = (
     name: keyof Employee,
     label: string,
     selectOptions: SelectOption[]
   ) => (
-    <ContributionListbox
-      name={name}
-      label={label}
-      value={(formData[name] as string) ?? ""}
-      onChange={(value) => handleListboxChange(name, value)}
-      options={selectOptions.map((o) => ({
-        id: o.id.toString(),
-        name: o.name,
-      }))}
-    />
+    <div className="space-y-2">
+      <label
+        htmlFor={name}
+        className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate"
+        title={label}
+      >
+        {label}
+      </label>
+      <select
+        id={name}
+        name={name}
+        value={(formData[name] as string) ?? ""}
+        onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
+          handleListboxChange(name, event.target.value)
+        }
+        className="block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm"
+      >
+        {selectOptions.map((option: SelectOption) => (
+          <option key={option.id} value={option.id}>
+            {option.name}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 
   const renderListbox = (
