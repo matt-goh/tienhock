@@ -724,9 +724,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     }).format(quantity);
   };
 
-  const formatOthersRateQuantity = (
+  // Rate / quantity split into separate display strings so the Others table can
+  // use the same Rate and Total Qty columns as the Base/Tambahan/Overtime tables.
+  const getOthersRateQuantityDisplay = (
     record: MergedAdvance<OthersRecord>,
-  ): string => {
+  ): { rate: string; quantity: string } => {
     const rows: OthersRecord[] =
       record.merged_rows.length > 0 ? record.merged_rows : [record];
     const rate: number = Number(rows[0].rate) || 0;
@@ -736,7 +738,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         row.rate_unit === rateUnit && isMoneyEqual(Number(row.rate) || 0, rate),
     );
 
-    if (!hasConsistentRate) return "Mixed rates";
+    if (!hasConsistentRate) return { rate: "Mixed rates", quantity: "-" };
 
     if (rateUnit === "Fixed") {
       const allDirectAmountFixed: boolean = rows.every((row: OthersRecord) => {
@@ -746,23 +748,30 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       });
 
       if (allDirectAmountFixed) {
-        return rows.length === 1 ? "Ikut amaun" : `Ikut amaun × ${rows.length}`;
+        return {
+          rate: "Ikut amaun",
+          quantity: rows.length === 1 ? "-" : `${rows.length} entries`,
+        };
       }
 
-      return rows.length === 1
-        ? `${formatCurrency(rate)}/Fixed`
-        : `${formatCurrency(rate)}/Fixed × ${rows.length}`;
+      return {
+        rate:
+          rows.length > 1
+            ? `Fixed (${formatCurrency(rate)})`
+            : `${formatCurrency(rate)}/Fixed`,
+        quantity: rows.length === 1 ? "-" : String(rows.length),
+      };
     }
 
     const quantity: number = rows.reduce(
-      (sum: number, row: OthersRecord) =>
-        sum + (Number(row.quantity) || 0),
+      (sum: number, row: OthersRecord) => sum + (Number(row.quantity) || 0),
       0,
     );
 
-    return `${rate.toFixed(2)} × ${formatUnitQuantity(quantity)} ${
-      rateUnit
-    }`;
+    return {
+      rate: `${formatCurrency(rate)}/${rateUnit}`,
+      quantity: formatUnitQuantity(quantity),
+    };
   };
 
   const getMergedOthersPayCodeIds = (
@@ -2489,8 +2498,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
                       Description
                     </th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                      Rate × Qty
+                    <th className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+                      Rate
+                    </th>
+                    <th className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+                      Total Qty
                     </th>
                     <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
                       Amount
@@ -2505,6 +2517,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     const descriptionTitle: string = payCodeLabel
                       ? `${record.description} (${payCodeLabel})`
                       : record.description;
+                    const rateQuantityDisplay: {
+                      rate: string;
+                      quantity: string;
+                    } = getOthersRateQuantityDisplay(record);
 
                     return (
                       <tr
@@ -2540,8 +2556,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             )}
                           </div>
                         </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-right text-sm text-default-600 dark:text-gray-400">
-                          {formatOthersRateQuantity(record)}
+                        <td className="px-3 py-2 whitespace-nowrap text-center text-sm text-default-600 dark:text-gray-400">
+                          {rateQuantityDisplay.rate}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-center text-sm text-default-600 dark:text-gray-400">
+                          {rateQuantityDisplay.quantity}
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium text-default-800 dark:text-gray-100">
                           {formatCurrency(record.merged_amount)}
@@ -2553,7 +2572,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 <tfoot className="bg-default-50 dark:bg-gray-800">
                   <tr>
                     <td
-                      colSpan={3}
+                      colSpan={4}
                       className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
                     >
                       Total Others (Kerja Luar OT)
