@@ -14,6 +14,49 @@ const isSOCSOSKBBKEffective = (year, month) => {
   );
 };
 
+// Normalize a date value (string or Date) to a local YYYY-MM-DD string.
+// Never via toISOString — the server runs in Asia/Kuala_Lumpur (UTC+8) and that
+// would roll the date back a day.
+const toLocalYMD = (value) => {
+  if (!value) return null;
+  if (typeof value === "string") {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    return value.split("T")[0].split(" ")[0];
+  }
+  if (value instanceof Date) {
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, "0");
+    const d = String(value.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  return null;
+};
+
+// Backend mirror of filterOutLeaveDayItems (src/utils/payroll/payrollUtils.ts):
+// daily work-log items dated on a leave day pay nothing as work — the day is paid
+// via the Cuti block instead — so they must be excluded from gross pay exactly as
+// the payslip already excludes them from display. Without this, unit-based codes
+// (Bag/Tray/Bundle) that get quantity 1 on a leave day carry a real amount and
+// inflate the stored/recalculated gross above the sum the payslip shows.
+// Only work_log_type === "daily" items are affected; monthly/production items are
+// always kept, matching the frontend filter.
+const removeLeaveDayWorkItems = (items, leaveDateSet) => {
+  if (!Array.isArray(items) || items.length === 0) return items || [];
+  if (!leaveDateSet || leaveDateSet.size === 0) return items;
+  return items.filter((item) => {
+    if (item.work_log_type !== "daily" || !item.source_date) return true;
+    const ymd = toLocalYMD(item.source_date);
+    return ymd === null || !leaveDateSet.has(ymd);
+  });
+};
+
+const buildLeaveDateSet = (leaveRecords) =>
+  new Set(
+    (leaveRecords || [])
+      .map((record) => toLocalYMD(record.date))
+      .filter(Boolean),
+  );
+
 // Moved to top-level to be reusable
 const saveDeductions = async (pool, employeePayrollId, deductions) => {
   if (!deductions || deductions.length === 0) {
@@ -141,6 +184,12 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       days_taken: parseFloat(record.days_taken),
       amount_paid: parseFloat(record.amount_paid || 0),
     }));
+
+    // Exclude daily work items dated on a leave day — they pay nothing as work
+    // (the day is paid via leave) and would otherwise inflate gross, mirroring
+    // the payslip display. Used for gross + EPF base below.
+    const leaveDateSet = buildLeaveDateSet(leaveRecords);
+    const workItems = removeLeaveDayWorkItems(payrollItems, leaveDateSet);
 
     // Get commission records for this employee for the specific month/year
     const commissionRecordsRes = await pool.query(
@@ -309,7 +358,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       return totalCents;
     };
 
-    const workGrossPayCents = consolidateItems(payrollItems);
+    const workGrossPayCents = consolidateItems(workItems);
     const workGrossPay = workGrossPayCents / 100;
     const leaveGrossPayCents = leaveRecords.reduce(
       (sum, record) => sum + Math.round(record.amount_paid * 100),
@@ -332,7 +381,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
           100,
       ) / 100;
 
-    const groupedItems = payrollItems.reduce(
+    const groupedItems = workItems.reduce(
       (acc, item) => {
         const type = item.pay_type || "Tambahan"; // Default to Tambahan
         if (!acc[type]) acc[type] = [];
@@ -558,7 +607,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
   }
 };
 
-export { recalculateAndUpdatePayroll };
+export { recalculateAndUpdatePayroll, removeLeaveDayWorkItems, buildLeaveDateSet };
 
 export default function (pool) {
   const router = Router();
@@ -897,6 +946,7 @@ export default function (pool) {
         midMonthResult,
         commissionsResult,
         othersResult,
+        pinjamResult,
       ] = await Promise.all([
         // Get payroll items (including job_type, source_employee_id and source tracking for traceability)
         pool.query(
@@ -1077,6 +1127,18 @@ export default function (pool) {
                 `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-${new Date(payrollData.year, payrollData.month, 0).getDate().toString().padStart(2, "0")}`,
               ],
             ),
+
+        // Get pinjam records for this employee for the specific month/year.
+        pool.query(
+          `
+          SELECT p.*, s.name as employee_name
+          FROM pinjam_records p
+          LEFT JOIN staffs s ON p.employee_id = s.id
+          WHERE p.employee_id = $1 AND p.year = $2 AND p.month = $3
+          ORDER BY p.year DESC, p.month DESC, p.employee_id, p.pinjam_type, p.description
+        `,
+          [payrollData.employee_id, payrollData.year, payrollData.month],
+        ),
       ]);
 
       // Parse items
@@ -1104,6 +1166,10 @@ export default function (pool) {
         amount: parseFloat(record.amount),
         rate: parseFloat(record.rate),
         quantity: parseFloat(record.quantity),
+      }));
+      const pinjamRecords = pinjamResult.rows.map((record) => ({
+        ...record,
+        amount: parseFloat(record.amount),
       }));
 
       // Recalculate gross_pay using CONSOLIDATED approach (matches frontend display)
@@ -1139,7 +1205,11 @@ export default function (pool) {
         return totalCents;
       };
 
-      const workGrossPayCents = consolidateItemsAPI(items);
+      // Exclude leave-day daily items so the recalculated gross matches the
+      // payslip display (which already filters them via filterOutLeaveDayItems).
+      const workGrossPayCents = consolidateItemsAPI(
+        removeLeaveDayWorkItems(items, buildLeaveDateSet(leaveRecords)),
+      );
       const leaveGrossPayCents = leaveRecords.reduce(
         (sum, r) => sum + Math.round(r.amount_paid * 100),
         0,
@@ -1190,6 +1260,7 @@ export default function (pool) {
             : null,
         commission_records: commissionRecords,
         others_records: othersRecords,
+        pinjam_records: pinjamRecords,
       };
 
       res.json(response);
@@ -1479,7 +1550,11 @@ export default function (pool) {
         return totalCents;
       };
 
-      const workGrossPayCents = consolidateItemsAPI(items);
+      // Exclude leave-day daily items so the recalculated gross matches the
+      // payslip display (which already filters them via filterOutLeaveDayItems).
+      const workGrossPayCents = consolidateItemsAPI(
+        removeLeaveDayWorkItems(items, buildLeaveDateSet(leaveRecords)),
+      );
       const leaveGrossPayCents = leaveRecords.reduce(
         (sum, r) => sum + Math.round(r.amount_paid * 100),
         0,
