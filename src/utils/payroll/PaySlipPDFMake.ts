@@ -157,6 +157,17 @@ const isIxtPayCode = (payCodeId: string | null | undefined): boolean =>
 const isIncentivePayrollItem = (item: PayrollItem): boolean =>
   isIxtPayCode(item.pay_code_id);
 
+// Bonus paycode items (Tambahan items with pay code BONUS) are pulled out of the
+// Tambahan section and folded into the incentive/commission display stream so a
+// Bonus recorded as a Tambahan paycode merges (by description) with a Bonus from
+// the Bonus page into one line. Advance Bonus-page records still appear in the
+// advance deduction at the bottom (built separately from commission_records).
+const isBonusPayCode = (payCodeId: string | null | undefined): boolean =>
+  (payCodeId || "").toUpperCase() === "BONUS";
+
+const isBonusPayrollItem = (item: PayrollItem): boolean =>
+  isBonusPayCode(item.pay_code_id);
+
 const isIncentiveOthersRecord = (record: AdvanceRecord): boolean =>
   record.pay_code_pay_type === "Tambahan" && isIxtPayCode(record.pay_code_id);
 
@@ -914,8 +925,12 @@ const buildMainPayrollPage = (
   const incentivePayrollItems: PayrollItem[] = allPayrollItems.filter(
     isIncentivePayrollItem,
   );
+  const bonusPayrollItems: PayrollItem[] = allPayrollItems.filter(
+    isBonusPayrollItem,
+  );
   const standardPayrollItems: PayrollItem[] = allPayrollItems.filter(
-    (item: PayrollItem) => !isIncentivePayrollItem(item),
+    (item: PayrollItem) =>
+      !isIncentivePayrollItem(item) && !isBonusPayrollItem(item),
   );
   const allOthersRecords: AdvanceRecord[] =
     (payroll as any).others_records || [];
@@ -1030,6 +1045,12 @@ const buildMainPayrollPage = (
     ...buildIncentiveRecordsFromOthers(incentiveOthersRecords),
     ...buildIncentiveRecordsFromPayrollItems(
       incentivePayrollItems,
+      payroll.employee_id,
+      payroll.employee_name,
+      payrollMonthStartDate,
+    ),
+    ...buildIncentiveRecordsFromPayrollItems(
+      bonusPayrollItems,
       payroll.employee_id,
       payroll.employee_name,
       payrollMonthStartDate,
@@ -1742,8 +1763,12 @@ const buildIndividualJobPage = (
   const incentivePayrollItems: PayrollItem[] = allPayrollItems.filter(
     isIncentivePayrollItem,
   );
+  const bonusPayrollItems: PayrollItem[] = allPayrollItems.filter(
+    isBonusPayrollItem,
+  );
   const standardPayrollItems: PayrollItem[] = allPayrollItems.filter(
-    (item: PayrollItem) => !isIncentivePayrollItem(item),
+    (item: PayrollItem) =>
+      !isIncentivePayrollItem(item) && !isBonusPayrollItem(item),
   );
   const allOthersRecords: AdvanceRecord[] = individualJob.others_records || [];
   const incentiveOthersRecords: AdvanceRecord[] = allOthersRecords.filter(
@@ -1841,6 +1866,12 @@ const buildIndividualJobPage = (
     ...buildIncentiveRecordsFromOthers(incentiveOthersRecords),
     ...buildIncentiveRecordsFromPayrollItems(
       incentivePayrollItems,
+      jobEmployeeId || payroll.employee_id,
+      staffDetails?.name || payroll.employee_name,
+      payrollMonthStartDate,
+    ),
+    ...buildIncentiveRecordsFromPayrollItems(
+      bonusPayrollItems,
       jobEmployeeId || payroll.employee_id,
       staffDetails?.name || payroll.employee_name,
       payrollMonthStartDate,

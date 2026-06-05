@@ -195,7 +195,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     // Get commission records for this employee for the specific month/year
     const commissionRecordsRes = await pool.query(
       `
-      SELECT amount, description
+      SELECT amount, description, is_advance
       FROM commission_records
       WHERE employee_id = $1
         AND DATE(commission_date) >= $2
@@ -363,6 +363,14 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       0,
     );
     const commissionGrossPay = commissionGrossPayCents / 100;
+    const commissionAdvanceCents = commissionRecords.reduce(
+      (sum, record) =>
+        record.is_advance === false
+          ? sum
+          : sum + Math.round(record.amount * 100),
+      0,
+    );
+    const commissionAdvancePay = commissionAdvanceCents / 100;
     const othersGrossPayCents = othersRecords.reduce(
       (sum, record) => sum + Math.round(record.amount * 100),
       0,
@@ -560,9 +568,9 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       (sum, d) => sum + d.employee_amount,
       0,
     );
-    // Commission amounts are deducted as advance payments.
+    // Only advance commission/bonus records are deducted as advance payments.
     // Others (Kerja Luar OT) is treated as a regular earning — included in gross/EPF only, NOT deducted from net.
-    const totalCommissionDeductions = commissionGrossPay;
+    const totalCommissionDeductions = commissionAdvancePay;
     const netPay =
       grossPay - totalEmployeeDeductions - totalCommissionDeductions;
 

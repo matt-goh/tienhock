@@ -527,6 +527,15 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const nonIncentivePayrollItems: PayrollItem[] = payroll.items.filter(
     (item: PayrollItem) => !isIncentivePayrollItem(item),
   );
+  // Bonus paycode payroll items (Tambahan items with pay code BONUS). These are
+  // folded into the same incentive stream below so a "Bonus" recorded as a
+  // Tambahan paycode merges (by description) with a "Bonus" entered on the Bonus
+  // page into a single line, instead of showing "Bonus + Bonus".
+  const isBonusPayCode = (payCodeId?: string | null): boolean =>
+    payCodeId === "BONUS";
+  const bonusPayrollItems: PayrollItem[] = payroll.items.filter(
+    (item: PayrollItem) => isBonusPayCode(item.pay_code_id),
+  );
   const payrollMonthStartDate: string = `${payroll.year}-${String(
     payroll.month,
   ).padStart(2, "0")}-01`;
@@ -554,8 +563,23 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       employee_name: payroll.employee_name,
       is_advance: false,
     })),
+    ...bonusPayrollItems.map((item: PayrollItem) => ({
+      id: item.id ? -item.id : 0,
+      employee_id: item.source_employee_id || payroll.employee_id,
+      commission_date: item.source_date || payrollMonthStartDate,
+      amount: Number(item.amount) || 0,
+      description: item.description,
+      created_by: "",
+      created_at: item.source_date || payrollMonthStartDate,
+      employee_name: payroll.employee_name,
+      is_advance: false,
+    })),
   ];
   const mergedCommissionRecords = mergeByDescription(incentiveDisplayRecords);
+  const mergedCommissionTotal: number = mergedCommissionRecords.reduce(
+    (sum, record) => sum + record.merged_amount,
+    0,
+  );
   const monthlyLeaveDisplayRecords: MonthlyLeaveRecord[] = [
     ...monthlyLeaveRecords,
     ...cutiTahunanCommissionRecords.map((record: CommissionRecord) => ({
@@ -699,6 +723,15 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const consolidatedItems = consolidatePayrollItems(displayItems);
   const groupedConsolidatedItems =
     groupConsolidatedItemsByType(consolidatedItems);
+  // Bonus paycode items are excluded from the Tambahan tables here; they are
+  // shown together with Bonus-page records in the Bonus section instead.
+  const consolidatedTambahanItems: ConsolidatedPayrollItem[] =
+    groupedConsolidatedItems["Tambahan"].filter(
+      (item: ConsolidatedPayrollItem) => !isBonusPayCode(item.pay_code_id),
+    );
+  const detailedTambahanItems: PayrollItem[] = groupedItems["Tambahan"].filter(
+    (item: PayrollItem) => !isBonusPayCode(item.pay_code_id),
+  );
 
   const getPayrollItemGroupKey = (
     payCodeId: string,
@@ -822,7 +855,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     (sum, item) => sum + item.total_amount,
     0,
   );
-  const tambahanTotal = groupedConsolidatedItems["Tambahan"].reduce(
+  const tambahanTotal = consolidatedTambahanItems.reduce(
     (sum, item) => sum + item.total_amount,
     0,
   );
@@ -1611,12 +1644,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       .join(" + ")}
                   </span>
                   <span className="font-medium text-default-800 dark:text-gray-100">
-                    {formatCurrency(
-                      mergedCommissionRecords.reduce(
-                        (sum, record) => sum + record.merged_amount,
-                        0,
-                      ),
-                    )}
+                    {formatCurrency(mergedCommissionTotal)}
                   </span>
                 </div>
               )}
@@ -2323,9 +2351,9 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
             {/* Tambahan Pay Items */}
             {((viewMode === "consolidated" &&
-              groupedConsolidatedItems["Tambahan"].length > 0) ||
+              consolidatedTambahanItems.length > 0) ||
               (viewMode === "detailed" &&
-                groupedItems["Tambahan"].length > 0)) && (
+                detailedTambahanItems.length > 0)) && (
               <div className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
                 <div className="px-4 py-2 bg-violet-50 dark:bg-violet-900/20 border-b border-violet-100 dark:border-violet-800/50">
                   <h3 className="text-md font-semibold text-violet-800 dark:text-violet-300 flex items-center gap-2">
@@ -2375,7 +2403,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         {isEditable &&
                           (viewMode === "detailed" ||
                             (viewMode === "consolidated" &&
-                              groupedConsolidatedItems["Tambahan"].some(
+                              consolidatedTambahanItems.some(
                                 (item) =>
                                   item.is_manual && item.item_count === 1,
                               ))) && (
@@ -2388,11 +2416,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                       {viewMode === "consolidated"
-                        ? groupedConsolidatedItems["Tambahan"].map(
+                        ? consolidatedTambahanItems.map(
                             (item, index) => renderConsolidatedRow(item, index),
                           )
                         : getSortedItemsWithSeparators(
-                            groupedItems["Tambahan"],
+                            detailedTambahanItems,
                           ).map((item, index, arr) =>
                             renderDetailedRow(item, index, arr, true),
                           )}
@@ -2411,7 +2439,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         {isEditable &&
                           (viewMode === "detailed" ||
                             (viewMode === "consolidated" &&
-                              groupedConsolidatedItems["Tambahan"].some(
+                              consolidatedTambahanItems.some(
                                 (item) =>
                                   item.is_manual && item.item_count === 1,
                               ))) && <td></td>}
@@ -2506,7 +2534,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           </>
         )}
 
-        {/* Commission Records */}
+        {/* Bonus / incentive records */}
         {mergedCommissionRecords.length > 0 && (
           <div className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
             <div className="px-4 py-2 bg-teal-50 dark:bg-teal-900/20 border-b border-teal-100 dark:border-teal-800/50">
@@ -2516,13 +2544,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   className="text-teal-600 dark:text-teal-400"
                 />
                 <Link
-                  to={`/payroll/commission?year=${payroll.year}&month=${payroll.month}`}
+                  to={`/payroll/bonus?year=${payroll.year}&month=${payroll.month}`}
                   className="hover:underline"
-                  title="Open Others (Advance) input page"
+                  title="Open Bonus input page"
                 >
-                  {mergedCommissionRecords
-                    .map((record) => record.description)
-                    .join(" + ")}
+                  Bonus
                 </Link>
               </h3>
             </div>
@@ -2587,18 +2613,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       colSpan={2}
                       className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
                     >
-                      Total{" "}
-                      {mergedCommissionRecords
-                        .map((record) => record.description)
-                        .join(" + ")}
+                      Total Bonus
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
-                      {formatCurrency(
-                        mergedCommissionRecords.reduce(
-                          (sum, record) => sum + record.merged_amount,
-                          0,
-                        ),
-                      )}
+                      {formatCurrency(mergedCommissionTotal)}
                     </td>
                   </tr>
                 </tfoot>
