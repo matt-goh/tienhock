@@ -493,6 +493,13 @@ export interface Employee {
   numberOfChildren: number;
   department: string;
   kwspNumber: string;
+  // Per-staff statutory contribution overrides ("" = auto from birthdate/nationality).
+  // Age overrides: "under_60" | "over_60" | "none" (not eligible).
+  // epfNationalityOverride: "local" | "foreign".
+  epfAgeOverride: string;
+  epfNationalityOverride: string;
+  socsoAgeOverride: string;
+  sipAgeOverride: string;
   updatedAt?: string;
   headStaffId?: string | null;
 }

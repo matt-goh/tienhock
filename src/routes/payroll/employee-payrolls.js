@@ -1,5 +1,6 @@
 // src/routes/payroll/employee-payrolls.js
 import { Router } from "express";
+import { resolveContributionContext } from "./contributionOverrides.js";
 
 const SOCSO_SKBBK_EFFECTIVE_YEAR = 2026;
 const SOCSO_SKBBK_EFFECTIVE_MONTH = 6;
@@ -116,7 +117,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
 
     // Get employee's info (birthdate, nationality, marital status, spouse employment status, number of children)
     const employeeInfoRes = await pool.query(
-      "SELECT birthdate, nationality, marital_status, spouse_employment_status, number_of_children FROM staffs WHERE id = $1",
+      "SELECT birthdate, nationality, marital_status, spouse_employment_status, number_of_children, epf_age_override, epf_nationality_override, socso_age_override, sip_age_override FROM staffs WHERE id = $1",
       [employee_id],
     );
     if (employeeInfoRes.rows.length === 0)
@@ -257,14 +258,6 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     // 2. PERFORM CALCULATIONS (Server-side implementation of client logic)
 
     // --- Calculation Helpers ---
-    const getEmployeeType = (nationality, age) => {
-      const isLocal = (nationality || "").toLowerCase() === "malaysian";
-      if (isLocal && age < 60) return "local_under_60";
-      if (isLocal && age >= 60) return "local_over_60";
-      if (!isLocal && age < 60) return "foreign_under_60";
-      return "foreign_over_60";
-    };
-
     const findEPFRate = (rates, type, wage) => {
       const applicable = rates.filter((r) => r.employee_type === type);
       if (!applicable.length) return null;
@@ -404,15 +397,14 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       (Date.now() - new Date(employeeInfo.birthdate).getTime()) /
         (365.25 * 24 * 60 * 60 * 1000),
     );
-    const employeeType = getEmployeeType(
-      employeeInfo.nationality || "Malaysian",
-      age,
-    );
+    const contributionCtx = resolveContributionContext(employeeInfo, age);
 
     const deductions = [];
 
     // Calculate EPF
-    const epfRate = findEPFRate(epfRates, employeeType, epfGrossPay);
+    const epfRate = contributionCtx.epf.eligible
+      ? findEPFRate(epfRates, contributionCtx.epf.employeeType, epfGrossPay)
+      : null;
     if (epfRate) {
       const wageCeiling = getEPFWageCeiling(epfGrossPay);
       if (wageCeiling > 0) {
@@ -438,7 +430,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
             employer_rate: epfRate.employer_rate_percentage
               ? `${epfRate.employer_rate_percentage}%`
               : `RM${epfRate.employer_fixed_amount}`,
-            age_group: employeeType,
+            age_group: contributionCtx.epf.employeeType,
             wage_ceiling_used: wageCeiling,
           },
         });
@@ -446,9 +438,11 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     }
 
     // Calculate SOCSO. SKBBK applies from June 2026 payrolls onward.
-    const socsoRate = findRateByWage(socsoRates, grossPay);
+    const socsoRate = contributionCtx.socso.eligible
+      ? findRateByWage(socsoRates, grossPay)
+      : null;
     if (socsoRate) {
-      const isOver60 = age >= 60;
+      const isOver60 = contributionCtx.socso.isOver60;
       const shouldApplySKBBK = isSOCSOSKBBKEffective(year, month);
       const skbbk =
         shouldApplySKBBK
@@ -481,9 +475,11 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     }
 
     // Calculate SIP (only for Malaysian citizens under 60)
-    const isMalaysian =
-      (employeeInfo.nationality || "").toLowerCase() === "malaysian";
-    if (age < 60 && isMalaysian) {
+    if (
+      contributionCtx.sip.eligible &&
+      contributionCtx.sip.under60 &&
+      contributionCtx.isMalaysian
+    ) {
       const sipRate = findRateByWage(sipRates, grossPay);
       if (sipRate) {
         deductions.push({

@@ -1,5 +1,6 @@
 // src/routes/greentarget/monthly-payrolls.js
 import { Router } from "express";
+import { resolveContributionContext } from "../payroll/contributionOverrides.js";
 
 const SOCSO_SKBBK_EFFECTIVE_YEAR = 2026;
 const SOCSO_SKBBK_EFFECTIVE_MONTH = 6;
@@ -298,7 +299,9 @@ export default function (pool) {
         // Staff data
         client.query(`
           SELECT id, name, birthdate, nationality, marital_status,
-            spouse_employment_status, number_of_children
+            spouse_employment_status, number_of_children,
+            epf_age_override, epf_nationality_override,
+            socso_age_override, sip_age_override
           FROM public.staffs
         `),
 
@@ -490,14 +493,6 @@ export default function (pool) {
       });
 
       // Helper functions
-      const getEmployeeType = (nationality, age) => {
-        const isLocal = (nationality || "").toLowerCase() === "malaysian";
-        if (isLocal && age < 60) return "local_under_60";
-        if (isLocal && age >= 60) return "local_over_60";
-        if (!isLocal && age < 60) return "foreign_under_60";
-        return "foreign_over_60";
-      };
-
       const findEPFRate = (rates, type, wage) => {
         const applicable = rates.filter((r) => r.employee_type === type);
         if (!applicable.length) return null;
@@ -700,8 +695,7 @@ export default function (pool) {
             (Date.now() - new Date(staff.birthdate).getTime()) /
               (365.25 * 24 * 60 * 60 * 1000)
           );
-          const employeeType = getEmployeeType(staff.nationality, age);
-          const isMalaysian = (staff.nationality || "").toLowerCase() === "malaysian";
+          const contributionCtx = resolveContributionContext(staff, age);
 
           // Group items by pay type for EPF calculation
           const groupedItems = { Base: [], Tambahan: [], Overtime: [] };
@@ -718,7 +712,9 @@ export default function (pool) {
           const deductions = [];
 
           // EPF
-          const epfRate = findEPFRate(epfRates, employeeType, epfGrossPay);
+          const epfRate = contributionCtx.epf.eligible
+            ? findEPFRate(epfRates, contributionCtx.epf.employeeType, epfGrossPay)
+            : null;
           if (epfRate) {
             const wageCeiling = getEPFWageCeiling(epfGrossPay);
             if (wageCeiling > 0) {
@@ -742,7 +738,7 @@ export default function (pool) {
                   employer_rate: epfRate.employer_rate_percentage
                     ? `${epfRate.employer_rate_percentage}%`
                     : `RM${epfRate.employer_fixed_amount}`,
-                  age_group: employeeType,
+                  age_group: contributionCtx.epf.employeeType,
                   wage_ceiling_used: wageCeiling,
                 },
               });
@@ -750,9 +746,11 @@ export default function (pool) {
           }
 
           // SOCSO. SKBBK applies from June 2026 payrolls onward.
-          const socsoRate = findRateByWage(socsoRates, grossPay);
+          const socsoRate = contributionCtx.socso.eligible
+            ? findRateByWage(socsoRates, grossPay)
+            : null;
           if (socsoRate) {
-            const isOver60 = age >= 60;
+            const isOver60 = contributionCtx.socso.isOver60;
             const shouldApplySKBBK = isSOCSOSKBBKEffective(year, month);
             const skbbk =
               shouldApplySKBBK
@@ -788,7 +786,11 @@ export default function (pool) {
           }
 
           // SIP (Malaysian only, under 60)
-          if (age < 60 && isMalaysian) {
+          if (
+            contributionCtx.sip.eligible &&
+            contributionCtx.sip.under60 &&
+            contributionCtx.isMalaysian
+          ) {
             const sipRate = findRateByWage(sipRates, grossPay);
             if (sipRate) {
               deductions.push({
