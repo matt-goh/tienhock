@@ -20,6 +20,56 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-05",
+    ms: "Salary Report (jadual Employee/Lokasi): lajur \"COMM\" dinamakan semula kepada \"C/I/O\" dan kini menjumlahkan Commission, semua bayaran Tambahan/Insentif (termasuk IXT, kerja Ahad/penyelenggaraan, dll. — kecuali Bonus) dan Others/Kerja Luar OT. Lajur \"GAJI\" kini menunjukkan gaji asas sahaja (bayaran Tambahan telah dipindahkan ke C/I/O). Lajur baharu \"CUTI\" ditambah yang menjumlahkan semua bayaran cuti (Cuti Umum, Sakit, Tahunan, Rawatan); Cuti Tahunan yang direkod sebagai komisen (lokasi 23) kini dikira di bawah CUTI, bukan lagi C/I/O.",
+    en: "Salary Report (Employee/Location tables): the \"COMM\" column is renamed to \"C/I/O\" and now adds up Commission, all Tambahan/Insentif pay (including IXT, Sunday/maintenance work, etc. — except Bonus) and Others/Kerja Luar OT. The \"GAJI\" column now shows base salary only (Tambahan pay has moved into C/I/O). A new \"CUTI\" column is added that totals all leave pay (Cuti Umum, Sakit, Tahunan, Rawatan); Cuti Tahunan recorded as commission (location 23) now counts under CUTI instead of C/I/O.",
+  },
+  {
+    date: "2026-06-05",
+    ms: "Salary Report: tab baharu \"Cuti\" ditambah. Ia memaparkan ringkasan cuti bagi semua pekerja dengan setiap jenis cuti (Cuti Sakit, Cuti Tahunan, Cuti Umum, Cuti Rawatan) sebagai lajur, masing-masing menunjukkan hari (guna/jumlah kelayakan) dan amaun. Ia mengikut suis Bulanan/Tahunan: Bulanan menunjukkan cuti bulan dipilih, Tahunan menunjukkan jumlah setahun.",
+    en: "Salary Report: added a new \"Cuti\" tab. It shows a leave summary for all employees with each leave type (Cuti Sakit, Cuti Tahunan, Cuti Umum, Cuti Rawatan) as columns, each showing days (used/total entitlement) and amount. It follows the Monthly/Yearly toggle: Monthly shows the selected month's leave, Yearly shows the full-year totals.",
+  },
+  {
+    date: "2026-06-05",
+    ms: "Payroll Details dan payslip: entri IXT kini digabungkan ke bahagian Insentif Tidak Tetap, jadi jumlah pendapatan Insentif Tidak Tetap menunjukkan amaun Advance dan IXT bersama-sama, bukan lagi sebagai baris Tambahan Pay berasingan. Cuti Tahunan kekal dipaparkan di bahagian Cuti.",
+    en: "Payroll Details and payslips: IXT entries now combine into the Insentif Tidak Tetap section, so the Insentif Tidak Tetap earnings amount shows the Advance and IXT amounts together instead of a separate Tambahan Pay row. Cuti Tahunan stays in the Leave section.",
+  },
+  {
+    date: "2026-06-05",
+    ms: "Payslip: apabila insentif yang sama muncul sebagai Advance (commission) dan juga sebagai Others (Kerja Luar OT) dengan nama yang sama, kedua-duanya kini digabung menjadi satu baris pendapatan dengan jumlah penuh (contohnya Insentif Tidak Tetap 50 + 830 = 880). Potongan Advance di bahagian bawah payslip kekal hanya pada amaun Advance yang sebenar (50).",
+    en: "Payslip: when the same incentive appears both as an Advance (commission) and as an Others (Kerja Luar OT) entry with the same name, the two are now combined into one earnings line showing the full total (e.g. Insentif Tidak Tetap 50 + 830 = 880). The Advance deduction at the bottom of the payslip still shows only the actual Advance amount (50).",
+  },
+  {
+    date: "2026-06-05",
+    ms: "Payslip: apabila kerja yang sama muncul dalam Tambahan dan juga Others (Kerja Luar OT) dengan paycode, kadar dan unit yang sama, kedua-duanya kini digabung menjadi satu baris dengan jumlah jam dan amaun yang betul pada payslip. Halaman Payroll Details kekal memaparkannya secara berasingan.",
+    en: "Payslip: when the same work appears under Tambahan and also under Others (Kerja Luar OT) with the same paycode, rate and unit, the two are now combined into a single line with the correct total hours and amount on the payslip. The Payroll Details page still shows them separately.",
+  },
+  {
+    date: "2026-06-05",
+    ms: "Setiap pekerja kini boleh ditetapkan cara caruman EPF, SOCSO dan SIP dikira di bawah tab Documents pada borang pekerja. Contohnya, pekerja yang berumur 60 ke atas boleh diberi kadar EPF 'bawah 60', dan pekerja asing tanpa pasport Malaysia boleh ditanda 'Tidak Layak' supaya tiada caruman EPF/SOCSO/SIP dikira untuknya. Biarkan sebagai Auto untuk mengikut tarikh lahir dan kewarganegaraan seperti biasa. Payroll akan mengikut tetapan ini.",
+    en: "You can now set how EPF, SOCSO and SIP are applied for each staff under the Documents tab of the staff form. For example, a staff aged 60 or above can be given the 'under 60' EPF rate, and a foreign worker without a Malaysian passport can be marked 'Not Eligible' so no EPF/SOCSO/SIP is calculated for them. Leave it as Auto to follow birthdate and nationality as before. Payroll follows these settings.",
+  },
+  {
+    date: "2026-06-05",
+    ms: "Halaman Production Entry kini membolehkan susunan kad pekerja diubah dengan menyeret pemegang pada kad. Susunan ini dikongsi untuk semua pengguna mengikut kumpulan kerja Bihun atau Mee, nilai yang sudah ditaip kekal bersama pekerja yang betul apabila kad dipindahkan, dan butang Refresh Order boleh digunakan untuk memuat semula susunan terkini.",
+    en: "Production Entry now lets you reorder worker cards by dragging the handle on each card. The order is shared for all users by Bihun or Mee worker group, typed values stay with the correct worker when cards are moved, and the Refresh Order button can reload the latest order.",
+  },
+  {
+    date: "2026-06-05",
+    ms: "Payroll Details kini menunjukkan ringkasan Pinjam di bahagian bawah halaman apabila pekerja ada pinjam pada bulan itu, memaparkan gaji akhir selepas ditolak pinjam (Final Mid-Month Pay dan Jumlah Masuk Bank). Ringkasan ini hanya pada halaman dan tidak muncul dalam payslip. Di halaman Sistem Pinjam, klik pada badan kad pekerja untuk terus pergi ke ringkasan Pinjam di bahagian bawah Payroll Details pekerja itu.",
+    en: "Payroll Details now shows a Pinjam summary at the bottom of the page when an employee has pinjam that month, displaying the final pay after pinjam deductions (Final Mid-Month Pay and Jumlah Masuk Bank). This summary is page-only and does not appear on the payslip. On the Pinjam System page, click an employee card's body to jump straight to the Pinjam summary at the bottom of that employee's Payroll Details.",
+  },
+  {
+    date: "2026-06-05",
+    ms: "Pembetulan Gaji Kasar: kerja harian yang dicatat pada hari cuti tidak lagi ditambah ke dalam gaji kasar. Hari cuti sudah dibayar di bahagian Cuti, jadi kerja pada hari yang sama (contohnya bungkusan atau dulang) tidak lagi dikira dua kali. Jumlah Gaji Kasar dalam Payroll Details dan payslip kini sama dengan jumlah baris yang dipaparkan.",
+    en: "Gross pay fix (RAMBU & DANISH, etc.): daily work recorded on a leave day is no longer added to gross pay. The leave day is already paid in the Cuti section, so work logged on the same day (e.g. packing bags or trays) is no longer double-counted. The Jumlah Gaji Kasar in Payroll Details and payslips now matches the sum of the lines shown.",
+  },
+  {
+    date: "2026-06-05",
+    ms: "Pembetulan Payroll: entri Others (Kerja Luar OT) yang menggunakan paycode jenis Overtime kini dipaparkan dan dijumlahkan di bahagian Overtime dalam Payroll Details dan payslip.",
+    en: "Payroll fix: Others (Kerja Luar OT) entries that use an Overtime paycode now appear and total under Overtime in Payroll Details and payslips.",
+  },
+  {
+    date: "2026-06-05",
     ms: "Pembetulan PCB: gaji dengan sen kini dipadankan kepada julat PCB yang betul, contohnya RM5,975.78 menggunakan julat RM5,976-RM5,980 supaya potongan PCB muncul dalam payslip.",
     en: "PCB fix: salary amounts with cents now match the correct PCB range, for example RM5,975.78 uses the RM5,976-RM5,980 range so the PCB deduction appears on the payslip.",
   },

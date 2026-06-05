@@ -1,9 +1,43 @@
 # Handover: Bihun "Jumlah gaji kasar" higher than legacy system
 
 **Date:** 2026-06-05
-**Status:** Root cause identified & verified. **Awaiting a business decision** (rate effective-date intent) before any
-code/data remediation. No code has been changed.
+**Status:** ✅ **RESOLVED — actual root cause was different from the rate-change theory below. Fix implemented &
+verified.** See §0.
 **Area:** Payroll — monthly payroll gross pay, Bihun section / SANGKUT BIHUN location.
+
+---
+
+## 0. RESOLUTION (2026-06-05, supersedes the rate-change theory in §1/§4)
+The rate-change theory below was a **red herring**. The real cause: **daily work items dated on a leave day were being
+added to gross pay, even though the payslip already hides them** (the day is paid via the Cuti block instead). Unit-based
+codes (Bag / Tray / Bundle) get quantity 1 on a leave day, so they carry a real amount and inflated gross by exactly that
+amount — while `filterOutLeaveDayItems` correctly removed them from the *display*. Result: printed *Jumlah Gaji Kasar* >
+sum of the visible payslip lines.
+
+**The deltas match to the cent:**
+- RAMBU +6.58 = her entire BH_PACKING record, all logged on leave days (May 2/27/30). Corrected gross **3571.62**.
+- DANISH +22.00 = `BHANGKUT` (Tray) RM11.00 on May 27 & 30 (both leave days).
+- CLARENCE / DARRYL / PREDO also leaked RM22.00 each (same BHANGKUT-on-leave-day pattern — the original reconciliation in
+  §5 missed this because it only checked stored == Σ items, not whether leave-day items *should* count).
+- MASLAN leaked RM377.84 — full salesman allowances (IKUT/ELAUN + product bags) logged on 8 sick-leave days.
+
+**Fix (implemented):** a backend mirror of `filterOutLeaveDayItems` (`removeLeaveDayWorkItems`) now excludes leave-day
+daily items from the gross/EPF totals everywhere gross is computed, matching the display:
+- `src/routes/payroll/employee-payrolls.js` — `recalculateAndUpdatePayroll` (stored gross) + the two live-recalc
+  endpoints (`/:id/comprehensive`, `/:id`). Helper defined & exported there.
+- `src/routes/payroll/monthly-payrolls.js` — the process/reprocess gross + EPF base.
+- The leave-day rows are still **stored** in `payroll_items` (the display already hides them); they are only excluded
+  from the totals.
+
+**One-off May correction:** just **reprocess May from the Payroll page** after deploying — reprocess now applies the
+leave-day filter, so it corrects the stored gross/net/deductions. (Dev was already corrected via a temporary recalc:
+RAMBU 3578.20 → **3571.62** ✓, all 7 leak cases fixed.) ⚠️ Reprocess also re-resolves current pay-code rates and
+refreshes any **stale** stored gross (§8), so a few employees' gross may shift for reasons unrelated to the leave-day fix
+(e.g. records added after the original processing) — this is expected.
+
+**Caveat surfaced:** MASLAN (and likely others) have real-looking work logged on sick-leave days. The fix correctly
+stops paying for it (consistent with the display), but the *data* (leave + work on the same day) may be worth a separate
+look with the user.
 
 ---
 

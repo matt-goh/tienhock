@@ -1,5 +1,5 @@
 // src/pages/Payroll/EmployeePayrollDetailsPage.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Link,
   useNavigate,
@@ -20,6 +20,8 @@ import {
   IconList,
   IconListDetails,
   IconClockHour4,
+  IconBuildingBank,
+  IconWallet,
 } from "@tabler/icons-react";
 import { format } from "date-fns";
 import Button from "../../components/Button";
@@ -43,6 +45,7 @@ import {
   CommissionRecord,
   MidMonthPayroll,
   OthersRecord,
+  PinjamRecord,
 } from "../../types/types";
 import {
   DownloadPayslipButton,
@@ -51,6 +54,28 @@ import {
 import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 
 type PayrollDetailsViewMode = "consolidated" | "detailed";
+
+const CLEAR_SEARCH_ON_RETURN_STORAGE_KEY: string =
+  "payroll-clear-search-on-return";
+
+const markSearchClearOnReturn = (): void => {
+  try {
+    sessionStorage.setItem(
+      CLEAR_SEARCH_ON_RETURN_STORAGE_KEY,
+      Date.now().toString()
+    );
+  } catch {
+    // Ignore storage failures so back navigation still works.
+  }
+};
+
+const clearSearchClearOnReturn = (): void => {
+  try {
+    sessionStorage.removeItem(CLEAR_SEARCH_ON_RETURN_STORAGE_KEY);
+  } catch {
+    // Ignore storage failures so back navigation still works.
+  }
+};
 
 interface PayrollItem {
   id?: number;
@@ -62,7 +87,7 @@ interface PayrollItem {
   foc_units?: number | null;
   amount: number;
   is_manual: boolean;
-  pay_type?: string;
+  pay_type: string;
   job_type?: string;
   source_employee_id?: string | null;
   source_date?: string | null;
@@ -74,6 +99,8 @@ interface FixedDirectAmountSummary {
   paidEntries: number;
   totalEntries: number;
 }
+
+type PayrollItemOthersPayType = "Tambahan" | "Overtime";
 
 interface MonthlyLeaveRecord {
   id: number;
@@ -94,6 +121,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const shouldClearSearchOnBackRef = useRef<boolean>(false);
+  const hasConsumedPinjamScrollRef = useRef<boolean>(false);
 
   const [payroll, setPayroll] = useState<EmployeePayroll | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -110,6 +139,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     CommissionRecord[]
   >([]);
   const [othersRecords, setOthersRecords] = useState<OthersRecord[]>([]);
+  const [pinjamRecords, setPinjamRecords] = useState<PinjamRecord[]>([]);
   const [viewMode, setViewMode] = useState<PayrollDetailsViewMode>(() =>
     searchParams.get("view") === "detailed" ? "detailed" : "consolidated",
   );
@@ -140,8 +170,58 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   }, [searchParams]);
 
   useEffect(() => {
+    const handleCtrlKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== "Control" && !event.ctrlKey) return;
+
+      shouldClearSearchOnBackRef.current = true;
+      markSearchClearOnReturn();
+    };
+
+    const handleCtrlKeyUp = (event: KeyboardEvent): void => {
+      if (event.key !== "Control" && event.ctrlKey) return;
+
+      shouldClearSearchOnBackRef.current = false;
+      clearSearchClearOnReturn();
+    };
+
+    document.addEventListener("keydown", handleCtrlKeyDown);
+    document.addEventListener("keyup", handleCtrlKeyUp);
+    return () => {
+      document.removeEventListener("keydown", handleCtrlKeyDown);
+      document.removeEventListener("keyup", handleCtrlKeyUp);
+    };
+  }, []);
+
+  useEffect(() => {
     fetchEmployeePayrollComprehensive();
   }, [id]);
+
+  // When opened from the Pinjam page (?scrollTo=pinjam), jump to the Pinjam
+  // summary at the bottom once the page has finished loading. Runs after the
+  // scroll-restoration pass (double rAF) so it wins on a deliberate navigation.
+  useEffect(() => {
+    if (isLoading || !payroll) return;
+    if (searchParams.get("scrollTo") !== "pinjam") return;
+    if (hasConsumedPinjamScrollRef.current) return;
+
+    hasConsumedPinjamScrollRef.current = true;
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("scrollTo");
+    setSearchParams(nextParams, { replace: true });
+
+    const frame = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const target = document.getElementById("pinjam-section");
+        if (target) {
+          target.scrollIntoView({ behavior: "auto", block: "end" });
+        } else {
+          const main = document.querySelector("main");
+          if (main) main.scrollTop = main.scrollHeight;
+        }
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [isLoading, payroll, pinjamRecords, searchParams, setSearchParams]);
 
   const fetchEmployeePayrollComprehensive = async () => {
     if (!id) return;
@@ -156,6 +236,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       setMonthlyLeaveRecords(response.leave_records || []);
       setCommissionRecords(response.commission_records || []);
       setOthersRecords(response.others_records || []);
+      setPinjamRecords(response.pinjam_records || []);
     } catch (error) {
       console.error("Error fetching comprehensive employee payroll:", error);
       toast.error("Failed to load employee payroll details");
@@ -183,6 +264,12 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   };
 
   const handleBack = () => {
+    if (shouldClearSearchOnBackRef.current) {
+      markSearchClearOnReturn();
+    } else {
+      clearSearchClearOnReturn();
+    }
+
     // Navigate back with year and month params to preserve the selected month
     if (payroll) {
       navigate(
@@ -191,6 +278,12 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     } else {
       navigate("/payroll/monthly-payrolls");
     }
+  };
+
+  const handleBackMouseDown = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ): void => {
+    shouldClearSearchOnBackRef.current = event.ctrlKey;
   };
 
   const formatCurrency = (amount: number) => {
@@ -208,6 +301,33 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     } catch {
       return dateStr;
     }
+  };
+
+  const parseDisplayDate = (value: string | Date | null | undefined): Date | null => {
+    if (!value) return null;
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? null : value;
+    }
+
+    const trimmedValue: string = value.trim();
+    const ymdMatch: RegExpMatchArray | null = trimmedValue.match(
+      /^(\d{4})-(\d{2})-(\d{2})$/,
+    );
+    if (ymdMatch) {
+      const [, year, month, day] = ymdMatch;
+      return new Date(Number(year), Number(month) - 1, Number(day));
+    }
+
+    const parsedDate = new Date(trimmedValue);
+    return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+  };
+
+  const formatDisplayDate = (
+    value: string | Date | null | undefined,
+    fallback: string = "-",
+  ): string => {
+    const parsedDate: Date | null = parseDisplayDate(value);
+    return parsedDate ? format(parsedDate, "dd MMM yyyy") : fallback;
   };
 
   // Helper to generate work log URL for navigation
@@ -375,14 +495,220 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     });
     return Array.from(map.values());
   };
-  const mergedCommissionRecords = mergeByDescription(commissionRecords);
-  const mergedOthersRecords = mergeByDescription(othersRecords);
+  const getDescriptionKey = (description: string): string =>
+    (description || "").trim().toLowerCase();
+  const isCutiTahunanCommissionRecord = (
+    record: CommissionRecord,
+  ): boolean =>
+    record.location_code === "23" ||
+    getDescriptionKey(record.description) === "cuti tahunan";
+  const cutiTahunanCommissionRecords: CommissionRecord[] =
+    commissionRecords.filter(isCutiTahunanCommissionRecord);
+  const nonCutiCommissionRecords: CommissionRecord[] = commissionRecords.filter(
+    (record: CommissionRecord) => !isCutiTahunanCommissionRecord(record),
+  );
+  const commissionDescriptionKeys: Set<string> = new Set(
+    nonCutiCommissionRecords.map((record: CommissionRecord) =>
+      getDescriptionKey(record.description),
+    ),
+  );
+  const isIncentiveOthersRecord = (record: OthersRecord): boolean =>
+    record.pay_code_pay_type === "Tambahan" &&
+    ((record.pay_code_id || "").toUpperCase() === "IXT" ||
+      commissionDescriptionKeys.has(getDescriptionKey(record.description)));
+  const isIncentivePayrollItem = (item: PayrollItem): boolean =>
+    (item.pay_code_id || "").toUpperCase() === "IXT";
+  const incentiveOthersRecords: OthersRecord[] = othersRecords.filter(
+    isIncentiveOthersRecord,
+  );
+  const incentivePayrollItems: PayrollItem[] = payroll.items.filter(
+    isIncentivePayrollItem,
+  );
+  const nonIncentivePayrollItems: PayrollItem[] = payroll.items.filter(
+    (item: PayrollItem) => !isIncentivePayrollItem(item),
+  );
+  // Bonus paycode payroll items (Tambahan items with pay code BONUS). These are
+  // folded into the same incentive stream below so a "Bonus" recorded as a
+  // Tambahan paycode merges (by description) with a "Bonus" entered on the Bonus
+  // page into a single line, instead of showing "Bonus + Bonus".
+  const isBonusPayCode = (payCodeId?: string | null): boolean =>
+    payCodeId === "BONUS";
+  const bonusPayrollItems: PayrollItem[] = payroll.items.filter(
+    (item: PayrollItem) => isBonusPayCode(item.pay_code_id),
+  );
+  const payrollMonthStartDate: string = `${payroll.year}-${String(
+    payroll.month,
+  ).padStart(2, "0")}-01`;
+  const incentiveDisplayRecords: CommissionRecord[] = [
+    ...nonCutiCommissionRecords,
+    ...incentiveOthersRecords.map((record: OthersRecord) => ({
+      id: -record.id,
+      employee_id: record.employee_id,
+      commission_date: record.record_date,
+      amount: Number(record.amount) || 0,
+      description: record.description,
+      created_by: record.created_by || "",
+      created_at: record.created_at || record.record_date,
+      employee_name: record.employee_name,
+      is_advance: false,
+    })),
+    ...incentivePayrollItems.map((item: PayrollItem) => ({
+      id: item.id ? -item.id : 0,
+      employee_id: item.source_employee_id || payroll.employee_id,
+      commission_date: item.source_date || payrollMonthStartDate,
+      amount: Number(item.amount) || 0,
+      description: item.description,
+      created_by: "",
+      created_at: item.source_date || payrollMonthStartDate,
+      employee_name: payroll.employee_name,
+      is_advance: false,
+    })),
+    ...bonusPayrollItems.map((item: PayrollItem) => ({
+      id: item.id ? -item.id : 0,
+      employee_id: item.source_employee_id || payroll.employee_id,
+      commission_date: item.source_date || payrollMonthStartDate,
+      amount: Number(item.amount) || 0,
+      description: item.description,
+      created_by: "",
+      created_at: item.source_date || payrollMonthStartDate,
+      employee_name: payroll.employee_name,
+      is_advance: false,
+    })),
+  ];
+  const mergedCommissionRecords = mergeByDescription(incentiveDisplayRecords);
+  const mergedCommissionTotal: number = mergedCommissionRecords.reduce(
+    (sum, record) => sum + record.merged_amount,
+    0,
+  );
+  const monthlyLeaveDisplayRecords: MonthlyLeaveRecord[] = [
+    ...monthlyLeaveRecords,
+    ...cutiTahunanCommissionRecords.map((record: CommissionRecord) => ({
+      id: -record.id,
+      employee_id: record.employee_id,
+      date: record.commission_date,
+      leave_type: "cuti_tahunan",
+      days_taken: 1,
+      amount_paid: Number(record.amount) || 0,
+      status: "approved",
+      work_log_id: null,
+      work_log_type: null,
+      notes: record.description,
+    })),
+  ];
+  const isAdvanceCommissionRecord = (record: CommissionRecord): boolean =>
+    record.is_advance !== false;
+  const advanceCommissionRecords: CommissionRecord[] = commissionRecords.filter(
+    isAdvanceCommissionRecord,
+  );
+  const mergedAdvanceCommissionRecords =
+    mergeByDescription(advanceCommissionRecords);
+  const getPayrollItemOthersPayType = (
+    record: OthersRecord,
+  ): PayrollItemOthersPayType | null => {
+    if (
+      record.pay_code_pay_type === "Tambahan" ||
+      record.pay_code_pay_type === "Overtime"
+    ) {
+      return record.pay_code_pay_type;
+    }
+    return null;
+  };
+  const isPayrollItemOthersRecord = (record: OthersRecord): boolean =>
+    getPayrollItemOthersPayType(record) !== null;
+  const payrollItemOthersRecords: OthersRecord[] = othersRecords.filter(
+    (record: OthersRecord) =>
+      isPayrollItemOthersRecord(record) && !isIncentiveOthersRecord(record),
+  );
+  const regularOthersRecords: OthersRecord[] = othersRecords.filter(
+    (record: OthersRecord) =>
+      !isPayrollItemOthersRecord(record) && !isIncentiveOthersRecord(record),
+  );
+  const mergedOthersRecords = mergeByDescription(regularOthersRecords);
+
+  // Commission advance + the rounded final pay ("Jumlah Digenapkan"). This is the
+  // same expression rendered in the Deductions column below; computed once here so
+  // the Pinjam table's monthly "before pinjam" base matches what's shown above.
+  const commissionAdvanceTotal: number = advanceCommissionRecords.reduce(
+    (sum, record) => sum + Number(record.amount),
+    0,
+  );
+  const finalPaymentBeforeRounding: number =
+    payroll.net_pay -
+    (midMonthPayroll?.amount || 0) -
+    commissionAdvanceTotal;
+  const jumlahDigenapkan: number =
+    payroll.setelah_digenapkan ?? Math.ceil(finalPaymentBeforeRounding);
+
+  // Split pinjam records by type for the bottom-of-page Pinjam summary.
+  const midMonthPinjamRecords: PinjamRecord[] = pinjamRecords.filter(
+    (record: PinjamRecord) => record.pinjam_type === "mid_month",
+  );
+  const monthlyPinjamRecords: PinjamRecord[] = pinjamRecords.filter(
+    (record: PinjamRecord) => record.pinjam_type === "monthly",
+  );
+  const midMonthPinjamTotal: number = midMonthPinjamRecords.reduce(
+    (sum, record) => sum + Number(record.amount),
+    0,
+  );
+  const monthlyPinjamTotal: number = monthlyPinjamRecords.reduce(
+    (sum, record) => sum + Number(record.amount),
+    0,
+  );
+  const hasMidMonthPinjam: boolean = midMonthPinjamRecords.length > 0;
+  const hasMonthlyPinjam: boolean = monthlyPinjamRecords.length > 0;
+  const hasBothPinjamPanels: boolean = hasMidMonthPinjam && hasMonthlyPinjam;
+  const midMonthPayBeforePinjam: number = midMonthPayroll?.amount || 0;
+  const midMonthFinalPay: number = midMonthPayBeforePinjam - midMonthPinjamTotal;
+  const monthlyFinalPay: number = jumlahDigenapkan - monthlyPinjamTotal;
+
+  // Pinjam amounts can go negative when advances/pinjam exceed earnings (the
+  // worker owes money). Show the real value but render negatives in red so it
+  // reads as owing rather than money received.
+  const pinjamAmountColor = (value: number, positiveClass: string): string =>
+    value < -0.005 ? "text-red-600 dark:text-red-400" : positiveClass;
+
+  const getOthersRecordJobType = (record: OthersRecord): string | undefined => {
+    const mappedJobType: string | undefined =
+      payroll.employee_job_mapping?.[record.employee_id];
+    if (mappedJobType) return mappedJobType;
+    return payroll.job_type.includes(",") ? undefined : payroll.job_type;
+  };
+
+  const payrollItemOthersItems: PayrollItem[] =
+    payrollItemOthersRecords.flatMap((record: OthersRecord) => {
+      const payType: PayrollItemOthersPayType | null =
+        getPayrollItemOthersPayType(record);
+      if (!payType) return [];
+
+      return [
+        {
+          id: -record.id,
+          pay_code_id: record.pay_code_id || `OTHERS-${record.id}`,
+          description: record.description,
+          rate: Number(record.rate) || 0,
+          rate_unit: record.rate_unit,
+          quantity: Number(record.quantity) || 0,
+          amount: Number(record.amount) || 0,
+          is_manual: false,
+          pay_type: payType,
+          job_type: getOthersRecordJobType(record),
+          source_employee_id: record.employee_id,
+          source_date: record.record_date,
+          work_log_id: null,
+          work_log_type: null,
+        },
+      ];
+    });
+  const payrollItemsWithTypedOthers: PayrollItem[] = [
+    ...nonIncentivePayrollItems,
+    ...payrollItemOthersItems,
+  ];
 
   // Hide leave-day activities from base pay — on a leave day the employee did not
   // actually work, so these rows pay nothing (quantity is 0) and the real leave
   // payment is shown separately in the Cuti section (from leave_records).
   const displayItems = filterOutLeaveDayItems(
-    payroll.items,
+    payrollItemsWithTypedOthers,
     payroll.leave_records,
   );
 
@@ -397,6 +723,15 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const consolidatedItems = consolidatePayrollItems(displayItems);
   const groupedConsolidatedItems =
     groupConsolidatedItemsByType(consolidatedItems);
+  // Bonus paycode items are excluded from the Tambahan tables here; they are
+  // shown together with Bonus-page records in the Bonus section instead.
+  const consolidatedTambahanItems: ConsolidatedPayrollItem[] =
+    groupedConsolidatedItems["Tambahan"].filter(
+      (item: ConsolidatedPayrollItem) => !isBonusPayCode(item.pay_code_id),
+    );
+  const detailedTambahanItems: PayrollItem[] = groupedItems["Tambahan"].filter(
+    (item: PayrollItem) => !isBonusPayCode(item.pay_code_id),
+  );
 
   const getPayrollItemGroupKey = (
     payCodeId: string,
@@ -417,15 +752,13 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   };
 
   const directAmountFixedKeys: Set<string> = new Set(
-    payroll.items
+    payrollItemsWithTypedOthers
       .filter((item: PayrollItem) => {
         const amount: number = Number(item.amount) || 0;
-        const quantity: number = Number(item.quantity) || 0;
         return (
           item.rate_unit === "Fixed" &&
           Number(item.rate) === 0 &&
-          amount > 0 &&
-          isMoneyEqual(quantity, amount)
+          amount > 0
         );
       })
       .map((item: PayrollItem) => getPayrollItemKey(item)),
@@ -442,7 +775,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   ): FixedDirectAmountSummary | null => {
     if (!isDirectAmountFixedItem(item)) return null;
 
-    const matchingItems: PayrollItem[] = payroll.items.filter(
+    const matchingItems: PayrollItem[] = payrollItemsWithTypedOthers.filter(
       (payrollItem: PayrollItem) =>
         payrollItem.pay_code_id === item.pay_code_id &&
         payrollItem.rate === item.rate &&
@@ -459,13 +792,17 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
   // Detect if this is a combined job payroll (multiple job types)
   const uniqueJobTypes = [
-    ...new Set(payroll.items.map((item) => item.job_type).filter(Boolean)),
+    ...new Set(
+      payrollItemsWithTypedOthers
+        .map((item: PayrollItem) => item.job_type)
+        .filter(Boolean),
+    ),
   ];
   const isCombinedPayroll = uniqueJobTypes.length > 1;
 
   // Derive employee-to-job-types mapping from actual payroll items
   // This handles cases where one employee ID works on multiple job types
-  const derivedEmployeeJobMapping = payroll.items.reduce(
+  const derivedEmployeeJobMapping = payrollItemsWithTypedOthers.reduce(
     (acc, item) => {
       const empId = item.source_employee_id || payroll.employee_id;
       if (empId && item.job_type) {
@@ -518,7 +855,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     (sum, item) => sum + item.total_amount,
     0,
   );
-  const tambahanTotal = groupedConsolidatedItems["Tambahan"].reduce(
+  const tambahanTotal = consolidatedTambahanItems.reduce(
     (sum, item) => sum + item.total_amount,
     0,
   );
@@ -551,9 +888,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     }).format(quantity);
   };
 
-  const formatOthersRateQuantity = (
+  // Rate / quantity split into separate display strings so the Others table can
+  // use the same Rate and Total Qty columns as the Base/Tambahan/Overtime tables.
+  const getOthersRateQuantityDisplay = (
     record: MergedAdvance<OthersRecord>,
-  ): string => {
+  ): { rate: string; quantity: string } => {
     const rows: OthersRecord[] =
       record.merged_rows.length > 0 ? record.merged_rows : [record];
     const rate: number = Number(rows[0].rate) || 0;
@@ -563,7 +902,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         row.rate_unit === rateUnit && isMoneyEqual(Number(row.rate) || 0, rate),
     );
 
-    if (!hasConsistentRate) return "Mixed rates";
+    if (!hasConsistentRate) return { rate: "Mixed rates", quantity: "-" };
 
     if (rateUnit === "Fixed") {
       const allDirectAmountFixed: boolean = rows.every((row: OthersRecord) => {
@@ -573,23 +912,44 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       });
 
       if (allDirectAmountFixed) {
-        return rows.length === 1 ? "Ikut amaun" : `Ikut amaun × ${rows.length}`;
+        return {
+          rate: "Ikut amaun",
+          quantity: rows.length === 1 ? "-" : `${rows.length} entries`,
+        };
       }
 
-      return rows.length === 1
-        ? `${formatCurrency(rate)}/Fixed`
-        : `${formatCurrency(rate)}/Fixed × ${rows.length}`;
+      return {
+        rate:
+          rows.length > 1
+            ? `Fixed (${formatCurrency(rate)})`
+            : `${formatCurrency(rate)}/Fixed`,
+        quantity: rows.length === 1 ? "-" : String(rows.length),
+      };
     }
 
     const quantity: number = rows.reduce(
-      (sum: number, row: OthersRecord) =>
-        sum + (Number(row.quantity) || 0),
+      (sum: number, row: OthersRecord) => sum + (Number(row.quantity) || 0),
       0,
     );
 
-    return `${rate.toFixed(2)} × ${formatUnitQuantity(quantity)} ${
-      rateUnit
-    }`;
+    return {
+      rate: `${formatCurrency(rate)}/${rateUnit}`,
+      quantity: formatUnitQuantity(quantity),
+    };
+  };
+
+  const getMergedOthersPayCodeIds = (
+    record: MergedAdvance<OthersRecord>,
+  ): string[] => {
+    const rows: OthersRecord[] =
+      record.merged_rows.length > 0 ? record.merged_rows : [record];
+    return Array.from(
+      new Set(
+        rows
+          .map((row: OthersRecord) => row.pay_code_id)
+          .filter((payCodeId): payCodeId is string => Boolean(payCodeId)),
+      ),
+    );
   };
 
   const getTotalUnitQuantity = (item: ConsolidatedPayrollItem): number => {
@@ -1059,7 +1419,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     <div className="space-y-3">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
         <div className="flex items-center gap-4">
-          <BackButton onClick={handleBack} />
+          <BackButton onClick={handleBack} onMouseDown={handleBackMouseDown} />
           <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
           <div>
             <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
@@ -1265,11 +1625,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-default-600 dark:text-gray-300">
-                  Leave Pay
+                  Cuti Pay
                 </span>
                 <span className="font-medium text-default-800 dark:text-gray-100">
                   {formatCurrency(
-                    monthlyLeaveRecords.reduce(
+                    monthlyLeaveDisplayRecords.reduce(
                       (sum, record) => sum + Number(record.amount_paid),
                       0,
                     ),
@@ -1284,12 +1644,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       .join(" + ")}
                   </span>
                   <span className="font-medium text-default-800 dark:text-gray-100">
-                    {formatCurrency(
-                      mergedCommissionRecords.reduce(
-                        (sum, record) => sum + record.merged_amount,
-                        0,
-                      ),
-                    )}
+                    {formatCurrency(mergedCommissionTotal)}
                   </span>
                 </div>
               )}
@@ -1452,10 +1807,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 })}
 
               {/* Commission Advance with Tooltip */}
-              {mergedCommissionRecords.length > 0 && (
+              {mergedAdvanceCommissionRecords.length > 0 && (
                 <div className="group relative flex justify-between text-sm">
                   <span className="text-default-600 dark:text-gray-300 flex items-center gap-1 cursor-help">
-                    {mergedCommissionRecords
+                    {mergedAdvanceCommissionRecords
                       .map((record) => record.description)
                       .join(" + ")}{" "}
                     Advance
@@ -1467,7 +1822,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   <span className="font-medium text-rose-600 dark:text-rose-400">
                     -{" "}
                     {formatCurrency(
-                      mergedCommissionRecords.reduce(
+                      mergedAdvanceCommissionRecords.reduce(
                         (sum, record) => sum + record.merged_amount,
                         0,
                       ),
@@ -1487,7 +1842,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           </span>
                           <span>
                             {formatCurrency(
-                              mergedCommissionRecords.reduce(
+                              mergedAdvanceCommissionRecords.reduce(
                                 (sum, record) => sum + record.merged_amount,
                                 0,
                               ),
@@ -1496,7 +1851,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-default-300">Records:</span>
-                          <span>{commissionRecords.length}</span>
+                          <span>{advanceCommissionRecords.length}</span>
                         </div>
                       </div>
                       <div className="border-t border-default-600 mt-2 pt-2 text-default-400">
@@ -1565,14 +1920,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             ?.filter((d) => d.employee_amount > 0)
                             .reduce((sum, d) => sum + d.employee_amount, 0) ||
                           0;
-                        const commissionAdvance = commissionRecords.reduce(
-                          (sum, r) => sum + Number(r.amount),
-                          0,
-                        );
                         const midMonthAdvance = midMonthPayroll?.amount || 0;
                         return (
                           statutoryDeductions +
-                          commissionAdvance +
+                          commissionAdvanceTotal +
                           midMonthAdvance
                         );
                       })(),
@@ -1584,17 +1935,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
             {/* Digenapkan (Rounding) - Only show if there's an adjustment */}
             {(() => {
-              const commissionAdvance = commissionRecords.reduce(
-                (sum, r) => sum + Number(r.amount),
-                0,
-              );
-              const finalPayment =
-                payroll.net_pay -
-                (midMonthPayroll?.amount || 0) -
-                commissionAdvance;
               // Use stored rounding values if available, otherwise calculate
               const digenapkan =
-                payroll.digenapkan ?? Math.ceil(finalPayment) - finalPayment;
+                payroll.digenapkan ??
+                Math.ceil(finalPaymentBeforeRounding) -
+                  finalPaymentBeforeRounding;
 
               return digenapkan > 0.001 ? (
                 <div className="flex justify-between text-sm mt-2">
@@ -1615,22 +1960,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   Jumlah Digenapkan
                 </span>
                 <span className="text-sky-900 dark:text-sky-200 text-2xl font-bold">
-                  {formatCurrency(
-                    (() => {
-                      const commissionAdvance = commissionRecords.reduce(
-                        (sum, r) => sum + Number(r.amount),
-                        0,
-                      );
-                      const finalPayment =
-                        payroll.net_pay -
-                        (midMonthPayroll?.amount || 0) -
-                        commissionAdvance;
-                      // Use stored rounding values if available, otherwise calculate on-the-fly
-                      return (
-                        payroll.setelah_digenapkan ?? Math.ceil(finalPayment)
-                      );
-                    })(),
-                  )}
+                  {formatCurrency(jumlahDigenapkan)}
                 </span>
               </div>
             </div>
@@ -2021,9 +2351,9 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
             {/* Tambahan Pay Items */}
             {((viewMode === "consolidated" &&
-              groupedConsolidatedItems["Tambahan"].length > 0) ||
+              consolidatedTambahanItems.length > 0) ||
               (viewMode === "detailed" &&
-                groupedItems["Tambahan"].length > 0)) && (
+                detailedTambahanItems.length > 0)) && (
               <div className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
                 <div className="px-4 py-2 bg-violet-50 dark:bg-violet-900/20 border-b border-violet-100 dark:border-violet-800/50">
                   <h3 className="text-md font-semibold text-violet-800 dark:text-violet-300 flex items-center gap-2">
@@ -2073,7 +2403,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         {isEditable &&
                           (viewMode === "detailed" ||
                             (viewMode === "consolidated" &&
-                              groupedConsolidatedItems["Tambahan"].some(
+                              consolidatedTambahanItems.some(
                                 (item) =>
                                   item.is_manual && item.item_count === 1,
                               ))) && (
@@ -2086,11 +2416,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                       {viewMode === "consolidated"
-                        ? groupedConsolidatedItems["Tambahan"].map(
+                        ? consolidatedTambahanItems.map(
                             (item, index) => renderConsolidatedRow(item, index),
                           )
                         : getSortedItemsWithSeparators(
-                            groupedItems["Tambahan"],
+                            detailedTambahanItems,
                           ).map((item, index, arr) =>
                             renderDetailedRow(item, index, arr, true),
                           )}
@@ -2109,7 +2439,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         {isEditable &&
                           (viewMode === "detailed" ||
                             (viewMode === "consolidated" &&
-                              groupedConsolidatedItems["Tambahan"].some(
+                              consolidatedTambahanItems.some(
                                 (item) =>
                                   item.is_manual && item.item_count === 1,
                               ))) && <td></td>}
@@ -2204,7 +2534,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           </>
         )}
 
-        {/* Commission Records */}
+        {/* Bonus / incentive records */}
         {mergedCommissionRecords.length > 0 && (
           <div className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
             <div className="px-4 py-2 bg-teal-50 dark:bg-teal-900/20 border-b border-teal-100 dark:border-teal-800/50">
@@ -2214,13 +2544,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   className="text-teal-600 dark:text-teal-400"
                 />
                 <Link
-                  to={`/payroll/commission?year=${payroll.year}&month=${payroll.month}`}
+                  to={`/payroll/bonus?year=${payroll.year}&month=${payroll.month}`}
                   className="hover:underline"
-                  title="Open Others (Advance) input page"
+                  title="Open Bonus input page"
                 >
-                  {mergedCommissionRecords
-                    .map((record) => record.description)
-                    .join(" + ")}
+                  Bonus
                 </Link>
               </h3>
             </div>
@@ -2285,18 +2613,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       colSpan={2}
                       className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
                     >
-                      Total{" "}
-                      {mergedCommissionRecords
-                        .map((record) => record.description)
-                        .join(" + ")}
+                      Total Bonus
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
-                      {formatCurrency(
-                        mergedCommissionRecords.reduce(
-                          (sum, record) => sum + record.merged_amount,
-                          0,
-                        ),
-                      )}
+                      {formatCurrency(mergedCommissionTotal)}
                     </td>
                   </tr>
                 </tfoot>
@@ -2327,8 +2647,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
                       Description
                     </th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                      Rate × Qty
+                    <th className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+                      Rate
+                    </th>
+                    <th className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+                      Total Qty
                     </th>
                     <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
                       Amount
@@ -2336,44 +2659,69 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                  {mergedOthersRecords.map((record) => (
-                    <tr
-                      key={record.id}
-                      className="hover:bg-default-50 dark:hover:bg-gray-700"
-                    >
-                      <td className="px-3 py-2 whitespace-nowrap text-sm text-default-800 dark:text-gray-100">
-                        {record.merged_count === 1
-                          ? format(new Date(record.record_date), "dd MMM yyyy")
-                          : `${record.merged_count} entries`}
-                      </td>
-                      <td
-                        className="px-3 py-2 text-sm text-default-800 dark:text-gray-100 max-w-xs"
-                        title={record.description}
+                  {mergedOthersRecords.map((record) => {
+                    const payCodeIds: string[] =
+                      getMergedOthersPayCodeIds(record);
+                    const payCodeLabel: string = payCodeIds.join(", ");
+                    const descriptionTitle: string = payCodeLabel
+                      ? `${record.description} (${payCodeLabel})`
+                      : record.description;
+                    const rateQuantityDisplay: {
+                      rate: string;
+                      quantity: string;
+                    } = getOthersRateQuantityDisplay(record);
+
+                    return (
+                      <tr
+                        key={record.id}
+                        className="hover:bg-default-50 dark:hover:bg-gray-700"
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="truncate min-w-0">
-                            {record.description}
-                          </span>
-                          {record.merged_count > 1 && (
-                            <span className="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
-                              ×{record.merged_count}
+                        <td className="px-3 py-2 whitespace-nowrap text-sm text-default-800 dark:text-gray-100">
+                          {record.merged_count === 1
+                            ? format(
+                                new Date(record.record_date),
+                                "dd MMM yyyy",
+                              )
+                            : `${record.merged_count} entries`}
+                        </td>
+                        <td
+                          className="px-3 py-2 text-sm text-default-800 dark:text-gray-100 max-w-xs"
+                          title={descriptionTitle}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="truncate min-w-0">
+                              {record.description}
+                              {payCodeLabel && (
+                                <span className="text-default-500 dark:text-gray-400">
+                                  {" "}
+                                  ({payCodeLabel})
+                                </span>
+                              )}
                             </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-right text-sm text-default-600 dark:text-gray-400">
-                        {formatOthersRateQuantity(record)}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium text-default-800 dark:text-gray-100">
-                        {formatCurrency(record.merged_amount)}
-                      </td>
-                    </tr>
-                  ))}
+                            {record.merged_count > 1 && (
+                              <span className="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
+                                ×{record.merged_count}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-center text-sm text-default-600 dark:text-gray-400">
+                          {rateQuantityDisplay.rate}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-center text-sm text-default-600 dark:text-gray-400">
+                          {rateQuantityDisplay.quantity}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium text-default-800 dark:text-gray-100">
+                          {formatCurrency(record.merged_amount)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
                 <tfoot className="bg-default-50 dark:bg-gray-800">
                   <tr>
                     <td
-                      colSpan={3}
+                      colSpan={4}
                       className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
                     >
                       Total Others (Kerja Luar OT)
@@ -2394,7 +2742,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         )}
 
         {/* Monthly Leave Summary */}
-        {monthlyLeaveRecords.length > 0 && (
+        {monthlyLeaveDisplayRecords.length > 0 && (
           <div className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
             <div className="px-4 py-2 bg-rose-50 dark:bg-rose-900/20 border-b border-rose-100 dark:border-rose-800/50">
               <h3 className="text-md font-semibold text-rose-800 dark:text-rose-300 flex items-center gap-2">
@@ -2402,7 +2750,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   size={18}
                   className="text-rose-600 dark:text-rose-400"
                 />
-                Leave Records This Month
+                Cuti Records
               </h3>
             </div>
             <div className="overflow-x-auto">
@@ -2436,7 +2784,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                  {monthlyLeaveRecords.map((record, index) => {
+                  {monthlyLeaveDisplayRecords.map((record, index) => {
                     const getLeaveTypeDisplay = (leaveType: string) => {
                       switch (leaveType) {
                         case "cuti_umum":
@@ -2483,9 +2831,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     };
                     const leaveRecordUrl: string | null =
                       getLeaveRecordUrl(record);
-                    const leaveDateLabel: string = format(
-                      new Date(record.date.replace(/-/g, "/")),
-                      "dd MMM yyyy",
+                    const leaveDateLabel: string = formatDisplayDate(
+                      record.date,
                     );
                     return (
                       <tr
@@ -2530,15 +2877,15 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
                     >
                       Jumlah cuti (
-                      {monthlyLeaveRecords.reduce(
+                      {monthlyLeaveDisplayRecords.reduce(
                         (sum, r) => sum + (Number(r.days_taken) || 0),
                         0,
                       )}{" "}
-                      hari )
+                      hari)
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
                       {formatCurrency(
-                        monthlyLeaveRecords.reduce(
+                        monthlyLeaveDisplayRecords.reduce(
                           (sum, r) => sum + (Number(r.amount_paid) || 0),
                           0,
                         ),
@@ -2552,7 +2899,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         )}
 
         {payroll.items.length === 0 && (
-          <div className="text-center py-8 border border-default-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
+          <div className="mb-4 text-center py-8 border border-default-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
             <p className="text-default-500 dark:text-gray-400">
               No payroll items found.
             </p>
@@ -2566,6 +2913,178 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 Add Manual Item
               </Button>
             )}
+          </div>
+        )}
+
+        {/* Pinjam Summary - Final pay after pinjam deductions.
+            Only shown when this employee has pinjam recorded this month.
+            Intentionally page-only: it is not part of the payslip PDF. */}
+        {pinjamRecords.length > 0 && (
+          <div
+            id="pinjam-section"
+            className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800"
+          >
+            <div className="px-4 py-2 bg-red-50 dark:bg-red-900/20 border-b border-red-100 dark:border-red-800/50">
+              <h3 className="text-md font-semibold text-red-800 dark:text-red-300 flex items-center gap-2">
+                <IconWallet
+                  size={18}
+                  className="text-red-600 dark:text-red-400"
+                />
+                <Link
+                  to={`/payroll/pinjam?year=${payroll.year}&month=${payroll.month}`}
+                  className="hover:underline"
+                  title="Open Pinjam System"
+                >
+                  Pinjam
+                </Link>
+              </h3>
+            </div>
+            <div className="p-4">
+              <div
+                className={`flex flex-col ${
+                  hasBothPinjamPanels
+                    ? "lg:flex-row lg:gap-6 lg:divide-x lg:divide-default-200 dark:lg:divide-gray-700"
+                    : ""
+                } gap-6`}
+              >
+                {/* Mid-Month panel */}
+                {hasMidMonthPinjam && (
+                  <div
+                    className={`min-w-0 flex flex-col ${
+                      hasBothPinjamPanels ? "flex-1 lg:pr-6" : "w-full"
+                    }`}
+                  >
+                    <div className="mb-3">
+                      <p className="text-sm text-default-500 dark:text-gray-400 mb-1">
+                        Mid-Month Pay (Before Pinjam)
+                      </p>
+                      <p
+                        className={`text-xl font-bold ${pinjamAmountColor(
+                          midMonthPayBeforePinjam,
+                          "text-default-800 dark:text-gray-100",
+                        )}`}
+                      >
+                        {formatCurrency(midMonthPayBeforePinjam)}
+                      </p>
+                    </div>
+
+                    <div className="mb-3">
+                      <p className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
+                        Pinjam Items:
+                      </p>
+                      <div className="space-y-1 text-sm text-default-600 dark:text-gray-300">
+                        {midMonthPinjamRecords.map((record) => (
+                          <div key={record.id} className="flex items-start">
+                            <span className="text-default-400 mr-2 mt-0.5">
+                              •
+                            </span>
+                            <span className="flex-1 min-w-0">
+                              {record.description}
+                            </span>
+                            <span className="ml-2 flex-shrink-0 font-medium text-default-700 dark:text-gray-200">
+                              {formatCurrency(Number(record.amount))}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-auto text-sm">
+                      <div className="flex justify-between mb-2">
+                        <span className="text-default-600 dark:text-gray-300">
+                          Jumlah Pinjam:
+                        </span>
+                        <span className="font-semibold text-red-600 dark:text-red-400">
+                          - {formatCurrency(midMonthPinjamTotal)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center font-semibold border-t border-default-200 dark:border-gray-600 pt-2">
+                        <span className="text-default-800 dark:text-gray-100">
+                          Final Mid-Month Pay
+                        </span>
+                        <span
+                          className={`text-lg font-bold ${pinjamAmountColor(
+                            midMonthFinalPay,
+                            "text-sky-600 dark:text-sky-400",
+                          )}`}
+                        >
+                          {formatCurrency(midMonthFinalPay)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Monthly panel */}
+                {hasMonthlyPinjam && (
+                  <div
+                    className={`min-w-0 flex flex-col ${
+                      hasBothPinjamPanels ? "flex-1 lg:pl-6" : "w-full"
+                    }`}
+                  >
+                    <div className="mb-3">
+                      <p className="text-sm text-default-500 dark:text-gray-400 mb-1">
+                        Gaji Genap (Before Pinjam)
+                      </p>
+                      <p
+                        className={`text-xl font-bold ${pinjamAmountColor(
+                          jumlahDigenapkan,
+                          "text-default-800 dark:text-gray-100",
+                        )}`}
+                      >
+                        {formatCurrency(jumlahDigenapkan)}
+                      </p>
+                    </div>
+
+                    <div className="mb-3">
+                      <p className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
+                        Pinjam Items:
+                      </p>
+                      <div className="space-y-1 text-sm text-default-600 dark:text-gray-300">
+                        {monthlyPinjamRecords.map((record) => (
+                          <div key={record.id} className="flex items-start">
+                            <span className="text-default-400 mr-2 mt-0.5">
+                              •
+                            </span>
+                            <span className="flex-1 min-w-0">
+                              {record.description}
+                            </span>
+                            <span className="ml-2 flex-shrink-0 font-medium text-default-700 dark:text-gray-200">
+                              {formatCurrency(Number(record.amount))}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-auto text-sm">
+                      <div className="flex justify-between mb-2">
+                        <span className="text-default-600 dark:text-gray-300">
+                          Jumlah Pinjam:
+                        </span>
+                        <span className="font-semibold text-red-600 dark:text-red-400">
+                          - {formatCurrency(monthlyPinjamTotal)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center font-semibold border-t border-default-200 dark:border-gray-600 pt-2">
+                        <span className="text-default-800 dark:text-gray-100 flex items-center gap-1.5">
+                          <IconBuildingBank className="w-4 h-4 flex-shrink-0" />
+                          Jumlah Masuk Bank
+                        </span>
+                        <span
+                          className={`text-lg font-bold ${pinjamAmountColor(
+                            monthlyFinalPay,
+                            "text-sky-600 dark:text-sky-400",
+                          )}`}
+                        >
+                          {formatCurrency(monthlyFinalPay)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>

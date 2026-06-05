@@ -12,6 +12,42 @@ const PACKING_JOB_BY_PRODUCT_TYPE = {
   MEE: "MEE_PACKING",
   BH: "BH_PACKING",
 };
+const WORKER_ORDER_SCOPES = new Set(["BH_PACKING", "MEE_PACKING"]);
+
+let workerOrderTableReady = false;
+
+const ensureWorkerOrderTable = async (pool) => {
+  if (workerOrderTableReady) return;
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS production_worker_orders (
+      scope text NOT NULL CHECK (scope IN ('BH_PACKING', 'MEE_PACKING')),
+      worker_id varchar(50) NOT NULL REFERENCES staffs(id) ON DELETE CASCADE,
+      sort_order integer NOT NULL CHECK (sort_order >= 0),
+      updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+      updated_by varchar(50),
+      PRIMARY KEY (scope, worker_id)
+    )
+  `);
+
+  workerOrderTableReady = true;
+};
+
+const validateWorkerOrderScope = (scope) =>
+  typeof scope === "string" && WORKER_ORDER_SCOPES.has(scope);
+
+const normalizeWorkerIds = (workerIds) => {
+  const seen = new Set();
+
+  return workerIds
+    .filter((workerId) => typeof workerId === "string" && workerId.trim())
+    .map((workerId) => workerId.trim())
+    .filter((workerId) => {
+      if (seen.has(workerId)) return false;
+      seen.add(workerId);
+      return true;
+    });
+};
 
 const getPackingCutiConflicts = async (client, date, productId, workerIds) => {
   const activeWorkerIds = workerIds.filter(Boolean);
@@ -116,6 +152,101 @@ export default function (pool) {
   });
 
   // ========== END MACHINE STATUS ROUTES ==========
+
+  // GET /api/production-entries/worker-order - Get saved worker order by packing scope
+  router.get("/worker-order", async (req, res) => {
+    try {
+      const { scope } = req.query;
+
+      if (!validateWorkerOrderScope(scope)) {
+        return res.status(400).json({
+          message: "scope must be BH_PACKING or MEE_PACKING",
+        });
+      }
+
+      await ensureWorkerOrderTable(pool);
+
+      const result = await pool.query(
+        `SELECT worker_id
+         FROM production_worker_orders
+         WHERE scope = $1
+         ORDER BY sort_order ASC, worker_id ASC`,
+        [scope]
+      );
+
+      res.json({
+        scope,
+        worker_ids: result.rows.map((row) => row.worker_id),
+      });
+    } catch (error) {
+      console.error("Error fetching worker order:", error);
+      res.status(500).json({
+        message: "Error fetching worker order",
+        error: error.message,
+      });
+    }
+  });
+
+  // PUT /api/production-entries/worker-order - Save worker order by packing scope
+  router.put("/worker-order", async (req, res) => {
+    try {
+      const { scope, worker_ids } = req.body;
+
+      if (!validateWorkerOrderScope(scope)) {
+        return res.status(400).json({
+          message: "scope must be BH_PACKING or MEE_PACKING",
+        });
+      }
+
+      if (!Array.isArray(worker_ids)) {
+        return res.status(400).json({
+          message: "worker_ids array is required",
+        });
+      }
+
+      const normalizedWorkerIds = normalizeWorkerIds(worker_ids);
+      const updatedBy = req.session?.staff?.id || req.session?.staff_id || null;
+
+      await ensureWorkerOrderTable(pool);
+
+      const client = await pool.connect();
+
+      try {
+        await client.query("BEGIN");
+        await client.query(
+          "DELETE FROM production_worker_orders WHERE scope = $1",
+          [scope]
+        );
+
+        for (const [index, workerId] of normalizedWorkerIds.entries()) {
+          await client.query(
+            `INSERT INTO production_worker_orders (scope, worker_id, sort_order, updated_by)
+             VALUES ($1, $2, $3, $4)`,
+            [scope, workerId, index, updatedBy]
+          );
+        }
+
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+
+      res.json({
+        message: "Worker order saved",
+        scope,
+        worker_ids: normalizedWorkerIds,
+      });
+    } catch (error) {
+      console.error("Error saving worker order:", error);
+      res.status(500).json({
+        message: "Error saving worker order",
+        error: error.message,
+      });
+    }
+  });
 
   // GET /api/production-entries - List entries with filters
   router.get("/", async (req, res) => {

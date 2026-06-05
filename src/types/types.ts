@@ -493,6 +493,13 @@ export interface Employee {
   numberOfChildren: number;
   department: string;
   kwspNumber: string;
+  // Per-staff statutory contribution overrides ("" = auto from birthdate/nationality).
+  // Age overrides: "under_60" | "over_60" | "none" (not eligible).
+  // epfNationalityOverride: "local" | "foreign".
+  epfAgeOverride: string;
+  epfNationalityOverride: string;
+  socsoAgeOverride: string;
+  sipAgeOverride: string;
   updatedAt?: string;
   headStaffId?: string | null;
 }
@@ -772,6 +779,8 @@ export interface CommissionRecord {
   created_by: string;
   created_at: string;
   employee_name?: string;
+  is_advance?: boolean;
+  location_code?: string | null;
 }
 
 export interface OthersRecord {
@@ -790,6 +799,7 @@ export interface OthersRecord {
   updated_at?: string;
   employee_name?: string;
   pay_code_description?: string | null;
+  pay_code_pay_type?: PayType | null;
 }
 
 export interface LeaveRecord {
@@ -936,6 +946,20 @@ export interface MidMonthPayroll {
   paid_at?: string;
   notes?: string;
   default_payment_method?: string;
+}
+
+export interface PinjamRecord {
+  id: number;
+  employee_id: string;
+  employee_name?: string;
+  year: number;
+  month: number;
+  amount: number;
+  description: string;
+  pinjam_type: "mid_month" | "monthly";
+  created_by: string;
+  created_at: string;
+  updated_at: string | null;
 }
 
 // ==================== ACCOUNTING / JOURNAL SYSTEM TYPES ====================
@@ -1122,6 +1146,18 @@ export interface ProductionWorker {
   id: string;
   name: string;
   job: string[];
+}
+
+export type ProductionWorkerOrderScope = "BH_PACKING" | "MEE_PACKING";
+
+export interface ProductionWorkerOrderResponse {
+  scope: ProductionWorkerOrderScope;
+  worker_ids: string[];
+}
+
+export interface ProductionWorkerOrderRequest {
+  scope: ProductionWorkerOrderScope;
+  worker_ids: string[];
 }
 
 // Special Item Configuration (for Hancur, Bundle entries)

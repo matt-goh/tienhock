@@ -58,7 +58,7 @@ This is a comprehensive ERP system supporting three companies:
 - Maintenance mode support for database operations
 - Environment variables for database configuration
 
-#### Database Schema (76 tables)
+#### Database Schema (77 tables)
 
 **Accounting & Finance:**
 
@@ -102,6 +102,7 @@ This is a comprehensive ERP system supporting three companies:
 - `products` - id, description, price_per_unit, type, tax, is_active
 - `production_entries` - id, entry_date, product_id, worker_id (nullable for stock-only OTH production records), bags_packed, created_at, updated_at, created_by
 - `production_machine_status` - id, entry_date, product_id (FK products), machine_broken, notes, created_at, updated_at, created_by (tracks machine broken status per date/product for production bonus threshold override - when machine_broken=true, workers below threshold still receive bonus pay codes)
+- `production_worker_orders` - scope (BH_PACKING/MEE_PACKING), worker_id (FK staffs), sort_order, updated_at, updated_by (shared drag-and-drop worker card order for Production Entry worker grids)
 - `product_pay_codes` - id, product_id, pay_code_id, created_at, updated_at
 - `stock_adjustments` - id, entry_date, product_id, adjustment_type, quantity, reason, created_at, created_by, reference
 - `stock_opening_balances` - id, product_id, balance, effective_date, created_at, updated_at, created_by, notes
@@ -115,7 +116,7 @@ This is a comprehensive ERP system supporting three companies:
 
 **Staff & Employees:**
 
-- `staffs` - id (no whitespace allowed), name, telephone_no, email, gender, nationality, birthdate, address, job, location, date_joined, ic_no, bank_account_number, epf_no, income_tax_no, socso_no, document, payment_type, payment_preference, race, agama, date_resigned, password, updated_at, marital_status, spouse_employment_status, number_of_children, kwsp_number, department, head_staff_id (references staffs.id - for same-name staff, indicates who is the "Head" for location determination in salary reports)
+- `staffs` - id (no whitespace allowed), name, telephone_no, email, gender, nationality, birthdate, address, job, location, date_joined, ic_no, bank_account_number, epf_no, income_tax_no, socso_no, document, payment_type, payment_preference, race, agama, date_resigned, password, updated_at, marital_status, spouse_employment_status, number_of_children, kwsp_number, department, head_staff_id (references staffs.id - for same-name staff, indicates who is the "Head" for location determination in salary reports), epf_age_override, epf_nationality_override, socso_age_override, sip_age_override (per-staff statutory contribution overrides; NULL = auto from birthdate/nationality. age overrides: 'under_60'|'over_60'|'none' where 'none' = not eligible; epf_nationality_override: 'local'|'foreign'. Honoured by payroll EPF/SOCSO/SIP calculation)
 - `active_sessions` - session_id, staff_id, last_active, created_at, status
 - `bookmarks` - id, staff_id, name
 
@@ -141,7 +142,7 @@ This is a comprehensive ERP system supporting three companies:
 - `payroll_deductions` - id, employee_payroll_id, deduction_type, employee_amount, employer_amount, wage_amount, rate_info, created_at
 - `mid_month_payrolls` - id, employee_id, year, month, amount, payment_method, status, created_at, updated_at, created_by, paid_at, notes
 - `pinjam_records` - id, employee_id (varchar 255, matches staffs.id), year, month, amount, description, pinjam_type, created_by, created_at, updated_at
-- `commission_records` - id, employee_id, commission_date, amount, description, created_by, created_at, updated_at, location_code (location 16-24 for commission entries, NULL for bonus)
+- `commission_records` - id, employee_id, commission_date, amount, description, created_by, created_at, updated_at, location_code (location 16-24 for commission entries, NULL for bonus), is_advance (true = deduct from net pay as an advance; false = normal bonus/earning)
 - `others_records` - id, employee_id (FK staffs), record_date, pay_code_id (FK pay_codes), description, rate, rate_unit, quantity, amount, link_id (nullable UUID; rows sharing the same link_id are "linked siblings" — same staff/paycode across multiple dates; shared fields always stay in sync; NULL = standalone record), created_by, created_at, updated_at (Others (Kerja Luar OT) entries; entry uses pay_code+rate+quantity like Add Manual Item, then is added to gross pay and deducted as advance on the payslip — same flow as commission_records)
 
 **Statutory Rates:**

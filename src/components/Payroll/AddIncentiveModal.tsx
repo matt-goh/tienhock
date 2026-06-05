@@ -11,6 +11,7 @@ import {
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { useLocationMappingsCache } from "../../utils/catalogue/useLocationMappingsCache";
 import Button from "../Button";
+import Checkbox from "../Checkbox";
 import { IconDeviceFloppy, IconPlus, IconX } from "@tabler/icons-react";
 import { FormCombobox, FormInput, FormListbox } from "../FormComponents";
 import toast from "react-hot-toast";
@@ -28,6 +29,7 @@ interface IncentiveEntry {
   amount: string;
   description: string;
   locationCode: string | null; // For Commission entries only
+  isAdvance: boolean; // For Bonus entries only
 }
 
 interface AddIncentiveModalProps {
@@ -82,6 +84,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
         amount: "",
         description: displayLabel,
         locationCode: incentiveType === "Commission" ? "18" : null, // Default to COMM-KILANG for Commission
+        isAdvance: true,
       };
       setEntries([initialEntry]);
       setStaffQueries({});
@@ -134,6 +137,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
         amount: "",
         description: displayLabel,
         locationCode: incentiveType === "Commission" ? "18" : null, // Default to COMM-KILANG for Commission
+        isAdvance: true,
       },
     ]);
   };
@@ -177,6 +181,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
         description: entry.description,
         created_by: user?.id,
         location_code: incentiveType === "Commission" ? entry.locationCode : null,
+        is_advance: incentiveType === "Commission" ? true : entry.isAdvance,
       };
       return api.post("/api/incentives", payload);
     });
@@ -258,7 +263,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                   <table className="min-w-full">
                     <thead>
                       <tr>
-                        <th className={`py-2 text-left font-medium text-default-600 dark:text-default-400 ${incentiveType === "Commission" ? "w-1/4" : "w-2/5"}`}>
+                        <th className={`py-2 text-left font-medium text-default-600 dark:text-default-400 ${incentiveType === "Commission" ? "w-1/4" : "w-1/3"}`}>
                           Staff
                         </th>
                         {incentiveType === "Commission" && (
@@ -269,9 +274,14 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                         <th className="py-2 px-3 text-left font-medium text-default-600 dark:text-default-400 w-1/6">
                           Amount (RM)
                         </th>
-                        <th className={`py-2 px-3 text-left font-medium text-default-600 dark:text-default-400 ${incentiveType === "Commission" ? "w-1/4" : "w-2/5"}`}>
+                        <th className={`py-2 px-3 text-left font-medium text-default-600 dark:text-default-400 ${incentiveType === "Commission" ? "w-1/4" : "w-1/3"}`}>
                           Description
                         </th>
+                        {incentiveType === "Bonus" && (
+                          <th className="py-2 px-3 text-left font-medium text-default-600 dark:text-default-400 w-1/6">
+                            Advance
+                          </th>
+                        )}
                         <th className="py-2 text-left font-medium text-default-600 dark:text-default-400"></th>
                       </tr>
                     </thead>
@@ -348,6 +358,19 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                               placeholder={`e.g., ${displayLabel}, bonus work`}
                             />
                           </td>
+                          {incentiveType === "Bonus" && (
+                            <td className="py-2 px-3 align-top">
+                              <Checkbox
+                                checked={entry.isAdvance}
+                                onChange={(checked) =>
+                                  handleEntryChange(index, "isAdvance", checked)
+                                }
+                                label="Deduct"
+                                size={18}
+                                className="pt-2"
+                              />
+                            </td>
+                          )}
                           <td className="py-2 align-top">
                             {entries.length > 1 && (
                               <button

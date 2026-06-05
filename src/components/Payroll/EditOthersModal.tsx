@@ -22,7 +22,7 @@ import { format } from "date-fns";
 import Button from "../Button";
 import { FormInput } from "../FormComponents";
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
-import { PayrollCalculationService } from "../../utils/payroll/payrollCalculationService";
+import { calculateAmount } from "../../utils/payroll/payrollUtils";
 import { OthersRecord, PayCode, RateUnit } from "../../types/types";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
@@ -179,7 +179,7 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
     const q = parseFloat(quantity || "0");
     if (!isFinite(r) || !isFinite(q) || !rateUnit) return 0;
     try {
-      return PayrollCalculationService.calculateAmount(r, q, rateUnit as RateUnit);
+      return calculateAmount(r, q, rateUnit as RateUnit);
     } catch {
       return 0;
     }
