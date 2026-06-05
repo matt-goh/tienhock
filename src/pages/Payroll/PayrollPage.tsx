@@ -50,6 +50,9 @@ import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 const FIRST_WEEK_DAY_OF_MONTH: number = 7;
 const EXPANDED_JOBS_STORAGE_PREFIX: string = "payroll-expanded-jobs:";
 const SEARCH_TERM_STORAGE_KEY: string = "payroll-search-term";
+const CLEAR_SEARCH_ON_RETURN_STORAGE_KEY: string =
+  "payroll-clear-search-on-return";
+const CLEAR_SEARCH_ON_RETURN_WINDOW_MS: number = 10000;
 
 const getDefaultPayrollMonth = (today: Date = new Date()): Date => {
   const monthOffset: number =
@@ -106,6 +109,23 @@ const saveExpandedJobsToStorage = (
 
 const readSearchTermFromStorage = (): string => {
   try {
+    const clearSearchMarkedAt: string | null = sessionStorage.getItem(
+      CLEAR_SEARCH_ON_RETURN_STORAGE_KEY
+    );
+    sessionStorage.removeItem(CLEAR_SEARCH_ON_RETURN_STORAGE_KEY);
+
+    if (clearSearchMarkedAt) {
+      const markedAt: number = Number(clearSearchMarkedAt);
+      const isRecentClearRequest: boolean =
+        Number.isFinite(markedAt) &&
+        Date.now() - markedAt <= CLEAR_SEARCH_ON_RETURN_WINDOW_MS;
+
+      if (isRecentClearRequest) {
+        sessionStorage.removeItem(SEARCH_TERM_STORAGE_KEY);
+        return "";
+      }
+    }
+
     const storedSearchTerm: string | null =
       sessionStorage.getItem(SEARCH_TERM_STORAGE_KEY);
 
