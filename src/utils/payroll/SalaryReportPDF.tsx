@@ -415,7 +415,7 @@ const TableHeader: React.FC<{ isLocationReport: boolean }> = ({
           <Text style={styles.headerText}>BONUS</Text>
         </View>
         <View style={styles.colComm}>
-          <Text style={styles.headerTextSmall}>COMM/INS/LAIN</Text>
+          <Text style={styles.headerTextSmall}>C/I/O</Text>
         </View>
         <View style={styles.colCuti}>
           <Text style={styles.headerText}>CUTI</Text>
