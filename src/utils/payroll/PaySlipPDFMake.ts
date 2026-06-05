@@ -7,7 +7,11 @@ import {
   TableCell,
   ContentTable,
 } from "pdfmake/interfaces";
-import { EmployeePayroll, MidMonthPayroll } from "../../types/types";
+import {
+  EmployeePayroll,
+  MidMonthPayroll,
+  PayrollItem,
+} from "../../types/types";
 import {
   getMonthName,
   consolidatePayrollItems,
@@ -35,6 +39,11 @@ interface AdvanceRecord {
   rate?: number | string | null;
   rate_unit?: string | null;
   quantity?: number | string | null;
+  id?: number | string | null;
+  pay_code_id?: string | null;
+  pay_code_pay_type?: string | null;
+  employee_id?: string | null;
+  record_date?: string | null;
 }
 
 interface MergedAdvance {
@@ -469,6 +478,38 @@ const getOthersRateQuantityDisplay = (
   };
 };
 
+const isOvertimeOthersRecord = (record: AdvanceRecord): boolean =>
+  record.pay_code_pay_type === "Overtime";
+
+const buildOvertimeOthersPayrollItems = (
+  records: AdvanceRecord[] = [],
+  employeeJobMapping: Record<string, string> = {},
+  fallbackJobType?: string,
+): PayrollItem[] => {
+  return records.map((record: AdvanceRecord) => {
+    const employeeId: string = String(record.employee_id || "");
+    const mappedJobType: string | undefined = employeeJobMapping[employeeId];
+
+    return {
+      id: record.id ? -Number(record.id) : undefined,
+      pay_code_id: record.pay_code_id || `OTHERS-${record.id || ""}`,
+      description: record.description || "",
+      pay_type: "Overtime",
+      rate: Number(record.rate) || 0,
+      rate_unit: record.rate_unit || "",
+      quantity: Number(record.quantity) || 0,
+      foc_units: 0,
+      amount: Number(record.amount) || 0,
+      is_manual: false,
+      job_type: mappedJobType || fallbackJobType,
+      source_employee_id: employeeId || null,
+      source_date: record.record_date || null,
+      work_log_id: null,
+      work_log_type: null,
+    };
+  });
+};
+
 const getBaseRateSummaryUnits = (
   consolidatedBaseItems: ConsolidatedPayrollItem[],
 ): BaseRateSummaryUnit[] => {
@@ -734,10 +775,30 @@ const buildMainPayrollPage = (
     return null;
   };
 
+  const allOthersRecords: AdvanceRecord[] =
+    (payroll as any).others_records || [];
+  const overtimeOthersRecords: AdvanceRecord[] = allOthersRecords.filter(
+    isOvertimeOthersRecord,
+  );
+  const regularOthersRecords: AdvanceRecord[] = allOthersRecords.filter(
+    (record: AdvanceRecord) => !isOvertimeOthersRecord(record),
+  );
+  const payrollItemsWithOvertimeOthers: PayrollItem[] = [
+    ...(payroll.items || []),
+    ...buildOvertimeOthersPayrollItems(
+      overtimeOthersRecords,
+      employeeJobMapping,
+      isGroupedPayroll ? undefined : payroll.job_type,
+    ),
+  ];
+
   // Consolidate items for cleaner PDF output (leave-day activities are excluded —
   // their amount is shown in the Cuti section, and they pay nothing under base pay).
   const consolidatedItems = consolidatePayrollItems(
-    filterOutLeaveDayItems(payroll.items || [], payroll.leave_records),
+    filterOutLeaveDayItems(
+      payrollItemsWithOvertimeOthers,
+      payroll.leave_records,
+    ),
   );
   const groupedConsolidatedItems =
     groupConsolidatedItemsByType(consolidatedItems);
@@ -854,7 +915,7 @@ const buildMainPayrollPage = (
   );
 
   // Others (Kerja Luar OT) records - treated like commission for calculation/display
-  const othersRecords = (payroll as any).others_records || [];
+  const othersRecords: AdvanceRecord[] = regularOthersRecords;
   const othersTotalAmount = othersRecords.reduce(
     (sum: number, record: any) => sum + Number(record.amount || 0),
     0,
@@ -1483,10 +1544,29 @@ const buildIndividualJobPage = (
 ): Content[] => {
   const employeeJobMapping = payroll.employee_job_mapping || {};
 
+  const allOthersRecords: AdvanceRecord[] = individualJob.others_records || [];
+  const overtimeOthersRecords: AdvanceRecord[] = allOthersRecords.filter(
+    isOvertimeOthersRecord,
+  );
+  const regularOthersRecords: AdvanceRecord[] = allOthersRecords.filter(
+    (record: AdvanceRecord) => !isOvertimeOthersRecord(record),
+  );
+  const payrollItemsWithOvertimeOthers: PayrollItem[] = [
+    ...(individualJob.items || []),
+    ...buildOvertimeOthersPayrollItems(
+      overtimeOthersRecords,
+      employeeJobMapping,
+      individualJob.job_type,
+    ),
+  ];
+
   // Consolidate items for cleaner PDF output (leave-day activities are excluded —
   // their amount is shown in the Cuti section, and they pay nothing under base pay).
   const consolidatedItems = consolidatePayrollItems(
-    filterOutLeaveDayItems(individualJob.items || [], individualJob.leave_records),
+    filterOutLeaveDayItems(
+      payrollItemsWithOvertimeOthers,
+      individualJob.leave_records,
+    ),
   );
   const groupedConsolidatedItems =
     groupConsolidatedItemsByType(consolidatedItems);
@@ -1587,7 +1667,7 @@ const buildIndividualJobPage = (
   );
 
   // Others (Kerja Luar OT) records (merged duplicates)
-  const othersRecords = individualJob.others_records || [];
+  const othersRecords: AdvanceRecord[] = regularOthersRecords;
   const othersTotalAmount = othersRecords.reduce(
     (sum: number, record: any) => sum + Number(record.amount || 0),
     0,

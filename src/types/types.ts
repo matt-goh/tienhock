@@ -790,6 +790,7 @@ export interface OthersRecord {
   updated_at?: string;
   employee_name?: string;
   pay_code_description?: string | null;
+  pay_code_pay_type?: PayType | null;
 }
 
 export interface LeaveRecord {

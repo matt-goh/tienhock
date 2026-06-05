@@ -62,7 +62,7 @@ interface PayrollItem {
   foc_units?: number | null;
   amount: number;
   is_manual: boolean;
-  pay_type?: string;
+  pay_type: string;
   job_type?: string;
   source_employee_id?: string | null;
   source_date?: string | null;
@@ -630,6 +630,20 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     return `${rate.toFixed(2)} × ${formatUnitQuantity(quantity)} ${
       rateUnit
     }`;
+  };
+
+  const getMergedOthersPayCodeIds = (
+    record: MergedAdvance<OthersRecord>,
+  ): string[] => {
+    const rows: OthersRecord[] =
+      record.merged_rows.length > 0 ? record.merged_rows : [record];
+    return Array.from(
+      new Set(
+        rows
+          .map((row: OthersRecord) => row.pay_code_id)
+          .filter((payCodeId): payCodeId is string => Boolean(payCodeId)),
+      ),
+    );
   };
 
   const getTotalUnitQuantity = (item: ConsolidatedPayrollItem): number => {
@@ -2376,39 +2390,57 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                  {mergedOthersRecords.map((record) => (
-                    <tr
-                      key={record.id}
-                      className="hover:bg-default-50 dark:hover:bg-gray-700"
-                    >
-                      <td className="px-3 py-2 whitespace-nowrap text-sm text-default-800 dark:text-gray-100">
-                        {record.merged_count === 1
-                          ? format(new Date(record.record_date), "dd MMM yyyy")
-                          : `${record.merged_count} entries`}
-                      </td>
-                      <td
-                        className="px-3 py-2 text-sm text-default-800 dark:text-gray-100 max-w-xs"
-                        title={record.description}
+                  {mergedOthersRecords.map((record) => {
+                    const payCodeIds: string[] =
+                      getMergedOthersPayCodeIds(record);
+                    const payCodeLabel: string = payCodeIds.join(", ");
+                    const descriptionTitle: string = payCodeLabel
+                      ? `${record.description} (${payCodeLabel})`
+                      : record.description;
+
+                    return (
+                      <tr
+                        key={record.id}
+                        className="hover:bg-default-50 dark:hover:bg-gray-700"
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="truncate min-w-0">
-                            {record.description}
-                          </span>
-                          {record.merged_count > 1 && (
-                            <span className="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
-                              ×{record.merged_count}
+                        <td className="px-3 py-2 whitespace-nowrap text-sm text-default-800 dark:text-gray-100">
+                          {record.merged_count === 1
+                            ? format(
+                                new Date(record.record_date),
+                                "dd MMM yyyy",
+                              )
+                            : `${record.merged_count} entries`}
+                        </td>
+                        <td
+                          className="px-3 py-2 text-sm text-default-800 dark:text-gray-100 max-w-xs"
+                          title={descriptionTitle}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="truncate min-w-0">
+                              {record.description}
+                              {payCodeLabel && (
+                                <span className="text-default-500 dark:text-gray-400">
+                                  {" "}
+                                  ({payCodeLabel})
+                                </span>
+                              )}
                             </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-right text-sm text-default-600 dark:text-gray-400">
-                        {formatOthersRateQuantity(record)}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium text-default-800 dark:text-gray-100">
-                        {formatCurrency(record.merged_amount)}
-                      </td>
-                    </tr>
-                  ))}
+                            {record.merged_count > 1 && (
+                              <span className="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
+                                ×{record.merged_count}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-right text-sm text-default-600 dark:text-gray-400">
+                          {formatOthersRateQuantity(record)}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium text-default-800 dark:text-gray-100">
+                          {formatCurrency(record.merged_amount)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
                 <tfoot className="bg-default-50 dark:bg-gray-800">
                   <tr>

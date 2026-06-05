@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-05",
+    ms: "Pembetulan Payroll: entri Others (Kerja Luar OT) yang menggunakan paycode jenis Overtime kini dipaparkan dan dijumlahkan di bahagian Overtime dalam Payroll Details dan payslip.",
+    en: "Payroll fix: Others (Kerja Luar OT) entries that use an Overtime paycode now appear and total under Overtime in Payroll Details and payslips.",
+  },
+  {
+    date: "2026-06-05",
     ms: "Pembetulan PCB: gaji dengan sen kini dipadankan kepada julat PCB yang betul, contohnya RM5,975.78 menggunakan julat RM5,976-RM5,980 supaya potongan PCB muncul dalam payslip.",
     en: "PCB fix: salary amounts with cents now match the correct PCB range, for example RM5,975.78 uses the RM5,976-RM5,980 range so the PCB deduction appears on the payslip.",
   },

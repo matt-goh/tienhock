@@ -773,7 +773,8 @@ export default function (pool) {
         ep.id as employee_payroll_id,
         orec.*,
         s.name as employee_name,
-        pc.description as pay_code_description
+        pc.description as pay_code_description,
+        pc.pay_type as pay_code_pay_type
       FROM employee_payrolls ep
       JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
       JOIN staffs emp_staff ON ep.employee_id = emp_staff.id
@@ -1041,7 +1042,8 @@ export default function (pool) {
           ? pool.query(
               `
               SELECT orec.*, s.name as employee_name,
-                     pc.description as pay_code_description
+                     pc.description as pay_code_description,
+                     pc.pay_type as pay_code_pay_type
               FROM others_records orec
               JOIN staffs s ON orec.employee_id = s.id
               LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
@@ -1059,7 +1061,8 @@ export default function (pool) {
           : pool.query(
               `
               SELECT orec.*, s.name as employee_name,
-                     pc.description as pay_code_description
+                     pc.description as pay_code_description,
+                     pc.pay_type as pay_code_pay_type
               FROM others_records orec
               JOIN staffs s ON orec.employee_id = s.id
               LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
@@ -1379,7 +1382,8 @@ export default function (pool) {
           ? pool.query(
               `
               SELECT orec.*, s.name as employee_name,
-                     pc.description as pay_code_description
+                     pc.description as pay_code_description,
+                     pc.pay_type as pay_code_pay_type
               FROM others_records orec
               JOIN staffs s ON orec.employee_id = s.id
               LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
@@ -1397,7 +1401,8 @@ export default function (pool) {
           : pool.query(
               `
               SELECT orec.*, s.name as employee_name,
-                     pc.description as pay_code_description
+                     pc.description as pay_code_description,
+                     pc.pay_type as pay_code_pay_type
               FROM others_records orec
               JOIN staffs s ON orec.employee_id = s.id
               LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
