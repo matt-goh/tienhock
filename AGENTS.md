@@ -58,7 +58,7 @@ This is a comprehensive ERP system supporting three companies:
 - Maintenance mode support for database operations
 - Environment variables for database configuration
 
-#### Database Schema (76 tables)
+#### Database Schema (77 tables)
 
 **Accounting & Finance:**
 
@@ -102,6 +102,7 @@ This is a comprehensive ERP system supporting three companies:
 - `products` - id, description, price_per_unit, type, tax, is_active
 - `production_entries` - id, entry_date, product_id, worker_id (nullable for stock-only OTH production records), bags_packed, created_at, updated_at, created_by
 - `production_machine_status` - id, entry_date, product_id (FK products), machine_broken, notes, created_at, updated_at, created_by (tracks machine broken status per date/product for production bonus threshold override - when machine_broken=true, workers below threshold still receive bonus pay codes)
+- `production_worker_orders` - scope (BH_PACKING/MEE_PACKING), worker_id (FK staffs), sort_order, updated_at, updated_by (shared drag-and-drop worker card order for Production Entry worker grids)
 - `product_pay_codes` - id, product_id, pay_code_id, created_at, updated_at
 - `stock_adjustments` - id, entry_date, product_id, adjustment_type, quantity, reason, created_at, created_by, reference
 - `stock_opening_balances` - id, product_id, balance, effective_date, created_at, updated_at, created_by, notes

@@ -10,6 +10,7 @@ import { getBundleItems } from "../../config/specialItems";
 interface BundleEntrySectionProps {
   selectedDate: string;
   initialTab?: BundleTab;
+  workerOrderRefreshKey?: number;
 }
 
 export interface BundleEntrySectionHandle {
@@ -58,6 +59,7 @@ const TAB_CONFIG: Record<
 const BundleEntrySection = forwardRef<BundleEntrySectionHandle, BundleEntrySectionProps>(({
   selectedDate,
   initialTab = "BUNDLE_BP",
+  workerOrderRefreshKey = 0,
 }, ref) => {
   // Get bundle configs
   const bundleItems = getBundleItems();
@@ -295,6 +297,8 @@ const BundleEntrySection = forwardRef<BundleEntrySectionHandle, BundleEntrySecti
           inputStep={activeConfig.inputStep}
           unitLabel={activeConfig.unit}
           defaultValue={activeConfig.defaultValue}
+          workerOrderScope={activeConfig.workerJob}
+          workerOrderRefreshKey={workerOrderRefreshKey}
           onSave={handleSave}
           onReset={handleReset}
           hasUnsavedChanges={hasUnsavedChanges}

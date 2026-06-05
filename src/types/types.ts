@@ -1139,6 +1139,18 @@ export interface ProductionWorker {
   job: string[];
 }
 
+export type ProductionWorkerOrderScope = "BH_PACKING" | "MEE_PACKING";
+
+export interface ProductionWorkerOrderResponse {
+  scope: ProductionWorkerOrderScope;
+  worker_ids: string[];
+}
+
+export interface ProductionWorkerOrderRequest {
+  scope: ProductionWorkerOrderScope;
+  worker_ids: string[];
+}
+
 // Special Item Configuration (for Hancur, Bundle entries)
 export type SpecialItemCategory = "HANCUR" | "KARUNG_HANCUR" | "BUNDLE";
 export type SpecialItemUnit = "kg" | "bags" | "pcs" | "sack" | "bundle";

@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-05",
+    ms: "Halaman Production Entry kini membolehkan susunan kad pekerja diubah dengan menyeret pemegang pada kad. Susunan ini dikongsi untuk semua pengguna mengikut kumpulan kerja Bihun atau Mee, nilai yang sudah ditaip kekal bersama pekerja yang betul apabila kad dipindahkan, dan butang Refresh Order boleh digunakan untuk memuat semula susunan terkini.",
+    en: "Production Entry now lets you reorder worker cards by dragging the handle on each card. The order is shared for all users by Bihun or Mee worker group, typed values stay with the correct worker when cards are moved, and the Refresh Order button can reload the latest order.",
+  },
+  {
+    date: "2026-06-05",
     ms: "Payroll Details kini menunjukkan ringkasan Pinjam di bahagian bawah halaman apabila pekerja ada pinjam pada bulan itu, memaparkan gaji akhir selepas ditolak pinjam (Final Mid-Month Pay dan Jumlah Masuk Bank). Ringkasan ini hanya pada halaman dan tidak muncul dalam payslip. Di halaman Sistem Pinjam, klik pada badan kad pekerja untuk terus pergi ke ringkasan Pinjam di bahagian bawah Payroll Details pekerja itu.",
     en: "Payroll Details now shows a Pinjam summary at the bottom of the page when an employee has pinjam that month, displaying the final pay after pinjam deductions (Final Mid-Month Pay and Jumlah Masuk Bank). This summary is page-only and does not appear on the payslip. On the Pinjam System page, click an employee card's body to jump straight to the Pinjam summary at the bottom of that employee's Payroll Details.",
   },
