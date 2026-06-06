@@ -211,18 +211,22 @@ export const getBatchMidMonthPayrolls = async (
   if (employeeIds.length === 0) return [];
 
   try {
-    // First try to get existing payrolls with efficient single request
+    // Filter by the requested employee IDs server-side. Relying on `limit`
+    // alone to "get all for the month" drops records whenever the month has
+    // more mid-month payrolls than the number of employees requested (e.g.
+    // printing a small section in a month with many advances), because the
+    // server applies LIMIT before we filter locally.
     const queryParams = new URLSearchParams();
     queryParams.append("year", year.toString());
     queryParams.append("month", month.toString());
     queryParams.append("limit", employeeIds.length.toString());
+    employeeIds.forEach((id) => queryParams.append("employee_id", id));
 
-    // Execute the query first without employee_id filter to get all for the month
     const response = await api.get(
       `/api/mid-month-payrolls?${queryParams.toString()}`
     );
 
-    // Filter locally to match the requested employee IDs
+    // Local filter kept as a safety net against any unexpected extra rows.
     if (response && response.payrolls && Array.isArray(response.payrolls)) {
       return response.payrolls.filter((payroll: { employee_id: string }) =>
         employeeIds.includes(payroll.employee_id)
