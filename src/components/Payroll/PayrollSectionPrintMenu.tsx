@@ -140,6 +140,9 @@ const PayrollSectionPrintMenu: React.FC<PayrollSectionPrintMenuProps> = ({
 
     const details = createStaffDetailsMap(filtered, staffs, jobs);
 
+    // The mid-month advance is resolved inside printBatchPayslips from the
+    // /batch payroll fetch, so the (selection-scoped) parent map is only a
+    // fallback here — whole-section employees still get their advance line.
     await printBatchPayslips(filtered, details, {
       companyName,
       midMonthPayrollsMap,

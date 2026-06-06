@@ -170,11 +170,19 @@ export const downloadBatchPayslips = async (
       }
     }
 
+    // The /batch call already returns each payroll's mid-month payroll, so build
+    // the map from that instead of requiring a separate fetch. Any caller-
+    // supplied map is kept as a fallback for payrolls that weren't re-fetched.
+    const effectiveMidMonthMap = buildMidMonthMapFromPayrolls(
+      completePayrolls,
+      midMonthPayrollsMap
+    );
+
     const blob = await generateBatchPayslipPDF(
       completePayrolls,
       staffDetailsMap,
       companyName,
-      midMonthPayrollsMap
+      effectiveMidMonthMap
     );
 
     // Get month/year info from the first payroll
@@ -348,11 +356,19 @@ export const printBatchPayslips = async (
       }
     }
 
+    // The /batch call already returns each payroll's mid-month payroll, so build
+    // the map from that instead of requiring a separate fetch. Any caller-
+    // supplied map is kept as a fallback for payrolls that weren't re-fetched.
+    const effectiveMidMonthMap = buildMidMonthMapFromPayrolls(
+      completePayrolls,
+      midMonthPayrollsMap
+    );
+
     const blob = await generateBatchPayslipPDF(
       completePayrolls,
       staffDetailsMap,
       companyName,
-      midMonthPayrollsMap
+      effectiveMidMonthMap
     );
     pdfUrl = URL.createObjectURL(blob);
 
@@ -430,6 +446,23 @@ export const createStaffDetailsMap = (
   });
 
   return staffDetailsMap;
+};
+
+// Helper to build the mid-month map from payrolls already fetched via the
+// /batch endpoint (which embeds each payroll's mid_month_payroll). This lets
+// the print/download flows avoid a separate mid-month API call. A caller-
+// supplied fallback map covers any payroll that wasn't re-fetched.
+export const buildMidMonthMapFromPayrolls = (
+  payrolls: EmployeePayroll[],
+  fallbackMap?: Record<string, MidMonthPayroll | null>
+): Record<string, MidMonthPayroll | null> => {
+  const map: Record<string, MidMonthPayroll | null> = { ...(fallbackMap || {}) };
+  payrolls.forEach((payroll) => {
+    if (payroll.mid_month_payroll) {
+      map[payroll.employee_id] = payroll.mid_month_payroll;
+    }
+  });
+  return map;
 };
 
 // Helper to create mid-month payrolls map

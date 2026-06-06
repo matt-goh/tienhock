@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-06",
+    ms: "Pembetulan: baris Advance Payment (bayaran pertengahan bulan) kini muncul dengan betul pada slip gaji yang dicetak. \"Print Payslips\" (cetak ikut seksyen) dahulunya hanya menunjukkannya untuk pekerja yang telah ditanda; selain itu, pada bulan yang mempunyai banyak bayaran pertengahan bulan, sesetengah slip tercetak tanpa baris ini walaupun pekerja telah dipilih. Kedua-dua keadaan kini diperbetulkan.",
+    en: "Fix: the Advance Payment (mid-month) line now appears correctly on printed payslips. \"Print Payslips\" (print by section) previously only showed it for employees who were ticked first; separately, in months with many mid-month payments some payslips printed without this line even when the employee was selected. Both cases are now fixed.",
+  },
+  {
+    date: "2026-06-06",
     ms: "Pembetulan: rekod (Bonus, Insentif, Kerja Luar/OT, dan cuti) yang bertarikh pada hari terakhir bulan kini dikira dengan betul semasa memproses gaji. Sebelum ini ia tertinggal daripada jumlah Gaji Kasar di senarai Payroll dan daripada potongan KWSP/SOCSO/SIP/cukai, walaupun ia betul pada slip gaji — menyebabkan jumlah di senarai berbeza dengan slip. Gaji bulan yang terlibat perlu diproses semula untuk membetulkan jumlah tersimpan.",
     en: "Fix: records (Bonus, Incentive, Others/OT, and leave) dated on the last day of the month are now counted correctly when processing payroll. Previously they were left out of the Gross Pay shown in the Payroll list and out of the EPF/SOCSO/SIP/tax deductions, even though the payslip was correct — making the list total disagree with the payslip. Affected months should be re-processed to correct the stored totals.",
   },
