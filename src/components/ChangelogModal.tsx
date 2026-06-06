@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-06-06",
+    ms: "Pembetulan: rekod (Bonus, Insentif, Kerja Luar/OT, dan cuti) yang bertarikh pada hari terakhir bulan kini dikira dengan betul semasa memproses gaji. Sebelum ini ia tertinggal daripada jumlah Gaji Kasar di senarai Payroll dan daripada potongan KWSP/SOCSO/SIP/cukai, walaupun ia betul pada slip gaji — menyebabkan jumlah di senarai berbeza dengan slip. Gaji bulan yang terlibat perlu diproses semula untuk membetulkan jumlah tersimpan.",
+    en: "Fix: records (Bonus, Incentive, Others/OT, and leave) dated on the last day of the month are now counted correctly when processing payroll. Previously they were left out of the Gross Pay shown in the Payroll list and out of the EPF/SOCSO/SIP/tax deductions, even though the payslip was correct — making the list total disagree with the payslip. Affected months should be re-processed to correct the stored totals.",
+  },
+  {
     date: "2026-06-05",
     ms: "Salary Report (jadual Employee/Lokasi): lajur \"COMM\" dinamakan semula kepada \"C/I/O\" dan kini menjumlahkan Commission, semua bayaran Tambahan/Insentif (termasuk IXT, kerja Ahad/penyelenggaraan, dll. — kecuali Bonus) dan Others/Kerja Luar OT. Lajur \"GAJI\" kini menunjukkan gaji asas sahaja (bayaran Tambahan telah dipindahkan ke C/I/O). Lajur baharu \"CUTI\" ditambah yang menjumlahkan semua bayaran cuti (Cuti Umum, Sakit, Tahunan, Rawatan); Cuti Tahunan yang direkod sebagai komisen (lokasi 23) kini dikira di bawah CUTI, bukan lagi C/I/O.",
     en: "Salary Report (Employee/Location tables): the \"COMM\" column is renamed to \"C/I/O\" and now adds up Commission, all Tambahan/Insentif pay (including IXT, Sunday/maintenance work, etc. — except Bonus) and Others/Kerja Luar OT. The \"GAJI\" column now shows base salary only (Tambahan pay has moved into C/I/O). A new \"CUTI\" column is added that totals all leave pay (Cuti Umum, Sakit, Tahunan, Rawatan); Cuti Tahunan recorded as commission (location 23) now counts under CUTI instead of C/I/O.",
