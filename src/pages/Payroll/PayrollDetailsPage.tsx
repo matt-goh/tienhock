@@ -2548,7 +2548,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   className="hover:underline"
                   title="Open Bonus input page"
                 >
-                  Bonus
+                  Bonus / Insentif
                 </Link>
               </h3>
             </div>
@@ -2613,7 +2613,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       colSpan={2}
                       className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
                     >
-                      Total Bonus
+                      Total Bonus / Insentif
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
                       {formatCurrency(mergedCommissionTotal)}
