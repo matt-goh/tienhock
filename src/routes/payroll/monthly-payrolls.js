@@ -120,7 +120,7 @@ export default function (pool) {
 
       // Get all work logs for this month and year
       const startDate = `${year}-${month.toString().padStart(2, "0")}-01`;
-      const endDate = new Date(year, month, 0).toISOString().split("T")[0]; // Last day of month
+      const endDate = `${year}-${month.toString().padStart(2, "0")}-${new Date(year, month, 0).getDate().toString().padStart(2, "0")}`; // Last day of month (local time)
 
       // Query daily work logs and extract unique employee-job combinations
       const dailyEligibleQuery = `
@@ -318,7 +318,7 @@ export default function (pool) {
 
       // Get all work logs for this month and year
       const startDate = `${year}-${month.toString().padStart(2, "0")}-01`;
-      const endDate = new Date(year, month, 0).toISOString().split("T")[0]; // Last day of month
+      const endDate = `${year}-${month.toString().padStart(2, "0")}-${new Date(year, month, 0).getDate().toString().padStart(2, "0")}`; // Last day of month (local time)
 
       // Query daily work logs
       const dailyWorkLogsQuery = `
@@ -446,7 +446,7 @@ export default function (pool) {
       const { year, month } = payrollResult.rows[0];
 
       const startDate = `${year}-${month.toString().padStart(2, "0")}-01`;
-      const endDate = new Date(year, month, 0).toISOString().split("T")[0];
+      const endDate = `${year}-${month.toString().padStart(2, "0")}-${new Date(year, month, 0).getDate().toString().padStart(2, "0")}`; // Last day of month (local time)
 
       // 2. Fetch all required data in parallel
       let dailyLogsResult,
