@@ -19,6 +19,21 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-06-07",
+    ms: "Pembetulan: pengiraan bonus F/HARIAN untuk Packing Mee diperbetulkan dalam tiga keadaan. (1) Hari yang membungkus lebih 140 beg tidak lagi kehilangan bonus F/HARIAN — sebelum ini bonus untuk hari tersebut hilang sepenuhnya kerana Mee tiada kadar \">140\". (2) Hari yang mencapai tepat ambang (100 beg untuk Mee, 70 beg untuk Bihun) kini layak menerima bonus — sebelum ini hanya \"lebih daripada\" ambang yang dikira. (3) Kadar asas kini mengikut paycode yang ditetapkan kepada pekerja; sebelum ini sesetengah produk (2UDG/3UDG) tersilap memilih kadar mesin (0.45) dan bukan kadar pekerja (0.25). Gaji bulan yang terlibat perlu diproses semula untuk membetulkan jumlah tersimpan.",
+    en: "Fix: the Packing Mee F/HARIAN bonus calculation is corrected in three cases. (1) Days packing more than 140 bags no longer lose their F/HARIAN bonus — previously the whole day's bonus disappeared because Mee has no \">140\" rate. (2) Days that hit exactly the threshold (100 bags for Mee, 70 bags for Bihun) now qualify for the bonus — previously only days strictly above the threshold counted. (3) The base rate now follows the pay code assigned to each worker; previously some products (2UDG/3UDG) wrongly picked the machine rate (0.45) instead of the worker's rate (0.25). Affected months should be re-processed to correct the stored totals.",
+  },
+  {
+    date: "2026-06-07",
+    ms: "Pembetulan: paycode yang menggunakan unit \"Bill\" (contohnya BILL — jual lebih 10 bil/hari untuk salesman) kini mengira amaun berdasarkan kuantiti bil yang dimasukkan (kadar × bilangan bil), sama seperti unit \"Day\". Sebelum ini paparan di halaman Daily Log Details menunjukkan amaun/kuantiti yang tidak konsisten kerana unit \"Bill\" dikira ikut jam (salesman tiada jam). Amaun pada slip gaji tidak berubah.",
+    en: "Fix: paycodes using the \"Bill\" unit (e.g. BILL — sell more than 10 bills/day for salesmen) now calculate the amount from the entered bill count (rate × number of bills), the same as the \"Day\" unit. Previously the Daily Log Details page showed an inconsistent amount/quantity because the \"Bill\" unit was computed from hours (salesmen have no hours). Payslip amounts are unchanged.",
+  },
+  {
+    date: "2026-06-07",
+    ms: "Pembetulan: pada modal Others (Kerja Luar OT), paycode yang menggunakan unit \"Tray\" kini mengira amaun dengan betul (kadar × kuantiti). Sebelum ini menukar kuantiti tidak mengubah amaun (kekal 0) walaupun ada kadar.",
+    en: "Fix: in the Others (Kerja Luar OT) modal, paycodes using the \"Tray\" unit now calculate the amount correctly (rate × quantity). Previously changing the quantity didn't affect the amount (stayed 0) even though a rate was set.",
+  },
+  {
     date: "2026-06-06",
     ms: "Pembetulan: baris Advance Payment (bayaran pertengahan bulan) kini muncul dengan betul pada slip gaji yang dicetak. \"Print Payslips\" (cetak ikut seksyen) dahulunya hanya menunjukkannya untuk pekerja yang telah ditanda; selain itu, pada bulan yang mempunyai banyak bayaran pertengahan bulan, sesetengah slip tercetak tanpa baris ini walaupun pekerja telah dipilih. Kedua-dua keadaan kini diperbetulkan.",
     en: "Fix: the Advance Payment (mid-month) line now appears correctly on printed payslips. \"Print Payslips\" (print by section) previously only showed it for employees who were ticked first; separately, in months with many mid-month payments some payslips printed without this line even when the employee was selected. Both cases are now fixed.",
