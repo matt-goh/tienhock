@@ -424,7 +424,7 @@ export interface ConsolidatedPayrollItem {
 
 /**
  * Consolidates payroll items by grouping identical items together
- * Groups by: pay_code_id + rate + rate_unit
+ * Groups by: job_type + pay_code_id + rate + rate_unit
  * @param items Array of payroll items
  * @returns Array of consolidated items with totals
  */
@@ -437,8 +437,9 @@ export const consolidatePayrollItems = (items: PayrollItem[]): ConsolidatedPayro
   const groupMap = new Map<string, ConsolidatedPayrollItem>();
 
   items.forEach((item) => {
-    // Create unique key from pay_code_id + rate + rate_unit
-    const key = `${item.pay_code_id}_${item.rate}_${item.rate_unit}`;
+    // Keep combined-payroll jobs separate even when they share the same pay code.
+    const jobTypeKey: string = item.job_type || "";
+    const key: string = `${jobTypeKey}_${item.pay_code_id}_${item.rate}_${item.rate_unit}`;
     const focUnits = (item as any).foc_units ? parseFloat((item as any).foc_units) : 0;
 
     if (groupMap.has(key)) {

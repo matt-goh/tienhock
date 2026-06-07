@@ -58,6 +58,13 @@ interface MergedAdvance {
   rows: AdvanceRecord[];
 }
 
+interface CombinedJobItemGroup {
+  jobType: string | null;
+  baseItems: ConsolidatedPayrollItem[];
+  tambahanItems: ConsolidatedPayrollItem[];
+  overtimeItems: ConsolidatedPayrollItem[];
+}
+
 // Merge records that share a description (case-insensitive) into a single line.
 // Used for both commission_records and others_records so duplicate rows collapse on display.
 const mergeByDescription = (rows: AdvanceRecord[] = []): MergedAdvance[] => {
@@ -411,6 +418,64 @@ const groupItemsByJobType = (
   }
 
   return jobGroups;
+};
+
+const buildCombinedJobItemGroups = (
+  baseGroups: { jobType: string | null; items: any[] }[],
+  tambahanGroups: { jobType: string | null; items: any[] }[],
+  overtimeGroups: { jobType: string | null; items: any[] }[],
+  jobTypes: string[],
+): CombinedJobItemGroup[] => {
+  const keyForJob = (jobType: string | null): string => jobType ?? "__shared__";
+  const toItemMap = (
+    groups: { jobType: string | null; items: any[] }[],
+  ): Map<string, ConsolidatedPayrollItem[]> => {
+    const itemMap = new Map<string, ConsolidatedPayrollItem[]>();
+    groups.forEach((group) => {
+      itemMap.set(
+        keyForJob(group.jobType),
+        group.items as ConsolidatedPayrollItem[],
+      );
+    });
+    return itemMap;
+  };
+
+  const baseMap: Map<string, ConsolidatedPayrollItem[]> =
+    toItemMap(baseGroups);
+  const tambahanMap: Map<string, ConsolidatedPayrollItem[]> =
+    toItemMap(tambahanGroups);
+  const overtimeMap: Map<string, ConsolidatedPayrollItem[]> =
+    toItemMap(overtimeGroups);
+
+  const buildGroup = (jobType: string | null): CombinedJobItemGroup => {
+    const key: string = keyForJob(jobType);
+    return {
+      jobType,
+      baseItems: baseMap.get(key) || [],
+      tambahanItems: tambahanMap.get(key) || [],
+      overtimeItems: overtimeMap.get(key) || [],
+    };
+  };
+
+  const groups: CombinedJobItemGroup[] = jobTypes
+    .map((jobType) => buildGroup(jobType))
+    .filter(
+      (group) =>
+        group.baseItems.length > 0 ||
+        group.tambahanItems.length > 0 ||
+        group.overtimeItems.length > 0,
+    );
+
+  const sharedGroup: CombinedJobItemGroup = buildGroup(null);
+  if (
+    sharedGroup.baseItems.length > 0 ||
+    sharedGroup.tambahanItems.length > 0 ||
+    sharedGroup.overtimeItems.length > 0
+  ) {
+    groups.push(sharedGroup);
+  }
+
+  return groups;
 };
 
 // Create table row for an item
@@ -801,6 +866,42 @@ const appendBasePayRows = (
   );
 };
 
+const appendTambahanPayRows = (
+  tableBody: TableCell[][],
+  consolidatedTambahanItems: ConsolidatedPayrollItem[],
+  monthName: string,
+): void => {
+  consolidatedTambahanItems.forEach((item) => {
+    tableBody.push(
+      createItemRow(
+        stripBagCountSuffix(item.description),
+        getConsolidatedRateLabel(item),
+        getTambahanItemQuantityLabel(item, monthName),
+        formatCurrency(item.total_amount),
+      ),
+    );
+  });
+};
+
+const appendOvertimePayRows = (
+  tableBody: TableCell[][],
+  consolidatedOvertimeItems: ConsolidatedPayrollItem[],
+): void => {
+  consolidatedOvertimeItems.forEach((item) => {
+    const qtyLabel = isDirectAmountFixedItem(item)
+      ? "-"
+      : `${item.total_quantity} Jam OT`;
+    tableBody.push(
+      createItemRow(
+        item.description,
+        getConsolidatedRateLabel(item),
+        qtyLabel,
+        formatCurrency(item.total_amount),
+      ),
+    );
+  });
+};
+
 // Build main payroll page content
 const buildMainPayrollPage = (
   payroll: EmployeePayroll,
@@ -918,6 +1019,13 @@ const buildMainPayrollPage = (
     jobTypes,
     employeeJobMapping,
   );
+  const combinedItemsByJob: CombinedJobItemGroup[] =
+    buildCombinedJobItemGroups(
+      baseItemsByJob,
+      tambahanItemsByJob,
+      overtimeItemsByJob,
+      jobTypes,
+    );
 
   // Calculate totals - use consolidated items for consistency with recalculated amounts
   const consolidatedBaseItems = groupedConsolidatedItems.Base || [];
@@ -1080,15 +1188,20 @@ const buildMainPayrollPage = (
     },
   ]);
 
-  // Base Pay Items - grouped payrolls show per-job sections.
+  // Grouped payrolls show one section per work, with that work's base,
+  // tambahan and overtime rows kept together.
   if (isGroupedPayroll) {
-    baseItemsByJob.forEach((jobGroup) => {
-      const jobItems = jobGroup.items as ConsolidatedPayrollItem[];
-      const jobTotal = jobItems.reduce(
-        (sum, item) => sum + (item.total_amount || 0),
+    combinedItemsByJob.forEach((jobGroup) => {
+      const jobTotal: number = [
+        ...jobGroup.baseItems,
+        ...jobGroup.tambahanItems,
+        ...jobGroup.overtimeItems,
+      ].reduce(
+        (sum: number, item: ConsolidatedPayrollItem) =>
+          sum + (item.total_amount || 0),
         0,
       );
-      const jobTypeLabel = jobGroup.jobType || "Shared";
+      const jobTypeLabel: string = jobGroup.jobType || "Shared";
 
       if (jobGroup.jobType) {
         tableBody.push(
@@ -1097,17 +1210,17 @@ const buildMainPayrollPage = (
             getEmployeeIdForJob(jobGroup.jobType),
           ),
         );
-      } else if (jobItems.length > 0) {
+      } else {
         tableBody.push(createJobCategoryRow("Shared", null));
       }
 
-      appendBasePayRows(tableBody, jobItems);
+      appendBasePayRows(tableBody, jobGroup.baseItems);
+      appendTambahanPayRows(tableBody, jobGroup.tambahanItems, monthName);
+      appendOvertimePayRows(tableBody, jobGroup.overtimeItems);
 
-      if (jobItems.length > 0) {
-        tableBody.push(
-          createJobSubtotalRow(jobTypeLabel, formatCurrency(jobTotal)),
-        );
-      }
+      tableBody.push(
+        createJobSubtotalRow(jobTypeLabel, formatCurrency(jobTotal)),
+      );
     });
   }
 
@@ -1124,45 +1237,11 @@ const buildMainPayrollPage = (
     nonCutiDisplayRecords.length > 0 ||
     othersRecords.length > 0
   ) {
-    tambahanItemsByJob.forEach((jobGroup) => {
-      const jobItems = jobGroup.items as ConsolidatedPayrollItem[];
-      const tambahanJobTotal = jobItems.reduce(
-        (sum, item) => sum + (item.total_amount || 0),
-        0,
-      );
-      const jobTypeLabel = jobGroup.jobType
-        ? `${jobGroup.jobType} - Tambahan`
-        : "Shared - Tambahan";
-
-      if (isGroupedPayroll && jobGroup.jobType && jobItems.length > 0) {
-        tableBody.push(
-          createJobCategoryRow(
-            `${jobGroup.jobType} - Tambahan`,
-            getEmployeeIdForJob(jobGroup.jobType),
-          ),
-        );
-      } else if (isGroupedPayroll && !jobGroup.jobType && jobItems.length > 0) {
-        tableBody.push(createJobCategoryRow("Shared - Tambahan", null));
-      }
-
-      jobItems.forEach((item) => {
-        tableBody.push(
-          createItemRow(
-            stripBagCountSuffix(item.description),
-            getConsolidatedRateLabel(item),
-            getTambahanItemQuantityLabel(item, monthName),
-            formatCurrency(item.total_amount),
-          ),
-        );
-      });
-
-      // Add job subtotal row for combined payrolls (only when there are items)
-      if (isGroupedPayroll && jobItems.length > 0) {
-        tableBody.push(
-          createJobSubtotalRow(jobTypeLabel, formatCurrency(tambahanJobTotal)),
-        );
-      }
-    });
+    const consolidatedTambahanItems: ConsolidatedPayrollItem[] =
+      groupedConsolidatedItems.Tambahan || [];
+    if (!isGroupedPayroll) {
+      appendTambahanPayRows(tableBody, consolidatedTambahanItems, monthName);
+    }
 
     // Commission records (merged duplicates). Cuti Tahunan commissions are
     // omitted here — they're rendered with the leave records below and rolled
@@ -1211,7 +1290,7 @@ const buildMainPayrollPage = (
     });
 
     const totalNonLeaveTambahanItems =
-      (groupedConsolidatedItems.Tambahan?.length || 0) +
+      consolidatedTambahanItems.length +
       standaloneCommissions.length +
       mergedOthersRecords.length;
 
@@ -1269,7 +1348,7 @@ const buildMainPayrollPage = (
           fontSize: 8,
         },
       ]);
-      if (hasOvertimeItems) {
+      if (!isGroupedPayroll && hasOvertimeItems) {
         tableBody.push([
           {
             text: "",
@@ -1296,55 +1375,12 @@ const buildMainPayrollPage = (
     groupedConsolidatedItems.Overtime &&
     groupedConsolidatedItems.Overtime.length > 0
   ) {
-    overtimeItemsByJob.forEach((jobGroup) => {
-      const jobItems = jobGroup.items as ConsolidatedPayrollItem[];
-      const overtimeJobTotal = jobItems.reduce(
-        (sum, item) => sum + (item.total_amount || 0),
-        0,
-      );
-      const jobTypeLabel = jobGroup.jobType
-        ? `${jobGroup.jobType} - OT`
-        : "Shared - OT";
-
-      if (isGroupedPayroll && jobGroup.jobType && jobItems.length > 0) {
-        tableBody.push(
-          createJobCategoryRow(
-            `${jobGroup.jobType} - OT`,
-            getEmployeeIdForJob(jobGroup.jobType),
-          ),
-        );
-      } else if (isGroupedPayroll && !jobGroup.jobType && jobItems.length > 0) {
-        tableBody.push(createJobCategoryRow("Shared - OT", null));
-      }
-
-      jobItems.forEach((item) => {
-        const qtyLabel = isDirectAmountFixedItem(item)
-          ? "-"
-          : `${item.total_quantity} Jam OT`;
-        tableBody.push(
-          createItemRow(
-            item.description,
-            getConsolidatedRateLabel(item),
-            qtyLabel,
-            formatCurrency(item.total_amount),
-          ),
-        );
-      });
-
-      // Add job subtotal row for combined payrolls (only when there are items)
-      if (isGroupedPayroll && jobItems.length > 0) {
-        tableBody.push(
-          createJobSubtotalRow(
-            jobTypeLabel,
-            formatCurrency(overtimeJobTotal),
-            "Jumlah OT",
-          ),
-        );
-      }
-    });
+    const consolidatedOvertimeItems: ConsolidatedPayrollItem[] =
+      groupedConsolidatedItems.Overtime || [];
 
     // Overtime subtotal (only for single-job payrolls)
     if (!isGroupedPayroll) {
+      appendOvertimePayRows(tableBody, consolidatedOvertimeItems);
       tableBody.push([
         { text: "", fillColor: "#f8f9fa", fontSize: 8 },
         { text: "", fillColor: "#f8f9fa", fontSize: 8 },

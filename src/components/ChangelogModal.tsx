@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-07",
+    ms: "Slip gaji gabungan kini menyusun baris mengikut kerja dahulu. Untuk setiap kerja, bayaran asas, tambahan dan OT dipaparkan bersama di bawah bahagian kerja itu, jadi tambahan Packing Bihun contohnya tidak lagi muncul jauh di bawah kerja lain.",
+    en: "Combined payslips now group rows by work first. For each work section, base pay, additional pay and OT appear together under that work, so a Packing Bihun additional line no longer appears far below other work sections.",
+  },
+  {
+    date: "2026-06-07",
     ms: "Payroll kini boleh diproses semula secara terpilih. Jika carian digunakan, butang Process hanya memproses pekerja yang sedang dipaparkan. Pekerja yang ditanda juga boleh diproses melalui butang Process Selected, dan halaman Payroll Details kini mempunyai butang Re-process untuk pekerja tersebut sahaja.",
     en: "Payroll can now be reprocessed selectively. When a search is active, the Process button only processes the employees currently shown. Checked employees can also be processed with Process Selected, and Payroll Details now has a Re-process button for that employee only.",
   },
