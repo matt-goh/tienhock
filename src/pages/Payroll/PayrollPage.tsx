@@ -207,6 +207,18 @@ const PayrollPage: React.FC = () => {
   >({});
   const [isFetchingMidMonth, setIsFetchingMidMonth] = useState(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const hasFocusedSearchOnInitialReadyRef = useRef<boolean>(false);
+
+  const handleClearSearchMouseDown = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ): void => {
+    event.preventDefault();
+  };
+
+  const handleClearSearch = (): void => {
+    setSearchTerm("");
+    searchInputRef.current?.focus();
+  };
 
   // Processing state
   const [isProcessing, setIsProcessing] = useState(false);
@@ -236,6 +248,21 @@ const PayrollPage: React.FC = () => {
     !isLoading && !!payroll,
     '[data-scroll-container="payroll-list"]'
   );
+
+  useEffect(() => {
+    if (hasFocusedSearchOnInitialReadyRef.current || isLoading || !payroll) {
+      return;
+    }
+
+    const searchInputElement: HTMLInputElement | null = searchInputRef.current;
+    if (!searchInputElement) return;
+
+    hasFocusedSearchOnInitialReadyRef.current = true;
+    searchInputElement.focus();
+
+    const searchValueLength: number = searchInputElement.value.length;
+    searchInputElement.setSelectionRange(searchValueLength, searchValueLength);
+  }, [isLoading, payroll]);
 
   // Handler to update selected month and URL params
   const handleMonthChange = useCallback((newMonth: Date) => {
@@ -1106,7 +1133,8 @@ const PayrollPage: React.FC = () => {
               {searchTerm && (
                 <button
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-300 transition-colors"
-                  onClick={() => setSearchTerm("")}
+                  onMouseDown={handleClearSearchMouseDown}
+                  onClick={handleClearSearch}
                   title="Clear search"
                 >
                   ×
