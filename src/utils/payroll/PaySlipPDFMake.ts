@@ -101,8 +101,8 @@ interface CombinedAdvanceDisplay {
   // Commission records with no same-description Others row — rendered as their
   // own "Advance" earnings rows, exactly as before.
   standaloneCommissions: MergedAdvance[];
-  // Each Others row paired with the commission amount folded into it (0 if none).
-  othersRows: { record: MergedAdvance; foldedCommission: number }[];
+  // Each Others row paired with same-description commission rows folded into it.
+  othersRows: { record: MergedAdvance; foldedCommissions: MergedAdvance[] }[];
 }
 
 // Fold commission records into a same-description Others row so the incentive
@@ -118,16 +118,14 @@ const combineCommissionsIntoOthers = (
   const othersKeys = new Set(
     mergedOthers.map((other) => descKey(other.description)),
   );
-  const foldedByKey = new Map<string, number>();
+  const foldedByKey = new Map<string, MergedAdvance[]>();
   const standaloneCommissions: MergedAdvance[] = [];
 
   mergedCommissions.forEach((commission) => {
     const key = descKey(commission.description);
     if (othersKeys.has(key)) {
-      foldedByKey.set(
-        key,
-        (foldedByKey.get(key) || 0) + commission.merged_amount,
-      );
+      const existing = foldedByKey.get(key) || [];
+      foldedByKey.set(key, [...existing, commission]);
     } else {
       standaloneCommissions.push(commission);
     }
@@ -135,10 +133,54 @@ const combineCommissionsIntoOthers = (
 
   const othersRows = mergedOthers.map((record) => ({
     record,
-    foldedCommission: foldedByKey.get(descKey(record.description)) || 0,
+    foldedCommissions: foldedByKey.get(descKey(record.description)) || [],
   }));
 
   return { standaloneCommissions, othersRows };
+};
+
+const getMergedAdvanceTotal = (records: MergedAdvance[]): number =>
+  records.reduce(
+    (sum: number, record: MergedAdvance) => sum + record.merged_amount,
+    0,
+  );
+
+const getAdvanceStatusDescriptionNote = (
+  records: MergedAdvance[],
+): string => {
+  const summary = records.reduce(
+    (
+      acc: {
+        regularAmount: number;
+        regularCount: number;
+        advanceAmount: number;
+        advanceCount: number;
+      },
+      record: MergedAdvance,
+    ) => {
+      record.rows.forEach((row: AdvanceRecord) => {
+        const amount = Number(row.amount) || 0;
+        if (isAdvanceRecord(row)) {
+          acc.advanceAmount += amount;
+          acc.advanceCount += 1;
+        } else {
+          acc.regularAmount += amount;
+          acc.regularCount += 1;
+        }
+      });
+      return acc;
+    },
+    {
+      regularAmount: 0,
+      regularCount: 0,
+      advanceAmount: 0,
+      advanceCount: 0,
+    },
+  );
+
+  if (summary.regularCount === 0 || summary.advanceCount === 0) return "";
+
+  return ` (Regular: ${formatCurrency(summary.regularAmount)} x${summary.regularCount}; Advance: ${formatCurrency(summary.advanceAmount)} x${summary.advanceCount})`;
 };
 
 interface GroupedLeaveRecord {
@@ -1272,7 +1314,7 @@ const buildMainPayrollPage = (
           : commission.description;
       tableBody.push(
         createItemRow(
-          desc,
+          `${desc}${getAdvanceStatusDescriptionNote([commission])}`,
           "",
           getCommissionQuantityLabel(commission),
           formatCurrency(commission.merged_amount),
@@ -1283,7 +1325,8 @@ const buildMainPayrollPage = (
     // Others (Kerja Luar OT) records (merged duplicates). When a commission was
     // folded in, drop the rate column so the rate no longer mismatches the
     // combined amount, but keep the quantity note (e.g. "Fixed").
-    othersRows.forEach(({ record: other, foldedCommission }) => {
+    othersRows.forEach(({ record: other, foldedCommissions }) => {
+      const foldedCommission = getMergedAdvanceTotal(foldedCommissions);
       const desc =
         other.merged_count > 1
           ? `${other.description} (x${other.merged_count})`
@@ -1291,9 +1334,13 @@ const buildMainPayrollPage = (
       const rateQuantityDisplay: RateQuantityDisplay =
         getOthersRateQuantityDisplay(other);
       const isMerged = foldedCommission > 0;
+      const descriptionNote = getAdvanceStatusDescriptionNote([
+        other,
+        ...foldedCommissions,
+      ]);
       tableBody.push(
         createItemRow(
-          desc,
+          `${desc}${descriptionNote}`,
           isMerged ? "" : rateQuantityDisplay.rate,
           rateQuantityDisplay.quantity,
           formatCurrency(other.merged_amount + foldedCommission),
@@ -2030,7 +2077,7 @@ const buildIndividualJobPage = (
           : commission.description;
       tableBody.push(
         createItemRow(
-          desc,
+          `${desc}${getAdvanceStatusDescriptionNote([commission])}`,
           "",
           getCommissionQuantityLabel(commission),
           formatCurrency(commission.merged_amount),
@@ -2038,7 +2085,8 @@ const buildIndividualJobPage = (
       );
     });
 
-    othersRows.forEach(({ record: other, foldedCommission }) => {
+    othersRows.forEach(({ record: other, foldedCommissions }) => {
+      const foldedCommission = getMergedAdvanceTotal(foldedCommissions);
       const desc =
         other.merged_count > 1
           ? `${other.description} (x${other.merged_count})`
@@ -2046,9 +2094,13 @@ const buildIndividualJobPage = (
       const rateQuantityDisplay: RateQuantityDisplay =
         getOthersRateQuantityDisplay(other);
       const isMerged = foldedCommission > 0;
+      const descriptionNote = getAdvanceStatusDescriptionNote([
+        other,
+        ...foldedCommissions,
+      ]);
       tableBody.push(
         createItemRow(
-          desc,
+          `${desc}${descriptionNote}`,
           isMerged ? "" : rateQuantityDisplay.rate,
           rateQuantityDisplay.quantity,
           formatCurrency(other.merged_amount + foldedCommission),
