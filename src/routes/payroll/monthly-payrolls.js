@@ -1153,11 +1153,16 @@ export default function (pool) {
           );
 
           // Apply first tier bonus (>70 for BH, >100 for MEE, or machine broken with any bags)
-          // Only apply if NOT in second tier (>140) - second tier has its own bonus
+          // Only skip in favour of the second tier (>140) when a real second-tier
+          // bonus code exists for this product. MEE products (MNL/2UDG/3UDG/350G)
+          // have no >140 code, so without this guard any MEE day over 140 bags would
+          // lose its F/HARIAN bonus entirely (first tier capped at 140, second tier
+          // never fires). When there is no second-tier code, the first tier applies
+          // to all qualifying days regardless of bag count.
           if (
             bonus70Code &&
             (meetsThreshold1 || hasMachineBroken) &&
-            totalBags <= threshold2
+            (!bonus140Code || totalBags <= threshold2)
           ) {
             // Select rate based on day type - if using a regular code on holiday, use ahad/umum rate
             let bonusRate = bonus70Code.rate_biasa;
