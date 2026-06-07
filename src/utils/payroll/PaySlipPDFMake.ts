@@ -586,6 +586,16 @@ const formatUnitQuantity = (quantity: number): string => {
   }).format(quantity);
 };
 
+const isDisplayableConsolidatedItem = (
+  item: ConsolidatedPayrollItem,
+): boolean => {
+  return (
+    Math.abs(Number(item.total_quantity) || 0) > 0.0001 ||
+    Math.abs(Number(item.total_foc_units) || 0) > 0.0001 ||
+    Math.abs(Number(item.total_amount) || 0) > 0.0001
+  );
+};
+
 interface RateQuantityDisplay {
   rate: string;
   quantity: string;
@@ -775,14 +785,16 @@ const getBaseItemQuantityLabel = (item: ConsolidatedPayrollItem): string => {
   if (isDirectAmountFixedItem(item)) return "-";
 
   if (item.rate_unit === "Bag") {
-    return `${item.total_quantity} Bag${item.total_quantity > 1 ? "s" : ""}`;
+    return `${formatUnitQuantity(item.total_quantity)} Bag${
+      item.total_quantity > 1 ? "s" : ""
+    }`;
   }
 
   if (item.rate_unit === "Hour") {
-    return `${item.total_quantity} Jam`;
+    return `${formatUnitQuantity(item.total_quantity)} Jam`;
   }
 
-  return `${item.total_quantity} ${item.rate_unit}`;
+  return `${formatUnitQuantity(item.total_quantity)} ${item.rate_unit}`;
 };
 
 const getTambahanItemQuantityLabel = (
@@ -791,7 +803,7 @@ const getTambahanItemQuantityLabel = (
 ): string => {
   if (isDirectAmountFixedItem(item)) return "-";
   if (item.rate_unit === "Fixed") return monthName;
-  return `${item.total_quantity} ${item.rate_unit}`;
+  return `${formatUnitQuantity(item.total_quantity)} ${item.rate_unit}`;
 };
 
 // F/HARIAN / production-bonus descriptions carry a per-day "(N bags)" or
@@ -890,7 +902,7 @@ const appendOvertimePayRows = (
   consolidatedOvertimeItems.forEach((item) => {
     const qtyLabel = isDirectAmountFixedItem(item)
       ? "-"
-      : `${item.total_quantity} Jam OT`;
+      : `${formatUnitQuantity(item.total_quantity)} Jam OT`;
     tableBody.push(
       createItemRow(
         item.description,
@@ -996,7 +1008,7 @@ const buildMainPayrollPage = (
       payrollItemsWithOvertimeOthers,
       payroll.leave_records,
     ),
-  );
+  ).filter(isDisplayableConsolidatedItem);
   const groupedConsolidatedItems =
     groupConsolidatedItemsByType(consolidatedItems);
 
@@ -1805,7 +1817,7 @@ const buildIndividualJobPage = (
       payrollItemsWithOvertimeOthers,
       individualJob.leave_records,
     ),
-  );
+  ).filter(isDisplayableConsolidatedItem);
   const groupedConsolidatedItems =
     groupConsolidatedItemsByType(consolidatedItems);
 
@@ -2130,7 +2142,7 @@ const buildIndividualJobPage = (
     consolidatedOvertimeItems.forEach((item) => {
       const qtyLabel = isDirectAmountFixedItem(item)
         ? "-"
-        : `${item.total_quantity} Jam OT`;
+        : `${formatUnitQuantity(item.total_quantity)} Jam OT`;
       tableBody.push(
         createItemRow(
           item.description,

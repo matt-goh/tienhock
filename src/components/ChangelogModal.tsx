@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-07",
+    ms: "Pembetulan slip gaji Packing Bihun: aktiviti harian yang tiada kuantiti tidak lagi dikira sebagai 1 beg/bundle, dan rekod Hancur/Karung tidak lagi menaikkan jumlah beg harian untuk bonus F/HARIAN. Ini membetulkan kes seperti RAMBU_PB supaya bonus dan jumlah gaji kasar sepadan dengan slip lama. Gaji bulan yang terlibat perlu diproses semula.",
+    en: "Packing Bihun payslip fix: daily activities with no quantity no longer count as 1 bag/bundle, and Hancur/Karung records no longer increase the daily bag count for F/HARIAN bonus eligibility. This fixes cases like RAMBU_PB so the bonus and gross pay match the legacy payslip. Affected months should be re-processed.",
+  },
+  {
+    date: "2026-06-07",
     ms: "Slip gaji gabungan kini menyusun baris mengikut kerja dahulu. Untuk setiap kerja, bayaran asas, tambahan dan OT dipaparkan bersama di bawah bahagian kerja itu, jadi tambahan Packing Bihun contohnya tidak lagi muncul jauh di bawah kerja lain.",
     en: "Combined payslips now group rows by work first. For each work section, base pay, additional pay and OT appear together under that work, so a Packing Bihun additional line no longer appears far below other work sections.",
   },

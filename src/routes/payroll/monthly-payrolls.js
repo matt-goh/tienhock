@@ -701,10 +701,18 @@ export default function (pool) {
           .filter((a) => a.pay_code_id)
           .forEach((activity) => {
             const rateUnit = activity.rate_unit || "Fixed";
+            const hasUnitsProduced =
+              activity.units_produced !== null &&
+              activity.units_produced !== undefined &&
+              activity.units_produced !== "";
             const qty =
               activity.rate_unit === "Hour"
                 ? parseFloat(activity.hours_applied) || 0
-                : parseFloat(activity.units_produced) || 1;
+                : hasUnitsProduced
+                  ? parseFloat(activity.units_produced) || 0
+                  : rateUnit === "Fixed"
+                    ? 1
+                    : 0;
             const focUnits = parseFloat(activity.foc_units) || 0;
 
             // Re-resolve the rate from the CURRENT pay code (employee/job
@@ -734,6 +742,10 @@ export default function (pool) {
                     : biasaRate;
               if (!Number.isNaN(resolved)) rate = resolved;
               amount = Math.round(rate * (qty + focUnits) * 100) / 100;
+            }
+
+            if (qty === 0 && focUnits === 0 && amount === 0) {
+              return;
             }
 
             // Each activity becomes a separate item with source tracking
@@ -1088,6 +1100,12 @@ export default function (pool) {
         const jobType = productType === "MEE" ? "MEE_PACKING" : "BH_PACKING";
         const key = `${entry.worker_id}-${jobType}`;
         const dateStr = formatDateToYMD(entry.entry_date);
+        const payCodesForProduct = productPayCodeMap[entry.product_id] || [];
+        const countsTowardPackingThreshold = payCodesForProduct.some(
+          (pc) =>
+            pc.pay_type === "Base" &&
+            productionRateUnits.includes(pc.rate_unit),
+        );
 
         if (!workLogsByEmployeeJob[key]) {
           workLogsByEmployeeJob[key] = {
@@ -1115,19 +1133,18 @@ export default function (pool) {
           };
         }
         const entryBags = parseInt(entry.bags_packed) || 0;
-        dailyTotalsPerWorker[dailyKey].totalBags += entryBags;
-        dailyTotalsPerWorker[dailyKey].productBags[entry.product_id] =
-          (dailyTotalsPerWorker[dailyKey].productBags[entry.product_id] || 0) +
-          entryBags;
+        if (countsTowardPackingThreshold) {
+          dailyTotalsPerWorker[dailyKey].totalBags += entryBags;
+          dailyTotalsPerWorker[dailyKey].productBags[entry.product_id] =
+            (dailyTotalsPerWorker[dailyKey].productBags[entry.product_id] ||
+              0) + entryBags;
 
-        // Check if this product was marked as machine broken on this date
-        const machineKey = `${dateStr}-${entry.product_id}`;
-        if (machineBrokenLookup.has(machineKey)) {
-          dailyTotalsPerWorker[dailyKey].hasMachineBroken = true;
+          // Check if this product was marked as machine broken on this date
+          const machineKey = `${dateStr}-${entry.product_id}`;
+          if (machineBrokenLookup.has(machineKey)) {
+            dailyTotalsPerWorker[dailyKey].hasMachineBroken = true;
+          }
         }
-
-        // Get pay codes for this product
-        const payCodesForProduct = productPayCodeMap[entry.product_id] || [];
 
         // Find the Base production pay code, preferring the worker's assigned rate
         const basePayCode = findBasePayCode(
