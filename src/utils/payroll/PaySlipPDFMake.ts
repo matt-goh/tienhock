@@ -500,18 +500,6 @@ const createJobSubtotalRow = (
   ];
 };
 
-const getTotalUnitQuantity = (item: ConsolidatedPayrollItem): number => {
-  const quantity: number = Number(item.total_quantity) || 0;
-  const focUnits: number = Number(item.total_foc_units) || 0;
-  return quantity + focUnits;
-};
-
-interface BaseRateSummary {
-  averageRate: number;
-  totalUnits: number;
-  totalAmount: number;
-}
-
 type BaseRateSummaryUnit = "Bag" | "Hour";
 type BaseSectionCell = TableCell & {
   baseSectionBorder?: boolean;
@@ -675,87 +663,18 @@ const getBaseRateSummaryUnits = (
   );
 };
 
-const shouldShowBaseRateSummary = (
-  summaryItems: ConsolidatedPayrollItem[],
-  _summaryUnit: BaseRateSummaryUnit,
-): boolean => {
-  // Always show the base subtotal (Jumlah Bag / Rate per Jam), even for a single
-  // base paycode. Otherwise the base section has no subtotal while the Tambahan
-  // section still shows "Jumlah Lain-lain", making it look like the base row is
-  // part of the lain-lain total.
-  return summaryItems.length > 0;
-};
-
-const calculateBaseRateSummary = (
-  consolidatedBaseItems: ConsolidatedPayrollItem[],
-  summaryUnit: BaseRateSummaryUnit,
-): BaseRateSummary => {
-  const summaryItems: ConsolidatedPayrollItem[] = consolidatedBaseItems.filter(
-    (item) => item.rate_unit === summaryUnit,
-  );
-  const totalAmount: number = summaryItems.reduce(
-    (sum, item) => sum + (Number(item.total_amount) || 0),
-    0,
-  );
-
-  if (summaryUnit === "Bag") {
-    const totalUnits: number = summaryItems.reduce(
-      (sum, item) => sum + getTotalUnitQuantity(item),
-      0,
-    );
-
-    return {
-      averageRate: totalUnits > 0 ? totalAmount / totalUnits : 0,
-      totalUnits,
-      totalAmount,
-    };
-  }
-
-  // Hourly rows can repeat the same hours across multiple tasks, so keep using
-  // one representative hour quantity rather than summing duplicated hours.
-  const representativeHours: number =
-    summaryItems.length > 0 ? Number(summaryItems[0].total_quantity) || 0 : 0;
-  return {
-    averageRate:
-      representativeHours > 0 ? totalAmount / representativeHours : 0,
-    totalUnits: representativeHours,
-    totalAmount,
-  };
-};
-
-const createBaseRateSummaryRow = (
-  _baseRateSummaryUnit: BaseRateSummaryUnit,
-  baseRateSummary: BaseRateSummary,
+const createBaseSubtotalRow = (
+  label: string,
+  totalAmount: number,
+  options: { baseSubtotalBorder?: boolean } = {},
 ): TableCell[] => {
-  // "Jumlah Base" subtotal with just the total amount — no "Rate/Bag"/"Rate/Jam"
-  // average or bag count. A worker can have several base paycodes at different
-  // rates (e.g. MEE_ROLL's hourly tasks), so a single blended rate/quantity would
-  // be misleading. The flagged first cell lets the layout draw the line below.
   return [
     {
       text: "",
       fillColor: "#f8f9fa",
       fontSize: 8,
-      baseSubtotalBorder: true,
+      baseSubtotalBorder: options.baseSubtotalBorder,
     } as BaseSectionCell,
-    { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-    { text: "Jumlah Base", bold: true, fillColor: "#f8f9fa", fontSize: 8 },
-    {
-      text: formatCurrency(baseRateSummary.totalAmount),
-      alignment: "right",
-      bold: true,
-      fillColor: "#f8f9fa",
-      fontSize: 8,
-    },
-  ];
-};
-
-const createBaseSubtotalRow = (
-  label: string,
-  totalAmount: number,
-): TableCell[] => {
-  return [
-    { text: "", fillColor: "#f8f9fa", fontSize: 8 },
     { text: "", fillColor: "#f8f9fa", fontSize: 8 },
     {
       text: label,
@@ -828,6 +747,11 @@ const appendBasePayRows = (
 ): void => {
   if (consolidatedBaseItems.length === 0) return;
 
+  const baseTotalAmount: number = consolidatedBaseItems.reduce(
+    (sum: number, item: ConsolidatedPayrollItem) =>
+      sum + (Number(item.total_amount) || 0),
+    0,
+  );
   const baseRateSummaryUnits: BaseRateSummaryUnit[] = getBaseRateSummaryUnits(
     consolidatedBaseItems,
   );
@@ -849,23 +773,10 @@ const appendBasePayRows = (
         index > 0 && itemIndex === 0 ? markBaseSectionBorder(row) : row,
       );
     });
-
-    if (shouldShowBaseRateSummary(unitItems, unit)) {
-      tableBody.push(
-        createBaseRateSummaryRow(
-          unit,
-          calculateBaseRateSummary(unitItems, unit),
-        ),
-      );
-    }
   });
 
   const otherItems: ConsolidatedPayrollItem[] = consolidatedBaseItems.filter(
     (item) => !isBaseRateSummaryUnit(item.rate_unit),
-  );
-  const otherTotalAmount: number = otherItems.reduce(
-    (sum, item) => sum + (Number(item.total_amount) || 0),
-    0,
   );
 
   otherItems.forEach((item, itemIndex) => {
@@ -883,10 +794,11 @@ const appendBasePayRows = (
     );
   });
 
-  if (otherItems.length > 0 && baseRateSummaryUnits.length > 0) {
-    tableBody.push(createBaseSubtotalRow("Jumlah Lain-lain", otherTotalAmount));
-  }
-
+  tableBody.push(
+    createBaseSubtotalRow("Jumlah Base", baseTotalAmount, {
+      baseSubtotalBorder: true,
+    }),
+  );
 };
 
 // Build main payroll page content
@@ -1009,6 +921,11 @@ const buildMainPayrollPage = (
 
   // Calculate totals - use consolidated items for consistency with recalculated amounts
   const consolidatedBaseItems = groupedConsolidatedItems.Base || [];
+  const baseTotalAmount: number = consolidatedBaseItems.reduce(
+    (sum: number, item: ConsolidatedPayrollItem) =>
+      sum + (item.total_amount || 0),
+    0,
+  );
   const tambahanTotalAmount = (groupedConsolidatedItems.Tambahan || []).reduce(
     (sum, item) => sum + (item.total_amount || 0),
     0,
@@ -1017,6 +934,8 @@ const buildMainPayrollPage = (
     (sum, item) => sum + (item.total_amount || 0),
     0,
   );
+  const hasOvertimeItems: boolean =
+    (groupedConsolidatedItems.Overtime || []).length > 0;
 
   // Commission records (merged by description so duplicate rows collapse).
   // Cuti Tahunan entries are recorded via the Others/Incentives page using
@@ -1121,6 +1040,15 @@ const buildMainPayrollPage = (
     0,
   );
   const mergedOthersRecords = mergeByDescription(othersRecords);
+  const totalBeforeOvertimeAmount: number =
+    Math.round(
+      (baseTotalAmount +
+        tambahanTotalAmount +
+        nonCutiCommissionTotalAmount +
+        othersTotalAmount +
+        leaveTotalAmount) *
+        100,
+    ) / 100;
 
   // Mid-month and final calculations. payroll.net_pay from the comprehensive
   // endpoint is gross - statutory only, so we subtract only advance records here
@@ -1341,6 +1269,25 @@ const buildMainPayrollPage = (
           fontSize: 8,
         },
       ]);
+      if (hasOvertimeItems) {
+        tableBody.push([
+          {
+            text: "",
+            fillColor: "#f8f9fa",
+            fontSize: 8,
+            baseSubtotalBorder: true,
+          } as BaseSectionCell,
+          { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+          { text: "", bold: true, fillColor: "#f8f9fa", fontSize: 8 },
+          {
+            text: formatCurrency(totalBeforeOvertimeAmount),
+            alignment: "right",
+            bold: true,
+            fillColor: "#f8f9fa",
+            fontSize: 8,
+          },
+        ]);
+      }
     }
   }
 
@@ -1845,6 +1792,8 @@ const buildIndividualJobPage = (
     (sum, item) => sum + (item.total_amount || 0),
     0,
   );
+  const hasOvertimeItems: boolean =
+    (groupedConsolidatedItems.Overtime || []).length > 0;
 
   // Commission records (merged duplicates). Split out Cuti Tahunan entries
   // (location_code = '23') so they render as leave instead of an Advance row.
@@ -1946,8 +1895,9 @@ const buildIndividualJobPage = (
   // We must NOT use individualJob.gross_pay_portion here: that sums each day's
   // separately-rounded stored amount, which can drift a few cents from the
   // consolidated subtotals (e.g. 1195.10 vs the 1195.05 the rows add up to).
-  const baseTotalAmount = consolidatedBaseItems.reduce(
-    (sum, item) => sum + (item.total_amount || 0),
+  const baseTotalAmount: number = consolidatedBaseItems.reduce(
+    (sum: number, item: ConsolidatedPayrollItem) =>
+      sum + (item.total_amount || 0),
     0,
   );
   const breakdownGrossPay =
@@ -1955,6 +1905,15 @@ const buildIndividualJobPage = (
       (baseTotalAmount +
         tambahanTotalAmount +
         overtimeTotalAmount +
+        nonCutiCommissionTotalAmount +
+        othersTotalAmount +
+        leaveTotalAmount) *
+        100,
+    ) / 100;
+  const totalBeforeOvertimeAmount: number =
+    Math.round(
+      (baseTotalAmount +
+        tambahanTotalAmount +
         nonCutiCommissionTotalAmount +
         othersTotalAmount +
         leaveTotalAmount) *
@@ -2107,6 +2066,25 @@ const buildIndividualJobPage = (
           fontSize: 8,
         },
       ]);
+      if (hasOvertimeItems) {
+        tableBody.push([
+          {
+            text: "",
+            fillColor: "#f8f9fa",
+            fontSize: 8,
+            baseSubtotalBorder: true,
+          } as BaseSectionCell,
+          { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+          { text: "", bold: true, fillColor: "#f8f9fa", fontSize: 8 },
+          {
+            text: formatCurrency(totalBeforeOvertimeAmount),
+            alignment: "right",
+            bold: true,
+            fillColor: "#f8f9fa",
+            fontSize: 8,
+          },
+        ]);
+      }
     }
   }
 
