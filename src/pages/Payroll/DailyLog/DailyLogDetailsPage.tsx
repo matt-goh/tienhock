@@ -597,8 +597,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                                       activity.hours_applied !== null &&
                                       activity.hours_applied > 0
                                     ? `${activity.hours_applied} Hour`
-                                    : activity.units_produced !== null &&
-                                      activity.rate_unit !== "Bill"
+                                    : activity.units_produced !== null
                                     ? (
                                       <>
                                         {(activity.foc_units ?? 0) > 0 && (

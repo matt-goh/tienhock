@@ -1213,7 +1213,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
             {formatCurrency(item.amount)}
           </td>
-          {showDeleteButton && isEditable && (
+          {showDeleteButton && isEditable && (item.id ?? 0) > 0 && (
             <td className="px-3 py-2 whitespace-nowrap text-center">
               <button
                 onClick={() => {

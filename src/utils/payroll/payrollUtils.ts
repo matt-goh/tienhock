@@ -34,6 +34,7 @@ export const calculateAmount = (
     case "Karung":
     case "Bundle":
     case "Trip":
+    case "Tray":
       amount = multiplyMoney(rate, quantity);
       break;
     case "Percent":
