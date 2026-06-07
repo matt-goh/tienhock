@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-07",
+    ms: "Payroll kini boleh diproses semula secara terpilih. Jika carian digunakan, butang Process hanya memproses pekerja yang sedang dipaparkan. Pekerja yang ditanda juga boleh diproses melalui butang Process Selected, dan halaman Payroll Details kini mempunyai butang Re-process untuk pekerja tersebut sahaja.",
+    en: "Payroll can now be reprocessed selectively. When a search is active, the Process button only processes the employees currently shown. Checked employees can also be processed with Process Selected, and Payroll Details now has a Re-process button for that employee only.",
+  },
+  {
+    date: "2026-06-07",
     ms: "Pembetulan: pada slip pecahan individu (Individual Breakdown) bagi pekerja gabungan, \"Bahagian\" kini menunjukkan bahagian kerja itu sendiri (contohnya MEE_PACKING → Mee), bukan lagi bahagian gabungan (kerja utama). Sebelum ini slip MEE_PACKING ROSMINA tersilap menunjukkan Bahagian: Bihun.",
     en: "Fix: on the Individual Breakdown slip for combined employees, \"Bahagian\" now shows that job's own section (e.g. MEE_PACKING → Mee) instead of the combined payroll's (primary job's) section. Previously ROSMINA's MEE_PACKING slip wrongly showed Bahagian: Bihun.",
   },

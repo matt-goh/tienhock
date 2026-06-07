@@ -22,6 +22,7 @@ import {
   IconClockHour4,
   IconBuildingBank,
   IconWallet,
+  IconRefresh,
 } from "@tabler/icons-react";
 import { format } from "date-fns";
 import Button from "../../components/Button";
@@ -37,6 +38,8 @@ import {
   filterOutLeaveDayItems,
   groupConsolidatedItemsByType,
   ConsolidatedPayrollItem,
+  processMonthlyPayrolls,
+  type PayrollProcessEmployeeSelection,
 } from "../../utils/payroll/payrollUtils";
 import toast from "react-hot-toast";
 import AddManualItemModal from "../../components/Payroll/AddManualItemModal";
@@ -130,6 +133,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const [itemToDelete, setItemToDelete] = useState<PayrollItem | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isReprocessingPayroll, setIsReprocessingPayroll] = useState(false);
   const [midMonthPayroll, setMidMonthPayroll] =
     useState<MidMonthPayroll | null>(null);
   const [monthlyLeaveRecords, setMonthlyLeaveRecords] = useState<
@@ -260,6 +264,105 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       setIsDeleting(false);
       setShowDeleteDialog(false);
       setItemToDelete(null);
+    }
+  };
+
+  const splitPayrollJobTypes = (jobType: string): string[] => {
+    return jobType
+      .split(",")
+      .map((value: string) => value.trim())
+      .filter((value: string) => value.length > 0);
+  };
+
+  const buildIndividualProcessCombinations =
+    (): PayrollProcessEmployeeSelection[] => {
+      if (!payroll) return [];
+
+      const combinations: PayrollProcessEmployeeSelection[] = [];
+      const seenCombinations: Set<string> = new Set();
+
+      const addCombination = (employeeId: string, jobType: string): void => {
+        if (!employeeId || !jobType) return;
+
+        const key: string = `${employeeId}::${jobType}`;
+        if (seenCombinations.has(key)) return;
+
+        seenCombinations.add(key);
+        combinations.push({ employeeId, jobType });
+      };
+
+      const employeeJobMapping: Record<string, string> | undefined =
+        payroll.employee_job_mapping;
+
+      if (
+        employeeJobMapping &&
+        typeof employeeJobMapping === "object" &&
+        Object.keys(employeeJobMapping).length > 0
+      ) {
+        Object.entries(employeeJobMapping).forEach(
+          ([employeeId, mappedJobType]: [string, string]) => {
+            splitPayrollJobTypes(mappedJobType).forEach((jobType: string) => {
+              addCombination(employeeId, jobType);
+            });
+          },
+        );
+      }
+
+      if (combinations.length === 0) {
+        payroll.items
+          .filter(
+            (item: PayrollItem) => item.source_employee_id && item.job_type,
+          )
+          .forEach((item: PayrollItem) => {
+            addCombination(item.source_employee_id || "", item.job_type || "");
+          });
+      }
+
+      if (combinations.length === 0) {
+        splitPayrollJobTypes(payroll.job_type).forEach((jobType: string) => {
+          addCombination(payroll.employee_id, jobType);
+        });
+      }
+
+      return combinations;
+    };
+
+  const handleReprocessPayroll = async (): Promise<void> => {
+    if (!payroll?.monthly_payroll_id || isReprocessingPayroll) return;
+
+    const selectedCombinations: PayrollProcessEmployeeSelection[] =
+      buildIndividualProcessCombinations();
+    if (selectedCombinations.length === 0) {
+      toast.error("No employee jobs found for processing");
+      return;
+    }
+
+    setIsReprocessingPayroll(true);
+    try {
+      const response = await processMonthlyPayrolls(
+        payroll.monthly_payroll_id,
+        {
+          selected_employees: selectedCombinations,
+          prune_unselected: false,
+        },
+      );
+
+      if (response.errors?.length > 0) {
+        toast.error(`Processed with ${response.errors.length} errors`);
+      } else {
+        toast.success("Payroll reprocessed successfully");
+      }
+
+      if (response.missing_income_tax_employees?.length > 0) {
+        toast.error("Some employees are missing income tax rates");
+      }
+
+      await fetchEmployeePayrollComprehensive();
+    } catch (error) {
+      console.error("Error reprocessing employee payroll:", error);
+      toast.error("Failed to reprocess payroll");
+    } finally {
+      setIsReprocessingPayroll(false);
     }
   };
 
@@ -1459,6 +1562,18 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           </div>
         </div>
         <div className="flex flex-wrap gap-2 mt-2 md:mt-0 w-full md:w-auto">
+          {isEditable && (
+            <Button
+              onClick={handleReprocessPayroll}
+              icon={IconRefresh}
+              variant="outline"
+              color="sky"
+              disabled={isReprocessingPayroll}
+              className="flex-1 md:flex-none"
+            >
+              {isReprocessingPayroll ? "Processing..." : "Re-process"}
+            </Button>
+          )}
           <PrintPayslipButton
             payroll={payroll}
             midMonthPayroll={midMonthPayroll}

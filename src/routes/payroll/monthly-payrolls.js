@@ -422,7 +422,11 @@ export default function (pool) {
   // ============================================================================
   router.post("/:id/process-all", async (req, res) => {
     const { id } = req.params;
-    const { selected_employees = [] } = req.body; // [{employeeId, jobType}, ...]
+    const {
+      selected_employees = [],
+      prune_unselected = true,
+    } = req.body; // [{employeeId, jobType}, ...]
+    const shouldPruneUnselected = prune_unselected !== false;
 
     if (!selected_employees.length) {
       return res
@@ -1912,53 +1916,56 @@ export default function (pool) {
       // so siblings sharing the same name combine into one payroll — orphan
       // detection has to match by name too, otherwise we'd wrongly flag the
       // primary-id rows of grouped payrolls.
-      const orphansResult = await client.query(
-        `WITH selected_names AS (
-           SELECT DISTINCT s.name FROM staffs s WHERE s.id = ANY($1)
-         )
-         SELECT ep.id,
-           EXISTS (
-             SELECT 1 FROM payroll_items pi
-             WHERE pi.employee_payroll_id = ep.id AND pi.is_manual = true
-           ) AS has_manual_items
-         FROM employee_payrolls ep
-         JOIN staffs s ON ep.employee_id = s.id
-         WHERE ep.monthly_payroll_id = $2
-           AND s.name NOT IN (SELECT name FROM selected_names)`,
-        [selected_employees.map((e) => e.employeeId), id],
-      );
-
       const orphansToReset = [];
       const orphansToDelete = [];
-      for (const row of orphansResult.rows) {
-        if (row.has_manual_items) orphansToReset.push(row.id);
-        else orphansToDelete.push(row.id);
-      }
 
-      if (orphansToReset.length > 0) {
-        await client.query(
-          "DELETE FROM payroll_items WHERE employee_payroll_id = ANY($1) AND is_manual = false",
-          [orphansToReset],
+      if (shouldPruneUnselected) {
+        const orphansResult = await client.query(
+          `WITH selected_names AS (
+             SELECT DISTINCT s.name FROM staffs s WHERE s.id = ANY($1)
+           )
+           SELECT ep.id,
+             EXISTS (
+               SELECT 1 FROM payroll_items pi
+               WHERE pi.employee_payroll_id = ep.id AND pi.is_manual = true
+             ) AS has_manual_items
+           FROM employee_payrolls ep
+           JOIN staffs s ON ep.employee_id = s.id
+           WHERE ep.monthly_payroll_id = $2
+             AND s.name NOT IN (SELECT name FROM selected_names)`,
+          [selected_employees.map((e) => e.employeeId), id],
         );
-        await client.query(
-          "DELETE FROM payroll_deductions WHERE employee_payroll_id = ANY($1)",
-          [orphansToReset],
-        );
-      }
 
-      if (orphansToDelete.length > 0) {
-        await client.query(
-          "DELETE FROM payroll_items WHERE employee_payroll_id = ANY($1)",
-          [orphansToDelete],
-        );
-        await client.query(
-          "DELETE FROM payroll_deductions WHERE employee_payroll_id = ANY($1)",
-          [orphansToDelete],
-        );
-        await client.query(
-          "DELETE FROM employee_payrolls WHERE id = ANY($1)",
-          [orphansToDelete],
-        );
+        for (const row of orphansResult.rows) {
+          if (row.has_manual_items) orphansToReset.push(row.id);
+          else orphansToDelete.push(row.id);
+        }
+
+        if (orphansToReset.length > 0) {
+          await client.query(
+            "DELETE FROM payroll_items WHERE employee_payroll_id = ANY($1) AND is_manual = false",
+            [orphansToReset],
+          );
+          await client.query(
+            "DELETE FROM payroll_deductions WHERE employee_payroll_id = ANY($1)",
+            [orphansToReset],
+          );
+        }
+
+        if (orphansToDelete.length > 0) {
+          await client.query(
+            "DELETE FROM payroll_items WHERE employee_payroll_id = ANY($1)",
+            [orphansToDelete],
+          );
+          await client.query(
+            "DELETE FROM payroll_deductions WHERE employee_payroll_id = ANY($1)",
+            [orphansToDelete],
+          );
+          await client.query(
+            "DELETE FROM employee_payrolls WHERE id = ANY($1)",
+            [orphansToDelete],
+          );
+        }
       }
 
       // Update the monthly payroll's updated_at timestamp using Node.js time
