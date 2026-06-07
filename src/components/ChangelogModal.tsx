@@ -20,6 +20,16 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-07",
+    ms: "Pembetulan: pada slip pecahan individu (Individual Breakdown) bagi pekerja gabungan, \"Bahagian\" kini menunjukkan bahagian kerja itu sendiri (contohnya MEE_PACKING → Mee), bukan lagi bahagian gabungan (kerja utama). Sebelum ini slip MEE_PACKING ROSMINA tersilap menunjukkan Bahagian: Bihun.",
+    en: "Fix: on the Individual Breakdown slip for combined employees, \"Bahagian\" now shows that job's own section (e.g. MEE_PACKING → Mee) instead of the combined payroll's (primary job's) section. Previously ROSMINA's MEE_PACKING slip wrongly showed Bahagian: Bihun.",
+  },
+  {
+    date: "2026-06-07",
+    ms: "Pembetulan KWSP: bayaran kerja lebih masa (OT/Overtime) tidak lagi dimasukkan dalam asas pengiraan KWSP. Sebelum ini entri OT yang dimasukkan melalui Others (Kerja Luar OT) — contohnya \"OT (TARIK MEE-DRYER)\" — tersilap dikira dalam gaji asas KWSP, menyebabkan potongan KWSP terlebih. OT masih dikira dalam Gaji Kasar dan dalam SOCSO/SIP/PCB seperti biasa; hanya KWSP yang berubah. Gaji bulan yang terlibat perlu diproses semula.",
+    en: "EPF fix: overtime (OT) pay is no longer included in the EPF wage base. Previously OT entered via Others (Kerja Luar OT) — e.g. \"OT (TARIK MEE-DRYER)\" — was wrongly counted in the EPF base, overstating the EPF deduction. OT still counts towards Gross Pay and towards SOCSO/SIP/PCB as before; only EPF changes. Affected months should be re-processed.",
+  },
+  {
+    date: "2026-06-07",
     ms: "Pembetulan: bonus F/HARIAN kini menggunakan kod (dan kadar) yang ditetapkan kepada pekerja apabila sesuatu produk mempunyai lebih daripada satu kod untuk tahap yang sama. Contohnya bagi Bihun 3U(600G), sistem tersilap memilih kadar 0.17 sedangkan pekerja ditetapkan kadar 0.19, menyebabkan bonus terkurang bayar. Gaji bulan yang terlibat perlu diproses semula.",
     en: "Fix: the F/HARIAN bonus now uses the code (and rate) assigned to the worker when a product has more than one code for the same tier. For example on Bihun 3U(600G) the system wrongly picked the 0.17 rate when the worker was assigned 0.19, underpaying the bonus. Affected months should be re-processed.",
   },
