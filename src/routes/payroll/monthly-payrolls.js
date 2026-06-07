@@ -1085,14 +1085,19 @@ export default function (pool) {
             productType: productType,
             jobType: jobType,
             totalBags: 0,
-            productIds: new Set(),
+            // Bags packed per product that day, so the F/HARIAN bonus can be
+            // emitted per product at each product's own rate (e.g. a day mixing
+            // 350G @0.20 and MNL @0.11 must not pay one rate on the whole day).
+            productBags: {},
             hasMachineBroken: false,
             dayType: getDayType(entry.entry_date), // Track day type for bonus calculation
           };
         }
-        dailyTotalsPerWorker[dailyKey].totalBags +=
-          parseInt(entry.bags_packed) || 0;
-        dailyTotalsPerWorker[dailyKey].productIds.add(entry.product_id);
+        const entryBags = parseInt(entry.bags_packed) || 0;
+        dailyTotalsPerWorker[dailyKey].totalBags += entryBags;
+        dailyTotalsPerWorker[dailyKey].productBags[entry.product_id] =
+          (dailyTotalsPerWorker[dailyKey].productBags[entry.product_id] || 0) +
+          entryBags;
 
         // Check if this product was marked as machine broken on this date
         const machineKey = `${dateStr}-${entry.product_id}`;
@@ -1170,7 +1175,7 @@ export default function (pool) {
           productType,
           jobType,
           totalBags,
-          productIds,
+          productBags,
           hasMachineBroken,
           dayType,
         } = dailyData;
@@ -1188,89 +1193,90 @@ export default function (pool) {
           meetsThreshold1 || (hasMachineBroken && totalBags > 0);
 
         if (qualifiesForFirstTierBonus) {
-          // Get pay codes from the first product to find bonus codes
-          const firstProductId = productIds.values().next().value;
-          const payCodesForProduct = productPayCodeMap[firstProductId] || [];
-          // Pass dayType to get the appropriate bonus code (holiday-specific or regular)
-          const { bonus70Code, bonus140Code } = findThresholdBonusCodes(
-            payCodesForProduct,
-            productType,
-            dayType,
-          );
+          // The threshold qualification above is based on the combined daily
+          // total, but the payout is emitted PER PRODUCT at each product's own
+          // rate/code. A day mixing e.g. 350G (0.20) and MNL (0.11) must pay each
+          // product at its own rate instead of applying one product's rate to the
+          // whole day's bags (which is how the legacy payslips are calculated).
+          const isMachineBrokenBonus = hasMachineBroken && !meetsThreshold1;
 
-          // Apply first tier bonus (>70 for BH, >100 for MEE, or machine broken with any bags)
-          // Only skip in favour of the second tier (>140) when a real second-tier
-          // bonus code exists for this product. MEE products (MNL/2UDG/3UDG/350G)
-          // have no >140 code, so without this guard any MEE day over 140 bags would
-          // lose its F/HARIAN bonus entirely (first tier capped at 140, second tier
-          // never fires). When there is no second-tier code, the first tier applies
-          // to all qualifying days regardless of bag count.
-          if (
-            bonus70Code &&
-            (meetsThreshold1 || hasMachineBroken) &&
-            (!bonus140Code || totalBags <= threshold2)
-          ) {
-            // Select rate based on day type - if using a regular code on holiday, use ahad/umum rate
-            let bonusRate = bonus70Code.rate_biasa;
-            if (dayType === "ahad" && bonus70Code.rate_ahad > 0) {
-              bonusRate = bonus70Code.rate_ahad;
-            } else if (dayType === "umum" && bonus70Code.rate_umum > 0) {
-              bonusRate = bonus70Code.rate_umum;
+          Object.entries(productBags).forEach(([productId, productBagCount]) => {
+            if (!productBagCount) return;
+            const payCodesForProduct = productPayCodeMap[productId] || [];
+            // Pass dayType to get the appropriate bonus code (holiday-specific or regular)
+            const { bonus70Code, bonus140Code } = findThresholdBonusCodes(
+              payCodesForProduct,
+              productType,
+              dayType,
+            );
+            const bagsDisplay = Math.round(productBagCount);
+
+            // Apply first tier bonus (>=70 for BH, >=100 for MEE, or machine broken).
+            // Only skip in favour of the second tier (>140) when a real second-tier
+            // bonus code exists for this product. MEE products (MNL/2UDG/3UDG/350G)
+            // have no >140 code, so without this guard any MEE day over 140 bags would
+            // lose its F/HARIAN bonus entirely (first tier capped at 140, second tier
+            // never fires). When there is no second-tier code, the first tier applies
+            // to all qualifying days regardless of bag count.
+            if (
+              bonus70Code &&
+              (meetsThreshold1 || hasMachineBroken) &&
+              (!bonus140Code || totalBags <= threshold2)
+            ) {
+              // Select rate based on day type - if using a regular code on holiday, use ahad/umum rate
+              let bonusRate = bonus70Code.rate_biasa;
+              if (dayType === "ahad" && bonus70Code.rate_ahad > 0) {
+                bonusRate = bonus70Code.rate_ahad;
+              } else if (dayType === "umum" && bonus70Code.rate_umum > 0) {
+                bonusRate = bonus70Code.rate_umum;
+              }
+
+              if (bonusRate > 0) {
+                workLogsByEmployeeJob[key].items.push({
+                  pay_code_id: bonus70Code.pay_code_id,
+                  description: isMachineBrokenBonus
+                    ? `${bonus70Code.description} (${bagsDisplay} bags, mesin rosak)`
+                    : `${bonus70Code.description} (${bagsDisplay} bags)`,
+                  pay_type: "Tambahan",
+                  rate: bonusRate,
+                  rate_unit: bonus70Code.rate_unit,
+                  quantity: productBagCount,
+                  amount: productBagCount * bonusRate,
+                  source_date: date,
+                  work_log_id: null,
+                  work_log_type: isMachineBrokenBonus
+                    ? "prod_bonus_rosak"
+                    : "production_bonus",
+                });
+              }
             }
 
-            if (bonusRate > 0) {
-              const bonusAmount = totalBags * bonusRate;
-              // Add indicator if bonus was applied due to machine broken
-              const isMachineBrokenBonus = hasMachineBroken && !meetsThreshold1;
-              const bagsDisplay = Math.round(totalBags);
-              const description = isMachineBrokenBonus
-                ? `${bonus70Code.description} (${bagsDisplay} bags, mesin rosak)`
-                : `${bonus70Code.description} (${bagsDisplay} bags)`;
+            // Apply second tier bonus (>140) - only when actually exceeds threshold, NOT for machine broken
+            if (bonus140Code && totalBags > threshold2) {
+              // Select rate based on day type
+              let bonusRate = bonus140Code.rate_biasa;
+              if (dayType === "ahad" && bonus140Code.rate_ahad > 0) {
+                bonusRate = bonus140Code.rate_ahad;
+              } else if (dayType === "umum" && bonus140Code.rate_umum > 0) {
+                bonusRate = bonus140Code.rate_umum;
+              }
 
-              workLogsByEmployeeJob[key].items.push({
-                pay_code_id: bonus70Code.pay_code_id,
-                description: description,
-                pay_type: "Tambahan",
-                rate: bonusRate,
-                rate_unit: bonus70Code.rate_unit,
-                quantity: totalBags,
-                amount: bonusAmount,
-                source_date: date,
-                work_log_id: null,
-                work_log_type: isMachineBrokenBonus
-                  ? "prod_bonus_rosak"
-                  : "production_bonus",
-              });
+              if (bonusRate > 0) {
+                workLogsByEmployeeJob[key].items.push({
+                  pay_code_id: bonus140Code.pay_code_id,
+                  description: `${bonus140Code.description} (${bagsDisplay} bags)`,
+                  pay_type: "Tambahan",
+                  rate: bonusRate,
+                  rate_unit: bonus140Code.rate_unit,
+                  quantity: productBagCount,
+                  amount: productBagCount * bonusRate,
+                  source_date: date,
+                  work_log_id: null,
+                  work_log_type: "production_bonus",
+                });
+              }
             }
-          }
-
-          // Apply second tier bonus (>140) - only when actually exceeds threshold, NOT for machine broken
-          if (bonus140Code && totalBags > threshold2) {
-            // Select rate based on day type
-            let bonusRate = bonus140Code.rate_biasa;
-            if (dayType === "ahad" && bonus140Code.rate_ahad > 0) {
-              bonusRate = bonus140Code.rate_ahad;
-            } else if (dayType === "umum" && bonus140Code.rate_umum > 0) {
-              bonusRate = bonus140Code.rate_umum;
-            }
-
-            if (bonusRate > 0) {
-              const bonusAmount = totalBags * bonusRate;
-              const bagsDisplay = Math.round(totalBags);
-              workLogsByEmployeeJob[key].items.push({
-                pay_code_id: bonus140Code.pay_code_id,
-                description: `${bonus140Code.description} (${bagsDisplay} bags)`,
-                pay_type: "Tambahan",
-                rate: bonusRate,
-                rate_unit: bonus140Code.rate_unit,
-                quantity: totalBags,
-                amount: bonusAmount,
-                source_date: date,
-                work_log_id: null,
-                work_log_type: "production_bonus",
-              });
-            }
-          }
+          });
         }
       });
 
@@ -1675,20 +1681,36 @@ export default function (pool) {
           const netPay =
             grossPay - totalEmployeeDeductions - commissionAdvancePay;
 
-          // Fetch mid-month payroll for rounding calculation
-          const midMonthResult = await client.query(
-            `SELECT COALESCE(amount, 0) as amount FROM mid_month_payrolls
-             WHERE employee_id = $1 AND year = $2 AND month = $3`,
-            [primaryEmployee.employeeId, year, month],
-          );
-          const midMonthAmount = parseFloat(
-            midMonthResult.rows[0]?.amount || 0,
-          );
-
+          // Fetch mid-month payroll for rounding calculation. For grouped
+          // payrolls each sibling id (e.g. JASSON_PM and JASSON_ROLL) can have
+          // its own advance, all paid to the same person, so the final rounding
+          // must subtract the SUM across every sibling id (matched by name, the
+          // same way the comprehensive/list endpoints aggregate advances).
+          // Only grouped payrolls (more than one job type, i.e. a comma in
+          // job_type) aggregate by name; single-job payrolls use just this
+          // employee's advance — matching how the read endpoints decide.
           const uniqueJobTypes = [
             ...new Set(employeeJobCombos.map((c) => c.jobType)),
           ].sort();
           const jobTypes = uniqueJobTypes.join(", ");
+          const isGroupedPayrollRow = uniqueJobTypes.length > 1;
+
+          const midMonthResult = await client.query(
+            isGroupedPayrollRow
+              ? `SELECT COALESCE(SUM(amount), 0) as amount FROM mid_month_payrolls
+                 WHERE employee_id IN (SELECT id FROM staffs WHERE name = $1)
+                   AND year = $2 AND month = $3`
+              : `SELECT COALESCE(SUM(amount), 0) as amount FROM mid_month_payrolls
+                 WHERE employee_id = $1 AND year = $2 AND month = $3`,
+            [
+              isGroupedPayrollRow ? employeeName : primaryEmployee.employeeId,
+              year,
+              month,
+            ],
+          );
+          const midMonthAmount = parseFloat(
+            midMonthResult.rows[0]?.amount || 0,
+          );
 
           // Calculate rounding (digenapkan) - round UP to nearest whole ringgit
           const jumlah = netPay - midMonthAmount;

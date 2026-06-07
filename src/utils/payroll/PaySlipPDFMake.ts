@@ -513,7 +513,10 @@ interface BaseRateSummary {
 }
 
 type BaseRateSummaryUnit = "Bag" | "Hour";
-type BaseSectionCell = TableCell & { baseSectionBorder?: boolean };
+type BaseSectionCell = TableCell & {
+  baseSectionBorder?: boolean;
+  baseSubtotalBorder?: boolean;
+};
 
 const BASE_RATE_SUMMARY_UNITS: BaseRateSummaryUnit[] = ["Bag", "Hour"];
 
@@ -674,9 +677,13 @@ const getBaseRateSummaryUnits = (
 
 const shouldShowBaseRateSummary = (
   summaryItems: ConsolidatedPayrollItem[],
-  summaryUnit: BaseRateSummaryUnit,
+  _summaryUnit: BaseRateSummaryUnit,
 ): boolean => {
-  return summaryUnit !== "Bag" || summaryItems.length > 1;
+  // Always show the base subtotal (Jumlah Bag / Rate per Jam), even for a single
+  // base paycode. Otherwise the base section has no subtotal while the Tambahan
+  // section still shows "Jumlah Lain-lain", making it look like the base row is
+  // part of the lain-lain total.
+  return summaryItems.length > 0;
 };
 
 const calculateBaseRateSummary = (
@@ -717,44 +724,22 @@ const calculateBaseRateSummary = (
 };
 
 const createBaseRateSummaryRow = (
-  baseRateSummaryUnit: BaseRateSummaryUnit,
+  _baseRateSummaryUnit: BaseRateSummaryUnit,
   baseRateSummary: BaseRateSummary,
 ): TableCell[] => {
-  if (baseRateSummaryUnit === "Bag") {
-    return [
-      { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-      {
-        text: `Rate/Bag: ${baseRateSummary.averageRate.toFixed(2)}`,
-        alignment: "right",
-        bold: true,
-        fillColor: "#f8f9fa",
-        fontSize: 8,
-      },
-      {
-        text: `Jumlah Bag: ${formatUnitQuantity(baseRateSummary.totalUnits)}`,
-        bold: true,
-        fillColor: "#f8f9fa",
-        fontSize: 8,
-      },
-      {
-        text: formatCurrency(baseRateSummary.totalAmount),
-        alignment: "right",
-        bold: true,
-        fillColor: "#f8f9fa",
-        fontSize: 8,
-      },
-    ];
-  }
-
+  // "Jumlah Base" subtotal with just the total amount — no "Rate/Bag"/"Rate/Jam"
+  // average or bag count. A worker can have several base paycodes at different
+  // rates (e.g. MEE_ROLL's hourly tasks), so a single blended rate/quantity would
+  // be misleading. The flagged first cell lets the layout draw the line below.
   return [
-    { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-    { text: "", fillColor: "#f8f9fa", fontSize: 8 },
     {
-      text: `Rate/Jam: ${baseRateSummary.averageRate.toFixed(2)}`,
-      bold: true,
+      text: "",
       fillColor: "#f8f9fa",
       fontSize: 8,
-    },
+      baseSubtotalBorder: true,
+    } as BaseSectionCell,
+    { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+    { text: "Jumlah Base", bold: true, fillColor: "#f8f9fa", fontSize: 8 },
     {
       text: formatCurrency(baseRateSummary.totalAmount),
       alignment: "right",
@@ -824,6 +809,13 @@ const getTambahanItemQuantityLabel = (
   if (item.rate_unit === "Fixed") return monthName;
   return `${item.total_quantity} ${item.rate_unit}`;
 };
+
+// F/HARIAN / production-bonus descriptions carry a per-day "(N bags)" or
+// "(N bags, mesin rosak)" tag. After consolidation one line spans many days, so
+// that single-day count no longer matches the merged quantity column — strip it
+// for display (the quantity column already shows the real total).
+const stripBagCountSuffix = (description: string): string =>
+  (description || "").replace(/\s*\(\d[\d.]*\s*bags?\b[^)]*\)\s*$/i, "").trim();
 
 const markBaseSectionBorder = (row: TableCell[]): TableCell[] => {
   (row[0] as BaseSectionCell).baseSectionBorder = true;
@@ -1228,7 +1220,7 @@ const buildMainPayrollPage = (
       jobItems.forEach((item) => {
         tableBody.push(
           createItemRow(
-            item.description,
+            stripBagCountSuffix(item.description),
             getConsolidatedRateLabel(item),
             getTambahanItemQuantityLabel(item, monthName),
             formatCurrency(item.total_amount),
@@ -1675,6 +1667,10 @@ const buildMainPayrollPage = (
           // Check row above the line (row i-1) for border below specific rows
           const prevRow = node.table.body[i - 1];
           if (prevRow && Array.isArray(prevRow)) {
+            // Border below the base subtotal row (just an amount, flagged)
+            if ((prevRow[0] as BaseSectionCell)?.baseSubtotalBorder) {
+              return 0.5;
+            }
             const descCell = prevRow[2];
             const descText =
               typeof descCell === "object" ? descCell.text : descCell;
@@ -1945,6 +1941,26 @@ const buildIndividualJobPage = (
   );
   const mergedOthersRecords = mergeByDescription(othersRecords);
 
+  // Gross pay shown on the breakdown is the sum of the subtotals actually
+  // rendered above it, all derived from consolidated items (rate × total qty).
+  // We must NOT use individualJob.gross_pay_portion here: that sums each day's
+  // separately-rounded stored amount, which can drift a few cents from the
+  // consolidated subtotals (e.g. 1195.10 vs the 1195.05 the rows add up to).
+  const baseTotalAmount = consolidatedBaseItems.reduce(
+    (sum, item) => sum + (item.total_amount || 0),
+    0,
+  );
+  const breakdownGrossPay =
+    Math.round(
+      (baseTotalAmount +
+        tambahanTotalAmount +
+        overtimeTotalAmount +
+        nonCutiCommissionTotalAmount +
+        othersTotalAmount +
+        leaveTotalAmount) *
+        100,
+    ) / 100;
+
   // Build table body
   const tableBody: TableCell[][] = [];
 
@@ -1984,7 +2000,7 @@ const buildIndividualJobPage = (
     consolidatedTambahanItems.forEach((item) => {
       tableBody.push(
         createItemRow(
-          item.description,
+          stripBagCountSuffix(item.description),
           getConsolidatedRateLabel(item),
           getTambahanItemQuantityLabel(item, monthName),
           formatCurrency(item.total_amount),
@@ -2136,13 +2152,50 @@ const buildIndividualJobPage = (
       fontSize: 8,
     },
     {
-      text: formatCurrency(individualJob.gross_pay_portion),
+      text: formatCurrency(breakdownGrossPay),
       alignment: "right",
       bold: true,
       fillColor: "#f8f9fa",
       fontSize: 8,
     },
   ]);
+
+  // This sibling's own mid-month advance (e.g. JASSON_PM's 200), shown on its
+  // own breakdown like the legacy per-identity slips. Statutory deductions stay
+  // on the combined slip; only the advance for this id is shown here.
+  const advanceByEmployee = payroll.mid_month_payrolls_by_employee || {};
+  const jobAdvance = jobEmployeeId
+    ? Number(advanceByEmployee[jobEmployeeId]) || 0
+    : 0;
+  if (jobAdvance > 0) {
+    tableBody.push([
+      { text: "BAYARAN PENDAHULUAN (ADVANCES PAYMENT)", fontSize: 8 },
+      { text: "", fontSize: 8 },
+      { text: "", fontSize: 8 },
+      {
+        text: `(${formatCurrency(jobAdvance)})`,
+        alignment: "right",
+        fontSize: 8,
+      },
+    ]);
+    tableBody.push([
+      { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+      { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+      {
+        text: "Jumlah Selepas Advances",
+        bold: true,
+        fillColor: "#f8f9fa",
+        fontSize: 8,
+      },
+      {
+        text: formatCurrency(breakdownGrossPay - jobAdvance),
+        alignment: "right",
+        bold: true,
+        fillColor: "#f8f9fa",
+        fontSize: 8,
+      },
+    ]);
+  }
 
   // Build content array
   const content: Content[] = [
@@ -2198,6 +2251,10 @@ const buildIndividualJobPage = (
           // Check row above the line (row i-1) for border below specific rows
           const prevRow = node.table.body[i - 1];
           if (prevRow && Array.isArray(prevRow)) {
+            // Border below the base subtotal row (just an amount, flagged)
+            if ((prevRow[0] as BaseSectionCell)?.baseSubtotalBorder) {
+              return 0.5;
+            }
             const descCell = prevRow[2];
             const descText =
               typeof descCell === "object" ? descCell.text : descCell;

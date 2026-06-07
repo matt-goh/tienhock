@@ -145,7 +145,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     // Get employee payroll details to fetch year and month for leave records
     const payrollInfoRes = await pool.query(
       `
-      SELECT ep.employee_id, s.name as employee_name, mp.year, mp.month
+      SELECT ep.employee_id, ep.job_type, s.name as employee_name, mp.year, mp.month
       FROM employee_payrolls ep
       JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
       JOIN staffs s ON s.id = ep.employee_id
@@ -158,7 +158,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       throw new Error("Employee payroll not found");
     }
 
-    const { year, month, employee_name } = payrollInfoRes.rows[0];
+    const { year, month, employee_name, job_type } = payrollInfoRes.rows[0];
 
     // Get leave records for this employee for the specific month/year
     const leaveRecordsRes = await pool.query(
@@ -574,11 +574,19 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     const netPay =
       grossPay - totalEmployeeDeductions - totalCommissionDeductions;
 
-    // Get mid-month payroll for rounding calculation
+    // Get mid-month payroll for rounding calculation. Grouped payrolls (job_type
+    // has a comma) sum every sibling id's advance by name so the final rounding
+    // subtracts all advances paid to the person; single-job payrolls use just
+    // this employee's advance — matching payroll processing and the read endpoints.
+    const isGroupedRecalc = (job_type || "").includes(", ");
     const midMonthRes = await pool.query(
-      `SELECT COALESCE(amount, 0) as amount FROM mid_month_payrolls
-       WHERE employee_id = $1 AND year = $2 AND month = $3`,
-      [employee_id, year, month],
+      isGroupedRecalc
+        ? `SELECT COALESCE(SUM(amount), 0) as amount FROM mid_month_payrolls
+           WHERE employee_id IN (SELECT id FROM staffs WHERE name = $1)
+             AND year = $2 AND month = $3`
+        : `SELECT COALESCE(amount, 0) as amount FROM mid_month_payrolls
+           WHERE employee_id = $1 AND year = $2 AND month = $3`,
+      [isGroupedRecalc ? employee_name : employee_id, year, month],
     );
     const midMonthAmount = parseFloat(midMonthRes.rows[0]?.amount || 0);
 
@@ -749,28 +757,44 @@ export default function (pool) {
         {},
       );
 
-      // Get all mid-month payrolls for these payrolls in a single query
+      // Get all mid-month payrolls for these payrolls in a single query.
+      // For grouped payrolls match by employee name so every sibling's advance
+      // is gathered (mirrors the commission handling).
       const midMonthQuery = `
-      SELECT 
+      SELECT
         ep.id as employee_payroll_id,
         mmp.*,
         s.name as employee_name
       FROM employee_payrolls ep
       JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
-      JOIN mid_month_payrolls mmp ON ep.employee_id = mmp.employee_id AND mp.year = mmp.year AND mp.month = mmp.month
+      JOIN staffs emp_staff ON ep.employee_id = emp_staff.id
+      JOIN mid_month_payrolls mmp ON (
+        CASE
+          WHEN ep.job_type LIKE '%,%' THEN mmp.employee_id IN (
+            SELECT s2.id FROM staffs s2 WHERE s2.name = emp_staff.name
+          )
+          ELSE mmp.employee_id = ep.employee_id
+        END
+      ) AND mp.year = mmp.year AND mp.month = mmp.month
       LEFT JOIN staffs s ON mmp.employee_id = s.id
       WHERE ep.id = ANY($1)
       ORDER BY ep.id
     `;
       const midMonthResult = await pool.query(midMonthQuery, [payrollIds]);
 
-      // Group mid-month payrolls by employee_payroll_id
+      // Group mid-month payrolls by employee_payroll_id, accumulating the total
+      // advance and a per-sibling map (used by the individual breakdown slips).
       const midMonthByPayrollId = midMonthResult.rows.reduce((acc, record) => {
-        acc[record.employee_payroll_id] = {
-          ...record,
-          amount: parseFloat(record.amount),
-        };
-        delete acc[record.employee_payroll_id].employee_payroll_id;
+        const pid = record.employee_payroll_id;
+        const amount = parseFloat(record.amount);
+        if (!acc[pid]) {
+          acc[pid] = { total: 0, byEmployee: {}, rows: [] };
+        }
+        acc[pid].total += amount;
+        acc[pid].byEmployee[record.employee_id] = amount;
+        const cleanRecord = { ...record, amount };
+        delete cleanRecord.employee_payroll_id;
+        acc[pid].rows.push(cleanRecord);
         return acc;
       }, {});
 
@@ -864,17 +888,27 @@ export default function (pool) {
       }, {});
 
       // Merge payrolls with their items, deductions, leave records, mid-month payrolls, commission, and others records
-      const response = payrollsResult.rows.map((payroll) => ({
-        ...payroll,
-        items: itemsByPayrollId[payroll.id] || [],
-        deductions: deductionsByPayrollId[payroll.id] || [],
-        leave_records: leaveRecordsByPayrollId[payroll.id] || [],
-        mid_month_payroll: midMonthByPayrollId[payroll.id] || null,
-        commission_records: commissionsByPayrollId[payroll.id] || [],
-        others_records: othersByPayrollId[payroll.id] || [],
-        gross_pay: parseFloat(payroll.gross_pay),
-        net_pay: parseFloat(payroll.net_pay),
-      }));
+      const response = payrollsResult.rows.map((payroll) => {
+        const midMonth = midMonthByPayrollId[payroll.id];
+        const primaryMidMonth = midMonth
+          ? midMonth.rows.find((r) => r.employee_id === payroll.employee_id) ||
+            midMonth.rows[0]
+          : null;
+        return {
+          ...payroll,
+          items: itemsByPayrollId[payroll.id] || [],
+          deductions: deductionsByPayrollId[payroll.id] || [],
+          leave_records: leaveRecordsByPayrollId[payroll.id] || [],
+          mid_month_payroll: primaryMidMonth
+            ? { ...primaryMidMonth, amount: midMonth.total }
+            : null,
+          mid_month_payrolls_by_employee: midMonth ? midMonth.byEmployee : {},
+          commission_records: commissionsByPayrollId[payroll.id] || [],
+          others_records: othersByPayrollId[payroll.id] || [],
+          gross_pay: parseFloat(payroll.gross_pay),
+          net_pay: parseFloat(payroll.net_pay),
+        };
+      });
 
       res.json(response);
     } catch (error) {
@@ -1041,9 +1075,24 @@ export default function (pool) {
           [payrollData.employee_id, payrollData.year, payrollData.month],
         ),
 
-        // Get mid-month payroll data
-        pool.query(
-          `
+        // Get mid-month payroll data. For grouped payrolls each sibling id can
+        // have its own advance (all paid to the same person), so match by name
+        // to gather every sibling's advance — mirroring the commission handling.
+        isGroupedPayroll
+          ? pool.query(
+              `
+          SELECT
+            mmp.*,
+            s.name as employee_name
+          FROM mid_month_payrolls mmp
+          LEFT JOIN staffs s ON mmp.employee_id = s.id
+          WHERE s.name = (SELECT name FROM staffs WHERE id = $1)
+            AND mmp.year = $2 AND mmp.month = $3
+        `,
+              [payrollData.employee_id, payrollData.year, payrollData.month],
+            )
+          : pool.query(
+              `
           SELECT
             mmp.*,
             s.name as employee_name
@@ -1051,8 +1100,8 @@ export default function (pool) {
           LEFT JOIN staffs s ON mmp.employee_id = s.id
           WHERE mmp.employee_id = $1 AND mmp.year = $2 AND mmp.month = $3
         `,
-          [payrollData.employee_id, payrollData.year, payrollData.month],
-        ),
+              [payrollData.employee_id, payrollData.year, payrollData.month],
+            ),
 
         // Get commission records for the specific month/year
         // For grouped payrolls, get commissions for all employees with same name
@@ -1241,6 +1290,23 @@ export default function (pool) {
       const recalculatedNetPay =
         Math.round((recalculatedGrossPay - totalDeductions) * 100) / 100;
 
+      // Aggregate sibling mid-month advances: the combined `mid_month_payroll`
+      // carries the SUM (for the main slip), while `mid_month_payrolls_by_employee`
+      // keeps each sibling's own amount (for the individual breakdown slips).
+      const midMonthRows = midMonthResult.rows.map((row) => ({
+        ...row,
+        amount: parseFloat(row.amount),
+      }));
+      const midMonthTotal = midMonthRows.reduce((sum, r) => sum + r.amount, 0);
+      const midMonthByEmployee = midMonthRows.reduce((acc, r) => {
+        acc[r.employee_id] = r.amount;
+        return acc;
+      }, {});
+      const primaryMidMonth =
+        midMonthRows.find((r) => r.employee_id === payrollData.employee_id) ||
+        midMonthRows[0] ||
+        null;
+
       // Format comprehensive response
       const response = {
         ...payrollData,
@@ -1255,13 +1321,10 @@ export default function (pool) {
           rate_info: deduction.rate_info || {},
         })),
         leave_records: leaveRecords,
-        mid_month_payroll:
-          midMonthResult.rows.length > 0
-            ? {
-                ...midMonthResult.rows[0],
-                amount: parseFloat(midMonthResult.rows[0].amount),
-              }
-            : null,
+        mid_month_payroll: primaryMidMonth
+          ? { ...primaryMidMonth, amount: midMonthTotal }
+          : null,
+        mid_month_payrolls_by_employee: midMonthByEmployee,
         commission_records: commissionRecords,
         others_records: othersRecords,
         pinjam_records: pinjamRecords,
@@ -1403,9 +1466,24 @@ export default function (pool) {
           [payrollData.employee_id, payrollData.year, payrollData.month],
         ),
 
-        // Get mid-month payroll data
-        pool.query(
-          `
+        // Get mid-month payroll data. For grouped payrolls each sibling id can
+        // have its own advance (all paid to the same person), so match by name
+        // to gather every sibling's advance — mirroring the commission handling.
+        isGroupedPayroll
+          ? pool.query(
+              `
+          SELECT
+            mmp.*,
+            s.name as employee_name
+          FROM mid_month_payrolls mmp
+          LEFT JOIN staffs s ON mmp.employee_id = s.id
+          WHERE s.name = (SELECT name FROM staffs WHERE id = $1)
+            AND mmp.year = $2 AND mmp.month = $3
+        `,
+              [payrollData.employee_id, payrollData.year, payrollData.month],
+            )
+          : pool.query(
+              `
           SELECT
             mmp.*,
             s.name as employee_name
@@ -1413,8 +1491,8 @@ export default function (pool) {
           LEFT JOIN staffs s ON mmp.employee_id = s.id
           WHERE mmp.employee_id = $1 AND mmp.year = $2 AND mmp.month = $3
         `,
-          [payrollData.employee_id, payrollData.year, payrollData.month],
-        ),
+              [payrollData.employee_id, payrollData.year, payrollData.month],
+            ),
 
         // Get commission records for the specific month/year
         // For grouped payrolls, get commissions for all employees with same name
@@ -1586,6 +1664,23 @@ export default function (pool) {
       const recalculatedNetPay =
         Math.round((recalculatedGrossPay - totalDeductions) * 100) / 100;
 
+      // Aggregate sibling mid-month advances (see comprehensive endpoint): the
+      // combined `mid_month_payroll` carries the SUM, while
+      // `mid_month_payrolls_by_employee` keeps each sibling's own amount.
+      const midMonthRows = midMonthResult.rows.map((row) => ({
+        ...row,
+        amount: parseFloat(row.amount),
+      }));
+      const midMonthTotal = midMonthRows.reduce((sum, r) => sum + r.amount, 0);
+      const midMonthByEmployee = midMonthRows.reduce((acc, r) => {
+        acc[r.employee_id] = r.amount;
+        return acc;
+      }, {});
+      const primaryMidMonth =
+        midMonthRows.find((r) => r.employee_id === payrollData.employee_id) ||
+        midMonthRows[0] ||
+        null;
+
       // Format comprehensive response
       const response = {
         ...payrollData,
@@ -1600,13 +1695,10 @@ export default function (pool) {
           rate_info: deduction.rate_info || {},
         })),
         leave_records: leaveRecords,
-        mid_month_payroll:
-          midMonthResult.rows.length > 0
-            ? {
-                ...midMonthResult.rows[0],
-                amount: parseFloat(midMonthResult.rows[0].amount),
-              }
-            : null,
+        mid_month_payroll: primaryMidMonth
+          ? { ...primaryMidMonth, amount: midMonthTotal }
+          : null,
+        mid_month_payrolls_by_employee: midMonthByEmployee,
         commission_records: commissionRecords,
         others_records: othersRecords,
       };
@@ -1676,10 +1768,18 @@ export default function (pool) {
         } = payroll;
 
         try {
-          // Fetch mid_month_payroll amount for digenapkan calculation
+          // Fetch mid_month_payroll amount for digenapkan calculation. Grouped
+          // payrolls (job_type has a comma) sum every sibling id's advance by
+          // name; single-job payrolls use just this employee's advance.
+          const isGroupedSave = (job_type || "").includes(", ");
           const midMonthResult = await client.query(
-            `SELECT COALESCE(amount, 0) as amount FROM mid_month_payrolls
-             WHERE employee_id = $1 AND year = $2 AND month = $3`,
+            isGroupedSave
+              ? `SELECT COALESCE(SUM(amount), 0) as amount FROM mid_month_payrolls
+                 WHERE employee_id IN (
+                   SELECT id FROM staffs WHERE name = (SELECT name FROM staffs WHERE id = $1)
+                 ) AND year = $2 AND month = $3`
+              : `SELECT COALESCE(amount, 0) as amount FROM mid_month_payrolls
+                 WHERE employee_id = $1 AND year = $2 AND month = $3`,
             [employee_id, payrollYear, payrollMonth],
           );
           const midMonthAmount = parseFloat(
@@ -1895,10 +1995,17 @@ export default function (pool) {
       const { year: payrollYear, month: payrollMonth } =
         monthlyPayrollResult.rows[0] || {};
 
-      // Fetch mid_month_payroll amount for digenapkan calculation
+      // Fetch mid_month_payroll amount for digenapkan calculation. Grouped
+      // payrolls (job_type has a comma) sum every sibling id's advance by name.
+      const isGroupedSave = (job_type || "").includes(", ");
       const midMonthResult = await pool.query(
-        `SELECT COALESCE(amount, 0) as amount FROM mid_month_payrolls
-         WHERE employee_id = $1 AND year = $2 AND month = $3`,
+        isGroupedSave
+          ? `SELECT COALESCE(SUM(amount), 0) as amount FROM mid_month_payrolls
+             WHERE employee_id IN (
+               SELECT id FROM staffs WHERE name = (SELECT name FROM staffs WHERE id = $1)
+             ) AND year = $2 AND month = $3`
+          : `SELECT COALESCE(amount, 0) as amount FROM mid_month_payrolls
+             WHERE employee_id = $1 AND year = $2 AND month = $3`,
         [employee_id, payrollYear, payrollMonth],
       );
       const midMonthAmount = parseFloat(midMonthResult.rows[0]?.amount || 0);

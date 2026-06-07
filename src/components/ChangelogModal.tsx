@@ -20,6 +20,26 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-07",
+    ms: "Slip gaji: bahagian asas kini sentiasa menunjukkan baris subtotal \"Jumlah Base\" dengan garis pemisah, supaya ia jelas berasingan daripada \"Jumlah Lain-lain\". Baris itu hanya menunjukkan jumlah amaun — label \"Rate/Bag\" dan \"Jumlah Bag\" dibuang kerana ia mengelirukan apabila pekerja mempunyai beberapa paycode asas pada kadar berbeza. Selain itu, baris F/HARIAN yang digabungkan tidak lagi memaparkan label \"(N bags)\" sehari yang mengelirukan (contohnya \"(130 bags)\" di sebelah \"1492 Bag\") — kuantiti penuh tetap dipaparkan di lajur kuantiti.",
+    en: "Payslip: the base section now always shows a \"Jumlah Base\" subtotal row with a separating line, so it reads as clearly separate from \"Jumlah Lain-lain\". That row shows only the total amount — the \"Rate/Bag\" and \"Jumlah Bag\" labels were removed because they're misleading when a worker has several base paycodes at different rates. Also, merged F/HARIAN lines no longer show the misleading single-day \"(N bags)\" tag (e.g. \"(130 bags)\" next to \"1492 Bag\") — the full quantity still appears in the quantity column.",
+  },
+  {
+    date: "2026-06-07",
+    ms: "Pembetulan: pada slip pecahan individu (Individual Breakdown) bagi pekerja gabungan, baris \"Gross Pay\" kini sentiasa sama dengan jumlah subtotal yang dipaparkan di atasnya. Sebelum ini ia kadangkala tersasar beberapa sen (contohnya 1195.10 berbanding 1195.05) kerana ia menjumlahkan amaun harian yang digenapkan satu per satu, manakala subtotal dikira sekali gus (kadar × jumlah kuantiti).",
+    en: "Fix: on the Individual Breakdown slip for combined employees, the \"Gross Pay\" row now always equals the subtotals shown above it. Previously it could be a few cents off (e.g. 1195.10 vs 1195.05) because it summed each day's separately-rounded amount, while the subtotals are computed once (rate × total quantity).",
+  },
+  {
+    date: "2026-06-07",
+    ms: "Pembetulan: bagi pekerja gabungan (satu orang dengan beberapa ID/kerja, contohnya Packing + Roll), bayaran pendahuluan pertengahan bulan setiap ID kini dikira dengan betul. Slip gabungan kini menolak JUMLAH semua bayaran pendahuluan (contohnya 250 + 200 = 450), dan setiap slip pecahan individu memaparkan bayaran pendahuluannya sendiri serta \"Jumlah Selepas Advances\". Sebelum ini hanya satu bayaran pendahuluan diambil kira, jadi baki seperti 200 itu hilang dan tidak ditolak. Gaji bulan yang terlibat perlu diproses semula.",
+    en: "Fix: for combined employees (one person with several IDs/jobs, e.g. Packing + Roll), each ID's mid-month advance is now handled correctly. The combined slip now deducts the TOTAL of all advances (e.g. 250 + 200 = 450), and every individual breakdown slip shows its own advance and a \"Jumlah Selepas Advances\" line. Previously only one advance was counted, so an amount like the extra 200 went missing and was never deducted. Affected months should be re-processed.",
+  },
+  {
+    date: "2026-06-07",
+    ms: "Pembetulan: bonus F/HARIAN Packing Mee kini dibayar mengikut setiap produk pada kadar produk itu sendiri. Pada hari pekerja membungkus lebih daripada satu jenis produk (contohnya 350G dan MNL pada hari yang sama), sistem dahulunya menggunakan satu kadar untuk semua beg hari itu, menyebabkan jumlah tidak sepadan dengan slip lama. Kelayakan masih berdasarkan jumlah beg sehari. Gaji bulan yang terlibat perlu diproses semula.",
+    en: "Fix: the Packing Mee F/HARIAN bonus is now paid per product at each product's own rate. On days a worker packs more than one product type (e.g. 350G and MNL on the same day), the system previously applied a single rate to the whole day's bags, making totals disagree with the legacy slips. Qualification is still based on the combined daily bag count. Affected months should be re-processed.",
+  },
+  {
+    date: "2026-06-07",
     ms: "Pembetulan: pengiraan bonus F/HARIAN untuk Packing Mee diperbetulkan dalam tiga keadaan. (1) Hari yang membungkus lebih 140 beg tidak lagi kehilangan bonus F/HARIAN — sebelum ini bonus untuk hari tersebut hilang sepenuhnya kerana Mee tiada kadar \">140\". (2) Hari yang mencapai tepat ambang (100 beg untuk Mee, 70 beg untuk Bihun) kini layak menerima bonus — sebelum ini hanya \"lebih daripada\" ambang yang dikira. (3) Kadar asas kini mengikut paycode yang ditetapkan kepada pekerja; sebelum ini sesetengah produk (2UDG/3UDG) tersilap memilih kadar mesin (0.45) dan bukan kadar pekerja (0.25). Gaji bulan yang terlibat perlu diproses semula untuk membetulkan jumlah tersimpan.",
     en: "Fix: the Packing Mee F/HARIAN bonus calculation is corrected in three cases. (1) Days packing more than 140 bags no longer lose their F/HARIAN bonus — previously the whole day's bonus disappeared because Mee has no \">140\" rate. (2) Days that hit exactly the threshold (100 bags for Mee, 70 bags for Bihun) now qualify for the bonus — previously only days strictly above the threshold counted. (3) The base rate now follows the pay code assigned to each worker; previously some products (2UDG/3UDG) wrongly picked the machine rate (0.45) instead of the worker's rate (0.25). Affected months should be re-processed to correct the stored totals.",
   },
