@@ -143,6 +143,37 @@ export const processMonthlyPayroll = async (id: number) => {
   }
 };
 
+export interface PayrollProcessEmployeeSelection {
+  employeeId: string;
+  jobType: string;
+}
+
+export interface ProcessMonthlyPayrollsOptions {
+  selected_employees: PayrollProcessEmployeeSelection[];
+  prune_unselected?: boolean;
+}
+
+/**
+ * Processes selected employee/job combinations for a monthly payroll.
+ * prune_unselected keeps the existing full-payroll orphan cleanup behaviour
+ * unless callers explicitly disable it for selective reprocessing.
+ */
+export const processMonthlyPayrolls = async (
+  id: number,
+  options: ProcessMonthlyPayrollsOptions
+) => {
+  try {
+    const response = await api.post(
+      `/api/monthly-payrolls/${id}/process-all`,
+      options
+    );
+    return response;
+  } catch (error) {
+    console.error("Error processing selected monthly payrolls:", error);
+    throw error;
+  }
+};
+
 /**
  * Updates a monthly payroll status
  * @param id Monthly payroll ID
@@ -393,7 +424,7 @@ export interface ConsolidatedPayrollItem {
 
 /**
  * Consolidates payroll items by grouping identical items together
- * Groups by: pay_code_id + rate + rate_unit
+ * Groups by: job_type + pay_code_id + rate + rate_unit
  * @param items Array of payroll items
  * @returns Array of consolidated items with totals
  */
@@ -406,8 +437,9 @@ export const consolidatePayrollItems = (items: PayrollItem[]): ConsolidatedPayro
   const groupMap = new Map<string, ConsolidatedPayrollItem>();
 
   items.forEach((item) => {
-    // Create unique key from pay_code_id + rate + rate_unit
-    const key = `${item.pay_code_id}_${item.rate}_${item.rate_unit}`;
+    // Keep combined-payroll jobs separate even when they share the same pay code.
+    const jobTypeKey: string = item.job_type || "";
+    const key: string = `${jobTypeKey}_${item.pay_code_id}_${item.rate}_${item.rate_unit}`;
     const focUnits = (item as any).foc_units ? parseFloat((item as any).foc_units) : 0;
 
     if (groupMap.has(key)) {
@@ -481,7 +513,10 @@ export const consolidatePayrollItems = (items: PayrollItem[]): ConsolidatedPayro
  */
 export const filterOutLeaveDayItems = (
   items: PayrollItem[],
-  leaveRecords?: Array<{ date?: string | null }> | null,
+  leaveRecords?: Array<{
+    date?: string | null;
+    employee_id?: string | null;
+  }> | null,
 ): PayrollItem[] => {
   if (!items || items.length === 0) return items ?? [];
   if (!leaveRecords || leaveRecords.length === 0) return items;
@@ -499,17 +534,23 @@ export const filterOutLeaveDayItems = (
     }
   };
 
-  const leaveDates = new Set<string>();
+  // Scope by employee_id (key = `${employee_id}|${ymd}`) so leave only drops the
+  // leave owner's own daily work — a multi-job worker's other jobs that day are
+  // kept. Single-job workers are unaffected (leave id === item source id).
+  const leaveKeys = new Set<string>();
   leaveRecords.forEach((record) => {
     const ymd = toYMD(record?.date);
-    if (ymd) leaveDates.add(ymd);
+    if (ymd) leaveKeys.add(`${record?.employee_id ?? ""}|${ymd}`);
   });
-  if (leaveDates.size === 0) return items;
+  if (leaveKeys.size === 0) return items;
 
   return items.filter((item) => {
     if (item.work_log_type !== "daily" || !item.source_date) return true;
     const ymd = toYMD(item.source_date);
-    return ymd === null || !leaveDates.has(ymd);
+    if (ymd === null) return true;
+    return !leaveKeys.has(
+      `${(item as { source_employee_id?: string | null }).source_employee_id ?? ""}|${ymd}`,
+    );
   });
 };
 

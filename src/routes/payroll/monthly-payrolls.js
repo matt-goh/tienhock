@@ -422,7 +422,11 @@ export default function (pool) {
   // ============================================================================
   router.post("/:id/process-all", async (req, res) => {
     const { id } = req.params;
-    const { selected_employees = [] } = req.body; // [{employeeId, jobType}, ...]
+    const {
+      selected_employees = [],
+      prune_unselected = true,
+    } = req.body; // [{employeeId, jobType}, ...]
+    const shouldPruneUnselected = prune_unselected !== false;
 
     if (!selected_employees.length) {
       return res
@@ -697,10 +701,18 @@ export default function (pool) {
           .filter((a) => a.pay_code_id)
           .forEach((activity) => {
             const rateUnit = activity.rate_unit || "Fixed";
+            const hasUnitsProduced =
+              activity.units_produced !== null &&
+              activity.units_produced !== undefined &&
+              activity.units_produced !== "";
             const qty =
               activity.rate_unit === "Hour"
                 ? parseFloat(activity.hours_applied) || 0
-                : parseFloat(activity.units_produced) || 1;
+                : hasUnitsProduced
+                  ? parseFloat(activity.units_produced) || 0
+                  : rateUnit === "Fixed"
+                    ? 1
+                    : 0;
             const focUnits = parseFloat(activity.foc_units) || 0;
 
             // Re-resolve the rate from the CURRENT pay code (employee/job
@@ -730,6 +742,10 @@ export default function (pool) {
                     : biasaRate;
               if (!Number.isNaN(resolved)) rate = resolved;
               amount = Math.round(rate * (qty + focUnits) * 100) / 100;
+            }
+
+            if (qty === 0 && focUnits === 0 && amount === 0) {
+              return;
             }
 
             // Each activity becomes a separate item with source tracking
@@ -992,10 +1008,25 @@ export default function (pool) {
         payCodesForProduct,
         productType,
         dayType,
+        assignedPayCodes,
       ) => {
         // For BH products, look for FULL_B* codes (ME-Q specific) or FULL_* codes
         // For MEE products, look for FULL_* codes
         // Day-specific codes have UMUM/AHAD in description or pay_code_id ending with _UM/_AH
+
+        // When a product exposes several codes for the same tier (e.g. 3U(600G)
+        // has both FULL_3U(600G)_40 @0.17 and FULL_B3U(600G) @0.19), prefer the
+        // one the worker is actually assigned; otherwise fall back to the first.
+        const pickAssigned = (candidates) => {
+          if (!candidates || candidates.length === 0) return undefined;
+          if (assignedPayCodes) {
+            const assigned = candidates.find((pc) =>
+              assignedPayCodes.has(pc.pay_code_id),
+            );
+            if (assigned) return assigned;
+          }
+          return candidates[0];
+        };
 
         // Helper to check if a code is for a specific day type
         const isHolidayCode = (pc) => {
@@ -1042,17 +1073,19 @@ export default function (pool) {
         if (dayType === "umum" || dayType === "ahad") {
           // For holidays/Sundays, prefer holiday-specific codes, fallback to regular with ahad/umum rate
           bonus70Code =
-            allBonus70Codes.find(isHolidayCode) ||
-            allBonus70Codes.find(isRegularCode);
+            pickAssigned(allBonus70Codes.filter(isHolidayCode)) ||
+            pickAssigned(allBonus70Codes.filter(isRegularCode));
           bonus140Code =
-            allBonus140Codes.find(isHolidayCode) ||
-            allBonus140Codes.find(isRegularCode);
+            pickAssigned(allBonus140Codes.filter(isHolidayCode)) ||
+            pickAssigned(allBonus140Codes.filter(isRegularCode));
         } else {
           // For regular days, prefer regular codes
           bonus70Code =
-            allBonus70Codes.find(isRegularCode) || allBonus70Codes[0];
+            pickAssigned(allBonus70Codes.filter(isRegularCode)) ||
+            pickAssigned(allBonus70Codes);
           bonus140Code =
-            allBonus140Codes.find(isRegularCode) || allBonus140Codes[0];
+            pickAssigned(allBonus140Codes.filter(isRegularCode)) ||
+            pickAssigned(allBonus140Codes);
         }
 
         return { bonus70Code, bonus140Code, dayType };
@@ -1067,6 +1100,12 @@ export default function (pool) {
         const jobType = productType === "MEE" ? "MEE_PACKING" : "BH_PACKING";
         const key = `${entry.worker_id}-${jobType}`;
         const dateStr = formatDateToYMD(entry.entry_date);
+        const payCodesForProduct = productPayCodeMap[entry.product_id] || [];
+        const countsTowardPackingThreshold = payCodesForProduct.some(
+          (pc) =>
+            pc.pay_type === "Base" &&
+            productionRateUnits.includes(pc.rate_unit),
+        );
 
         if (!workLogsByEmployeeJob[key]) {
           workLogsByEmployeeJob[key] = {
@@ -1085,23 +1124,27 @@ export default function (pool) {
             productType: productType,
             jobType: jobType,
             totalBags: 0,
-            productIds: new Set(),
+            // Bags packed per product that day, so the F/HARIAN bonus can be
+            // emitted per product at each product's own rate (e.g. a day mixing
+            // 350G @0.20 and MNL @0.11 must not pay one rate on the whole day).
+            productBags: {},
             hasMachineBroken: false,
             dayType: getDayType(entry.entry_date), // Track day type for bonus calculation
           };
         }
-        dailyTotalsPerWorker[dailyKey].totalBags +=
-          parseInt(entry.bags_packed) || 0;
-        dailyTotalsPerWorker[dailyKey].productIds.add(entry.product_id);
+        const entryBags = parseInt(entry.bags_packed) || 0;
+        if (countsTowardPackingThreshold) {
+          dailyTotalsPerWorker[dailyKey].totalBags += entryBags;
+          dailyTotalsPerWorker[dailyKey].productBags[entry.product_id] =
+            (dailyTotalsPerWorker[dailyKey].productBags[entry.product_id] ||
+              0) + entryBags;
 
-        // Check if this product was marked as machine broken on this date
-        const machineKey = `${dateStr}-${entry.product_id}`;
-        if (machineBrokenLookup.has(machineKey)) {
-          dailyTotalsPerWorker[dailyKey].hasMachineBroken = true;
+          // Check if this product was marked as machine broken on this date
+          const machineKey = `${dateStr}-${entry.product_id}`;
+          if (machineBrokenLookup.has(machineKey)) {
+            dailyTotalsPerWorker[dailyKey].hasMachineBroken = true;
+          }
         }
-
-        // Get pay codes for this product
-        const payCodesForProduct = productPayCodeMap[entry.product_id] || [];
 
         // Find the Base production pay code, preferring the worker's assigned rate
         const basePayCode = findBasePayCode(
@@ -1170,7 +1213,7 @@ export default function (pool) {
           productType,
           jobType,
           totalBags,
-          productIds,
+          productBags,
           hasMachineBroken,
           dayType,
         } = dailyData;
@@ -1188,89 +1231,92 @@ export default function (pool) {
           meetsThreshold1 || (hasMachineBroken && totalBags > 0);
 
         if (qualifiesForFirstTierBonus) {
-          // Get pay codes from the first product to find bonus codes
-          const firstProductId = productIds.values().next().value;
-          const payCodesForProduct = productPayCodeMap[firstProductId] || [];
-          // Pass dayType to get the appropriate bonus code (holiday-specific or regular)
-          const { bonus70Code, bonus140Code } = findThresholdBonusCodes(
-            payCodesForProduct,
-            productType,
-            dayType,
-          );
+          // The threshold qualification above is based on the combined daily
+          // total, but the payout is emitted PER PRODUCT at each product's own
+          // rate/code. A day mixing e.g. 350G (0.20) and MNL (0.11) must pay each
+          // product at its own rate instead of applying one product's rate to the
+          // whole day's bags (which is how the legacy payslips are calculated).
+          const isMachineBrokenBonus = hasMachineBroken && !meetsThreshold1;
 
-          // Apply first tier bonus (>70 for BH, >100 for MEE, or machine broken with any bags)
-          // Only skip in favour of the second tier (>140) when a real second-tier
-          // bonus code exists for this product. MEE products (MNL/2UDG/3UDG/350G)
-          // have no >140 code, so without this guard any MEE day over 140 bags would
-          // lose its F/HARIAN bonus entirely (first tier capped at 140, second tier
-          // never fires). When there is no second-tier code, the first tier applies
-          // to all qualifying days regardless of bag count.
-          if (
-            bonus70Code &&
-            (meetsThreshold1 || hasMachineBroken) &&
-            (!bonus140Code || totalBags <= threshold2)
-          ) {
-            // Select rate based on day type - if using a regular code on holiday, use ahad/umum rate
-            let bonusRate = bonus70Code.rate_biasa;
-            if (dayType === "ahad" && bonus70Code.rate_ahad > 0) {
-              bonusRate = bonus70Code.rate_ahad;
-            } else if (dayType === "umum" && bonus70Code.rate_umum > 0) {
-              bonusRate = bonus70Code.rate_umum;
+          Object.entries(productBags).forEach(([productId, productBagCount]) => {
+            if (!productBagCount) return;
+            const payCodesForProduct = productPayCodeMap[productId] || [];
+            // Pass dayType + the worker's assigned codes so the right bonus code
+            // (and rate) is chosen when a product has several for the same tier.
+            const { bonus70Code, bonus140Code } = findThresholdBonusCodes(
+              payCodesForProduct,
+              productType,
+              dayType,
+              employeePayCodeSet.get(workerId),
+            );
+            const bagsDisplay = Math.round(productBagCount);
+
+            // Apply first tier bonus (>=70 for BH, >=100 for MEE, or machine broken).
+            // Only skip in favour of the second tier (>140) when a real second-tier
+            // bonus code exists for this product. MEE products (MNL/2UDG/3UDG/350G)
+            // have no >140 code, so without this guard any MEE day over 140 bags would
+            // lose its F/HARIAN bonus entirely (first tier capped at 140, second tier
+            // never fires). When there is no second-tier code, the first tier applies
+            // to all qualifying days regardless of bag count.
+            if (
+              bonus70Code &&
+              (meetsThreshold1 || hasMachineBroken) &&
+              (!bonus140Code || totalBags <= threshold2)
+            ) {
+              // Select rate based on day type - if using a regular code on holiday, use ahad/umum rate
+              let bonusRate = bonus70Code.rate_biasa;
+              if (dayType === "ahad" && bonus70Code.rate_ahad > 0) {
+                bonusRate = bonus70Code.rate_ahad;
+              } else if (dayType === "umum" && bonus70Code.rate_umum > 0) {
+                bonusRate = bonus70Code.rate_umum;
+              }
+
+              if (bonusRate > 0) {
+                workLogsByEmployeeJob[key].items.push({
+                  pay_code_id: bonus70Code.pay_code_id,
+                  description: isMachineBrokenBonus
+                    ? `${bonus70Code.description} (${bagsDisplay} bags, mesin rosak)`
+                    : `${bonus70Code.description} (${bagsDisplay} bags)`,
+                  pay_type: "Tambahan",
+                  rate: bonusRate,
+                  rate_unit: bonus70Code.rate_unit,
+                  quantity: productBagCount,
+                  amount: productBagCount * bonusRate,
+                  source_date: date,
+                  work_log_id: null,
+                  work_log_type: isMachineBrokenBonus
+                    ? "prod_bonus_rosak"
+                    : "production_bonus",
+                });
+              }
             }
 
-            if (bonusRate > 0) {
-              const bonusAmount = totalBags * bonusRate;
-              // Add indicator if bonus was applied due to machine broken
-              const isMachineBrokenBonus = hasMachineBroken && !meetsThreshold1;
-              const bagsDisplay = Math.round(totalBags);
-              const description = isMachineBrokenBonus
-                ? `${bonus70Code.description} (${bagsDisplay} bags, mesin rosak)`
-                : `${bonus70Code.description} (${bagsDisplay} bags)`;
+            // Apply second tier bonus (>140) - only when actually exceeds threshold, NOT for machine broken
+            if (bonus140Code && totalBags > threshold2) {
+              // Select rate based on day type
+              let bonusRate = bonus140Code.rate_biasa;
+              if (dayType === "ahad" && bonus140Code.rate_ahad > 0) {
+                bonusRate = bonus140Code.rate_ahad;
+              } else if (dayType === "umum" && bonus140Code.rate_umum > 0) {
+                bonusRate = bonus140Code.rate_umum;
+              }
 
-              workLogsByEmployeeJob[key].items.push({
-                pay_code_id: bonus70Code.pay_code_id,
-                description: description,
-                pay_type: "Tambahan",
-                rate: bonusRate,
-                rate_unit: bonus70Code.rate_unit,
-                quantity: totalBags,
-                amount: bonusAmount,
-                source_date: date,
-                work_log_id: null,
-                work_log_type: isMachineBrokenBonus
-                  ? "prod_bonus_rosak"
-                  : "production_bonus",
-              });
+              if (bonusRate > 0) {
+                workLogsByEmployeeJob[key].items.push({
+                  pay_code_id: bonus140Code.pay_code_id,
+                  description: `${bonus140Code.description} (${bagsDisplay} bags)`,
+                  pay_type: "Tambahan",
+                  rate: bonusRate,
+                  rate_unit: bonus140Code.rate_unit,
+                  quantity: productBagCount,
+                  amount: productBagCount * bonusRate,
+                  source_date: date,
+                  work_log_id: null,
+                  work_log_type: "production_bonus",
+                });
+              }
             }
-          }
-
-          // Apply second tier bonus (>140) - only when actually exceeds threshold, NOT for machine broken
-          if (bonus140Code && totalBags > threshold2) {
-            // Select rate based on day type
-            let bonusRate = bonus140Code.rate_biasa;
-            if (dayType === "ahad" && bonus140Code.rate_ahad > 0) {
-              bonusRate = bonus140Code.rate_ahad;
-            } else if (dayType === "umum" && bonus140Code.rate_umum > 0) {
-              bonusRate = bonus140Code.rate_umum;
-            }
-
-            if (bonusRate > 0) {
-              const bonusAmount = totalBags * bonusRate;
-              const bagsDisplay = Math.round(totalBags);
-              workLogsByEmployeeJob[key].items.push({
-                pay_code_id: bonus140Code.pay_code_id,
-                description: `${bonus140Code.description} (${bagsDisplay} bags)`,
-                pay_type: "Tambahan",
-                rate: bonusRate,
-                rate_unit: bonus140Code.rate_unit,
-                quantity: totalBags,
-                amount: bonusAmount,
-                source_date: date,
-                work_log_id: null,
-                work_log_type: "production_bonus",
-              });
-            }
-          }
+          });
         }
       });
 
@@ -1382,7 +1428,7 @@ export default function (pool) {
             await Promise.all([
               client.query(
                 `
-              SELECT to_char(leave_date, 'YYYY-MM-DD') as date, amount_paid
+              SELECT to_char(leave_date, 'YYYY-MM-DD') as date, employee_id, amount_paid
               FROM leave_records
               WHERE employee_id IN (
                 SELECT id FROM staffs WHERE name = $1
@@ -1405,8 +1451,12 @@ export default function (pool) {
               ),
               client.query(
                 `
-              SELECT SUM(amount) as total FROM others_records
-              WHERE employee_id = $1 AND DATE(record_date) >= $2 AND DATE(record_date) <= $3
+              SELECT
+                SUM(orec.amount) as total,
+                SUM(CASE WHEN pc.pay_type ILIKE 'overtime' THEN orec.amount ELSE 0 END) as overtime_total
+              FROM others_records orec
+              LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
+              WHERE orec.employee_id = $1 AND DATE(orec.record_date) >= $2 AND DATE(orec.record_date) <= $3
             `,
                 [primaryEmployee.employeeId, startDate, endDate],
               ),
@@ -1416,14 +1466,22 @@ export default function (pool) {
             (sum, row) => sum + (parseFloat(row.amount_paid) || 0),
             0,
           );
+          // Keyed by `${employee_id}|${date}` so leave only drops the leave
+          // owner's own daily work, not a different sibling job's work that day.
           const leaveDateSet = new Set(
-            leaveResult.rows.map((row) => row.date).filter(Boolean),
+            leaveResult.rows
+              .filter((row) => row.date)
+              .map((row) => `${row.employee_id ?? ""}|${row.date}`),
           );
           const commissionGrossPay =
             parseFloat(commissionResult.rows[0]?.total) || 0;
           const commissionAdvancePay =
             parseFloat(commissionResult.rows[0]?.advance_total) || 0;
           const othersGrossPay = parseFloat(othersResult.rows[0]?.total) || 0;
+          // Overtime "Others" (e.g. DY_OT "OT (TARIK MEE-DRYER)") count towards
+          // gross pay but are excluded from the EPF wage base (OT is not EPF-able).
+          const othersOvertimePay =
+            parseFloat(othersResult.rows[0]?.overtime_total) || 0;
 
           // Exclude daily work items dated on a leave day — they pay nothing as
           // work (the day is paid via leave) and would otherwise inflate gross
@@ -1503,12 +1561,14 @@ export default function (pool) {
             groupedItems[type].push(item);
           });
 
+          // EPF wage base excludes all overtime: Overtime work items are not in
+          // Base/Tambahan, and overtime "Others" are removed via othersOvertimePay.
           const epfGrossPay =
             groupedItems.Base.reduce((s, i) => s + i.amount, 0) +
             groupedItems.Tambahan.reduce((s, i) => s + i.amount, 0) +
             leaveGrossPay +
             commissionGrossPay +
-            othersGrossPay;
+            (othersGrossPay - othersOvertimePay);
 
           const deductions = [];
 
@@ -1675,20 +1735,36 @@ export default function (pool) {
           const netPay =
             grossPay - totalEmployeeDeductions - commissionAdvancePay;
 
-          // Fetch mid-month payroll for rounding calculation
-          const midMonthResult = await client.query(
-            `SELECT COALESCE(amount, 0) as amount FROM mid_month_payrolls
-             WHERE employee_id = $1 AND year = $2 AND month = $3`,
-            [primaryEmployee.employeeId, year, month],
-          );
-          const midMonthAmount = parseFloat(
-            midMonthResult.rows[0]?.amount || 0,
-          );
-
+          // Fetch mid-month payroll for rounding calculation. For grouped
+          // payrolls each sibling id (e.g. JASSON_PM and JASSON_ROLL) can have
+          // its own advance, all paid to the same person, so the final rounding
+          // must subtract the SUM across every sibling id (matched by name, the
+          // same way the comprehensive/list endpoints aggregate advances).
+          // Only grouped payrolls (more than one job type, i.e. a comma in
+          // job_type) aggregate by name; single-job payrolls use just this
+          // employee's advance — matching how the read endpoints decide.
           const uniqueJobTypes = [
             ...new Set(employeeJobCombos.map((c) => c.jobType)),
           ].sort();
           const jobTypes = uniqueJobTypes.join(", ");
+          const isGroupedPayrollRow = uniqueJobTypes.length > 1;
+
+          const midMonthResult = await client.query(
+            isGroupedPayrollRow
+              ? `SELECT COALESCE(SUM(amount), 0) as amount FROM mid_month_payrolls
+                 WHERE employee_id IN (SELECT id FROM staffs WHERE name = $1)
+                   AND year = $2 AND month = $3`
+              : `SELECT COALESCE(SUM(amount), 0) as amount FROM mid_month_payrolls
+                 WHERE employee_id = $1 AND year = $2 AND month = $3`,
+            [
+              isGroupedPayrollRow ? employeeName : primaryEmployee.employeeId,
+              year,
+              month,
+            ],
+          );
+          const midMonthAmount = parseFloat(
+            midMonthResult.rows[0]?.amount || 0,
+          );
 
           // Calculate rounding (digenapkan) - round UP to nearest whole ringgit
           const jumlah = netPay - midMonthAmount;
@@ -1857,53 +1933,56 @@ export default function (pool) {
       // so siblings sharing the same name combine into one payroll — orphan
       // detection has to match by name too, otherwise we'd wrongly flag the
       // primary-id rows of grouped payrolls.
-      const orphansResult = await client.query(
-        `WITH selected_names AS (
-           SELECT DISTINCT s.name FROM staffs s WHERE s.id = ANY($1)
-         )
-         SELECT ep.id,
-           EXISTS (
-             SELECT 1 FROM payroll_items pi
-             WHERE pi.employee_payroll_id = ep.id AND pi.is_manual = true
-           ) AS has_manual_items
-         FROM employee_payrolls ep
-         JOIN staffs s ON ep.employee_id = s.id
-         WHERE ep.monthly_payroll_id = $2
-           AND s.name NOT IN (SELECT name FROM selected_names)`,
-        [selected_employees.map((e) => e.employeeId), id],
-      );
-
       const orphansToReset = [];
       const orphansToDelete = [];
-      for (const row of orphansResult.rows) {
-        if (row.has_manual_items) orphansToReset.push(row.id);
-        else orphansToDelete.push(row.id);
-      }
 
-      if (orphansToReset.length > 0) {
-        await client.query(
-          "DELETE FROM payroll_items WHERE employee_payroll_id = ANY($1) AND is_manual = false",
-          [orphansToReset],
+      if (shouldPruneUnselected) {
+        const orphansResult = await client.query(
+          `WITH selected_names AS (
+             SELECT DISTINCT s.name FROM staffs s WHERE s.id = ANY($1)
+           )
+           SELECT ep.id,
+             EXISTS (
+               SELECT 1 FROM payroll_items pi
+               WHERE pi.employee_payroll_id = ep.id AND pi.is_manual = true
+             ) AS has_manual_items
+           FROM employee_payrolls ep
+           JOIN staffs s ON ep.employee_id = s.id
+           WHERE ep.monthly_payroll_id = $2
+             AND s.name NOT IN (SELECT name FROM selected_names)`,
+          [selected_employees.map((e) => e.employeeId), id],
         );
-        await client.query(
-          "DELETE FROM payroll_deductions WHERE employee_payroll_id = ANY($1)",
-          [orphansToReset],
-        );
-      }
 
-      if (orphansToDelete.length > 0) {
-        await client.query(
-          "DELETE FROM payroll_items WHERE employee_payroll_id = ANY($1)",
-          [orphansToDelete],
-        );
-        await client.query(
-          "DELETE FROM payroll_deductions WHERE employee_payroll_id = ANY($1)",
-          [orphansToDelete],
-        );
-        await client.query(
-          "DELETE FROM employee_payrolls WHERE id = ANY($1)",
-          [orphansToDelete],
-        );
+        for (const row of orphansResult.rows) {
+          if (row.has_manual_items) orphansToReset.push(row.id);
+          else orphansToDelete.push(row.id);
+        }
+
+        if (orphansToReset.length > 0) {
+          await client.query(
+            "DELETE FROM payroll_items WHERE employee_payroll_id = ANY($1) AND is_manual = false",
+            [orphansToReset],
+          );
+          await client.query(
+            "DELETE FROM payroll_deductions WHERE employee_payroll_id = ANY($1)",
+            [orphansToReset],
+          );
+        }
+
+        if (orphansToDelete.length > 0) {
+          await client.query(
+            "DELETE FROM payroll_items WHERE employee_payroll_id = ANY($1)",
+            [orphansToDelete],
+          );
+          await client.query(
+            "DELETE FROM payroll_deductions WHERE employee_payroll_id = ANY($1)",
+            [orphansToDelete],
+          );
+          await client.query(
+            "DELETE FROM employee_payrolls WHERE id = ANY($1)",
+            [orphansToDelete],
+          );
+        }
       }
 
       // Update the monthly payroll's updated_at timestamp using Node.js time
