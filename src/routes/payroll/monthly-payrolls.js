@@ -461,7 +461,8 @@ export default function (pool) {
         holidaysResult,
         productionEntriesResult,
         productPayCodeMappingsResult,
-        machineStatusResult;
+        machineStatusResult,
+        employeePayCodesResult;
 
       try {
         [
@@ -478,6 +479,7 @@ export default function (pool) {
           productionEntriesResult,
           productPayCodeMappingsResult,
           machineStatusResult,
+          employeePayCodesResult,
         ] = await Promise.all([
           // Daily work logs with activities
           client.query(
@@ -631,6 +633,13 @@ export default function (pool) {
         `,
             [startDate, endDate],
           ),
+
+          // Per-employee pay code assignments (used to pick the correct base
+          // production rate when a product has several base codes, e.g. the
+          // manual PM_2U (0.25) vs the machine PM_2U(M) (0.45) for 2UDG)
+          client.query(
+            `SELECT employee_id, pay_code_id FROM employee_pay_codes`,
+          ),
         ]);
       } catch (fetchError) {
         console.error("Error fetching payroll data:", fetchError);
@@ -639,6 +648,17 @@ export default function (pool) {
 
       // Build lookup maps
       const staffsMap = new Map(staffsResult.rows.map((s) => [s.id, s]));
+
+      // Pay codes each employee is explicitly assigned (employee_id -> Set of
+      // pay_code_id). Used by findBasePayCode so the worker's own base rate wins
+      // when a product exposes more than one base code.
+      const employeePayCodeSet = new Map();
+      employeePayCodesResult.rows.forEach(({ employee_id, pay_code_id }) => {
+        if (!employeePayCodeSet.has(employee_id)) {
+          employeePayCodeSet.set(employee_id, new Set());
+        }
+        employeePayCodeSet.get(employee_id).add(pay_code_id);
+      });
       const jobsMap = new Map(jobsResult.rows.map((j) => [j.id, j]));
       const epfRates = epfRatesResult.rows;
       const socsoRates = socsoRatesResult.rows;
@@ -918,31 +938,52 @@ export default function (pool) {
       // Helper to find the Base production pay code (PBH_*, PM_*, PWE_*, WE_*, WE-* prefixes)
       // Production-based rate units: Bag, Kg, Karung, Bundle
       const productionRateUnits = ["Bag", "Kg", "Karung", "Bundle"];
-      const findBasePayCode = (payCodesForProduct) => {
+      const findBasePayCode = (payCodesForProduct, assignedPayCodes) => {
+        // When a product exposes several candidates (e.g. PM_2U 0.25 and
+        // PM_2U(M) 0.45 for 2UDG), prefer the one the worker is actually
+        // assigned; otherwise fall back to the first match so workers without an
+        // explicit assignment keep working.
+        const pickPreferred = (candidates) => {
+          if (candidates.length === 0) return undefined;
+          if (assignedPayCodes) {
+            const assigned = candidates.find((pc) =>
+              assignedPayCodes.has(pc.pay_code_id),
+            );
+            if (assigned) return assigned;
+          }
+          return candidates[0];
+        };
+
         // First, try to find a Base pay code with production prefix
         // Note: WE codes use both underscore (WE_) and dash (WE-)
         const productionPrefixes = ["PBH_", "PM_", "PWE_", "WE_", "WE-"];
-        const baseProductionCode = payCodesForProduct.find(
-          (pc) =>
-            pc.pay_type === "Base" &&
-            productionRateUnits.includes(pc.rate_unit) &&
-            productionPrefixes.some((prefix) =>
-              pc.pay_code_id.startsWith(prefix),
-            ),
+        const baseProductionCode = pickPreferred(
+          payCodesForProduct.filter(
+            (pc) =>
+              pc.pay_type === "Base" &&
+              productionRateUnits.includes(pc.rate_unit) &&
+              productionPrefixes.some((prefix) =>
+                pc.pay_code_id.startsWith(prefix),
+              ),
+          ),
         );
         if (baseProductionCode) return baseProductionCode;
 
         // Fallback to any Base pay code with production rate_unit
-        const anyBaseCode = payCodesForProduct.find(
-          (pc) =>
-            pc.pay_type === "Base" &&
-            productionRateUnits.includes(pc.rate_unit),
+        const anyBaseCode = pickPreferred(
+          payCodesForProduct.filter(
+            (pc) =>
+              pc.pay_type === "Base" &&
+              productionRateUnits.includes(pc.rate_unit),
+          ),
         );
         if (anyBaseCode) return anyBaseCode;
 
         // Last resort: any pay code with production rate_unit
-        return payCodesForProduct.find((pc) =>
-          productionRateUnits.includes(pc.rate_unit),
+        return pickPreferred(
+          payCodesForProduct.filter((pc) =>
+            productionRateUnits.includes(pc.rate_unit),
+          ),
         );
       };
 
@@ -1062,8 +1103,11 @@ export default function (pool) {
         // Get pay codes for this product
         const payCodesForProduct = productPayCodeMap[entry.product_id] || [];
 
-        // Find the Base production pay code
-        const basePayCode = findBasePayCode(payCodesForProduct);
+        // Find the Base production pay code, preferring the worker's assigned rate
+        const basePayCode = findBasePayCode(
+          payCodesForProduct,
+          employeePayCodeSet.get(entry.worker_id),
+        );
 
         if (basePayCode) {
           const dayType = getDayType(entry.entry_date);
@@ -1113,8 +1157,10 @@ export default function (pool) {
       });
 
       // Apply threshold bonuses based on daily totals
-      // Threshold for BH: >70 bags/day for first bonus, >140 for second
-      // Threshold for MEE: >100 bags/day for first bonus (based on pay code descriptions)
+      // Threshold for BH: 70+ bags/day for first bonus, >140 for second
+      // Threshold for MEE: 100+ bags/day for first bonus (based on pay code descriptions)
+      // The threshold is inclusive ("100 or more" / "70 or more") to match the
+      // legacy payslips: a day that hits exactly the threshold still earns F/HARIAN.
       // Exception: If machine_broken is true, apply first tier bonus even if below threshold
       // Day type aware: Uses holiday-specific bonus codes for ahad/umum days
       Object.values(dailyTotalsPerWorker).forEach((dailyData) => {
@@ -1135,9 +1181,9 @@ export default function (pool) {
         const threshold2 = 140;
 
         // Check if qualifies for first tier bonus:
-        // - Normal case: totalBags > threshold1
+        // - Normal case: totalBags >= threshold1 (inclusive; exactly 100/70 qualifies)
         // - Machine broken case: any bags packed (even < threshold)
-        const meetsThreshold1 = totalBags > threshold1;
+        const meetsThreshold1 = totalBags >= threshold1;
         const qualifiesForFirstTierBonus =
           meetsThreshold1 || (hasMachineBroken && totalBags > 0);
 
