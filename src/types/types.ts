@@ -761,6 +761,11 @@ export interface EmployeePayroll {
   deductions?: PayrollDeduction[];
   leave_records?: LeaveRecord[];
   mid_month_payroll?: MidMonthPayroll | null;
+  // Per-sibling mid-month advance amounts for combined payrolls, keyed by
+  // employee_id (e.g. {"JASSON_PM": 200, "JASSON_ROLL": 250}). The combined
+  // `mid_month_payroll.amount` carries the aggregate; this map drives the
+  // per-identity advance shown on each individual breakdown slip.
+  mid_month_payrolls_by_employee?: Record<string, number>;
   commission_records?: CommissionRecord[];
   others_records?: OthersRecord[];
   // Mapping of employee_id to job_type for combined payrolls (e.g., {"MASRUN_S": "MEE_ROLL", "MASRUN": "MEE_SANGKUT"})
