@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-07",
+    ms: "Pembetulan: paycode yang menggunakan unit \"Bill\" (contohnya BILL — jual lebih 10 bil/hari untuk salesman) kini mengira amaun berdasarkan kuantiti bil yang dimasukkan (kadar × bilangan bil), sama seperti unit \"Day\". Sebelum ini paparan di halaman Daily Log Details menunjukkan amaun/kuantiti yang tidak konsisten kerana unit \"Bill\" dikira ikut jam (salesman tiada jam). Amaun pada slip gaji tidak berubah.",
+    en: "Fix: paycodes using the \"Bill\" unit (e.g. BILL — sell more than 10 bills/day for salesmen) now calculate the amount from the entered bill count (rate × number of bills), the same as the \"Day\" unit. Previously the Daily Log Details page showed an inconsistent amount/quantity because the \"Bill\" unit was computed from hours (salesmen have no hours). Payslip amounts are unchanged.",
+  },
+  {
+    date: "2026-06-07",
     ms: "Pembetulan: pada modal Others (Kerja Luar OT), paycode yang menggunakan unit \"Tray\" kini mengira amaun dengan betul (kadar × kuantiti). Sebelum ini menukar kuantiti tidak mengubah amaun (kekal 0) walaupun ada kadar.",
     en: "Fix: in the Others (Kerja Luar OT) modal, paycodes using the \"Tray\" unit now calculate the amount correctly (rate × quantity). Previously changing the quantity didn't affect the amount (stayed 0) even though a rate was set.",
   },
