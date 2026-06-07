@@ -27,9 +27,10 @@ import {
   updateMonthlyPayrollStatus,
   createMonthlyPayroll,
   getEligibleEmployees,
+  processMonthlyPayrolls,
+  type PayrollProcessEmployeeSelection,
 } from "../../utils/payroll/payrollUtils";
 import { formatDistanceToNow } from "date-fns";
-import { api } from "../../routes/utils/api";
 import MissingIncomeTaxRatesDialog, {
   MissingIncomeTaxEmployee,
 } from "../../components/Payroll/MissingIncomeTaxRatesDialog";
@@ -418,7 +419,19 @@ const PayrollPage: React.FC = () => {
         ...emp,
         items: emp.items || [], // Ensure items is always at least an empty array
       }));
-  }, [payroll?.employeePayrolls, selectedEmployeePayrolls]);
+  }, [payroll?.employeePayrolls, selectedEmployeePayrolls, searchTerm]);
+
+  const getVisibleEmployeePayrolls = (): EmployeePayroll[] => {
+    if (!payroll?.employeePayrolls) return [];
+
+    const grouped: Record<string, EmployeePayroll[]> = groupEmployeesByJobType(
+      payroll.employeePayrolls
+    );
+
+    return Object.entries(grouped).flatMap(([jobType, employees]) =>
+      getFilteredEmployees(jobType, employees)
+    );
+  };
 
   // Calculate selected count
   const selectedCount = useMemo(
@@ -451,21 +464,24 @@ const PayrollPage: React.FC = () => {
   const handleSelectAll = useCallback(() => {
     if (!payroll?.employeePayrolls) return;
 
-    // If all are selected, deselect all. Otherwise, select all.
-    const allSelected = payroll.employeePayrolls.every(
+    const visibleEmployees: EmployeePayroll[] = getVisibleEmployeePayrolls();
+    if (visibleEmployees.length === 0) return;
+
+    // If all visible employees are selected, deselect visible employees.
+    const allSelected = visibleEmployees.every(
       (emp) => selectedEmployeePayrolls[`${emp.id}`]
     );
 
-    const newSelectedEmployees: Record<string, boolean> = {};
+    const newSelectedEmployees: Record<string, boolean> = {
+      ...selectedEmployeePayrolls,
+    };
 
     if (allSelected) {
-      // Deselect all
-      payroll.employeePayrolls.forEach((emp) => {
+      visibleEmployees.forEach((emp) => {
         newSelectedEmployees[`${emp.id}`] = false;
       });
     } else {
-      // Select all
-      payroll.employeePayrolls.forEach((emp) => {
+      visibleEmployees.forEach((emp) => {
         newSelectedEmployees[`${emp.id}`] = true;
       });
     }
@@ -479,12 +495,18 @@ const PayrollPage: React.FC = () => {
       return;
     }
 
-    const allSelected = payroll.employeePayrolls.every(
+    const visibleEmployees: EmployeePayroll[] = getVisibleEmployeePayrolls();
+    if (visibleEmployees.length === 0) {
+      setIsAllSelected(false);
+      return;
+    }
+
+    const allSelected = visibleEmployees.every(
       (emp) => selectedEmployeePayrolls[`${emp.id}`]
     );
 
     setIsAllSelected(allSelected);
-  }, [payroll?.employeePayrolls, selectedEmployeePayrolls]);
+  }, [payroll?.employeePayrolls, selectedEmployeePayrolls, searchTerm]);
 
   // Handle job group selection (select all in group)
   const handleSelectJobGroup = (jobType: string, isSelected: boolean) => {
@@ -596,6 +618,123 @@ const PayrollPage: React.FC = () => {
     navigate(`/payroll/employee-payroll/${employeePayrollId}`);
   };
 
+  const splitPayrollJobTypes = (jobType: string): string[] => {
+    return jobType
+      .split(",")
+      .map((value: string) => value.trim())
+      .filter((value: string) => value.length > 0);
+  };
+
+  const buildProcessCombinationsFromPayrolls = (
+    employeePayrolls: EmployeePayroll[]
+  ): PayrollProcessEmployeeSelection[] => {
+    const combinations: PayrollProcessEmployeeSelection[] = [];
+    const seenCombinations: Set<string> = new Set();
+
+    const addCombination = (employeeId: string, jobType: string): void => {
+      if (!employeeId || !jobType) return;
+
+      const key: string = `${employeeId}::${jobType}`;
+      if (seenCombinations.has(key)) return;
+
+      seenCombinations.add(key);
+      combinations.push({ employeeId, jobType });
+    };
+
+    employeePayrolls.forEach((employeePayroll: EmployeePayroll) => {
+      const employeeJobMapping: Record<string, string> | undefined =
+        employeePayroll.employee_job_mapping;
+
+      if (
+        employeeJobMapping &&
+        typeof employeeJobMapping === "object" &&
+        Object.keys(employeeJobMapping).length > 0
+      ) {
+        Object.entries(employeeJobMapping).forEach(
+          ([employeeId, mappedJobType]: [string, string]) => {
+            splitPayrollJobTypes(mappedJobType).forEach((jobType: string) => {
+              addCombination(employeeId, jobType);
+            });
+          }
+        );
+        return;
+      }
+
+      splitPayrollJobTypes(employeePayroll.job_type).forEach(
+        (jobType: string) => {
+          addCombination(employeePayroll.employee_id, jobType);
+        }
+      );
+    });
+
+    return combinations;
+  };
+
+  const buildProcessCombinationsFromEligibleData = (
+    jobEmployeeMap: Record<string, string[]>
+  ): PayrollProcessEmployeeSelection[] => {
+    const combinations: PayrollProcessEmployeeSelection[] = [];
+
+    Object.entries(jobEmployeeMap).forEach(([jobType, employeeIds]) => {
+      employeeIds.forEach((employeeId: string) => {
+        combinations.push({ employeeId, jobType });
+      });
+    });
+
+    return combinations;
+  };
+
+  const processPayrollCombinations = async (
+    selectedCombinations: PayrollProcessEmployeeSelection[],
+    pruneUnselected: boolean,
+    emptyMessage: string
+  ): Promise<void> => {
+    if (!payroll?.id) return;
+
+    if (selectedCombinations.length === 0) {
+      toast.error(emptyMessage);
+      return;
+    }
+
+    setProcessingProgress({
+      current: 30,
+      total: 100,
+      stage: `Processing ${selectedCombinations.length} employee-job combinations...`,
+    });
+
+    const response = await processMonthlyPayrolls(payroll.id, {
+      selected_employees: selectedCombinations,
+      prune_unselected: pruneUnselected,
+    });
+
+    setProcessingProgress({
+      current: 90,
+      total: 100,
+      stage: "Finalizing...",
+    });
+
+    if (response.missing_income_tax_employees?.length > 0) {
+      setMissingIncomeTaxEmployees(response.missing_income_tax_employees);
+      setShowMissingTaxDialog(true);
+    }
+
+    if (response.errors?.length > 0) {
+      toast.error(`Processed with ${response.errors.length} errors`);
+    } else {
+      toast.success(
+        `Successfully processed ${response.processed_count} employees`
+      );
+    }
+
+    await fetchPayrollDetails();
+
+    if (response.updated_at) {
+      setPayroll((prev) =>
+        prev ? { ...prev, updated_at: response.updated_at } : prev
+      );
+    }
+  };
+
   // Handle processing all eligible employees
   const handleProcessAll = async () => {
     if (!payroll?.id || isProcessing) return;
@@ -604,79 +743,64 @@ const PayrollPage: React.FC = () => {
     setProcessingProgress({
       current: 10,
       total: 100,
-      stage: "Fetching eligible employees...",
+      stage:
+        searchTerm.trim().length > 0
+          ? "Preparing shown employees..."
+          : "Fetching eligible employees...",
     });
 
     try {
-      // 1. Get eligible employees
-      const eligibleData = await getEligibleEmployees(payroll.id);
+      if (searchTerm.trim().length > 0) {
+        const selectedCombinations: PayrollProcessEmployeeSelection[] =
+          buildProcessCombinationsFromPayrolls(getVisibleEmployeePayrolls());
 
-      // 2. Build selected_employees array (all employees)
-      const selectedCombinations: Array<{
-        employeeId: string;
-        jobType: string;
-      }> = [];
-      Object.entries(eligibleData.jobEmployeeMap).forEach(
-        ([jobId, employeeIds]) => {
-          (employeeIds as string[]).forEach((empId) => {
-            selectedCombinations.push({ employeeId: empId, jobType: jobId });
-          });
-        }
-      );
-
-      if (selectedCombinations.length === 0) {
-        toast.error("No eligible employees found for processing");
-        setIsProcessing(false);
-        setProcessingProgress({ current: 0, total: 0, stage: "" });
-        return;
-      }
-
-      setProcessingProgress({
-        current: 30,
-        total: 100,
-        stage: `Processing ${selectedCombinations.length} employee-job combinations...`,
-      });
-
-      // 3. Call process-all API
-      const response = await api.post(
-        `/api/monthly-payrolls/${payroll.id}/process-all`,
-        { selected_employees: selectedCombinations }
-      );
-
-      setProcessingProgress({
-        current: 90,
-        total: 100,
-        stage: "Finalizing...",
-      });
-
-      // 4. Handle missing income tax rates
-      if (response.missing_income_tax_employees?.length > 0) {
-        setMissingIncomeTaxEmployees(response.missing_income_tax_employees);
-        setShowMissingTaxDialog(true);
-      }
-
-      // 5. Show result
-      if (response.errors?.length > 0) {
-        toast.error(`Processed with ${response.errors.length} errors`);
-      } else {
-        toast.success(
-          `Successfully processed ${response.processed_count} employees`
+        await processPayrollCombinations(
+          selectedCombinations,
+          false,
+          "No visible employees found for processing"
         );
-      }
+      } else {
+        const eligibleData = await getEligibleEmployees(payroll.id);
+        const selectedCombinations: PayrollProcessEmployeeSelection[] =
+          buildProcessCombinationsFromEligibleData(eligibleData.jobEmployeeMap);
 
-      // 6. Refresh data for complete update
-      await fetchPayrollDetails();
-
-      // 7. Update the payroll's updated_at AFTER fetch to ensure it's not overwritten
-      // The response.updated_at is the server timestamp at processing completion
-      if (response.updated_at) {
-        setPayroll((prev) =>
-          prev ? { ...prev, updated_at: response.updated_at } : prev
+        await processPayrollCombinations(
+          selectedCombinations,
+          true,
+          "No eligible employees found for processing"
         );
       }
     } catch (error) {
       console.error("Error processing payroll:", error);
       toast.error("Failed to process payroll");
+    } finally {
+      setIsProcessing(false);
+      setProcessingProgress({ current: 0, total: 0, stage: "" });
+    }
+  };
+
+  const handleProcessSelected = async () => {
+    if (!payroll?.id || isProcessing) return;
+
+    setIsProcessing(true);
+    setProcessingProgress({
+      current: 10,
+      total: 100,
+      stage: "Preparing selected employees...",
+    });
+
+    try {
+      const selectedCombinations: PayrollProcessEmployeeSelection[] =
+        buildProcessCombinationsFromPayrolls(getSelectedPayrolls());
+
+      await processPayrollCombinations(
+        selectedCombinations,
+        false,
+        "No selected employees found for processing"
+      );
+    } catch (error) {
+      console.error("Error processing selected payrolls:", error);
+      toast.error("Failed to process selected payrolls");
     } finally {
       setIsProcessing(false);
       setProcessingProgress({ current: 0, total: 0, stage: "" });
@@ -779,7 +903,17 @@ const PayrollPage: React.FC = () => {
   const groupedEmployees = groupEmployeesByJobType(
     payroll.employeePayrolls || []
   );
+  const visibleEmployeePayrolls: EmployeePayroll[] = getVisibleEmployeePayrolls();
+  const hasActiveSearch: boolean = searchTerm.trim().length > 0;
   const totals = calculateTotals(payroll.employeePayrolls || []);
+  const processButtonText: string =
+    hasActiveSearch && visibleEmployeePayrolls.length > 0
+      ? `Process ${visibleEmployeePayrolls.length} shown`
+      : payroll.employeePayrolls.length > 0 && payroll.updated_at
+        ? formatDistanceToNow(new Date(payroll.updated_at), {
+            addSuffix: true,
+          })
+        : "Process";
 
   // Check if all jobs are expanded
   const areAllJobsExpanded =
@@ -859,21 +993,22 @@ const PayrollPage: React.FC = () => {
                   <span className="text-default-300 dark:text-gray-600">•</span>
                   <button
                     onClick={handleProcessAll}
-                    disabled={isProcessing}
+                    disabled={
+                      isProcessing ||
+                      (hasActiveSearch && visibleEmployeePayrolls.length === 0)
+                    }
                     className="inline-flex items-center gap-1.5 text-default-400 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors disabled:opacity-50"
-                    title="Re-process payroll"
+                    title={
+                      hasActiveSearch
+                        ? "Process employees shown by the search"
+                        : "Re-process payroll"
+                    }
                   >
                     <IconRefresh
                       size={14}
                       className={isProcessing ? "animate-spin" : ""}
                     />
-                    <span>
-                      {payroll.employeePayrolls.length > 0 && payroll.updated_at
-                        ? formatDistanceToNow(new Date(payroll.updated_at), {
-                            addSuffix: true,
-                          })
-                        : "Process"}
-                    </span>
+                    <span>{processButtonText}</span>
                   </button>
                   <span className="text-default-300 dark:text-gray-600">•</span>
                   <button
@@ -917,20 +1052,36 @@ const PayrollPage: React.FC = () => {
 
           {/* Right side: Action Buttons */}
           <div className="flex space-x-2">
-            {selectedCount > 0 && !isAllSelected && (
-              <PrintBatchPayslipsButton
-                payrolls={getSelectedPayrolls()}
-                size="sm"
-                variant="outline"
-                color="sky"
-                buttonText={
-                  isFetchingMidMonth
-                    ? "Loading mid-month data..."
-                    : `Print ${selectedCount} Payslips`
-                }
-                disabled={isFetchingMidMonth || selectedCount === 0}
-                midMonthPayrollsMap={midMonthPayrollsMap}
-              />
+            {selectedCount > 0 && (
+              <>
+                {payroll.status === "Processing" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    color="sky"
+                    icon={IconRefresh}
+                    onClick={handleProcessSelected}
+                    disabled={isProcessing || selectedCount === 0}
+                  >
+                    Process Selected
+                  </Button>
+                )}
+                {!isAllSelected && (
+                  <PrintBatchPayslipsButton
+                    payrolls={getSelectedPayrolls()}
+                    size="sm"
+                    variant="outline"
+                    color="sky"
+                    buttonText={
+                      isFetchingMidMonth
+                        ? "Loading mid-month data..."
+                        : `Print ${selectedCount} Payslips`
+                    }
+                    disabled={isFetchingMidMonth || selectedCount === 0}
+                    midMonthPayrollsMap={midMonthPayrollsMap}
+                  />
+                )}
+              </>
             )}
             <PayrollSectionPrintMenu
               payrolls={payroll.employeePayrolls || []}

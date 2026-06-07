@@ -143,6 +143,37 @@ export const processMonthlyPayroll = async (id: number) => {
   }
 };
 
+export interface PayrollProcessEmployeeSelection {
+  employeeId: string;
+  jobType: string;
+}
+
+export interface ProcessMonthlyPayrollsOptions {
+  selected_employees: PayrollProcessEmployeeSelection[];
+  prune_unselected?: boolean;
+}
+
+/**
+ * Processes selected employee/job combinations for a monthly payroll.
+ * prune_unselected keeps the existing full-payroll orphan cleanup behaviour
+ * unless callers explicitly disable it for selective reprocessing.
+ */
+export const processMonthlyPayrolls = async (
+  id: number,
+  options: ProcessMonthlyPayrollsOptions
+) => {
+  try {
+    const response = await api.post(
+      `/api/monthly-payrolls/${id}/process-all`,
+      options
+    );
+    return response;
+  } catch (error) {
+    console.error("Error processing selected monthly payrolls:", error);
+    throw error;
+  }
+};
+
 /**
  * Updates a monthly payroll status
  * @param id Monthly payroll ID
