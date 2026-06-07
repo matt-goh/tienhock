@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-07",
+    ms: "Pembetulan: bonus F/HARIAN kini menggunakan kod (dan kadar) yang ditetapkan kepada pekerja apabila sesuatu produk mempunyai lebih daripada satu kod untuk tahap yang sama. Contohnya bagi Bihun 3U(600G), sistem tersilap memilih kadar 0.17 sedangkan pekerja ditetapkan kadar 0.19, menyebabkan bonus terkurang bayar. Gaji bulan yang terlibat perlu diproses semula.",
+    en: "Fix: the F/HARIAN bonus now uses the code (and rate) assigned to the worker when a product has more than one code for the same tier. For example on Bihun 3U(600G) the system wrongly picked the 0.17 rate when the worker was assigned 0.19, underpaying the bonus. Affected months should be re-processed.",
+  },
+  {
+    date: "2026-06-07",
     ms: "Slip gaji: bahagian asas kini sentiasa menunjukkan baris subtotal \"Jumlah Base\" dengan garis pemisah, supaya ia jelas berasingan daripada \"Jumlah Lain-lain\". Baris itu hanya menunjukkan jumlah amaun — label \"Rate/Bag\" dan \"Jumlah Bag\" dibuang kerana ia mengelirukan apabila pekerja mempunyai beberapa paycode asas pada kadar berbeza. Selain itu, baris F/HARIAN yang digabungkan tidak lagi memaparkan label \"(N bags)\" sehari yang mengelirukan (contohnya \"(130 bags)\" di sebelah \"1492 Bag\") — kuantiti penuh tetap dipaparkan di lajur kuantiti.",
     en: "Payslip: the base section now always shows a \"Jumlah Base\" subtotal row with a separating line, so it reads as clearly separate from \"Jumlah Lain-lain\". That row shows only the total amount — the \"Rate/Bag\" and \"Jumlah Bag\" labels were removed because they're misleading when a worker has several base paycodes at different rates. Also, merged F/HARIAN lines no longer show the misleading single-day \"(N bags)\" tag (e.g. \"(130 bags)\" next to \"1492 Bag\") — the full quantity still appears in the quantity column.",
   },

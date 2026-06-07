@@ -992,10 +992,25 @@ export default function (pool) {
         payCodesForProduct,
         productType,
         dayType,
+        assignedPayCodes,
       ) => {
         // For BH products, look for FULL_B* codes (ME-Q specific) or FULL_* codes
         // For MEE products, look for FULL_* codes
         // Day-specific codes have UMUM/AHAD in description or pay_code_id ending with _UM/_AH
+
+        // When a product exposes several codes for the same tier (e.g. 3U(600G)
+        // has both FULL_3U(600G)_40 @0.17 and FULL_B3U(600G) @0.19), prefer the
+        // one the worker is actually assigned; otherwise fall back to the first.
+        const pickAssigned = (candidates) => {
+          if (!candidates || candidates.length === 0) return undefined;
+          if (assignedPayCodes) {
+            const assigned = candidates.find((pc) =>
+              assignedPayCodes.has(pc.pay_code_id),
+            );
+            if (assigned) return assigned;
+          }
+          return candidates[0];
+        };
 
         // Helper to check if a code is for a specific day type
         const isHolidayCode = (pc) => {
@@ -1042,17 +1057,19 @@ export default function (pool) {
         if (dayType === "umum" || dayType === "ahad") {
           // For holidays/Sundays, prefer holiday-specific codes, fallback to regular with ahad/umum rate
           bonus70Code =
-            allBonus70Codes.find(isHolidayCode) ||
-            allBonus70Codes.find(isRegularCode);
+            pickAssigned(allBonus70Codes.filter(isHolidayCode)) ||
+            pickAssigned(allBonus70Codes.filter(isRegularCode));
           bonus140Code =
-            allBonus140Codes.find(isHolidayCode) ||
-            allBonus140Codes.find(isRegularCode);
+            pickAssigned(allBonus140Codes.filter(isHolidayCode)) ||
+            pickAssigned(allBonus140Codes.filter(isRegularCode));
         } else {
           // For regular days, prefer regular codes
           bonus70Code =
-            allBonus70Codes.find(isRegularCode) || allBonus70Codes[0];
+            pickAssigned(allBonus70Codes.filter(isRegularCode)) ||
+            pickAssigned(allBonus70Codes);
           bonus140Code =
-            allBonus140Codes.find(isRegularCode) || allBonus140Codes[0];
+            pickAssigned(allBonus140Codes.filter(isRegularCode)) ||
+            pickAssigned(allBonus140Codes);
         }
 
         return { bonus70Code, bonus140Code, dayType };
@@ -1203,11 +1220,13 @@ export default function (pool) {
           Object.entries(productBags).forEach(([productId, productBagCount]) => {
             if (!productBagCount) return;
             const payCodesForProduct = productPayCodeMap[productId] || [];
-            // Pass dayType to get the appropriate bonus code (holiday-specific or regular)
+            // Pass dayType + the worker's assigned codes so the right bonus code
+            // (and rate) is chosen when a product has several for the same tier.
             const { bonus70Code, bonus140Code } = findThresholdBonusCodes(
               payCodesForProduct,
               productType,
               dayType,
+              employeePayCodeSet.get(workerId),
             );
             const bagsDisplay = Math.round(productBagCount);
 
