@@ -2218,7 +2218,10 @@ const buildIndividualJobPage = (
         individualJob.job_type,
         "  •  ",
         { text: "Bahagian: ", bold: true },
-        staffDetails?.section || payroll.section,
+        // Use this job's own section, not the combined payroll's (primary job's).
+        payroll.job_sections?.[individualJob.job_type] ||
+          staffDetails?.section ||
+          payroll.section,
       ],
       margin: [0, 0, 0, 5],
     },

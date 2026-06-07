@@ -770,6 +770,9 @@ export interface EmployeePayroll {
   others_records?: OthersRecord[];
   // Mapping of employee_id to job_type for combined payrolls (e.g., {"MASRUN_S": "MEE_ROLL", "MASRUN": "MEE_SANGKUT"})
   employee_job_mapping?: Record<string, string>;
+  // Section name per job_type (e.g., {"MEE_PACKING": "Mee", "BIHUN_SANGKUT": "Bihun"})
+  // so each individual breakdown slip shows its own job's Bahagian.
+  job_sections?: Record<string, string>;
   // Rounding adjustment values
   digenapkan?: number;          // Rounding adjustment amount
   setelah_digenapkan?: number;  // Final rounded amount

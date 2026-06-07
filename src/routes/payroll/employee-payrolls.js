@@ -217,12 +217,13 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     // Get others (Kerja Luar OT) records for this employee for the specific month/year
     const othersRecordsRes = await pool.query(
       `
-      SELECT amount, description
-      FROM others_records
-      WHERE employee_id = $1
-        AND DATE(record_date) >= $2
-        AND DATE(record_date) <= $3
-      ORDER BY record_date DESC
+      SELECT orec.amount, orec.description, pc.pay_type
+      FROM others_records orec
+      LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
+      WHERE orec.employee_id = $1
+        AND DATE(orec.record_date) >= $2
+        AND DATE(orec.record_date) <= $3
+      ORDER BY orec.record_date DESC
     `,
       [
         employee_id,
@@ -235,6 +236,14 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       ...record,
       amount: parseFloat(record.amount || 0),
     }));
+    // Overtime "Others" count towards gross but are excluded from the EPF base.
+    const othersOvertimeGrossPay = othersRecords.reduce(
+      (sum, record) =>
+        (record.pay_type || "").toLowerCase() === "overtime"
+          ? sum + record.amount
+          : sum,
+      0,
+    );
 
     // Get all active contribution rates
     const [epfRatesRes, socsoRatesRes, sipRatesRes, incomeTaxRatesRes] =
@@ -392,13 +401,15 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       { Base: [], Tambahan: [], Overtime: [] },
     );
 
-    // Calculate EPF gross pay using CONSOLIDATED approach
+    // Calculate EPF gross pay using CONSOLIDATED approach. Excludes all overtime:
+    // Overtime work items aren't in Base/Tambahan, and overtime "Others" are
+    // removed via othersOvertimeGrossPay (OT is not part of the EPF wage base).
     const epfGrossPayCents =
       consolidateItems(groupedItems.Base || []) +
       consolidateItems(groupedItems.Tambahan || []) +
       Math.round(leaveGrossPay * 100) +
       Math.round(commissionGrossPay * 100) +
-      Math.round(othersGrossPay * 100);
+      Math.round((othersGrossPay - othersOvertimeGrossPay) * 100);
     const epfGrossPay = epfGrossPayCents / 100;
 
     const age = Math.floor(
@@ -887,6 +898,30 @@ export default function (pool) {
         return acc;
       }, {});
 
+      // Per-job section names so each individual breakdown shows its own Bahagian
+      // (instead of the combined payroll's primary-job section).
+      const splitJobTypes = (jobType) =>
+        (jobType || "")
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+      const allJobTypes = [
+        ...new Set(payrollsResult.rows.flatMap((p) => splitJobTypes(p.job_type))),
+      ];
+      const jobSectionsResult = allJobTypes.length
+        ? await pool.query(
+            `SELECT j.id, COALESCE(s.name, j.section) AS section
+             FROM jobs j
+             LEFT JOIN sections s ON j.section = s.id OR j.section = s.name
+             WHERE j.id = ANY($1)`,
+            [allJobTypes],
+          )
+        : { rows: [] };
+      const jobSectionsMap = jobSectionsResult.rows.reduce((acc, r) => {
+        acc[r.id] = r.section;
+        return acc;
+      }, {});
+
       // Merge payrolls with their items, deductions, leave records, mid-month payrolls, commission, and others records
       const response = payrollsResult.rows.map((payroll) => {
         const midMonth = midMonthByPayrollId[payroll.id];
@@ -899,6 +934,10 @@ export default function (pool) {
           items: itemsByPayrollId[payroll.id] || [],
           deductions: deductionsByPayrollId[payroll.id] || [],
           leave_records: leaveRecordsByPayrollId[payroll.id] || [],
+          job_sections: splitJobTypes(payroll.job_type).reduce((acc, jt) => {
+            if (jobSectionsMap[jt]) acc[jt] = jobSectionsMap[jt];
+            return acc;
+          }, {}),
           mid_month_payroll: primaryMidMonth
             ? { ...primaryMidMonth, amount: midMonth.total }
             : null,
@@ -1307,6 +1346,27 @@ export default function (pool) {
         midMonthRows[0] ||
         null;
 
+      // Per-job section names (e.g. {MEE_PACKING: "Mee", BIHUN_SANGKUT: "Bihun"})
+      // so each individual breakdown slip shows its own job's Bahagian instead of
+      // the combined payroll's (primary job's) section.
+      const jobTypeList = (payrollData.job_type || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const jobSectionsResult = jobTypeList.length
+        ? await pool.query(
+            `SELECT j.id, COALESCE(s.name, j.section) AS section
+             FROM jobs j
+             LEFT JOIN sections s ON j.section = s.id OR j.section = s.name
+             WHERE j.id = ANY($1)`,
+            [jobTypeList],
+          )
+        : { rows: [] };
+      const jobSections = jobSectionsResult.rows.reduce((acc, r) => {
+        acc[r.id] = r.section;
+        return acc;
+      }, {});
+
       // Format comprehensive response
       const response = {
         ...payrollData,
@@ -1321,6 +1381,7 @@ export default function (pool) {
           rate_info: deduction.rate_info || {},
         })),
         leave_records: leaveRecords,
+        job_sections: jobSections,
         mid_month_payroll: primaryMidMonth
           ? { ...primaryMidMonth, amount: midMonthTotal }
           : null,
@@ -1681,6 +1742,27 @@ export default function (pool) {
         midMonthRows[0] ||
         null;
 
+      // Per-job section names (e.g. {MEE_PACKING: "Mee", BIHUN_SANGKUT: "Bihun"})
+      // so each individual breakdown slip shows its own job's Bahagian instead of
+      // the combined payroll's (primary job's) section.
+      const jobTypeList = (payrollData.job_type || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const jobSectionsResult = jobTypeList.length
+        ? await pool.query(
+            `SELECT j.id, COALESCE(s.name, j.section) AS section
+             FROM jobs j
+             LEFT JOIN sections s ON j.section = s.id OR j.section = s.name
+             WHERE j.id = ANY($1)`,
+            [jobTypeList],
+          )
+        : { rows: [] };
+      const jobSections = jobSectionsResult.rows.reduce((acc, r) => {
+        acc[r.id] = r.section;
+        return acc;
+      }, {});
+
       // Format comprehensive response
       const response = {
         ...payrollData,
@@ -1695,6 +1777,7 @@ export default function (pool) {
           rate_info: deduction.rate_info || {},
         })),
         leave_records: leaveRecords,
+        job_sections: jobSections,
         mid_month_payroll: primaryMidMonth
           ? { ...primaryMidMonth, amount: midMonthTotal }
           : null,

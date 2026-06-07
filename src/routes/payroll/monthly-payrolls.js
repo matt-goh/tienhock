@@ -1430,8 +1430,12 @@ export default function (pool) {
               ),
               client.query(
                 `
-              SELECT SUM(amount) as total FROM others_records
-              WHERE employee_id = $1 AND DATE(record_date) >= $2 AND DATE(record_date) <= $3
+              SELECT
+                SUM(orec.amount) as total,
+                SUM(CASE WHEN pc.pay_type ILIKE 'overtime' THEN orec.amount ELSE 0 END) as overtime_total
+              FROM others_records orec
+              LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
+              WHERE orec.employee_id = $1 AND DATE(orec.record_date) >= $2 AND DATE(orec.record_date) <= $3
             `,
                 [primaryEmployee.employeeId, startDate, endDate],
               ),
@@ -1449,6 +1453,10 @@ export default function (pool) {
           const commissionAdvancePay =
             parseFloat(commissionResult.rows[0]?.advance_total) || 0;
           const othersGrossPay = parseFloat(othersResult.rows[0]?.total) || 0;
+          // Overtime "Others" (e.g. DY_OT "OT (TARIK MEE-DRYER)") count towards
+          // gross pay but are excluded from the EPF wage base (OT is not EPF-able).
+          const othersOvertimePay =
+            parseFloat(othersResult.rows[0]?.overtime_total) || 0;
 
           // Exclude daily work items dated on a leave day — they pay nothing as
           // work (the day is paid via leave) and would otherwise inflate gross
@@ -1528,12 +1536,14 @@ export default function (pool) {
             groupedItems[type].push(item);
           });
 
+          // EPF wage base excludes all overtime: Overtime work items are not in
+          // Base/Tambahan, and overtime "Others" are removed via othersOvertimePay.
           const epfGrossPay =
             groupedItems.Base.reduce((s, i) => s + i.amount, 0) +
             groupedItems.Tambahan.reduce((s, i) => s + i.amount, 0) +
             leaveGrossPay +
             commissionGrossPay +
-            othersGrossPay;
+            (othersGrossPay - othersOvertimePay);
 
           const deductions = [];
 
