@@ -58,6 +58,13 @@ interface MergedAdvance {
   rows: AdvanceRecord[];
 }
 
+interface CombinedJobItemGroup {
+  jobType: string | null;
+  baseItems: ConsolidatedPayrollItem[];
+  tambahanItems: ConsolidatedPayrollItem[];
+  overtimeItems: ConsolidatedPayrollItem[];
+}
+
 // Merge records that share a description (case-insensitive) into a single line.
 // Used for both commission_records and others_records so duplicate rows collapse on display.
 const mergeByDescription = (rows: AdvanceRecord[] = []): MergedAdvance[] => {
@@ -94,8 +101,8 @@ interface CombinedAdvanceDisplay {
   // Commission records with no same-description Others row — rendered as their
   // own "Advance" earnings rows, exactly as before.
   standaloneCommissions: MergedAdvance[];
-  // Each Others row paired with the commission amount folded into it (0 if none).
-  othersRows: { record: MergedAdvance; foldedCommission: number }[];
+  // Each Others row paired with same-description commission rows folded into it.
+  othersRows: { record: MergedAdvance; foldedCommissions: MergedAdvance[] }[];
 }
 
 // Fold commission records into a same-description Others row so the incentive
@@ -111,16 +118,14 @@ const combineCommissionsIntoOthers = (
   const othersKeys = new Set(
     mergedOthers.map((other) => descKey(other.description)),
   );
-  const foldedByKey = new Map<string, number>();
+  const foldedByKey = new Map<string, MergedAdvance[]>();
   const standaloneCommissions: MergedAdvance[] = [];
 
   mergedCommissions.forEach((commission) => {
     const key = descKey(commission.description);
     if (othersKeys.has(key)) {
-      foldedByKey.set(
-        key,
-        (foldedByKey.get(key) || 0) + commission.merged_amount,
-      );
+      const existing = foldedByKey.get(key) || [];
+      foldedByKey.set(key, [...existing, commission]);
     } else {
       standaloneCommissions.push(commission);
     }
@@ -128,10 +133,54 @@ const combineCommissionsIntoOthers = (
 
   const othersRows = mergedOthers.map((record) => ({
     record,
-    foldedCommission: foldedByKey.get(descKey(record.description)) || 0,
+    foldedCommissions: foldedByKey.get(descKey(record.description)) || [],
   }));
 
   return { standaloneCommissions, othersRows };
+};
+
+const getMergedAdvanceTotal = (records: MergedAdvance[]): number =>
+  records.reduce(
+    (sum: number, record: MergedAdvance) => sum + record.merged_amount,
+    0,
+  );
+
+const getAdvanceStatusDescriptionNote = (
+  records: MergedAdvance[],
+): string => {
+  const summary = records.reduce(
+    (
+      acc: {
+        regularAmount: number;
+        regularCount: number;
+        advanceAmount: number;
+        advanceCount: number;
+      },
+      record: MergedAdvance,
+    ) => {
+      record.rows.forEach((row: AdvanceRecord) => {
+        const amount = Number(row.amount) || 0;
+        if (isAdvanceRecord(row)) {
+          acc.advanceAmount += amount;
+          acc.advanceCount += 1;
+        } else {
+          acc.regularAmount += amount;
+          acc.regularCount += 1;
+        }
+      });
+      return acc;
+    },
+    {
+      regularAmount: 0,
+      regularCount: 0,
+      advanceAmount: 0,
+      advanceCount: 0,
+    },
+  );
+
+  if (summary.regularCount === 0 || summary.advanceCount === 0) return "";
+
+  return ` (Regular: ${formatCurrency(summary.regularAmount)} x${summary.regularCount}; Advance: ${formatCurrency(summary.advanceAmount)} x${summary.advanceCount})`;
 };
 
 interface GroupedLeaveRecord {
@@ -413,6 +462,64 @@ const groupItemsByJobType = (
   return jobGroups;
 };
 
+const buildCombinedJobItemGroups = (
+  baseGroups: { jobType: string | null; items: any[] }[],
+  tambahanGroups: { jobType: string | null; items: any[] }[],
+  overtimeGroups: { jobType: string | null; items: any[] }[],
+  jobTypes: string[],
+): CombinedJobItemGroup[] => {
+  const keyForJob = (jobType: string | null): string => jobType ?? "__shared__";
+  const toItemMap = (
+    groups: { jobType: string | null; items: any[] }[],
+  ): Map<string, ConsolidatedPayrollItem[]> => {
+    const itemMap = new Map<string, ConsolidatedPayrollItem[]>();
+    groups.forEach((group) => {
+      itemMap.set(
+        keyForJob(group.jobType),
+        group.items as ConsolidatedPayrollItem[],
+      );
+    });
+    return itemMap;
+  };
+
+  const baseMap: Map<string, ConsolidatedPayrollItem[]> =
+    toItemMap(baseGroups);
+  const tambahanMap: Map<string, ConsolidatedPayrollItem[]> =
+    toItemMap(tambahanGroups);
+  const overtimeMap: Map<string, ConsolidatedPayrollItem[]> =
+    toItemMap(overtimeGroups);
+
+  const buildGroup = (jobType: string | null): CombinedJobItemGroup => {
+    const key: string = keyForJob(jobType);
+    return {
+      jobType,
+      baseItems: baseMap.get(key) || [],
+      tambahanItems: tambahanMap.get(key) || [],
+      overtimeItems: overtimeMap.get(key) || [],
+    };
+  };
+
+  const groups: CombinedJobItemGroup[] = jobTypes
+    .map((jobType) => buildGroup(jobType))
+    .filter(
+      (group) =>
+        group.baseItems.length > 0 ||
+        group.tambahanItems.length > 0 ||
+        group.overtimeItems.length > 0,
+    );
+
+  const sharedGroup: CombinedJobItemGroup = buildGroup(null);
+  if (
+    sharedGroup.baseItems.length > 0 ||
+    sharedGroup.tambahanItems.length > 0 ||
+    sharedGroup.overtimeItems.length > 0
+  ) {
+    groups.push(sharedGroup);
+  }
+
+  return groups;
+};
+
 // Create table row for an item
 const createItemRow = (
   description: string,
@@ -500,20 +607,11 @@ const createJobSubtotalRow = (
   ];
 };
 
-const getTotalUnitQuantity = (item: ConsolidatedPayrollItem): number => {
-  const quantity: number = Number(item.total_quantity) || 0;
-  const focUnits: number = Number(item.total_foc_units) || 0;
-  return quantity + focUnits;
-};
-
-interface BaseRateSummary {
-  averageRate: number;
-  totalUnits: number;
-  totalAmount: number;
-}
-
 type BaseRateSummaryUnit = "Bag" | "Hour";
-type BaseSectionCell = TableCell & { baseSectionBorder?: boolean };
+type BaseSectionCell = TableCell & {
+  baseSectionBorder?: boolean;
+  baseSubtotalBorder?: boolean;
+};
 
 const BASE_RATE_SUMMARY_UNITS: BaseRateSummaryUnit[] = ["Bag", "Hour"];
 
@@ -528,6 +626,16 @@ const formatUnitQuantity = (quantity: number): string => {
     minimumFractionDigits: Number.isInteger(quantity) ? 0 : 2,
     maximumFractionDigits: 2,
   }).format(quantity);
+};
+
+const isDisplayableConsolidatedItem = (
+  item: ConsolidatedPayrollItem,
+): boolean => {
+  return (
+    Math.abs(Number(item.total_quantity) || 0) > 0.0001 ||
+    Math.abs(Number(item.total_foc_units) || 0) > 0.0001 ||
+    Math.abs(Number(item.total_amount) || 0) > 0.0001
+  );
 };
 
 interface RateQuantityDisplay {
@@ -672,105 +780,18 @@ const getBaseRateSummaryUnits = (
   );
 };
 
-const shouldShowBaseRateSummary = (
-  summaryItems: ConsolidatedPayrollItem[],
-  summaryUnit: BaseRateSummaryUnit,
-): boolean => {
-  return summaryUnit !== "Bag" || summaryItems.length > 1;
-};
-
-const calculateBaseRateSummary = (
-  consolidatedBaseItems: ConsolidatedPayrollItem[],
-  summaryUnit: BaseRateSummaryUnit,
-): BaseRateSummary => {
-  const summaryItems: ConsolidatedPayrollItem[] = consolidatedBaseItems.filter(
-    (item) => item.rate_unit === summaryUnit,
-  );
-  const totalAmount: number = summaryItems.reduce(
-    (sum, item) => sum + (Number(item.total_amount) || 0),
-    0,
-  );
-
-  if (summaryUnit === "Bag") {
-    const totalUnits: number = summaryItems.reduce(
-      (sum, item) => sum + getTotalUnitQuantity(item),
-      0,
-    );
-
-    return {
-      averageRate: totalUnits > 0 ? totalAmount / totalUnits : 0,
-      totalUnits,
-      totalAmount,
-    };
-  }
-
-  // Hourly rows can repeat the same hours across multiple tasks, so keep using
-  // one representative hour quantity rather than summing duplicated hours.
-  const representativeHours: number =
-    summaryItems.length > 0 ? Number(summaryItems[0].total_quantity) || 0 : 0;
-  return {
-    averageRate:
-      representativeHours > 0 ? totalAmount / representativeHours : 0,
-    totalUnits: representativeHours,
-    totalAmount,
-  };
-};
-
-const createBaseRateSummaryRow = (
-  baseRateSummaryUnit: BaseRateSummaryUnit,
-  baseRateSummary: BaseRateSummary,
-): TableCell[] => {
-  if (baseRateSummaryUnit === "Bag") {
-    return [
-      { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-      {
-        text: `Rate/Bag: ${baseRateSummary.averageRate.toFixed(2)}`,
-        alignment: "right",
-        bold: true,
-        fillColor: "#f8f9fa",
-        fontSize: 8,
-      },
-      {
-        text: `Jumlah Bag: ${formatUnitQuantity(baseRateSummary.totalUnits)}`,
-        bold: true,
-        fillColor: "#f8f9fa",
-        fontSize: 8,
-      },
-      {
-        text: formatCurrency(baseRateSummary.totalAmount),
-        alignment: "right",
-        bold: true,
-        fillColor: "#f8f9fa",
-        fontSize: 8,
-      },
-    ];
-  }
-
-  return [
-    { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-    { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-    {
-      text: `Rate/Jam: ${baseRateSummary.averageRate.toFixed(2)}`,
-      bold: true,
-      fillColor: "#f8f9fa",
-      fontSize: 8,
-    },
-    {
-      text: formatCurrency(baseRateSummary.totalAmount),
-      alignment: "right",
-      bold: true,
-      fillColor: "#f8f9fa",
-      fontSize: 8,
-    },
-  ];
-};
-
 const createBaseSubtotalRow = (
   label: string,
   totalAmount: number,
+  options: { baseSubtotalBorder?: boolean } = {},
 ): TableCell[] => {
   return [
-    { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+    {
+      text: "",
+      fillColor: "#f8f9fa",
+      fontSize: 8,
+      baseSubtotalBorder: options.baseSubtotalBorder,
+    } as BaseSectionCell,
     { text: "", fillColor: "#f8f9fa", fontSize: 8 },
     {
       text: label,
@@ -806,14 +827,16 @@ const getBaseItemQuantityLabel = (item: ConsolidatedPayrollItem): string => {
   if (isDirectAmountFixedItem(item)) return "-";
 
   if (item.rate_unit === "Bag") {
-    return `${item.total_quantity} Bag${item.total_quantity > 1 ? "s" : ""}`;
+    return `${formatUnitQuantity(item.total_quantity)} Bag${
+      item.total_quantity > 1 ? "s" : ""
+    }`;
   }
 
   if (item.rate_unit === "Hour") {
-    return `${item.total_quantity} Jam`;
+    return `${formatUnitQuantity(item.total_quantity)} Jam`;
   }
 
-  return `${item.total_quantity} ${item.rate_unit}`;
+  return `${formatUnitQuantity(item.total_quantity)} ${item.rate_unit}`;
 };
 
 const getTambahanItemQuantityLabel = (
@@ -822,8 +845,15 @@ const getTambahanItemQuantityLabel = (
 ): string => {
   if (isDirectAmountFixedItem(item)) return "-";
   if (item.rate_unit === "Fixed") return monthName;
-  return `${item.total_quantity} ${item.rate_unit}`;
+  return `${formatUnitQuantity(item.total_quantity)} ${item.rate_unit}`;
 };
+
+// F/HARIAN / production-bonus descriptions carry a per-day "(N bags)" or
+// "(N bags, mesin rosak)" tag. After consolidation one line spans many days, so
+// that single-day count no longer matches the merged quantity column — strip it
+// for display (the quantity column already shows the real total).
+const stripBagCountSuffix = (description: string): string =>
+  (description || "").replace(/\s*\(\d[\d.]*\s*bags?\b[^)]*\)\s*$/i, "").trim();
 
 const markBaseSectionBorder = (row: TableCell[]): TableCell[] => {
   (row[0] as BaseSectionCell).baseSectionBorder = true;
@@ -836,6 +866,11 @@ const appendBasePayRows = (
 ): void => {
   if (consolidatedBaseItems.length === 0) return;
 
+  const baseTotalAmount: number = consolidatedBaseItems.reduce(
+    (sum: number, item: ConsolidatedPayrollItem) =>
+      sum + (Number(item.total_amount) || 0),
+    0,
+  );
   const baseRateSummaryUnits: BaseRateSummaryUnit[] = getBaseRateSummaryUnits(
     consolidatedBaseItems,
   );
@@ -857,23 +892,10 @@ const appendBasePayRows = (
         index > 0 && itemIndex === 0 ? markBaseSectionBorder(row) : row,
       );
     });
-
-    if (shouldShowBaseRateSummary(unitItems, unit)) {
-      tableBody.push(
-        createBaseRateSummaryRow(
-          unit,
-          calculateBaseRateSummary(unitItems, unit),
-        ),
-      );
-    }
   });
 
   const otherItems: ConsolidatedPayrollItem[] = consolidatedBaseItems.filter(
     (item) => !isBaseRateSummaryUnit(item.rate_unit),
-  );
-  const otherTotalAmount: number = otherItems.reduce(
-    (sum, item) => sum + (Number(item.total_amount) || 0),
-    0,
   );
 
   otherItems.forEach((item, itemIndex) => {
@@ -891,10 +913,47 @@ const appendBasePayRows = (
     );
   });
 
-  if (otherItems.length > 0 && baseRateSummaryUnits.length > 0) {
-    tableBody.push(createBaseSubtotalRow("Jumlah Lain-lain", otherTotalAmount));
-  }
+  tableBody.push(
+    createBaseSubtotalRow("Jumlah Base", baseTotalAmount, {
+      baseSubtotalBorder: true,
+    }),
+  );
+};
 
+const appendTambahanPayRows = (
+  tableBody: TableCell[][],
+  consolidatedTambahanItems: ConsolidatedPayrollItem[],
+  monthName: string,
+): void => {
+  consolidatedTambahanItems.forEach((item) => {
+    tableBody.push(
+      createItemRow(
+        stripBagCountSuffix(item.description),
+        getConsolidatedRateLabel(item),
+        getTambahanItemQuantityLabel(item, monthName),
+        formatCurrency(item.total_amount),
+      ),
+    );
+  });
+};
+
+const appendOvertimePayRows = (
+  tableBody: TableCell[][],
+  consolidatedOvertimeItems: ConsolidatedPayrollItem[],
+): void => {
+  consolidatedOvertimeItems.forEach((item) => {
+    const qtyLabel = isDirectAmountFixedItem(item)
+      ? "-"
+      : `${formatUnitQuantity(item.total_quantity)} Jam OT`;
+    tableBody.push(
+      createItemRow(
+        item.description,
+        getConsolidatedRateLabel(item),
+        qtyLabel,
+        formatCurrency(item.total_amount),
+      ),
+    );
+  });
 };
 
 // Build main payroll page content
@@ -991,7 +1050,7 @@ const buildMainPayrollPage = (
       payrollItemsWithOvertimeOthers,
       payroll.leave_records,
     ),
-  );
+  ).filter(isDisplayableConsolidatedItem);
   const groupedConsolidatedItems =
     groupConsolidatedItemsByType(consolidatedItems);
 
@@ -1014,9 +1073,21 @@ const buildMainPayrollPage = (
     jobTypes,
     employeeJobMapping,
   );
+  const combinedItemsByJob: CombinedJobItemGroup[] =
+    buildCombinedJobItemGroups(
+      baseItemsByJob,
+      tambahanItemsByJob,
+      overtimeItemsByJob,
+      jobTypes,
+    );
 
   // Calculate totals - use consolidated items for consistency with recalculated amounts
   const consolidatedBaseItems = groupedConsolidatedItems.Base || [];
+  const baseTotalAmount: number = consolidatedBaseItems.reduce(
+    (sum: number, item: ConsolidatedPayrollItem) =>
+      sum + (item.total_amount || 0),
+    0,
+  );
   const tambahanTotalAmount = (groupedConsolidatedItems.Tambahan || []).reduce(
     (sum, item) => sum + (item.total_amount || 0),
     0,
@@ -1025,6 +1096,8 @@ const buildMainPayrollPage = (
     (sum, item) => sum + (item.total_amount || 0),
     0,
   );
+  const hasOvertimeItems: boolean =
+    (groupedConsolidatedItems.Overtime || []).length > 0;
 
   // Commission records (merged by description so duplicate rows collapse).
   // Cuti Tahunan entries are recorded via the Others/Incentives page using
@@ -1129,6 +1202,15 @@ const buildMainPayrollPage = (
     0,
   );
   const mergedOthersRecords = mergeByDescription(othersRecords);
+  const totalBeforeOvertimeAmount: number =
+    Math.round(
+      (baseTotalAmount +
+        tambahanTotalAmount +
+        nonCutiCommissionTotalAmount +
+        othersTotalAmount +
+        leaveTotalAmount) *
+        100,
+    ) / 100;
 
   // Mid-month and final calculations. payroll.net_pay from the comprehensive
   // endpoint is gross - statutory only, so we subtract only advance records here
@@ -1160,15 +1242,20 @@ const buildMainPayrollPage = (
     },
   ]);
 
-  // Base Pay Items - grouped payrolls show per-job sections.
+  // Grouped payrolls show one section per work, with that work's base,
+  // tambahan and overtime rows kept together.
   if (isGroupedPayroll) {
-    baseItemsByJob.forEach((jobGroup) => {
-      const jobItems = jobGroup.items as ConsolidatedPayrollItem[];
-      const jobTotal = jobItems.reduce(
-        (sum, item) => sum + (item.total_amount || 0),
+    combinedItemsByJob.forEach((jobGroup) => {
+      const jobTotal: number = [
+        ...jobGroup.baseItems,
+        ...jobGroup.tambahanItems,
+        ...jobGroup.overtimeItems,
+      ].reduce(
+        (sum: number, item: ConsolidatedPayrollItem) =>
+          sum + (item.total_amount || 0),
         0,
       );
-      const jobTypeLabel = jobGroup.jobType || "Shared";
+      const jobTypeLabel: string = jobGroup.jobType || "Shared";
 
       if (jobGroup.jobType) {
         tableBody.push(
@@ -1177,17 +1264,17 @@ const buildMainPayrollPage = (
             getEmployeeIdForJob(jobGroup.jobType),
           ),
         );
-      } else if (jobItems.length > 0) {
+      } else {
         tableBody.push(createJobCategoryRow("Shared", null));
       }
 
-      appendBasePayRows(tableBody, jobItems);
+      appendBasePayRows(tableBody, jobGroup.baseItems);
+      appendTambahanPayRows(tableBody, jobGroup.tambahanItems, monthName);
+      appendOvertimePayRows(tableBody, jobGroup.overtimeItems);
 
-      if (jobItems.length > 0) {
-        tableBody.push(
-          createJobSubtotalRow(jobTypeLabel, formatCurrency(jobTotal)),
-        );
-      }
+      tableBody.push(
+        createJobSubtotalRow(jobTypeLabel, formatCurrency(jobTotal)),
+      );
     });
   }
 
@@ -1204,45 +1291,11 @@ const buildMainPayrollPage = (
     nonCutiDisplayRecords.length > 0 ||
     othersRecords.length > 0
   ) {
-    tambahanItemsByJob.forEach((jobGroup) => {
-      const jobItems = jobGroup.items as ConsolidatedPayrollItem[];
-      const tambahanJobTotal = jobItems.reduce(
-        (sum, item) => sum + (item.total_amount || 0),
-        0,
-      );
-      const jobTypeLabel = jobGroup.jobType
-        ? `${jobGroup.jobType} - Tambahan`
-        : "Shared - Tambahan";
-
-      if (isGroupedPayroll && jobGroup.jobType && jobItems.length > 0) {
-        tableBody.push(
-          createJobCategoryRow(
-            `${jobGroup.jobType} - Tambahan`,
-            getEmployeeIdForJob(jobGroup.jobType),
-          ),
-        );
-      } else if (isGroupedPayroll && !jobGroup.jobType && jobItems.length > 0) {
-        tableBody.push(createJobCategoryRow("Shared - Tambahan", null));
-      }
-
-      jobItems.forEach((item) => {
-        tableBody.push(
-          createItemRow(
-            item.description,
-            getConsolidatedRateLabel(item),
-            getTambahanItemQuantityLabel(item, monthName),
-            formatCurrency(item.total_amount),
-          ),
-        );
-      });
-
-      // Add job subtotal row for combined payrolls (only when there are items)
-      if (isGroupedPayroll && jobItems.length > 0) {
-        tableBody.push(
-          createJobSubtotalRow(jobTypeLabel, formatCurrency(tambahanJobTotal)),
-        );
-      }
-    });
+    const consolidatedTambahanItems: ConsolidatedPayrollItem[] =
+      groupedConsolidatedItems.Tambahan || [];
+    if (!isGroupedPayroll) {
+      appendTambahanPayRows(tableBody, consolidatedTambahanItems, monthName);
+    }
 
     // Commission records (merged duplicates). Cuti Tahunan commissions are
     // omitted here — they're rendered with the leave records below and rolled
@@ -1261,7 +1314,7 @@ const buildMainPayrollPage = (
           : commission.description;
       tableBody.push(
         createItemRow(
-          desc,
+          `${desc}${getAdvanceStatusDescriptionNote([commission])}`,
           "",
           getCommissionQuantityLabel(commission),
           formatCurrency(commission.merged_amount),
@@ -1272,7 +1325,8 @@ const buildMainPayrollPage = (
     // Others (Kerja Luar OT) records (merged duplicates). When a commission was
     // folded in, drop the rate column so the rate no longer mismatches the
     // combined amount, but keep the quantity note (e.g. "Fixed").
-    othersRows.forEach(({ record: other, foldedCommission }) => {
+    othersRows.forEach(({ record: other, foldedCommissions }) => {
+      const foldedCommission = getMergedAdvanceTotal(foldedCommissions);
       const desc =
         other.merged_count > 1
           ? `${other.description} (x${other.merged_count})`
@@ -1280,9 +1334,13 @@ const buildMainPayrollPage = (
       const rateQuantityDisplay: RateQuantityDisplay =
         getOthersRateQuantityDisplay(other);
       const isMerged = foldedCommission > 0;
+      const descriptionNote = getAdvanceStatusDescriptionNote([
+        other,
+        ...foldedCommissions,
+      ]);
       tableBody.push(
         createItemRow(
-          desc,
+          `${desc}${descriptionNote}`,
           isMerged ? "" : rateQuantityDisplay.rate,
           rateQuantityDisplay.quantity,
           formatCurrency(other.merged_amount + foldedCommission),
@@ -1291,7 +1349,7 @@ const buildMainPayrollPage = (
     });
 
     const totalNonLeaveTambahanItems =
-      (groupedConsolidatedItems.Tambahan?.length || 0) +
+      consolidatedTambahanItems.length +
       standaloneCommissions.length +
       mergedOthersRecords.length;
 
@@ -1349,6 +1407,25 @@ const buildMainPayrollPage = (
           fontSize: 8,
         },
       ]);
+      if (!isGroupedPayroll && hasOvertimeItems) {
+        tableBody.push([
+          {
+            text: "",
+            fillColor: "#f8f9fa",
+            fontSize: 8,
+            baseSubtotalBorder: true,
+          } as BaseSectionCell,
+          { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+          { text: "", bold: true, fillColor: "#f8f9fa", fontSize: 8 },
+          {
+            text: formatCurrency(totalBeforeOvertimeAmount),
+            alignment: "right",
+            bold: true,
+            fillColor: "#f8f9fa",
+            fontSize: 8,
+          },
+        ]);
+      }
     }
   }
 
@@ -1357,55 +1434,12 @@ const buildMainPayrollPage = (
     groupedConsolidatedItems.Overtime &&
     groupedConsolidatedItems.Overtime.length > 0
   ) {
-    overtimeItemsByJob.forEach((jobGroup) => {
-      const jobItems = jobGroup.items as ConsolidatedPayrollItem[];
-      const overtimeJobTotal = jobItems.reduce(
-        (sum, item) => sum + (item.total_amount || 0),
-        0,
-      );
-      const jobTypeLabel = jobGroup.jobType
-        ? `${jobGroup.jobType} - OT`
-        : "Shared - OT";
-
-      if (isGroupedPayroll && jobGroup.jobType && jobItems.length > 0) {
-        tableBody.push(
-          createJobCategoryRow(
-            `${jobGroup.jobType} - OT`,
-            getEmployeeIdForJob(jobGroup.jobType),
-          ),
-        );
-      } else if (isGroupedPayroll && !jobGroup.jobType && jobItems.length > 0) {
-        tableBody.push(createJobCategoryRow("Shared - OT", null));
-      }
-
-      jobItems.forEach((item) => {
-        const qtyLabel = isDirectAmountFixedItem(item)
-          ? "-"
-          : `${item.total_quantity} Jam OT`;
-        tableBody.push(
-          createItemRow(
-            item.description,
-            getConsolidatedRateLabel(item),
-            qtyLabel,
-            formatCurrency(item.total_amount),
-          ),
-        );
-      });
-
-      // Add job subtotal row for combined payrolls (only when there are items)
-      if (isGroupedPayroll && jobItems.length > 0) {
-        tableBody.push(
-          createJobSubtotalRow(
-            jobTypeLabel,
-            formatCurrency(overtimeJobTotal),
-            "Jumlah OT",
-          ),
-        );
-      }
-    });
+    const consolidatedOvertimeItems: ConsolidatedPayrollItem[] =
+      groupedConsolidatedItems.Overtime || [];
 
     // Overtime subtotal (only for single-job payrolls)
     if (!isGroupedPayroll) {
+      appendOvertimePayRows(tableBody, consolidatedOvertimeItems);
       tableBody.push([
         { text: "", fillColor: "#f8f9fa", fontSize: 8 },
         { text: "", fillColor: "#f8f9fa", fontSize: 8 },
@@ -1675,6 +1709,10 @@ const buildMainPayrollPage = (
           // Check row above the line (row i-1) for border below specific rows
           const prevRow = node.table.body[i - 1];
           if (prevRow && Array.isArray(prevRow)) {
+            // Border below the base subtotal row (just an amount, flagged)
+            if ((prevRow[0] as BaseSectionCell)?.baseSubtotalBorder) {
+              return 0.5;
+            }
             const descCell = prevRow[2];
             const descText =
               typeof descCell === "object" ? descCell.text : descCell;
@@ -1826,7 +1864,7 @@ const buildIndividualJobPage = (
       payrollItemsWithOvertimeOthers,
       individualJob.leave_records,
     ),
-  );
+  ).filter(isDisplayableConsolidatedItem);
   const groupedConsolidatedItems =
     groupConsolidatedItemsByType(consolidatedItems);
 
@@ -1849,6 +1887,8 @@ const buildIndividualJobPage = (
     (sum, item) => sum + (item.total_amount || 0),
     0,
   );
+  const hasOvertimeItems: boolean =
+    (groupedConsolidatedItems.Overtime || []).length > 0;
 
   // Commission records (merged duplicates). Split out Cuti Tahunan entries
   // (location_code = '23') so they render as leave instead of an Advance row.
@@ -1945,6 +1985,36 @@ const buildIndividualJobPage = (
   );
   const mergedOthersRecords = mergeByDescription(othersRecords);
 
+  // Gross pay shown on the breakdown is the sum of the subtotals actually
+  // rendered above it, all derived from consolidated items (rate × total qty).
+  // We must NOT use individualJob.gross_pay_portion here: that sums each day's
+  // separately-rounded stored amount, which can drift a few cents from the
+  // consolidated subtotals (e.g. 1195.10 vs the 1195.05 the rows add up to).
+  const baseTotalAmount: number = consolidatedBaseItems.reduce(
+    (sum: number, item: ConsolidatedPayrollItem) =>
+      sum + (item.total_amount || 0),
+    0,
+  );
+  const breakdownGrossPay =
+    Math.round(
+      (baseTotalAmount +
+        tambahanTotalAmount +
+        overtimeTotalAmount +
+        nonCutiCommissionTotalAmount +
+        othersTotalAmount +
+        leaveTotalAmount) *
+        100,
+    ) / 100;
+  const totalBeforeOvertimeAmount: number =
+    Math.round(
+      (baseTotalAmount +
+        tambahanTotalAmount +
+        nonCutiCommissionTotalAmount +
+        othersTotalAmount +
+        leaveTotalAmount) *
+        100,
+    ) / 100;
+
   // Build table body
   const tableBody: TableCell[][] = [];
 
@@ -1984,7 +2054,7 @@ const buildIndividualJobPage = (
     consolidatedTambahanItems.forEach((item) => {
       tableBody.push(
         createItemRow(
-          item.description,
+          stripBagCountSuffix(item.description),
           getConsolidatedRateLabel(item),
           getTambahanItemQuantityLabel(item, monthName),
           formatCurrency(item.total_amount),
@@ -2007,7 +2077,7 @@ const buildIndividualJobPage = (
           : commission.description;
       tableBody.push(
         createItemRow(
-          desc,
+          `${desc}${getAdvanceStatusDescriptionNote([commission])}`,
           "",
           getCommissionQuantityLabel(commission),
           formatCurrency(commission.merged_amount),
@@ -2015,7 +2085,8 @@ const buildIndividualJobPage = (
       );
     });
 
-    othersRows.forEach(({ record: other, foldedCommission }) => {
+    othersRows.forEach(({ record: other, foldedCommissions }) => {
+      const foldedCommission = getMergedAdvanceTotal(foldedCommissions);
       const desc =
         other.merged_count > 1
           ? `${other.description} (x${other.merged_count})`
@@ -2023,9 +2094,13 @@ const buildIndividualJobPage = (
       const rateQuantityDisplay: RateQuantityDisplay =
         getOthersRateQuantityDisplay(other);
       const isMerged = foldedCommission > 0;
+      const descriptionNote = getAdvanceStatusDescriptionNote([
+        other,
+        ...foldedCommissions,
+      ]);
       tableBody.push(
         createItemRow(
-          desc,
+          `${desc}${descriptionNote}`,
           isMerged ? "" : rateQuantityDisplay.rate,
           rateQuantityDisplay.quantity,
           formatCurrency(other.merged_amount + foldedCommission),
@@ -2091,6 +2166,25 @@ const buildIndividualJobPage = (
           fontSize: 8,
         },
       ]);
+      if (hasOvertimeItems) {
+        tableBody.push([
+          {
+            text: "",
+            fillColor: "#f8f9fa",
+            fontSize: 8,
+            baseSubtotalBorder: true,
+          } as BaseSectionCell,
+          { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+          { text: "", bold: true, fillColor: "#f8f9fa", fontSize: 8 },
+          {
+            text: formatCurrency(totalBeforeOvertimeAmount),
+            alignment: "right",
+            bold: true,
+            fillColor: "#f8f9fa",
+            fontSize: 8,
+          },
+        ]);
+      }
     }
   }
 
@@ -2100,7 +2194,7 @@ const buildIndividualJobPage = (
     consolidatedOvertimeItems.forEach((item) => {
       const qtyLabel = isDirectAmountFixedItem(item)
         ? "-"
-        : `${item.total_quantity} Jam OT`;
+        : `${formatUnitQuantity(item.total_quantity)} Jam OT`;
       tableBody.push(
         createItemRow(
           item.description,
@@ -2136,13 +2230,50 @@ const buildIndividualJobPage = (
       fontSize: 8,
     },
     {
-      text: formatCurrency(individualJob.gross_pay_portion),
+      text: formatCurrency(breakdownGrossPay),
       alignment: "right",
       bold: true,
       fillColor: "#f8f9fa",
       fontSize: 8,
     },
   ]);
+
+  // This sibling's own mid-month advance (e.g. JASSON_PM's 200), shown on its
+  // own breakdown like the legacy per-identity slips. Statutory deductions stay
+  // on the combined slip; only the advance for this id is shown here.
+  const advanceByEmployee = payroll.mid_month_payrolls_by_employee || {};
+  const jobAdvance = jobEmployeeId
+    ? Number(advanceByEmployee[jobEmployeeId]) || 0
+    : 0;
+  if (jobAdvance > 0) {
+    tableBody.push([
+      { text: "BAYARAN PENDAHULUAN (ADVANCES PAYMENT)", fontSize: 8 },
+      { text: "", fontSize: 8 },
+      { text: "", fontSize: 8 },
+      {
+        text: `(${formatCurrency(jobAdvance)})`,
+        alignment: "right",
+        fontSize: 8,
+      },
+    ]);
+    tableBody.push([
+      { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+      { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+      {
+        text: "Jumlah Selepas Advances",
+        bold: true,
+        fillColor: "#f8f9fa",
+        fontSize: 8,
+      },
+      {
+        text: formatCurrency(breakdownGrossPay - jobAdvance),
+        alignment: "right",
+        bold: true,
+        fillColor: "#f8f9fa",
+        fontSize: 8,
+      },
+    ]);
+  }
 
   // Build content array
   const content: Content[] = [
@@ -2165,7 +2296,10 @@ const buildIndividualJobPage = (
         individualJob.job_type,
         "  •  ",
         { text: "Bahagian: ", bold: true },
-        staffDetails?.section || payroll.section,
+        // Use this job's own section, not the combined payroll's (primary job's).
+        payroll.job_sections?.[individualJob.job_type] ||
+          staffDetails?.section ||
+          payroll.section,
       ],
       margin: [0, 0, 0, 5],
     },
@@ -2198,6 +2332,10 @@ const buildIndividualJobPage = (
           // Check row above the line (row i-1) for border below specific rows
           const prevRow = node.table.body[i - 1];
           if (prevRow && Array.isArray(prevRow)) {
+            // Border below the base subtotal row (just an amount, flagged)
+            if ((prevRow[0] as BaseSectionCell)?.baseSubtotalBorder) {
+              return 0.5;
+            }
             const descCell = prevRow[2];
             const descText =
               typeof descCell === "object" ? descCell.text : descCell;
