@@ -1407,7 +1407,7 @@ export default function (pool) {
             await Promise.all([
               client.query(
                 `
-              SELECT to_char(leave_date, 'YYYY-MM-DD') as date, amount_paid
+              SELECT to_char(leave_date, 'YYYY-MM-DD') as date, employee_id, amount_paid
               FROM leave_records
               WHERE employee_id IN (
                 SELECT id FROM staffs WHERE name = $1
@@ -1445,8 +1445,12 @@ export default function (pool) {
             (sum, row) => sum + (parseFloat(row.amount_paid) || 0),
             0,
           );
+          // Keyed by `${employee_id}|${date}` so leave only drops the leave
+          // owner's own daily work, not a different sibling job's work that day.
           const leaveDateSet = new Set(
-            leaveResult.rows.map((row) => row.date).filter(Boolean),
+            leaveResult.rows
+              .filter((row) => row.date)
+              .map((row) => `${row.employee_id ?? ""}|${row.date}`),
           );
           const commissionGrossPay =
             parseFloat(commissionResult.rows[0]?.total) || 0;

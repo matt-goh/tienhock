@@ -41,20 +41,30 @@ const toLocalYMD = (value) => {
 // inflate the stored/recalculated gross above the sum the payslip shows.
 // Only work_log_type === "daily" items are affected; monthly/production items are
 // always kept, matching the frontend filter.
-const removeLeaveDayWorkItems = (items, leaveDateSet) => {
+// Leave-day exclusion is scoped per employee_id (key = `${employee_id}|${ymd}`),
+// not just by date. A person with several job ids (e.g. ROSMINA = MEE,
+// ROSMINA_SB = Sangkut) who takes leave under one id must not have their OTHER
+// jobs' daily work dropped — only the work belonging to the leave's own id is
+// replaced by the Cuti payment. Single-job workers are unaffected (their leave
+// id equals their work items' source_employee_id).
+const removeLeaveDayWorkItems = (items, leaveKeySet) => {
   if (!Array.isArray(items) || items.length === 0) return items || [];
-  if (!leaveDateSet || leaveDateSet.size === 0) return items;
+  if (!leaveKeySet || leaveKeySet.size === 0) return items;
   return items.filter((item) => {
     if (item.work_log_type !== "daily" || !item.source_date) return true;
     const ymd = toLocalYMD(item.source_date);
-    return ymd === null || !leaveDateSet.has(ymd);
+    if (ymd === null) return true;
+    return !leaveKeySet.has(`${item.source_employee_id ?? ""}|${ymd}`);
   });
 };
 
 const buildLeaveDateSet = (leaveRecords) =>
   new Set(
     (leaveRecords || [])
-      .map((record) => toLocalYMD(record.date))
+      .map((record) => {
+        const ymd = toLocalYMD(record.date);
+        return ymd ? `${record.employee_id ?? ""}|${ymd}` : null;
+      })
       .filter(Boolean),
   );
 
@@ -163,8 +173,9 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     // Get leave records for this employee for the specific month/year
     const leaveRecordsRes = await pool.query(
       `
-      SELECT 
+      SELECT
         to_char(leave_date, 'YYYY-MM-DD') as date,
+        employee_id,
         leave_type,
         days_taken,
         amount_paid

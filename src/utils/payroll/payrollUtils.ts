@@ -481,7 +481,10 @@ export const consolidatePayrollItems = (items: PayrollItem[]): ConsolidatedPayro
  */
 export const filterOutLeaveDayItems = (
   items: PayrollItem[],
-  leaveRecords?: Array<{ date?: string | null }> | null,
+  leaveRecords?: Array<{
+    date?: string | null;
+    employee_id?: string | null;
+  }> | null,
 ): PayrollItem[] => {
   if (!items || items.length === 0) return items ?? [];
   if (!leaveRecords || leaveRecords.length === 0) return items;
@@ -499,17 +502,23 @@ export const filterOutLeaveDayItems = (
     }
   };
 
-  const leaveDates = new Set<string>();
+  // Scope by employee_id (key = `${employee_id}|${ymd}`) so leave only drops the
+  // leave owner's own daily work — a multi-job worker's other jobs that day are
+  // kept. Single-job workers are unaffected (leave id === item source id).
+  const leaveKeys = new Set<string>();
   leaveRecords.forEach((record) => {
     const ymd = toYMD(record?.date);
-    if (ymd) leaveDates.add(ymd);
+    if (ymd) leaveKeys.add(`${record?.employee_id ?? ""}|${ymd}`);
   });
-  if (leaveDates.size === 0) return items;
+  if (leaveKeys.size === 0) return items;
 
   return items.filter((item) => {
     if (item.work_log_type !== "daily" || !item.source_date) return true;
     const ymd = toYMD(item.source_date);
-    return ymd === null || !leaveDates.has(ymd);
+    if (ymd === null) return true;
+    return !leaveKeys.has(
+      `${(item as { source_employee_id?: string | null }).source_employee_id ?? ""}|${ymd}`,
+    );
   });
 };
 
