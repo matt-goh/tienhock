@@ -62,8 +62,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#d1d5db",
     borderRadius: 6,
-    // Prevent page breaks within employee cards
-    break: false,
   },
   employeeHeader: {
     paddingHorizontal: 10,
@@ -213,105 +211,14 @@ const formatCurrency = (amount: number): string => {
   }).format(amount);
 };
 
-// Pagination constants
-const ROWS_PER_PAGE = 50; // Total rows per page
-const HEADER_ROWS = 2; // For subsequent pages
-const FIRST_PAGE_HEADER_ROWS = 2; // Company title + report title on first page
-const EMPLOYEE_BASE_ROWS = 8; // Base rows for employee card header and structure
-const PINJAM_DETAIL_ROWS_PER_ITEM = 1;
-const PINJAM_SECTION_OVERHEAD = 2; // Additional rows for pinjam section structure
-
-const calculateEmployeeCardRows = (employee: PinjamEmployee): number => {
-  let rows = EMPLOYEE_BASE_ROWS;
-
-  // Add rows for mid-month pinjam details
-  if (
-    employee.midMonthPinjam > 0 &&
-    employee.midMonthPinjamDetails.length > 0
-  ) {
-    rows +=
-      employee.midMonthPinjamDetails.length * PINJAM_DETAIL_ROWS_PER_ITEM +
-      PINJAM_SECTION_OVERHEAD;
-  }
-
-  // Add rows for monthly pinjam details
-  if (employee.monthlyPinjam > 0 && employee.monthlyPinjamDetails.length > 0) {
-    rows +=
-      employee.monthlyPinjamDetails.length * PINJAM_DETAIL_ROWS_PER_ITEM +
-      PINJAM_SECTION_OVERHEAD;
-  }
-
-  // Add buffer for spacing between sections and potential line wrapping
-  const totalPinjamItems =
-    (employee.midMonthPinjamDetails?.length || 0) +
-    (employee.monthlyPinjamDetails?.length || 0);
-
-  if (totalPinjamItems > 5) {
-    rows += Math.ceil(totalPinjamItems / 10); // Add extra rows for cards with many items
-  }
-
-  return rows;
-};
-
-const paginateEmployees = (employees: PinjamEmployee[]): PinjamEmployee[][] => {
-  if (!employees || employees.length === 0) {
-    return [];
-  }
-
-  const pages: PinjamEmployee[][] = [];
-  let currentPage: PinjamEmployee[] = [];
-  let isFirstPage = true;
-  let currentPageRows = FIRST_PAGE_HEADER_ROWS; // Start with first page header rows
-
-  employees.forEach((employee, index) => {
-    const employeeRows = calculateEmployeeCardRows(employee);
-
-    // Determine the available space based on whether this is the first page or not
-    const headerRowsForThisPage = isFirstPage
-      ? FIRST_PAGE_HEADER_ROWS
-      : HEADER_ROWS;
-    const maxContentRows = ROWS_PER_PAGE - headerRowsForThisPage;
-
-    let startNewPage = false;
-
-    if (
-      currentPageRows + employeeRows > ROWS_PER_PAGE &&
-      currentPage.length > 0
-    ) {
-      // If adding this employee exceeds page limit and current page is not empty
-      startNewPage = true;
-    } else if (employeeRows > maxContentRows && currentPage.length === 0) {
-      // If a single employee card is too large for one page and it's the start of a new page
-      // It will just take its own page - simplified approach
-    }
-
-    if (startNewPage) {
-      pages.push(currentPage);
-      currentPage = [];
-      isFirstPage = false; // All subsequent pages will have regular headers
-      currentPageRows = HEADER_ROWS; // Reset to regular header rows for subsequent pages
-    }
-
-    currentPage.push(employee);
-    currentPageRows += employeeRows;
-  });
-
-  // Add the last page if it has any employees
-  if (currentPage.length > 0) {
-    pages.push(currentPage);
-  }
-
-  return pages;
-};
-
 const PinjamPDFDocument: React.FC<{ data: PinjamPDFData }> = ({ data }) => {
   const { employees, year, month } = data;
   const monthName = getMonthName(month);
 
-  const pdfPages = paginateEmployees(employees);
-
   const renderEmployeeCard = (employee: PinjamEmployee) => (
-    <View key={employee.employee_id} style={styles.employeeCard} break={false}>
+    // wrap={false} keeps each card whole — react-pdf moves it to the next page
+    // rather than splitting it across a page boundary.
+    <View key={employee.employee_id} style={styles.employeeCard} wrap={false}>
       {/* Employee Header */}
       <View style={styles.employeeHeader}>
         <Text style={styles.employeeName}>{employee.employee_name}</Text>
@@ -432,21 +339,17 @@ const PinjamPDFDocument: React.FC<{ data: PinjamPDFData }> = ({ data }) => {
 
   return (
     <Document title={`Pinjam Summary - ${monthName} ${year}`}>
-      {pdfPages.map((pageEmployees, pageIndex) => (
-        <Page key={`page-${pageIndex}`} size="A4" style={styles.page}>
-          {/* Header - only on first page */}
-          {pageIndex === 0 && (
-            <View style={styles.headerSection}>
-              <Text style={styles.companyHeader}>
-                TIEN HOCK FOOD INDUSTRIES S/B
-              </Text>
-            </View>
-          )}
+      <Page size="A4" style={styles.page} wrap>
+        {/* Header - flows once at the top, so it appears only on the first page */}
+        <View style={styles.headerSection}>
+          <Text style={styles.companyHeader}>
+            TIEN HOCK FOOD INDUSTRIES S/B
+          </Text>
+        </View>
 
-          {/* Employee Cards */}
-          {pageEmployees.map((employee) => renderEmployeeCard(employee))}
-        </Page>
-      ))}
+        {/* Employee Cards - react-pdf flows these across pages automatically */}
+        {employees.map((employee) => renderEmployeeCard(employee))}
+      </Page>
     </Document>
   );
 };
