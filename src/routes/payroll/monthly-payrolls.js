@@ -1200,10 +1200,11 @@ export default function (pool) {
       });
 
       // Apply threshold bonuses based on daily totals
-      // Threshold for BH: 70+ bags/day for first bonus, >140 for second
+      // Threshold for BH: 70+ bags/day for first bonus, 140+ for second
       // Threshold for MEE: 100+ bags/day for first bonus (based on pay code descriptions)
-      // The threshold is inclusive ("100 or more" / "70 or more") to match the
-      // legacy payslips: a day that hits exactly the threshold still earns F/HARIAN.
+      // All thresholds are inclusive ("70 or more", "100 or more", "140 or more")
+      // to match the legacy payslips: a day that hits exactly a threshold earns the
+      // higher tier. (Daily bag total excludes Hancur/Karung/Bundle.)
       // Exception: If machine_broken is true, apply first tier bonus even if below threshold
       // Day type aware: Uses holiday-specific bonus codes for ahad/umum days
       Object.values(dailyTotalsPerWorker).forEach((dailyData) => {
@@ -1252,16 +1253,17 @@ export default function (pool) {
             const bagsDisplay = Math.round(productBagCount);
 
             // Apply first tier bonus (>=70 for BH, >=100 for MEE, or machine broken).
-            // Only skip in favour of the second tier (>140) when a real second-tier
-            // bonus code exists for this product. MEE products (MNL/2UDG/3UDG/350G)
+            // Only skip in favour of the second tier (>=140) when a real second-tier
+            // bonus code exists for this product. The 140 boundary is inclusive: a
+            // day of exactly 140 bags belongs to the >=140 tier (matches legacy), so
+            // the first tier covers totalBags < 140. MEE products (MNL/2UDG/3UDG/350G)
             // have no >140 code, so without this guard any MEE day over 140 bags would
-            // lose its F/HARIAN bonus entirely (first tier capped at 140, second tier
-            // never fires). When there is no second-tier code, the first tier applies
-            // to all qualifying days regardless of bag count.
+            // lose its F/HARIAN bonus entirely; when there is no second-tier code the
+            // first tier applies to all qualifying days regardless of bag count.
             if (
               bonus70Code &&
               (meetsThreshold1 || hasMachineBroken) &&
-              (!bonus140Code || totalBags <= threshold2)
+              (!bonus140Code || totalBags < threshold2)
             ) {
               // Select rate based on day type - if using a regular code on holiday, use ahad/umum rate
               let bonusRate = bonus70Code.rate_biasa;
@@ -1291,8 +1293,9 @@ export default function (pool) {
               }
             }
 
-            // Apply second tier bonus (>140) - only when actually exceeds threshold, NOT for machine broken
-            if (bonus140Code && totalBags > threshold2) {
+            // Apply second tier bonus (>=140; inclusive boundary so a day of
+            // exactly 140 bags lands here, matching the legacy payslips).
+            if (bonus140Code && totalBags >= threshold2) {
               // Select rate based on day type
               let bonusRate = bonus140Code.rate_biasa;
               if (dayType === "ahad" && bonus140Code.rate_ahad > 0) {
