@@ -74,6 +74,84 @@ All four statements render a single period only — no prior-year comparative co
 
 ---
 
+## Active build: Bank statement from journal (item 1B-1)
+
+> Started 8 Jun 2026 · report built 9 Jun 2026 · **tie-out proof in progress (Jan 2026)**. First concrete accounting build. Format reference: legacy `bank_statement_from_journal.pdf` (Public Bank acct 3170049926, Dec 2025 sample). End goal: the report's closing book balance ties to the real Public Bank statement for a chosen month. **Proof month switched Dec 2025 → Jan 2026** — see Key findings. The Dec-2025 sample's close of 275,918.00 DR (book) ≈ 275,918.05 (bank) stays as the format/sanity reference.
+
+### Decisions
+
+- **Bank code:** the new report treats **`BANK_PBB`** as the live Public Bank account (it's where customer receipts already post). Legacy `PBB_1` is kept for historical/comparative data only.
+- **Architecture — layered, not "legacy format vs fresh".** [`JournalEntryPage`](src/pages/Accounting/JournalEntryPage.tsx) is the universal foundation and escape hatch: it can already capture *every* line type on the statement, so it makes the transition possible today. Structured screens sit **on top** and *emit* journal entries (exactly like the existing `REC`/`PAY` auto-posting), and are built only for **high-volume** lines. Lead with structure, fall back to raw journals for the long tail. *Guardrail to add later:* mark subledger-owned accounts (`TR`, `BANK_PBB`, …) so manual journals can't double-post against them.
+- **Transition — parallel run.** The co-worker keeps the legacy system as system-of-record while the ERP runs alongside. She re-keys **less** than in legacy, because daily operations (sales invoices, customer receipts) already feed most lines; she only manually journals the residual gap lines (below). Cut over once a few months tie out cleanly.
+- **Order of work:** build the *measuring instrument* (bank-statement report + opening balance) **before** any structured screen — you can't prove a screen's journal is right until you can see the running balance tie out. Supplier-payment → journal is **already wired** (`supplier-payments.js:376` calls `createSupplierPaymentJournalEntry`); it's a future *activation* (depends on entering purchase invoices), not a build.
+
+### What's built (9 Jun 2026) — report is DONE
+
+The read-only bank-statement report is complete and verified against live data. Restart the API server (`rs`) to pick up the new route.
+
+- **Backend:** [bank-statement.js](src/routes/accounting/bank-statement.js) — `GET /api/bank-statement/:accountCode/:year/:month`. Returns `opening_balance` (net of all posted lines *before* the month), `transactions` (each posted journal line for the account, with a running balance), `closing_balance`, `totals`. Filters `status='posted'`, half-open month range, TZ-safe date strings. Mounted in [index.js](src/routes/index.js) (`/api/bank-statement`).
+- **Frontend:** [BankStatementPage.tsx](src/pages/Accounting/Reports/BankStatementPage.tsx) — **Accounting → Bank Statement** (`/accounting/reports/bank-statement`), registered in [TienHockNavData.tsx](src/pages/TienHockNavData.tsx). Account selector (BK-ledger accounts + `CASH`, default `BANK_PBB`), `MonthNavigator`, Date · Journal · Particulars · Cheque · Debit · Credit · running Balance (DR/CR), opening/closing summary cards.
+- **PDF:** [BankStatementPDFMake.ts](src/utils/accounting/BankStatementPDFMake.ts) — **pdfMake** (user prefers it over `@react-pdf/renderer`), landscape, mirrors legacy layout.
+
+### Key findings (verified against dev DB)
+
+1. **Payment→journal auto-posting has a hard cutover at 1 Jan 2026.** Coverage by month of `payments` with a `journal_entry_id`: Jun–Dec 2025 = **0–4%**, Jan 2026 onward = **100%**. So pre-2026 customer payments have a payment *record* but **no journal entry**; everything from Jan 2026 posts automatically. (The stray <5% in late 2025 are old payments edited after Jan, which re-triggered posting.)
+2. **Decision: NO backfill of 2025** (user's call). Therefore the proof runs on **Jan 2026**, where receipts are already 100% posted — no backfill needed.
+3. **The cutover only auto-posts customer RECEIPTS, not outgoing payments.** Jan 2026 `BANK_PBB` currently holds **160 receipt (debit) lines = RM 461,123.64**, and **zero credit lines**. Every outgoing line on the bank statement (supplier/director/worker payments, transfers, bank charges, loans — the gap categories below) still has to be entered **manually as a journal**, in 2026 just as in any month. **This is the bulk of the proof work.**
+4. **The report's computed Jan-2026 opening (45,615.45 DR) is noise, not a real balance** — it's the net of those ~20 late-posted 2025 stragglers. It must be overridden by the user's real opening figure (see Handover).
+
+### Reference dataset (to be provided next session)
+
+For the Jan 2026 proof the user will provide: **(a)** the real opening balance of `BANK_PBB` as at **1 Jan 2026**, and **(b)** the **complete Jan 2026 Public Bank statement** (every line — the outgoing ones especially, since those are what get keyed in). The gap-line categories below (from the Dec sample) are the same line *types* that appear on the Jan statement.
+
+### Gap lines — particulars with no clean ERP source (for the co-worker's key-ins)
+
+Direction: **IN** = money into bank (book debit) · **OUT** = money out (book credit).
+
+**❌ No source at all — must be captured manually (journal entry now; maybe a screen later):**
+
+- **A. Worker cash claims & drawings** *(monthly, recurring)* — `CLAIM BILLS/AL WORKERS`, `CLAIM BILLS/DRAWING WORKERS/SALARY WORKERS`, `CLAIM BILLS/BONUS/OT&AL WORKERS`, `CLAIM BILLS/DRAWING WORKERS` (OUT); `FROM DRAWING WORKERS` (IN, workers returning cash). *Q: how is each figure derived — tied to payroll, or a separate cash-claim sheet?*
+- **B. Director account movements** — `AMOUNT DUE TO DIRECTOR -GTH / -GT` (OUT). *Q: which director; loan repayment vs reimbursement vs drawing; backing document?*
+- **C. Inter-bank transfers** — `TRANSFER FUNDS PBB TH TO ABB TH` (OUT). *Q: frequency; is the ABB side recorded?*
+- **D. Inter-company transfers** — `TRANSFER FUND RECEIVED FROM GT TO TH` (IN). *Q: what triggers it; logged on the Green Target side too?*
+- **E. Loans / financing** *(monthly fixed)* — `LOAN PYMT 46TH INSTALLMENT (SD1016T)`, `TRANSFER FUND OF MBB LOAN #…` (OUT). *Q: how many active loans/HP contracts, monthly instalment of each, lender. (Future HP/loan schedule.)*
+
+**🟡 Source/feature exists but isn't flowing — needs activation or a manual journal:**
+
+- **F. Supplier / vendor payments** — `JOHOR BAHRU FLOUR MILL S/B`, `GREEN TARGET WASTE TREATMENT IND.S/B`, `MY CO2 (PG) S/B`, `POLIS DIRAJA MALAYSIA` (a fine, not a real supplier). Feature exists (auto-posts `PAY`), unused; needs the purchase invoice entered first. *Q: ~how many supplier payments a month; does she have the matching bill for each?*
+- **G. Bank charges** — `BANK CHARGES MONTH OF DEC'2025`. Manual `J` journal (DR `BC`/`AE_BK`/`MBBC` / CR bank).
+- **H. Corrections / contra** — `WRONGLY PYMT ISSUE JP DEBT TO TH DEBT`, `CONTRA PYMT OF WRONGLY PYMT RECEIVED`. Manual `J` journal.
+- **I. Daily cash-sales banking** — `SALES {date}`. Underlying CASH receipts exist (posted to `CASH`), but the "deposit the day's cash into PBB" step isn't modeled. *Q (key): how is the `SALES {date}` amount and banking day decided — is it literally the day's cash collection physically deposited?*
+
+**✅ Already flowing:** `INV/NO : {inv}/{customer}` — customer payments against credit invoices, auto-posted as `REC` (DR `BANK_PBB` / CR `TR`).
+
+### Build pieces
+
+1. ✅ **Bank-statement / account-ledger report** — done (see "What's built"). Doubles as the generic Account Ledger (1B-2 / Type-2 #3).
+2. 🟡 **Opening-balance mechanism** — *held, build next session* (see Handover). Needed so the report shows the real opening, not the 45,615.45 straggler noise.
+3. 🟡 **Jan 2026 tie-out proof** — enter the outgoing gap lines as journal entries, confirm the report's Jan close ties to the bank's Jan closing balance.
+4. ⬜ **Structured screens** — later, by volume; first candidate is activating the purchases → payables → supplier-payment loop (already built end-to-end).
+
+---
+
+## Handover — next session (do exactly this)
+
+**Goal:** make the Bank Statement report's `BANK_PBB` **Jan 2026** closing balance tie to the real Public Bank statement's Jan 2026 closing balance. The report is already built; the proof needs an opening balance + the outgoing journal lines.
+
+**Wait for the user to provide** (they said "tomorrow"): (a) `BANK_PBB` opening balance as at 1 Jan 2026; (b) the complete Jan 2026 Public Bank statement.
+
+**Then:**
+
+1. **Build the opening-balance mechanism (Option B — recommended).** A small opening-balance record `(account_code, as_of_date, amount, notes)` + a report rule: when an opening balance exists with `as_of_date <= period_start`, compute `opening = amount + sum(lines in [as_of_date, period_start))` and **ignore everything before `as_of_date`**. Set `(BANK_PBB, 2026-01-01, <user's figure>)`. This cleanly discards the 45,615.45 of pre-cutover 2025 noise and generalises to the proper Opening Balance setup (gap 1A-7). Update [bank-statement.js](src/routes/accounting/bank-statement.js) to use it, and add a way to set it (small endpoint/UI). New table ⇒ update the schema in **CLAUDE.md and AGENTS.md** (rule 13).
+   - *Option A (rejected as fragile):* an opening-balance journal dated 31 Dec 2025 with bank leg = `real_opening − 45,615.45`. Breaks if a 2025 straggler is later edited.
+2. **Enter every outgoing (credit) line from the Jan 2026 statement as journal entries** — these are the gap categories A–I above (supplier/director/worker payments, transfers, bank charges, loans, contras). Use `BANK_PBB` as the bank leg (credit), an appropriate contra as the debit (e.g. bank charges → `BC`/`AE_BK`/`MBBC`; supplier → `TP`/supplier; director → director account). Put the cheque no. in the line `reference` and the narrative in `particulars`, so they render in the report's Cheque/Particulars columns. **Confirm the contra account per category with the user** — don't guess.
+3. **Reconcile the receipts.** The 160 posted Jan receipts should correspond to the statement's deposit/`SALES {date}`/`INV/NO` inflow lines. Resolve the open "SALES {date}" question (gap-line I): is it the day's cash collection physically banked? That decides whether cash receipts (currently in `CASH`) need a "deposit into PBB" entry.
+4. **Verify:** run the Bank Statement report for `BANK_PBB` / Jan 2026; the closing balance should match the bank's Jan 2026 closing. Investigate any difference (it's either a missing line or a genuine reconciling item → future bank-rec worksheet, 1B-8).
+
+**Don't:** backfill 2025 (user declined). Don't post opening balances or gap lines without the user present/confirming the figures and contra accounts.
+
+---
+
 ## 0. The chart-of-accounts question (the decision underneath everything)
 
 You're stuck choosing between "~60 simplified codes" and "keep the 1,202 legacy codes." Reframe it: **that is a false choice.**
@@ -121,7 +199,7 @@ Tien Hock is a Sdn Bhd: every year it must file audited financial statements wit
 
 | # | Capability | Status | Why it matters |
 |---|-----------|--------|----------------|
-| 1 | **Bank statement from journal** | ❌ | A running-ledger view of any bank/cash account (`BANK_PBB`, `BANK_ABB`, `CASH`; legacy `PBB_1`/`PBB_2`) — date, journal, particulars, cheque no., debit, credit, running balance. The most-used legacy report; today there is no way to see a bank account's running balance without doing it by hand. (Handover #1; [Phase 2.2](docs/ACCOUNTING_SYSTEM_IMPLEMENTATION_PLAN.md).) |
+| 1 | **Bank statement from journal** | 🟡 *in progress* | A running-ledger view of any bank/cash account (`BANK_PBB`, `BANK_ABB`, `CASH`; legacy `PBB_1`/`PBB_2`) — date, journal, particulars, cheque no., debit, credit, running balance. The most-used legacy report; today there is no way to see a bank account's running balance without doing it by hand. (Handover #1; [Phase 2.2](docs/ACCOUNTING_SYSTEM_IMPLEMENTATION_PLAN.md).) **First accounting build now in progress — see [§ Active build](#active-build-bank-statement-from-journal-item-1b-1) below.** |
 | 2 | **Account ledger / GL drill-down** | ❌ | The generic version of #1: pick any account, see every transaction and a running balance — a creditor, a director account (`CL_WSF`/`CL_GTH`), a prepayment (`CA_INS`), an inter-company balance. One screen that answers "where did this number come from" for the whole trial balance. |
 | 3 | **Journal posting for General Purchases** | 🟡 | [`LocalGeneralPurchaseFormPage`](src/pages/Accounting/Purchases/LocalGeneralPurchaseFormPage.tsx) writes `self_billed_invoices` rows but creates **no journal entry** (verified in [`self-billed-invoices.js`](src/routes/accounting/self-billed-invoices.js)) — only *material* purchases auto-post. Every local general purchase (utilities, stationery, repairs, services) is currently invisible to the GL. (Handover #2.) |
 | 4 | **Supplier payment entry** | ❌ | No "pay this supplier invoice" screen — supplier payments and their DR Payables / CR Bank journal are done by hand. Pairs with #3 to close the purchase-to-pay loop that customer payments already have. |
@@ -136,7 +214,7 @@ Tien Hock is a Sdn Bhd: every year it must file audited financial statements wit
 
 | # | Legacy feature → new-ERP shape | Status | Pain it solves |
 |---|-------------------------------|--------|----------------|
-| 1 | PBB bank running ledger → **bank-statement-from-journal page** | ❌ | Can't reconcile the books to the actual bank statement; no view of a bank balance over time. *(= 1B-1)* |
+| 1 | PBB bank running ledger → **bank-statement-from-journal page** | 🟡 *in progress* | Can't reconcile the books to the actual bank statement; no view of a bank balance over time. *(= 1B-1; see [§ Active build](#active-build-bank-statement-from-journal-item-1b-1))* |
 | 2 | Every purchase posted to the books → **journal posting for General Purchases** | 🟡 | Local general purchases never reach the GL, so the trial balance understates expenses and payables. *(= 1B-3)* |
 | 3 | Print-any-code ledger → **generic Account Ledger** | ❌ | No way to trace any account's transactions or running balance — neither you nor an auditor can drill from a trial-balance number to its movements. |
 | 4 | Detailed P&L → **Schedule B** (admin expense breakdown) | ❌ | The P&L shows Note 5 as one lump; you can't see what the company actually spent money on. *(= 1A-5)* |
