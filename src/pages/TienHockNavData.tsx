@@ -24,6 +24,7 @@ import LocationAccountMappingsPage from "./Accounting/LocationAccountMappingsPag
 
 // Accounting - Financial Reports
 import TrialBalancePage from "./Accounting/Reports/TrialBalancePage";
+import BankStatementPage from "./Accounting/Reports/BankStatementPage";
 import IncomeStatementPage from "./Accounting/Reports/IncomeStatementPage";
 import BalanceSheetPage from "./Accounting/Reports/BalanceSheetPage";
 import CogmPage from "./Accounting/Reports/CogmPage";
@@ -381,6 +382,11 @@ export const TienHockNavData: SidebarItem[] = [
         name: "Account Mappings",
         path: "/accounting/location-account-mappings",
         component: LocationAccountMappingsPage,
+      },
+      {
+        name: "Bank Statement",
+        path: "/accounting/reports/bank-statement",
+        component: BankStatementPage,
       },
       {
         name: "Trial Balance",
