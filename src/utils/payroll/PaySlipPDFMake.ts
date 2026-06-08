@@ -914,7 +914,7 @@ const appendBasePayRows = (
   });
 
   tableBody.push(
-    createBaseSubtotalRow("Jumlah Base", baseTotalAmount, {
+    createBaseSubtotalRow("Jumlah Biasa", baseTotalAmount, {
       baseSubtotalBorder: true,
     }),
   );
