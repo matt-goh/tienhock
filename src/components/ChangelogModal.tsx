@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-06-10",
+    ms: "Cetakan slip gaji kini mencetak slip pecahan individu (individual breakdown) secara lalai di semua tempat — butang cetak pada baris pekerja, halaman Butiran Gaji, dan cetak ikut bahagian — kerana itu yang paling kerap diperlukan. Slip gabungan tidak lagi dicetak secara automatik. Butang baharu 'Print Combined' ditambah pada halaman Butiran Gaji untuk mencetak slip gabungan sahaja apabila diperlukan (hanya muncul untuk pekerja berbilang kerja).",
+    en: "Printing payslips now prints the individual breakdown slips by default everywhere — the employee-row print button, the Payroll Details page, and print-by-section — since that's what's needed most often. The combined slip is no longer printed automatically. A new 'Print Combined' button on the Payroll Details page prints the combined slip only when needed (it appears only for multi-job employees).",
+  },
+  {
     date: "2026-06-09",
     ms: "Slip gaji individu (individual breakdown) bagi pekerja yang berkongsi nama: tajuk 'Kerja N of M (Individual Breakdown)' telah dibuang. Slip pekerja Ketua (Head) — yang ditetapkan dalam borang Staf — kini disenaraikan dahulu selepas slip gabungan dan memaparkan potongan KWSP/SOCSO/SIP/PCB serta jumlah Gaji Bersih. Jika tiada Head ditetapkan, potongan kekal hanya pada slip gabungan seperti biasa. Pada slip gabungan, baris 'Jumlah Lain-lain' yang mengelirukan (mengira semula item Tambahan yang sudah termasuk dalam subtotal setiap kerja) tidak lagi dipaparkan apabila tiada item lain-lain sebenar. Selain itu, bayaran pendahuluan (advance) kini dipaparkan pada slip gabungan walaupun ia direkodkan di bawah ID pekerja yang berkongsi nama — sebelum ini jumlahnya ditolak daripada gaji akhir tetapi barisnya tidak ditunjukkan.",
     en: "Individual breakdown payslips for same-name staff: the 'Kerja N of M (Individual Breakdown)' title was removed. The Head's slip — set in the Staff form — now appears first after the combined slip and shows the EPF/SOCSO/SIP/PCB deductions plus a Net Pay total. If no Head is set, deductions stay on the combined slip only, as before. On the combined slip, the misleading 'Jumlah Lain-lain' row (which re-summed Tambahan items already included in each job's subtotal) no longer appears when there are no genuine other items. Also, advance payments now show on the combined slip even when recorded under a same-name sibling ID — previously the amount was subtracted from the final total but its line item was hidden.",
@@ -32,6 +37,16 @@ const CHANGELOG_ENTRIES: ChangelogEntry[] = [
     date: "2026-06-09",
     ms: "Penyata Bank kini boleh ditetapkan baki pembukaan (opening balance). Klik 'Set opening balance', pilih tarikh dan jumlah, dan laporan akan bermula dari baki itu serta mengabaikan semua catatan sebelum tarikh tersebut — berguna untuk memadankan baki dengan penyata bank sebenar.",
     en: "The Bank Statement report now supports a starting (opening) balance. Click 'Set opening balance', pick a date and amount, and the report starts from that figure and ignores everything before that date — useful for tying the book balance to the real bank statement.",
+  },
+  {
+    date: "2026-06-09",
+    ms: "Slip gaji kini sama tanpa mengira dari mana ia dicetak (butang cetak pada baris pekerja, halaman butiran gaji, atau cetak ikut bahagian). Sebelum ini cetakan dari baris pekerja kadangkala tertinggal baris Bayaran Pendahuluan, dan cetakan ikut bahagian kadangkala menolak advance Insentif Tidak Tetap dua kali — kedua-duanya kini diselaraskan.",
+    en: "Payslips are now identical no matter where they're printed from (the employee row print button, the payroll details page, or print-by-section). Previously a row print could miss the mid-month advance (Bayaran Pendahuluan) line, and a print-by-section could deduct an Insentif Tidak Tetap advance twice — both are now consistent.",
+  },
+  {
+    date: "2026-06-09",
+    ms: "Pembetulan slip pecahan individu (Individual Breakdown) bagi pekerja gabungan: advance Insentif Tidak Tetap kini ditolak pada slip pecahan yang memaparkan pendapatan advance itu, supaya \"Jumlah Selepas Advances\" pada slip tersebut lengkap. Sebelum ini advance itu ditunjukkan sebagai pendapatan tetapi tidak ditolak pada slip yang sama.",
+    en: "Individual Breakdown fix for combined employees: an Insentif Tidak Tetap advance is now deducted on the same breakdown slip that shows its income, so that slip's \"Jumlah Selepas Advances\" is complete. Previously the advance appeared as income but was not deducted on the same slip.",
   },
   {
     date: "2026-06-07",

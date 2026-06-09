@@ -11,6 +11,7 @@ import {
   StaffDetails,
   createStaffDetailsMap,
 } from "../../utils/payroll/PayslipManager";
+import { PayslipPrintMode } from "../../utils/payroll/PaySlipPDFMake";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 import Button from "../../components/Button";
@@ -30,6 +31,8 @@ export interface PayslipButtonProps {
   size?: "sm" | "md" | "lg";
   staffDetails?: StaffDetails;
   midMonthPayroll?: MidMonthPayroll | null;
+  // Which slip(s) to print; defaults to the print flow's "individual" breakdown.
+  mode?: PayslipPrintMode;
   onComplete?: () => void;
 }
 
@@ -195,6 +198,7 @@ export const PrintPayslipButton: React.FC<PayslipButtonProps> = ({
   size = "md",
   staffDetails,
   midMonthPayroll,
+  mode,
   onComplete,
 }) => {
   const [isPrinting, setIsPrinting] = useState(false);
@@ -218,6 +222,7 @@ export const PrintPayslipButton: React.FC<PayslipButtonProps> = ({
     await printPayslip(payroll, details, {
       companyName,
       midMonthPayroll,
+      mode,
       onBeforePrint: () => {
         setShowOverlay(true);
       },

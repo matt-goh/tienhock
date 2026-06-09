@@ -934,6 +934,44 @@ export default function (pool) {
         return acc;
       }, {});
 
+      // Recalculate gross_pay/net_pay with the CONSOLIDATED approach so the batch
+      // print/download flows produce the exact same figures as the single (/:id)
+      // and /comprehensive endpoints. net_pay here is gross - statutory only;
+      // commission advances are shown as a separate advance deduction on the
+      // payslip, so they must NOT be pre-subtracted from net_pay (the raw stored
+      // net_pay already excludes them, which would double-count on the slip).
+      const consolidateItemsAPI = (itemsList) => {
+        const groups = new Map();
+        itemsList.forEach((item) => {
+          const key = `${item.pay_code_id}_${item.rate}_${item.rate_unit}`;
+          if (groups.has(key)) {
+            const group = groups.get(key);
+            group.totalQuantity += item.quantity;
+            group.totalFocUnits += item.foc_units || 0;
+            group.originalAmountSum += item.amount;
+          } else {
+            groups.set(key, {
+              rate: item.rate,
+              rate_unit: item.rate_unit,
+              totalQuantity: item.quantity,
+              totalFocUnits: item.foc_units || 0,
+              originalAmountSum: item.amount,
+            });
+          }
+        });
+        let totalCents = 0;
+        groups.forEach((group) => {
+          if (group.rate_unit === "Percent" || group.rate_unit === "Fixed") {
+            totalCents += Math.round(group.originalAmountSum * 100);
+          } else {
+            const roundedRate = Math.round(group.rate * 100) / 100;
+            const totalUnits = group.totalQuantity + group.totalFocUnits;
+            totalCents += Math.round(roundedRate * totalUnits * 100);
+          }
+        });
+        return totalCents;
+      };
+
       // Merge payrolls with their items, deductions, leave records, mid-month payrolls, commission, and others records
       const response = payrollsResult.rows.map((payroll) => {
         const midMonth = midMonthByPayrollId[payroll.id];
@@ -941,11 +979,46 @@ export default function (pool) {
           ? midMonth.rows.find((r) => r.employee_id === payroll.employee_id) ||
             midMonth.rows[0]
           : null;
+
+        const payrollItems = itemsByPayrollId[payroll.id] || [];
+        const payrollLeave = leaveRecordsByPayrollId[payroll.id] || [];
+        const payrollCommissions = commissionsByPayrollId[payroll.id] || [];
+        const payrollOthers = othersByPayrollId[payroll.id] || [];
+        const payrollDeductions = deductionsByPayrollId[payroll.id] || [];
+
+        const workGrossPayCents = consolidateItemsAPI(
+          removeLeaveDayWorkItems(payrollItems, buildLeaveDateSet(payrollLeave)),
+        );
+        const leaveGrossPayCents = payrollLeave.reduce(
+          (sum, r) => sum + Math.round(r.amount_paid * 100),
+          0,
+        );
+        const commissionGrossPayCents = payrollCommissions.reduce(
+          (sum, r) => sum + Math.round(r.amount * 100),
+          0,
+        );
+        const othersGrossPayCents = payrollOthers.reduce(
+          (sum, r) => sum + Math.round(r.amount * 100),
+          0,
+        );
+        const recalculatedGrossPay =
+          (workGrossPayCents +
+            leaveGrossPayCents +
+            commissionGrossPayCents +
+            othersGrossPayCents) /
+          100;
+        const totalDeductions = payrollDeductions.reduce(
+          (sum, d) => sum + parseFloat(d.employee_amount || 0),
+          0,
+        );
+        const recalculatedNetPay =
+          Math.round((recalculatedGrossPay - totalDeductions) * 100) / 100;
+
         return {
           ...payroll,
-          items: itemsByPayrollId[payroll.id] || [],
-          deductions: deductionsByPayrollId[payroll.id] || [],
-          leave_records: leaveRecordsByPayrollId[payroll.id] || [],
+          items: payrollItems,
+          deductions: payrollDeductions,
+          leave_records: payrollLeave,
           job_sections: splitJobTypes(payroll.job_type).reduce((acc, jt) => {
             if (jobSectionsMap[jt]) acc[jt] = jobSectionsMap[jt];
             return acc;
@@ -954,10 +1027,10 @@ export default function (pool) {
             ? { ...primaryMidMonth, amount: midMonth.total }
             : null,
           mid_month_payrolls_by_employee: midMonth ? midMonth.byEmployee : {},
-          commission_records: commissionsByPayrollId[payroll.id] || [],
-          others_records: othersByPayrollId[payroll.id] || [],
-          gross_pay: parseFloat(payroll.gross_pay),
-          net_pay: parseFloat(payroll.net_pay),
+          commission_records: payrollCommissions,
+          others_records: payrollOthers,
+          gross_pay: recalculatedGrossPay,
+          net_pay: recalculatedNetPay,
         };
       });
 
