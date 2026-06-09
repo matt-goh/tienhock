@@ -770,6 +770,10 @@ export interface EmployeePayroll {
   others_records?: OthersRecord[];
   // Mapping of employee_id to job_type for combined payrolls (e.g., {"MASRUN_S": "MEE_ROLL", "MASRUN": "MEE_SANGKUT"})
   employee_job_mapping?: Record<string, string>;
+  // Designated Head sibling id (staffs.head_staff_id) for the same-name group, or
+  // null when no Head is set. Drives which individual breakdown slip carries the
+  // statutory deductions and is rendered first.
+  head_employee_id?: string | null;
   // Section name per job_type (e.g., {"MEE_PACKING": "Mee", "BIHUN_SANGKUT": "Bihun"})
   // so each individual breakdown slip shows its own job's Bahagian.
   job_sections?: Record<string, string>;
