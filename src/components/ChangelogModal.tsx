@@ -19,6 +19,16 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-06-09",
+    ms: "Halaman baharu 'Payroll Bank Payment' (di bawah Perakaunan). Ia menyenaraikan bayaran gaji bersih, gaji separuh bulan, dan caruman KWSP/SOCSO/SIP/PCB bagi bulan yang dipilih, dengan jumlah diisi automatik daripada payroll (gaji bersih tolak pinjam). Setiap jumlah, tarikh dan akaun bank boleh diubah supaya sepadan dengan bayaran sebenar, kemudian dicatat terus ke lejar bank sebagai bayaran keluar.",
+    en: "New 'Payroll Bank Payment' page (under Accounting). It lists net salary, half-month salary, and the EPF/SOCSO/SIP/PCB remittances for the selected month, with amounts pre-filled from payroll (take-home minus pinjam). Every amount, date and bank account is editable to match the actual transfer, then posts straight to the bank ledger as an outgoing payment.",
+  },
+  {
+    date: "2026-06-09",
+    ms: "Penyata Bank kini boleh ditetapkan baki pembukaan (opening balance). Klik 'Set opening balance', pilih tarikh dan jumlah, dan laporan akan bermula dari baki itu serta mengabaikan semua catatan sebelum tarikh tersebut — berguna untuk memadankan baki dengan penyata bank sebenar.",
+    en: "The Bank Statement report now supports a starting (opening) balance. Click 'Set opening balance', pick a date and amount, and the report starts from that figure and ignores everything before that date — useful for tying the book balance to the real bank statement.",
+  },
+  {
     date: "2026-06-07",
     ms: "Pembetulan slip gaji Packing Bihun: aktiviti harian yang tiada kuantiti tidak lagi dikira sebagai 1 beg/bundle, dan rekod Hancur/Karung tidak lagi menaikkan jumlah beg harian untuk bonus F/HARIAN. Ini membetulkan kes seperti RAMBU_PB supaya bonus dan jumlah gaji kasar sepadan dengan slip lama. Gaji bulan yang terlibat perlu diproses semula.",
     en: "Packing Bihun payslip fix: daily activities with no quantity no longer count as 1 bag/bundle, and Hancur/Karung records no longer increase the daily bag count for F/HARIAN bonus eligibility. This fixes cases like RAMBU_PB so the bonus and gross pay match the legacy payslip. Affected months should be re-processed.",
