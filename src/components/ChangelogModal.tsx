@@ -19,6 +19,16 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-06-09",
+    ms: "Slip gaji kini sama tanpa mengira dari mana ia dicetak (butang cetak pada baris pekerja, halaman butiran gaji, atau cetak ikut bahagian). Sebelum ini cetakan dari baris pekerja kadangkala tertinggal baris Bayaran Pendahuluan, dan cetakan ikut bahagian kadangkala menolak advance Insentif Tidak Tetap dua kali — kedua-duanya kini diselaraskan.",
+    en: "Payslips are now identical no matter where they're printed from (the employee row print button, the payroll details page, or print-by-section). Previously a row print could miss the mid-month advance (Bayaran Pendahuluan) line, and a print-by-section could deduct an Insentif Tidak Tetap advance twice — both are now consistent.",
+  },
+  {
+    date: "2026-06-09",
+    ms: "Pembetulan slip pecahan individu (Individual Breakdown) bagi pekerja gabungan: advance Insentif Tidak Tetap kini ditolak pada slip pecahan yang memaparkan pendapatan advance itu, supaya \"Jumlah Selepas Advances\" pada slip tersebut lengkap. Sebelum ini advance itu ditunjukkan sebagai pendapatan tetapi tidak ditolak pada slip yang sama.",
+    en: "Individual Breakdown fix for combined employees: an Insentif Tidak Tetap advance is now deducted on the same breakdown slip that shows its income, so that slip's \"Jumlah Selepas Advances\" is complete. Previously the advance appeared as income but was not deducted on the same slip.",
+  },
+  {
     date: "2026-06-07",
     ms: "Pembetulan slip gaji Packing Bihun: aktiviti harian yang tiada kuantiti tidak lagi dikira sebagai 1 beg/bundle, dan rekod Hancur/Karung tidak lagi menaikkan jumlah beg harian untuk bonus F/HARIAN. Ini membetulkan kes seperti RAMBU_PB supaya bonus dan jumlah gaji kasar sepadan dengan slip lama. Gaji bulan yang terlibat perlu diproses semula.",
     en: "Packing Bihun payslip fix: daily activities with no quantity no longer count as 1 bag/bundle, and Hancur/Karung records no longer increase the daily bag count for F/HARIAN bonus eligibility. This fixes cases like RAMBU_PB so the bonus and gross pay match the legacy payslip. Affected months should be re-processed.",
