@@ -20,6 +20,21 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-09",
+    ms: "Slip gaji individu (individual breakdown) bagi pekerja yang berkongsi nama: tajuk 'Kerja N of M (Individual Breakdown)' telah dibuang. Slip pekerja Ketua (Head) — yang ditetapkan dalam borang Staf — kini disenaraikan dahulu selepas slip gabungan dan memaparkan potongan KWSP/SOCSO/SIP/PCB serta jumlah Gaji Bersih. Jika tiada Head ditetapkan, potongan kekal hanya pada slip gabungan seperti biasa. Pada slip gabungan, baris 'Jumlah Lain-lain' yang mengelirukan (mengira semula item Tambahan yang sudah termasuk dalam subtotal setiap kerja) tidak lagi dipaparkan apabila tiada item lain-lain sebenar. Selain itu, bayaran pendahuluan (advance) kini dipaparkan pada slip gabungan walaupun ia direkodkan di bawah ID pekerja yang berkongsi nama — sebelum ini jumlahnya ditolak daripada gaji akhir tetapi barisnya tidak ditunjukkan.",
+    en: "Individual breakdown payslips for same-name staff: the 'Kerja N of M (Individual Breakdown)' title was removed. The Head's slip — set in the Staff form — now appears first after the combined slip and shows the EPF/SOCSO/SIP/PCB deductions plus a Net Pay total. If no Head is set, deductions stay on the combined slip only, as before. On the combined slip, the misleading 'Jumlah Lain-lain' row (which re-summed Tambahan items already included in each job's subtotal) no longer appears when there are no genuine other items. Also, advance payments now show on the combined slip even when recorded under a same-name sibling ID — previously the amount was subtracted from the final total but its line item was hidden.",
+  },
+  {
+    date: "2026-06-09",
+    ms: "Halaman baharu 'Payroll Bank Payment' (di bawah Perakaunan). Ia menyenaraikan bayaran gaji bersih, gaji separuh bulan, dan caruman KWSP/SOCSO/SIP/PCB bagi bulan yang dipilih, dengan jumlah diisi automatik daripada payroll (gaji bersih tolak pinjam). Setiap jumlah, tarikh dan akaun bank boleh diubah supaya sepadan dengan bayaran sebenar, kemudian dicatat terus ke lejar bank sebagai bayaran keluar.",
+    en: "New 'Payroll Bank Payment' page (under Accounting). It lists net salary, half-month salary, and the EPF/SOCSO/SIP/PCB remittances for the selected month, with amounts pre-filled from payroll (take-home minus pinjam). Every amount, date and bank account is editable to match the actual transfer, then posts straight to the bank ledger as an outgoing payment.",
+  },
+  {
+    date: "2026-06-09",
+    ms: "Penyata Bank kini boleh ditetapkan baki pembukaan (opening balance). Klik 'Set opening balance', pilih tarikh dan jumlah, dan laporan akan bermula dari baki itu serta mengabaikan semua catatan sebelum tarikh tersebut — berguna untuk memadankan baki dengan penyata bank sebenar.",
+    en: "The Bank Statement report now supports a starting (opening) balance. Click 'Set opening balance', pick a date and amount, and the report starts from that figure and ignores everything before that date — useful for tying the book balance to the real bank statement.",
+  },
+  {
+    date: "2026-06-09",
     ms: "Slip gaji kini sama tanpa mengira dari mana ia dicetak (butang cetak pada baris pekerja, halaman butiran gaji, atau cetak ikut bahagian). Sebelum ini cetakan dari baris pekerja kadangkala tertinggal baris Bayaran Pendahuluan, dan cetakan ikut bahagian kadangkala menolak advance Insentif Tidak Tetap dua kali — kedua-duanya kini diselaraskan.",
     en: "Payslips are now identical no matter where they're printed from (the employee row print button, the payroll details page, or print-by-section). Previously a row print could miss the mid-month advance (Bayaran Pendahuluan) line, and a print-by-section could deduct an Insentif Tidak Tetap advance twice — both are now consistent.",
   },

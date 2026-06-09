@@ -35,6 +35,9 @@ export interface BankStatementData {
     end_date: string;
   };
   opening_balance: number;
+  opening_source?:
+    | { type: "anchored"; as_of_date: string; amount: number }
+    | { type: "derived" };
   transactions: BankStatementTransaction[];
   closing_balance: number;
   totals: {
