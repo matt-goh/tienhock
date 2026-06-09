@@ -398,6 +398,22 @@ const splitGroupedPayroll = (
     });
   });
 
+  // Render the Head sibling's breakdown first (right after the combined slip).
+  // The Head is set via Staff form (staffs.head_staff_id, surfaced as
+  // payroll.head_employee_id); leave order unchanged when no Head maps to a job here.
+  const headJobType = payroll.head_employee_id
+    ? employeeJobMapping[payroll.head_employee_id]
+    : undefined;
+  if (headJobType) {
+    const headIndex = individualJobs.findIndex(
+      (job) => job.job_type === headJobType,
+    );
+    if (headIndex > 0) {
+      const [headJob] = individualJobs.splice(headIndex, 1);
+      individualJobs.unshift(headJob);
+    }
+  }
+
   return individualJobs;
 };
 
@@ -1215,7 +1231,23 @@ const buildMainPayrollPage = (
   // Mid-month and final calculations. payroll.net_pay from the comprehensive
   // endpoint is gross - statutory only, so we subtract only advance records here
   // to get the true post-advance amount that lines up with stored rounding.
-  const midMonthPayment = midMonthPayroll ? midMonthPayroll.amount : 0;
+  // The advance can be recorded under any sibling id (e.g. ROSMINA_PB), so sum
+  // the whole group's advances from mid_month_payrolls_by_employee rather than
+  // rely on the midMonthPayroll prop alone (it is keyed by the primary id and is
+  // null when the advance sits on a sibling, which hid the row on combined slips).
+  // Fall back to the prop for any legacy payload without the breakdown map.
+  const midMonthByEmployee = payroll.mid_month_payrolls_by_employee || {};
+  const midMonthFromBreakdown = Object.values(midMonthByEmployee).reduce(
+    (sum: number, amount) => sum + (Number(amount) || 0),
+    0,
+  );
+  const midMonthPayment =
+    midMonthFromBreakdown > 0
+      ? midMonthFromBreakdown
+      : midMonthPayroll
+        ? midMonthPayroll.amount
+        : 0;
+  const hasMidMonthAdvance = midMonthPayment > 0.001;
   const finalPayment =
     payroll.net_pay - midMonthPayment - commissionAdvanceTotalAmount;
 
@@ -1348,16 +1380,25 @@ const buildMainPayrollPage = (
       );
     });
 
-    const totalNonLeaveTambahanItems =
-      consolidatedTambahanItems.length +
-      standaloneCommissions.length +
-      mergedOthersRecords.length;
+    // For grouped payrolls the Tambahan rows live inside each job's section and
+    // are already counted in the per-job subtotals, so the global "Jumlah
+    // Lain-lain" must exclude them — it only summarises the standalone
+    // commission/others rows printed just above (and is hidden when there are
+    // none). Single-job slips still include the Tambahan rows shown here.
+    const lainLainRowCount = isGroupedPayroll
+      ? standaloneCommissions.length + mergedOthersRecords.length
+      : consolidatedTambahanItems.length +
+        standaloneCommissions.length +
+        mergedOthersRecords.length;
+    const lainLainAmount = isGroupedPayroll
+      ? nonCutiCommissionTotalAmount + othersTotalAmount
+      : tambahanTotalAmount + nonCutiCommissionTotalAmount + othersTotalAmount;
 
     // Jumlah lain-lain (excludes cuti) — printed above the leave block so the
     // non-leave subtotal sits next to its own rows.
     if (
-      totalNonLeaveTambahanItems > 1 ||
-      (totalNonLeaveTambahanItems > 0 && leaveRecordsArray.length > 0)
+      lainLainRowCount > 1 ||
+      (lainLainRowCount > 0 && leaveRecordsArray.length > 0)
     ) {
       tableBody.push([
         { text: "", fillColor: "#f8f9fa", fontSize: 8 },
@@ -1369,11 +1410,7 @@ const buildMainPayrollPage = (
           fontSize: 8,
         },
         {
-          text: formatCurrency(
-            tambahanTotalAmount +
-              nonCutiCommissionTotalAmount +
-              othersTotalAmount,
-          ),
+          text: formatCurrency(lainLainAmount),
           alignment: "right",
           bold: true,
           fillColor: "#f8f9fa",
@@ -1589,7 +1626,7 @@ const buildMainPayrollPage = (
   }
 
   // Mid-month payment deduction
-  if (midMonthPayroll) {
+  if (hasMidMonthAdvance) {
     tableBody.push([
       { text: "BAYARAN PENDAHULUAN (ADVANCES PAYMENT)", fontSize: 8 },
       { text: "", fontSize: 8 },
@@ -1603,7 +1640,7 @@ const buildMainPayrollPage = (
   }
 
   // Jumlah row (raw final payment before rounding)
-  if (midMonthPayroll || advanceCommissionRecords.length > 0) {
+  if (hasMidMonthAdvance || advanceCommissionRecords.length > 0) {
     tableBody.push([
       { text: "", fontSize: 8, fillColor: "#f8f9fa" },
       { text: "", fontSize: 8, fillColor: "#f8f9fa" },
@@ -1717,10 +1754,11 @@ const buildMainPayrollPage = (
             const descText =
               typeof descCell === "object" ? descCell.text : descCell;
             // Add border below Rate/ subtotal and Jumlah Gaji Kasar rows
+            // (job subtotal rows read "<JOB> Subtotal", so match the suffix).
             if (
               typeof descText === "string" &&
               (descText.includes("Rate/") ||
-                descText === "Subtotal" ||
+                descText.endsWith("Subtotal") ||
                 descText.endsWith("Jumlah OT") ||
                 descText === "Jumlah Cuti" ||
                 descText === "Jumlah Lain-lain" ||
@@ -1791,8 +1829,6 @@ const buildIndividualJobPage = (
   month: number,
   monthName: string,
   isGrouped: boolean,
-  jobIndex: number,
-  totalJobs: number,
 ): Content[] => {
   const employeeJobMapping = payroll.employee_job_mapping || {};
 
@@ -2224,7 +2260,7 @@ const buildIndividualJobPage = (
     { text: "", fillColor: "#f8f9fa", fontSize: 8 },
     { text: "", fillColor: "#f8f9fa", fontSize: 8 },
     {
-      text: isGrouped ? `${jobEmployeeId} Gross Pay` : "Jumlah Gaji Kasar",
+      text: "Jumlah Gaji Kasar",
       bold: true,
       fillColor: "#f8f9fa",
       fontSize: 8,
@@ -2238,9 +2274,121 @@ const buildIndividualJobPage = (
     },
   ]);
 
+  // Head breakdown only: surface the employee's statutory deductions and a net
+  // line. The Head sibling is set via Staff form (staffs.head_staff_id, surfaced
+  // as payroll.head_employee_id); it absorbs the full deductions so Head net +
+  // the other breakdowns' grosses still equals the combined slip's net. Non-head
+  // breakdowns keep showing only their gross/advance.
+  const isHead =
+    isGrouped &&
+    !!payroll.head_employee_id &&
+    jobEmployeeId === payroll.head_employee_id;
+
+  let baseAfterDeductions = breakdownGrossPay;
+  if (isHead && payroll.deductions && payroll.deductions.length > 0) {
+    const epfDeduction = payroll.deductions.find(
+      (d) => d.deduction_type.toUpperCase() === "EPF",
+    );
+    const socsoDeduction = payroll.deductions.find(
+      (d) => d.deduction_type.toUpperCase() === "SOCSO",
+    );
+    const sipDeduction = payroll.deductions.find(
+      (d) => d.deduction_type.toUpperCase() === "SIP",
+    );
+    const incomeTaxDeduction = payroll.deductions.find(
+      (d) => d.deduction_type === "income_tax",
+    );
+
+    if (epfDeduction) {
+      tableBody.push([
+        { text: "EPF (Majikan)", fontSize: 8 },
+        {
+          text: formatCurrency(epfDeduction.employer_amount),
+          alignment: "right",
+          fontSize: 8,
+        },
+        { text: "EPF (Pekerja)", fontSize: 8 },
+        {
+          text: `(${formatCurrency(epfDeduction.employee_amount)})`,
+          alignment: "right",
+          fontSize: 8,
+        },
+      ]);
+    }
+    if (socsoDeduction) {
+      tableBody.push([
+        { text: "SOCSO (Majikan)", fontSize: 8 },
+        {
+          text: formatCurrency(socsoDeduction.employer_amount),
+          alignment: "right",
+          fontSize: 8,
+        },
+        { text: "SOCSO (Pekerja)", fontSize: 8 },
+        {
+          text: `(${formatCurrency(socsoDeduction.employee_amount)})`,
+          alignment: "right",
+          fontSize: 8,
+        },
+      ]);
+    }
+    if (sipDeduction) {
+      tableBody.push([
+        { text: "SIP (Majikan)", fontSize: 8 },
+        {
+          text: formatCurrency(sipDeduction.employer_amount),
+          alignment: "right",
+          fontSize: 8,
+        },
+        { text: "SIP (Pekerja)", fontSize: 8 },
+        {
+          text: `(${formatCurrency(sipDeduction.employee_amount)})`,
+          alignment: "right",
+          fontSize: 8,
+        },
+      ]);
+    }
+    if (incomeTaxDeduction) {
+      tableBody.push([
+        { text: "", fontSize: 8 },
+        { text: "", fontSize: 8 },
+        { text: "Income Tax (PCB)", fontSize: 8 },
+        {
+          text: `(${formatCurrency(incomeTaxDeduction.employee_amount)})`,
+          alignment: "right",
+          fontSize: 8,
+        },
+      ]);
+    }
+
+    const totalEmployeeDeductions = payroll.deductions.reduce(
+      (sum, d) => sum + (Number(d.employee_amount) || 0),
+      0,
+    );
+    baseAfterDeductions =
+      Math.round((breakdownGrossPay - totalEmployeeDeductions) * 100) / 100;
+
+    tableBody.push([
+      { text: "", fontSize: 8, fillColor: "#f8f9fa" },
+      { text: "", fontSize: 8, fillColor: "#f8f9fa" },
+      {
+        text: "Jumlah Gaji Bersih",
+        bold: true,
+        fontSize: 8,
+        fillColor: "#f8f9fa",
+      },
+      {
+        text: formatCurrency(baseAfterDeductions),
+        alignment: "right",
+        bold: true,
+        fontSize: 8,
+        fillColor: "#f8f9fa",
+      },
+    ]);
+  }
+
   // This sibling's own mid-month advance (e.g. JASSON_PM's 200), shown on its
-  // own breakdown like the legacy per-identity slips. Statutory deductions stay
-  // on the combined slip; only the advance for this id is shown here.
+  // own breakdown like the legacy per-identity slips. On the Head slip it is
+  // deducted after the statutory deductions; on other slips after gross.
   const advanceByEmployee = payroll.mid_month_payrolls_by_employee || {};
   const jobAdvance = jobEmployeeId
     ? Number(advanceByEmployee[jobEmployeeId]) || 0
@@ -2266,7 +2414,7 @@ const buildIndividualJobPage = (
         fontSize: 8,
       },
       {
-        text: formatCurrency(breakdownGrossPay - jobAdvance),
+        text: formatCurrency(baseAfterDeductions - jobAdvance),
         alignment: "right",
         bold: true,
         fillColor: "#f8f9fa",
@@ -2306,7 +2454,7 @@ const buildIndividualJobPage = (
 
     // Payslip title
     {
-      text: `Slip Gaji Pajak ${jobEmployeeId ? ` - ${jobEmployeeId}` : ""} Untuk Bulan ${monthName} ${year}${isGrouped ? ` - Kerja ${jobIndex + 1} of ${totalJobs} (Individual Breakdown)` : ""}`,
+      text: `Slip Gaji Pajak ${jobEmployeeId ? ` - ${jobEmployeeId}` : ""} Untuk Bulan ${monthName} ${year}`,
       style: "payslipTitle",
       margin: [0, 0, 0, 4],
     },
@@ -2372,7 +2520,13 @@ const buildIndividualJobPage = (
 
     // Notice
     {
-      text: `*** Individual job breakdown - ${isGrouped ? "No deductions applied to individual jobs" : ""}`,
+      text: `*** Individual job breakdown${
+        isHead
+          ? " - statutory deductions shown on this (Head) slip"
+          : isGrouped
+            ? " - No deductions applied to individual jobs"
+            : ""
+      }`,
       style: "notice",
       margin: [0, 3, 0, 0],
     },
@@ -2442,7 +2596,7 @@ export const generatePaySlipPDF = (props: PaySlipPDFProps): void => {
 
   // Individual job pages for grouped payrolls
   if (isGroupedPayroll && individualJobs.length > 0) {
-    individualJobs.forEach((job, index) => {
+    individualJobs.forEach((job) => {
       allContent = allContent.concat(
         buildIndividualJobPage(
           job,
@@ -2453,8 +2607,6 @@ export const generatePaySlipPDF = (props: PaySlipPDFProps): void => {
           month,
           monthName,
           true,
-          index,
-          individualJobs.length,
         ),
       );
     });
@@ -2532,7 +2684,7 @@ export const getPaySlipPDFBlob = (props: PaySlipPDFProps): Promise<Blob> => {
     );
 
     if (isGroupedPayroll && individualJobs.length > 0) {
-      individualJobs.forEach((job, index) => {
+      individualJobs.forEach((job) => {
         allContent = allContent.concat(
           buildIndividualJobPage(
             job,
@@ -2543,8 +2695,6 @@ export const getPaySlipPDFBlob = (props: PaySlipPDFProps): Promise<Blob> => {
             month,
             monthName,
             true,
-            index,
-            individualJobs.length,
           ),
         );
       });
@@ -2645,7 +2795,7 @@ export const getBatchPaySlipPDFBlob = (
 
       // Individual job pages for grouped payrolls
       if (isGroupedPayroll && individualJobs.length > 0) {
-        individualJobs.forEach((job, index) => {
+        individualJobs.forEach((job) => {
           allContent = allContent.concat(
             buildIndividualJobPage(
               job,
@@ -2656,8 +2806,6 @@ export const getBatchPaySlipPDFBlob = (
               month,
               monthName,
               true,
-              index,
-              individualJobs.length,
             ),
           );
         });
