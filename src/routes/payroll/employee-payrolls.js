@@ -662,7 +662,8 @@ export default function (pool) {
 
       // Query all payrolls in a single database call
       const query = `
-      SELECT ep.*, mp.year, mp.month, mp.status as payroll_status, s.name as employee_name
+      SELECT ep.*, mp.year, mp.month, mp.status as payroll_status, s.name as employee_name,
+             s.head_staff_id as head_employee_id
       FROM employee_payrolls ep
       JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
       LEFT JOIN staffs s ON ep.employee_id = s.id
@@ -1008,7 +1009,8 @@ export default function (pool) {
     try {
       // Get employee payroll details
       const payrollQuery = `
-        SELECT ep.*, mp.year, mp.month, mp.status as payroll_status, s.name as employee_name
+        SELECT ep.*, mp.year, mp.month, mp.status as payroll_status, s.name as employee_name,
+               s.head_staff_id as head_employee_id
         FROM employee_payrolls ep
         JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
         LEFT JOIN staffs s ON ep.employee_id = s.id
@@ -1422,7 +1424,8 @@ export default function (pool) {
     try {
       // Get employee payroll details
       const payrollQuery = `
-        SELECT ep.*, mp.year, mp.month, mp.status as payroll_status, s.name as employee_name
+        SELECT ep.*, mp.year, mp.month, mp.status as payroll_status, s.name as employee_name,
+               s.head_staff_id as head_employee_id
         FROM employee_payrolls ep
         JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
         LEFT JOIN staffs s ON ep.employee_id = s.id
