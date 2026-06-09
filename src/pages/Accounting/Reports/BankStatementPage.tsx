@@ -3,10 +3,12 @@
 // bank/cash account. Pick an account + month; see opening balance, every posted
 // journal line that touches the account, a running balance, and closing totals.
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { IconDownload, IconRefresh } from "@tabler/icons-react";
+import { IconDownload, IconRefresh, IconAnchor } from "@tabler/icons-react";
 import MonthNavigator from "../../../components/MonthNavigator";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import ListboxSelect from "../../../components/ListboxSelect";
+import OpeningBalanceModal from "../../../components/Accounting/OpeningBalanceModal";
 import { api } from "../../../routes/utils/api";
 import { useAccountCodesCache } from "../../../utils/accounting/useAccountingCache";
 import {
@@ -47,6 +49,13 @@ const BankStatementPage: React.FC = () => {
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
 
+  const [showOpeningModal, setShowOpeningModal] = useState<boolean>(false);
+  const [currentAnchor, setCurrentAnchor] = useState<{
+    as_of_date: string;
+    amount: number;
+    notes?: string | null;
+  } | null>(null);
+
   // Bank/cash accounts only (BK ledger type, plus CASH in hand)
   const bankAccounts = useMemo(
     () =>
@@ -79,6 +88,22 @@ const BankStatementPage: React.FC = () => {
   useEffect(() => {
     fetchStatement();
   }, [fetchStatement]);
+
+  const selectedAccountDescription = useMemo(
+    () => bankAccounts.find((a) => a.code === selectedAccount)?.description,
+    [bankAccounts, selectedAccount]
+  );
+
+  const handleOpenOpeningModal = async (): Promise<void> => {
+    try {
+      const res = await api.get(`/api/opening-balances/${selectedAccount}`);
+      setCurrentAnchor(res?.opening_balance || null);
+    } catch (err) {
+      console.error("Error fetching opening balance:", err);
+      setCurrentAnchor(null);
+    }
+    setShowOpeningModal(true);
+  };
 
   const handleExportPDF = async (): Promise<void> => {
     if (!statement) return;
@@ -119,24 +144,36 @@ const BankStatementPage: React.FC = () => {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             {/* Account selector */}
-            <select
+            <ListboxSelect
               value={selectedAccount}
-              onChange={(e) => setSelectedAccount(e.target.value)}
+              onChange={setSelectedAccount}
               disabled={accountsLoading}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
-            >
-              {bankAccounts.length === 0 && (
-                <option value={DEFAULT_ACCOUNT}>{DEFAULT_ACCOUNT}</option>
-              )}
-              {bankAccounts.map((a) => (
-                <option key={a.code} value={a.code}>
-                  {a.code} - {a.description}
-                </option>
-              ))}
-            </select>
+              className="w-64"
+              options={
+                bankAccounts.length === 0
+                  ? [{ value: DEFAULT_ACCOUNT, label: DEFAULT_ACCOUNT }]
+                  : bankAccounts.map((a) => ({
+                      value: a.code,
+                      label: `${a.code} - ${a.description}`,
+                    }))
+              }
+            />
 
             {/* Month Navigator */}
             <MonthNavigator selectedMonth={selectedMonth} onChange={setSelectedMonth} />
+
+            {/* Set opening balance */}
+            <Button
+              onClick={handleOpenOpeningModal}
+              variant="outline"
+              disabled={accountsLoading}
+              additionalClasses="flex-shrink-0"
+            >
+              <span className="flex items-center justify-center whitespace-nowrap">
+                <IconAnchor className="h-4 w-4 mr-2" />
+                Set opening balance
+              </span>
+            </Button>
           </div>
 
           {/* Actions */}
@@ -185,6 +222,11 @@ const BankStatementPage: React.FC = () => {
             <div className="text-lg font-semibold font-mono text-gray-900 dark:text-white mt-1">
               {formatBalance(statement.opening_balance)}
             </div>
+            <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              {statement.opening_source?.type === "anchored"
+                ? `Anchored as of ${formatDate(statement.opening_source.as_of_date)}`
+                : "Derived from prior postings"}
+            </div>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
             <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
@@ -208,7 +250,7 @@ const BankStatementPage: React.FC = () => {
       {/* Statement Table */}
       {statement && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+          <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
                 <tr>
@@ -313,6 +355,15 @@ const BankStatementPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      <OpeningBalanceModal
+        isOpen={showOpeningModal}
+        onClose={() => setShowOpeningModal(false)}
+        accountCode={selectedAccount}
+        accountDescription={selectedAccountDescription}
+        current={currentAnchor}
+        onSaved={fetchStatement}
+      />
     </div>
   );
 };

@@ -55,17 +55,55 @@ export default function (pool) {
       const lastDay = new Date(y, m, 0).getDate();
       const endStr = `${y}-${pad(m)}-${pad(lastDay)}`;
 
-      // Opening (brought-forward) balance = net of all posted lines before the month
-      const openingResult = await pool.query(
-        `SELECT COALESCE(SUM(jel.debit_amount - jel.credit_amount), 0) AS opening
-           FROM journal_entry_lines jel
-           JOIN journal_entries je ON jel.journal_entry_id = je.id
-          WHERE je.status = 'posted'
-            AND jel.account_code = $1
-            AND je.entry_date < $2`,
+      // Opening (brought-forward) balance.
+      // If an opening-balance anchor exists with as_of_date <= the period start, seed from
+      // it and only add posted lines in [as_of_date, period_start) — everything before the
+      // anchor is deliberately ignored (discards pre-cutover/migration noise). Otherwise
+      // fall back to the net of all posted lines before the month.
+      const anchorResult = await pool.query(
+        `SELECT to_char(as_of_date, 'YYYY-MM-DD') AS as_of_date, amount
+           FROM account_opening_balances
+          WHERE account_code = $1 AND as_of_date <= $2
+          ORDER BY as_of_date DESC
+          LIMIT 1`,
         [accountCode, startStr]
       );
-      const openingBalance = parseFloat(openingResult.rows[0].opening) || 0;
+
+      let openingBalance;
+      let openingSource;
+      if (anchorResult.rows.length > 0) {
+        const anchor = anchorResult.rows[0];
+        const anchorAmount = parseFloat(anchor.amount) || 0;
+        const sinceResult = await pool.query(
+          `SELECT COALESCE(SUM(jel.debit_amount - jel.credit_amount), 0) AS movement
+             FROM journal_entry_lines jel
+             JOIN journal_entries je ON jel.journal_entry_id = je.id
+            WHERE je.status = 'posted'
+              AND jel.account_code = $1
+              AND je.entry_date >= $2
+              AND je.entry_date < $3`,
+          [accountCode, anchor.as_of_date, startStr]
+        );
+        openingBalance =
+          anchorAmount + (parseFloat(sinceResult.rows[0].movement) || 0);
+        openingSource = {
+          type: "anchored",
+          as_of_date: anchor.as_of_date,
+          amount: anchorAmount,
+        };
+      } else {
+        const openingResult = await pool.query(
+          `SELECT COALESCE(SUM(jel.debit_amount - jel.credit_amount), 0) AS opening
+             FROM journal_entry_lines jel
+             JOIN journal_entries je ON jel.journal_entry_id = je.id
+            WHERE je.status = 'posted'
+              AND jel.account_code = $1
+              AND je.entry_date < $2`,
+          [accountCode, startStr]
+        );
+        openingBalance = parseFloat(openingResult.rows[0].opening) || 0;
+        openingSource = { type: "derived" };
+      }
 
       // Transactions within the month, ordered for a stable running balance
       const txResult = await pool.query(
@@ -131,6 +169,7 @@ export default function (pool) {
           end_date: endStr,
         },
         opening_balance: openingBalance,
+        opening_source: openingSource,
         transactions,
         closing_balance: running,
         totals: {
