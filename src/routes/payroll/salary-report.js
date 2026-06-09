@@ -207,14 +207,28 @@ export default function (pool) {
             AND lr.status = 'approved'
           GROUP BY lr.employee_id, lr.leave_type
         ),
-        pinjam_monthly_data AS (
-          SELECT 
-            pr.employee_id,
-            COALESCE(SUM(pr.amount), 0) as total_pinjam
+        pinjam_by_name AS (
+          -- Aggregate pinjam by employee NAME so amounts recorded under any
+          -- sibling ID (multi-ID staff) roll up to the person, mirroring how
+          -- the combined payroll is keyed.
+          SELECT s.name AS staff_name, COALESCE(SUM(pr.amount), 0) as total_pinjam
           FROM pinjam_records pr
+          JOIN staffs s ON pr.employee_id = s.id
           WHERE pr.year = $1 AND pr.month = $2
           AND pr.pinjam_type = 'monthly'
-          GROUP BY pr.employee_id
+          GROUP BY s.name
+        ),
+        -- Pick one representative payroll ID per name (one that actually has a
+        -- report row) so the name-aggregated pinjam is attributed exactly once.
+        pinjam_rep AS (
+          SELECT staff_name, MIN(employee_id) AS employee_id
+          FROM (SELECT DISTINCT employee_id, staff_name FROM employee_base_data) d
+          GROUP BY staff_name
+        ),
+        pinjam_monthly_data AS (
+          SELECT pr.employee_id, pbn.total_pinjam
+          FROM pinjam_rep pr
+          JOIN pinjam_by_name pbn ON pbn.staff_name = pr.staff_name
         )
         SELECT 
           ebd.*,
@@ -1057,14 +1071,29 @@ export default function (pool) {
             AND lr.status = 'approved'
           GROUP BY lr.employee_id, lr.leave_type
         ),
-        pinjam_yearly_data AS (
-          SELECT
-            pr.employee_id,
-            COALESCE(SUM(pr.amount), 0) as total_pinjam
+        pinjam_by_name AS (
+          -- Aggregate pinjam by employee NAME so amounts recorded under any
+          -- sibling ID (multi-ID staff) roll up to the person, mirroring how
+          -- the combined payroll is keyed.
+          SELECT s.name AS staff_name, COALESCE(SUM(pr.amount), 0) as total_pinjam
           FROM pinjam_records pr
+          JOIN staffs s ON pr.employee_id = s.id
           WHERE pr.year = $1
           AND pr.pinjam_type = 'monthly'
-          GROUP BY pr.employee_id
+          GROUP BY s.name
+        ),
+        -- Pick one representative payroll ID per name (one that actually has a
+        -- report row) so the name-aggregated pinjam is attributed exactly once
+        -- across the year's sibling-ID rows (avoids double counting).
+        pinjam_rep AS (
+          SELECT staff_name, MIN(employee_id) AS employee_id
+          FROM (SELECT DISTINCT employee_id, staff_name FROM employee_base_data) d
+          GROUP BY staff_name
+        ),
+        pinjam_yearly_data AS (
+          SELECT pr.employee_id, pbn.total_pinjam
+          FROM pinjam_rep pr
+          JOIN pinjam_by_name pbn ON pbn.staff_name = pr.staff_name
         )
         SELECT
           ebd.*,
