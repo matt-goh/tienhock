@@ -1582,6 +1582,17 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             color="sky"
             className="flex-1 md:flex-none shadow-sm"
           />
+          {payroll.job_type?.includes(", ") && (
+            <PrintPayslipButton
+              payroll={payroll}
+              midMonthPayroll={midMonthPayroll}
+              mode="combined"
+              buttonText="Print Combined"
+              variant="outline"
+              color="sky"
+              className="flex-1 md:flex-none"
+            />
+          )}
           <DownloadPayslipButton
             payroll={payroll}
             midMonthPayroll={midMonthPayroll}

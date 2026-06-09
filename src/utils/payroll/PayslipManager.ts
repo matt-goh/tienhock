@@ -6,7 +6,11 @@ import {
   getEmployeePayrollDetails,
   getEmployeePayrollDetailsBatch,
 } from "./payrollUtils";
-import { getPaySlipPDFBlob, getBatchPaySlipPDFBlob } from "./PaySlipPDFMake";
+import {
+  getPaySlipPDFBlob,
+  getBatchPaySlipPDFBlob,
+  PayslipPrintMode,
+} from "./PaySlipPDFMake";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
 
 // Types
@@ -20,6 +24,9 @@ export interface StaffDetails {
 export interface PrintOptions {
   companyName?: string;
   midMonthPayroll?: MidMonthPayroll | null;
+  // Which slip(s) to print. Print flows default to "individual" (per-job
+  // breakdowns) since that's what HR prints most of the time.
+  mode?: PayslipPrintMode;
   onBeforePrint?: () => void;
   onAfterPrint?: () => void;
   onError?: (error: Error) => void;
@@ -40,13 +47,15 @@ const generatePayslipPDF = async (
   payroll: EmployeePayroll,
   staffDetails?: StaffDetails,
   companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
-  midMonthPayroll?: MidMonthPayroll | null
+  midMonthPayroll?: MidMonthPayroll | null,
+  mode: PayslipPrintMode = "both"
 ): Promise<Blob> => {
   return await getPaySlipPDFBlob({
     payroll,
     companyName,
     staffDetails,
     midMonthPayroll,
+    mode,
   });
 };
 
@@ -54,13 +63,15 @@ const generateBatchPayslipPDF = async (
   payrolls: EmployeePayroll[],
   staffDetailsMap?: Record<string, StaffDetails>,
   companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
-  midMonthPayrollsMap?: Record<string, MidMonthPayroll | null>
+  midMonthPayrollsMap?: Record<string, MidMonthPayroll | null>,
+  mode: PayslipPrintMode = "both"
 ): Promise<Blob> => {
   return await getBatchPaySlipPDFBlob(
     payrolls,
     staffDetailsMap,
     companyName,
-    midMonthPayrollsMap
+    midMonthPayrollsMap,
+    mode
   );
 };
 
@@ -228,6 +239,7 @@ export const printPayslip = async (
   const {
     companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
     midMonthPayroll,
+    mode = "individual",
     onBeforePrint,
     onAfterPrint,
     onError,
@@ -257,7 +269,8 @@ export const printPayslip = async (
       completePayroll,
       staffDetails,
       companyName,
-      midMonthPayroll
+      midMonthPayroll,
+      mode
     );
     pdfUrl = URL.createObjectURL(blob);
 
@@ -305,6 +318,7 @@ export const printBatchPayslips = async (
   const {
     companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
     midMonthPayrollsMap,
+    mode = "individual",
     onBeforePrint,
     onAfterPrint,
     onError,
@@ -368,7 +382,8 @@ export const printBatchPayslips = async (
       completePayrolls,
       staffDetailsMap,
       companyName,
-      effectiveMidMonthMap
+      effectiveMidMonthMap,
+      mode
     );
     pdfUrl = URL.createObjectURL(blob);
 

@@ -253,6 +253,13 @@ const buildIncentiveRecordsFromPayrollItems = (
     is_advance: false,
   }));
 
+// Which slip(s) to render for a grouped (multi-job) employee:
+//  - "combined":   only the combined payroll slip (one page).
+//  - "individual": only the per-job breakdown slips (no combined page).
+//  - "both":       combined slip followed by every breakdown slip.
+// A non-grouped employee has no breakdown, so all modes render its single slip.
+export type PayslipPrintMode = "both" | "individual" | "combined";
+
 interface PaySlipPDFProps {
   payroll: EmployeePayroll;
   companyName?: string;
@@ -263,6 +270,7 @@ interface PaySlipPDFProps {
     section: string;
   };
   midMonthPayroll?: MidMonthPayroll | null;
+  mode?: PayslipPrintMode;
 }
 
 // Helper functions
@@ -929,8 +937,27 @@ const appendBasePayRows = (
     );
   });
 
+  // Rate/Jam: the combined per-hour rate for the base section, shown only when
+  // base pay is Hour-based. Hourly rows repeat the same hours across multiple
+  // tasks, so divide the total hourly amount by one representative hour quantity
+  // (not the summed/duplicated hours) — this equals the sum of the per-hour rates.
+  // When it applies it replaces the "Jumlah Biasa" subtotal label.
+  const hourItems: ConsolidatedPayrollItem[] = consolidatedBaseItems.filter(
+    (item) => item.rate_unit === "Hour",
+  );
+  const representativeHours: number =
+    hourItems.length > 0 ? Number(hourItems[0].total_quantity) || 0 : 0;
+  const hourTotalAmount: number = hourItems.reduce(
+    (sum, item) => sum + (Number(item.total_amount) || 0),
+    0,
+  );
+  const baseSubtotalLabel: string =
+    representativeHours > 0
+      ? `Rate/Jam: ${(hourTotalAmount / representativeHours).toFixed(2)}`
+      : "Jumlah Biasa";
+
   tableBody.push(
-    createBaseSubtotalRow("Jumlah Biasa", baseTotalAmount, {
+    createBaseSubtotalRow(baseSubtotalLabel, baseTotalAmount, {
       baseSubtotalBorder: true,
     }),
   );
@@ -1928,8 +1955,8 @@ const buildIndividualJobPage = (
 
   // Commission records (merged duplicates). Split out Cuti Tahunan entries
   // (location_code = '23') so they render as leave instead of an Advance row.
-  // Individual-job pages don't show the bottom advance deduction, so we only
-  // need the non-cuti slices for display and totals.
+  // The non-cuti slices drive both display/totals and the advance deduction shown
+  // at the bottom of this breakdown (built from advance records further below).
   const commissionRecords = individualJob.commission_records || [];
   const cutiTahunanCommissions = commissionRecords.filter(
     isCutiTahunanCommission,
@@ -2274,6 +2301,21 @@ const buildIndividualJobPage = (
     },
   ]);
 
+  // Advances for this id, shown on its own breakdown like the legacy per-identity
+  // slips: the commission/incentive advance (is_advance) recorded against this job
+  // plus this id's own mid-month advance (e.g. JASSON_PM's 200). The commission
+  // advance income is part of this breakdown's gross, so it must also be deducted
+  // here — otherwise the breakdown shows the income with no matching deduction.
+  const advanceCommissionRecords: AdvanceRecord[] =
+    nonCutiCommissionRecords.filter(isAdvanceRecord);
+  const mergedAdvanceCommissionRecords: MergedAdvance[] = mergeByDescription(
+    advanceCommissionRecords,
+  );
+  const commissionAdvanceTotal: number = advanceCommissionRecords.reduce(
+    (sum: number, record: AdvanceRecord) => sum + (Number(record.amount) || 0),
+    0,
+  );
+
   // Head breakdown only: surface the employee's statutory deductions and a net
   // line. The Head sibling is set via Staff form (staffs.head_staff_id, surfaced
   // as payroll.head_employee_id); it absorbs the full deductions so Head net +
@@ -2393,17 +2435,31 @@ const buildIndividualJobPage = (
   const jobAdvance = jobEmployeeId
     ? Number(advanceByEmployee[jobEmployeeId]) || 0
     : 0;
-  if (jobAdvance > 0) {
-    tableBody.push([
-      { text: "BAYARAN PENDAHULUAN (ADVANCES PAYMENT)", fontSize: 8 },
-      { text: "", fontSize: 8 },
-      { text: "", fontSize: 8 },
-      {
-        text: `(${formatCurrency(jobAdvance)})`,
-        alignment: "right",
-        fontSize: 8,
-      },
-    ]);
+  if (commissionAdvanceTotal > 0 || jobAdvance > 0) {
+    mergedAdvanceCommissionRecords.forEach((commission) => {
+      tableBody.push([
+        { text: `${commission.description} (Advance)`, fontSize: 8 },
+        { text: "", fontSize: 8 },
+        { text: "", fontSize: 8 },
+        {
+          text: `(${formatCurrency(commission.merged_amount)})`,
+          alignment: "right",
+          fontSize: 8,
+        },
+      ]);
+    });
+    if (jobAdvance > 0) {
+      tableBody.push([
+        { text: "BAYARAN PENDAHULUAN (ADVANCES PAYMENT)", fontSize: 8 },
+        { text: "", fontSize: 8 },
+        { text: "", fontSize: 8 },
+        {
+          text: `(${formatCurrency(jobAdvance)})`,
+          alignment: "right",
+          fontSize: 8,
+        },
+      ]);
+    }
     tableBody.push([
       { text: "", fillColor: "#f8f9fa", fontSize: 8 },
       { text: "", fillColor: "#f8f9fa", fontSize: 8 },
@@ -2414,7 +2470,9 @@ const buildIndividualJobPage = (
         fontSize: 8,
       },
       {
-        text: formatCurrency(baseAfterDeductions - jobAdvance),
+        text: formatCurrency(
+          baseAfterDeductions - commissionAdvanceTotal - jobAdvance,
+        ),
         alignment: "right",
         bold: true,
         fillColor: "#f8f9fa",
@@ -2557,12 +2615,78 @@ const buildIndividualJobPage = (
 };
 
 // Main function to generate PDF
+// Build the slip content for a single payroll, honouring the print mode. Handles
+// the leading page break so that when breakdowns are printed without the combined
+// page first, the document doesn't start with a blank page.
+const buildPayrollSlipContent = (
+  payroll: EmployeePayroll,
+  companyName: string,
+  staffDetails: any,
+  midMonthPayroll: MidMonthPayroll | null | undefined,
+  year: number,
+  month: number,
+  monthName: string,
+  mode: PayslipPrintMode,
+): Content[] => {
+  const isGroupedPayroll =
+    !!payroll.job_type && payroll.job_type.includes(", ");
+  const individualJobs = isGroupedPayroll ? splitGroupedPayroll(payroll) : [];
+  const hasIndividual = isGroupedPayroll && individualJobs.length > 0;
+
+  const includeIndividual = mode !== "combined" && hasIndividual;
+  // Always include the combined page for "combined"/"both", and for a
+  // non-grouped employee (whose single slip is the combined slip) so something
+  // always prints even in "individual" mode.
+  const includeCombined =
+    mode === "combined" || mode === "both" || !hasIndividual;
+
+  let content: Content[] = [];
+
+  if (includeCombined) {
+    content = content.concat(
+      buildMainPayrollPage(
+        payroll,
+        companyName,
+        staffDetails,
+        midMonthPayroll,
+        year,
+        month,
+        monthName,
+      ),
+    );
+  }
+
+  if (includeIndividual) {
+    individualJobs.forEach((job, index) => {
+      let jobContent = buildIndividualJobPage(
+        job,
+        payroll,
+        companyName,
+        staffDetails,
+        year,
+        month,
+        monthName,
+        true,
+      );
+      // Each breakdown page begins with a forced page break. Drop it on the very
+      // first breakdown when no combined page precedes it (avoids a blank page 1).
+      if (index === 0 && !includeCombined) {
+        jobContent = jobContent.slice(1);
+      }
+      content = content.concat(jobContent);
+    });
+  }
+
+  return content;
+};
+
 export const generatePaySlipPDF = (props: PaySlipPDFProps): void => {
   const {
     payroll,
     companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
     staffDetails,
     midMonthPayroll,
+    mode = "both",
   } = props;
 
   if (!payroll) {
@@ -2574,43 +2698,20 @@ export const generatePaySlipPDF = (props: PaySlipPDFProps): void => {
   const month = payroll.month ?? new Date().getMonth() + 1;
   const monthName = getMonthName(month);
 
-  // Check if grouped payroll
-  const isGroupedPayroll = payroll.job_type && payroll.job_type.includes(", ");
-  const individualJobs = isGroupedPayroll ? splitGroupedPayroll(payroll) : [];
+  // Fall back to the mid-month advance embedded in the fetched payroll when the
+  // caller didn't pass one explicitly (see getPaySlipPDFBlob for rationale).
+  const effectiveMidMonthPayroll = midMonthPayroll ?? payroll.mid_month_payroll;
 
-  // Build all content
-  let allContent: Content[] = [];
-
-  // Main payroll page
-  allContent = allContent.concat(
-    buildMainPayrollPage(
-      payroll,
-      companyName,
-      staffDetails,
-      midMonthPayroll,
-      year,
-      month,
-      monthName,
-    ),
+  const allContent: Content[] = buildPayrollSlipContent(
+    payroll,
+    companyName,
+    staffDetails,
+    effectiveMidMonthPayroll,
+    year,
+    month,
+    monthName,
+    mode,
   );
-
-  // Individual job pages for grouped payrolls
-  if (isGroupedPayroll && individualJobs.length > 0) {
-    individualJobs.forEach((job) => {
-      allContent = allContent.concat(
-        buildIndividualJobPage(
-          job,
-          payroll,
-          companyName,
-          staffDetails,
-          year,
-          month,
-          monthName,
-          true,
-        ),
-      );
-    });
-  }
 
   // Document definition
   const docDefinition: TDocumentDefinitions = {
@@ -2655,6 +2756,7 @@ export const getPaySlipPDFBlob = (props: PaySlipPDFProps): Promise<Blob> => {
       companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
       staffDetails,
       midMonthPayroll,
+      mode = "both",
     } = props;
 
     if (!payroll) {
@@ -2666,39 +2768,22 @@ export const getPaySlipPDFBlob = (props: PaySlipPDFProps): Promise<Blob> => {
     const month = payroll.month ?? new Date().getMonth() + 1;
     const monthName = getMonthName(month);
 
-    const isGroupedPayroll =
-      payroll.job_type && payroll.job_type.includes(", ");
-    const individualJobs = isGroupedPayroll ? splitGroupedPayroll(payroll) : [];
+    // Fall back to the mid-month advance embedded in the fetched payroll when the
+    // caller didn't pass one explicitly (e.g. printing an unselected table row,
+    // where the page-level map only holds selected employees). This keeps the
+    // single-print BAYARAN PENDAHULUAN line in sync with the details/batch slips.
+    const effectiveMidMonthPayroll = midMonthPayroll ?? payroll.mid_month_payroll;
 
-    let allContent: Content[] = [];
-    allContent = allContent.concat(
-      buildMainPayrollPage(
-        payroll,
-        companyName,
-        staffDetails,
-        midMonthPayroll,
-        year,
-        month,
-        monthName,
-      ),
+    const allContent: Content[] = buildPayrollSlipContent(
+      payroll,
+      companyName,
+      staffDetails,
+      effectiveMidMonthPayroll,
+      year,
+      month,
+      monthName,
+      mode,
     );
-
-    if (isGroupedPayroll && individualJobs.length > 0) {
-      individualJobs.forEach((job) => {
-        allContent = allContent.concat(
-          buildIndividualJobPage(
-            job,
-            payroll,
-            companyName,
-            staffDetails,
-            year,
-            month,
-            monthName,
-            true,
-          ),
-        );
-      });
-    }
 
     const docDefinition: TDocumentDefinitions = {
       pageSize: "A4",
@@ -2754,6 +2839,7 @@ export const getBatchPaySlipPDFBlob = (
   staffDetailsMap?: Record<string, StaffDetails>,
   companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
   midMonthPayrollsMap?: Record<string, MidMonthPayrollType | null>,
+  mode: PayslipPrintMode = "both",
 ): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     if (!payrolls || payrolls.length === 0) {
@@ -2768,48 +2854,28 @@ export const getBatchPaySlipPDFBlob = (
       const month = payroll.month ?? new Date().getMonth() + 1;
       const monthName = getMonthName(month);
       const staffDetails = staffDetailsMap?.[payroll.employee_id];
-      const midMonthPayroll = midMonthPayrollsMap?.[payroll.employee_id];
-
-      const isGroupedPayroll =
-        payroll.job_type && payroll.job_type.includes(", ");
-      const individualJobs = isGroupedPayroll
-        ? splitGroupedPayroll(payroll)
-        : [];
+      // Fall back to the payroll's own embedded mid-month advance when the map
+      // has no entry, so every slip shows its BAYARAN PENDAHULUAN consistently.
+      const midMonthPayroll =
+        midMonthPayrollsMap?.[payroll.employee_id] ?? payroll.mid_month_payroll;
 
       // Add page break before each payroll (except the first)
       if (payrollIndex > 0) {
         allContent.push({ text: "", pageBreak: "before" });
       }
 
-      // Main payroll page content (without the array wrapper for first item)
-      const mainPageContent = buildMainPayrollPage(
-        payroll,
-        companyName,
-        staffDetails,
-        midMonthPayroll as MidMonthPayroll | null | undefined,
-        year,
-        month,
-        monthName,
+      allContent = allContent.concat(
+        buildPayrollSlipContent(
+          payroll,
+          companyName,
+          staffDetails,
+          midMonthPayroll as MidMonthPayroll | null | undefined,
+          year,
+          month,
+          monthName,
+          mode,
+        ),
       );
-      allContent = allContent.concat(mainPageContent);
-
-      // Individual job pages for grouped payrolls
-      if (isGroupedPayroll && individualJobs.length > 0) {
-        individualJobs.forEach((job) => {
-          allContent = allContent.concat(
-            buildIndividualJobPage(
-              job,
-              payroll,
-              companyName,
-              staffDetails,
-              year,
-              month,
-              monthName,
-              true,
-            ),
-          );
-        });
-      }
     });
 
     const docDefinition: TDocumentDefinitions = {
