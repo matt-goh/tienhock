@@ -63,7 +63,7 @@ Verified by code scan and a query against the dev DB on 26 May 2026. Grouped by 
 | Cost of Goods Manufactured + PDF | 🟡 | [CogmPage](src/pages/Accounting/Reports/CogmPage.tsx), [CogmPDF.tsx](src/utils/accounting/CogmPDF.tsx) |
 | Note 22 (Trade Receivables) + Note 7 (Revenue) calculated live from `invoices` — no `DEBTOR` / `SLS*` GL codes needed | ✅ | [financial-reports.js](src/routes/accounting/financial-reports.js) |
 
-All four statements render a single period only — no prior-year comparative column *(= 1A-3, Type 2 / #7)*. Note 5 is shown as one rolled-up number — no Schedule B itemisation *(= 1A-5, Type 2 / #4)*.
+All four statements render a single period only — no prior-year comparative column *(= 1A-3, Type 2 / #7)*. Note 5 is shown as one rolled-up number — no Schedule B itemisation *(= 1A-5, Type 2 / #4)*. They sum posted journals **YTD from Jan 1 with no brought-forward** and **do not read the opening-balance anchor**, so the Balance Sheet cannot balance for an established company until opening balances are loaded *and* wired into these engines *(= 1A-7; see [§ readiness assessment](#can-the-erp-generate-the-legacy-report-pack-yet-readiness-assessment-9-jun-2026))*.
 
 ### Master data
 
@@ -168,6 +168,35 @@ The settlement screen covers salary/director/statutory. The remaining outgoing l
 
 ---
 
+## Can the ERP generate the legacy report pack yet? *(readiness assessment, 9 Jun 2026)*
+
+The uploaded legacy files (`core_tienhock_acc_docs.pdf` 12/2024, `Balance_sheet.pdf` 2014) are **two different targets**, and the distance to each is very different:
+
+- **Monthly management pack** (12/2024 set): Trial Balance → Balance Sheet → Detail Income Statement → COGM. *Management reporting.*
+- **Annual audited set** (2014 draft): the same **plus** prior-year comparative columns, Schedule A (COGM detail), Schedule B (admin-expense itemisation), and the two primary statements not in the monthly pack — **Cash Flow** and **Statement of Changes in Equity** — with full notes. *Statutory / audit.*
+
+**The report machinery already exists.** All four monthly engines + PDFs are built (🟡): [trial-balance / income-statement / balance-sheet / cogm](src/routes/accounting/financial-reports.js#L361). The distance is **not** "build report renderers." Every engine is a group-by over `journal_entry_lines WHERE status='posted'`, categorised by `fs_note` — so **a statement is exactly as complete and correct as the journals beneath it.** That is the whole game.
+
+### Could pure manual journal entry produce them?
+
+In principle **yes** — [JournalEntryPage](src/pages/Accounting/JournalEntryPage.tsx) is a universal escape hatch and every statement is just a roll-up of posted journals, so keying every transaction as a balanced entry *would* populate the pack. But four things stop "simply key it all manually" from being sufficient:
+
+1. **Opening balances — the hard blocker.** The TB/BS engine sums journals **YTD from Jan 1 only, with no brought-forward** ([financial-reports.js:373-391](src/routes/accounting/financial-reports.js#L373)). For an established company that means retained profit, fixed assets, accumulated depreciation, loans and payables all start at **zero** unless posted. **And the opening-balance anchor built this session is read only by the Bank Statement report — the TB/BS/IS/COGM do not consume it yet.** So before *any* route (manual or structured) can make the Balance Sheet balance, every account's opening migration balance must be loaded **and the statement engines must read it** (sharpens 1A-7 — see below).
+2. **Some figures are computed schedules, not natural "entries."** Depreciation (needs the fixed-asset register), HP interest/principal split (needs the amortization schedule), **closing-inventory valuation** (qty × cost across hundreds of items — feeds both COGM and the BS), and tax provision / deferred tax. Each *can* be computed in Excel and keyed as a journal — but that is exactly the fragile manual work the ERP exists to remove, and where the numbers drift.
+3. **Granularity for Schedule B.** Note 5 renders as one lump today; the itemised admin-expense schedule needs the lean-GL group-by (§0) or enough coding granularity.
+4. **Sustainability + compliance.** Manual-everything is fine as a *parallel-run proof* (the May tie-out is exactly that); as the standing process it defeats the ERP. The audited set additionally needs Cash Flow + Changes in Equity + comparatives (1A-1/2/3) — not journal-entry problems at all.
+
+### Distance estimate
+
+| Target | Distance |
+|---|---|
+| **Monthly pack that ties out** (TB/BS/IS/COGM, 12/2024-style) | **Close.** The bank tie-out is the first brick. Gating work: (a) load full opening balances **and wire the statements to read them**, (b) get the recurring non-auto journals flowing — depreciation, HP, closing-stock valuation, and the missing General Purchase → GL journal (1B-3). Then existing auto-posting + a disciplined parallel run produces it — roughly the next 2–4 focused builds. |
+| **Audited statutory set** (2014-style) | **Further.** Add Cash Flow (1A-1), Changes in Equity (1A-2), comparatives (1A-3), Schedule B (1A-5), fixed-asset register (1A-4), HP schedule (1A-6) — each its own 1A item. |
+
+**Verdict:** manually keying every journal *would* generate a correct-looking monthly TB→BS→IS→COGM — **but only after opening balances are loaded**, and you would still be hand-computing depreciation, HP interest, closing stock and tax outside the system. Pure-manual is a viable *transition tactic*, not a sustainable or audit-complete process. **The single most important next unlock is wiring opening-balance setup into the statements (1A-7) — nothing on the Balance Sheet balances without it.**
+
+---
+
 ## 0. The chart-of-accounts question (the decision underneath everything)
 
 You're stuck choosing between "~60 simplified codes" and "keep the 1,202 legacy codes." Reframe it: **that is a false choice.**
@@ -206,7 +235,7 @@ Tien Hock is a Sdn Bhd: every year it must file audited financial statements wit
 | 4 | **Fixed Asset Register + depreciation schedule** | ❌ | Backs the PP&E note. Per asset: acquisition date, cost, useful life, monthly depreciation, accumulated depreciation, NBV — the movement schedule auditors vouch `NCA_*` (cost) and `AD_*` (accumulated depreciation) against. Also the source of the depreciation line in the P&L. |
 | 5 | **Schedule B — administrative expenses breakdown** | ❌ | The legacy detailed P&L itemises Note 5 into ~40 lines (Auditors' Remuneration, Bank Charges, Electricity & Water, Vehicle Running Expenses…). [IncomeStatementPage](src/pages/Accounting/Reports/) shows Note 5 as one number. Auditors expect the itemised P&L. With a lean GL this is a near-trivial group-by; with legacy codes it's a rollup of `MB*`/`BT*`/`INS*`/`R*`/… . |
 | 6 | **Hire-purchase amortization schedule** | ❌ | Per HP contract — each `HPA_*` principal paired with its `HPB_*` interest-in-suspense — the monthly split of each instalment into principal vs interest. Backs the HP-payable and finance-cost notes; without it those figures can't be substantiated. |
-| 7 | **Opening balance setup** | 🟡 | Per-account anchor `account_opening_balances` + a "Set opening balance" modal now exist (built 9 Jun 2026, first used by the Bank Statement report). Still needed: a full setup *screen* to load every account's DR/CR migration balance at once (the legacy "Opening Balance as at 1 Sept 2012"). |
+| 7 | **Opening balance setup** | 🟡 | Per-account anchor `account_opening_balances` + a "Set opening balance" modal now exist (built 9 Jun 2026, first used by the Bank Statement report). Still needed, and **the single most important next unlock**: (a) a full setup *screen* to load every account's DR/CR migration balance at once (the legacy "Opening Balance as at 1 Sept 2012"), **and (b) wire the anchor into the Trial Balance / Balance Sheet / Income Statement / COGM engines** — today they sum journals YTD from Jan 1 with **no brought-forward** ([financial-reports.js:373-391](src/routes/accounting/financial-reports.js#L373)) and ignore the anchor, so the Balance Sheet cannot balance for an established company until this is done. |
 | 8 | **Period close / month-end lock** | 🟡 | Posted journal entries are individually immutable, but there's no *period-level* lock — nothing stops a backdated entry landing in a month already reported or audited. Auditors expect closed periods frozen. |
 | 9 | **Tax estimation & computation** (CP204 / CP204A, Form C tax computation) | ❌ | Every Sdn Bhd must file a CP204 estimate of tax payable plus an annual return. `CL_TAX` (provision) and `DF_TAX` (deferred tax) are currently manual journal entries with no supporting computation in the system. |
 | 10 | **SST-02 return support** | ❌ | If Tien Hock is SST-registered as a manufacturer, it files a bi-monthly SST-02. Worth confirming registration status first — many food products are SST-exempt, so the taxable-output position may be small. (e-Invoice / MyInvois is already partly handled via the foreign self-billed flow.) |
