@@ -2578,13 +2578,7 @@ const buildIndividualJobPage = (
 
     // Notice
     {
-      text: `*** Individual job breakdown${
-        isHead
-          ? " - statutory deductions shown on this (Head) slip"
-          : isGrouped
-            ? " - No deductions applied to individual jobs"
-            : ""
-      }`,
+      text: "*** Perhatian : Sila kembalikan selepas tandatangan slip ini",
       style: "notice",
       margin: [0, 3, 0, 0],
     },
