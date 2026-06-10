@@ -1577,7 +1577,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           <PrintPayslipButton
             payroll={payroll}
             midMonthPayroll={midMonthPayroll}
-            buttonText="Print Pay Slip"
+            buttonText={
+              payroll.job_type?.includes(", ")
+                ? "Print Slips (Per Job)"
+                : "Print Pay Slip"
+            }
             variant="filled"
             color="sky"
             className="flex-1 md:flex-none shadow-sm"
@@ -1596,7 +1600,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           <DownloadPayslipButton
             payroll={payroll}
             midMonthPayroll={midMonthPayroll}
-            buttonText="Download PDF"
+            buttonText={
+              payroll.job_type?.includes(", ")
+                ? "Download Full PDF"
+                : "Download PDF"
+            }
             variant="default"
             color="sky"
             className="flex-1 md:flex-none"

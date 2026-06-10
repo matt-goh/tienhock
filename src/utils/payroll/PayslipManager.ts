@@ -230,6 +230,29 @@ export const downloadBatchPayslips = async (
   }
 };
 
+// Tell the user what was actually sent to print. Only fires for multi-job
+// (grouped) payrolls — that's where combined vs per-job differs; single-job
+// staff have one slip and the print dialog itself is feedback enough.
+const notifyPrintMode = (
+  payroll: EmployeePayroll,
+  mode: PayslipPrintMode
+): void => {
+  const isGrouped = !!payroll.job_type && payroll.job_type.includes(", ");
+  if (!isGrouped) return;
+
+  const jobCount = payroll.job_type.split(", ").length;
+  const siblingIds = Object.keys(payroll.employee_job_mapping || {});
+  const idList = siblingIds.length > 0 ? ` (${siblingIds.join(", ")})` : "";
+
+  if (mode === "combined") {
+    toast.success("Printing combined slip only");
+  } else if (mode === "both") {
+    toast.success(`Printing combined slip + ${jobCount} per-job slips`);
+  } else {
+    toast.success(`Printing ${jobCount} per-job slips${idList}`);
+  }
+};
+
 // Core functionality for printing
 export const printPayslip = async (
   payroll: EmployeePayroll,
@@ -272,6 +295,7 @@ export const printPayslip = async (
       midMonthPayroll,
       mode
     );
+    notifyPrintMode(completePayroll, mode);
     pdfUrl = URL.createObjectURL(blob);
 
     printFrame = document.createElement("iframe");
@@ -385,6 +409,28 @@ export const printBatchPayslips = async (
       effectiveMidMonthMap,
       mode
     );
+
+    // Mode feedback, only when the batch contains multi-job staff (for everyone
+    // else combined vs per-job makes no difference).
+    const groupedCount = completePayrolls.filter(
+      (p) => !!p.job_type && p.job_type.includes(", ")
+    ).length;
+    if (groupedCount > 0) {
+      const employeeWord = groupedCount === 1 ? "employee" : "employees";
+      if (mode === "combined") {
+        toast.success(
+          `Printing ${completePayrolls.length} payslips (combined slips only)`
+        );
+      } else if (mode === "both") {
+        toast.success(
+          `Printing ${completePayrolls.length} payslips (combined + per-job slips)`
+        );
+      } else {
+        toast.success(
+          `Printing ${completePayrolls.length} payslips — per-job slips for ${groupedCount} multi-job ${employeeWord}`
+        );
+      }
+    }
     pdfUrl = URL.createObjectURL(blob);
 
     printFrame = document.createElement("iframe");
