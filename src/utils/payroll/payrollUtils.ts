@@ -295,11 +295,13 @@ export const getEmployeePayrollDetails = async (id: number) => {
  * Adds a manual item to an employee payroll
  * @param employeePayrollId Employee payroll ID
  * @param item Payroll item data
+ * @param apiBasePath API base path (Green Target uses /greentarget/api/employee-payrolls)
  * @returns API response
  */
 export const addManualPayrollItem = async (
   employeePayrollId: number,
-  item: Omit<PayrollItem, "amount" | "is_manual">
+  item: Omit<PayrollItem, "amount" | "is_manual">,
+  apiBasePath: string = "/api/employee-payrolls"
 ) => {
   try {
     // Calculate the amount using our calculation service
@@ -319,7 +321,7 @@ export const addManualPayrollItem = async (
     };
 
     const response = await api.post(
-      `/api/employee-payrolls/${employeePayrollId}/items`,
+      `${apiBasePath}/${employeePayrollId}/items`,
       payload
     );
     return response;

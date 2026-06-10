@@ -26,9 +26,10 @@ import GreenTargetDashboardPage from "./GreenTarget/GreenTargetDashboardPage";
 import GreenTargetPaymentPage from "./GreenTarget/Payments/GreenTargetPaymentPage";
 import GTPayrollPage from "./GreenTarget/Payroll/GTPayrollPage";
 import GTMonthlyLogEntryPage from "./GreenTarget/Payroll/GTMonthlyLogEntryPage";
-import DriverTripEntryPage from "./GreenTarget/Payroll/DriverTripEntryPage";
 import GTPayrollDetailsPage from "./GreenTarget/Payroll/GTPayrollDetailsPage";
 import PayrollRulesPage from "./GreenTarget/Payroll/PayrollRulesPage";
+import GTMidMonthPayrollPage from "./GreenTarget/Payroll/GTMidMonthPayrollPage";
+import GTPinjamListPage from "./GreenTarget/Payroll/GTPinjamListPage";
 import GTAdjustmentDocsListPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsListPage";
 import GTAdjustmentDocsFormPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsFormPage";
 import GTAdjustmentDocsDetailsPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsDetailsPage";
@@ -116,31 +117,38 @@ export const GreenTargetNavData: SidebarItem[] = [
   {
     name: "Payroll",
     icon: IconReceipt,
-    path: "/payroll",
-    component: GTPayrollPage,
     subItems: [
       {
-        name: "OFFICE Work Log",
+        name: "Monthly Payroll",
+        path: "/payroll",
+        component: GTPayrollPage,
+        subItems: [
+          {
+            name: "Payroll Details",
+            path: "/payroll/details/:id",
+            component: GTPayrollDetailsPage,
+          },
+        ],
+      },
+      {
+        name: "Office",
         path: "/payroll/office-log",
         component: GTMonthlyLogEntryPage,
-        showInPopover: true,
       },
       {
-        name: "Driver Trips",
-        path: "/payroll/driver-trips",
-        component: DriverTripEntryPage,
-        showInPopover: true,
+        name: "Mid-month Payroll",
+        path: "/payroll/mid-month",
+        component: GTMidMonthPayrollPage,
       },
       {
-        name: "Payroll Details",
-        path: "/payroll/details/:id",
-        component: GTPayrollDetailsPage,
+        name: "Pinjam",
+        path: "/payroll/pinjam",
+        component: GTPinjamListPage,
       },
       {
         name: "Payroll Settings",
         path: "/payroll/settings",
         component: PayrollRulesPage,
-        showInPopover: true,
       },
     ],
   },

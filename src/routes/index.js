@@ -90,11 +90,12 @@ import greenTargetDashboardRouter from "./greentarget/dashboard.js";
 import greenTargetPayrollEmployeesRouter from "./greentarget/payroll-employees.js";
 import greenTargetMonthlyPayrollsRouter from "./greentarget/monthly-payrolls.js";
 import greenTargetMonthlyWorkLogsRouter from "./greentarget/monthly-work-logs.js";
-import greenTargetDriverTripsRouter from "./greentarget/driver-trips.js";
 import greenTargetEmployeePayrollsRouter from "./greentarget/employee-payrolls.js";
 import greenTargetPickupDestinationsRouter from "./greentarget/pickup-destinations.js";
 import greenTargetPayrollRulesRouter from "./greentarget/payroll-rules.js";
 import greenTargetRentalAddonsRouter from "./greentarget/rental-addons.js";
+import greenTargetPinjamRecordsRouter from "./greentarget/pinjam-records.js";
+import greenTargetMidMonthPayrollsRouter from "./greentarget/mid-month-payrolls.js";
 import greenTargetAdjustmentDocsRouter from "./greentarget/adjustment-docs.js";
 
 // Jellypolly routes
@@ -245,7 +246,6 @@ export default function setupRoutes(app, pool) {
     "/greentarget/api/monthly-work-logs",
     greenTargetMonthlyWorkLogsRouter(pool)
   );
-  app.use("/greentarget/api/driver-trips", greenTargetDriverTripsRouter(pool));
   app.use(
     "/greentarget/api/employee-payrolls",
     greenTargetEmployeePayrollsRouter(pool)
@@ -261,6 +261,14 @@ export default function setupRoutes(app, pool) {
   app.use(
     "/greentarget/api/rental-addons",
     greenTargetRentalAddonsRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/pinjam-records",
+    greenTargetPinjamRecordsRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/mid-month-payrolls",
+    greenTargetMidMonthPayrollsRouter(pool)
   );
   app.use(
     "/greentarget/api/adjustment-docs",

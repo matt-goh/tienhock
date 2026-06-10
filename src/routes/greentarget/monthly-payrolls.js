@@ -1,19 +1,9 @@
 // src/routes/greentarget/monthly-payrolls.js
 import { Router } from "express";
-import { resolveContributionContext } from "../payroll/contributionOverrides.js";
-
-const SOCSO_SKBBK_EFFECTIVE_YEAR = 2026;
-const SOCSO_SKBBK_EFFECTIVE_MONTH = 6;
-
-const isSOCSOSKBBKEffective = (year, month) => {
-  const payrollYear = Number(year);
-  const payrollMonth = Number(month);
-  return (
-    payrollYear > SOCSO_SKBBK_EFFECTIVE_YEAR ||
-    (payrollYear === SOCSO_SKBBK_EFFECTIVE_YEAR &&
-      payrollMonth >= SOCSO_SKBBK_EFFECTIVE_MONTH)
-  );
-};
+import {
+  calculateGTStatutoryDeductions,
+  fetchActiveContributionRates,
+} from "./gtStatutoryCalc.js";
 
 // Helper function to format date to YYYY-MM-DD string
 const formatDateToYMD = (date) => {
@@ -232,20 +222,33 @@ export default function (pool) {
       return res.status(400).json({ message: "No employees selected for processing" });
     }
 
+    // 1. Get payroll details and block re-processing once finalized
+    let year, month;
+    try {
+      const payrollResult = await pool.query(
+        "SELECT year, month, status FROM greentarget.monthly_payrolls WHERE id = $1",
+        [id]
+      );
+      if (payrollResult.rows.length === 0) {
+        return res.status(404).json({ message: "Monthly payroll not found" });
+      }
+      if (payrollResult.rows[0].status === "Finalized") {
+        return res.status(400).json({ message: "Cannot process a finalized payroll" });
+      }
+      ({ year, month } = payrollResult.rows[0]);
+    } catch (error) {
+      console.error("Error checking GT payroll status:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Error processing payroll",
+        error: error.message,
+      });
+    }
+
     const client = await pool.connect();
 
     try {
       await client.query("BEGIN");
-
-      // 1. Get payroll details
-      const payrollResult = await client.query(
-        "SELECT year, month FROM greentarget.monthly_payrolls WHERE id = $1",
-        [id]
-      );
-      if (payrollResult.rows.length === 0) {
-        throw new Error("Monthly payroll not found");
-      }
-      const { year, month } = payrollResult.rows[0];
 
       // 2. Fetch all required data in parallel
       const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
@@ -254,18 +257,15 @@ export default function (pool) {
 
       const [
         monthlyLogsResult,
-        driverTripsResult,
         staffsResult,
         jobPayCodesResult,
-        epfRatesResult,
-        socsoRatesResult,
-        sipRatesResult,
-        incomeTaxRatesResult,
+        contributionRates,
         payrollRulesResult,
         payrollSettingsResult,
         driverRentalsResult,
         rentalAddonsResult,
         allPayCodesResult,
+        midMonthResult,
       ] = await Promise.all([
         // Monthly work logs for OFFICE workers (from GT schema)
         client.query(`
@@ -288,13 +288,6 @@ export default function (pool) {
           GROUP BY mwl.id, mwl.log_month, mwl.log_year, mwle.employee_id, mwle.job_id,
             mwle.total_hours, mwle.overtime_hours
         `, [month, year]),
-
-        // Driver trips
-        client.query(`
-          SELECT driver_id, year, month, trip_count
-          FROM greentarget.driver_trips
-          WHERE year = $1 AND month = $2
-        `, [year, month]),
 
         // Staff data
         client.query(`
@@ -319,10 +312,7 @@ export default function (pool) {
         `),
 
         // Contribution rates
-        client.query("SELECT * FROM public.epf_rates WHERE is_active = true"),
-        client.query("SELECT * FROM public.socso_rates WHERE is_active = true ORDER BY wage_from"),
-        client.query("SELECT * FROM public.sip_rates WHERE is_active = true ORDER BY wage_from"),
-        client.query("SELECT * FROM public.income_tax_rates WHERE is_active = true ORDER BY wage_from"),
+        fetchActiveContributionRates(client),
 
         // Payroll rules for DRIVER processing
         client.query(`
@@ -344,16 +334,16 @@ export default function (pool) {
             r.driver,
             r.pickup_destination,
             COALESCE(
-              (SELECT SUM(i.total_excluding_tax)
+              (SELECT SUM(i.amount_before_tax)
                FROM greentarget.invoice_rentals ir
                JOIN greentarget.invoices i ON ir.invoice_id = i.invoice_id
-               WHERE ir.rental_id = r.rental_id AND i.invoice_status != 'Cancelled'),
+               WHERE ir.rental_id = r.rental_id AND i.status != 'cancelled'),
               NULL
             ) as invoice_amount,
             EXISTS(
               SELECT 1 FROM greentarget.invoice_rentals ir
               JOIN greentarget.invoices i ON ir.invoice_id = i.invoice_id
-              WHERE ir.rental_id = r.rental_id AND i.invoice_status != 'Cancelled'
+              WHERE ir.rental_id = r.rental_id AND i.status != 'cancelled'
             ) as has_invoice
           FROM greentarget.rentals r
           WHERE r.date_picked IS NOT NULL
@@ -382,14 +372,21 @@ export default function (pool) {
           FROM pay_codes
           WHERE is_active = true
         `),
+
+        // Mid-month advances for this month (deducted before rounding)
+        client.query(`
+          SELECT employee_id, amount
+          FROM greentarget.mid_month_payrolls
+          WHERE year = $1 AND month = $2
+        `, [year, month]),
       ]);
 
       // Build lookup maps
       const staffsMap = new Map(staffsResult.rows.map((s) => [s.id, s]));
-      const epfRates = epfRatesResult.rows;
-      const socsoRates = socsoRatesResult.rows;
-      const sipRates = sipRatesResult.rows;
-      const incomeTaxRates = incomeTaxRatesResult.rows;
+      const { epfRates, socsoRates, sipRates, incomeTaxRates } = contributionRates;
+      const midMonthMap = new Map(
+        midMonthResult.rows.map((r) => [r.employee_id, parseFloat(r.amount)])
+      );
 
       // Build job pay codes map
       const jobPayCodesMap = {};
@@ -399,11 +396,6 @@ export default function (pool) {
         }
         jobPayCodesMap[row.job_id].push(row);
       });
-
-      // Build driver trips map
-      const driverTripsMap = new Map(
-        driverTripsResult.rows.map((t) => [t.driver_id, t.trip_count])
-      );
 
       // Build payroll rules map
       const payrollRules = payrollRulesResult.rows;
@@ -491,41 +483,6 @@ export default function (pool) {
           });
         });
       });
-
-      // Helper functions
-      const findEPFRate = (rates, type, wage) => {
-        const applicable = rates.filter((r) => r.employee_type === type);
-        if (!applicable.length) return null;
-        if (type.startsWith("local_")) {
-          const over = applicable.find((r) => r.wage_threshold === null);
-          const under = applicable.find((r) => r.wage_threshold !== null);
-          return under && wage <= parseFloat(under.wage_threshold) ? under : over || null;
-        }
-        return applicable[0];
-      };
-
-      const findRateByWage = (rates, wage) =>
-        rates.find(
-          (r) => wage >= parseFloat(r.wage_from) && wage <= parseFloat(r.wage_to)
-        ) || null;
-
-      const findIncomeTaxRateByWage = (rates, wage) => {
-        const lookupWage = Math.ceil(wage);
-        return (
-          rates.find(
-            (r) =>
-              lookupWage >= parseFloat(r.wage_from) &&
-              lookupWage <= parseFloat(r.wage_to)
-          ) || null
-        );
-      };
-
-      const getEPFWageCeiling = (wageAmount) => {
-        if (wageAmount <= 10) return 0;
-        if (wageAmount <= 20) return 20;
-        if (wageAmount <= 5000) return Math.ceil(wageAmount / 20) * 20;
-        return 5000 + Math.ceil((wageAmount - 5000) / 100) * 100;
-      };
 
       // 3. Process each selected employee
       const processedPayrolls = [];
@@ -687,17 +644,14 @@ export default function (pool) {
             }
           }
 
-          // Calculate gross pay
-          const grossPay = combinedItems.reduce((sum, item) => sum + item.amount, 0);
-
-          // Calculate contributions
-          const age = Math.floor(
-            (Date.now() - new Date(staff.birthdate).getTime()) /
-              (365.25 * 24 * 60 * 60 * 1000)
+          // Calculate gross pay in integer cents to avoid float drift
+          const grossPayCents = combinedItems.reduce(
+            (sum, item) => sum + Math.round(item.amount * 100),
+            0
           );
-          const contributionCtx = resolveContributionContext(staff, age);
+          const grossPay = grossPayCents / 100;
 
-          // Group items by pay type for EPF calculation
+          // Group items by pay type for EPF calculation (EPF base excludes Overtime)
           const groupedItems = { Base: [], Tambahan: [], Overtime: [] };
           combinedItems.forEach((item) => {
             const type = item.pay_type || "Tambahan";
@@ -705,160 +659,35 @@ export default function (pool) {
             groupedItems[type].push(item);
           });
 
-          const epfGrossPay =
-            groupedItems.Base.reduce((s, i) => s + i.amount, 0) +
-            groupedItems.Tambahan.reduce((s, i) => s + i.amount, 0);
+          const epfGrossPayCents =
+            groupedItems.Base.reduce((s, i) => s + Math.round(i.amount * 100), 0) +
+            groupedItems.Tambahan.reduce((s, i) => s + Math.round(i.amount * 100), 0);
+          const epfGrossPay = epfGrossPayCents / 100;
 
-          const deductions = [];
-
-          // EPF
-          const epfRate = contributionCtx.epf.eligible
-            ? findEPFRate(epfRates, contributionCtx.epf.employeeType, epfGrossPay)
-            : null;
-          if (epfRate) {
-            const wageCeiling = getEPFWageCeiling(epfGrossPay);
-            if (wageCeiling > 0) {
-              const employeeContribution = Math.ceil(
-                (wageCeiling * parseFloat(epfRate.employee_rate_percentage)) / 100
-              );
-              const employerContribution =
-                epfRate.employer_rate_percentage !== null
-                  ? Math.ceil(
-                      (wageCeiling * parseFloat(epfRate.employer_rate_percentage)) / 100
-                    )
-                  : parseFloat(epfRate.employer_fixed_amount);
-              deductions.push({
-                deduction_type: "epf",
-                employee_amount: employeeContribution || 0,
-                employer_amount: employerContribution || 0,
-                wage_amount: epfGrossPay,
-                rate_info: {
-                  rate_id: epfRate.id,
-                  employee_rate: `${epfRate.employee_rate_percentage}%`,
-                  employer_rate: epfRate.employer_rate_percentage
-                    ? `${epfRate.employer_rate_percentage}%`
-                    : `RM${epfRate.employer_fixed_amount}`,
-                  age_group: contributionCtx.epf.employeeType,
-                  wage_ceiling_used: wageCeiling,
-                },
-              });
-            }
-          }
-
-          // SOCSO. SKBBK applies from June 2026 payrolls onward.
-          const socsoRate = contributionCtx.socso.eligible
-            ? findRateByWage(socsoRates, grossPay)
-            : null;
-          if (socsoRate) {
-            const isOver60 = contributionCtx.socso.isOver60;
-            const shouldApplySKBBK = isSOCSOSKBBKEffective(year, month);
-            const skbbk =
-              shouldApplySKBBK
-                ? Math.round(
-                    parseFloat(socsoRate.employee_rate_skbbk || 0) * 100
-                  ) / 100
-                : 0;
-            const keilatan = isOver60
-              ? 0
-              : Math.round(parseFloat(socsoRate.employee_rate || 0) * 100) /
-                100;
-            const employee_amount = Math.round((keilatan + skbbk) * 100) / 100;
-            const employer_amount = isOver60
-              ? Math.round(
-                  parseFloat(socsoRate.employer_rate_over_60 || 0) * 100
-                ) / 100
-              : Math.round(parseFloat(socsoRate.employer_rate || 0) * 100) /
-                100;
-            deductions.push({
-              deduction_type: "socso",
-              employee_amount,
-              employer_amount,
-              wage_amount: grossPay,
-              rate_info: {
-                rate_id: socsoRate.id,
-                employee_rate: `RM${employee_amount.toFixed(2)}`,
-                employer_rate: `RM${employer_amount.toFixed(2)}`,
-                age_group: isOver60 ? "60_and_above" : "under_60",
-                keilatan_amount: keilatan,
-                skbbk_amount: skbbk,
-              },
-            });
-          }
-
-          // SIP (Malaysian only, under 60)
-          if (
-            contributionCtx.sip.eligible &&
-            contributionCtx.sip.under60 &&
-            contributionCtx.isMalaysian
-          ) {
-            const sipRate = findRateByWage(sipRates, grossPay);
-            if (sipRate) {
-              deductions.push({
-                deduction_type: "sip",
-                employee_amount: parseFloat(sipRate.employee_rate) || 0,
-                employer_amount: parseFloat(sipRate.employer_rate) || 0,
-                wage_amount: grossPay,
-                rate_info: {
-                  rate_id: sipRate.id,
-                  employee_rate: `RM${sipRate.employee_rate}`,
-                  employer_rate: `RM${sipRate.employer_rate}`,
-                  age_group: "under_60",
-                },
-              });
-            }
-          }
-
-          // Income Tax
-          const incomeTaxRate = findIncomeTaxRateByWage(
+          const deductions = calculateGTStatutoryDeductions({
+            staff,
+            grossPay,
+            epfGrossPay,
+            year,
+            month,
+            epfRates,
+            socsoRates,
+            sipRates,
             incomeTaxRates,
-            grossPay
-          );
-          if (incomeTaxRate) {
-            const maritalStatus = staff.marital_status || "Single";
-            const spouseEmploymentStatus = staff.spouse_employment_status || null;
-            const numberOfChildren = staff.number_of_children || 0;
-            let applicableRate = parseFloat(incomeTaxRate.base_rate);
-
-            if (maritalStatus === "Married") {
-              const childrenKey = Math.min(numberOfChildren, 10);
-              if (spouseEmploymentStatus === "Unemployed") {
-                applicableRate =
-                  parseFloat(incomeTaxRate[`unemployed_spouse_k${childrenKey}`]) ||
-                  applicableRate;
-              } else if (spouseEmploymentStatus === "Employed") {
-                applicableRate =
-                  parseFloat(incomeTaxRate[`employed_spouse_k${childrenKey}`]) ||
-                  applicableRate;
-              }
-            }
-
-            if (applicableRate > 0) {
-              let taxCategory = maritalStatus;
-              if (maritalStatus === "Married") {
-                taxCategory += `-K${Math.min(numberOfChildren, 10)}`;
-                if (spouseEmploymentStatus) taxCategory += `-${spouseEmploymentStatus}`;
-              }
-              deductions.push({
-                deduction_type: "income_tax",
-                employee_amount: applicableRate,
-                employer_amount: 0,
-                wage_amount: grossPay,
-                rate_info: {
-                  rate_id: incomeTaxRate.id,
-                  employee_rate: `RM${applicableRate}`,
-                  employer_rate: "RM0.00",
-                  tax_category: taxCategory,
-                },
-              });
-            }
-          }
+          });
 
           // Calculate net pay
           const totalEmployeeDeductions = deductions.reduce(
             (sum, d) => sum + d.employee_amount,
             0
           );
-          const netPay = grossPay - totalEmployeeDeductions;
+          const netPay = Math.round((grossPay - totalEmployeeDeductions) * 100) / 100;
+
+          // Mid-month advance + rounding (digenapkan), mirroring Tien Hock payroll
+          const midMonthAmount = midMonthMap.get(employeeId) || 0;
+          const jumlah = netPay - midMonthAmount;
+          const setelahDigenapkan = Math.ceil(jumlah);
+          const digenapkan = setelahDigenapkan - jumlah;
 
           // 4. Save to database
           const existingPayroll = await client.query(
@@ -874,9 +703,18 @@ export default function (pool) {
             // Update existing
             await client.query(
               `UPDATE greentarget.employee_payrolls
-               SET gross_pay = $1, net_pay = $2, job_type = $3, section = $4
-               WHERE id = $5`,
-              [grossPay.toFixed(2), netPay.toFixed(2), jobType, jobType, employeePayrollId]
+               SET gross_pay = $1, net_pay = $2, digenapkan = $3, setelah_digenapkan = $4,
+                   job_type = $5, section = $6
+               WHERE id = $7`,
+              [
+                grossPay.toFixed(2),
+                netPay.toFixed(2),
+                digenapkan.toFixed(2),
+                setelahDigenapkan.toFixed(2),
+                jobType,
+                jobType,
+                employeePayrollId,
+              ]
             );
             // Delete existing items and deductions
             await client.query(
@@ -891,32 +729,44 @@ export default function (pool) {
             // Create new
             const insertResult = await client.query(
               `INSERT INTO greentarget.employee_payrolls
-               (monthly_payroll_id, employee_id, job_type, section, gross_pay, net_pay)
-               VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-              [id, employeeId, jobType, jobType, grossPay.toFixed(2), netPay.toFixed(2)]
+               (monthly_payroll_id, employee_id, job_type, section, gross_pay, net_pay,
+                digenapkan, setelah_digenapkan)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+              [
+                id,
+                employeeId,
+                jobType,
+                jobType,
+                grossPay.toFixed(2),
+                netPay.toFixed(2),
+                digenapkan.toFixed(2),
+                setelahDigenapkan.toFixed(2),
+              ]
             );
             employeePayrollId = insertResult.rows[0].id;
           }
 
           // Insert payroll items
           const nonManualItems = combinedItems.filter((item) => !item.is_manual);
-          if (nonManualItems.length > 0) {
-            const itemValues = nonManualItems
-              .map(
-                (item) =>
-                  `(${employeePayrollId}, '${item.pay_code_id}', '${(item.description || "").replace(/'/g, "''")}',
-                    ${item.rate}, '${item.rate_unit}', ${item.quantity}, ${item.amount}, false,
-                    ${item.job_type ? `'${item.job_type}'` : "NULL"},
-                    ${item.source_employee_id ? `'${item.source_employee_id}'` : "NULL"},
-                    ${item.work_log_id || "NULL"},
-                    ${item.work_log_type ? `'${item.work_log_type}'` : "NULL"})`
-              )
-              .join(", ");
-            await client.query(`
-              INSERT INTO greentarget.payroll_items
-              (employee_payroll_id, pay_code_id, description, rate, rate_unit, quantity, amount, is_manual, job_type, source_employee_id, work_log_id, work_log_type)
-              VALUES ${itemValues}
-            `);
+          for (const item of nonManualItems) {
+            await client.query(
+              `INSERT INTO greentarget.payroll_items
+               (employee_payroll_id, pay_code_id, description, rate, rate_unit, quantity, amount, is_manual, job_type, source_employee_id, work_log_id, work_log_type)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8, $9, $10, $11)`,
+              [
+                employeePayrollId,
+                item.pay_code_id,
+                item.description || "",
+                item.rate,
+                item.rate_unit,
+                item.quantity,
+                item.amount,
+                item.job_type || null,
+                item.source_employee_id || null,
+                item.work_log_id || null,
+                item.work_log_type || null,
+              ]
+            );
           }
 
           // Insert deductions
@@ -949,6 +799,30 @@ export default function (pool) {
             throw error;
           }
         }
+      }
+
+      // Prune payrolls for employees no longer selected (e.g. removed from the
+      // GT employee list), so they don't linger after re-processing
+      const selectedEmployeeIds = selected_employees.map((s) => s.employeeId);
+      const orphanResult = await client.query(
+        `SELECT id FROM greentarget.employee_payrolls
+         WHERE monthly_payroll_id = $1 AND NOT (employee_id = ANY($2))`,
+        [id, selectedEmployeeIds]
+      );
+      if (orphanResult.rows.length > 0) {
+        const orphanIds = orphanResult.rows.map((r) => r.id);
+        await client.query(
+          "DELETE FROM greentarget.payroll_items WHERE employee_payroll_id = ANY($1)",
+          [orphanIds]
+        );
+        await client.query(
+          "DELETE FROM greentarget.payroll_deductions WHERE employee_payroll_id = ANY($1)",
+          [orphanIds]
+        );
+        await client.query(
+          "DELETE FROM greentarget.employee_payrolls WHERE id = ANY($1)",
+          [orphanIds]
+        );
       }
 
       // Update timestamp

@@ -44,6 +44,10 @@ interface PinjamFormModalProps {
   currentYear: number;
   currentMonth: number;
   editingRecord?: PinjamRecord | null;
+  /** Override the API base path (e.g. Green Target uses /greentarget/api/pinjam-records) */
+  apiBasePath?: string;
+  /** Override the selectable employees (defaults to the full staff cache) */
+  employeeOptions?: { id: string; name: string }[];
 }
 
 const DEFAULT_CATEGORIES = [
@@ -64,6 +68,8 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
   currentYear,
   currentMonth,
   editingRecord,
+  apiBasePath = "/api/pinjam-records",
+  employeeOptions,
 }) => {
   const { staffs } = useStaffsCache();
   const { user } = useAuth();
@@ -74,11 +80,12 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
 
   const allStaffOptions = useMemo(
     () =>
+      employeeOptions ??
       staffs.map((staff) => ({
         id: staff.id,
         name: `${staff.name} (${staff.id})`,
       })),
-    [staffs]
+    [employeeOptions, staffs]
   );
 
   // Initialize entries with default categories
@@ -213,7 +220,7 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
       if (editingRecord) {
         // For editing, we need to update the existing record
         const updateData = validRecords[0]; // Should only be one record when editing
-        await api.put(`/api/pinjam-records/${editingRecord.id}`, updateData);
+        await api.put(`${apiBasePath}/${editingRecord.id}`, updateData);
         toast.success("Pinjam record updated successfully!");
       } else {
         // For creating, use batch endpoint
@@ -224,7 +231,7 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
           created_by: user?.id,
         }));
 
-        const response = await api.post("/api/pinjam-records/batch", {
+        const response = await api.post(`${apiBasePath}/batch`, {
           records: recordsWithMeta,
         });
 
