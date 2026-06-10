@@ -257,7 +257,7 @@ Revenue                           Note 7 (from invoices)
 | Report Pages | `src/pages/Accounting/Reports/*.tsx` |
 | Account Codes | `src/routes/accounting/account-codes.js` |
 | Journal Entries | `src/routes/accounting/journal-entries.js` |
-| Old System Mapping | `docs/FINANCIAL_STATEMENTS_MAPPING.md` |
+| Old System Mapping | `docs/Account/FINANCIAL_STATEMENTS_MAPPING.md` |
 
 ---
 
