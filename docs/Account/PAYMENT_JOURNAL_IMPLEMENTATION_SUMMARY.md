@@ -436,7 +436,7 @@ The system is designed to be **resilient**:
 ### Created:
 - `migrations/add_payment_journals.sql`
 - `src/routes/accounting/payment-journal.js`
-- `docs/PAYMENT_JOURNAL_IMPLEMENTATION_SUMMARY.md`
+- `docs/Account/PAYMENT_JOURNAL_IMPLEMENTATION_SUMMARY.md`
 
 ### Modified:
 - `src/routes/sales/invoices/payments.js`

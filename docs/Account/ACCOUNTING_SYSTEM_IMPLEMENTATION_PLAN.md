@@ -587,7 +587,7 @@ Lines:
 ```
 
 **Testing Status:**
-- Manual testing guide provided in `docs/PAYMENT_JOURNAL_IMPLEMENTATION_SUMMARY.md`
+- Manual testing guide provided in `docs/Account/PAYMENT_JOURNAL_IMPLEMENTATION_SUMMARY.md`
 - Ready for production use
 - Currently: 2,529 active/pending payments, 2,516 with bank_account assigned
 
