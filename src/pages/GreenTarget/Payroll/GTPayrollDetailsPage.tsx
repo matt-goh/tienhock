@@ -8,7 +8,6 @@ import {
   IconReceipt,
   IconUser,
   IconTruck,
-  IconDownload,
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import BackButton from "../../../components/BackButton";
@@ -16,8 +15,13 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
-import { generatePaySlipPDF } from "../../../utils/payroll/PaySlipPDFMake";
 import { EmployeePayroll } from "../../../types/types";
+import AddManualItemModal from "../../../components/Payroll/AddManualItemModal";
+import { MidMonthPayroll } from "../../../utils/payroll/midMonthPayrollUtils";
+import {
+  DownloadPayslipButton,
+  PrintPayslipButton,
+} from "../../../utils/payroll/PayslipButtons";
 
 interface PayrollItem {
   id: number;
@@ -43,6 +47,26 @@ interface Deduction {
   };
 }
 
+interface GTPinjamRecord {
+  id: number;
+  employee_id: string;
+  year: number;
+  month: number;
+  amount: number;
+  description: string;
+  pinjam_type: "mid_month" | "monthly";
+}
+
+interface GTMidMonthAdvance {
+  id: number;
+  employee_id: string;
+  year: number;
+  month: number;
+  amount: number;
+  payment_method: "Cash" | "Bank" | "Cheque";
+  status: "Pending" | "Paid" | "Cancelled";
+}
+
 interface GTEmployeePayroll {
   id: number;
   monthly_payroll_id: number;
@@ -52,6 +76,8 @@ interface GTEmployeePayroll {
   section: string;
   gross_pay: number;
   net_pay: number;
+  digenapkan?: number;
+  setelah_digenapkan?: number | null;
   year: number;
   month: number;
   payroll_status: string;
@@ -61,6 +87,8 @@ interface GTEmployeePayroll {
   socso_no: string;
   items: PayrollItem[];
   deductions: Deduction[];
+  pinjam_records?: GTPinjamRecord[];
+  mid_month_payroll?: GTMidMonthAdvance | null;
 }
 
 const GTPayrollDetailsPage: React.FC = () => {
@@ -72,6 +100,7 @@ const GTPayrollDetailsPage: React.FC = () => {
   const [itemToDelete, setItemToDelete] = useState<PayrollItem | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
 
   useEffect(() => {
     fetchPayrollDetails();
@@ -110,10 +139,9 @@ const GTPayrollDetailsPage: React.FC = () => {
     }
   };
 
-  const handleDownloadPayslip = () => {
-    if (!payroll) return;
-
-    // Convert GT payroll format to EmployeePayroll format for PDF generator
+  // Convert GT payroll format to EmployeePayroll format for the shared
+  // payslip download/print buttons (same PDF as Tien Hock payslips).
+  const buildPayslipData = (payroll: GTEmployeePayroll) => {
     const pdfPayroll: EmployeePayroll = {
       id: payroll.id,
       monthly_payroll_id: payroll.monthly_payroll_id,
@@ -123,6 +151,8 @@ const GTPayrollDetailsPage: React.FC = () => {
       section: payroll.section,
       gross_pay: payroll.gross_pay,
       net_pay: payroll.net_pay,
+      digenapkan: payroll.digenapkan,
+      setelah_digenapkan: payroll.setelah_digenapkan ?? undefined,
       status: payroll.payroll_status,
       year: payroll.year,
       month: payroll.month,
@@ -160,14 +190,22 @@ const GTPayrollDetailsPage: React.FC = () => {
       section: payroll.section || "GREEN TARGET",
     };
 
-    generatePaySlipPDF({
-      payroll: pdfPayroll,
-      companyName: "GREEN TARGET SDN. BHD.",
-      staffDetails,
-      midMonthPayroll: null,
-    });
+    const midMonthForPdf: MidMonthPayroll | null = payroll.mid_month_payroll
+      ? {
+          id: payroll.mid_month_payroll.id,
+          employee_id: payroll.employee_id,
+          employee_name: payroll.employee_name,
+          year: payroll.year,
+          month: payroll.month,
+          amount: payroll.mid_month_payroll.amount,
+          payment_method: payroll.mid_month_payroll.payment_method,
+          status: payroll.mid_month_payroll.status,
+          created_at: "",
+          updated_at: "",
+        }
+      : null;
 
-    toast.success("Payslip downloaded!");
+    return { pdfPayroll, staffDetails, midMonthForPdf };
   };
 
   const formatCurrency = (amount: number): string => {
@@ -237,9 +275,35 @@ const GTPayrollDetailsPage: React.FC = () => {
   );
 
   const isFinalized = payroll.payroll_status === "Finalized";
+  const { pdfPayroll, staffDetails, midMonthForPdf } = buildPayslipData(payroll);
+
+  // Mid-month advance + rounding (mirrors the backend processing math)
+  const midMonthAmount = payroll.mid_month_payroll?.amount || 0;
+  const jumlah = payroll.net_pay - midMonthAmount;
+  const setelahDigenapkan = payroll.setelah_digenapkan ?? Math.ceil(jumlah);
+  const digenapkan = payroll.digenapkan ?? setelahDigenapkan - jumlah;
+
+  // Pinjam summary (deducted from the rounded pay, not part of net pay)
+  const pinjamRecords = payroll.pinjam_records || [];
+  const midMonthPinjamRecords = pinjamRecords.filter(
+    (r) => r.pinjam_type === "mid_month"
+  );
+  const monthlyPinjamRecords = pinjamRecords.filter(
+    (r) => r.pinjam_type === "monthly"
+  );
+  const midMonthPinjamTotal = midMonthPinjamRecords.reduce(
+    (sum, r) => sum + r.amount,
+    0
+  );
+  const monthlyPinjamTotal = monthlyPinjamRecords.reduce(
+    (sum, r) => sum + r.amount,
+    0
+  );
+  const monthlyFinalPay = setelahDigenapkan - monthlyPinjamTotal;
+  const midMonthFinalPay = midMonthAmount - midMonthPinjamTotal;
 
   return (
-    <div className="px-6 pb-6 space-y-3">
+    <div className="pb-6 space-y-3">
       {/* Header */}
       <div className="flex items-center gap-4">
         <BackButton onClick={() => navigate("/greentarget/payroll")} />
@@ -260,15 +324,24 @@ const GTPayrollDetailsPage: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
+          <PrintPayslipButton
+            payroll={pdfPayroll}
+            staffDetails={staffDetails}
+            midMonthPayroll={midMonthForPdf}
+            companyName="GREEN TARGET SDN. BHD."
             size="sm"
             variant="outline"
-            onClick={handleDownloadPayslip}
-            icon={IconDownload}
-            iconSize={16}
-          >
-            Payslip
-          </Button>
+            buttonText="Print"
+          />
+          <DownloadPayslipButton
+            payroll={pdfPayroll}
+            staffDetails={staffDetails}
+            midMonthPayroll={midMonthForPdf}
+            companyName="GREEN TARGET SDN. BHD."
+            size="sm"
+            variant="outline"
+            buttonText="Download"
+          />
           <span
             className={`px-3 py-1 rounded-full text-sm font-medium ${
               isFinalized
@@ -334,7 +407,7 @@ const GTPayrollDetailsPage: React.FC = () => {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => toast("Add manual item feature coming soon")}
+              onClick={() => setShowAddItemModal(true)}
               icon={IconPlus}
               iconSize={16}
             >
@@ -516,8 +589,8 @@ const GTPayrollDetailsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Net Pay Summary */}
-      <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg shadow p-4">
+      {/* Net Pay + Rounding Summary */}
+      <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg shadow p-4 space-y-2">
         <div className="flex justify-between items-center">
           <span className="text-lg font-medium text-emerald-800 dark:text-emerald-300">
             Net Pay
@@ -526,7 +599,127 @@ const GTPayrollDetailsPage: React.FC = () => {
             {formatCurrency(payroll.net_pay)}
           </span>
         </div>
+        {midMonthAmount > 0 && (
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-emerald-700 dark:text-emerald-300">
+              Bayaran Pendahuluan (Mid-month)
+            </span>
+            <span className="font-medium text-red-600 dark:text-red-400">
+              -{formatCurrency(midMonthAmount)}
+            </span>
+          </div>
+        )}
+        {digenapkan > 0.001 && (
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-emerald-700 dark:text-emerald-300">
+              Digenapkan (Rounding)
+            </span>
+            <span className="font-medium text-emerald-700 dark:text-emerald-300">
+              +{formatCurrency(digenapkan)}
+            </span>
+          </div>
+        )}
+        <div className="flex justify-between items-center pt-2 border-t border-emerald-200 dark:border-emerald-800">
+          <span className="text-lg font-medium text-emerald-800 dark:text-emerald-300">
+            Jumlah Digenapkan
+          </span>
+          <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+            {formatCurrency(setelahDigenapkan)}
+          </span>
+        </div>
       </div>
+
+      {/* Pinjam Summary - final pay after pinjam deductions.
+          Only shown when this employee has pinjam recorded this month. */}
+      {pinjamRecords.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+          <div className="px-4 py-3 border-b border-default-200 dark:border-gray-700">
+            <h3 className="font-medium text-default-800 dark:text-gray-200">
+              Pinjam
+            </h3>
+          </div>
+          <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {midMonthPinjamRecords.length > 0 && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">
+                  Mid-Month Pinjam
+                </p>
+                <div className="flex justify-between text-sm text-blue-700 dark:text-blue-300">
+                  <span>Bayaran Pendahuluan</span>
+                  <span>{formatCurrency(midMonthAmount)}</span>
+                </div>
+                {midMonthPinjamRecords.map((record) => (
+                  <div
+                    key={record.id}
+                    className="flex justify-between text-sm text-blue-700 dark:text-blue-300"
+                  >
+                    <span>{record.description}</span>
+                    <span>-{formatCurrency(record.amount)}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between mt-2 pt-2 border-t border-blue-200 dark:border-blue-800 font-semibold">
+                  <span className="text-blue-800 dark:text-blue-200">
+                    Final Mid-Month Pay
+                  </span>
+                  <span
+                    className={
+                      midMonthFinalPay < 0
+                        ? "text-rose-600 dark:text-rose-400"
+                        : "text-blue-800 dark:text-blue-200"
+                    }
+                  >
+                    {formatCurrency(midMonthFinalPay)}
+                  </span>
+                </div>
+              </div>
+            )}
+            {monthlyPinjamRecords.length > 0 && (
+              <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                <p className="text-sm font-semibold text-green-800 dark:text-green-200 mb-2">
+                  Monthly Pinjam
+                </p>
+                <div className="flex justify-between text-sm text-green-700 dark:text-green-300">
+                  <span>Jumlah Digenapkan</span>
+                  <span>{formatCurrency(setelahDigenapkan)}</span>
+                </div>
+                {monthlyPinjamRecords.map((record) => (
+                  <div
+                    key={record.id}
+                    className="flex justify-between text-sm text-green-700 dark:text-green-300"
+                  >
+                    <span>{record.description}</span>
+                    <span>-{formatCurrency(record.amount)}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between mt-2 pt-2 border-t border-green-200 dark:border-green-800 font-semibold">
+                  <span className="text-green-800 dark:text-green-200">
+                    Final Pay
+                  </span>
+                  <span
+                    className={
+                      monthlyFinalPay < 0
+                        ? "text-rose-600 dark:text-rose-400"
+                        : "text-green-800 dark:text-green-200"
+                    }
+                  >
+                    {formatCurrency(monthlyFinalPay)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Add Manual Item Modal */}
+      <AddManualItemModal
+        isOpen={showAddItemModal}
+        onClose={() => setShowAddItemModal(false)}
+        employeePayrollId={payroll.id}
+        employeeJobType={payroll.job_type}
+        onItemAdded={fetchPayrollDetails}
+        apiBasePath="/greentarget/api/employee-payrolls"
+      />
 
       {/* Delete Confirmation Dialog */}
       <ConfirmationDialog

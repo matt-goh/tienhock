@@ -35,6 +35,7 @@ interface AddManualItemModalProps {
   employeePayrollId: number;
   onItemAdded: () => void;
   employeeJobType?: string; // Optional job type for filtering pay codes
+  apiBasePath?: string; // Override the API base path (e.g. Green Target)
 }
 
 interface PayCodeOption {
@@ -52,6 +53,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
   employeePayrollId,
   onItemAdded,
   employeeJobType,
+  apiBasePath,
 }) => {
   const {
     payCodes,
@@ -231,14 +233,18 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
     setError(null);
 
     try {
-      await addManualPayrollItem(employeePayrollId, {
-        pay_code_id: selectedPayCode,
-        description: customDescription.trim(),
-        pay_type: selectedPayCodeDetails.pay_type || "Tambahan",
-        rate: parseFloat(rate),
-        rate_unit: selectedPayCodeDetails.rate_unit,
-        quantity: parseFloat(quantity),
-      });
+      await addManualPayrollItem(
+        employeePayrollId,
+        {
+          pay_code_id: selectedPayCode,
+          description: customDescription.trim(),
+          pay_type: selectedPayCodeDetails.pay_type || "Tambahan",
+          rate: parseFloat(rate),
+          rate_unit: selectedPayCodeDetails.rate_unit,
+          quantity: parseFloat(quantity),
+        },
+        apiBasePath
+      );
 
       toast.success("Manual item added successfully");
       onItemAdded();

@@ -13,6 +13,7 @@ import {
   IconChevronUp,
   IconSettings,
   IconAdjustments,
+  IconClock,
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -351,6 +352,20 @@ const GTPayrollPage: React.FC = () => {
         {/* Right side: Action Buttons */}
         <div className="flex items-center gap-2">
           <button
+            onClick={() =>
+              navigate(
+                `/greentarget/payroll/office-log?year=${selectedMonth.getFullYear()}&month=${
+                  selectedMonth.getMonth() + 1
+                }`
+              )
+            }
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-default-600 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/20 rounded-lg transition-colors"
+            title="Office monthly hours entry"
+          >
+            <IconClock size={16} />
+            <span>Office Entry</span>
+          </button>
+          <button
             onClick={() => navigate("/greentarget/payroll/settings")}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-default-600 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
             title="Payroll Settings"
@@ -455,7 +470,7 @@ const GTPayrollPage: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <IconUser size={20} className="text-sky-500" />
                   <span className="font-medium text-default-800 dark:text-gray-200">
-                    OFFICE ({officePayrolls.length})
+                    Office ({officePayrolls.length})
                   </span>
                 </div>
                 {expandedSections.OFFICE ? (

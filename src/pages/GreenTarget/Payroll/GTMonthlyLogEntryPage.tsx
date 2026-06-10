@@ -5,12 +5,13 @@ import Button from "../../../components/Button";
 import BackButton from "../../../components/BackButton";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import MonthNavigator from "../../../components/MonthNavigator";
+import Checkbox from "../../../components/Checkbox";
 import toast from "react-hot-toast";
 import { api } from "../../../routes/utils/api";
 import { useJobPayCodeMappings } from "../../../utils/catalogue/useJobPayCodeMappings";
 import { useJobsCache } from "../../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
-import { IconCheck, IconX, IconClock, IconRefresh } from "@tabler/icons-react";
+import { IconClock, IconRefresh } from "@tabler/icons-react";
 
 interface GTPayrollEmployee {
   id: number;
@@ -262,6 +263,17 @@ const GTMonthlyLogEntryPage: React.FC = () => {
     }));
   };
 
+  const handleSelectAll = () => {
+    const allSelected = Object.values(employeeEntries).every((e) => e.selected);
+    setEmployeeEntries((prev) => {
+      const updated: Record<string, EmployeeEntry> = {};
+      Object.keys(prev).forEach((id) => {
+        updated[id] = { ...prev[id], selected: !allSelected };
+      });
+      return updated;
+    });
+  };
+
   const handleRefreshCache = async () => {
     setIsRefreshingCache(true);
     try {
@@ -341,56 +353,126 @@ const GTMonthlyLogEntryPage: React.FC = () => {
     return { totalHours, totalOvertime, totalAmount, count: selectedEntries.length };
   }, [employeeEntries]);
 
+  const allSelected =
+    Object.values(employeeEntries).length > 0 &&
+    Object.values(employeeEntries).every((e) => e.selected);
+
+  const renderHourInput = (
+    entry: EmployeeEntry,
+    field: "totalHours" | "overtimeHours",
+    ariaLabel: string
+  ) => (
+    <input
+      type="number"
+      value={entry.selected ? entry[field] || 0 : ""}
+      onChange={(e) =>
+        handleHoursChange(entry.employeeId, field, parseFloat(e.target.value) || 0)
+      }
+      onClick={(e) => e.stopPropagation()}
+      disabled={!entry.selected || isSaving}
+      title={ariaLabel}
+      aria-label={ariaLabel}
+      className="w-full min-w-[4.25rem] pl-3 py-1 text-center text-sm border rounded focus:ring-1 disabled:bg-default-100 dark:disabled:bg-gray-700 bg-white dark:bg-gray-800 dark:text-gray-100 disabled:text-default-400 dark:disabled:text-gray-500 border-default-300 dark:border-gray-600 focus:ring-sky-500 focus:border-sky-500"
+      min="0"
+      step="0.5"
+    />
+  );
+
+  const renderHourGroup = (entry: EmployeeEntry) => (
+    <div className="min-w-[9.5rem] rounded-md border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-2">
+      <div className="grid grid-cols-2 gap-1.5">
+        <div>
+          <div className="mb-0.5 text-center text-[10px] uppercase text-default-400 dark:text-gray-500">
+            Hrs
+          </div>
+          {renderHourInput(entry, "totalHours", "Biasa hours")}
+        </div>
+        <div>
+          <div className="mb-0.5 text-center text-[10px] uppercase text-default-400 dark:text-gray-500">
+            OT
+          </div>
+          {renderHourInput(entry, "overtimeHours", "Biasa overtime hours")}
+        </div>
+      </div>
+    </div>
+  );
+
   if (isLoading || loadingPayCodes) {
     return (
-      <div className="flex justify-center items-center h-64">
+      <div className="flex justify-center items-center h-96">
         <LoadingSpinner />
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-3">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <BackButton onClick={() => navigate("/greentarget/payroll")} />
-        <div>
-          <h1 className="text-2xl font-semibold text-default-800 dark:text-gray-100">
-            OFFICE Work Log
-          </h1>
-          <p className="text-sm text-default-500 dark:text-gray-400">
-            {existingWorkLog ? "Edit" : "Create"} monthly work hours for OFFICE employees
-          </p>
+    <div className="space-y-4">
+      {/* Header & Month Selection */}
+      <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-default-200 dark:border-gray-700">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <BackButton onClick={() => navigate("/greentarget/payroll")} />
+            <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
+            <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">
+              {existingWorkLog ? "Edit" : "New"} Office Monthly Entry
+            </h1>
+            <div className="w-px h-6 bg-default-300 dark:bg-gray-600" />
+            <MonthNavigator
+              selectedMonth={selectedMonthDate}
+              onChange={handleMonthChange}
+              showGoToCurrentButton={false}
+            />
+            {existingWorkLog && (
+              <span
+                className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  existingWorkLog.status === "Submitted"
+                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                    : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                }`}
+              >
+                {existingWorkLog.status}
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleRefreshCache}
+              disabled={isRefreshingCache}
+              className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-default-300 dark:border-gray-600 hover:bg-default-100 dark:hover:bg-gray-700 text-default-600 dark:text-gray-300 text-sm font-medium transition-colors disabled:opacity-50"
+              title="Refresh staff, jobs, and pay codes"
+            >
+              <IconRefresh
+                size={16}
+                className={isRefreshingCache ? "animate-spin" : ""}
+              />
+              Refresh
+            </button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate("/greentarget/payroll")}
+              disabled={isSaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              color="sky"
+              size="sm"
+              onClick={handleSave}
+              disabled={isSaving || totals.count === 0}
+            >
+              {isSaving ? "Saving..." : existingWorkLog ? "Update" : "Save"}
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Month Navigator */}
-      <MonthNavigator
-        selectedMonth={selectedMonthDate}
-        onChange={handleMonthChange}
-      />
-
-      {/* Status Badge */}
-      {existingWorkLog && (
-        <div className="flex items-center gap-2">
-          <span
-            className={`px-3 py-1 rounded-full text-sm font-medium ${
-              existingWorkLog.status === "Submitted"
-                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-            }`}
-          >
-            {existingWorkLog.status}
-          </span>
-        </div>
-      )}
-
       {/* No Employees State */}
       {gtEmployees.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-8 text-center">
           <IconClock size={48} className="mx-auto text-default-300 dark:text-gray-600 mb-4" />
           <h3 className="text-lg font-medium text-default-800 dark:text-gray-200 mb-2">
-            No OFFICE Employees
+            No Office Employees
           </h3>
           <p className="text-default-500 dark:text-gray-400 mb-4">
             Add OFFICE employees to GT Payroll first.
@@ -404,8 +486,98 @@ const GTMonthlyLogEntryPage: React.FC = () => {
         </div>
       ) : (
         <>
+          {/* Employee Selection Table */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+                <thead className="bg-default-50 dark:bg-gray-900/50">
+                  <tr>
+                    <th className="px-6 py-1 text-left w-12 whitespace-nowrap">
+                      <Checkbox
+                        checked={allSelected}
+                        onChange={handleSelectAll}
+                        size={20}
+                        checkedColor="text-sky-600"
+                        disabled={isSaving}
+                        buttonClassName="p-1 rounded-lg"
+                      />
+                    </th>
+                    <th className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap">
+                      ID
+                    </th>
+                    <th className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap">
+                      Name
+                    </th>
+                    <th className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap w-44">
+                      Biasa
+                    </th>
+                    <th className="px-6 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap">
+                      Amount
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-default-200 dark:divide-gray-700">
+                  {Object.values(employeeEntries).map((entry) => {
+                    const entryTotal = entry.activities
+                      .filter((a) => a.isSelected)
+                      .reduce((s, a) => s + a.calculatedAmount, 0);
+
+                    return (
+                      <tr
+                        key={entry.employeeId}
+                        className={`${
+                          entry.selected
+                            ? "bg-sky-50 dark:bg-sky-900/20"
+                            : "bg-white dark:bg-gray-800"
+                        } hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer`}
+                        onClick={() => toggleEmployeeSelection(entry.employeeId)}
+                      >
+                        <td
+                          className="px-6 py-2 whitespace-nowrap cursor-pointer"
+                          onClickCapture={(e) => {
+                            e.stopPropagation();
+                            if (!isSaving) {
+                              toggleEmployeeSelection(entry.employeeId);
+                            }
+                          }}
+                        >
+                          <Checkbox
+                            checked={entry.selected}
+                            onChange={() => {}}
+                            size={20}
+                            checkedColor="text-sky-600"
+                            disabled={isSaving}
+                            buttonClassName="p-1 rounded-lg"
+                          />
+                        </td>
+                        <td className="px-6 py-2 whitespace-nowrap text-sm font-medium text-default-700 dark:text-gray-200">
+                          {entry.employeeId}
+                        </td>
+                        <td className="px-6 py-2 whitespace-nowrap text-sm text-default-900 dark:text-gray-100">
+                          <span className="font-medium">{entry.employeeName}</span>
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          {renderHourGroup(entry)}
+                        </td>
+                        <td className="px-6 py-2 whitespace-nowrap text-right text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                          RM {entryTotal.toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {Object.values(employeeEntries).length === 0 && (
+              <div className="p-8 text-center text-default-500 dark:text-gray-400">
+                No employees found.
+              </div>
+            )}
+          </div>
+
           {/* Summary */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
               <div>
                 <p className="text-sm text-default-500 dark:text-gray-400">Selected</p>
@@ -432,147 +604,6 @@ const GTMonthlyLogEntryPage: React.FC = () => {
                 </p>
               </div>
             </div>
-          </div>
-
-          {/* Employee Table */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-default-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-4 py-3 text-left text-default-600 dark:text-gray-300 font-medium w-12">
-                    <input
-                      type="checkbox"
-                      checked={Object.values(employeeEntries).every((e) => e.selected)}
-                      onChange={() => {
-                        const allSelected = Object.values(employeeEntries).every((e) => e.selected);
-                        setEmployeeEntries((prev) => {
-                          const updated = { ...prev };
-                          Object.keys(updated).forEach((id) => {
-                            updated[id] = { ...updated[id], selected: !allSelected };
-                          });
-                          return updated;
-                        });
-                      }}
-                      className="rounded border-default-300 dark:border-gray-600"
-                    />
-                  </th>
-                  <th className="px-4 py-3 text-left text-default-600 dark:text-gray-300 font-medium">
-                    Employee
-                  </th>
-                  <th className="px-4 py-3 text-center text-default-600 dark:text-gray-300 font-medium w-32">
-                    Regular Hours
-                  </th>
-                  <th className="px-4 py-3 text-center text-default-600 dark:text-gray-300 font-medium w-32">
-                    Overtime Hours
-                  </th>
-                  <th className="px-4 py-3 text-right text-default-600 dark:text-gray-300 font-medium w-32">
-                    Amount
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.values(employeeEntries).map((entry) => {
-                  const entryTotal = entry.activities
-                    .filter((a) => a.isSelected)
-                    .reduce((s, a) => s + a.calculatedAmount, 0);
-
-                  return (
-                    <tr
-                      key={entry.employeeId}
-                      className={`border-b border-default-100 dark:border-gray-700 ${
-                        !entry.selected ? "opacity-50" : ""
-                      }`}
-                    >
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={entry.selected}
-                          onChange={() => toggleEmployeeSelection(entry.employeeId)}
-                          className="rounded border-default-300 dark:border-gray-600"
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="font-medium text-default-800 dark:text-gray-200">
-                          {entry.employeeName}
-                        </span>
-                        <span className="text-xs text-default-400 dark:text-gray-500 ml-2">
-                          {entry.employeeId}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <input
-                          type="number"
-                          value={entry.totalHours}
-                          onChange={(e) =>
-                            handleHoursChange(
-                              entry.employeeId,
-                              "totalHours",
-                              parseFloat(e.target.value) || 0
-                            )
-                          }
-                          disabled={!entry.selected}
-                          className="w-20 px-2 py-1 text-center border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-800 dark:text-gray-200 rounded disabled:opacity-50"
-                        />
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <input
-                          type="number"
-                          value={entry.overtimeHours}
-                          onChange={(e) =>
-                            handleHoursChange(
-                              entry.employeeId,
-                              "overtimeHours",
-                              parseFloat(e.target.value) || 0
-                            )
-                          }
-                          disabled={!entry.selected}
-                          className="w-20 px-2 py-1 text-center border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-800 dark:text-gray-200 rounded disabled:opacity-50"
-                        />
-                      </td>
-                      <td className="px-4 py-3 text-right font-medium text-emerald-600 dark:text-emerald-400">
-                        RM {entryTotal.toFixed(2)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Actions */}
-          <div className="flex justify-end gap-3">
-            <button
-              onClick={handleRefreshCache}
-              disabled={isRefreshingCache}
-              className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-default-300 dark:border-gray-600 hover:bg-default-100 dark:hover:bg-gray-700 text-default-600 dark:text-gray-300 text-sm font-medium transition-colors disabled:opacity-50"
-              title="Refresh staff, jobs, and pay codes"
-            >
-              <IconRefresh
-                size={16}
-                className={isRefreshingCache ? "animate-spin" : ""}
-              />
-              Refresh
-            </button>
-            <Button variant="outline" onClick={() => navigate("/greentarget/payroll")}>
-              Cancel
-            </Button>
-            <Button
-              color="emerald"
-              variant="filled"
-              onClick={handleSave}
-              disabled={isSaving || totals.count === 0}
-            >
-              {isSaving ? (
-                <>
-                  <LoadingSpinner size="sm" hideText />
-                  <span className="ml-2">Saving...</span>
-                </>
-              ) : existingWorkLog ? (
-                "Update Work Log"
-              ) : (
-                "Save Work Log"
-              )}
-            </Button>
           </div>
         </>
       )}
