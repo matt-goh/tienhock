@@ -1,7 +1,7 @@
 # Green Target Payroll Implementation Status
 
-**Last Updated**: 2026-01-11
-**Status**: ON HOLD - Pending Verification & Fixes
+**Last Updated**: 2026-06-10
+**Status**: SUPERSEDED — the GT payroll was audited and upgraded (pinjam, mid-month advances, rounding/digenapkan, deduction recalculation). See `docs/GT_PAYROLL_AUDIT.md` for the audit/fix log and `docs/GT_PAYROLL_PANDUAN_PENGGUNA.md` / `docs/GT_PAYROLL_USER_GUIDE_EN.md` for the HR user guides. The content below is the original (historical) implementation plan.
 
 ---
 

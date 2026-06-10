@@ -195,6 +195,31 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isRefreshingCache, setIsRefreshingCache] = useState(false);
 
+  // Staff on the Green Target payroll (OFFICE and DRIVER) are paid through
+  // the GT system, so they are excluded from Tien Hock monthly entries.
+  const [gtPayrollEmployeeIds, setGtPayrollEmployeeIds] = useState<Set<string>>(
+    new Set(),
+  );
+
+  useEffect(() => {
+    const fetchGtPayrollEmployees = async () => {
+      try {
+        const gtEmployees = await api.get("/greentarget/api/payroll-employees");
+        setGtPayrollEmployeeIds(
+          new Set(
+            (gtEmployees || []).map(
+              (emp: { employee_id: string }) => emp.employee_id,
+            ),
+          ),
+        );
+      } catch (error) {
+        // Non-fatal: without the GT list, simply no one is excluded.
+        console.error("Error fetching GT payroll employees:", error);
+      }
+    };
+    fetchGtPayrollEmployees();
+  }, []);
+
   // Activities state
   const [showActivitiesModal, setShowActivitiesModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] =
@@ -271,14 +296,15 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     });
   };
 
-  // Filter employees by job type
+  // Filter employees by job type, excluding staff on the GT payroll
   const eligibleEmployees = useMemo(() => {
     if (!allStaffs || loadingStaffs) return [];
     return allStaffs.filter((staff: Employee) => {
+      if (gtPayrollEmployeeIds.has(staff.id)) return false;
       const employeeJobs = staff.job || [];
       return employeeJobs.some((job: string) => JOB_IDS.includes(job));
     });
-  }, [allStaffs, loadingStaffs, JOB_IDS]);
+  }, [allStaffs, loadingStaffs, JOB_IDS, gtPayrollEmployeeIds]);
 
   // Leave is aggregated per name on the backend, so the Add Leave modal
   // picker collapses multi-ID employees to a single row (senior ID kept).
