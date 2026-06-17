@@ -16,7 +16,7 @@ For each item: **rank by importance**, and **note whether the new ERP already ha
 
 **Type 2 — Features identified in the legacy system but missing from the new ERP.** Ranked by user-pain priority. The user already started this thread on the Claude Code side and produced a revised list (see "Conclusions so far" below).
 
-The user's #1 acknowledged gap (top of Type 2): the **bank-statement-from-journal report** (running ledger view of any bank/cash account, used to reconcile against the actual bank statement). Already partially specified in [docs/ACCOUNTING_SYSTEM_IMPLEMENTATION_PLAN.md](docs/ACCOUNTING_SYSTEM_IMPLEMENTATION_PLAN.md) Phase 2.2.
+The user's #1 acknowledged gap (top of Type 2): the **bank-statement-from-journal report** (running ledger view of any bank/cash account, used to reconcile against the actual bank statement). Already partially specified in [docs/Account/ACCOUNTING_SYSTEM_IMPLEMENTATION_PLAN.md](docs/Account/ACCOUNTING_SYSTEM_IMPLEMENTATION_PLAN.md) Phase 2.2.
 
 The user's #2 acknowledged gap: **journal generation for local general purchases** (the existing `LocalGeneralPurchaseFormPage` does not create journal entries — only material purchases do).
 
@@ -26,12 +26,12 @@ The user's #2 acknowledged gap: **journal generation for local general purchases
 
 Read these docs in order before doing anything:
 
-1. [docs/TRIAL_BALANCE_ANALYZED_BY_USER.md](docs/TRIAL_BALANCE_ANALYZED_BY_USER.md) — the user's own walk-through of every legacy trial-balance code prefix. **Most important single doc** for understanding the legacy system.
-2. [docs/FINANCIAL_STATEMENTS_MAPPING.md](docs/FINANCIAL_STATEMENTS_MAPPING.md) — how `account_codes.fs_note` maps codes to the 33 financial-statement notes. The legacy trial balance's "APPX" column is literally this `fs_note` number.
-3. [docs/ACCOUNTING_SYSTEM_IMPLEMENTATION_PLAN.md](docs/ACCOUNTING_SYSTEM_IMPLEMENTATION_PLAN.md) — the active phased plan. Phase 2 (customer payment journals) is done; Phase 2.1 (cash-receipt voucher PDF) is done; Phase 2.2 (bank statement from journal) is next; Phase 1 (purchases & payables) is in progress.
-4. [docs/PAYMENT_JOURNAL_IMPLEMENTATION_SUMMARY.md](docs/PAYMENT_JOURNAL_IMPLEMENTATION_SUMMARY.md) — what got built for customer payment journals.
-5. [docs/BANK_CASH_SYSTEM_PLAN.md](docs/BANK_CASH_SYSTEM_PLAN.md) and [docs/FRESH_ACCOUNTING_SYSTEM_PLAN.md](docs/FRESH_ACCOUNTING_SYSTEM_PLAN.md) — older planning docs, useful for backstory.
-6. [docs/AccountCodeCalculations.md](docs/AccountCodeCalculations.md) — how the existing JVDR/JVSL payroll journal vouchers calculate.
+1. [docs/Account/TRIAL_BALANCE_ANALYZED_BY_USER.md](docs/Account/TRIAL_BALANCE_ANALYZED_BY_USER.md) — the user's own walk-through of every legacy trial-balance code prefix. **Most important single doc** for understanding the legacy system.
+2. [docs/Account/FINANCIAL_STATEMENTS_MAPPING.md](docs/Account/FINANCIAL_STATEMENTS_MAPPING.md) — how `account_codes.fs_note` maps codes to the 33 financial-statement notes. The legacy trial balance's "APPX" column is literally this `fs_note` number.
+3. [docs/Account/ACCOUNTING_SYSTEM_IMPLEMENTATION_PLAN.md](docs/Account/ACCOUNTING_SYSTEM_IMPLEMENTATION_PLAN.md) — the active phased plan. Phase 2 (customer payment journals) is done; Phase 2.1 (cash-receipt voucher PDF) is done; Phase 2.2 (bank statement from journal) is next; Phase 1 (purchases & payables) is in progress.
+4. [docs/Account/PAYMENT_JOURNAL_IMPLEMENTATION_SUMMARY.md](docs/Account/PAYMENT_JOURNAL_IMPLEMENTATION_SUMMARY.md) — what got built for customer payment journals.
+5. [docs/Account/BANK_CASH_SYSTEM_PLAN.md](docs/Account/BANK_CASH_SYSTEM_PLAN.md) and [docs/Account/FRESH_ACCOUNTING_SYSTEM_PLAN.md](docs/Account/FRESH_ACCOUNTING_SYSTEM_PLAN.md) — older planning docs, useful for backstory.
+6. [docs/Account/AccountCodeCalculations.md](docs/Account/AccountCodeCalculations.md) — how the existing JVDR/JVSL payroll journal vouchers calculate.
 7. [CLAUDE.md](CLAUDE.md) — codebase rules + full DB schema. Project rules: surgical changes, ask before modifying things not requested, no speculative abstractions.
 
 ---
@@ -150,7 +150,7 @@ Every code is a **prefix-based mnemonic**. Examples from user-supplied images:
 - **Keep the journal-entry system.** The user briefly considered abandoning it; we agreed to keep it as the engine and build cleaner transaction screens that auto-post (same pattern as JVDR/JVSL and now REC/PUR).
 - **Type 1 list ranking**: split into two sub-sections — Malaysian audit/compliance, then daily operations. Each ranked internally.
 - **Don't expand `account_codes` table.** The new ERP intentionally uses ~60 simplified codes vs the legacy's 2,754. Subledger detail lives in `purchase_invoices`, `invoices`, `payments`, etc.
-- **Type 2 #1 priority = bank-statement-from-journal report** (the running ledger view). Already partially specified in [docs/ACCOUNTING_SYSTEM_IMPLEMENTATION_PLAN.md](docs/ACCOUNTING_SYSTEM_IMPLEMENTATION_PLAN.md) Phase 2.2.
+- **Type 2 #1 priority = bank-statement-from-journal report** (the running ledger view). Already partially specified in [docs/Account/ACCOUNTING_SYSTEM_IMPLEMENTATION_PLAN.md](docs/Account/ACCOUNTING_SYSTEM_IMPLEMENTATION_PLAN.md) Phase 2.2.
 - **Type 2 #2 priority = journal generation for local general purchases.** Currently [LocalGeneralPurchaseFormPage](src/pages/Accounting/Purchases/LocalGeneralPurchaseFormPage.tsx) creates `self_billed_invoices` rows but no journal entry. Material purchases do it ([purchase-invoices.js:69](src/routes/accounting/purchase-invoices.js) — `createPurchaseJournalEntry`); local general purchases need an equivalent.
 
 ---

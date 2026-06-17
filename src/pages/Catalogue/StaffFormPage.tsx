@@ -970,7 +970,12 @@ const StaffFormPage: React.FC = () => {
     
     // Special handling for IC Number
     if (name === 'icNo') {
-      const formattedValue = formatICNumber(value);
+      // Only auto-format when the value is a numeric IC. Passport numbers
+      // (e.g. P3261441B) contain letters and must be stored as typed.
+      const containsLetter = /[a-zA-Z]/.test(value);
+      const formattedValue = containsLetter
+        ? value.toUpperCase()
+        : formatICNumber(value);
       setFormData((prevData) => ({
         ...prevData,
         [name]: formattedValue,
