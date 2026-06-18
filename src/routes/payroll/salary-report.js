@@ -194,18 +194,21 @@ export default function (pool) {
           SELECT
             cr.employee_id,
             cr.location_code,
+            lower(btrim(coalesce(cr.description, ''))) as desc_key,
             COALESCE(SUM(cr.amount), 0) as commission_amount,
             COALESCE(SUM(CASE WHEN COALESCE(cr.is_advance, true) THEN cr.amount ELSE 0 END), 0) as advance_amount
           FROM commission_records cr
           WHERE EXTRACT(YEAR FROM cr.commission_date) = $1
             AND EXTRACT(MONTH FROM cr.commission_date) = $2
-          GROUP BY cr.employee_id, cr.location_code
+          GROUP BY cr.employee_id, cr.location_code, lower(btrim(coalesce(cr.description, '')))
         ),
         others_data AS (
-          -- Kerja Luar (others) earnings carry pay_type + rate_unit so they can be
-          -- bucketed into GAJI / BONUS / C-I-O like regular payroll items.
+          -- Kerja Luar (others) earnings carry pay_code/description/pay_type/rate_unit so they
+          -- can be bucketed into GAJI / BONUS / C-I-O / CUTI like regular payroll items.
           SELECT
             orec.employee_id,
+            orec.pay_code_id,
+            lower(btrim(coalesce(orec.description, ''))) as desc_key,
             COALESCE(pc.pay_type, 'Tambahan') as pay_type,
             COALESCE(orec.rate_unit, pc.rate_unit) as rate_unit,
             COALESCE(SUM(orec.amount), 0) as others_amount
@@ -213,7 +216,7 @@ export default function (pool) {
           LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
           WHERE EXTRACT(YEAR FROM orec.record_date) = $1
             AND EXTRACT(MONTH FROM orec.record_date) = $2
-          GROUP BY orec.employee_id, pc.pay_type, COALESCE(orec.rate_unit, pc.rate_unit)
+          GROUP BY orec.employee_id, orec.pay_code_id, lower(btrim(coalesce(orec.description, ''))), pc.pay_type, COALESCE(orec.rate_unit, pc.rate_unit)
         ),
         leave_data AS (
           SELECT 
@@ -253,73 +256,87 @@ export default function (pool) {
           ebd.*,
           COALESCE(mmd.mid_month_amount, 0) as mid_month_amount,
           COALESCE(pmd.total_pinjam, 0) as total_pinjam,
-          -- GAJI = regular wage: non-Overtime, Hour/Day rate, from payroll items + Kerja Luar (excl. BONUS code)
+          -- GAJI = regular wage. Worker WITH an Hour/Day base: all non-piece work (base + hourly
+          -- maintenance/Sunday). Worker with NO hourly base (pure piece / office salary): their
+          -- Base only. Allowance/incentive codes (IXT/ADD_COMM/T-SALESMAN/FULL/HADIR_MEETING) and
+          -- Cuti-Tahunan are excluded (they belong to C/I/O / CUTI). Kerja-Luar matched by name.
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
              WHERE pid.employee_id = ebd.employee_id
                AND COALESCE(pid.pay_type, 'Tambahan') <> 'Overtime'
+               AND (pid.pay_code_id IS NULL OR pid.pay_code_id NOT IN ('BONUS', 'IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA'))
+               AND lower(btrim(coalesce(pid.description, ''))) <> 'cuti tahunan'
                AND (
-                 -- Base wage: Hour/Day-rate base is the regular wage. If the worker has NO
-                 -- Hour/Day base at all (pure packing / office salary), then ALL their base
-                 -- is the wage; otherwise piece-rate base is "extra" and falls to C/I/O.
-                 (COALESCE(pid.pay_type, 'Tambahan') = 'Base'
-                   AND (
-                     COALESCE(pid.rate_unit, 'Hour') IN ('Hour', 'Day')
-                     OR NOT EXISTS (
-                       SELECT 1 FROM payroll_items_data pid2
-                       WHERE pid2.employee_id = ebd.employee_id
-                         AND COALESCE(pid2.pay_type, 'Tambahan') = 'Base'
-                         AND COALESCE(pid2.rate_unit, 'Hour') IN ('Hour', 'Day')
-                     )
-                   ))
-                 -- Hour/Day maintenance/Sunday work (HARI_BIASA/AHAD etc.)
-                 OR (COALESCE(pid.pay_type, 'Tambahan') <> 'Base'
-                   AND COALESCE(pid.rate_unit, 'Hour') IN ('Hour', 'Day'))
-               )
-               AND (pid.pay_code_id IS NULL OR pid.pay_code_id <> 'BONUS')), 0
+                 (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                   AND COALESCE(pid.rate_unit, 'Hour') IN ('Hour', 'Day', 'Fixed'))
+                 OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                   AND COALESCE(pid.pay_type, 'Tambahan') = 'Base')
+               )), 0
           ) + COALESCE(
             (SELECT SUM(others_amount) FROM others_data od
-             WHERE od.employee_id = ebd.employee_id
+             WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
                AND od.pay_type <> 'Overtime'
-               AND COALESCE(od.rate_unit, 'Hour') IN ('Hour', 'Day')), 0
+               AND (od.pay_code_id IS NULL OR od.pay_code_id NOT IN ('IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA'))
+               AND od.desc_key <> 'cuti tahunan'
+               AND (
+                 (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                   AND COALESCE(od.rate_unit, 'Hour') IN ('Hour', 'Day', 'Fixed'))
+                 OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                   AND od.pay_type = 'Base')
+               )), 0
           ) as gaji_pay,
-          -- OT column = overtime from payroll items only (unchanged)
+          -- OT column = overtime from payroll items only (excl. Cuti-Tahunan)
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
-             WHERE pid.employee_id = ebd.employee_id AND COALESCE(pid.pay_type, 'Tambahan') = 'Overtime'), 0
+             WHERE pid.employee_id = ebd.employee_id AND COALESCE(pid.pay_type, 'Tambahan') = 'Overtime'
+               AND lower(btrim(coalesce(pid.description, ''))) <> 'cuti tahunan'), 0
           ) as overtime_pay,
-          -- Overtime recorded as Kerja Luar (others) - folded into BONUS together with payroll OT
+          -- Overtime recorded as Kerja Luar (others), by name - folded into BONUS with payroll OT
           COALESCE(
             (SELECT SUM(others_amount) FROM others_data od
-             WHERE od.employee_id = ebd.employee_id AND od.pay_type = 'Overtime'), 0
+             WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
+               AND od.pay_type = 'Overtime'
+               AND od.desc_key <> 'cuti tahunan'), 0
           ) as others_overtime,
-          -- C/I/O piece-rate + insentif: non-Overtime, non-Hour/Day rate, from payroll items + Kerja Luar (excl. BONUS code)
+          -- C/I/O = incentive/allowance codes (IXT/ADD_COMM/T-SALESMAN/FULL/HADIR_MEETING) +
+          -- everything that is NOT the worker's GAJI: piece-rate for an hourly worker, or any
+          -- non-Base extra for a pure-piece worker. Excl. Overtime, BONUS code, Cuti-Tahunan.
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
              WHERE pid.employee_id = ebd.employee_id
                AND COALESCE(pid.pay_type, 'Tambahan') <> 'Overtime'
+               AND (pid.pay_code_id IS NULL OR pid.pay_code_id <> 'BONUS')
+               AND lower(btrim(coalesce(pid.description, ''))) <> 'cuti tahunan'
                AND (
-                 -- Piece-rate base (packing) done as EXTRA: only when the worker also has
-                 -- Hour/Day base (their real wage). Pure piece-rate workers keep it in GAJI.
-                 (COALESCE(pid.pay_type, 'Tambahan') = 'Base'
-                   AND COALESCE(pid.rate_unit, 'Hour') NOT IN ('Hour', 'Day')
-                   AND EXISTS (
-                     SELECT 1 FROM payroll_items_data pid2
-                     WHERE pid2.employee_id = ebd.employee_id
-                       AND COALESCE(pid2.pay_type, 'Tambahan') = 'Base'
-                       AND COALESCE(pid2.rate_unit, 'Hour') IN ('Hour', 'Day')
-                   ))
-                 -- Non-Hour/Day premiums: piece-rate (Bag/Bundle/Kg/Trip/Bill/Percent), Fixed insentif (IXT)
-                 OR (COALESCE(pid.pay_type, 'Tambahan') <> 'Base'
-                   AND COALESCE(pid.rate_unit, 'Hour') NOT IN ('Hour', 'Day'))
-               )
-               AND (pid.pay_code_id IS NULL OR pid.pay_code_id <> 'BONUS')), 0
+                 pid.pay_code_id IN ('IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA')
+                 OR (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                   AND COALESCE(pid.rate_unit, 'Hour') NOT IN ('Hour', 'Day', 'Fixed'))
+                 OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                   AND COALESCE(pid.pay_type, 'Tambahan') <> 'Base')
+               )), 0
           ) + COALESCE(
             (SELECT SUM(others_amount) FROM others_data od
-             WHERE od.employee_id = ebd.employee_id
+             WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
                AND od.pay_type <> 'Overtime'
-               AND COALESCE(od.rate_unit, 'Hour') NOT IN ('Hour', 'Day')), 0
+               AND od.desc_key <> 'cuti tahunan'
+               AND (
+                 od.pay_code_id IN ('IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA')
+                 OR (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                   AND COALESCE(od.rate_unit, 'Hour') NOT IN ('Hour', 'Day', 'Fixed'))
+                 OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                   AND od.pay_type <> 'Base')
+               )), 0
           ) as piece_insentif_pay,
+          -- Cuti Tahunan recorded via payroll items / Kerja-Luar (by name) -> shown under CUTI
+          COALESCE(
+            (SELECT SUM(amount) FROM payroll_items_data pid
+             WHERE pid.employee_id = ebd.employee_id
+               AND lower(btrim(coalesce(pid.description, ''))) = 'cuti tahunan'), 0
+          ) + COALESCE(
+            (SELECT SUM(others_amount) FROM others_data od
+             WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
+               AND od.desc_key = 'cuti tahunan'), 0
+          ) as cuti_tahunan_other_total,
           -- Aggregate deductions
           COALESCE(
             (SELECT SUM(employee_amount) FROM deductions_data dd 
@@ -349,24 +366,28 @@ export default function (pool) {
             (SELECT SUM(employee_amount) FROM deductions_data dd 
              WHERE dd.employee_id = ebd.employee_id AND dd.deduction_type = 'income_tax'), 0
           ) as income_tax,
-          -- Commission and bonus data (exclude location 23 = Cuti Tahunan, counted under Cuti)
+          -- Commission/incentive at a location (C/I/O), excl. Cuti-Tahunan (loc 23 or desc); by name across siblings
           COALESCE(
             (SELECT SUM(commission_amount) FROM commission_data cd
-             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NOT NULL AND cd.location_code <> '23'), 0
+             WHERE cd.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
+               AND cd.location_code IS NOT NULL
+               AND NOT (cd.location_code = '23' OR cd.desc_key = 'cuti tahunan')), 0
           ) as commission_total,
           COALESCE(
             (SELECT SUM(advance_amount) FROM commission_data cd
-             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NOT NULL), 0
+             WHERE cd.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
+               AND cd.location_code IS NOT NULL), 0
           ) as commission_advance_total,
-          -- Cuti Tahunan recorded as commission (location 23) - shown under Cuti, not COMM
+          -- Cuti Tahunan recorded as commission/advance (loc 23 or desc 'cuti tahunan') - shown under Cuti
           COALESCE(
             (SELECT SUM(commission_amount) FROM commission_data cd
-             WHERE cd.employee_id = ebd.employee_id AND cd.location_code = '23'), 0
+             WHERE cd.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
+               AND (cd.location_code = '23' OR cd.desc_key = 'cuti tahunan')), 0
           ) as cuti_tahunan_commission_total,
           (
             COALESCE(
               (SELECT SUM(commission_amount) FROM commission_data cd
-               WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NULL), 0
+               WHERE cd.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name) AND cd.location_code IS NULL), 0
             ) +
             COALESCE(
               (SELECT SUM(amount) FROM payroll_items_data pid
@@ -375,12 +396,12 @@ export default function (pool) {
           ) as bonus_total,
           COALESCE(
             (SELECT SUM(advance_amount) FROM commission_data cd
-             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NULL), 0
+             WHERE cd.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name) AND cd.location_code IS NULL), 0
           ) as bonus_advance_total,
-          -- Leave data: combine all 4 cuti types into a single Cuti figure
+          -- Leave data (by name across siblings): combine all cuti types into a single Cuti figure
           COALESCE(
             (SELECT SUM(leave_amount) FROM leave_data ld
-             WHERE ld.employee_id = ebd.employee_id), 0
+             WHERE ld.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)), 0
           ) as leave_total
         FROM employee_base_data ebd
         LEFT JOIN mid_month_data mmd ON ebd.employee_id = mmd.employee_id
@@ -434,14 +455,12 @@ export default function (pool) {
           section: row.section,
           // Salary tab data
           gaji: gaji,
-          ot: parseFloat(row.overtime_pay || 0),
-          // BONUS = real bonus (BONUS code & loc-null commission) if the worker has one;
-          // otherwise total overtime (payroll OT + Kerja Luar OT).
-          bonus:
-            parseFloat(row.bonus_total || 0) > 0
-              ? parseFloat(row.bonus_total || 0)
-              : parseFloat(row.overtime_pay || 0) +
-                parseFloat(row.others_overtime || 0),
+          // OT = all overtime (payroll + Kerja Luar). It is shown only here.
+          ot:
+            parseFloat(row.overtime_pay || 0) +
+            parseFloat(row.others_overtime || 0),
+          // BONUS = real bonuses only (BONUS paycode + loc-null commission). OT is NOT folded in.
+          bonus: parseFloat(row.bonus_total || 0),
           // COMM/INS/LAIN = location commission (excl. Cuti Tahunan loc 23)
           // + piece-rate work (Bag/Bundle/Kg/Trip/Bill/Percent) + Fixed insentif (IXT), from payroll + Kerja Luar
           comm:
@@ -451,7 +470,8 @@ export default function (pool) {
           // Display-only: does not feed gaji_bersih/jumlah (same as comm).
           cuti:
             parseFloat(row.leave_total || 0) +
-            parseFloat(row.cuti_tahunan_commission_total || 0),
+            parseFloat(row.cuti_tahunan_commission_total || 0) +
+            parseFloat(row.cuti_tahunan_other_total || 0),
           gaji_kasar: gajiKasar,
           epf_majikan: parseFloat(row.epf_employer || 0),
           epf_pekerja: parseFloat(row.epf_employee || 0),
@@ -606,9 +626,15 @@ export default function (pool) {
         const commField = locCode === "23" ? "cuti" : "comm";
 
         // Check if this employee exists in processedData (has regular payroll)
+        // Match by NAME: commission recorded under any sibling id belongs to a worker who
+        // may already have a (combined) payroll row under a different sibling id.
         const hasRegularPayroll = processedData.some(
-          (e) => e.staff_id === row.employee_id,
+          (e) => e.staff_name === row.staff_name,
         );
+        // Commission for a worker WITH a payroll is already folded into that payroll row's
+        // C/I/O (and Cuti for loc 23) by the main query's by-name aggregation. Skip it here
+        // so we don't create a duplicate commission-only row or double-count totals.
+        if (hasRegularPayroll) return;
 
         // Only process for commission locations (16-24)
         if (locationData[locCode]) {
@@ -1135,24 +1161,27 @@ export default function (pool) {
           SELECT
             cr.employee_id,
             cr.location_code,
+            lower(btrim(coalesce(cr.description, ''))) as desc_key,
             COALESCE(SUM(cr.amount), 0) as commission_amount,
             COALESCE(SUM(CASE WHEN COALESCE(cr.is_advance, true) THEN cr.amount ELSE 0 END), 0) as advance_amount
           FROM commission_records cr
           WHERE EXTRACT(YEAR FROM cr.commission_date) = $1
-          GROUP BY cr.employee_id, cr.location_code
+          GROUP BY cr.employee_id, cr.location_code, lower(btrim(coalesce(cr.description, '')))
         ),
         others_data AS (
-          -- Kerja Luar (others) earnings carry pay_type + rate_unit so they can be
-          -- bucketed into GAJI / BONUS / C-I-O like regular payroll items.
+          -- Kerja Luar (others) earnings carry pay_code/description/pay_type/rate_unit so they
+          -- can be bucketed into GAJI / BONUS / C-I-O / CUTI like regular payroll items.
           SELECT
             orec.employee_id,
+            orec.pay_code_id,
+            lower(btrim(coalesce(orec.description, ''))) as desc_key,
             COALESCE(pc.pay_type, 'Tambahan') as pay_type,
             COALESCE(orec.rate_unit, pc.rate_unit) as rate_unit,
             COALESCE(SUM(orec.amount), 0) as others_amount
           FROM others_records orec
           LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
           WHERE EXTRACT(YEAR FROM orec.record_date) = $1
-          GROUP BY orec.employee_id, pc.pay_type, COALESCE(orec.rate_unit, pc.rate_unit)
+          GROUP BY orec.employee_id, orec.pay_code_id, lower(btrim(coalesce(orec.description, ''))), pc.pay_type, COALESCE(orec.rate_unit, pc.rate_unit)
         ),
         leave_data AS (
           SELECT
@@ -1192,73 +1221,87 @@ export default function (pool) {
           ebd.*,
           COALESCE(mmd.mid_month_amount, 0) as mid_month_amount,
           COALESCE(pmd.total_pinjam, 0) as total_pinjam,
-          -- GAJI = regular wage: non-Overtime, Hour/Day rate, from payroll items + Kerja Luar (excl. BONUS code)
+          -- GAJI = regular wage. Worker WITH an Hour/Day base: all non-piece work (base + hourly
+          -- maintenance/Sunday). Worker with NO hourly base (pure piece / office salary): their
+          -- Base only. Allowance/incentive codes (IXT/ADD_COMM/T-SALESMAN/FULL/HADIR_MEETING) and
+          -- Cuti-Tahunan are excluded (they belong to C/I/O / CUTI). Kerja-Luar matched by name.
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
              WHERE pid.employee_id = ebd.employee_id
                AND COALESCE(pid.pay_type, 'Tambahan') <> 'Overtime'
+               AND (pid.pay_code_id IS NULL OR pid.pay_code_id NOT IN ('BONUS', 'IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA'))
+               AND lower(btrim(coalesce(pid.description, ''))) <> 'cuti tahunan'
                AND (
-                 -- Base wage: Hour/Day-rate base is the regular wage. If the worker has NO
-                 -- Hour/Day base at all (pure packing / office salary), then ALL their base
-                 -- is the wage; otherwise piece-rate base is "extra" and falls to C/I/O.
-                 (COALESCE(pid.pay_type, 'Tambahan') = 'Base'
-                   AND (
-                     COALESCE(pid.rate_unit, 'Hour') IN ('Hour', 'Day')
-                     OR NOT EXISTS (
-                       SELECT 1 FROM payroll_items_data pid2
-                       WHERE pid2.employee_id = ebd.employee_id
-                         AND COALESCE(pid2.pay_type, 'Tambahan') = 'Base'
-                         AND COALESCE(pid2.rate_unit, 'Hour') IN ('Hour', 'Day')
-                     )
-                   ))
-                 -- Hour/Day maintenance/Sunday work (HARI_BIASA/AHAD etc.)
-                 OR (COALESCE(pid.pay_type, 'Tambahan') <> 'Base'
-                   AND COALESCE(pid.rate_unit, 'Hour') IN ('Hour', 'Day'))
-               )
-               AND (pid.pay_code_id IS NULL OR pid.pay_code_id <> 'BONUS')), 0
+                 (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                   AND COALESCE(pid.rate_unit, 'Hour') IN ('Hour', 'Day', 'Fixed'))
+                 OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                   AND COALESCE(pid.pay_type, 'Tambahan') = 'Base')
+               )), 0
           ) + COALESCE(
             (SELECT SUM(others_amount) FROM others_data od
-             WHERE od.employee_id = ebd.employee_id
+             WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
                AND od.pay_type <> 'Overtime'
-               AND COALESCE(od.rate_unit, 'Hour') IN ('Hour', 'Day')), 0
+               AND (od.pay_code_id IS NULL OR od.pay_code_id NOT IN ('IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA'))
+               AND od.desc_key <> 'cuti tahunan'
+               AND (
+                 (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                   AND COALESCE(od.rate_unit, 'Hour') IN ('Hour', 'Day', 'Fixed'))
+                 OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                   AND od.pay_type = 'Base')
+               )), 0
           ) as gaji_pay,
-          -- OT column = overtime from payroll items only (unchanged)
+          -- OT column = overtime from payroll items only (excl. Cuti-Tahunan)
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
-             WHERE pid.employee_id = ebd.employee_id AND COALESCE(pid.pay_type, 'Tambahan') = 'Overtime'), 0
+             WHERE pid.employee_id = ebd.employee_id AND COALESCE(pid.pay_type, 'Tambahan') = 'Overtime'
+               AND lower(btrim(coalesce(pid.description, ''))) <> 'cuti tahunan'), 0
           ) as overtime_pay,
-          -- Overtime recorded as Kerja Luar (others) - folded into BONUS together with payroll OT
+          -- Overtime recorded as Kerja Luar (others), by name - folded into BONUS with payroll OT
           COALESCE(
             (SELECT SUM(others_amount) FROM others_data od
-             WHERE od.employee_id = ebd.employee_id AND od.pay_type = 'Overtime'), 0
+             WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
+               AND od.pay_type = 'Overtime'
+               AND od.desc_key <> 'cuti tahunan'), 0
           ) as others_overtime,
-          -- C/I/O piece-rate + insentif: non-Overtime, non-Hour/Day rate, from payroll items + Kerja Luar (excl. BONUS code)
+          -- C/I/O = incentive/allowance codes (IXT/ADD_COMM/T-SALESMAN/FULL/HADIR_MEETING) +
+          -- everything that is NOT the worker's GAJI: piece-rate for an hourly worker, or any
+          -- non-Base extra for a pure-piece worker. Excl. Overtime, BONUS code, Cuti-Tahunan.
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
              WHERE pid.employee_id = ebd.employee_id
                AND COALESCE(pid.pay_type, 'Tambahan') <> 'Overtime'
+               AND (pid.pay_code_id IS NULL OR pid.pay_code_id <> 'BONUS')
+               AND lower(btrim(coalesce(pid.description, ''))) <> 'cuti tahunan'
                AND (
-                 -- Piece-rate base (packing) done as EXTRA: only when the worker also has
-                 -- Hour/Day base (their real wage). Pure piece-rate workers keep it in GAJI.
-                 (COALESCE(pid.pay_type, 'Tambahan') = 'Base'
-                   AND COALESCE(pid.rate_unit, 'Hour') NOT IN ('Hour', 'Day')
-                   AND EXISTS (
-                     SELECT 1 FROM payroll_items_data pid2
-                     WHERE pid2.employee_id = ebd.employee_id
-                       AND COALESCE(pid2.pay_type, 'Tambahan') = 'Base'
-                       AND COALESCE(pid2.rate_unit, 'Hour') IN ('Hour', 'Day')
-                   ))
-                 -- Non-Hour/Day premiums: piece-rate (Bag/Bundle/Kg/Trip/Bill/Percent), Fixed insentif (IXT)
-                 OR (COALESCE(pid.pay_type, 'Tambahan') <> 'Base'
-                   AND COALESCE(pid.rate_unit, 'Hour') NOT IN ('Hour', 'Day'))
-               )
-               AND (pid.pay_code_id IS NULL OR pid.pay_code_id <> 'BONUS')), 0
+                 pid.pay_code_id IN ('IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA')
+                 OR (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                   AND COALESCE(pid.rate_unit, 'Hour') NOT IN ('Hour', 'Day', 'Fixed'))
+                 OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                   AND COALESCE(pid.pay_type, 'Tambahan') <> 'Base')
+               )), 0
           ) + COALESCE(
             (SELECT SUM(others_amount) FROM others_data od
-             WHERE od.employee_id = ebd.employee_id
+             WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
                AND od.pay_type <> 'Overtime'
-               AND COALESCE(od.rate_unit, 'Hour') NOT IN ('Hour', 'Day')), 0
+               AND od.desc_key <> 'cuti tahunan'
+               AND (
+                 od.pay_code_id IN ('IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA')
+                 OR (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                   AND COALESCE(od.rate_unit, 'Hour') NOT IN ('Hour', 'Day', 'Fixed'))
+                 OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                   AND od.pay_type <> 'Base')
+               )), 0
           ) as piece_insentif_pay,
+          -- Cuti Tahunan recorded via payroll items / Kerja-Luar (by name) -> shown under CUTI
+          COALESCE(
+            (SELECT SUM(amount) FROM payroll_items_data pid
+             WHERE pid.employee_id = ebd.employee_id
+               AND lower(btrim(coalesce(pid.description, ''))) = 'cuti tahunan'), 0
+          ) + COALESCE(
+            (SELECT SUM(others_amount) FROM others_data od
+             WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
+               AND od.desc_key = 'cuti tahunan'), 0
+          ) as cuti_tahunan_other_total,
           -- Aggregate deductions
           COALESCE(
             (SELECT SUM(employee_amount) FROM deductions_data dd
@@ -1288,24 +1331,28 @@ export default function (pool) {
             (SELECT SUM(employee_amount) FROM deductions_data dd
              WHERE dd.employee_id = ebd.employee_id AND dd.deduction_type = 'income_tax'), 0
           ) as income_tax,
-          -- Commission and bonus data (exclude location 23 = Cuti Tahunan, counted under Cuti)
+          -- Commission/incentive at a location (C/I/O), excl. Cuti-Tahunan (loc 23 or desc); by name across siblings
           COALESCE(
             (SELECT SUM(commission_amount) FROM commission_data cd
-             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NOT NULL AND cd.location_code <> '23'), 0
+             WHERE cd.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
+               AND cd.location_code IS NOT NULL
+               AND NOT (cd.location_code = '23' OR cd.desc_key = 'cuti tahunan')), 0
           ) as commission_total,
           COALESCE(
             (SELECT SUM(advance_amount) FROM commission_data cd
-             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NOT NULL), 0
+             WHERE cd.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
+               AND cd.location_code IS NOT NULL), 0
           ) as commission_advance_total,
-          -- Cuti Tahunan recorded as commission (location 23) - shown under Cuti, not COMM
+          -- Cuti Tahunan recorded as commission/advance (loc 23 or desc 'cuti tahunan') - shown under Cuti
           COALESCE(
             (SELECT SUM(commission_amount) FROM commission_data cd
-             WHERE cd.employee_id = ebd.employee_id AND cd.location_code = '23'), 0
+             WHERE cd.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
+               AND (cd.location_code = '23' OR cd.desc_key = 'cuti tahunan')), 0
           ) as cuti_tahunan_commission_total,
           (
             COALESCE(
               (SELECT SUM(commission_amount) FROM commission_data cd
-               WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NULL), 0
+               WHERE cd.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name) AND cd.location_code IS NULL), 0
             ) +
             COALESCE(
               (SELECT SUM(amount) FROM payroll_items_data pid
@@ -1314,12 +1361,12 @@ export default function (pool) {
           ) as bonus_total,
           COALESCE(
             (SELECT SUM(advance_amount) FROM commission_data cd
-             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NULL), 0
+             WHERE cd.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name) AND cd.location_code IS NULL), 0
           ) as bonus_advance_total,
-          -- Leave data: combine all 4 cuti types into a single Cuti figure
+          -- Leave data (by name across siblings): combine all cuti types into a single Cuti figure
           COALESCE(
             (SELECT SUM(leave_amount) FROM leave_data ld
-             WHERE ld.employee_id = ebd.employee_id), 0
+             WHERE ld.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)), 0
           ) as leave_total
         FROM employee_base_data ebd
         LEFT JOIN mid_month_data mmd ON ebd.employee_id = mmd.employee_id
@@ -1368,14 +1415,12 @@ export default function (pool) {
           section: row.section,
           // Salary tab data
           gaji: gaji,
-          ot: parseFloat(row.overtime_pay || 0),
-          // BONUS = real bonus (BONUS code & loc-null commission) if the worker has one;
-          // otherwise total overtime (payroll OT + Kerja Luar OT).
-          bonus:
-            parseFloat(row.bonus_total || 0) > 0
-              ? parseFloat(row.bonus_total || 0)
-              : parseFloat(row.overtime_pay || 0) +
-                parseFloat(row.others_overtime || 0),
+          // OT = all overtime (payroll + Kerja Luar). It is shown only here.
+          ot:
+            parseFloat(row.overtime_pay || 0) +
+            parseFloat(row.others_overtime || 0),
+          // BONUS = real bonuses only (BONUS paycode + loc-null commission). OT is NOT folded in.
+          bonus: parseFloat(row.bonus_total || 0),
           // COMM/INS/LAIN = location commission (excl. Cuti Tahunan loc 23)
           // + piece-rate work (Bag/Bundle/Kg/Trip/Bill/Percent) + Fixed insentif (IXT), from payroll + Kerja Luar
           comm:
@@ -1385,7 +1430,8 @@ export default function (pool) {
           // Display-only: does not feed gaji_bersih/jumlah (same as comm).
           cuti:
             parseFloat(row.leave_total || 0) +
-            parseFloat(row.cuti_tahunan_commission_total || 0),
+            parseFloat(row.cuti_tahunan_commission_total || 0) +
+            parseFloat(row.cuti_tahunan_other_total || 0),
           gaji_kasar: gajiKasar,
           epf_majikan: parseFloat(row.epf_employer || 0),
           epf_pekerja: parseFloat(row.epf_employee || 0),
@@ -1526,9 +1572,15 @@ export default function (pool) {
         // Location 23 = Cuti Tahunan: route the amount to the Cuti column, not COMM.
         const commField = locCode === "23" ? "cuti" : "comm";
 
+        // Match by NAME: commission recorded under any sibling id belongs to a worker who
+        // may already have a (combined) payroll row under a different sibling id.
         const hasRegularPayroll = processedData.some(
-          (e) => e.staff_id === row.employee_id,
+          (e) => e.staff_name === row.staff_name,
         );
+        // Commission for a worker WITH a payroll is already folded into that payroll row's
+        // C/I/O (and Cuti for loc 23) by the main query's by-name aggregation. Skip it here
+        // so we don't create a duplicate commission-only row or double-count totals.
+        if (hasRegularPayroll) return;
 
         if (locationData[locCode]) {
           const existingEmployee = locationData[locCode].employees.find(
