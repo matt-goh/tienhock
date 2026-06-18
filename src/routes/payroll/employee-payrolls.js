@@ -208,13 +208,13 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       `
       SELECT amount, description, is_advance
       FROM commission_records
-      WHERE employee_id = $1
+      WHERE employee_id IN (SELECT id FROM staffs WHERE name = $1)
         AND DATE(commission_date) >= $2
         AND DATE(commission_date) <= $3
       ORDER BY commission_date DESC
     `,
       [
-        employee_id,
+        employee_name,
         `${year}-${month.toString().padStart(2, "0")}-01`,
         `${year}-${month.toString().padStart(2, "0")}-${new Date(year, month, 0).getDate().toString().padStart(2, "0")}`,
       ],
@@ -231,13 +231,13 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       SELECT orec.amount, orec.description, pc.pay_type
       FROM others_records orec
       LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
-      WHERE orec.employee_id = $1
+      WHERE orec.employee_id IN (SELECT id FROM staffs WHERE name = $1)
         AND DATE(orec.record_date) >= $2
         AND DATE(orec.record_date) <= $3
       ORDER BY orec.record_date DESC
     `,
       [
-        employee_id,
+        employee_name,
         `${year}-${month.toString().padStart(2, "0")}-01`,
         `${year}-${month.toString().padStart(2, "0")}-${new Date(year, month, 0).getDate().toString().padStart(2, "0")}`,
       ],
