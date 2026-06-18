@@ -46,7 +46,18 @@ interface OthersEntry {
   rateUnit: RateUnit | "";
   quantity: string;
   dates: string[];
+  reportColumn: string; // "" = automatic; else GAJI/OT/BONUS/CIO/CUTI
 }
+
+// Optional override for which Salary Report column an Others amount lands in.
+const REPORT_COLUMN_OPTIONS: { value: string; label: string }[] = [
+  { value: "", label: "Automatic (by rule)" },
+  { value: "GAJI", label: "GAJI" },
+  { value: "OT", label: "OT" },
+  { value: "BONUS", label: "BONUS" },
+  { value: "CIO", label: "C/I/O" },
+  { value: "CUTI", label: "CUTI" },
+];
 
 interface AddOthersModalProps {
   isOpen: boolean;
@@ -149,6 +160,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
         rateUnit: "",
         quantity: "1",
         dates: [defaultDate],
+        reportColumn: "",
       },
     ]);
     setStaffQueries({});
@@ -218,6 +230,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
         rateUnit: "",
         quantity: "1",
         dates: [defaultDateForMonth(currentYear, currentMonth)],
+        reportColumn: "",
       },
     ]);
     setLoadedPayCodeCounts((prev) => ({
@@ -269,6 +282,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
       rateUnit: source.rateUnit,
       quantity: source.quantity,
       dates: [...source.dates],
+      reportColumn: source.reportColumn,
     }));
     setEntries((prev) => {
       const next = [...prev];
@@ -336,6 +350,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
           quantity: parseFloat(e.quantity),
           amount,
           created_by: user?.id,
+          report_column: e.reportColumn || null,
         };
         if (e.dates.length === 1) {
           payload.record_date = e.dates[0];
@@ -899,6 +914,34 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                                 </div>
                               )}
                             </div>
+                          </div>
+
+                          {/* Row 3.5: Salary report column override */}
+                          <div className="mb-3">
+                            <label className="block text-xs font-medium text-default-600 dark:text-gray-300 mb-1">
+                              Salary report column
+                            </label>
+                            <select
+                              value={entry.reportColumn}
+                              onChange={(e) =>
+                                handleEntryChange(
+                                  index,
+                                  "reportColumn",
+                                  e.target.value,
+                                )
+                              }
+                              disabled={isSaving}
+                              className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 text-sm text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:bg-gray-50 dark:disabled:bg-gray-700"
+                            >
+                              {REPORT_COLUMN_OPTIONS.map((opt) => (
+                                <option key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                            </select>
+                            <p className="mt-1 text-[11px] text-default-400 dark:text-gray-500">
+                              Forces which Salary Report column this amount shows in. Leave on Automatic unless it needs overriding.
+                            </p>
                           </div>
 
                           {/* Row 4: Description */}

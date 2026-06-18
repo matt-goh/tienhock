@@ -117,6 +117,7 @@ export default function (pool) {
       quantity,
       amount,
       created_by,
+      report_column,
     } = req.body;
 
     const dates = Array.isArray(record_dates)
@@ -145,8 +146,8 @@ export default function (pool) {
       const insertQuery = `
         INSERT INTO others_records (
           employee_id, record_date, pay_code_id, description,
-          rate, rate_unit, quantity, amount, created_by, link_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          rate, rate_unit, quantity, amount, created_by, link_id, report_column
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING *;
       `;
       const inserted = [];
@@ -162,6 +163,7 @@ export default function (pool) {
           amount,
           created_by || null,
           linkId,
+          report_column || null,
         ]);
         inserted.push(r.rows[0]);
       }
@@ -215,6 +217,7 @@ export default function (pool) {
       rate_unit,
       quantity,
       amount,
+      report_column,
     } = req.body;
 
     const client = await pool.connect();
@@ -239,8 +242,9 @@ export default function (pool) {
                  rate_unit = $5,
                  quantity = $6,
                  amount = $7,
+                 report_column = $8,
                  updated_at = now()
-           WHERE id = $8
+           WHERE id = $9
            RETURNING *`,
           [
             record_date,
@@ -250,6 +254,7 @@ export default function (pool) {
             rate_unit,
             quantity,
             amount,
+            report_column || null,
             id,
           ],
         );
@@ -279,8 +284,9 @@ export default function (pool) {
                rate_unit = $4,
                quantity = $5,
                amount = $6,
+               report_column = $7,
                updated_at = now()
-         WHERE link_id = $7`,
+         WHERE link_id = $8`,
         [
           pay_code_id || null,
           description,
@@ -288,6 +294,7 @@ export default function (pool) {
           rate_unit,
           quantity,
           amount,
+          report_column || null,
           row.link_id,
         ],
       );
@@ -318,8 +325,8 @@ export default function (pool) {
           const insertQuery = `
             INSERT INTO others_records (
               employee_id, record_date, pay_code_id, description,
-              rate, rate_unit, quantity, amount, created_by, link_id
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+              rate, rate_unit, quantity, amount, created_by, link_id, report_column
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
           `;
           for (const d of toInsertDates) {
             await client.query(insertQuery, [
@@ -333,6 +340,7 @@ export default function (pool) {
               amount,
               row.created_by,
               row.link_id,
+              report_column || null,
             ]);
           }
         }

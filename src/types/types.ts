@@ -806,6 +806,9 @@ export interface OthersRecord {
   quantity: number;
   amount: number;
   link_id: string | null;
+  // Optional Salary Report column override: "GAJI" | "OT" | "BONUS" | "CIO" | "CUTI".
+  // null/undefined = use the automatic bucketing rule.
+  report_column?: string | null;
   created_by?: string;
   created_at?: string;
   updated_at?: string;
