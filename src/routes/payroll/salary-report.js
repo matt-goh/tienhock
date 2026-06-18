@@ -131,12 +131,14 @@ export default function (pool) {
           ORDER BY employee_id, location_code, location_source
         ),
         payroll_items_data AS (
-          SELECT 
+          SELECT
             ep.employee_id,
             pi.pay_code_id,
             pi.description,
             pi.amount,
-            pc.pay_type
+            pi.job_type,
+            pc.pay_type,
+            COALESCE(pi.rate_unit, pc.rate_unit) as rate_unit
           FROM employee_payrolls ep
           JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
           JOIN payroll_items pi ON ep.id = pi.employee_payroll_id
@@ -169,12 +171,24 @@ export default function (pool) {
           JOIN payroll_deductions pd ON ep.id = pd.employee_payroll_id
           WHERE mp.year = $1 AND mp.month = $2
         ),
-        mid_month_data AS (
-          SELECT 
-            mmp.employee_id,
-            COALESCE(mmp.amount, 0) as mid_month_amount
+        -- Mid-month aggregated by NAME so advances recorded under any sibling ID
+        -- (multi-ID staff) roll up to the person, mirroring pinjam and the combined payroll.
+        mid_month_by_name AS (
+          SELECT s.name AS staff_name, COALESCE(SUM(mmp.amount), 0) as mid_month_amount
           FROM mid_month_payrolls mmp
+          JOIN staffs s ON mmp.employee_id = s.id
           WHERE mmp.year = $1 AND mmp.month = $2
+          GROUP BY s.name
+        ),
+        mid_month_rep AS (
+          SELECT staff_name, MIN(employee_id) AS employee_id
+          FROM (SELECT DISTINCT employee_id, staff_name FROM employee_base_data) d
+          GROUP BY staff_name
+        ),
+        mid_month_data AS (
+          SELECT mmr.employee_id, mmbn.mid_month_amount
+          FROM mid_month_rep mmr
+          JOIN mid_month_by_name mmbn ON mmbn.staff_name = mmr.staff_name
         ),
         commission_data AS (
           SELECT
@@ -188,13 +202,18 @@ export default function (pool) {
           GROUP BY cr.employee_id, cr.location_code
         ),
         others_data AS (
+          -- Kerja Luar (others) earnings carry pay_type + rate_unit so they can be
+          -- bucketed into GAJI / BONUS / C-I-O like regular payroll items.
           SELECT
             orec.employee_id,
+            COALESCE(pc.pay_type, 'Tambahan') as pay_type,
+            COALESCE(orec.rate_unit, pc.rate_unit) as rate_unit,
             COALESCE(SUM(orec.amount), 0) as others_amount
           FROM others_records orec
+          LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
           WHERE EXTRACT(YEAR FROM orec.record_date) = $1
             AND EXTRACT(MONTH FROM orec.record_date) = $2
-          GROUP BY orec.employee_id
+          GROUP BY orec.employee_id, pc.pay_type, COALESCE(orec.rate_unit, pc.rate_unit)
         ),
         leave_data AS (
           SELECT 
@@ -234,21 +253,73 @@ export default function (pool) {
           ebd.*,
           COALESCE(mmd.mid_month_amount, 0) as mid_month_amount,
           COALESCE(pmd.total_pinjam, 0) as total_pinjam,
-          -- Aggregate payroll items by type
+          -- GAJI = regular wage: non-Overtime, Hour/Day rate, from payroll items + Kerja Luar (excl. BONUS code)
           COALESCE(
-            (SELECT SUM(amount) FROM payroll_items_data pid 
-             WHERE pid.employee_id = ebd.employee_id AND COALESCE(pid.pay_type, 'Tambahan') = 'Base'), 0
-          ) as base_pay,
-          COALESCE(
-            (SELECT SUM(amount) FROM payroll_items_data pid 
+            (SELECT SUM(amount) FROM payroll_items_data pid
              WHERE pid.employee_id = ebd.employee_id
-               AND COALESCE(pid.pay_type, 'Tambahan') = 'Tambahan'
+               AND COALESCE(pid.pay_type, 'Tambahan') <> 'Overtime'
+               AND (
+                 -- Base wage: Hour/Day-rate base is the regular wage. If the worker has NO
+                 -- Hour/Day base at all (pure packing / office salary), then ALL their base
+                 -- is the wage; otherwise piece-rate base is "extra" and falls to C/I/O.
+                 (COALESCE(pid.pay_type, 'Tambahan') = 'Base'
+                   AND (
+                     COALESCE(pid.rate_unit, 'Hour') IN ('Hour', 'Day')
+                     OR NOT EXISTS (
+                       SELECT 1 FROM payroll_items_data pid2
+                       WHERE pid2.employee_id = ebd.employee_id
+                         AND COALESCE(pid2.pay_type, 'Tambahan') = 'Base'
+                         AND COALESCE(pid2.rate_unit, 'Hour') IN ('Hour', 'Day')
+                     )
+                   ))
+                 -- Hour/Day maintenance/Sunday work (HARI_BIASA/AHAD etc.)
+                 OR (COALESCE(pid.pay_type, 'Tambahan') <> 'Base'
+                   AND COALESCE(pid.rate_unit, 'Hour') IN ('Hour', 'Day'))
+               )
                AND (pid.pay_code_id IS NULL OR pid.pay_code_id <> 'BONUS')), 0
-          ) as tambahan_pay,
+          ) + COALESCE(
+            (SELECT SUM(others_amount) FROM others_data od
+             WHERE od.employee_id = ebd.employee_id
+               AND od.pay_type <> 'Overtime'
+               AND COALESCE(od.rate_unit, 'Hour') IN ('Hour', 'Day')), 0
+          ) as gaji_pay,
+          -- OT column = overtime from payroll items only (unchanged)
           COALESCE(
-            (SELECT SUM(amount) FROM payroll_items_data pid 
+            (SELECT SUM(amount) FROM payroll_items_data pid
              WHERE pid.employee_id = ebd.employee_id AND COALESCE(pid.pay_type, 'Tambahan') = 'Overtime'), 0
           ) as overtime_pay,
+          -- Overtime recorded as Kerja Luar (others) - folded into BONUS together with payroll OT
+          COALESCE(
+            (SELECT SUM(others_amount) FROM others_data od
+             WHERE od.employee_id = ebd.employee_id AND od.pay_type = 'Overtime'), 0
+          ) as others_overtime,
+          -- C/I/O piece-rate + insentif: non-Overtime, non-Hour/Day rate, from payroll items + Kerja Luar (excl. BONUS code)
+          COALESCE(
+            (SELECT SUM(amount) FROM payroll_items_data pid
+             WHERE pid.employee_id = ebd.employee_id
+               AND COALESCE(pid.pay_type, 'Tambahan') <> 'Overtime'
+               AND (
+                 -- Piece-rate base (packing) done as EXTRA: only when the worker also has
+                 -- Hour/Day base (their real wage). Pure piece-rate workers keep it in GAJI.
+                 (COALESCE(pid.pay_type, 'Tambahan') = 'Base'
+                   AND COALESCE(pid.rate_unit, 'Hour') NOT IN ('Hour', 'Day')
+                   AND EXISTS (
+                     SELECT 1 FROM payroll_items_data pid2
+                     WHERE pid2.employee_id = ebd.employee_id
+                       AND COALESCE(pid2.pay_type, 'Tambahan') = 'Base'
+                       AND COALESCE(pid2.rate_unit, 'Hour') IN ('Hour', 'Day')
+                   ))
+                 -- Non-Hour/Day premiums: piece-rate (Bag/Bundle/Kg/Trip/Bill/Percent), Fixed insentif (IXT)
+                 OR (COALESCE(pid.pay_type, 'Tambahan') <> 'Base'
+                   AND COALESCE(pid.rate_unit, 'Hour') NOT IN ('Hour', 'Day'))
+               )
+               AND (pid.pay_code_id IS NULL OR pid.pay_code_id <> 'BONUS')), 0
+          ) + COALESCE(
+            (SELECT SUM(others_amount) FROM others_data od
+             WHERE od.employee_id = ebd.employee_id
+               AND od.pay_type <> 'Overtime'
+               AND COALESCE(od.rate_unit, 'Hour') NOT IN ('Hour', 'Day')), 0
+          ) as piece_insentif_pay,
           -- Aggregate deductions
           COALESCE(
             (SELECT SUM(employee_amount) FROM deductions_data dd 
@@ -306,11 +377,6 @@ export default function (pool) {
             (SELECT SUM(advance_amount) FROM commission_data cd
              WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NULL), 0
           ) as bonus_advance_total,
-          -- Others (Kerja Luar OT) data - regular earnings, not advance deductions
-          COALESCE(
-            (SELECT SUM(others_amount) FROM others_data od
-             WHERE od.employee_id = ebd.employee_id), 0
-          ) as others_total,
           -- Leave data: combine all 4 cuti types into a single Cuti figure
           COALESCE(
             (SELECT SUM(leave_amount) FROM leave_data ld
@@ -326,8 +392,8 @@ export default function (pool) {
 
       // Process the data for different views
       const processedData = result.rows.map((row, index) => {
-        // GAJI = base pay only. Tambahan pay is shown under COMM/INS/LAIN (Insentif).
-        const gaji = parseFloat(row.base_pay || 0);
+        // GAJI = regular wage (non-OT Hour/Day work from payroll + Kerja Luar).
+        const gaji = parseFloat(row.gaji_pay || 0);
         const gajiKasar = parseFloat(row.gross_pay || 0);
         // Only advance commission/bonus records are already deducted from net_pay in DB.
         // Others (Kerja Luar OT) is a regular earning, NOT an advance, so it is NOT added back here.
@@ -336,18 +402,22 @@ export default function (pool) {
           parseFloat(row.bonus_advance_total || 0);
         // GAJI BERSIH = net_pay + commission (add back to show true net before advances)
         const gajiBersih = parseFloat(row.net_pay || 0) + commissionAdvance;
-        // JUMLAH = net_pay - mid_month (commission already deducted from net_pay)
+        // SALARY REPORT JUMLAH / S.DIGENAP show the TOTAL earned salary, INCLUDING amounts
+        // already paid in advance (commission/bonus advances). They are derived from
+        // gaji_bersih (advance added back), so the report reflects full salary - not
+        // cash-in-hand. The Bank/Pinjam tabs below use the actual take-home instead.
         const jumlah =
+          gajiBersih - parseFloat(row.mid_month_amount || 0);
+        const setelah_digenapkan = Math.ceil(jumlah);
+        const digenapkan = setelah_digenapkan - jumlah;
+        // Actual take-home (advance already deducted) for the Bank/Pinjam tabs - prefer the
+        // stored payroll rounding so they match the Payroll Details page and payslip.
+        const takeHomeJumlah =
           parseFloat(row.net_pay || 0) - parseFloat(row.mid_month_amount || 0);
-        // Use stored payroll rounding when available so bank/pinjam reports match Payroll Details.
-        const setelah_digenapkan =
+        const takeHomeSetelah =
           row.setelah_digenapkan == null
-            ? Math.ceil(jumlah)
+            ? Math.ceil(takeHomeJumlah)
             : parseFloat(row.setelah_digenapkan);
-        const digenapkan =
-          row.digenapkan == null
-            ? setelah_digenapkan - jumlah
-            : parseFloat(row.digenapkan);
         const totalPinjam = parseFloat(row.total_pinjam || 0);
 
         return {
@@ -365,13 +435,18 @@ export default function (pool) {
           // Salary tab data
           gaji: gaji,
           ot: parseFloat(row.overtime_pay || 0),
-          bonus: parseFloat(row.bonus_total || 0),
+          // BONUS = real bonus (BONUS code & loc-null commission) if the worker has one;
+          // otherwise total overtime (payroll OT + Kerja Luar OT).
+          bonus:
+            parseFloat(row.bonus_total || 0) > 0
+              ? parseFloat(row.bonus_total || 0)
+              : parseFloat(row.overtime_pay || 0) +
+                parseFloat(row.others_overtime || 0),
           // COMM/INS/LAIN = location commission (excl. Cuti Tahunan loc 23)
-          // + Insentif (all Tambahan payroll pay, excl. BONUS) + Others/Kerja Luar OT (incl. IXT)
+          // + piece-rate work (Bag/Bundle/Kg/Trip/Bill/Percent) + Fixed insentif (IXT), from payroll + Kerja Luar
           comm:
             parseFloat(row.commission_total || 0) +
-            parseFloat(row.tambahan_pay || 0) +
-            parseFloat(row.others_total || 0),
+            parseFloat(row.piece_insentif_pay || 0),
           // CUTI = all 4 leave types + Cuti Tahunan recorded as commission (loc 23).
           // Display-only: does not feed gaji_bersih/jumlah (same as comm).
           cuti:
@@ -390,10 +465,10 @@ export default function (pool) {
           jumlah: jumlah,
           digenapkan: digenapkan,
           setelah_digenapkan: setelah_digenapkan,
-          // Bank/Pinjam tab data
-          gaji_genap: setelah_digenapkan,
+          // Bank/Pinjam tab data (actual take-home: advance already deducted)
+          gaji_genap: takeHomeSetelah,
           total_pinjam: totalPinjam,
-          final_total: setelah_digenapkan - totalPinjam,
+          final_total: takeHomeSetelah - totalPinjam,
           net_pay: parseFloat(row.net_pay || 0),
           mid_month_amount: parseFloat(row.mid_month_amount || 0),
         };
@@ -1002,7 +1077,9 @@ export default function (pool) {
             pi.pay_code_id,
             pi.description,
             SUM(pi.amount) as amount,
-            pc.pay_type
+            pi.job_type,
+            pc.pay_type,
+            COALESCE(pi.rate_unit, pc.rate_unit) as rate_unit
           FROM employee_payrolls ep
           JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
           JOIN payroll_items pi ON ep.id = pi.employee_payroll_id
@@ -1021,7 +1098,7 @@ export default function (pool) {
                   AND lr2.leave_date = pi.source_date
               )
             )
-          GROUP BY ep.employee_id, pi.pay_code_id, pi.description, pc.pay_type
+          GROUP BY ep.employee_id, pi.pay_code_id, pi.description, pi.job_type, pc.pay_type, COALESCE(pi.rate_unit, pc.rate_unit)
         ),
         deductions_data AS (
           SELECT
@@ -1035,13 +1112,24 @@ export default function (pool) {
           WHERE mp.year = $1
           GROUP BY ep.employee_id, pd.deduction_type
         ),
-        mid_month_data AS (
-          SELECT
-            mmp.employee_id,
-            COALESCE(SUM(mmp.amount), 0) as mid_month_amount
+        -- Mid-month aggregated by NAME so advances recorded under any sibling ID
+        -- (multi-ID staff) roll up to the person, mirroring pinjam and the combined payroll.
+        mid_month_by_name AS (
+          SELECT s.name AS staff_name, COALESCE(SUM(mmp.amount), 0) as mid_month_amount
           FROM mid_month_payrolls mmp
+          JOIN staffs s ON mmp.employee_id = s.id
           WHERE mmp.year = $1
-          GROUP BY mmp.employee_id
+          GROUP BY s.name
+        ),
+        mid_month_rep AS (
+          SELECT staff_name, MIN(employee_id) AS employee_id
+          FROM (SELECT DISTINCT employee_id, staff_name FROM employee_base_data) d
+          GROUP BY staff_name
+        ),
+        mid_month_data AS (
+          SELECT mmr.employee_id, mmbn.mid_month_amount
+          FROM mid_month_rep mmr
+          JOIN mid_month_by_name mmbn ON mmbn.staff_name = mmr.staff_name
         ),
         commission_data AS (
           SELECT
@@ -1054,12 +1142,17 @@ export default function (pool) {
           GROUP BY cr.employee_id, cr.location_code
         ),
         others_data AS (
+          -- Kerja Luar (others) earnings carry pay_type + rate_unit so they can be
+          -- bucketed into GAJI / BONUS / C-I-O like regular payroll items.
           SELECT
             orec.employee_id,
+            COALESCE(pc.pay_type, 'Tambahan') as pay_type,
+            COALESCE(orec.rate_unit, pc.rate_unit) as rate_unit,
             COALESCE(SUM(orec.amount), 0) as others_amount
           FROM others_records orec
+          LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
           WHERE EXTRACT(YEAR FROM orec.record_date) = $1
-          GROUP BY orec.employee_id
+          GROUP BY orec.employee_id, pc.pay_type, COALESCE(orec.rate_unit, pc.rate_unit)
         ),
         leave_data AS (
           SELECT
@@ -1099,21 +1192,73 @@ export default function (pool) {
           ebd.*,
           COALESCE(mmd.mid_month_amount, 0) as mid_month_amount,
           COALESCE(pmd.total_pinjam, 0) as total_pinjam,
-          -- Aggregate payroll items by type
-          COALESCE(
-            (SELECT SUM(amount) FROM payroll_items_data pid
-             WHERE pid.employee_id = ebd.employee_id AND COALESCE(pid.pay_type, 'Tambahan') = 'Base'), 0
-          ) as base_pay,
+          -- GAJI = regular wage: non-Overtime, Hour/Day rate, from payroll items + Kerja Luar (excl. BONUS code)
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
              WHERE pid.employee_id = ebd.employee_id
-               AND COALESCE(pid.pay_type, 'Tambahan') = 'Tambahan'
+               AND COALESCE(pid.pay_type, 'Tambahan') <> 'Overtime'
+               AND (
+                 -- Base wage: Hour/Day-rate base is the regular wage. If the worker has NO
+                 -- Hour/Day base at all (pure packing / office salary), then ALL their base
+                 -- is the wage; otherwise piece-rate base is "extra" and falls to C/I/O.
+                 (COALESCE(pid.pay_type, 'Tambahan') = 'Base'
+                   AND (
+                     COALESCE(pid.rate_unit, 'Hour') IN ('Hour', 'Day')
+                     OR NOT EXISTS (
+                       SELECT 1 FROM payroll_items_data pid2
+                       WHERE pid2.employee_id = ebd.employee_id
+                         AND COALESCE(pid2.pay_type, 'Tambahan') = 'Base'
+                         AND COALESCE(pid2.rate_unit, 'Hour') IN ('Hour', 'Day')
+                     )
+                   ))
+                 -- Hour/Day maintenance/Sunday work (HARI_BIASA/AHAD etc.)
+                 OR (COALESCE(pid.pay_type, 'Tambahan') <> 'Base'
+                   AND COALESCE(pid.rate_unit, 'Hour') IN ('Hour', 'Day'))
+               )
                AND (pid.pay_code_id IS NULL OR pid.pay_code_id <> 'BONUS')), 0
-          ) as tambahan_pay,
+          ) + COALESCE(
+            (SELECT SUM(others_amount) FROM others_data od
+             WHERE od.employee_id = ebd.employee_id
+               AND od.pay_type <> 'Overtime'
+               AND COALESCE(od.rate_unit, 'Hour') IN ('Hour', 'Day')), 0
+          ) as gaji_pay,
+          -- OT column = overtime from payroll items only (unchanged)
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
              WHERE pid.employee_id = ebd.employee_id AND COALESCE(pid.pay_type, 'Tambahan') = 'Overtime'), 0
           ) as overtime_pay,
+          -- Overtime recorded as Kerja Luar (others) - folded into BONUS together with payroll OT
+          COALESCE(
+            (SELECT SUM(others_amount) FROM others_data od
+             WHERE od.employee_id = ebd.employee_id AND od.pay_type = 'Overtime'), 0
+          ) as others_overtime,
+          -- C/I/O piece-rate + insentif: non-Overtime, non-Hour/Day rate, from payroll items + Kerja Luar (excl. BONUS code)
+          COALESCE(
+            (SELECT SUM(amount) FROM payroll_items_data pid
+             WHERE pid.employee_id = ebd.employee_id
+               AND COALESCE(pid.pay_type, 'Tambahan') <> 'Overtime'
+               AND (
+                 -- Piece-rate base (packing) done as EXTRA: only when the worker also has
+                 -- Hour/Day base (their real wage). Pure piece-rate workers keep it in GAJI.
+                 (COALESCE(pid.pay_type, 'Tambahan') = 'Base'
+                   AND COALESCE(pid.rate_unit, 'Hour') NOT IN ('Hour', 'Day')
+                   AND EXISTS (
+                     SELECT 1 FROM payroll_items_data pid2
+                     WHERE pid2.employee_id = ebd.employee_id
+                       AND COALESCE(pid2.pay_type, 'Tambahan') = 'Base'
+                       AND COALESCE(pid2.rate_unit, 'Hour') IN ('Hour', 'Day')
+                   ))
+                 -- Non-Hour/Day premiums: piece-rate (Bag/Bundle/Kg/Trip/Bill/Percent), Fixed insentif (IXT)
+                 OR (COALESCE(pid.pay_type, 'Tambahan') <> 'Base'
+                   AND COALESCE(pid.rate_unit, 'Hour') NOT IN ('Hour', 'Day'))
+               )
+               AND (pid.pay_code_id IS NULL OR pid.pay_code_id <> 'BONUS')), 0
+          ) + COALESCE(
+            (SELECT SUM(others_amount) FROM others_data od
+             WHERE od.employee_id = ebd.employee_id
+               AND od.pay_type <> 'Overtime'
+               AND COALESCE(od.rate_unit, 'Hour') NOT IN ('Hour', 'Day')), 0
+          ) as piece_insentif_pay,
           -- Aggregate deductions
           COALESCE(
             (SELECT SUM(employee_amount) FROM deductions_data dd
@@ -1171,11 +1316,6 @@ export default function (pool) {
             (SELECT SUM(advance_amount) FROM commission_data cd
              WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NULL), 0
           ) as bonus_advance_total,
-          -- Others (Kerja Luar OT) data - regular earnings, not advance deductions
-          COALESCE(
-            (SELECT SUM(others_amount) FROM others_data od
-             WHERE od.employee_id = ebd.employee_id), 0
-          ) as others_total,
           -- Leave data: combine all 4 cuti types into a single Cuti figure
           COALESCE(
             (SELECT SUM(leave_amount) FROM leave_data ld
@@ -1191,8 +1331,8 @@ export default function (pool) {
 
       // Process the data for different views
       const processedData = result.rows.map((row, index) => {
-        // GAJI = base pay only. Tambahan pay is shown under COMM/INS/LAIN (Insentif).
-        const gaji = parseFloat(row.base_pay || 0);
+        // GAJI = regular wage (non-OT Hour/Day work from payroll + Kerja Luar).
+        const gaji = parseFloat(row.gaji_pay || 0);
         const gajiKasar = parseFloat(row.gross_pay || 0);
         // Only advance commission/bonus records are already deducted from net_pay in DB.
         // Others (Kerja Luar OT) is a regular earning, NOT an advance, so it is NOT added back here.
@@ -1201,15 +1341,17 @@ export default function (pool) {
           parseFloat(row.bonus_advance_total || 0);
         // GAJI BERSIH = net_pay + commission (add back to show true net before advances)
         const gajiBersih = parseFloat(row.net_pay || 0) + commissionAdvance;
-        // JUMLAH = net_pay - mid_month (commission already deducted from net_pay)
+        // SALARY REPORT JUMLAH / S.DIGENAP show the TOTAL earned salary, INCLUDING amounts
+        // already paid in advance (commission/bonus advances) - derived from gaji_bersih.
+        // NOTE: this rounds the annual figure, so it can differ by a few ringgit from the
+        // sum of the 12 monthly S.DIGENAP values. The Bank/Pinjam tabs below keep the
+        // summed stored take-home (advance already deducted) to match Payroll Details.
         const jumlah =
-          parseFloat(row.net_pay || 0) - parseFloat(row.mid_month_amount || 0);
-        // Use pre-calculated digenapkan values from monthly payrolls (summed across months)
-        // This ensures yearly totals match sum of monthly totals exactly
-        const setelah_digenapkan = parseFloat(
-          row.total_setelah_digenapkan || 0,
-        );
-        const digenapkan = parseFloat(row.total_digenapkan || 0);
+          gajiBersih - parseFloat(row.mid_month_amount || 0);
+        const setelah_digenapkan = Math.ceil(jumlah);
+        const digenapkan = setelah_digenapkan - jumlah;
+        // Actual take-home (advance already deducted), summed from stored monthly rounding.
+        const takeHomeSetelah = parseFloat(row.total_setelah_digenapkan || 0);
         const totalPinjam = parseFloat(row.total_pinjam || 0);
 
         return {
@@ -1227,13 +1369,18 @@ export default function (pool) {
           // Salary tab data
           gaji: gaji,
           ot: parseFloat(row.overtime_pay || 0),
-          bonus: parseFloat(row.bonus_total || 0),
+          // BONUS = real bonus (BONUS code & loc-null commission) if the worker has one;
+          // otherwise total overtime (payroll OT + Kerja Luar OT).
+          bonus:
+            parseFloat(row.bonus_total || 0) > 0
+              ? parseFloat(row.bonus_total || 0)
+              : parseFloat(row.overtime_pay || 0) +
+                parseFloat(row.others_overtime || 0),
           // COMM/INS/LAIN = location commission (excl. Cuti Tahunan loc 23)
-          // + Insentif (all Tambahan payroll pay, excl. BONUS) + Others/Kerja Luar OT (incl. IXT)
+          // + piece-rate work (Bag/Bundle/Kg/Trip/Bill/Percent) + Fixed insentif (IXT), from payroll + Kerja Luar
           comm:
             parseFloat(row.commission_total || 0) +
-            parseFloat(row.tambahan_pay || 0) +
-            parseFloat(row.others_total || 0),
+            parseFloat(row.piece_insentif_pay || 0),
           // CUTI = all 4 leave types + Cuti Tahunan recorded as commission (loc 23).
           // Display-only: does not feed gaji_bersih/jumlah (same as comm).
           cuti:
@@ -1252,10 +1399,10 @@ export default function (pool) {
           jumlah: jumlah,
           digenapkan: digenapkan,
           setelah_digenapkan: setelah_digenapkan,
-          // Bank/Pinjam tab data
-          gaji_genap: setelah_digenapkan,
+          // Bank/Pinjam tab data (actual take-home: advance already deducted)
+          gaji_genap: takeHomeSetelah,
           total_pinjam: totalPinjam,
-          final_total: setelah_digenapkan - totalPinjam,
+          final_total: takeHomeSetelah - totalPinjam,
           net_pay: parseFloat(row.net_pay || 0),
           mid_month_amount: parseFloat(row.mid_month_amount || 0),
         };
