@@ -261,9 +261,9 @@ export default function (pool) {
           COALESCE(mmd.mid_month_amount, 0) as mid_month_amount,
           COALESCE(pmd.total_pinjam, 0) as total_pinjam,
           -- GAJI = regular wage. Worker WITH an Hour/Day base: all non-piece work (base + hourly
-          -- maintenance/Sunday). Worker with NO hourly base (pure piece / office salary): their
-          -- Base only. Allowance/incentive codes (IXT/ADD_COMM/T-SALESMAN/FULL/HADIR_MEETING) and
-          -- Cuti-Tahunan are excluded (they belong to C/I/O / CUTI). Kerja-Luar matched by name.
+          -- maintenance/Sunday). Worker with NO hourly base (pure piece / office salary): Base +
+          -- production F/HARIAN codes (FULL_*). The generic FULL incentive code and other
+          -- allowances remain C/I/O. Kerja-Luar matched by name.
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
              WHERE pid.employee_id = ebd.employee_id
@@ -276,6 +276,8 @@ export default function (pool) {
                    AND COALESCE(pid.rate_unit, 'Hour') IN ('Hour', 'Day', 'Fixed'))
                  OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(pid.pay_type, 'Tambahan') = 'Base')
+                 OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                   AND pid.pay_code_id LIKE 'FULL!_%' ESCAPE '!')
                )))), 0
           ) + COALESCE(
             (SELECT SUM(others_amount) FROM others_data od
@@ -322,7 +324,8 @@ export default function (pool) {
                  OR (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(pid.rate_unit, 'Hour') NOT IN ('Hour', 'Day', 'Fixed'))
                  OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
-                   AND COALESCE(pid.pay_type, 'Tambahan') <> 'Base')
+                   AND COALESCE(pid.pay_type, 'Tambahan') <> 'Base'
+                   AND (pid.pay_code_id IS NULL OR pid.pay_code_id NOT LIKE 'FULL!_%' ESCAPE '!'))
                )))), 0
           ) + COALESCE(
             (SELECT SUM(others_amount) FROM others_data od
@@ -1247,9 +1250,9 @@ export default function (pool) {
           COALESCE(mmd.mid_month_amount, 0) as mid_month_amount,
           COALESCE(pmd.total_pinjam, 0) as total_pinjam,
           -- GAJI = regular wage. Worker WITH an Hour/Day base: all non-piece work (base + hourly
-          -- maintenance/Sunday). Worker with NO hourly base (pure piece / office salary): their
-          -- Base only. Allowance/incentive codes (IXT/ADD_COMM/T-SALESMAN/FULL/HADIR_MEETING) and
-          -- Cuti-Tahunan are excluded (they belong to C/I/O / CUTI). Kerja-Luar matched by name.
+          -- maintenance/Sunday). Worker with NO hourly base (pure piece / office salary): Base +
+          -- production F/HARIAN codes (FULL_*). The generic FULL incentive code and other
+          -- allowances remain C/I/O. Kerja-Luar matched by name.
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
              WHERE pid.employee_id = ebd.employee_id
@@ -1262,6 +1265,8 @@ export default function (pool) {
                    AND COALESCE(pid.rate_unit, 'Hour') IN ('Hour', 'Day', 'Fixed'))
                  OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(pid.pay_type, 'Tambahan') = 'Base')
+                 OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                   AND pid.pay_code_id LIKE 'FULL!_%' ESCAPE '!')
                )))), 0
           ) + COALESCE(
             (SELECT SUM(others_amount) FROM others_data od
@@ -1308,7 +1313,8 @@ export default function (pool) {
                  OR (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(pid.rate_unit, 'Hour') NOT IN ('Hour', 'Day', 'Fixed'))
                  OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
-                   AND COALESCE(pid.pay_type, 'Tambahan') <> 'Base')
+                   AND COALESCE(pid.pay_type, 'Tambahan') <> 'Base'
+                   AND (pid.pay_code_id IS NULL OR pid.pay_code_id NOT LIKE 'FULL!_%' ESCAPE '!'))
                )))), 0
           ) + COALESCE(
             (SELECT SUM(others_amount) FROM others_data od
