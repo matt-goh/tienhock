@@ -35,8 +35,8 @@ const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   },
   {
     date: "2026-06-21",
-    ms: "Halaman Payroll dan Laporan Gaji kini mengingati bulan terakhir yang anda buka pada pelayar ini. Apabila anda kembali ke salah satu halaman itu, bulan tersebut dibuka secara automatik; pautan yang memilih bulan tertentu masih menggunakan bulan pada pautan tersebut.",
-    en: "The Payroll and Salary Report pages now remember the last month you opened in this browser. When you return to either page, that month opens automatically; links that specify a month still open the month in the link.",
+    ms: "Halaman Payroll dan Laporan Gaji kini mengingati bulan terakhir yang anda buka pada pelayar ini. Laporan Gaji juga mengingati tab terakhir yang dibuka. Apabila anda kembali ke halaman tersebut, bulan dan tab itu dibuka secara automatik; pautan yang memilih bulan atau tab tertentu masih menggunakan pilihan pada pautan tersebut.",
+    en: "The Payroll and Salary Report pages now remember the last month you opened in this browser. Salary Report also remembers the last tab you opened. When you return, that month and tab open automatically; links that specify a month or tab still use the choices in the link.",
   },
   {
     date: "2026-06-21",

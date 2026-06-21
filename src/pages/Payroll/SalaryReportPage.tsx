@@ -37,8 +37,10 @@ import { useLocationMappingsCache } from "../../utils/catalogue/useLocationMappi
 import { groupStaffsByName } from "../../utils/payroll/groupStaffsByName";
 import {
   readLastAccessedPayrollMonth,
+  readLastAccessedSalaryReportTab,
   saveLastAccessedPayrollMonth,
-} from "../../utils/payroll/payrollMonthStorage";
+  saveLastAccessedSalaryReportTab,
+} from "../../utils/payroll/payrollPageStorage";
 import toast from "react-hot-toast";
 
 // Cuti (leave) summary types for the Cuti tab
@@ -280,12 +282,14 @@ const SalaryReportPage: React.FC = () => {
   const currentYear = selectedMonth.getFullYear();
   const currentMonth = selectedMonth.getMonth() + 1;
 
-  // Tab state - initialize from URL params
-  const [activeTab, setActiveTab] = useState(() => {
+  // Tab state - initialize from URL params, then the last opened tab.
+  const [activeTab, setActiveTab] = useState<number>(() => {
     const tabParam = searchParams.get("tab");
     const tabIndex = tabParam ? parseInt(tabParam, 10) : 0;
     // Validate tab index (0-4 are valid)
-    return tabIndex >= 0 && tabIndex <= 4 ? tabIndex : 0;
+    return tabParam && tabIndex >= 0 && tabIndex <= 4
+      ? tabIndex
+      : readLastAccessedSalaryReportTab() ?? 0;
   }); // 0 = Employee, 1 = Salary, 2 = Bank, 3 = Pinjam, 4 = Cuti
 
   // Update URL params when tab, year, month, or period changes
@@ -306,6 +310,10 @@ const SalaryReportPage: React.FC = () => {
   useEffect(() => {
     saveLastAccessedPayrollMonth(selectedMonth);
   }, [selectedMonth]);
+
+  useEffect(() => {
+    saveLastAccessedSalaryReportTab(activeTab);
+  }, [activeTab]);
 
   // Cleanup print dropdown timeout on unmount
   useEffect(() => {

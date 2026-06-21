@@ -50,7 +50,7 @@ import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 import {
   readLastAccessedPayrollMonth,
   saveLastAccessedPayrollMonth,
-} from "../../utils/payroll/payrollMonthStorage";
+} from "../../utils/payroll/payrollPageStorage";
 
 const FIRST_WEEK_DAY_OF_MONTH: number = 7;
 const EXPANDED_JOBS_STORAGE_PREFIX: string = "payroll-expanded-jobs:";
