@@ -134,9 +134,21 @@ export default function (pool) {
           SELECT
             ep.employee_id,
             pi.pay_code_id,
-            pi.description,
-            pi.amount,
-            pi.job_type,
+            CASE
+              WHEN lower(btrim(coalesce(pi.description, ''))) = 'cuti tahunan' THEN 'cuti tahunan'
+              ELSE NULL
+            END as description,
+            -- Match Payroll Details: calculate each pay code/rate/unit from its
+            -- total units, rather than adding individually rounded daily amounts.
+            CASE
+              WHEN COALESCE(pi.rate_unit, pc.rate_unit) IN ('Percent', 'Fixed')
+                THEN ROUND(SUM(pi.amount), 2)
+              ELSE ROUND(
+                ROUND(COALESCE(pi.rate, 0), 2) *
+                SUM(COALESCE(pi.quantity, 0) + COALESCE(pi.foc_units, 0)),
+                2
+              )
+            END as amount,
             pc.pay_type,
             pc.report_column,
             COALESCE(pi.rate_unit, pc.rate_unit) as rate_unit
@@ -160,6 +172,17 @@ export default function (pool) {
                   AND lr2.leave_date = pi.source_date
               )
             )
+          GROUP BY
+            ep.employee_id,
+            pi.pay_code_id,
+            pi.rate,
+            pc.pay_type,
+            pc.report_column,
+            COALESCE(pi.rate_unit, pc.rate_unit),
+            CASE
+              WHEN lower(btrim(coalesce(pi.description, ''))) = 'cuti tahunan' THEN 'cuti tahunan'
+              ELSE NULL
+            END
         ),
         deductions_data AS (
           SELECT 
@@ -1125,9 +1148,21 @@ export default function (pool) {
           SELECT
             ep.employee_id,
             pi.pay_code_id,
-            pi.description,
-            SUM(pi.amount) as amount,
-            pi.job_type,
+            CASE
+              WHEN lower(btrim(coalesce(pi.description, ''))) = 'cuti tahunan' THEN 'cuti tahunan'
+              ELSE NULL
+            END as description,
+            -- Keep the yearly report as the sum of the monthly consolidated
+            -- amounts, including when a pay rate changes between months.
+            CASE
+              WHEN COALESCE(pi.rate_unit, pc.rate_unit) IN ('Percent', 'Fixed')
+                THEN ROUND(SUM(pi.amount), 2)
+              ELSE ROUND(
+                ROUND(COALESCE(pi.rate, 0), 2) *
+                SUM(COALESCE(pi.quantity, 0) + COALESCE(pi.foc_units, 0)),
+                2
+              )
+            END as amount,
             pc.pay_type,
             pc.report_column,
             COALESCE(pi.rate_unit, pc.rate_unit) as rate_unit
@@ -1149,7 +1184,18 @@ export default function (pool) {
                   AND lr2.leave_date = pi.source_date
               )
             )
-          GROUP BY ep.employee_id, pi.pay_code_id, pi.description, pi.job_type, pc.pay_type, pc.report_column, COALESCE(pi.rate_unit, pc.rate_unit)
+          GROUP BY
+            ep.employee_id,
+            mp.month,
+            pi.pay_code_id,
+            pi.rate,
+            pc.pay_type,
+            pc.report_column,
+            COALESCE(pi.rate_unit, pc.rate_unit),
+            CASE
+              WHEN lower(btrim(coalesce(pi.description, ''))) = 'cuti tahunan' THEN 'cuti tahunan'
+              ELSE NULL
+            END
         ),
         deductions_data AS (
           SELECT

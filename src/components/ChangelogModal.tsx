@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-22",
+    ms: "Laporan Gaji kini mengira jumlah setiap Kod Gaji daripada jumlah jam/unit dahulu sebelum dibundarkan, sama seperti Butiran Gaji dan sistem lama. Ini membetulkan perbezaan beberapa sen pada lajur seperti Gaji, OT dan C/I/O tanpa mengubah rekod kerja asal.",
+    en: "Salary Report now totals each Pay Code's hours/units before rounding, matching Payroll Details and the legacy system. This fixes a few-sen difference in columns such as Gaji, OT, and C/I/O without changing the underlying work records.",
+  },
+  {
+    date: "2026-06-22",
     ms: "Panduan lajur Laporan Gaji kini boleh ditukar antara Bahasa Melayu dan English, dengan Kod Gaji dipaparkan sebagai label kod untuk lebih mudah dibaca.",
     en: "The Salary Report column guide can now be switched between Bahasa Melayu and English, with Pay Codes shown as code-style labels for easier reading.",
   },
