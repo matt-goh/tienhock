@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-21",
+    ms: "Kod Gaji (Pay Code) kini boleh ditetapkan untuk sentiasa dipaparkan di lajur Laporan Gaji yang dipilih (Gaji, OT, Bonus, C/I/O atau Cuti) melalui pilihan baharu 'Salary Report Column' pada borang Pay Code. Tetapan ini digunakan untuk kedua-dua item gaji biasa dan entri Lain-lain (Kerja Luar OT) yang menggunakan kod tersebut. Jika satu entri Lain-lain mempunyai pilihan lajurnya sendiri, pilihan entri itu tetap diutamakan. Biarkan 'Automatic' jika tiada keperluan untuk menetapkannya.",
+    en: "A Pay Code can now be set to always appear under a chosen Salary Report column (Gaji, OT, Bonus, C/I/O, or Cuti) via the new 'Salary Report Column' option on the Pay Code form. This applies to both regular pay items and Others (Kerja Luar OT) entries that use that code. If an individual Others entry has its own column choice, that per-entry choice still takes precedence. Leave it on 'Automatic' when no override is needed.",
+  },
+  {
+    date: "2026-06-21",
     ms: "Dalam Butiran Gaji, klik pada potongan Bayaran Pendahuluan (Mid-month Advance) untuk terus membuka halaman Mid-month Payroll bagi bulan dan pekerja tersebut. Halaman itu kini mempunyai carian pekerja untuk menapis senarai dengan cepat.",
     en: "In Payroll Details, click the Mid-month Advance deduction to open Mid-month Payroll directly for that month and employee. That page now has an employee search for quickly filtering the list.",
   },

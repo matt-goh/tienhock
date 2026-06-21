@@ -31,6 +31,7 @@ const defaultPayCode: Omit<PayCode, "code"> = {
   rate_umum: 0,
   is_active: true,
   requires_units_input: false,
+  report_column: null,
 };
 
 const PayCodeModal: React.FC<PayCodeModalProps> = ({
@@ -68,6 +69,17 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
     { id: "Tray", name: "Tray" },
     { id: "Percent", name: "Percent" },
     { id: "Fixed", name: "Fixed" },
+  ];
+
+  // Salary Report column override (priority below the per-entry Others override).
+  // "" = automatic bucketing rule. Labels mirror the Add/Edit Others modals.
+  const reportColumnOptions = [
+    { id: "", name: "Automatic (by rule)" },
+    { id: "GAJI", name: "GAJI" },
+    { id: "OT", name: "OT" },
+    { id: "BONUS", name: "BONUS" },
+    { id: "CIO", name: "C/I/O" },
+    { id: "CUTI", name: "CUTI" },
   ];
 
   // Initialize form data
@@ -248,6 +260,8 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
       rate_biasa: rateBiasa,
       rate_ahad: finalRateAhad,
       rate_umum: finalRateUmum,
+      // Empty string from the listbox means "automatic" -> store as null
+      report_column: formData.report_column || null,
     } as PayCode; // Assert type if Omit was used for state
 
     try {
@@ -358,6 +372,16 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                     onChange={handleListboxChange("rate_unit")}
                     options={rateUnitOptions}
                     required
+                    disabled={isSaving}
+                  />
+
+                  {/* Salary Report Column Override Listbox */}
+                  <FormListbox
+                    label="Salary Report Column"
+                    name="report_column"
+                    value={formData.report_column ?? ""}
+                    onChange={handleListboxChange("report_column")}
+                    options={reportColumnOptions}
                     disabled={isSaving}
                   />
 

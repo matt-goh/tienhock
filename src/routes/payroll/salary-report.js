@@ -138,6 +138,7 @@ export default function (pool) {
             pi.amount,
             pi.job_type,
             pc.pay_type,
+            pc.report_column,
             COALESCE(pi.rate_unit, pc.rate_unit) as rate_unit
           FROM employee_payrolls ep
           JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
@@ -208,7 +209,9 @@ export default function (pool) {
           SELECT
             orec.employee_id,
             orec.pay_code_id,
-            orec.report_column,
+            -- Per-entry override (orec) wins over the pay-code-level override (pc),
+            -- which in turn wins over the automatic bucketing rule below.
+            COALESCE(orec.report_column, pc.report_column) as report_column,
             lower(btrim(coalesce(orec.description, ''))) as desc_key,
             COALESCE(pc.pay_type, 'Tambahan') as pay_type,
             COALESCE(orec.rate_unit, pc.rate_unit) as rate_unit,
@@ -217,7 +220,7 @@ export default function (pool) {
           LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
           WHERE EXTRACT(YEAR FROM orec.record_date) = $1
             AND EXTRACT(MONTH FROM orec.record_date) = $2
-          GROUP BY orec.employee_id, orec.pay_code_id, orec.report_column, lower(btrim(coalesce(orec.description, ''))), pc.pay_type, COALESCE(orec.rate_unit, pc.rate_unit)
+          GROUP BY orec.employee_id, orec.pay_code_id, orec.report_column, pc.report_column, lower(btrim(coalesce(orec.description, ''))), pc.pay_type, COALESCE(orec.rate_unit, pc.rate_unit)
         ),
         leave_data AS (
           SELECT 
@@ -264,6 +267,7 @@ export default function (pool) {
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
              WHERE pid.employee_id = ebd.employee_id
+               AND (pid.report_column = 'GAJI' OR (pid.report_column IS NULL
                AND COALESCE(pid.pay_type, 'Tambahan') <> 'Overtime'
                AND (pid.pay_code_id IS NULL OR pid.pay_code_id NOT IN ('BONUS', 'IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA'))
                AND lower(btrim(coalesce(pid.description, ''))) <> 'cuti tahunan'
@@ -272,7 +276,7 @@ export default function (pool) {
                    AND COALESCE(pid.rate_unit, 'Hour') IN ('Hour', 'Day', 'Fixed'))
                  OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(pid.pay_type, 'Tambahan') = 'Base')
-               )), 0
+               )))), 0
           ) + COALESCE(
             (SELECT SUM(others_amount) FROM others_data od
              WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
@@ -290,8 +294,10 @@ export default function (pool) {
           -- OT column = overtime from payroll items only (excl. Cuti-Tahunan)
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
-             WHERE pid.employee_id = ebd.employee_id AND COALESCE(pid.pay_type, 'Tambahan') = 'Overtime'
-               AND lower(btrim(coalesce(pid.description, ''))) <> 'cuti tahunan'), 0
+             WHERE pid.employee_id = ebd.employee_id
+               AND (pid.report_column = 'OT' OR (pid.report_column IS NULL
+               AND COALESCE(pid.pay_type, 'Tambahan') = 'Overtime'
+               AND lower(btrim(coalesce(pid.description, ''))) <> 'cuti tahunan'))), 0
           ) as overtime_pay,
           -- Overtime recorded as Kerja Luar (others), by name - folded into BONUS with payroll OT
           COALESCE(
@@ -307,6 +313,7 @@ export default function (pool) {
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
              WHERE pid.employee_id = ebd.employee_id
+               AND (pid.report_column = 'CIO' OR (pid.report_column IS NULL
                AND COALESCE(pid.pay_type, 'Tambahan') <> 'Overtime'
                AND (pid.pay_code_id IS NULL OR pid.pay_code_id <> 'BONUS')
                AND lower(btrim(coalesce(pid.description, ''))) <> 'cuti tahunan'
@@ -316,7 +323,7 @@ export default function (pool) {
                    AND COALESCE(pid.rate_unit, 'Hour') NOT IN ('Hour', 'Day', 'Fixed'))
                  OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(pid.pay_type, 'Tambahan') <> 'Base')
-               )), 0
+               )))), 0
           ) + COALESCE(
             (SELECT SUM(others_amount) FROM others_data od
              WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
@@ -336,7 +343,8 @@ export default function (pool) {
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
              WHERE pid.employee_id = ebd.employee_id
-               AND lower(btrim(coalesce(pid.description, ''))) = 'cuti tahunan'), 0
+               AND (pid.report_column = 'CUTI' OR (pid.report_column IS NULL
+               AND lower(btrim(coalesce(pid.description, ''))) = 'cuti tahunan'))), 0
           ) + COALESCE(
             (SELECT SUM(others_amount) FROM others_data od
              WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
@@ -397,7 +405,9 @@ export default function (pool) {
             ) +
             COALESCE(
               (SELECT SUM(amount) FROM payroll_items_data pid
-               WHERE pid.employee_id = ebd.employee_id AND pid.pay_code_id = 'BONUS'), 0
+               WHERE pid.employee_id = ebd.employee_id
+                 AND (pid.report_column = 'BONUS' OR (pid.report_column IS NULL
+                 AND pid.pay_code_id = 'BONUS'))), 0
             ) +
             COALESCE(
               (SELECT SUM(others_amount) FROM others_data od
@@ -1116,6 +1126,7 @@ export default function (pool) {
             SUM(pi.amount) as amount,
             pi.job_type,
             pc.pay_type,
+            pc.report_column,
             COALESCE(pi.rate_unit, pc.rate_unit) as rate_unit
           FROM employee_payrolls ep
           JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
@@ -1135,7 +1146,7 @@ export default function (pool) {
                   AND lr2.leave_date = pi.source_date
               )
             )
-          GROUP BY ep.employee_id, pi.pay_code_id, pi.description, pi.job_type, pc.pay_type, COALESCE(pi.rate_unit, pc.rate_unit)
+          GROUP BY ep.employee_id, pi.pay_code_id, pi.description, pi.job_type, pc.pay_type, pc.report_column, COALESCE(pi.rate_unit, pc.rate_unit)
         ),
         deductions_data AS (
           SELECT
@@ -1185,7 +1196,9 @@ export default function (pool) {
           SELECT
             orec.employee_id,
             orec.pay_code_id,
-            orec.report_column,
+            -- Per-entry override (orec) wins over the pay-code-level override (pc),
+            -- which in turn wins over the automatic bucketing rule below.
+            COALESCE(orec.report_column, pc.report_column) as report_column,
             lower(btrim(coalesce(orec.description, ''))) as desc_key,
             COALESCE(pc.pay_type, 'Tambahan') as pay_type,
             COALESCE(orec.rate_unit, pc.rate_unit) as rate_unit,
@@ -1193,7 +1206,7 @@ export default function (pool) {
           FROM others_records orec
           LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
           WHERE EXTRACT(YEAR FROM orec.record_date) = $1
-          GROUP BY orec.employee_id, orec.pay_code_id, orec.report_column, lower(btrim(coalesce(orec.description, ''))), pc.pay_type, COALESCE(orec.rate_unit, pc.rate_unit)
+          GROUP BY orec.employee_id, orec.pay_code_id, orec.report_column, pc.report_column, lower(btrim(coalesce(orec.description, ''))), pc.pay_type, COALESCE(orec.rate_unit, pc.rate_unit)
         ),
         leave_data AS (
           SELECT
@@ -1240,6 +1253,7 @@ export default function (pool) {
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
              WHERE pid.employee_id = ebd.employee_id
+               AND (pid.report_column = 'GAJI' OR (pid.report_column IS NULL
                AND COALESCE(pid.pay_type, 'Tambahan') <> 'Overtime'
                AND (pid.pay_code_id IS NULL OR pid.pay_code_id NOT IN ('BONUS', 'IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA'))
                AND lower(btrim(coalesce(pid.description, ''))) <> 'cuti tahunan'
@@ -1248,7 +1262,7 @@ export default function (pool) {
                    AND COALESCE(pid.rate_unit, 'Hour') IN ('Hour', 'Day', 'Fixed'))
                  OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(pid.pay_type, 'Tambahan') = 'Base')
-               )), 0
+               )))), 0
           ) + COALESCE(
             (SELECT SUM(others_amount) FROM others_data od
              WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
@@ -1266,8 +1280,10 @@ export default function (pool) {
           -- OT column = overtime from payroll items only (excl. Cuti-Tahunan)
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
-             WHERE pid.employee_id = ebd.employee_id AND COALESCE(pid.pay_type, 'Tambahan') = 'Overtime'
-               AND lower(btrim(coalesce(pid.description, ''))) <> 'cuti tahunan'), 0
+             WHERE pid.employee_id = ebd.employee_id
+               AND (pid.report_column = 'OT' OR (pid.report_column IS NULL
+               AND COALESCE(pid.pay_type, 'Tambahan') = 'Overtime'
+               AND lower(btrim(coalesce(pid.description, ''))) <> 'cuti tahunan'))), 0
           ) as overtime_pay,
           -- Overtime recorded as Kerja Luar (others), by name - folded into BONUS with payroll OT
           COALESCE(
@@ -1283,6 +1299,7 @@ export default function (pool) {
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
              WHERE pid.employee_id = ebd.employee_id
+               AND (pid.report_column = 'CIO' OR (pid.report_column IS NULL
                AND COALESCE(pid.pay_type, 'Tambahan') <> 'Overtime'
                AND (pid.pay_code_id IS NULL OR pid.pay_code_id <> 'BONUS')
                AND lower(btrim(coalesce(pid.description, ''))) <> 'cuti tahunan'
@@ -1292,7 +1309,7 @@ export default function (pool) {
                    AND COALESCE(pid.rate_unit, 'Hour') NOT IN ('Hour', 'Day', 'Fixed'))
                  OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(pid.pay_type, 'Tambahan') <> 'Base')
-               )), 0
+               )))), 0
           ) + COALESCE(
             (SELECT SUM(others_amount) FROM others_data od
              WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
@@ -1312,7 +1329,8 @@ export default function (pool) {
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
              WHERE pid.employee_id = ebd.employee_id
-               AND lower(btrim(coalesce(pid.description, ''))) = 'cuti tahunan'), 0
+               AND (pid.report_column = 'CUTI' OR (pid.report_column IS NULL
+               AND lower(btrim(coalesce(pid.description, ''))) = 'cuti tahunan'))), 0
           ) + COALESCE(
             (SELECT SUM(others_amount) FROM others_data od
              WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
@@ -1373,7 +1391,9 @@ export default function (pool) {
             ) +
             COALESCE(
               (SELECT SUM(amount) FROM payroll_items_data pid
-               WHERE pid.employee_id = ebd.employee_id AND pid.pay_code_id = 'BONUS'), 0
+               WHERE pid.employee_id = ebd.employee_id
+                 AND (pid.report_column = 'BONUS' OR (pid.report_column IS NULL
+                 AND pid.pay_code_id = 'BONUS'))), 0
             ) +
             COALESCE(
               (SELECT SUM(others_amount) FROM others_data od
