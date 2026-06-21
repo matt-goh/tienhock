@@ -278,7 +278,7 @@ export default function (pool) {
              WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
                AND (od.report_column = 'GAJI' OR (od.report_column IS NULL
                AND od.pay_type <> 'Overtime'
-               AND (od.pay_code_id IS NULL OR od.pay_code_id NOT IN ('IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA'))
+               AND (od.pay_code_id IS NULL OR od.pay_code_id NOT IN ('BONUS', 'IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA'))
                AND od.desc_key <> 'cuti tahunan'
                AND (
                  (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
@@ -322,6 +322,7 @@ export default function (pool) {
              WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
                AND (od.report_column = 'CIO' OR (od.report_column IS NULL
                AND od.pay_type <> 'Overtime'
+               AND (od.pay_code_id IS NULL OR od.pay_code_id <> 'BONUS')
                AND od.desc_key <> 'cuti tahunan'
                AND (
                  od.pay_code_id IN ('IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA')
@@ -400,7 +401,8 @@ export default function (pool) {
             ) +
             COALESCE(
               (SELECT SUM(others_amount) FROM others_data od
-               WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name) AND od.report_column = 'BONUS'), 0
+               WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
+                 AND (od.report_column = 'BONUS' OR (od.report_column IS NULL AND od.pay_code_id = 'BONUS'))), 0
             )
           ) as bonus_total,
           COALESCE(
@@ -1252,7 +1254,7 @@ export default function (pool) {
              WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
                AND (od.report_column = 'GAJI' OR (od.report_column IS NULL
                AND od.pay_type <> 'Overtime'
-               AND (od.pay_code_id IS NULL OR od.pay_code_id NOT IN ('IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA'))
+               AND (od.pay_code_id IS NULL OR od.pay_code_id NOT IN ('BONUS', 'IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA'))
                AND od.desc_key <> 'cuti tahunan'
                AND (
                  (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
@@ -1296,6 +1298,7 @@ export default function (pool) {
              WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
                AND (od.report_column = 'CIO' OR (od.report_column IS NULL
                AND od.pay_type <> 'Overtime'
+               AND (od.pay_code_id IS NULL OR od.pay_code_id <> 'BONUS')
                AND od.desc_key <> 'cuti tahunan'
                AND (
                  od.pay_code_id IN ('IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA')
@@ -1374,7 +1377,8 @@ export default function (pool) {
             ) +
             COALESCE(
               (SELECT SUM(others_amount) FROM others_data od
-               WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name) AND od.report_column = 'BONUS'), 0
+               WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
+                 AND (od.report_column = 'BONUS' OR (od.report_column IS NULL AND od.pay_code_id = 'BONUS'))), 0
             )
           ) as bonus_total,
           COALESCE(
