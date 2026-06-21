@@ -1,12 +1,14 @@
 # Salary Report rework + per-entry override — handover
 
-_Last updated 2026-06-19. Context for the Salary Report column logic, the Others `report_column` override, and the recurring "is this a report bug?" questions._
+_Last updated 2026-06-22. Context for the Salary Report column logic, the Others `report_column` override, and the recurring "is this a report bug?" questions._
 
 ## What the Salary Report is
 
 `src/routes/payroll/salary-report.js` builds the data for the Salary Report (three views: by-name/individual, by-location/grouped, location totals), monthly (`GET /`) and yearly (`GET /yearly`). The PDF is `src/utils/payroll/SalaryReportPDF.tsx`. Columns: **GAJI, OT, BONUS, C/I/O, CUTI**, then G.KASAR (gross), EPF/SOCSO/SIP/PCB, G.BERSIH, ½ BULAN, JUMLAH, DIGENAP, S.DIGENAP.
 
 The report is **read-only** — it reflects whatever payroll processing stored. `G.KASAR` = stored `employee_payrolls.gross_pay`; contributions = stored `payroll_deductions`. If those look wrong, the **payroll itself** is wrong/stale — **re-process that staff** (see Gotchas), don't "fix" the report.
+
+Payroll-item column totals are consolidated by pay code, rate, and rate unit (total units × rate, rounded once), matching Payroll Details and the legacy calculation. `G.KASAR` remains the stored payroll gross.
 
 ## Column bucketing rule (the core logic, monthly + yearly queries are kept identical)
 
