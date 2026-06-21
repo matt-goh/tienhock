@@ -24,11 +24,6 @@ const CHANGELOG_ENTRIES: ChangelogEntry[] = [
     en: "Salary Report now totals each Pay Code's hours/units before rounding, matching Payroll Details and the legacy system. This fixes a few-sen difference in columns such as Gaji, OT, and C/I/O without changing the underlying work records.",
   },
   {
-    date: "2026-06-22",
-    ms: "Panduan lajur Laporan Gaji kini boleh ditukar antara Bahasa Melayu dan English, dengan Kod Gaji dipaparkan sebagai label kod untuk lebih mudah dibaca.",
-    en: "The Salary Report column guide can now be switched between Bahasa Melayu and English, with Pay Codes shown as code-style labels for easier reading.",
-  },
-  {
     date: "2026-06-21",
     ms: "Laporan Gaji kini mempunyai butang panduan lajur di bawah jadual. Panduan ini menerangkan cara Gaji, OT, Bonus, C/I/O dan Cuti ditetapkan, termasuk keutamaan tetapan manual dan cara bayaran pembungkusan F/HARIAN dikendalikan.",
     en: "Salary Report now has a column guide button below the table. It explains how Gaji, OT, Bonus, C/I/O, and Cuti are assigned, including manual-setting priority and how F/HARIAN packing pay is handled.",
