@@ -1670,9 +1670,12 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         <div className="flex items-center gap-4">
           <BackButton onClick={handleBack} onMouseDown={handleBackMouseDown} />
           <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
-          <div>
-            <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-              Payroll Details
+          <div className="min-w-0">
+            <h1
+              className="max-w-48 truncate text-xl font-semibold text-default-800 dark:text-gray-100 sm:max-w-72"
+              title={payroll.employee_name || "Unknown employee"}
+            >
+              {payroll.employee_name || "Unknown employee"}
             </h1>
             <p className="text-sm text-default-500 dark:text-gray-400 mt-1">
               {getMonthName(payroll.month)} {payroll.year}
