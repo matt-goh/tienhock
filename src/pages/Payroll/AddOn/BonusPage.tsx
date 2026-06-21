@@ -7,6 +7,8 @@ import {
   IconTrash,
   IconGift,
   IconRefresh,
+  IconSearch,
+  IconX,
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -59,8 +61,14 @@ const BonusPage: React.FC = () => {
     return new Date().getMonth() + 1;
   };
 
+  const getInitialSearch = (): string => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("search") || "";
+  };
+
   // State
   const [bonuses, setBonuses] = useState<Bonus[]>([]);
+  const [searchQuery, setSearchQuery] = useState<string>(getInitialSearch);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -141,7 +149,42 @@ const BonusPage: React.FC = () => {
     }).format(amount);
   };
 
-  const totalAmount = bonuses.reduce(
+  // Universal search across the displayed columns (employee, amount, type,
+  // description, date).
+  const filteredBonuses = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return bonuses;
+    return bonuses.filter((bonus) => {
+      const amount = Number(bonus.amount) || 0;
+      const dateFormatted = (() => {
+        try {
+          return format(new Date(bonus.commission_date), "dd MMM yyyy");
+        } catch {
+          return "";
+        }
+      })();
+      const dateIso =
+        typeof bonus.commission_date === "string"
+          ? bonus.commission_date.slice(0, 10)
+          : "";
+      const haystack = [
+        bonus.employee_id || "",
+        bonus.employee_name || "",
+        bonus.description || "",
+        bonus.is_advance === false ? "normal" : "advance",
+        dateFormatted,
+        dateIso,
+        amount.toString(),
+        amount.toFixed(2),
+        formatCurrency(amount),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [bonuses, searchQuery]);
+
+  const totalAmount = filteredBonuses.reduce(
     (sum, bonus) => sum + (Number(bonus.amount) || 0),
     0
   );
@@ -190,9 +233,33 @@ const BonusPage: React.FC = () => {
               showGoToCurrentButton={false}
             />
           </div>
+          {/* Universal search: name, amount, type, description, date */}
+          <div className="relative w-full md:flex-1 md:max-w-sm">
+            <IconSearch
+              size={15}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none"
+            />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search name, amount, description..."
+              className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 pl-8 pr-8 text-sm text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-gray-400 hover:bg-default-100 dark:text-gray-500 dark:hover:bg-gray-700"
+                title="Clear search"
+              >
+                <IconX size={13} />
+              </button>
+            )}
+          </div>
           <div className="text-sm text-default-600 dark:text-gray-300">
             <div className="font-medium">
-              Total: {bonuses.length} records
+              Total: {filteredBonuses.length} records
             </div>
             <div className="font-medium">
               Amount: {formatCurrency(totalAmount)}
@@ -212,11 +279,17 @@ const BonusPage: React.FC = () => {
           <div className="flex justify-center py-12">
             <LoadingSpinner />
           </div>
-        ) : bonuses.length === 0 ? (
+        ) : filteredBonuses.length === 0 ? (
           <div className="text-center py-12 text-default-500 dark:text-gray-400">
             <IconGift className="mx-auto h-12 w-12 text-default-300 mb-4" />
-            <p className="text-lg font-medium">No bonuses found</p>
-            <p>Click "Add Bonus" to create records</p>
+            <p className="text-lg font-medium">
+              {searchQuery.trim() ? "No matching bonuses" : "No bonuses found"}
+            </p>
+            <p>
+              {searchQuery.trim()
+                ? "Try a different search term"
+                : 'Click "Add Bonus" to create records'}
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -247,7 +320,7 @@ const BonusPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                {bonuses.map((bonus) => (
+                {filteredBonuses.map((bonus) => (
                   <tr key={bonus.id} className="hover:bg-default-50 dark:hover:bg-gray-700">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 dark:text-gray-100">
                       {bonus.employee_id}

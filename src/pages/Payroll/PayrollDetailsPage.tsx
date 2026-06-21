@@ -95,7 +95,9 @@ interface PayrollItem {
   source_employee_id?: string | null;
   source_date?: string | null;
   work_log_id?: number | null;
-  work_log_type?: "daily" | "monthly" | null;
+  // "daily" | "monthly" for work-log items; "production" | "production_bonus" |
+  // "prod_bonus_rosak" for production-entry items; null for manual/other.
+  work_log_type?: string | null;
 }
 
 interface FixedDirectAmountSummary {
@@ -118,6 +120,9 @@ interface MonthlyLeaveRecord {
   work_log_section?: string | null;
   notes?: string | null;
   holiday_description?: string | null;
+  // True when this Cuti Tahunan row originated from a Commission page entry
+  // (location 23) rather than a work log; used to deep-link to /payroll/commission.
+  fromCommission?: boolean;
 }
 
 const EmployeePayrollDetailsPage: React.FC = () => {
@@ -435,6 +440,22 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
   // Helper to generate work log URL for navigation
   const getWorkLogUrl = (item: PayrollItem): string | null => {
+    // Production-derived items (base packing + threshold bonuses) aren't work
+    // logs — they have no work_log_id — so link them back to the Production Entry
+    // page for their date instead. Covers work_log_type "production",
+    // "production_bonus" and "prod_bonus_rosak".
+    if (item.work_log_type?.startsWith("prod") && item.source_date) {
+      return `/stock/production?date=${item.source_date}&search=${encodeURIComponent(
+        payroll?.employee_name || "",
+      )}`;
+    }
+
+    // Others (Kerja Luar) records surfaced as Tambahan/Overtime payroll items
+    // link back to the Others page, with the employee name pre-filled.
+    if (item.work_log_type === "others_record") {
+      return incentiveEntryLink("/payroll/others");
+    }
+
     if (!item.work_log_id || !item.work_log_type) return null;
 
     const jobType = item.job_type || "";
@@ -683,6 +704,59 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     (sum, record) => sum + record.merged_amount,
     0,
   );
+  // Per-record (un-merged) incentive rows for the detailed view. Each row keeps
+  // its own date/amount and is tagged with the entry page it was created on so it
+  // can deep-link back, prefilling that page's search box (where present) with
+  // this payroll's employee name.
+  type IncentiveDetailRow = {
+    key: string;
+    date: string;
+    description: string;
+    amount: number;
+    link: string;
+  };
+  const incentiveEntryLink = (entryPath: string): string =>
+    `${entryPath}?year=${payroll.year}&month=${payroll.month}&search=${encodeURIComponent(
+      payroll.employee_name || "",
+    )}`;
+  // IXT/BONUS items can originate from a work log (daily/monthly) rather than the
+  // Bonus page — in that case link to their work log, falling back to the Bonus
+  // page for manually-added or page-entered incentives.
+  const incentivePayrollItemLink = (item: PayrollItem): string =>
+    getWorkLogUrl(item) ?? incentiveEntryLink("/payroll/bonus");
+  const incentiveDetailRows: IncentiveDetailRow[] = [
+    ...nonCutiCommissionRecords.map((record: CommissionRecord) => ({
+      key: `commission-${record.id}`,
+      date: record.commission_date,
+      description: record.description,
+      amount: Number(record.amount) || 0,
+      // location_code present => Insentif/commission entry; null => Bonus entry.
+      link: incentiveEntryLink(
+        record.location_code ? "/payroll/commission" : "/payroll/bonus",
+      ),
+    })),
+    ...incentiveOthersRecords.map((record: OthersRecord) => ({
+      key: `others-${record.id}`,
+      date: record.record_date,
+      description: record.description,
+      amount: Number(record.amount) || 0,
+      link: incentiveEntryLink("/payroll/others"),
+    })),
+    ...incentivePayrollItems.map((item: PayrollItem, idx: number) => ({
+      key: `ixt-${item.id ?? idx}`,
+      date: item.source_date || payrollMonthStartDate,
+      description: item.description,
+      amount: Number(item.amount) || 0,
+      link: incentivePayrollItemLink(item),
+    })),
+    ...bonusPayrollItems.map((item: PayrollItem, idx: number) => ({
+      key: `bonus-${item.id ?? idx}`,
+      date: item.source_date || payrollMonthStartDate,
+      description: item.description,
+      amount: Number(item.amount) || 0,
+      link: incentivePayrollItemLink(item),
+    })),
+  ];
   const monthlyLeaveDisplayRecords: MonthlyLeaveRecord[] = [
     ...monthlyLeaveRecords,
     ...cutiTahunanCommissionRecords.map((record: CommissionRecord) => ({
@@ -696,6 +770,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       work_log_id: null,
       work_log_type: null,
       notes: record.description,
+      fromCommission: true,
     })),
   ];
   const isAdvanceCommissionRecord = (record: CommissionRecord): boolean =>
@@ -727,6 +802,25 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       !isPayrollItemOthersRecord(record) && !isIncentiveOthersRecord(record),
   );
   const mergedOthersRecords = mergeByDescription(regularOthersRecords);
+  // Wrap a single Others record in the merged shape so the detailed view can
+  // reuse getMergedOthersPayCodeIds/getOthersRateQuantityDisplay while showing
+  // one row per record.
+  const toSingleMergedOthers = (
+    record: OthersRecord,
+  ): MergedAdvance<OthersRecord> => ({
+    ...record,
+    merged_amount: Number(record.amount) || 0,
+    merged_count: 1,
+    merged_rows: [record],
+  });
+  // Detailed view lists each record on its own row (linking back to /payroll/others);
+  // consolidated view keeps the merged ×N rollup.
+  const othersRowsToRender: MergedAdvance<OthersRecord>[] =
+    viewMode === "detailed"
+      ? mergedOthersRecords.flatMap((group) =>
+          group.merged_rows.map(toSingleMergedOthers),
+        )
+      : mergedOthersRecords;
 
   // Commission advance + the rounded final pay ("Jumlah Digenapkan"). This is the
   // same expression rendered in the Deductions column below; computed once here so
@@ -798,7 +892,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           source_employee_id: record.employee_id,
           source_date: record.record_date,
           work_log_id: null,
-          work_log_type: null,
+          // Sentinel so getWorkLogUrl links these back to the Others page.
+          work_log_type: "others_record",
         },
       ];
     });
@@ -1520,7 +1615,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
+      <div className="sticky top-1 z-20 -mx-1 flex flex-col items-start justify-between gap-2 rounded-lg border border-default-200 bg-white/95 px-3 py-2 shadow-sm backdrop-blur dark:border-gray-700 dark:bg-gray-800/95 md:flex-row md:items-center">
         <div className="flex items-center gap-4">
           <BackButton onClick={handleBack} onMouseDown={handleBackMouseDown} />
           <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
@@ -2711,35 +2806,61 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                  {mergedCommissionRecords.map((record) => (
-                    <tr
-                      key={record.id}
-                      className="hover:bg-default-50 dark:hover:bg-gray-700"
-                    >
-                      <td className="px-3 py-2 whitespace-nowrap text-sm text-default-800 dark:text-gray-100">
-                        {record.merged_count === 1
-                          ? format(
-                              new Date(record.commission_date),
-                              "dd MMM yyyy",
-                            )
-                          : `${record.merged_count} entries`}
-                      </td>
-                      <td
-                        className="px-3 py-2 text-sm text-default-800 dark:text-gray-100"
-                        title={record.description}
-                      >
-                        {record.description}
-                        {record.merged_count > 1 && (
-                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300">
-                            ×{record.merged_count}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium text-default-800 dark:text-gray-100">
-                        {formatCurrency(record.merged_amount)}
-                      </td>
-                    </tr>
-                  ))}
+                  {viewMode === "detailed"
+                    ? incentiveDetailRows.map((row) => (
+                        <tr
+                          key={row.key}
+                          className="hover:bg-default-50 dark:hover:bg-gray-700"
+                        >
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-default-800 dark:text-gray-100">
+                            <Link
+                              to={row.link}
+                              className="hover:underline text-teal-700 dark:text-teal-400"
+                              title="Open entry page"
+                            >
+                              {format(new Date(row.date), "dd MMM yyyy")}
+                            </Link>
+                          </td>
+                          <td
+                            className="px-3 py-2 text-sm text-default-800 dark:text-gray-100"
+                            title={row.description}
+                          >
+                            {row.description}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium text-default-800 dark:text-gray-100">
+                            {formatCurrency(row.amount)}
+                          </td>
+                        </tr>
+                      ))
+                    : mergedCommissionRecords.map((record) => (
+                        <tr
+                          key={record.id}
+                          className="hover:bg-default-50 dark:hover:bg-gray-700"
+                        >
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-default-800 dark:text-gray-100">
+                            {record.merged_count === 1
+                              ? format(
+                                  new Date(record.commission_date),
+                                  "dd MMM yyyy",
+                                )
+                              : `${record.merged_count} entries`}
+                          </td>
+                          <td
+                            className="px-3 py-2 text-sm text-default-800 dark:text-gray-100"
+                            title={record.description}
+                          >
+                            {record.description}
+                            {record.merged_count > 1 && (
+                              <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300">
+                                ×{record.merged_count}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium text-default-800 dark:text-gray-100">
+                            {formatCurrency(record.merged_amount)}
+                          </td>
+                        </tr>
+                      ))}
                 </tbody>
                 <tfoot className="bg-default-50 dark:bg-gray-800">
                   <tr>
@@ -2793,7 +2914,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                  {mergedOthersRecords.map((record) => {
+                  {othersRowsToRender.map((record) => {
                     const payCodeIds: string[] =
                       getMergedOthersPayCodeIds(record);
                     const payCodeLabel: string = payCodeIds.join(", ");
@@ -2811,12 +2932,19 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         className="hover:bg-default-50 dark:hover:bg-gray-700"
                       >
                         <td className="px-3 py-2 whitespace-nowrap text-sm text-default-800 dark:text-gray-100">
-                          {record.merged_count === 1
-                            ? format(
-                                new Date(record.record_date),
-                                "dd MMM yyyy",
-                              )
-                            : `${record.merged_count} entries`}
+                          {viewMode === "detailed" ? (
+                            <Link
+                              to={incentiveEntryLink("/payroll/others")}
+                              className="hover:underline text-indigo-700 dark:text-indigo-400"
+                              title="Open entry page"
+                            >
+                              {format(new Date(record.record_date), "dd MMM yyyy")}
+                            </Link>
+                          ) : record.merged_count === 1 ? (
+                            format(new Date(record.record_date), "dd MMM yyyy")
+                          ) : (
+                            `${record.merged_count} entries`
+                          )}
                         </td>
                         <td
                           className="px-3 py-2 text-sm text-default-800 dark:text-gray-100 max-w-xs"
@@ -2964,7 +3092,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       }
                     };
                     const leaveRecordUrl: string | null =
-                      getLeaveRecordUrl(record);
+                      getLeaveRecordUrl(record) ??
+                      (record.fromCommission
+                        ? incentiveEntryLink("/payroll/commission")
+                        : null);
                     const leaveDateLabel: string = formatDisplayDate(
                       record.date,
                     );

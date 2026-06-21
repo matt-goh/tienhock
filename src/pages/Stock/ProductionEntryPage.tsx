@@ -117,6 +117,12 @@ const ProductionEntryPage: React.FC = () => {
     return null;
   };
 
+  // Worker search pre-fill from the URL (e.g. deep link from a payroll page).
+  const getInitialSearch = (): string => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("search") || "";
+  };
+
   // State
   const [selectedDate, setSelectedDate] = useState<string>(getInitialDate);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(
@@ -131,7 +137,7 @@ const ProductionEntryPage: React.FC = () => {
   const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [specialSelection, setSpecialSelection] =
     useState<SpecialSelection>(getInitialSpecialSelection);
-  const [workerSearchQuery, setWorkerSearchQuery] = useState("");
+  const [workerSearchQuery, setWorkerSearchQuery] = useState(getInitialSearch);
   const [hancurSearchQuery, setHancurSearchQuery] = useState("");
   const [bundleSearchQuery, setBundleSearchQuery] = useState("");
   const [workerOrderRefreshKey, setWorkerOrderRefreshKey] = useState(0);
@@ -141,6 +147,20 @@ const ProductionEntryPage: React.FC = () => {
   // Refs for checking unsaved changes in HANCUR and BUNDLE sections
   const hancurSectionRef = useRef<HancurEntrySectionHandle>(null);
   const bundleSectionRef = useRef<BundleEntrySectionHandle>(null);
+
+  // When the worker search is pre-filled from the URL (deep link from payroll),
+  // preserve it the first time a product is opened so the grid lands filtered to
+  // that worker. Normal product changes after that clear the search as usual.
+  const preserveInitialWorkerSearchRef = useRef<boolean>(
+    getInitialSearch() !== ""
+  );
+  const resetWorkerSearchOnProductChange = (): void => {
+    if (preserveInitialWorkerSearchRef.current) {
+      preserveInitialWorkerSearchRef.current = false;
+      return;
+    }
+    setWorkerSearchQuery("");
+  };
 
   // Compute hasUnsavedChanges by comparing entries with originalEntries
   const hasUnsavedChanges = useMemo(() => {
@@ -515,7 +535,7 @@ const ProductionEntryPage: React.FC = () => {
     if (productId === "HANCUR_BH") {
       setSpecialSelection("HANCUR_BH");
       setSelectedProductId(null);
-      setWorkerSearchQuery("");
+      resetWorkerSearchOnProductChange();
       return;
     }
 
@@ -523,13 +543,13 @@ const ProductionEntryPage: React.FC = () => {
     if (productId && productId.startsWith("BUNDLE_")) {
       setSpecialSelection(productId as SpecialSelection);
       setSelectedProductId(null);
-      setWorkerSearchQuery("");
+      resetWorkerSearchOnProductChange();
       return;
     }
 
     setSelectedProductId(productId);
     setSpecialSelection(null);
-    setWorkerSearchQuery(""); // Clear search when changing product
+    resetWorkerSearchOnProductChange(); // Clear search when changing product
   };
 
   const handleDateNavigatorChange = (date: Date): void => {
