@@ -90,10 +90,10 @@ import ContributionRatesPage from "./Payroll/Statutory/ContributionRatesPage";
 import ECarumanPage from "./Payroll/Statutory/ECarumanPage";
 
 // Payroll - AddOn
-import CommissionPage from "./Payroll/AddOn/CommissionPage";
+import OthersAdvancePage from "./Payroll/AddOn/OthersAdvancePage";
 import BonusPage from "./Payroll/AddOn/BonusPage";
 import PinjamListPage from "./Payroll/AddOn/PinjamListPage";
-import OthersListPage from "./Payroll/AddOn/OthersListPage";
+import OthersKerjaLuarOtPage from "./Payroll/AddOn/OthersKerjaLuarOtPage";
 import MidMonthPayrollPage from "./Payroll/AddOn/MidMonthPayrollPage";
 
 // Payroll - Root
@@ -281,13 +281,13 @@ const generatePayrollSubItems = (): SidebarItem[] => {
   payrollSubItems.push({
     name: "Others (Advance)",
     path: "/payroll/commission",
-    component: CommissionPage,
+    component: OthersAdvancePage,
   });
 
   payrollSubItems.push({
     name: "Others (Kerja Luar OT)",
     path: "/payroll/others",
-    component: OthersListPage,
+    component: OthersKerjaLuarOtPage,
   });
 
   payrollSubItems.push({
