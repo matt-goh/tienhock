@@ -20,6 +20,15 @@ that employee's **name** so the Production Entry worker grid can land already fi
 them — matching the `?search=` pre-fill convention used by the Bonus / Others / Commission
 pages.
 
+> **Update (2026-06-21):** The payroll link now also sends the source `workerId`.
+> Production Entry uses the existing production-record API to find that worker's positive
+> production records on the linked date. One regular product opens automatically; multiple
+> products (and special Hancur/Bundle products) are shown in a focused selector above the
+> normal catalogue. This applies to both base and bonus rows without parsing descriptions or
+> changing the database schema. Payroll-item API responses now serialize `source_date` as a
+> plain `YYYY-MM-DD` string, preventing UTC timestamps from being rejected and incorrectly
+> opening Production Entry on today instead.
+
 This was deliberately scoped to **date-only** precision (no product in the URL). Production
 payroll items do not store a `product_id`; the base item only embeds it inside the
 description string (`"<desc> - <productId>"`) and bonus items don't carry it at all. Parsing
