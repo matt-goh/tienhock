@@ -20,6 +20,16 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-21",
+    ms: "Butiran Gaji kini dibuka dalam paparan Terperinci (Detailed) secara lalai supaya setiap rekod dan tarikh sumber terus kelihatan. Anda masih boleh memilih paparan Ringkasan (Summary) apabila diperlukan.",
+    en: "Payroll Details now opens in the Detailed view by default, so each record and its source date are visible immediately. You can still switch to the Summary view when needed.",
+  },
+  {
+    date: "2026-06-21",
+    ms: "Halaman butiran log kerja Harian dan Bulanan kini mempunyai carian ringkas untuk menapis pekerja dan rekod cuti mengikut nama, ID atau kerja. Apabila rekod harian atau bulanan diklik dari Butiran Gaji, carian pada log terus diisi untuk pekerja tersebut. Dalam Butiran Gaji, rekod kerja bulanan kini memaparkan bulan yang boleh diklik terus ke log kerja bulanan berkenaan, menggantikan tanda '-'.",
+    en: "Daily and Monthly work-log details now have a compact search to filter employees and leave records by name, ID, or job. When a daily or monthly record is opened from Payroll Details, its log search is pre-filled for that employee. In Payroll Details, monthly work records now show a clickable month that opens the corresponding monthly work log instead of a '-'.",
+  },
+  {
+    date: "2026-06-21",
     ms: "Halaman Payroll kini mengingati bulan terakhir yang anda buka pada pelayar ini. Apabila anda kembali ke halaman Payroll, bulan itu dibuka secara automatik; pautan yang memilih bulan tertentu masih menggunakan bulan pada pautan tersebut.",
     en: "The Payroll page now remembers the last month you opened in this browser. When you return to Payroll, that month opens automatically; links that specify a month still open the month in the link.",
   },

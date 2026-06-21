@@ -150,7 +150,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const [othersRecords, setOthersRecords] = useState<OthersRecord[]>([]);
   const [pinjamRecords, setPinjamRecords] = useState<PinjamRecord[]>([]);
   const [viewMode, setViewMode] = useState<PayrollDetailsViewMode>(() =>
-    searchParams.get("view") === "detailed" ? "detailed" : "consolidated",
+    searchParams.get("view") === "consolidated" ? "consolidated" : "detailed",
   );
 
   const scrollRestorationKey: string = useMemo(() => {
@@ -163,16 +163,16 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     setViewMode(nextViewMode);
     const nextParams = new URLSearchParams(searchParams);
     if (nextViewMode === "detailed") {
-      nextParams.set("view", "detailed");
-    } else {
       nextParams.delete("view");
+    } else {
+      nextParams.set("view", "consolidated");
     }
     setSearchParams(nextParams, { replace: true });
   };
 
   useEffect(() => {
     const nextViewMode: PayrollDetailsViewMode =
-      searchParams.get("view") === "detailed" ? "detailed" : "consolidated";
+      searchParams.get("view") === "consolidated" ? "consolidated" : "detailed";
     setViewMode((currentViewMode) =>
       currentViewMode === nextViewMode ? currentViewMode : nextViewMode,
     );
@@ -411,6 +411,24 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     }
   };
 
+  const getPayrollItemDateLabel = (item: PayrollItem): string => {
+    if (item.source_date) return formatSourceDate(item.source_date);
+
+    if (
+      item.work_log_type === "monthly" &&
+      item.work_log_id &&
+      payroll?.year !== undefined &&
+      payroll.month !== undefined
+    ) {
+      return format(
+        new Date(payroll.year, payroll.month - 1, 1),
+        "MMM yyyy",
+      );
+    }
+
+    return "-";
+  };
+
   const parseDisplayDate = (value: string | Date | null | undefined): Date | null => {
     if (!value) return null;
     if (value instanceof Date) {
@@ -500,7 +518,22 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     const routePath = getRoutePath(jobType);
     if (!routePath) return null;
 
-    return `/payroll/${routePath}/${item.work_log_id}`;
+    const workLogPath: string = `/payroll/${routePath}/${item.work_log_id}`;
+    if (item.work_log_type === "daily") {
+      const searchValue: string =
+        payroll?.employee_name || item.source_employee_id || "";
+      return searchValue
+        ? `${workLogPath}?search=${encodeURIComponent(searchValue)}`
+        : workLogPath;
+    }
+
+    if (item.work_log_type === "monthly" && payroll?.employee_name) {
+      return `${workLogPath}?search=${encodeURIComponent(
+        payroll.employee_name
+      )}`;
+    }
+
+    return workLogPath;
   };
 
   const getDailyLeaveRoutePath = (
@@ -563,7 +596,12 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       const routePath: string | null = getMonthlyLeaveRoutePath(
         record.work_log_section,
       );
-      return routePath ? `/payroll/${routePath}/${record.work_log_id}` : null;
+      if (!routePath) return null;
+
+      const workLogPath: string = `/payroll/${routePath}/${record.work_log_id}`;
+      return payroll?.employee_name
+        ? `${workLogPath}?search=${encodeURIComponent(payroll.employee_name)}`
+        : workLogPath;
     }
 
     if (record.work_log_type === "packing_cuti") {
@@ -1350,6 +1388,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       prevItem && prevItem.source_date !== item.source_date && item.source_date;
     const colCount = showDeleteButton && isEditable ? 6 : 5;
     const focUnits: number = Number(item.foc_units) || 0;
+    const workLogUrl: string | null = getWorkLogUrl(item);
+    const dateLabel: string = getPayrollItemDateLabel(item);
 
     return (
       <React.Fragment key={item.id}>
@@ -1364,17 +1404,17 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           </tr>
         )}
         <tr className="hover:bg-default-50 dark:hover:bg-gray-700">
-          <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-            {item.source_date ? (
-              getWorkLogUrl(item) ? (
+          <td className="px-3 py-2 whitespace-nowrap text-left text-sm">
+            {dateLabel !== "-" ? (
+              workLogUrl ? (
                 <Link
-                  to={getWorkLogUrl(item)!}
+                  to={workLogUrl}
                   className="text-sky-600 dark:text-sky-400 hover:underline"
                 >
-                  {formatSourceDate(item.source_date)}
+                  {dateLabel}
                 </Link>
               ) : (
-                formatSourceDate(item.source_date)
+                dateLabel
               )
             ) : (
               "-"
@@ -2262,7 +2302,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             {viewMode === "detailed" && (
                               <th
                                 scope="col"
-                                className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
+                                className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
                               >
                                 Date
                               </th>
@@ -2341,7 +2381,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             {viewMode === "detailed" && (
                               <th
                                 scope="col"
-                                className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
+                                className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
                               >
                                 Date
                               </th>
@@ -2445,7 +2485,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             {viewMode === "detailed" && (
                               <th
                                 scope="col"
-                                className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
+                                className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
                               >
                                 Date
                               </th>
@@ -2534,7 +2574,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         {viewMode === "detailed" && (
                           <th
                             scope="col"
-                            className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
+                            className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
                           >
                             Date
                           </th>
@@ -2611,7 +2651,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         {viewMode === "detailed" && (
                           <th
                             scope="col"
-                            className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
+                            className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
                           >
                             Date
                           </th>
@@ -2712,7 +2752,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         {viewMode === "detailed" && (
                           <th
                             scope="col"
-                            className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
+                            className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
                           >
                             Date
                           </th>
