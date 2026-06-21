@@ -10,6 +10,8 @@ import {
   IconBeach,
   IconLock,
   IconCalendarEvent,
+  IconSearch,
+  IconX,
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import BackButton from "../../../components/BackButton";
@@ -74,6 +76,11 @@ interface LeaveRecord {
   amount_paid: number;
 }
 
+const getInitialEmployeeSearch = (): string => {
+  const params: URLSearchParams = new URLSearchParams(window.location.search);
+  return params.get("search") || "";
+};
+
 const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
   jobType,
 }) => {
@@ -88,6 +95,9 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
   const [expandedEntries, setExpandedEntries] = useState<
     Record<string, boolean>
   >({});
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState<string>(
+    getInitialEmployeeSearch
+  );
 
   useEffect(() => {
     const fetchWorkLog = async () => {
@@ -268,6 +278,29 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
       ),
     0
   );
+  const normalizedEmployeeSearchQuery: string = employeeSearchQuery
+    .trim()
+    .toLowerCase();
+  const filteredEmployeeEntries: EmployeeEntry[] =
+    workLog.employeeEntries.filter((entry: EmployeeEntry): boolean => {
+      if (!normalizedEmployeeSearchQuery) return true;
+      return [
+        entry.employee_name,
+        entry.employee_id,
+        entry.job_name,
+        entry.job_id,
+      ].some((value: string): boolean =>
+        value.toLowerCase().includes(normalizedEmployeeSearchQuery)
+      );
+    });
+  const filteredLeaveRecords: LeaveRecord[] = workLog.leaveRecords.filter(
+    (record: LeaveRecord): boolean =>
+      !normalizedEmployeeSearchQuery ||
+      record.employee_name
+        .toLowerCase()
+        .includes(normalizedEmployeeSearchQuery) ||
+      record.employee_id.toLowerCase().includes(normalizedEmployeeSearchQuery)
+  );
 
   return (
     <div className="space-y-3">
@@ -340,7 +373,7 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
               <div className="flex items-center gap-1.5">
                 <IconBeach size={16} className="text-rose-500 dark:text-rose-400" />
                 <span className="font-medium text-default-700 dark:text-gray-200">
-                  {workLog.leaveRecords.length}
+                  {filteredLeaveRecords.length}
                 </span>
                 <span className="text-default-400 dark:text-gray-400">leave days</span>
               </div>
@@ -360,9 +393,36 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
             </div>
           </div>
 
-          {/* Right: Action Buttons */}
-          {workLog.status !== "Processed" && (
-            <div className="flex gap-2">
+          {/* Right: Search + Action Buttons */}
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <IconSearch
+                size={14}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-500"
+              />
+              <input
+                type="text"
+                value={employeeSearchQuery}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  setEmployeeSearchQuery(event.target.value)
+                }
+                placeholder="Search employee..."
+                className="w-36 rounded-md border border-default-300 bg-white py-1.5 pl-7 pr-7 text-xs text-default-900 placeholder:text-default-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder:text-gray-400 sm:w-44"
+              />
+              {employeeSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setEmployeeSearchQuery("")}
+                  aria-label="Clear employee search"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-600 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  <IconX size={12} />
+                </button>
+              )}
+            </div>
+            {workLog.status !== "Processed" && (
+              <>
+                <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
               <Button onClick={handleEdit} icon={IconPencil} color="sky">
                 Edit
               </Button>
@@ -374,8 +434,9 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
               >
                 Delete
               </Button>
-            </div>
-          )}
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -436,7 +497,7 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-default-200 dark:divide-gray-700">
-                {workLog.employeeEntries.map((entry) => {
+                {filteredEmployeeEntries.map((entry: EmployeeEntry) => {
                   const employeeTotal = entry.activities.reduce(
                     (sum, activity) => sum + activity.calculated_amount,
                     0
@@ -692,12 +753,12 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
               Leave Records
             </h3>
             <span className="text-xs font-medium text-rose-700 dark:text-rose-300">
-              {workLog.leaveRecords.length} leave days
+              {filteredLeaveRecords.length} leave days
             </span>
           </div>
         </div>
 
-        {workLog.leaveRecords.length > 0 ? (
+        {filteredLeaveRecords.length > 0 ? (
           <table className="min-w-full">
             <thead className="bg-default-50 dark:bg-gray-900/50">
               <tr>
@@ -716,7 +777,7 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-default-100 dark:divide-gray-700">
-              {workLog.leaveRecords.map((record) => (
+              {filteredLeaveRecords.map((record: LeaveRecord) => (
                 <tr
                   key={record.id}
                   className="hover:bg-default-50 dark:hover:bg-gray-700 transition-colors"
@@ -757,7 +818,9 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
               <IconCalendarEvent size={24} className="text-default-400 dark:text-gray-500" />
             </div>
             <p className="text-default-500 dark:text-gray-400 text-sm">
-              No leave records for this month
+              {employeeSearchQuery
+                ? "No leave records match your search"
+                : "No leave records for this month"}
             </p>
           </div>
         )}
