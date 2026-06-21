@@ -445,9 +445,20 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     // page for their date instead. Covers work_log_type "production",
     // "production_bonus" and "prod_bonus_rosak".
     if (item.work_log_type?.startsWith("prod") && item.source_date) {
-      return `/stock/production?date=${item.source_date}&search=${encodeURIComponent(
-        payroll?.employee_name || "",
-      )}`;
+      const sourceDate: string = format(
+        new Date(item.source_date),
+        "yyyy-MM-dd",
+      );
+      const productionParams: URLSearchParams = new URLSearchParams({
+        date: sourceDate,
+        search: payroll?.employee_name || "",
+      });
+
+      if (item.source_employee_id) {
+        productionParams.set("workerId", item.source_employee_id);
+      }
+
+      return `/stock/production?${productionParams.toString()}`;
     }
 
     // Others (Kerja Luar) records surfaced as Tambahan/Overtime payroll items

@@ -676,7 +676,8 @@ export default function (pool) {
       const itemsQuery = `
       SELECT pi.employee_payroll_id, pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit,
             pi.quantity, pi.amount, pi.is_manual, pi.job_type, pi.source_employee_id,
-            pi.source_date, pi.work_log_id, pi.work_log_type, pi.foc_units,
+            TO_CHAR(pi.source_date, 'YYYY-MM-DD') AS source_date,
+            pi.work_log_id, pi.work_log_type, pi.foc_units,
             pc.pay_type
       FROM payroll_items pi
       LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
@@ -1116,7 +1117,8 @@ export default function (pool) {
           `
           SELECT pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit,
                 pi.quantity, pi.amount, pi.is_manual, pi.job_type, pi.source_employee_id,
-                pi.source_date, pi.work_log_id, pi.work_log_type, pi.foc_units,
+                TO_CHAR(pi.source_date, 'YYYY-MM-DD') AS source_date,
+                pi.work_log_id, pi.work_log_type, pi.foc_units,
                 pc.pay_type
           FROM payroll_items pi
           LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
@@ -1530,7 +1532,8 @@ export default function (pool) {
           `
           SELECT pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit,
                 pi.quantity, pi.amount, pi.is_manual, pi.job_type, pi.source_employee_id,
-                pi.source_date, pi.work_log_id, pi.work_log_type, pi.foc_units,
+                TO_CHAR(pi.source_date, 'YYYY-MM-DD') AS source_date,
+                pi.work_log_id, pi.work_log_type, pi.foc_units,
                 pc.pay_type
           FROM payroll_items pi
           LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id

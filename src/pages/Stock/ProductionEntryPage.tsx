@@ -41,6 +41,7 @@ import {
   IconPackage,
 } from "@tabler/icons-react";
 import { Switch } from "@headlessui/react";
+import { format } from "date-fns";
 import Button from "../../components/Button";
 import ProductPayCodeMappingModal from "../../components/Stock/ProductPayCodeMappingModal";
 import { isSpecialItem } from "../../config/specialItems";
@@ -64,6 +65,16 @@ const parseLocalDate = (dateStr: string): Date => {
   return new Date(year, month - 1, day);
 };
 
+const normalizeDateParam = (dateParam: string): string | null => {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+    const parsedDate: Date = parseLocalDate(dateParam);
+    return format(parsedDate, "yyyy-MM-dd") === dateParam ? dateParam : null;
+  }
+
+  const parsedDate: Date = new Date(dateParam);
+  return isNaN(parsedDate.getTime()) ? null : format(parsedDate, "yyyy-MM-dd");
+};
+
 // Special selection types for Hancur and Bundle entries
 type SpecialSelection =
   | "HANCUR_BH"
@@ -78,10 +89,8 @@ const ProductionEntryPage: React.FC = () => {
     const params = new URLSearchParams(window.location.search);
     const dateParam = params.get("date");
     if (dateParam) {
-      const parsed = parseLocalDate(dateParam);
-      if (!isNaN(parsed.getTime())) {
-        return dateParam;
-      }
+      const normalizedDate: string | null = normalizeDateParam(dateParam);
+      if (normalizedDate) return normalizedDate;
     }
     return formatDateLocal(new Date());
   };
@@ -123,6 +132,12 @@ const ProductionEntryPage: React.FC = () => {
     return params.get("search") || "";
   };
 
+  const getInitialWorkerId = (): string | null => {
+    const params = new URLSearchParams(window.location.search);
+    const workerId: string | null = params.get("workerId");
+    return workerId?.trim() || null;
+  };
+
   // State
   const [selectedDate, setSelectedDate] = useState<string>(getInitialDate);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(
@@ -138,6 +153,12 @@ const ProductionEntryPage: React.FC = () => {
   const [specialSelection, setSpecialSelection] =
     useState<SpecialSelection>(getInitialSpecialSelection);
   const [workerSearchQuery, setWorkerSearchQuery] = useState(getInitialSearch);
+  const [deepLinkWorkerId] = useState<string | null>(getInitialWorkerId);
+  const [deepLinkProductions, setDeepLinkProductions] = useState<
+    ProductionEntry[]
+  >([]);
+  const [isLoadingDeepLinkProductions, setIsLoadingDeepLinkProductions] =
+    useState(false);
   const [hancurSearchQuery, setHancurSearchQuery] = useState("");
   const [bundleSearchQuery, setBundleSearchQuery] = useState("");
   const [workerOrderRefreshKey, setWorkerOrderRefreshKey] = useState(0);
@@ -154,6 +175,7 @@ const ProductionEntryPage: React.FC = () => {
   const preserveInitialWorkerSearchRef = useRef<boolean>(
     getInitialSearch() !== ""
   );
+  const hasResolvedDeepLinkProductionRef = useRef<boolean>(false);
   const resetWorkerSearchOnProductChange = (): void => {
     if (preserveInitialWorkerSearchRef.current) {
       preserveInitialWorkerSearchRef.current = false;
@@ -335,6 +357,74 @@ const ProductionEntryPage: React.FC = () => {
 
     fetchExistingEntries();
   }, [selectedDate, selectedProductId]);
+
+  // A payroll deep link identifies the worker as well as the date. Find that
+  // worker's production records so one matching product opens immediately and
+  // multiple products can be selected without searching the whole catalogue.
+  useEffect(() => {
+    if (
+      !deepLinkWorkerId ||
+      selectedProductId !== null ||
+      specialSelection !== null
+    ) {
+      return;
+    }
+
+    let isCurrent: boolean = true;
+
+    const fetchDeepLinkProductions = async (): Promise<void> => {
+      setIsLoadingDeepLinkProductions(true);
+      try {
+        const response: ProductionEntry[] = await api.get(
+          `/api/production-entries?date=${encodeURIComponent(
+            selectedDate
+          )}&worker_id=${encodeURIComponent(deepLinkWorkerId)}`
+        );
+        if (!isCurrent) return;
+
+        const productionsByProductId: Map<string, ProductionEntry> = new Map();
+        response.forEach((entry: ProductionEntry): void => {
+          if (Number(entry.bags_packed) > 0) {
+            productionsByProductId.set(entry.product_id, entry);
+          }
+        });
+        const productions: ProductionEntry[] = Array.from(
+          productionsByProductId.values()
+        );
+        setDeepLinkProductions(productions);
+
+        if (
+          productions.length === 1 &&
+          productions[0].product_id !== "HANCUR_BH" &&
+          productions[0].product_id !== "KARUNG_HANCUR" &&
+          !productions[0].product_id.startsWith("BUNDLE_") &&
+          !hasResolvedDeepLinkProductionRef.current
+        ) {
+          const [production]: ProductionEntry[] = productions;
+          hasResolvedDeepLinkProductionRef.current = true;
+          preserveInitialWorkerSearchRef.current = false;
+          setSelectedProductId(production.product_id);
+        } else if (!hasResolvedDeepLinkProductionRef.current) {
+          hasResolvedDeepLinkProductionRef.current = true;
+        }
+      } catch (error) {
+        console.error("Error fetching linked worker productions:", error);
+        if (isCurrent) {
+          setDeepLinkProductions([]);
+        }
+      } finally {
+        if (isCurrent) {
+          setIsLoadingDeepLinkProductions(false);
+        }
+      }
+    };
+
+    fetchDeepLinkProductions();
+
+    return (): void => {
+      isCurrent = false;
+    };
+  }, [deepLinkWorkerId, selectedDate, selectedProductId, specialSelection]);
 
   // Fetch machine broken status when date or product changes
   useEffect(() => {
@@ -696,6 +786,44 @@ const ProductionEntryPage: React.FC = () => {
       {!selectedProductId && specialSelection === null && (
         <div className="p-4">
           <div className="space-y-4">
+            {deepLinkWorkerId &&
+              (isLoadingDeepLinkProductions || deepLinkProductions.length > 0) && (
+                <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 dark:border-sky-900/60 dark:bg-sky-950/30">
+                  <div className="mb-2 text-sm font-medium text-sky-800 dark:text-sky-200">
+                    Select this worker&apos;s production
+                  </div>
+                  {isLoadingDeepLinkProductions ? (
+                    <div className="text-sm text-sky-700 dark:text-sky-300">
+                      Loading productions...
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {deepLinkProductions.map(
+                        (production: ProductionEntry) => (
+                          <button
+                            key={production.product_id}
+                            type="button"
+                            onClick={() =>
+                              handleProductSelect(production.product_id)
+                            }
+                            className="inline-flex items-center gap-1.5 rounded-md border border-sky-300 bg-white px-2.5 py-1.5 text-sm text-sky-900 transition-colors hover:border-sky-400 hover:bg-sky-100 dark:border-sky-700 dark:bg-gray-800 dark:text-sky-100 dark:hover:border-sky-600 dark:hover:bg-sky-900/40"
+                          >
+                            <span className="font-semibold">
+                              {production.product_id}
+                            </span>
+                            {production.product_description && (
+                              <span className="text-sky-700 dark:text-sky-300">
+                                · {production.product_description}
+                              </span>
+                            )}
+                          </button>
+                        )
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
             {/* Product Selector Dropdown (for search/starring) */}
             <div className="pb-4 border-b border-default-200 dark:border-gray-700">
               <ProductSelector
