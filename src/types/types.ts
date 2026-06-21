@@ -695,6 +695,9 @@ export interface PayCode {
   rate_umum: number;
   is_active: boolean;
   requires_units_input: boolean;
+  // Optional Salary Report column override: "GAJI" | "OT" | "BONUS" | "CIO" | "CUTI".
+  // null = use automatic bucketing. Sits below the per-entry others_records.report_column override.
+  report_column?: string | null;
   created_at?: string;
   updated_at?: string;
   section_id?: string; // Optional field to indicate the section when used in section_pay_codes
