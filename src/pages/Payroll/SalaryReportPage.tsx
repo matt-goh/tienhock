@@ -35,6 +35,10 @@ import { generateSalaryReportPDF } from "../../utils/payroll/SalaryReportPDF";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { useLocationMappingsCache } from "../../utils/catalogue/useLocationMappingsCache";
 import { groupStaffsByName } from "../../utils/payroll/groupStaffsByName";
+import {
+  readLastAccessedPayrollMonth,
+  saveLastAccessedPayrollMonth,
+} from "../../utils/payroll/payrollMonthStorage";
 import toast from "react-hot-toast";
 
 // Cuti (leave) summary types for the Cuti tab
@@ -265,8 +269,11 @@ const SalaryReportPage: React.FC = () => {
       }
     }
 
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
+    const now: Date = new Date();
+    return (
+      readLastAccessedPayrollMonth() ??
+      new Date(now.getFullYear(), now.getMonth(), 1)
+    );
   });
 
   // Derived values for API calls and display
@@ -294,6 +301,11 @@ const SalaryReportPage: React.FC = () => {
     }
     setSearchParams(params, { replace: true });
   }, [activeTab, currentYear, currentMonth, periodType, setSearchParams]);
+
+  // Keep the Payroll and Salary Report month in sync for future visits.
+  useEffect(() => {
+    saveLastAccessedPayrollMonth(selectedMonth);
+  }, [selectedMonth]);
 
   // Cleanup print dropdown timeout on unmount
   useEffect(() => {
