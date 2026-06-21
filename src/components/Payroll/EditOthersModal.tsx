@@ -46,6 +46,16 @@ const formatCurrency = (amount: number): string =>
 
 const PAY_CODE_PAGE_SIZE = 50;
 
+// Optional override for which Salary Report column an Others amount lands in.
+const REPORT_COLUMN_OPTIONS: { value: string; label: string }[] = [
+  { value: "", label: "Automatic (by rule)" },
+  { value: "GAJI", label: "GAJI" },
+  { value: "OT", label: "OT" },
+  { value: "BONUS", label: "BONUS" },
+  { value: "CIO", label: "C/I/O" },
+  { value: "CUTI", label: "CUTI" },
+];
+
 const toLocalYmd = (value: string): string => {
   if (!value) return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
@@ -72,6 +82,7 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
   const [rate, setRate] = useState("0");
   const [rateUnit, setRateUnit] = useState<RateUnit | "">("");
   const [quantity, setQuantity] = useState("1");
+  const [reportColumn, setReportColumn] = useState("");
   const [pcQuery, setPcQuery] = useState("");
   const [loadedPayCodeCount, setLoadedPayCodeCount] =
     useState<number>(PAY_CODE_PAGE_SIZE);
@@ -120,6 +131,7 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
     setRate(String(record.rate ?? 0));
     setRateUnit((record.rate_unit as RateUnit) || "");
     setQuantity(String(record.quantity ?? 1));
+    setReportColumn(record.report_column || "");
     setPcQuery("");
     setLoadedPayCodeCount(PAY_CODE_PAGE_SIZE);
 
@@ -210,6 +222,7 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
         rate_unit: rateUnit,
         quantity: q,
         amount: calculatedAmount,
+        report_column: reportColumn || null,
       };
       if (isLinked) {
         payload.record_dates = [...linkedDates].sort();
@@ -506,6 +519,29 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
                     onChange={(e) => setDescription(e.target.value)}
                     required
                   />
+
+                  {/* Salary report column override */}
+                  <div>
+                    <label className="block text-xs font-medium text-default-600 dark:text-gray-300 mb-1">
+                      Salary report column
+                    </label>
+                    <select
+                      value={reportColumn}
+                      onChange={(e) => setReportColumn(e.target.value)}
+                      disabled={isSaving}
+                      className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 text-sm text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:bg-gray-50 dark:disabled:bg-gray-700"
+                    >
+                      {REPORT_COLUMN_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-[11px] text-default-400 dark:text-gray-500">
+                      Forces which Salary Report column this amount shows in. Leave on Automatic unless it needs overriding.
+                      {isLinked && " Applies to all linked dates."}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Footer (sticky) */}

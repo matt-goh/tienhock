@@ -208,13 +208,13 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       `
       SELECT amount, description, is_advance
       FROM commission_records
-      WHERE employee_id = $1
+      WHERE employee_id IN (SELECT id FROM staffs WHERE name = $1)
         AND DATE(commission_date) >= $2
         AND DATE(commission_date) <= $3
       ORDER BY commission_date DESC
     `,
       [
-        employee_id,
+        employee_name,
         `${year}-${month.toString().padStart(2, "0")}-01`,
         `${year}-${month.toString().padStart(2, "0")}-${new Date(year, month, 0).getDate().toString().padStart(2, "0")}`,
       ],
@@ -231,13 +231,13 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       SELECT orec.amount, orec.description, pc.pay_type
       FROM others_records orec
       LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
-      WHERE orec.employee_id = $1
+      WHERE orec.employee_id IN (SELECT id FROM staffs WHERE name = $1)
         AND DATE(orec.record_date) >= $2
         AND DATE(orec.record_date) <= $3
       ORDER BY orec.record_date DESC
     `,
       [
-        employee_id,
+        employee_name,
         `${year}-${month.toString().padStart(2, "0")}-01`,
         `${year}-${month.toString().padStart(2, "0")}-${new Date(year, month, 0).getDate().toString().padStart(2, "0")}`,
       ],
@@ -676,7 +676,8 @@ export default function (pool) {
       const itemsQuery = `
       SELECT pi.employee_payroll_id, pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit,
             pi.quantity, pi.amount, pi.is_manual, pi.job_type, pi.source_employee_id,
-            pi.source_date, pi.work_log_id, pi.work_log_type, pi.foc_units,
+            TO_CHAR(pi.source_date, 'YYYY-MM-DD') AS source_date,
+            pi.work_log_id, pi.work_log_type, pi.foc_units,
             pc.pay_type
       FROM payroll_items pi
       LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
@@ -1116,7 +1117,8 @@ export default function (pool) {
           `
           SELECT pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit,
                 pi.quantity, pi.amount, pi.is_manual, pi.job_type, pi.source_employee_id,
-                pi.source_date, pi.work_log_id, pi.work_log_type, pi.foc_units,
+                TO_CHAR(pi.source_date, 'YYYY-MM-DD') AS source_date,
+                pi.work_log_id, pi.work_log_type, pi.foc_units,
                 pc.pay_type
           FROM payroll_items pi
           LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
@@ -1530,7 +1532,8 @@ export default function (pool) {
           `
           SELECT pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit,
                 pi.quantity, pi.amount, pi.is_manual, pi.job_type, pi.source_employee_id,
-                pi.source_date, pi.work_log_id, pi.work_log_type, pi.foc_units,
+                TO_CHAR(pi.source_date, 'YYYY-MM-DD') AS source_date,
+                pi.work_log_id, pi.work_log_type, pi.foc_units,
                 pc.pay_type
           FROM payroll_items pi
           LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id

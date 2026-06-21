@@ -5,6 +5,23 @@ import cache, { CACHE_TTL, CACHE_KEYS } from "../utils/memory-cache.js";
 export default function (pool) {
   const router = Router();
 
+  // Allowed Salary Report column overrides (NULL/"" = automatic bucketing rule).
+  const REPORT_COLUMNS = ["GAJI", "OT", "BONUS", "CIO", "CUTI"];
+  // Normalize incoming report_column to a valid value or null; throws on invalid.
+  const normalizeReportColumn = (value) => {
+    if (value === undefined || value === null || value === "") return null;
+    if (!REPORT_COLUMNS.includes(value)) {
+      const err = new Error(
+        `Invalid report_column '${value}'. Must be one of ${REPORT_COLUMNS.join(
+          ", "
+        )} or empty.`
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+    return value;
+  };
+
   // GET / - Remove 'code' from SELECT
   router.get("/", async (req, res) => {
     try {
@@ -23,7 +40,7 @@ export default function (pool) {
           CAST(rate_biasa AS NUMERIC(10, 2)) as rate_biasa,
           CAST(rate_ahad AS NUMERIC(10, 2)) as rate_ahad,
           CAST(rate_umum AS NUMERIC(10, 2)) as rate_umum,
-          is_active, requires_units_input, created_at, updated_at
+          is_active, requires_units_input, report_column, created_at, updated_at
         FROM pay_codes ORDER BY updated_at DESC, created_at DESC`; // Order by latest modified/created
       const result = await pool.query(query);
       // Parse numeric values
@@ -59,7 +76,7 @@ export default function (pool) {
           CAST(rate_biasa AS NUMERIC(10, 2)) as rate_biasa,
           CAST(rate_ahad AS NUMERIC(10, 2)) as rate_ahad,
           CAST(rate_umum AS NUMERIC(10, 2)) as rate_umum,
-          is_active, requires_units_input, created_at, updated_at
+          is_active, requires_units_input, report_column, created_at, updated_at
         FROM pay_codes WHERE id = $1`;
       const result = await pool.query(query, [id]);
       if (result.rows.length === 0)
@@ -103,6 +120,7 @@ export default function (pool) {
       rate_umum,
       is_active,
       requires_units_input,
+      report_column,
     } = req.body;
 
     // ID is now the main identifier besides description
@@ -113,6 +131,13 @@ export default function (pool) {
           message:
             "Missing required fields (id, description, pay_type, rate_unit)",
         });
+    }
+
+    let normalizedReportColumn;
+    try {
+      normalizedReportColumn = normalizeReportColumn(report_column);
+    } catch (err) {
+      return res.status(err.statusCode || 400).json({ message: err.message });
     }
 
     try {
@@ -129,8 +154,8 @@ export default function (pool) {
         INSERT INTO pay_codes (
           id, description, pay_type, rate_unit,
           rate_biasa, rate_ahad, rate_umum,
-          is_active, requires_units_input
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) -- Adjusted parameter count
+          is_active, requires_units_input, report_column
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) -- Adjusted parameter count
         RETURNING *
       `;
       const values = [
@@ -143,6 +168,7 @@ export default function (pool) {
         rate_umum === null ? null : parseFloat(rate_umum) || 0,
         is_active === undefined ? true : !!is_active,
         requires_units_input === undefined ? false : !!requires_units_input,
+        normalizedReportColumn,
       ];
 
       const result = await pool.query(query, values);
@@ -192,6 +218,7 @@ export default function (pool) {
       rate_umum,
       is_active,
       requires_units_input,
+      report_column,
     } = req.body;
 
     if (!id) {
@@ -206,6 +233,13 @@ export default function (pool) {
         .json({
           message: "Missing required fields (description, pay_type, rate_unit)",
         });
+    }
+
+    let normalizedReportColumn;
+    try {
+      normalizedReportColumn = normalizeReportColumn(report_column);
+    } catch (err) {
+      return res.status(err.statusCode || 400).json({ message: err.message });
     }
 
     try {
@@ -236,8 +270,9 @@ export default function (pool) {
           rate_ahad = $5,
           rate_umum = $6,
           is_active = $7,
-          requires_units_input = $8
-        WHERE id = $9 -- Adjusted parameter count
+          requires_units_input = $8,
+          report_column = $9
+        WHERE id = $10 -- Adjusted parameter count
         RETURNING *
       `;
       const values = [
@@ -249,6 +284,7 @@ export default function (pool) {
         rate_umum === null ? null : parseFloat(rate_umum) || 0,
         is_active === undefined ? true : !!is_active,
         requires_units_input === undefined ? false : !!requires_units_input,
+        normalizedReportColumn,
         id,
       ];
 

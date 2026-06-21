@@ -1,4 +1,4 @@
-// src/pages/Payroll/AddOn/OthersListPage.tsx
+// src/pages/Payroll/AddOn/OthersKerjaLuarOtPage.tsx
 import React, { useState, useEffect, useMemo, useRef, Fragment } from "react";
 import { format } from "date-fns";
 import {
@@ -45,7 +45,7 @@ interface EmployeeGroup {
   rows: OthersRecord[];
 }
 
-const OthersListPage: React.FC = () => {
+const OthersKerjaLuarOtPage: React.FC = () => {
   const getInitialYear = (): number => {
     const params = new URLSearchParams(window.location.search);
     const yearParam = params.get("year");
@@ -66,6 +66,11 @@ const OthersListPage: React.FC = () => {
     return new Date().getMonth() + 1;
   };
 
+  const getInitialSearch = (): string => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("search") || "";
+  };
+
   const [records, setRecords] = useState<OthersRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -80,7 +85,7 @@ const OthersListPage: React.FC = () => {
   // Filters
   const [filterEmployee, setFilterEmployee] = useState<string>("");
   const [filterPayCode, setFilterPayCode] = useState<string>("");
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState<string>(getInitialSearch);
   const [employeeQuery, setEmployeeQuery] = useState<string>("");
   const [payCodeQuery, setPayCodeQuery] = useState<string>("");
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -413,8 +418,34 @@ const OthersListPage: React.FC = () => {
               showGoToCurrentButton={false}
             />
           </div>
-          <div className="text-sm text-default-600 dark:text-gray-300 text-right">
-            <div>
+          <div className="flex w-full flex-wrap items-center justify-end gap-3 md:w-auto">
+            <div className="relative w-full sm:w-80">
+              <IconSearch
+                size={15}
+                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+              />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search name, pay code, date, amount, description..."
+                className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 pl-8 pr-8 text-sm text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-gray-400 hover:bg-default-100 dark:text-gray-500 dark:hover:bg-gray-700"
+                  title="Clear search"
+                >
+                  <IconX size={13} />
+                </button>
+              )}
+            </div>
+            <div className="hidden h-6 w-px bg-default-300 dark:bg-gray-600 sm:block" />
+            <div className="text-right text-sm text-default-600 dark:text-gray-300">
+              <div>
               <span className="font-medium text-default-800 dark:text-gray-100">
                 {filteredRecords.length}
               </span>
@@ -426,6 +457,7 @@ const OthersListPage: React.FC = () => {
                 {formatCurrency(filteredTotalAmount)}
               </span>
             </div>
+          </div>
           </div>
         </div>
 
@@ -626,32 +658,6 @@ const OthersListPage: React.FC = () => {
                 </ComboboxOptions>
               </Transition>
             </Combobox>
-          </div>
-
-          {/* Universal search: name, pay code, date, amount, description */}
-          <div className="relative flex-1 min-w-[180px]">
-            <IconSearch
-              size={15}
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none"
-            />
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search name, pay code, date, amount, description..."
-              className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 pl-8 pr-8 text-sm text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-gray-400 hover:bg-default-100 dark:text-gray-500 dark:hover:bg-gray-700"
-                title="Clear search"
-              >
-                <IconX size={13} />
-              </button>
-            )}
           </div>
 
           {/* Clear all filters */}
@@ -920,4 +926,4 @@ const OthersListPage: React.FC = () => {
   );
 };
 
-export default OthersListPage;
+export default OthersKerjaLuarOtPage;
