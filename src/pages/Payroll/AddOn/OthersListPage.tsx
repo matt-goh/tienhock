@@ -66,6 +66,11 @@ const OthersListPage: React.FC = () => {
     return new Date().getMonth() + 1;
   };
 
+  const getInitialSearch = (): string => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("search") || "";
+  };
+
   const [records, setRecords] = useState<OthersRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -80,7 +85,7 @@ const OthersListPage: React.FC = () => {
   // Filters
   const [filterEmployee, setFilterEmployee] = useState<string>("");
   const [filterPayCode, setFilterPayCode] = useState<string>("");
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState<string>(getInitialSearch);
   const [employeeQuery, setEmployeeQuery] = useState<string>("");
   const [payCodeQuery, setPayCodeQuery] = useState<string>("");
   const searchInputRef = useRef<HTMLInputElement | null>(null);

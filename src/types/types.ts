@@ -845,7 +845,9 @@ export interface PayrollItem {
   // Source tracking fields for traceability to work logs
   source_date?: string | null; // ISO date string (YYYY-MM-DD)
   work_log_id?: number | null; // Reference to work log
-  work_log_type?: "daily" | "monthly" | null; // Type of work log
+  // "daily" | "monthly" for work logs; "production" | "production_bonus" |
+  // "prod_bonus_rosak" for production entries; null for manual/other.
+  work_log_type?: string | null; // Type of work log / source
 }
 
 export interface MonthlyPayroll {
