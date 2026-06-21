@@ -1725,8 +1725,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             midMonthPayroll={midMonthPayroll}
             buttonText={
               payroll.job_type?.includes(", ")
-                ? "Print Slips (Per Job)"
-                : "Print Pay Slip"
+                ? "Per Job"
+                : "Pay Slip"
             }
             variant="filled"
             color="sky"
@@ -1737,7 +1737,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               payroll={payroll}
               midMonthPayroll={midMonthPayroll}
               mode="combined"
-              buttonText="Print Combined"
+              buttonText="Combined"
               variant="outline"
               color="sky"
               className="flex-1 md:flex-none"
