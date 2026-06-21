@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-21",
+    ms: "Dalam Butiran Gaji, klik pada potongan Bayaran Pendahuluan (Mid-month Advance) untuk terus membuka halaman Mid-month Payroll bagi bulan dan pekerja tersebut. Halaman itu kini mempunyai carian pekerja untuk menapis senarai dengan cepat.",
+    en: "In Payroll Details, click the Mid-month Advance deduction to open Mid-month Payroll directly for that month and employee. That page now has an employee search for quickly filtering the list.",
+  },
+  {
+    date: "2026-06-21",
     ms: "Butiran Gaji kini dibuka dalam paparan Terperinci (Detailed) secara lalai supaya setiap rekod dan tarikh sumber terus kelihatan. Anda masih boleh memilih paparan Ringkasan (Summary) apabila diperlukan.",
     en: "Payroll Details now opens in the Detailed view by default, so each record and its source date are visible immediately. You can still switch to the Summary view when needed.",
   },

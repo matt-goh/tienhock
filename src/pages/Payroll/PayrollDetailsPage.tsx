@@ -2145,16 +2145,23 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               {/* Mid-month Advance with Tooltip */}
               {midMonthPayroll && (
                 <div className="group relative flex justify-between text-sm">
-                  <span className="text-default-600 dark:text-gray-300 flex items-center gap-1 cursor-help">
-                    Mid-month Advance
-                    <IconInfoCircle
-                      size={14}
-                      className="text-default-400 dark:text-gray-400 opacity-60 group-hover:opacity-100"
-                    />
-                  </span>
-                  <span className="font-medium text-rose-600 dark:text-rose-400">
-                    - {formatCurrency(midMonthPayroll.amount)}
-                  </span>
+                  <Link
+                    to={`/payroll/mid-month-payrolls?year=${midMonthPayroll.year}&month=${midMonthPayroll.month}&search=${encodeURIComponent(
+                      payroll.employee_name || ""
+                    )}`}
+                    className="flex flex-1 items-center justify-between rounded text-default-600 hover:text-sky-600 dark:text-gray-300 dark:hover:text-sky-400"
+                  >
+                    <span className="flex items-center gap-1 cursor-help">
+                      Mid-month Advance
+                      <IconInfoCircle
+                        size={14}
+                        className="text-default-400 dark:text-gray-400 opacity-60 group-hover:opacity-100"
+                      />
+                    </span>
+                    <span className="font-medium text-rose-600 dark:text-rose-400">
+                      - {formatCurrency(midMonthPayroll.amount)}
+                    </span>
+                  </Link>
                   {/* Tooltip - appears below */}
                   <div className="absolute left-0 top-full mt-2 hidden group-hover:block z-50 w-64">
                     <div className="bg-default-800 text-white text-xs rounded-lg p-3 shadow-lg relative">
