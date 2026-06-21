@@ -233,36 +233,38 @@ const BonusPage: React.FC = () => {
               showGoToCurrentButton={false}
             />
           </div>
-          {/* Universal search: name, amount, type, description, date */}
-          <div className="relative w-full md:flex-1 md:max-w-sm">
-            <IconSearch
-              size={15}
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none"
-            />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search name, amount, description..."
-              className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 pl-8 pr-8 text-sm text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-gray-400 hover:bg-default-100 dark:text-gray-500 dark:hover:bg-gray-700"
-                title="Clear search"
-              >
-                <IconX size={13} />
-              </button>
-            )}
-          </div>
-          <div className="text-sm text-default-600 dark:text-gray-300">
-            <div className="font-medium">
-              Total: {filteredBonuses.length} records
+          <div className="flex w-full flex-wrap items-center justify-end gap-3 md:w-auto">
+            <div className="relative w-full sm:w-72">
+              <IconSearch
+                size={15}
+                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+              />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search name, amount, description..."
+                className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 pl-8 pr-8 text-sm text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-gray-400 hover:bg-default-100 dark:text-gray-500 dark:hover:bg-gray-700"
+                  title="Clear search"
+                >
+                  <IconX size={13} />
+                </button>
+              )}
             </div>
-            <div className="font-medium">
-              Amount: {formatCurrency(totalAmount)}
+            <div className="hidden h-6 w-px bg-default-300 dark:bg-gray-600 sm:block" />
+            <div className="text-right text-sm text-default-600 dark:text-gray-300">
+              <div className="font-medium">
+                Total: {filteredBonuses.length} records
+              </div>
+              <div className="font-medium">
+                Amount: {formatCurrency(totalAmount)}
+              </div>
             </div>
           </div>
         </div>
