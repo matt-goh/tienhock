@@ -15,8 +15,8 @@ Each earning is bucketed by **pay_type + rate_unit + an explicit code list + a p
 - **OT** = all overtime (payroll `Overtime` items + Kerja-Luar/Others `Overtime`). Shown only here; BONUS does NOT duplicate it.
 - **BONUS** = real bonuses only: `BONUS` paycode items + location-null commission (+ Others overridden to BONUS). _Not_ OT.
 - **CUTI** = leave_records + Cuti-Tahunan recorded as commission (`location_code='23'` OR `description='cuti tahunan'`) + Cuti-Tahunan in payroll items/Others (description `cuti tahunan`).
-- **C/I/O** = incentive/allowance code list `('IXT','ADD_COMM','T-SALESMAN','FULL','HADIR_MEETING','IKUT_BX','JAGA_GATE','BH_JG_FORKLIFT','BH_SUSUN','T_KERJA')` + location commission (loc not null, not 23) + piece-rate "extra".
-- **GAJI** = the rest (regular wage). Mechanics: a worker **with an Hour/Day base** → GAJI = all non-piece-rate work (base + Hour/Day maintenance/Sunday), piece-rate (packing) → C/I/O. A worker with **no** Hour/Day base (pure-piece / office monthly salary) → GAJI = their **Base** only, everything else → C/I/O.
+- **C/I/O** = incentive/allowance code list `('IXT','ADD_COMM','T-SALESMAN','FULL','HADIR_MEETING','IKUT_BX','JAGA_GATE','BH_JG_FORKLIFT','BH_SUSUN','T_KERJA')` + location commission (loc not null, not 23) + piece-rate "extra". Production F/HARIAN `FULL_*` codes stay here for a worker who has an Hour/Day base.
+- **GAJI** = the rest (regular wage). Mechanics: a worker **with an Hour/Day base** → GAJI = all non-piece-rate work (base + Hour/Day maintenance/Sunday), piece-rate (packing) → C/I/O. A worker with **no** Hour/Day base (pure-piece / office monthly salary) → GAJI = their **Base** plus production F/HARIAN `FULL_*` codes; other non-Base extras → C/I/O.
 - "Piece-rate" = any rate_unit NOT in `('Hour','Day','Fixed')` (Bag/Bundle/Kg/Karung/Tray/Trip/Bill/Percent…). "Wage" rate units = Hour/Day/Fixed.
 
 This rule was reverse-engineered against boss-confirmed staff: ASRI, JAINJAM, MILTI, JEFFERY, JICKSON, ABEN, JEFFRY, JASSON. If you change it, re-validate against those.

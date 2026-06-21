@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-21",
+    ms: "Laporan Gaji: bagi pekerja pembungkusan sepenuhnya, bayaran F/HARIAN kini dipaparkan di lajur Gaji. Bagi pekerja yang turut mempunyai gaji ikut jam/hari, bayaran itu kekal di C/I/O. Jumlah Gaji Kasar dan potongan tidak berubah; hanya pembahagian lajur laporan diperbetulkan.",
+    en: "Salary Report: for pure packing workers, F/HARIAN pay now appears under Gaji. For workers who also have hourly/daily wages, it remains under C/I/O. Gross pay and deductions do not change; only the report column split is corrected.",
+  },
+  {
+    date: "2026-06-21",
     ms: "Kod Gaji (Pay Code) kini boleh ditetapkan untuk sentiasa dipaparkan di lajur Laporan Gaji yang dipilih (Gaji, OT, Bonus, C/I/O atau Cuti) melalui pilihan baharu 'Salary Report Column' pada borang Pay Code. Tetapan ini digunakan untuk kedua-dua item gaji biasa dan entri Lain-lain (Kerja Luar OT) yang menggunakan kod tersebut. Jika satu entri Lain-lain mempunyai pilihan lajurnya sendiri, pilihan entri itu tetap diutamakan. Biarkan 'Automatic' jika tiada keperluan untuk menetapkannya.",
     en: "A Pay Code can now be set to always appear under a chosen Salary Report column (Gaji, OT, Bonus, C/I/O, or Cuti) via the new 'Salary Report Column' option on the Pay Code form. This applies to both regular pay items and Others (Kerja Luar OT) entries that use that code. If an individual Others entry has its own column choice, that per-entry choice still takes precedence. Leave it on 'Automatic' when no override is needed.",
   },
