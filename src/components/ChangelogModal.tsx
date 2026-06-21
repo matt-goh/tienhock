@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-06-21",
+    ms: "Laporan Gaji: entri Lain-lain/Kerja Luar yang menggunakan kod BONUS kini dipaparkan dengan betul di lajur Bonus, bukan lagi tersilap masuk ke lajur Gaji. Jumlah Gaji Kasar tidak berubah — hanya pembahagian lajur diperbetulkan. Jika anda mahu satu entri masuk lajur lain, pilihan 'Salary report column' pada borang Lain-lain masih boleh digunakan.",
+    en: "Salary Report: Others/Kerja Luar entries using the BONUS pay code now correctly appear in the Bonus column instead of being mistakenly counted under Gaji. The Gross (Gaji Kasar) total is unchanged — only the column split is corrected. To force an entry into a different column, the 'Salary report column' option on the Others form still applies.",
+  },
+  {
     date: "2026-06-19",
     ms: "Laporan Gaji: cara gaji setiap pekerja dibahagikan kepada lajur Gaji, OT, Bonus, C/I/O dan Cuti telah diperbaharui. Gaji biasa/Ahad kekal di Gaji, semua kerja lebih masa (termasuk OT Kerja Luar) kini dipaparkan di lajur OT, kerja ikut bungkus/unit serta insentif (IXT, komisen, kehadiran penuh, dan seumpamanya) masuk ke C/I/O, dan Cuti Tahunan — termasuk yang dimasukkan melalui Lain-lain/pendahuluan — dipaparkan di Cuti. Jumlah yang direkod di bawah ID pekerja yang lain (pekerja berbilang ID) kini turut dimasukkan dalam baris pekerja itu, dan seorang pekerja tidak lagi dipaparkan dua kali. Jumlah dan Digenapkan dalam laporan kini menunjukkan jumlah gaji penuh termasuk amaun yang telah dibayar pendahuluan (senarai Bank dan slip gaji masih menunjukkan gaji bersih sebenar).",
     en: "Salary Report: reworked how each worker's pay is split across the Gaji, OT, Bonus, C/I/O and Cuti columns. Regular/Sunday wages stay in Gaji, all overtime (including Kerja Luar OT) now shows under the OT column, packing/piece-rate work and incentives (IXT, commission, full-attendance, etc.) go to C/I/O, and Cuti Tahunan — including those entered via Others/advances — shows under Cuti. Amounts recorded under a worker's other staff IDs (multi-ID staff) are now included in their row, and a person is no longer shown twice. The report's Jumlah and Digenapkan now reflect total salary including amounts already paid in advance (the Bank list and payslip still show the actual take-home).",
