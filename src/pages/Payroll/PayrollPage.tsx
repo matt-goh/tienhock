@@ -50,6 +50,8 @@ import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 
 const FIRST_WEEK_DAY_OF_MONTH: number = 7;
 const EXPANDED_JOBS_STORAGE_PREFIX: string = "payroll-expanded-jobs:";
+const LAST_ACCESSED_PAYROLL_MONTH_STORAGE_KEY: string =
+  "payroll-last-accessed-month";
 const SEARCH_TERM_STORAGE_KEY: string = "payroll-search-term";
 const CLEAR_SEARCH_ON_RETURN_STORAGE_KEY: string =
   "payroll-clear-search-on-return";
@@ -60,6 +62,39 @@ const getDefaultPayrollMonth = (today: Date = new Date()): Date => {
     today.getDate() <= FIRST_WEEK_DAY_OF_MONTH ? -1 : 0;
 
   return new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+};
+
+const readLastAccessedPayrollMonth = (): Date | null => {
+  try {
+    const storedMonth: string | null = localStorage.getItem(
+      LAST_ACCESSED_PAYROLL_MONTH_STORAGE_KEY
+    );
+    const matchedMonth: RegExpExecArray | null = storedMonth
+      ? /^(\d{4})-(0[1-9]|1[0-2])$/.exec(storedMonth)
+      : null;
+
+    if (!matchedMonth) return null;
+
+    const year: number = Number(matchedMonth[1]);
+    const month: number = Number(matchedMonth[2]);
+
+    return new Date(year, month - 1, 1);
+  } catch {
+    return null;
+  }
+};
+
+const saveLastAccessedPayrollMonth = (selectedMonth: Date): void => {
+  try {
+    const year: number = selectedMonth.getFullYear();
+    const month: string = String(selectedMonth.getMonth() + 1).padStart(2, "0");
+    localStorage.setItem(
+      LAST_ACCESSED_PAYROLL_MONTH_STORAGE_KEY,
+      `${year}-${month}`
+    );
+  } catch {
+    // Ignore storage failures so the payroll page remains usable.
+  }
 };
 
 const getPayrollJobGroupKey = (jobType: string): string => {
@@ -168,7 +203,7 @@ const PayrollPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Initialize with URL params or the payroll working month.
+  // Initialize with URL params, then the last accessed payroll month, then the payroll working month.
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
     const yearParam = searchParams.get("year");
     const monthParam = searchParams.get("month");
@@ -183,7 +218,7 @@ const PayrollPage: React.FC = () => {
       }
     }
 
-    return getDefaultPayrollMonth();
+    return readLastAccessedPayrollMonth() ?? getDefaultPayrollMonth();
   });
   const [payroll, setPayroll] = useState<MonthlyPayroll | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -265,7 +300,7 @@ const PayrollPage: React.FC = () => {
   }, [isLoading, payroll]);
 
   // Handler to update selected month and URL params
-  const handleMonthChange = useCallback((newMonth: Date) => {
+  const handleMonthChange = useCallback((newMonth: Date): void => {
     setSelectedMonth(newMonth);
 
     const year = newMonth.getFullYear();
@@ -307,6 +342,11 @@ const PayrollPage: React.FC = () => {
       }
     }
   }, [searchParams]);
+
+  // Remember the selected month for future visits without overriding shared URLs.
+  useEffect(() => {
+    saveLastAccessedPayrollMonth(selectedMonth);
+  }, [selectedMonth]);
 
   // Fetch payroll when selected month changes
   useEffect(() => {

@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-21",
+    ms: "Halaman Payroll kini mengingati bulan terakhir yang anda buka pada pelayar ini. Apabila anda kembali ke halaman Payroll, bulan itu dibuka secara automatik; pautan yang memilih bulan tertentu masih menggunakan bulan pada pautan tersebut.",
+    en: "The Payroll page now remembers the last month you opened in this browser. When you return to Payroll, that month opens automatically; links that specify a month still open the month in the link.",
+  },
+  {
+    date: "2026-06-21",
     ms: "Butiran Gaji: dalam paparan Terperinci (Detailed), setiap rekod Bonus / Insentif, Lain-lain (Kerja Luar OT), dan Cuti Tahunan kini dipaparkan pada barisnya sendiri dengan tarikh yang boleh diklik terus ke halaman kemasukannya (Bonus, Others (Advance), atau Lain-lain/Kerja Luar), dan kotak carian di halaman tersebut akan diisi dengan nama pekerja. Insentif (IXT) yang dimasukkan melalui log kerja harian/bulanan kini menghala ke log kerja berkenaan, bukan lagi tersilap ke halaman Bonus. Baris gaji pembungkusan/produksi (termasuk bonus) kini turut boleh diklik untuk terus ke halaman Production Entry pada tarikh berkenaan, dan carian pekerja akan diisi dengan nama pekerja itu apabila produk dipilih. Paparan ringkasan (Consolidated) kekal dipadatkan seperti biasa dengan tanda ×N. Selain itu, halaman Bonus dan Others (Advance) kini mempunyai kotak carian.",
     en: "Payroll Details: in the Detailed view, each Bonus / Insentif, Others (Kerja Luar OT), and Cuti Tahunan record now shows on its own row with a clickable date that opens the page where it was entered (Bonus, Others (Advance), or Others/Kerja Luar), pre-filling that page's search box with the employee's name. Incentives (IXT) entered through a daily/monthly work log now link to that work log instead of incorrectly going to the Bonus page. Production/packing pay rows (including bonuses) are now also clickable, opening the Production Entry page for that date and pre-filling the worker search with that worker once a product is selected. The summary (Consolidated) view stays compacted as before with the ×N badge. The Bonus and Others (Advance) pages now also have a search box.",
   },
