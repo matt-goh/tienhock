@@ -695,6 +695,9 @@ export interface PayCode {
   rate_umum: number;
   is_active: boolean;
   requires_units_input: boolean;
+  // Optional Salary Report column override: "GAJI" | "OT" | "BONUS" | "CIO" | "CUTI".
+  // null = use automatic bucketing. Sits below the per-entry others_records.report_column override.
+  report_column?: string | null;
   created_at?: string;
   updated_at?: string;
   section_id?: string; // Optional field to indicate the section when used in section_pay_codes
@@ -806,6 +809,9 @@ export interface OthersRecord {
   quantity: number;
   amount: number;
   link_id: string | null;
+  // Optional Salary Report column override: "GAJI" | "OT" | "BONUS" | "CIO" | "CUTI".
+  // null/undefined = use the automatic bucketing rule.
+  report_column?: string | null;
   created_by?: string;
   created_at?: string;
   updated_at?: string;
@@ -842,7 +848,9 @@ export interface PayrollItem {
   // Source tracking fields for traceability to work logs
   source_date?: string | null; // ISO date string (YYYY-MM-DD)
   work_log_id?: number | null; // Reference to work log
-  work_log_type?: "daily" | "monthly" | null; // Type of work log
+  // "daily" | "monthly" for work logs; "production" | "production_bonus" |
+  // "prod_bonus_rosak" for production entries; null for manual/other.
+  work_log_type?: string | null; // Type of work log / source
 }
 
 export interface MonthlyPayroll {

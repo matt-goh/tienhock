@@ -19,6 +19,71 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-06-22",
+    ms: "Laporan Gaji kini mengira jumlah setiap Kod Gaji daripada jumlah jam/unit dahulu sebelum dibundarkan, sama seperti Butiran Gaji dan sistem lama. Ini membetulkan perbezaan beberapa sen pada lajur seperti Gaji, OT dan C/I/O tanpa mengubah rekod kerja asal.",
+    en: "Salary Report now totals each Pay Code's hours/units before rounding, matching Payroll Details and the legacy system. This fixes a few-sen difference in columns such as Gaji, OT, and C/I/O without changing the underlying work records.",
+  },
+  {
+    date: "2026-06-22",
+    ms: "Panduan lajur Laporan Gaji kini boleh ditukar antara Bahasa Melayu dan English, dengan Kod Gaji dipaparkan sebagai label kod untuk lebih mudah dibaca.",
+    en: "The Salary Report column guide can now be switched between Bahasa Melayu and English, with Pay Codes shown as code-style labels for easier reading.",
+  },
+  {
+    date: "2026-06-21",
+    ms: "Laporan Gaji kini mempunyai butang panduan lajur di bawah jadual. Panduan ini menerangkan cara Gaji, OT, Bonus, C/I/O dan Cuti ditetapkan, termasuk keutamaan tetapan manual dan cara bayaran pembungkusan F/HARIAN dikendalikan.",
+    en: "Salary Report now has a column guide button below the table. It explains how Gaji, OT, Bonus, C/I/O, and Cuti are assigned, including manual-setting priority and how F/HARIAN packing pay is handled.",
+  },
+  {
+    date: "2026-06-21",
+    ms: "Laporan Gaji: bagi pekerja pembungkusan sepenuhnya, bayaran F/HARIAN kini dipaparkan di lajur Gaji. Bagi pekerja yang turut mempunyai gaji ikut jam/hari, bayaran itu kekal di C/I/O. Jumlah Gaji Kasar dan potongan tidak berubah; hanya pembahagian lajur laporan diperbetulkan.",
+    en: "Salary Report: for pure packing workers, F/HARIAN pay now appears under Gaji. For workers who also have hourly/daily wages, it remains under C/I/O. Gross pay and deductions do not change; only the report column split is corrected.",
+  },
+  {
+    date: "2026-06-21",
+    ms: "Kod Gaji (Pay Code) kini boleh ditetapkan untuk sentiasa dipaparkan di lajur Laporan Gaji yang dipilih (Gaji, OT, Bonus, C/I/O atau Cuti) melalui pilihan baharu 'Salary Report Column' pada borang Pay Code. Tetapan ini digunakan untuk kedua-dua item gaji biasa dan entri Lain-lain (Kerja Luar OT) yang menggunakan kod tersebut. Jika satu entri Lain-lain mempunyai pilihan lajurnya sendiri, pilihan entri itu tetap diutamakan. Biarkan 'Automatic' jika tiada keperluan untuk menetapkannya.",
+    en: "A Pay Code can now be set to always appear under a chosen Salary Report column (Gaji, OT, Bonus, C/I/O, or Cuti) via the new 'Salary Report Column' option on the Pay Code form. This applies to both regular pay items and Others (Kerja Luar OT) entries that use that code. If an individual Others entry has its own column choice, that per-entry choice still takes precedence. Leave it on 'Automatic' when no override is needed.",
+  },
+  {
+    date: "2026-06-21",
+    ms: "Dalam Butiran Gaji, klik pada potongan Bayaran Pendahuluan (Mid-month Advance) untuk terus membuka halaman Mid-month Payroll bagi bulan dan pekerja tersebut. Halaman itu kini mempunyai carian pekerja untuk menapis senarai dengan cepat.",
+    en: "In Payroll Details, click the Mid-month Advance deduction to open Mid-month Payroll directly for that month and employee. That page now has an employee search for quickly filtering the list.",
+  },
+  {
+    date: "2026-06-21",
+    ms: "Butiran Gaji kini dibuka dalam paparan Terperinci (Detailed) secara lalai supaya setiap rekod dan tarikh sumber terus kelihatan. Anda masih boleh memilih paparan Ringkasan (Summary) apabila diperlukan.",
+    en: "Payroll Details now opens in the Detailed view by default, so each record and its source date are visible immediately. You can still switch to the Summary view when needed.",
+  },
+  {
+    date: "2026-06-21",
+    ms: "Halaman butiran log kerja Harian dan Bulanan kini mempunyai carian ringkas untuk menapis pekerja dan rekod cuti mengikut nama, ID atau kerja. Apabila rekod harian atau bulanan diklik dari Butiran Gaji, carian pada log terus diisi untuk pekerja tersebut. Dalam Butiran Gaji, rekod kerja bulanan kini memaparkan bulan yang boleh diklik terus ke log kerja bulanan berkenaan, menggantikan tanda '-'.",
+    en: "Daily and Monthly work-log details now have a compact search to filter employees and leave records by name, ID, or job. When a daily or monthly record is opened from Payroll Details, its log search is pre-filled for that employee. In Payroll Details, monthly work records now show a clickable month that opens the corresponding monthly work log instead of a '-'.",
+  },
+  {
+    date: "2026-06-21",
+    ms: "Halaman Payroll dan Laporan Gaji kini mengingati bulan terakhir yang anda buka pada pelayar ini. Laporan Gaji juga mengingati tab terakhir yang dibuka. Apabila anda kembali ke halaman tersebut, bulan dan tab itu dibuka secara automatik; pautan yang memilih bulan atau tab tertentu masih menggunakan pilihan pada pautan tersebut.",
+    en: "The Payroll and Salary Report pages now remember the last month you opened in this browser. Salary Report also remembers the last tab you opened. When you return, that month and tab open automatically; links that specify a month or tab still use the choices in the link.",
+  },
+  {
+    date: "2026-06-21",
+    ms: "Butiran Gaji: dalam paparan Terperinci (Detailed), setiap rekod Bonus / Insentif, Lain-lain (Kerja Luar OT), dan Cuti Tahunan kini dipaparkan pada barisnya sendiri dengan tarikh yang boleh diklik terus ke halaman kemasukannya (Bonus, Others (Advance), atau Lain-lain/Kerja Luar), dan kotak carian di halaman tersebut akan diisi dengan nama pekerja. Insentif (IXT) yang dimasukkan melalui log kerja harian/bulanan kini menghala ke log kerja berkenaan, bukan lagi tersilap ke halaman Bonus. Baris gaji pembungkusan/produksi (termasuk bonus) kini turut boleh diklik untuk terus ke halaman Production Entry pada tarikh berkenaan, dan carian pekerja akan diisi dengan nama pekerja itu apabila produk dipilih. Paparan ringkasan (Consolidated) kekal dipadatkan seperti biasa dengan tanda ×N. Selain itu, halaman Bonus dan Others (Advance) kini mempunyai kotak carian.",
+    en: "Payroll Details: in the Detailed view, each Bonus / Insentif, Others (Kerja Luar OT), and Cuti Tahunan record now shows on its own row with a clickable date that opens the page where it was entered (Bonus, Others (Advance), or Others/Kerja Luar), pre-filling that page's search box with the employee's name. Incentives (IXT) entered through a daily/monthly work log now link to that work log instead of incorrectly going to the Bonus page. Production/packing pay rows (including bonuses) are now also clickable, opening the Production Entry page for that date and pre-filling the worker search with that worker once a product is selected. The summary (Consolidated) view stays compacted as before with the ×N badge. The Bonus and Others (Advance) pages now also have a search box.",
+  },
+  {
+    date: "2026-06-21",
+    ms: "Laporan Gaji: entri Lain-lain/Kerja Luar yang menggunakan kod BONUS kini dipaparkan dengan betul di lajur Bonus, bukan lagi tersilap masuk ke lajur Gaji. Jumlah Gaji Kasar tidak berubah — hanya pembahagian lajur diperbetulkan. Jika anda mahu satu entri masuk lajur lain, pilihan 'Salary report column' pada borang Lain-lain masih boleh digunakan.",
+    en: "Salary Report: Others/Kerja Luar entries using the BONUS pay code now correctly appear in the Bonus column instead of being mistakenly counted under Gaji. The Gross (Gaji Kasar) total is unchanged — only the column split is corrected. To force an entry into a different column, the 'Salary report column' option on the Others form still applies.",
+  },
+  {
+    date: "2026-06-19",
+    ms: "Laporan Gaji: cara gaji setiap pekerja dibahagikan kepada lajur Gaji, OT, Bonus, C/I/O dan Cuti telah diperbaharui. Gaji biasa/Ahad kekal di Gaji, semua kerja lebih masa (termasuk OT Kerja Luar) kini dipaparkan di lajur OT, kerja ikut bungkus/unit serta insentif (IXT, komisen, kehadiran penuh, dan seumpamanya) masuk ke C/I/O, dan Cuti Tahunan — termasuk yang dimasukkan melalui Lain-lain/pendahuluan — dipaparkan di Cuti. Jumlah yang direkod di bawah ID pekerja yang lain (pekerja berbilang ID) kini turut dimasukkan dalam baris pekerja itu, dan seorang pekerja tidak lagi dipaparkan dua kali. Jumlah dan Digenapkan dalam laporan kini menunjukkan jumlah gaji penuh termasuk amaun yang telah dibayar pendahuluan (senarai Bank dan slip gaji masih menunjukkan gaji bersih sebenar).",
+    en: "Salary Report: reworked how each worker's pay is split across the Gaji, OT, Bonus, C/I/O and Cuti columns. Regular/Sunday wages stay in Gaji, all overtime (including Kerja Luar OT) now shows under the OT column, packing/piece-rate work and incentives (IXT, commission, full-attendance, etc.) go to C/I/O, and Cuti Tahunan — including those entered via Others/advances — shows under Cuti. Amounts recorded under a worker's other staff IDs (multi-ID staff) are now included in their row, and a person is no longer shown twice. The report's Jumlah and Digenapkan now reflect total salary including amounts already paid in advance (the Bank list and payslip still show the actual take-home).",
+  },
+  {
+    date: "2026-06-19",
+    ms: "Laporan Gaji: anda kini boleh memilih lajur mana sesuatu entri Lain-lain/Kerja Luar dipaparkan. Borang Tambah/Edit Lain-lain mempunyai pilihan baharu 'Salary report column' (Gaji, OT, Bonus, C/I/O atau Cuti) untuk menetapkan lajur secara manual bagi entri tertentu; biarkan pada Automatic untuk entri biasa. Berguna apabila kod yang sama patut masuk lajur berbeza bagi pekerja berbeza.",
+    en: "Salary Report: you can now choose which column an Others/Kerja Luar entry appears in. The Add/Edit Others form has a new 'Salary report column' option (Gaji, OT, Bonus, C/I/O or Cuti) to override the automatic placement for specific entries; leave it on Automatic for normal entries. Handy when the same pay code should sit in different columns for different workers.",
+  },
+  {
     date: "2026-06-10",
     ms: "Sistem gaji Green Target dipertingkatkan dengan ciri-ciri penuh seperti Tien Hock: halaman baharu 'Mid-month Payroll' untuk merekod bayaran pendahuluan (ditolak automatik daripada gaji akhir bulan) dan halaman baharu 'Pinjam' untuk merekod pinjaman pekerja (jenis Mid-Month atau Monthly). Gaji bersih kini digenapkan ke ringgit penuh (Jumlah Digenapkan) selepas menolak bayaran pendahuluan, dan slip gaji memaparkan baris Bayaran Pendahuluan serta jumlah digenapkan. Butang 'Add Item' pada halaman butiran gaji kini berfungsi — caruman KWSP/PERKESO/SIP/PCB dikira semula secara automatik setiap kali item ditambah atau dibuang. Gaji yang sudah Finalized juga tidak lagi boleh diproses semula secara tidak sengaja. Menu Payroll Green Target kini mempunyai dropdown, halaman Driver Trips dibuang (trip pemandu dikira automatik daripada rekod sewaan semasa Process), pekerja yang dibuang daripada senarai pekerja GT akan dikeluarkan daripada gaji apabila Process ditekan semula, dan pekerja dalam senarai gaji GT tidak lagi muncul dalam halaman kemasukan jam kerja bulanan Tien Hock (elak gaji dua kali).",
     en: "The Green Target payroll system was upgraded with the full Tien Hock feature set: a new 'Mid-month Payroll' page to record advances (deducted automatically from the end-of-month pay) and a new 'Pinjam' page to record employee loans (Mid-Month or Monthly type). Net pay is now rounded up to the whole ringgit (Jumlah Digenapkan) after deducting the mid-month advance, and the payslip shows the Bayaran Pendahuluan line plus the rounded total. The 'Add Item' button on the pay details page now works — EPF/SOCSO/SIP/PCB contributions are recalculated automatically whenever an item is added or removed. Finalized payrolls can also no longer be accidentally re-processed. The Green Target Payroll menu now has a dropdown, the Driver Trips page was removed (driver trips are calculated automatically from rental records during Process), employees removed from the GT employee list are dropped from the payroll on the next Process, and staff on the GT payroll list no longer appear in Tien Hock's monthly hour-entry pages (prevents double payroll).",

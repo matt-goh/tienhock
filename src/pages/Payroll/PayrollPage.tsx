@@ -47,6 +47,10 @@ import MonthNavigator from "../../components/MonthNavigator";
 import PayrollUnifiedTable from "../../components/Payroll/PayrollUnifiedTable";
 import PayrollSectionPrintMenu from "../../components/Payroll/PayrollSectionPrintMenu";
 import { useScrollRestoration } from "../../hooks/useScrollRestoration";
+import {
+  readLastAccessedPayrollMonth,
+  saveLastAccessedPayrollMonth,
+} from "../../utils/payroll/payrollPageStorage";
 
 const FIRST_WEEK_DAY_OF_MONTH: number = 7;
 const EXPANDED_JOBS_STORAGE_PREFIX: string = "payroll-expanded-jobs:";
@@ -168,7 +172,7 @@ const PayrollPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Initialize with URL params or the payroll working month.
+  // Initialize with URL params, then the last accessed payroll month, then the payroll working month.
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
     const yearParam = searchParams.get("year");
     const monthParam = searchParams.get("month");
@@ -183,7 +187,7 @@ const PayrollPage: React.FC = () => {
       }
     }
 
-    return getDefaultPayrollMonth();
+    return readLastAccessedPayrollMonth() ?? getDefaultPayrollMonth();
   });
   const [payroll, setPayroll] = useState<MonthlyPayroll | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -265,7 +269,7 @@ const PayrollPage: React.FC = () => {
   }, [isLoading, payroll]);
 
   // Handler to update selected month and URL params
-  const handleMonthChange = useCallback((newMonth: Date) => {
+  const handleMonthChange = useCallback((newMonth: Date): void => {
     setSelectedMonth(newMonth);
 
     const year = newMonth.getFullYear();
@@ -307,6 +311,11 @@ const PayrollPage: React.FC = () => {
       }
     }
   }, [searchParams]);
+
+  // Remember the selected month for future visits without overriding shared URLs.
+  useEffect(() => {
+    saveLastAccessedPayrollMonth(selectedMonth);
+  }, [selectedMonth]);
 
   // Fetch payroll when selected month changes
   useEffect(() => {

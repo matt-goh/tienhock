@@ -7,6 +7,7 @@ import {
   IconPrinter,
   IconFileExport,
   IconLink,
+  IconInfoCircle,
 } from "@tabler/icons-react";
 import {
   Dialog,
@@ -35,6 +36,12 @@ import { generateSalaryReportPDF } from "../../utils/payroll/SalaryReportPDF";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { useLocationMappingsCache } from "../../utils/catalogue/useLocationMappingsCache";
 import { groupStaffsByName } from "../../utils/payroll/groupStaffsByName";
+import {
+  readLastAccessedPayrollMonth,
+  readLastAccessedSalaryReportTab,
+  saveLastAccessedPayrollMonth,
+  saveLastAccessedSalaryReportTab,
+} from "../../utils/payroll/payrollPageStorage";
 import toast from "react-hot-toast";
 
 // Cuti (leave) summary types for the Cuti tab
@@ -69,6 +76,8 @@ interface LocationOrderItem {
   id?: string;
   text?: string;
 }
+
+type ColumnGuideLanguage = "bm" | "en";
 
 interface SalaryReportData {
   no: number;
@@ -222,6 +231,9 @@ const SalaryReportPage: React.FC = () => {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState<boolean>(false);
   const [isGeneratingExport, setIsGeneratingExport] = useState<boolean>(false);
   const [showExportDialog, setShowExportDialog] = useState<boolean>(false);
+  const [showColumnGuide, setShowColumnGuide] = useState<boolean>(false);
+  const [columnGuideLanguage, setColumnGuideLanguage] =
+    useState<ColumnGuideLanguage>("bm");
   const [isPrintDropdownOpen, setIsPrintDropdownOpen] = useState<boolean>(false);
   const printDropdownTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   const [exportYear, setExportYear] = useState<number>(
@@ -265,20 +277,25 @@ const SalaryReportPage: React.FC = () => {
       }
     }
 
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
+    const now: Date = new Date();
+    return (
+      readLastAccessedPayrollMonth() ??
+      new Date(now.getFullYear(), now.getMonth(), 1)
+    );
   });
 
   // Derived values for API calls and display
   const currentYear = selectedMonth.getFullYear();
   const currentMonth = selectedMonth.getMonth() + 1;
 
-  // Tab state - initialize from URL params
-  const [activeTab, setActiveTab] = useState(() => {
+  // Tab state - initialize from URL params, then the last opened tab.
+  const [activeTab, setActiveTab] = useState<number>(() => {
     const tabParam = searchParams.get("tab");
     const tabIndex = tabParam ? parseInt(tabParam, 10) : 0;
     // Validate tab index (0-4 are valid)
-    return tabIndex >= 0 && tabIndex <= 4 ? tabIndex : 0;
+    return tabParam && tabIndex >= 0 && tabIndex <= 4
+      ? tabIndex
+      : readLastAccessedSalaryReportTab() ?? 0;
   }); // 0 = Employee, 1 = Salary, 2 = Bank, 3 = Pinjam, 4 = Cuti
 
   // Update URL params when tab, year, month, or period changes
@@ -294,6 +311,15 @@ const SalaryReportPage: React.FC = () => {
     }
     setSearchParams(params, { replace: true });
   }, [activeTab, currentYear, currentMonth, periodType, setSearchParams]);
+
+  // Keep the Payroll and Salary Report month in sync for future visits.
+  useEffect(() => {
+    saveLastAccessedPayrollMonth(selectedMonth);
+  }, [selectedMonth]);
+
+  useEffect(() => {
+    saveLastAccessedSalaryReportTab(activeTab);
+  }, [activeTab]);
 
   // Cleanup print dropdown timeout on unmount
   useEffect(() => {
@@ -2121,6 +2147,217 @@ const SalaryReportPage: React.FC = () => {
     </Transition>
   );
 
+  const columnGuideText =
+    columnGuideLanguage === "bm"
+      ? {
+          title: "Panduan lajur Laporan Gaji",
+          subtitle:
+            "Panduan ini menerangkan cara pendapatan ditetapkan pada lajur Laporan Gaji.",
+          priorityTitle: "Keutamaan",
+          priority:
+            "Pilihan lajur pada entri Lain-lain/Kerja Luar didahulukan, diikuti tetapan Salary Report Column pada Kod Gaji. Jika kedua-duanya Automatic, peraturan di bawah digunakan.",
+          gajiTitle: "GAJI",
+          gajiBefore:
+            "Bagi pekerja yang mempunyai item Base berkadar Hour atau Day, kerja biasa berkadar Hour, Day dan Fixed masuk ke Gaji. Bagi pekerja pembungkusan tulen tanpa Base Hour/Day, Gaji ialah Base pembungkusan serta bayaran F/HARIAN ",
+          gajiAfter: ".",
+          otTitle: "OT",
+          ot: "Semua item payroll dan Lain-lain/Kerja Luar yang Kod Gajinya bertipe Overtime.",
+          bonusTitle: "BONUS",
+          bonusBefore: "Item dengan Kod Gaji ",
+          bonusAfter: " serta rekod komisen/bonus tanpa lokasi.",
+          cioTitle: "C/I/O",
+          cioBefore:
+            "Komisen mengikut lokasi, kerja ikut unit bagi pekerja yang mempunyai Base Hour/Day, serta kod insentif/tugasan seperti ",
+          cioAfter:
+            ". Bagi pekerja pembungkusan tulen, tambahan bukan Base yang lain kekal di sini; bayaran F/HARIAN ",
+          cioEnd: " mereka masuk ke Gaji.",
+          cutiTitle: "CUTI",
+          cuti:
+            "Cuti yang diluluskan, rekod Cuti Tahunan, dan rekod komisen yang ditanda lokasi 23 atau Cuti Tahunan.",
+          sharedTitle: "ID pekerja yang sama nama",
+          shared:
+            "Cuti, Lain-lain/Kerja Luar dan komisen yang direkod di bawah ID staf berlainan tetapi nama sama digabungkan ke dalam satu baris payroll pekerja.",
+          close: "Tutup",
+        }
+      : {
+          title: "Salary Report column guide",
+          subtitle:
+            "This guide explains how earnings are assigned to the Salary Report columns.",
+          priorityTitle: "Priority",
+          priority:
+            "An individual Others/Kerja Luar column choice wins first, followed by the Pay Code's Salary Report Column setting. If both are Automatic, the rules below apply.",
+          gajiTitle: "GAJI",
+          gajiBefore:
+            "For workers with a Base item using an Hour or Day rate, regular Hour, Day, and Fixed work goes to Gaji. For pure packing workers without an Hour/Day Base, Gaji is Base packing pay plus F/HARIAN ",
+          gajiAfter: ".",
+          otTitle: "OT",
+          ot: "All payroll and Others/Kerja Luar entries whose Pay Code type is Overtime.",
+          bonusTitle: "BONUS",
+          bonusBefore: "Entries using the ",
+          bonusAfter: " Pay Code, plus commission/bonus records without a location.",
+          cioTitle: "C/I/O",
+          cioBefore:
+            "Location-based commission, piece-rate work for workers with an Hour/Day Base, and incentive/duty codes such as ",
+          cioAfter:
+            ". For pure packing workers, other non-Base extras remain here; their F/HARIAN ",
+          cioEnd: " pay goes to Gaji.",
+          cutiTitle: "CUTI",
+          cuti:
+            "Approved leave, Cuti Tahunan records, and commission records marked as location 23 or Cuti Tahunan.",
+          sharedTitle: "Shared staff IDs",
+          shared:
+            "Leave, Others/Kerja Luar, and commission recorded under staff IDs with the same name are combined into the employee's payroll row.",
+          close: "Close",
+        };
+
+  const PayCode = ({ children }: { children: React.ReactNode }): React.ReactElement => (
+    <code className="mx-0.5 inline-block rounded bg-default-100 px-1.5 py-0.5 font-mono text-[11px] font-medium text-default-800 dark:bg-gray-700 dark:text-gray-100">
+      {children}
+    </code>
+  );
+
+  const ColumnGuideDialog = () => (
+    <Transition appear show={showColumnGuide} as={React.Fragment}>
+      <Dialog
+        as="div"
+        className="fixed inset-0 z-50"
+        onClose={() => setShowColumnGuide(false)}
+      >
+        <div className="min-h-screen px-4 text-center">
+          <TransitionChild
+            as={React.Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <DialogPanel
+              className="fixed inset-0 bg-black opacity-30"
+              onClick={() => setShowColumnGuide(false)}
+            />
+          </TransitionChild>
+
+          <span className="inline-block h-screen align-middle" aria-hidden="true">
+            &#8203;
+          </span>
+
+          <TransitionChild
+            as={React.Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0 scale-95"
+            enterTo="opacity-100 scale-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100 scale-100"
+            leaveTo="opacity-0 scale-95"
+          >
+            <DialogPanel
+              className="inline-block w-full max-w-2xl p-6 my-8 text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-2xl"
+              onClick={(event: React.MouseEvent<HTMLDivElement>) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <DialogTitle
+                    as="h3"
+                    className="text-lg font-medium leading-6 text-default-900 dark:text-gray-100"
+                  >
+                    {columnGuideText.title}
+                  </DialogTitle>
+                  <p className="mt-2 text-sm text-default-600 dark:text-gray-300">
+                    {columnGuideText.subtitle}
+                  </p>
+                </div>
+                <div
+                  className="flex shrink-0 items-center bg-default-100 dark:bg-gray-700 rounded-lg p-0.5 text-xs"
+                  role="group"
+                  aria-label="Column guide language"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setColumnGuideLanguage("bm")}
+                    className={`px-2 py-1 rounded-md transition-colors ${
+                      columnGuideLanguage === "bm"
+                        ? "bg-white dark:bg-gray-600 text-sky-600 dark:text-sky-400 font-medium shadow-sm"
+                        : "text-default-500 dark:text-gray-400 hover:text-default-700"
+                    }`}
+                  >
+                    BM
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setColumnGuideLanguage("en")}
+                    className={`px-2 py-1 rounded-md transition-colors ${
+                      columnGuideLanguage === "en"
+                        ? "bg-white dark:bg-gray-600 text-sky-600 dark:text-sky-400 font-medium shadow-sm"
+                        : "text-default-500 dark:text-gray-400 hover:text-default-700"
+                    }`}
+                  >
+                    EN
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-4 text-sm text-default-700 dark:text-gray-200">
+                <section>
+                  <h4 className="font-semibold text-default-900 dark:text-gray-100">{columnGuideText.priorityTitle}</h4>
+                  <p className="mt-1">{columnGuideText.priority}</p>
+                </section>
+
+                <section>
+                  <h4 className="font-semibold text-default-900 dark:text-gray-100">{columnGuideText.gajiTitle}</h4>
+                  <p className="mt-1">
+                    {columnGuideText.gajiBefore}<PayCode>FULL_*</PayCode>{columnGuideText.gajiAfter}
+                  </p>
+                </section>
+
+                <section>
+                  <h4 className="font-semibold text-default-900 dark:text-gray-100">{columnGuideText.otTitle}</h4>
+                  <p className="mt-1">{columnGuideText.ot}</p>
+                </section>
+
+                <section>
+                  <h4 className="font-semibold text-default-900 dark:text-gray-100">{columnGuideText.bonusTitle}</h4>
+                  <p className="mt-1">
+                    {columnGuideText.bonusBefore}<PayCode>BONUS</PayCode>{columnGuideText.bonusAfter}
+                  </p>
+                </section>
+
+                <section>
+                  <h4 className="font-semibold text-default-900 dark:text-gray-100">{columnGuideText.cioTitle}</h4>
+                  <p className="mt-1">
+                    {columnGuideText.cioBefore}
+                    <PayCode>IXT</PayCode><PayCode>ADD_COMM</PayCode><PayCode>T-SALESMAN</PayCode>
+                    <PayCode>FULL</PayCode><PayCode>HADIR_MEETING</PayCode><PayCode>IKUT_BX</PayCode>
+                    <PayCode>JAGA_GATE</PayCode><PayCode>BH_JG_FORKLIFT</PayCode><PayCode>BH_SUSUN</PayCode>
+                    <PayCode>T_KERJA</PayCode>{columnGuideText.cioAfter}<PayCode>FULL_*</PayCode>
+                    {columnGuideText.cioEnd}
+                  </p>
+                </section>
+
+                <section>
+                  <h4 className="font-semibold text-default-900 dark:text-gray-100">{columnGuideText.cutiTitle}</h4>
+                  <p className="mt-1">{columnGuideText.cuti}</p>
+                </section>
+
+                <section>
+                  <h4 className="font-semibold text-default-900 dark:text-gray-100">{columnGuideText.sharedTitle}</h4>
+                  <p className="mt-1">{columnGuideText.shared}</p>
+                </section>
+              </div>
+
+              <div className="flex justify-end mt-6">
+                <Button onClick={() => setShowColumnGuide(false)} variant="outline" size="sm">
+                  {columnGuideText.close}
+                </Button>
+              </div>
+            </DialogPanel>
+          </TransitionChild>
+        </div>
+      </Dialog>
+    </Transition>
+  );
+
   // Bank Table Component
   const BankTable = () => (
     <div className="overflow-x-auto">
@@ -2854,9 +3091,20 @@ const SalaryReportPage: React.FC = () => {
             {/* Summary Footer */}
             <div className="bg-default-50 dark:bg-gray-900/50 px-6 py-2 border-t border-default-200 dark:border-gray-700">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-2 md:space-y-0">
-                <div className="text-sm text-default-600 dark:text-gray-300">
-                  <span className="font-medium">Total Records:</span>{" "}
-                  {displayedReportData.total_records}
+                <div className="flex items-center gap-2 text-sm text-default-600 dark:text-gray-300">
+                  <span>
+                    <span className="font-medium">Total Records:</span>{" "}
+                    {displayedReportData.total_records}
+                  </span>
+                  <span aria-hidden="true">|</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowColumnGuide(true)}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                  >
+                    <IconInfoCircle size={15} />
+                    Column guide
+                  </button>
                 </div>
                 <div className="flex flex-col md:flex-row space-y-1 md:space-y-0 md:space-x-6 text-sm">
                   <div className="text-default-700 dark:text-gray-200">
@@ -2886,6 +3134,7 @@ const SalaryReportPage: React.FC = () => {
 
       {/* Export Dialog */}
       <ExportDialog />
+      <ColumnGuideDialog />
     </div>
   );
 };

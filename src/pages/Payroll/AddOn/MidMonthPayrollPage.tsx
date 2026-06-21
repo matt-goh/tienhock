@@ -9,6 +9,8 @@ import {
   IconRefresh,
   IconPrinter,
   IconFileExport,
+  IconSearch,
+  IconX,
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -57,6 +59,11 @@ const MidMonthPayrollPage: React.FC = () => {
     return new Date().getMonth() + 1;
   };
 
+  const getInitialSearch = (): string => {
+    const params: URLSearchParams = new URLSearchParams(window.location.search);
+    return params.get("search") || "";
+  };
+
   // State
   const [payrolls, setPayrolls] = useState<MidMonthPayroll[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -77,6 +84,7 @@ const MidMonthPayrollPage: React.FC = () => {
   // Filters - initialize from URL params
   const [currentYear, setCurrentYear] = useState(getInitialYear);
   const [currentMonth, setCurrentMonth] = useState(getInitialMonth);
+  const [searchQuery, setSearchQuery] = useState<string>(getInitialSearch);
 
   // Create Date object for MonthNavigator
   const selectedMonth = useMemo(
@@ -89,9 +97,12 @@ const MidMonthPayrollPage: React.FC = () => {
     const params = new URLSearchParams();
     params.set("year", currentYear.toString());
     params.set("month", currentMonth.toString());
+    if (searchQuery) {
+      params.set("search", searchQuery);
+    }
     const newUrl = `${window.location.pathname}?${params.toString()}`;
     window.history.replaceState({}, "", newUrl);
-  }, [currentYear, currentMonth]);
+  }, [currentYear, currentMonth, searchQuery]);
 
   // Load payrolls on mount and filter changes
   useEffect(() => {
@@ -380,9 +391,21 @@ const MidMonthPayrollPage: React.FC = () => {
     }).format(amount);
   };
 
-  // Calculate total amount
-  const totalAmount = payrolls.reduce(
-    (sum, payroll) => sum + (Number(payroll.amount) || 0),
+  const normalizedSearchQuery: string = searchQuery.trim().toLowerCase();
+  const filteredPayrolls: MidMonthPayroll[] = useMemo(
+    () =>
+      payrolls.filter((payroll: MidMonthPayroll): boolean =>
+        !normalizedSearchQuery ||
+        payroll.employee_name
+          .toLowerCase()
+          .includes(normalizedSearchQuery) ||
+        payroll.employee_id.toLowerCase().includes(normalizedSearchQuery)
+      ),
+    [payrolls, normalizedSearchQuery]
+  );
+  const filteredTotalAmount: number = filteredPayrolls.reduce(
+    (sum: number, payroll: MidMonthPayroll): number =>
+      sum + (Number(payroll.amount) || 0),
     0
   );
 
@@ -480,12 +503,39 @@ const MidMonthPayrollPage: React.FC = () => {
               showGoToCurrentButton={false}
             />
           </div>
-          <div className="text-sm text-default-600 dark:text-gray-300">
-            <div className="font-medium">
-              Total: {payrolls.length} employees
+          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-end">
+            <div className="relative">
+              <IconSearch
+                size={16}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-500"
+              />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  setSearchQuery(event.target.value)
+                }
+                placeholder="Search employee..."
+                className="w-full rounded-lg border border-default-300 bg-white py-1.5 pl-8 pr-8 text-sm text-default-900 shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 sm:w-56"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  aria-label="Clear employee search"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-600 dark:text-gray-500 dark:hover:text-gray-300"
+                >
+                  <IconX size={14} />
+                </button>
+              )}
             </div>
-            <div className="font-medium">
-              Amount: {formatCurrency(totalAmount)}
+            <div className="text-sm text-default-600 dark:text-gray-300">
+              <div className="font-medium">
+                Total: {filteredPayrolls.length} employees
+              </div>
+              <div className="font-medium">
+                Amount: {formatCurrency(filteredTotalAmount)}
+              </div>
             </div>
           </div>
         </div>
@@ -508,6 +558,11 @@ const MidMonthPayrollPage: React.FC = () => {
             <IconCash className="mx-auto h-12 w-12 text-default-300 mb-4" />
             <p className="text-lg font-medium">No payrolls found</p>
             <p>Click "Add Payroll" to create mid-month payrolls</p>
+          </div>
+        ) : filteredPayrolls.length === 0 ? (
+          <div className="text-center py-12 text-default-500 dark:text-gray-400">
+            <IconSearch className="mx-auto mb-4 h-12 w-12 text-default-300" />
+            <p className="text-lg font-medium">No employees match your search</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -535,7 +590,7 @@ const MidMonthPayrollPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                {payrolls.map((payroll) => (
+                {filteredPayrolls.map((payroll: MidMonthPayroll) => (
                   <tr key={payroll.id} className="hover:bg-default-50 dark:hover:bg-gray-700">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 dark:text-gray-100">
                       {payroll.employee_id}

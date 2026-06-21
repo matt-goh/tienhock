@@ -1,4 +1,4 @@
-// src/pages/Payroll/AddOn/CommissionPage.tsx
+// src/pages/Payroll/AddOn/OthersAdvancePage.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
 import {
@@ -7,6 +7,8 @@ import {
   IconTrash,
   IconCash,
   IconRefresh,
+  IconSearch,
+  IconX,
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -34,7 +36,7 @@ interface Commission {
   location_name: string | null;
 }
 
-const CommissionPage: React.FC = () => {
+const OthersAdvancePage: React.FC = () => {
   // Get initial values from URL params or defaults
   const getInitialYear = (): number => {
     const params = new URLSearchParams(window.location.search);
@@ -60,8 +62,14 @@ const CommissionPage: React.FC = () => {
     return new Date().getMonth() + 1;
   };
 
+  const getInitialSearch = (): string => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("search") || "";
+  };
+
   // State
   const [commissions, setCommissions] = useState<Commission[]>([]);
+  const [searchQuery, setSearchQuery] = useState<string>(getInitialSearch);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -144,7 +152,43 @@ const CommissionPage: React.FC = () => {
     }).format(amount);
   };
 
-  const totalAmount = commissions.reduce(
+  // Universal search across the displayed columns (employee, location, amount,
+  // description, date).
+  const filteredCommissions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return commissions;
+    return commissions.filter((commission) => {
+      const amount = Number(commission.amount) || 0;
+      const dateFormatted = (() => {
+        try {
+          return format(new Date(commission.commission_date), "dd MMM yyyy");
+        } catch {
+          return "";
+        }
+      })();
+      const dateIso =
+        typeof commission.commission_date === "string"
+          ? commission.commission_date.slice(0, 10)
+          : "";
+      const haystack = [
+        commission.employee_id || "",
+        commission.employee_name || "",
+        commission.location_code || "",
+        commission.location_name || "",
+        commission.description || "",
+        dateFormatted,
+        dateIso,
+        amount.toString(),
+        amount.toFixed(2),
+        formatCurrency(amount),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [commissions, searchQuery]);
+
+  const totalAmount = filteredCommissions.reduce(
     (sum, commission) => sum + (Number(commission.amount) || 0),
     0
   );
@@ -193,12 +237,38 @@ const CommissionPage: React.FC = () => {
               showGoToCurrentButton={false}
             />
           </div>
-          <div className="text-sm text-default-600 dark:text-gray-300">
-            <div className="font-medium">
-              Total: {commissions.length} records
+          <div className="flex w-full flex-wrap items-center justify-end gap-3 md:w-auto">
+            <div className="relative w-full sm:w-72">
+              <IconSearch
+                size={15}
+                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+              />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search name, location, amount, description..."
+                className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 pl-8 pr-8 text-sm text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-gray-400 hover:bg-default-100 dark:text-gray-500 dark:hover:bg-gray-700"
+                  title="Clear search"
+                >
+                  <IconX size={13} />
+                </button>
+              )}
             </div>
-            <div className="font-medium">
-              Amount: {formatCurrency(totalAmount)}
+            <div className="hidden h-6 w-px bg-default-300 dark:bg-gray-600 sm:block" />
+            <div className="text-right text-sm text-default-600 dark:text-gray-300">
+              <div className="font-medium">
+                Total: {filteredCommissions.length} records
+              </div>
+              <div className="font-medium">
+                Amount: {formatCurrency(totalAmount)}
+              </div>
             </div>
           </div>
         </div>
@@ -215,11 +285,19 @@ const CommissionPage: React.FC = () => {
           <div className="flex justify-center py-12">
             <LoadingSpinner />
           </div>
-        ) : commissions.length === 0 ? (
+        ) : filteredCommissions.length === 0 ? (
           <div className="text-center py-12 text-default-500 dark:text-gray-400">
             <IconCash className="mx-auto h-12 w-12 text-default-300 mb-4" />
-            <p className="text-lg font-medium">No {DISPLAY_LABEL} records found</p>
-            <p>Click &quot;Add {DISPLAY_LABEL}&quot; to create records</p>
+            <p className="text-lg font-medium">
+              {searchQuery.trim()
+                ? `No matching ${DISPLAY_LABEL} records`
+                : `No ${DISPLAY_LABEL} records found`}
+            </p>
+            <p>
+              {searchQuery.trim()
+                ? "Try a different search term"
+                : `Click "Add ${DISPLAY_LABEL}" to create records`}
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -250,7 +328,7 @@ const CommissionPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                {commissions.map((commission) => (
+                {filteredCommissions.map((commission) => (
                   <tr
                     key={commission.id}
                     className="group transition-colors duration-150 hover:bg-sky-50/60 dark:hover:bg-sky-900/20"
@@ -349,4 +427,4 @@ const CommissionPage: React.FC = () => {
   );
 };
 
-export default CommissionPage;
+export default OthersAdvancePage;

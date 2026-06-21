@@ -10,6 +10,8 @@ import {
   IconMoon,
   IconCalendarEvent,
   IconBeach,
+  IconSearch,
+  IconX,
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -101,6 +103,11 @@ interface ApiError {
   };
 }
 
+const getInitialEmployeeSearch = (): string => {
+  const params: URLSearchParams = new URLSearchParams(window.location.search);
+  return params.get("search") || "";
+};
+
 const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
   jobType,
 }) => {
@@ -113,6 +120,9 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
     Record<string, boolean>
   >({});
   const [showDeleteDialog, setShowDeleteDialog] = useState<boolean>(false);
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState<string>(
+    getInitialEmployeeSearch
+  );
 
   useEffect(() => {
     fetchWorkLogDetails();
@@ -261,11 +271,33 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
       ),
     0
   );
-  const totalLeaveAmount =
-    workLog.leaveRecords?.reduce(
-      (sum, record) => sum + record.amount_paid,
-      0
-    ) || 0;
+  const normalizedEmployeeSearchQuery: string = employeeSearchQuery
+    .trim()
+    .toLowerCase();
+  const filteredEmployeeEntries: EmployeeEntry[] =
+    workLog.employeeEntries.filter((entry: EmployeeEntry): boolean => {
+      if (!normalizedEmployeeSearchQuery) return true;
+      return [
+        entry.employee_name,
+        entry.employee_id,
+        entry.job_name,
+        entry.job_id,
+      ].some((value: string): boolean =>
+        value.toLowerCase().includes(normalizedEmployeeSearchQuery)
+      );
+    });
+  const filteredLeaveRecords: LeaveRecord[] = (workLog.leaveRecords || []).filter(
+    (record: LeaveRecord): boolean =>
+      !normalizedEmployeeSearchQuery ||
+      record.employee_name
+        .toLowerCase()
+        .includes(normalizedEmployeeSearchQuery) ||
+      record.employee_id.toLowerCase().includes(normalizedEmployeeSearchQuery)
+  );
+  const filteredLeaveAmount: number = filteredLeaveRecords.reduce(
+    (sum: number, record: LeaveRecord): number => sum + record.amount_paid,
+    0
+  );
 
   // Helper to get context field display value
   const getContextFieldValue = (fieldId: string) => {
@@ -390,9 +422,36 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
             </div>
           </div>
 
-          {/* Right: Actions */}
-          {workLog.status !== "Processed" && (
-            <div className="flex items-center gap-2">
+          {/* Right: Search + Actions */}
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <IconSearch
+                size={14}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-500"
+              />
+              <input
+                type="text"
+                value={employeeSearchQuery}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  setEmployeeSearchQuery(event.target.value)
+                }
+                placeholder="Search employee..."
+                className="w-36 rounded-md border border-default-300 bg-white py-1.5 pl-7 pr-7 text-xs text-default-900 placeholder:text-default-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder:text-gray-400 sm:w-44"
+              />
+              {employeeSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setEmployeeSearchQuery("")}
+                  aria-label="Clear employee search"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-600 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  <IconX size={12} />
+                </button>
+              )}
+            </div>
+            {workLog.status !== "Processed" && (
+              <>
+                <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
               <Button
                 onClick={handleEdit}
                 icon={IconPencil}
@@ -409,8 +468,9 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
               >
                 Delete
               </Button>
-            </div>
-          )}
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -419,7 +479,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
         <div className="space-y-3">
           {/* Employee Cards */}
           <div className="grid gap-3 max-h-[calc(100vh-240px)] overflow-y-auto pr-1">
-            {workLog.employeeEntries
+            {filteredEmployeeEntries
               .sort((a: EmployeeEntry, b: EmployeeEntry) => {
                 const jobCompare = (a.job_name || "").localeCompare(
                   b.job_name || ""
@@ -659,7 +719,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
       )}
 
       {/* Leave Records Section */}
-      {workLog.leaveRecords && workLog.leaveRecords.length > 0 && (
+      {filteredLeaveRecords.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 overflow-hidden">
           {/* Section Header - Rose */}
           <div className="px-4 py-2.5 bg-rose-50 dark:bg-rose-900/20 border-b border-rose-100 dark:border-rose-800">
@@ -672,7 +732,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                 Leave Records
               </h3>
               <span className="text-xs font-medium text-rose-700 dark:text-rose-400">
-                {workLog.leaveRecords.length} employee(s) on leave
+                {filteredLeaveRecords.length} employee(s) on leave
               </span>
             </div>
           </div>
@@ -695,7 +755,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-default-100 dark:divide-gray-700">
-              {workLog.leaveRecords.map((record) => {
+              {filteredLeaveRecords.map((record: LeaveRecord) => {
                 const getLeaveTypeDisplay = (leaveType: string) => {
                   switch (leaveType) {
                     case "cuti_umum":
@@ -770,7 +830,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                   Total Leave Pay
                 </td>
                 <td className="px-4 py-3 text-right font-bold text-rose-900 dark:text-rose-200">
-                  {formatCurrency(totalLeaveAmount)}
+                  {formatCurrency(filteredLeaveAmount)}
                 </td>
               </tr>
             </tfoot>

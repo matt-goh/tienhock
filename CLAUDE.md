@@ -135,7 +135,7 @@ This is a comprehensive ERP system supporting three companies:
 
 **Payroll:**
 
-- `pay_codes` - id, description, pay_type, rate_unit (constraint: Hour/Bill/Day/Bag/Trip/Fixed/Percent), rate_biasa, rate_ahad, rate_umum, is_active, requires_units_input, created_at, updated_at
+- `pay_codes` - id, description, pay_type, rate_unit (constraint: Hour/Bill/Day/Bag/Trip/Fixed/Percent), rate_biasa, rate_ahad, rate_umum, is_active, requires_units_input, report_column (nullable; one of GAJI/OT/BONUS/CIO/CUTI — pay-code-level Salary Report column override applied to both regular payroll items and Others records; NULL = automatic bucketing. Priority: automatic < pay_codes.report_column < others_records.report_column), created_at, updated_at
 - `employee_pay_codes` - id, employee_id, pay_code_id, is_default, override_rate_biasa, override_rate_ahad, override_rate_umum
 - `monthly_payrolls` - id, year, month, status, created_at, updated_at, created_by
 - `employee_payrolls` - id, monthly_payroll_id, employee_id, job_type, section, gross_pay, net_pay, status, created_at, employee_job_mapping, digenapkan, setelah_digenapkan
@@ -144,7 +144,7 @@ This is a comprehensive ERP system supporting three companies:
 - `mid_month_payrolls` - id, employee_id, year, month, amount, payment_method, status, created_at, updated_at, created_by, paid_at, notes
 - `pinjam_records` - id, employee_id (varchar 255, matches staffs.id), year, month, amount, description, pinjam_type, created_by, created_at, updated_at
 - `commission_records` - id, employee_id, commission_date, amount, description, created_by, created_at, updated_at, location_code (location 16-24 for commission entries, NULL for bonus), is_advance (true = deduct from net pay as an advance; false = normal bonus/earning)
-- `others_records` - id, employee_id (FK staffs), record_date, pay_code_id (FK pay_codes), description, rate, rate_unit, quantity, amount, link_id (nullable UUID; rows sharing the same link_id are "linked siblings" — same staff/paycode across multiple dates; shared fields always stay in sync; NULL = standalone record), created_by, created_at, updated_at (Others (Kerja Luar OT) entries; entry uses pay_code+rate+quantity like Add Manual Item, then is added to gross pay and deducted as advance on the payslip — same flow as commission_records)
+- `others_records` - id, employee_id (FK staffs), record_date, pay_code_id (FK pay_codes), description, rate, rate_unit, quantity, amount, link_id (nullable UUID; rows sharing the same link_id are "linked siblings" — same staff/paycode across multiple dates; shared fields always stay in sync; NULL = standalone record), report_column (nullable; one of GAJI/OT/BONUS/CIO/CUTI — per-entry override forcing which Salary Report column this amount lands in; NULL = automatic bucketing rule; propagated across linked siblings), created_by, created_at, updated_at (Others (Kerja Luar OT) entries; entry uses pay_code+rate+quantity like Add Manual Item, then is added to gross pay and deducted as advance on the payslip — same flow as commission_records)
 
 **Statutory Rates:**
 
