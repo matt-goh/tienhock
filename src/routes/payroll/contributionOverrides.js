@@ -27,6 +27,15 @@ export function resolveContributionContext(staff, age) {
   // SOCSO
   const socsoEligible = staff.socso_age_override !== "none";
   const socsoOver60 = !pickUnder60(staff.socso_age_override, derivedUnder60);
+  // Foreign workers are covered by the Employment Injury Scheme only: the
+  // employee contributes nothing (no Invalidity/keilatan, no SKBBK) and the
+  // employer pays the Employment-Injury-only rate (same rate column used for
+  // over-60 locals). Honour the EPF nationality override so a single per-staff
+  // setting drives both EPF and SOCSO nationality treatment.
+  const socsoLocal = staff.epf_nationality_override
+    ? staff.epf_nationality_override === "local"
+    : derivedLocal;
+  const socsoForeign = !socsoLocal;
 
   // SIP (Malaysian-only stays auto-derived from nationality)
   const sipEligible = staff.sip_age_override !== "none";
@@ -35,7 +44,7 @@ export function resolveContributionContext(staff, age) {
   return {
     isMalaysian: derivedLocal,
     epf: { eligible: epfEligible, employeeType: epfType },
-    socso: { eligible: socsoEligible, isOver60: socsoOver60 },
+    socso: { eligible: socsoEligible, isOver60: socsoOver60, isForeign: socsoForeign },
     sip: { eligible: sipEligible, under60: sipUnder60 },
   };
 }

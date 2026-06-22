@@ -149,7 +149,7 @@ This is a comprehensive ERP system supporting three companies:
 **Statutory Rates:**
 
 - `epf_rates` - id, employee_type, wage_threshold, employee_rate_percentage, employer_rate_percentage, employer_fixed_amount, is_active, created_at, updated_at
-- `socso_rates` - id, wage_from, wage_to, employee_rate (Keilatan; applied only when under 60), employee_rate_skbbk (SKBBK / Bukan Bencana Kerja; paid by all ages), employer_rate, employer_rate_over_60, is_active, created_at, updated_at. Employee SOCSO total = employee_rate + employee_rate_skbbk (under 60) or employee_rate_skbbk only (60+).
+- `socso_rates` - id, wage_from, wage_to, employee_rate (Keilatan; applied only when under 60), employee_rate_skbbk (SKBBK / Bukan Bencana Kerja; paid by all ages), employer_rate, employer_rate_over_60, is_active, created_at, updated_at. Employee SOCSO total = employee_rate + employee_rate_skbbk (under 60) or employee_rate_skbbk only (60+). Foreign workers (Employment Injury Scheme only): employee total = 0 (no Keilatan, no SKBBK) and employer uses employer_rate_over_60. Foreign status for SOCSO follows the same nationality determination as EPF (epf_nationality_override, falling back to staffs.nationality).
 - `sip_rates` - id, wage_from, wage_to, employee_rate, employer_rate, is_active, created_at, updated_at
 - `income_tax_rates` - id, wage_from, wage_to, base_rate, unemployed_spouse_k0-k10, employed_spouse_k0-k10, is_active, created_at, updated_at
 
