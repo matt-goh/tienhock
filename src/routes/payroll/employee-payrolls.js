@@ -140,7 +140,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     // Get all current payroll items
     const itemsRes = await pool.query(
       `
-      SELECT pi.*, pc.pay_type, pc.epf_exempt
+      SELECT pi.*, pc.pay_type
       FROM payroll_items pi
       LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
       WHERE pi.employee_payroll_id = $1
@@ -231,7 +231,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     // Get others (Kerja Luar OT) records for this employee for the specific month/year
     const othersRecordsRes = await pool.query(
       `
-      SELECT orec.amount, orec.description, orec.pay_code_id, pc.pay_type, pc.epf_exempt
+      SELECT orec.amount, orec.description, pc.pay_type
       FROM others_records orec
       LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
       WHERE orec.employee_id IN (SELECT id FROM staffs WHERE name = $1)
@@ -254,16 +254,6 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     const othersOvertimeGrossPay = othersRecords.reduce(
       (sum, record) =>
         (record.pay_type || "").toLowerCase() === "overtime"
-          ? sum + record.amount
-          : sum,
-      0,
-    );
-    // EPF-exempt "Others" (e.g. BONUS) count towards gross but are excluded from
-    // the EPF base. Guard against double-counting any that are also overtime.
-    const othersEpfExemptGrossPay = othersRecords.reduce(
-      (sum, record) =>
-        record.epf_exempt === true &&
-        (record.pay_type || "").toLowerCase() !== "overtime"
           ? sum + record.amount
           : sum,
       0,
@@ -425,20 +415,15 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       { Base: [], Tambahan: [], Overtime: [] },
     );
 
-    // Calculate EPF gross pay using CONSOLIDATED approach. Excludes all overtime
-    // (overtime work items aren't in Base/Tambahan; overtime "Others" are removed
-    // below) and any EPF-exempt pay codes such as BONUS (filtered from work items
-    // here and removed from "Others" via othersEpfExemptGrossPay).
-    const notEpfExempt = (item) => item.epf_exempt !== true;
+    // Calculate EPF gross pay using CONSOLIDATED approach. Excludes all overtime:
+    // Overtime work items aren't in Base/Tambahan, and overtime "Others" are
+    // removed via othersOvertimeGrossPay (OT is not part of the EPF wage base).
     const epfGrossPayCents =
-      consolidateItems((groupedItems.Base || []).filter(notEpfExempt)) +
-      consolidateItems((groupedItems.Tambahan || []).filter(notEpfExempt)) +
+      consolidateItems(groupedItems.Base || []) +
+      consolidateItems(groupedItems.Tambahan || []) +
       Math.round(leaveGrossPay * 100) +
       Math.round(commissionGrossPay * 100) +
-      Math.round(
-        (othersGrossPay - othersOvertimeGrossPay - othersEpfExemptGrossPay) *
-          100,
-      );
+      Math.round((othersGrossPay - othersOvertimeGrossPay) * 100);
     const epfGrossPay = epfGrossPayCents / 100;
 
     const age = Math.floor(
@@ -497,25 +482,20 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       : null;
     if (socsoRate) {
       const isOver60 = contributionCtx.socso.isOver60;
-      const isForeign = contributionCtx.socso.isForeign;
       const shouldApplySKBBK = isSOCSOSKBBKEffective(year, month);
-      // Foreign workers (Employment Injury Scheme only): employee pays nothing.
       const skbbk =
-        shouldApplySKBBK && !isForeign
+        shouldApplySKBBK
           ? Math.round(parseFloat(socsoRate.employee_rate_skbbk || 0) * 100) /
             100
           : 0;
-      const keilatan =
-        isOver60 || isForeign
-          ? 0
-          : Math.round(parseFloat(socsoRate.employee_rate || 0) * 100) / 100;
+      const keilatan = isOver60
+        ? 0
+        : Math.round(parseFloat(socsoRate.employee_rate || 0) * 100) / 100;
       const employee_amount = Math.round((keilatan + skbbk) * 100) / 100;
-      // Foreign and over-60 employers both pay the Employment-Injury-only rate.
-      const employer_amount =
-        isOver60 || isForeign
-          ? Math.round(parseFloat(socsoRate.employer_rate_over_60 || 0) * 100) /
-            100
-          : Math.round(parseFloat(socsoRate.employer_rate || 0) * 100) / 100;
+      const employer_amount = isOver60
+        ? Math.round(parseFloat(socsoRate.employer_rate_over_60 || 0) * 100) /
+          100
+        : Math.round(parseFloat(socsoRate.employer_rate || 0) * 100) / 100;
 
       deductions.push({
         deduction_type: "socso",
@@ -526,11 +506,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
           rate_id: socsoRate.id,
           employee_rate: `RM${employee_amount.toFixed(2)}`,
           employer_rate: `RM${employer_amount.toFixed(2)}`,
-          age_group: isForeign
-            ? "foreign"
-            : isOver60
-              ? "60_and_above"
-              : "under_60",
+          age_group: isOver60 ? "60_and_above" : "under_60",
           keilatan_amount: keilatan,
           skbbk_amount: skbbk,
         },

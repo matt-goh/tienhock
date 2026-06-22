@@ -135,7 +135,7 @@ This is a comprehensive ERP system supporting three companies:
 
 **Payroll:**
 
-- `pay_codes` - id, description, pay_type, rate_unit (constraint: Hour/Bill/Day/Bag/Trip/Fixed/Percent), rate_biasa, rate_ahad, rate_umum, is_active, requires_units_input, report_column (nullable; one of GAJI/OT/BONUS/CIO/CUTI — pay-code-level Salary Report column override applied to both regular payroll items and Others records; NULL = automatic bucketing. Priority: automatic < pay_codes.report_column < others_records.report_column), epf_exempt (boolean, default false; when true the pay code is excluded from the EPF wage base — e.g. BONUS — but still counts towards gross pay and the SOCSO/SIP bases. Honoured by both payroll processing and recalculation, for work items and Others records), created_at, updated_at
+- `pay_codes` - id, description, pay_type, rate_unit (constraint: Hour/Bill/Day/Bag/Trip/Fixed/Percent), rate_biasa, rate_ahad, rate_umum, is_active, requires_units_input, report_column (nullable; one of GAJI/OT/BONUS/CIO/CUTI — pay-code-level Salary Report column override applied to both regular payroll items and Others records; NULL = automatic bucketing. Priority: automatic < pay_codes.report_column < others_records.report_column), created_at, updated_at
 - `employee_pay_codes` - id, employee_id, pay_code_id, is_default, override_rate_biasa, override_rate_ahad, override_rate_umum
 - `monthly_payrolls` - id, year, month, status, created_at, updated_at, created_by
 - `employee_payrolls` - id, monthly_payroll_id, employee_id, job_type, section, gross_pay, net_pay, status, created_at, employee_job_mapping, digenapkan, setelah_digenapkan
@@ -149,7 +149,7 @@ This is a comprehensive ERP system supporting three companies:
 **Statutory Rates:**
 
 - `epf_rates` - id, employee_type, wage_threshold, employee_rate_percentage, employer_rate_percentage, employer_fixed_amount, is_active, created_at, updated_at
-- `socso_rates` - id, wage_from, wage_to, employee_rate (Keilatan; applied only when under 60), employee_rate_skbbk (SKBBK / Bukan Bencana Kerja; paid by all ages), employer_rate, employer_rate_over_60, is_active, created_at, updated_at. Employee SOCSO total = employee_rate + employee_rate_skbbk (under 60) or employee_rate_skbbk only (60+). Foreign workers (Employment Injury Scheme only): employee total = 0 (no Keilatan, no SKBBK) and employer uses employer_rate_over_60. Foreign status for SOCSO follows the same nationality determination as EPF (epf_nationality_override, falling back to staffs.nationality).
+- `socso_rates` - id, wage_from, wage_to, employee_rate (Keilatan; applied only when under 60), employee_rate_skbbk (SKBBK / Bukan Bencana Kerja; paid by all ages), employer_rate, employer_rate_over_60, is_active, created_at, updated_at. Employee SOCSO total = employee_rate + employee_rate_skbbk (under 60) or employee_rate_skbbk only (60+).
 - `sip_rates` - id, wage_from, wage_to, employee_rate, employer_rate, is_active, created_at, updated_at. SIP/EIS applies only to Malaysian employees aged 18–60. The under-60 bound honours sip_age_override; the age-18 lower bound is automatic and evaluated as of the payroll month (an employee turning 18 in a later month is not charged SIP in earlier months). See `ageAtPayrollMonth` in `src/routes/payroll/contributionOverrides.js`.
 - `income_tax_rates` - id, wage_from, wage_to, base_rate, unemployed_spouse_k0-k10, employed_spouse_k0-k10, is_active, created_at, updated_at
 

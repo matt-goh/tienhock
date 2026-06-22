@@ -157,8 +157,7 @@ export const calculateSOCSO = (
   wageAmount: number,
   isOver60: boolean = false,
   payrollYear?: number,
-  payrollMonth?: number,
-  isForeign: boolean = false
+  payrollMonth?: number
 ): {
   employee: number;
   employer: number;
@@ -167,18 +166,6 @@ export const calculateSOCSO = (
 } => {
   if (!socsoRate)
     return { employee: 0, employer: 0, keilatan: 0, skbbk: 0 };
-
-  // Foreign workers are covered by the Employment Injury Scheme only: the
-  // employee contributes nothing (no Keilatan, no SKBBK) and the employer pays
-  // the Employment-Injury-only rate (the same column used for over-60 locals).
-  if (isForeign) {
-    return {
-      employee: 0,
-      employer: Math.round(Number(socsoRate.employer_rate_over_60) * 100) / 100,
-      keilatan: 0,
-      skbbk: 0,
-    };
-  }
 
   const shouldApplySKBBK =
     payrollYear === undefined || payrollMonth === undefined
