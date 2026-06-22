@@ -10,6 +10,7 @@ import { PayCode, PayType, RateUnit } from "../../types/types"; // PayCode type 
 import { FormInput, FormListbox } from "../FormComponents"; // Ensure correct import path
 import Button from "../Button";
 import Checkbox from "../Checkbox";
+import PayRateScheduleManager from "./PayRateScheduleManager";
 
 interface PayCodeModalProps {
   isOpen: boolean;
@@ -309,7 +310,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-md transform rounded-2xl bg-white dark:bg-gray-800 p-6 text-left align-middle shadow-xl transition-all">
+              <DialogPanel className="w-full max-w-2xl transform rounded-2xl bg-white dark:bg-gray-800 p-6 text-left align-middle shadow-xl transition-all">
                 <DialogTitle
                   as="h3"
                   className="text-lg font-semibold leading-6 text-default-800 dark:text-gray-100"
@@ -497,6 +498,19 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                       />
                     </div>
                   </div>
+
+                  {/* Effective-dated rate changes (existing pay codes only) */}
+                  {isEditMode && formData.id && (
+                    <PayRateScheduleManager
+                      scope="pay_code"
+                      payCodeId={formData.id}
+                      baseRates={{
+                        biasa: formData.rate_biasa,
+                        ahad: formData.rate_ahad,
+                        umum: formData.rate_umum,
+                      }}
+                    />
+                  )}
 
                   {/* Error message */}
                   {error && (

@@ -685,6 +685,26 @@ export interface SelectOption {
 export type PayType = "Base" | "Tambahan" | "Overtime";
 export type RateUnit = "Hour" | "Bill" | "Bag" | "Percent" | "Fixed" | "Day" | "Trip" | "Tray" | "Kg" | "Karung" | "Bundle";
 
+// Effective-month-dated rate override layered over the base rate columns.
+// Resolved at payroll-process time by get_effective_pay_rate(); see
+// pay_rate_schedules in the Database Schema notes.
+export type PayRateScheduleScope = "pay_code" | "job" | "employee";
+export interface PayRateSchedule {
+  id: number;
+  scope: PayRateScheduleScope;
+  job_id: string | null;
+  employee_id: string | null;
+  pay_code_id: string;
+  effective_year: number;
+  effective_month: number; // 1-12; applies from this month onward
+  rate_biasa: number | null;
+  rate_ahad: number | null;
+  rate_umum: number | null;
+  notes?: string | null;
+  created_at?: string;
+  created_by?: string | null;
+}
+
 export interface PayCode {
   id: string;
   description: string;

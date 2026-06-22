@@ -21,6 +21,7 @@ import toast from "react-hot-toast";
 import { useJobsCache } from "../../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
 import { useJobPayCodeMappings } from "../../../utils/catalogue/useJobPayCodeMappings";
+import { useEffectiveRates } from "../../../utils/payroll/useEffectiveRates";
 import { api } from "../../../routes/utils/api";
 import { useHolidayCache } from "../../../utils/payroll/useHolidayCache";
 import {
@@ -276,6 +277,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     loading: loadingPayCodeMappings,
     refreshData: refreshPayCodeMappings,
   } = useJobPayCodeMappings();
+  // Month-effective rate overlay (keeps the previewed rate in step with the
+  // payslip when a scheduled rate change applies to the log's month).
+  const { resolveEffectiveRates, getEffectiveRate } = useEffectiveRates();
   const [isSaving, setIsSaving] = useState(false);
   const [selectAll, setSelectAll] = useState(false);
   const [initialState, setInitialState] = useState<{
@@ -2098,7 +2102,64 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     cleaningPayCodeBiasa,
     cleaningOTPayCode,
     forceOTHours,
+    getEffectiveRate,
   ]);
+
+  // Resolve month-effective rates for the selected workers/jobs whenever the log
+  // month or selection changes, so generated activities preview the rate in force
+  // for that month (matching payroll processing). Falls back to base/override
+  // rates until resolved or when no schedule applies.
+  useEffect(() => {
+    const logDate = formData.logDate;
+    if (!logDate || loadingPayCodeMappings) return;
+    const year = parseInt(logDate.slice(0, 4), 10);
+    const month = parseInt(logDate.slice(5, 7), 10);
+    const seen = new Set<string>();
+    const tuples: { employee_id: string; job_id: string; pay_code_id: string }[] =
+      [];
+    Object.entries(employeeSelectionState.selectedJobs).forEach(
+      ([empId, jobTypes]) => {
+        (jobTypes as string[]).forEach((jt) => {
+          const codes = [
+            ...(jobPayCodeDetails[jt] || []),
+            ...(employeeMappings[empId] || []),
+          ];
+          codes.forEach((pc: any) => {
+            const k = `${empId}|${jt}|${pc.id}`;
+            if (!seen.has(k)) {
+              seen.add(k);
+              tuples.push({ employee_id: empId, job_id: jt, pay_code_id: pc.id });
+            }
+          });
+        });
+      },
+    );
+    resolveEffectiveRates(year, month, tuples);
+  }, [
+    formData.logDate,
+    employeeSelectionState.selectedJobs,
+    jobPayCodeDetails,
+    employeeMappings,
+    loadingPayCodeMappings,
+    resolveEffectiveRates,
+  ]);
+
+  // Overlay the month-effective rate onto a pay code's override fields so all
+  // downstream rate computations (override_rate_* || rate_*) use it. No-op when
+  // no schedule applies to the tuple/month.
+  const applyEffectiveRate = useCallback(
+    (payCode: any, employeeId: string, jobTypeId: string) => {
+      const eff = getEffectiveRate(employeeId, jobTypeId, payCode?.id);
+      if (!eff) return payCode;
+      return {
+        ...payCode,
+        override_rate_biasa: eff.rate_biasa,
+        override_rate_ahad: eff.rate_ahad,
+        override_rate_umum: eff.rate_umum,
+      };
+    },
+    [getEffectiveRate],
+  );
 
   const fetchAndApplyActivities = () => {
     // Get all unique job types from selected employees
@@ -2196,7 +2257,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           });
 
           // Convert map back to array
-          let mergedPayCodes = Array.from(allPayCodes.values());
+          let mergedPayCodes = Array.from(allPayCodes.values()).map((pc) =>
+            applyEffectiveRate(pc, employeeId, empJobType)
+          );
 
           // In cleaning mode (BIHUN/BOILER), use appropriate cleaning paycode:
           // - On Ahad: HARI_AHAD_JAM for first 8 hours, OT_A for hours > 8
@@ -2207,12 +2270,16 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             if (formData.dayType === "Ahad" && cleaningPayCode) {
               // Ahad: split into base + OT
               // Enrich with employee/job-specific override rates
-              const enrichedCleaningPayCode = enrichCleaningPayCode(
-                cleaningPayCode,
+              const enrichedCleaningPayCode = applyEffectiveRate(
+                enrichCleaningPayCode(
+                  cleaningPayCode,
+                  employeeId,
+                  empJobType,
+                  employeeMappings,
+                  jobPayCodeDetails
+                ),
                 employeeId,
-                empJobType,
-                employeeMappings,
-                jobPayCodeDetails
+                empJobType
               );
 
               const baseHours = Math.min(hours, 8);
@@ -2236,12 +2303,16 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               // Add OT_A for overtime hours (hours > 8) - only if OT hours exist
               const otHours = Math.max(0, hours - 8);
               if (otHours > 0 && cleaningOTPayCode) {
-                const enrichedOTPayCode = enrichCleaningPayCode(
-                  cleaningOTPayCode,
+                const enrichedOTPayCode = applyEffectiveRate(
+                  enrichCleaningPayCode(
+                    cleaningOTPayCode,
+                    employeeId,
+                    empJobType,
+                    employeeMappings,
+                    jobPayCodeDetails
+                  ),
                   employeeId,
-                  empJobType,
-                  employeeMappings,
-                  jobPayCodeDetails
+                  empJobType
                 );
 
                 mergedPayCodes.push({
@@ -2264,12 +2335,16 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             } else if (formData.dayType === "Biasa" && cleaningPayCodeBiasa) {
               // Biasa: single paycode for all hours (same rate for all)
               // Enrich with employee/job-specific override rates
-              const enrichedCleaningPayCodeBiasa = enrichCleaningPayCode(
-                cleaningPayCodeBiasa,
+              const enrichedCleaningPayCodeBiasa = applyEffectiveRate(
+                enrichCleaningPayCode(
+                  cleaningPayCodeBiasa,
+                  employeeId,
+                  empJobType,
+                  employeeMappings,
+                  jobPayCodeDetails
+                ),
                 employeeId,
-                empJobType,
-                employeeMappings,
-                jobPayCodeDetails
+                empJobType
               );
 
               mergedPayCodes.push({
@@ -2501,7 +2576,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         allPayCodes.set(pc.id, { ...pc, source: "employee" })
       );
 
-      const activities = Array.from(allPayCodes.values()).map((payCode) => {
+      const activities = Array.from(allPayCodes.values())
+        .map((pc) => applyEffectiveRate(pc, employeeId, primaryJobType))
+        .map((payCode) => {
         const rate = payCode.override_rate_biasa || payCode.rate_biasa;
         const isSelected =
           payCode.is_default_setting && payCode.pay_type === "Base";
@@ -2544,6 +2621,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       employeeMappings,
       jobConfig?.defaultHours,
       formData.logDate,
+      applyEffectiveRate,
     ]
   );
 
@@ -2573,7 +2651,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       );
 
       // Create activities with proper selection state
-      const activities = Array.from(allPayCodes.values()).map((payCode) => {
+      const activities = Array.from(allPayCodes.values())
+        .map((pc) => applyEffectiveRate(pc, employeeId, primaryJobType))
+        .map((payCode) => {
         const savedActivity = savedActivitiesMap.get(payCode.id);
         const rate = payCode.override_rate_biasa || payCode.rate_biasa;
         const hours = jobConfig?.defaultHours || 8;
@@ -2634,6 +2714,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       jobConfig?.defaultHours,
       formData.dayType,
       formData.logDate,
+      applyEffectiveRate,
     ]
   );
 

@@ -11,6 +11,7 @@ import toast from "react-hot-toast";
 import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
 import { useJobsCache } from "../../../utils/catalogue/useJobsCache";
 import { useJobPayCodeMappings } from "../../../utils/catalogue/useJobPayCodeMappings";
+import { useEffectiveRates } from "../../../utils/payroll/useEffectiveRates";
 import { api } from "../../../routes/utils/api";
 import { useHolidayCache } from "../../../utils/payroll/useHolidayCache";
 import {
@@ -154,6 +155,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     loading: loadingPayCodeMappings,
     refreshData: refreshPayCodeMappings,
   } = useJobPayCodeMappings();
+  // Month-effective rate overlay (keeps the previewed rate in step with the
+  // payslip when a scheduled rate change applies to the log's month).
+  const { resolveEffectiveRates, getEffectiveRate } = useEffectiveRates();
   const jobConfig = getJobConfig(jobType);
   const JOB_IDS = getJobIds(jobType);
   const contextLinkedPayCodes = jobConfig
@@ -386,6 +390,58 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     getJobDisplayName,
   ]);
 
+  // Overlay the month-effective rate onto a pay code's override fields so the
+  // existing override_rate_* ?? rate_* computations use it. No-op when no
+  // schedule applies to the tuple/month.
+  const applyEffectiveRate = useCallback(
+    (payCode: any, employeeId: string, jobTypeId: string) => {
+      const eff = getEffectiveRate(employeeId, jobTypeId, payCode?.id);
+      if (!eff) return payCode;
+      return {
+        ...payCode,
+        override_rate_biasa: eff.rate_biasa,
+        override_rate_ahad: eff.rate_ahad,
+        override_rate_umum: eff.rate_umum,
+      };
+    },
+    [getEffectiveRate],
+  );
+
+  // Resolve month-effective rates for the selected employees/jobs whenever the
+  // log month or entries change, so generated activities preview the rate in
+  // force for that month (matching payroll processing).
+  useEffect(() => {
+    if (loadingPayCodeMappings || !formData.logYear || !formData.logMonth) return;
+    const seen = new Set<string>();
+    const tuples: { employee_id: string; job_id: string; pay_code_id: string }[] =
+      [];
+    Object.values(employeeEntries).forEach((entry: any) => {
+      const empId = entry.employeeId;
+      const jt = entry.jobType;
+      if (!empId || !jt) return;
+      const codes = [
+        ...(jobPayCodeDetails[jt] || []),
+        ...(employeeMappings[empId] || []),
+      ];
+      codes.forEach((pc: any) => {
+        const k = `${empId}|${jt}|${pc.id}`;
+        if (!seen.has(k)) {
+          seen.add(k);
+          tuples.push({ employee_id: empId, job_id: jt, pay_code_id: pc.id });
+        }
+      });
+    });
+    resolveEffectiveRates(formData.logYear, formData.logMonth, tuples);
+  }, [
+    employeeEntries,
+    formData.logYear,
+    formData.logMonth,
+    jobPayCodeDetails,
+    employeeMappings,
+    loadingPayCodeMappings,
+    resolveEffectiveRates,
+  ]);
+
   // Fetch and apply activities for selected employees
   const fetchAndApplyActivities = useCallback(
     (currentActivities: Record<string, ActivityItem[]>) => {
@@ -429,8 +485,10 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
           allPayCodes.set(pc.id, { ...pc, source: "employee" });
         });
 
-        // Convert map back to array
-        const mergedPayCodes = Array.from(allPayCodes.values());
+        // Convert map back to array (with month-effective rate overlay)
+        const mergedPayCodes = Array.from(allPayCodes.values()).map((pc) =>
+          applyEffectiveRate(pc, employeeId, entryJobType),
+        );
 
         // Check if this employee was originally saved in the work log
         const wasOriginallySaved = savedEmployeeIdsRef.current.has(employeeId);
@@ -700,6 +758,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
       contextLinkedPayCodes,
       mode,
       supportsDayTypeHours,
+      applyEffectiveRate,
     ],
   );
 
@@ -715,6 +774,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     jobPayCodeDetails,
     employeeMappings,
     mode,
+    applyEffectiveRate,
   ]);
 
   // Restore activities from existing work log in edit mode
