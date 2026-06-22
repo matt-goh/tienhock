@@ -1626,25 +1626,30 @@ export default function (pool) {
             : null;
           if (socsoRate) {
             const isOver60 = contributionCtx.socso.isOver60;
+            const isForeign = contributionCtx.socso.isForeign;
             const shouldApplySKBBK = isSOCSOSKBBKEffective(year, month);
+            // Foreign workers (Employment Injury Scheme only): employee pays nothing.
             const skbbk =
-              shouldApplySKBBK
+              shouldApplySKBBK && !isForeign
                 ? Math.round(
                     parseFloat(socsoRate.employee_rate_skbbk || 0) * 100
                   ) / 100
                 : 0;
-            const keilatan = isOver60
-              ? 0
-              : Math.round(parseFloat(socsoRate.employee_rate || 0) * 100) /
-                100;
+            const keilatan =
+              isOver60 || isForeign
+                ? 0
+                : Math.round(parseFloat(socsoRate.employee_rate || 0) * 100) /
+                  100;
             const employee_amount =
               Math.round((keilatan + skbbk) * 100) / 100;
-            const employer_amount = isOver60
-              ? Math.round(
-                  parseFloat(socsoRate.employer_rate_over_60 || 0) * 100
-                ) / 100
-              : Math.round(parseFloat(socsoRate.employer_rate || 0) * 100) /
-                100;
+            // Foreign and over-60 employers both pay the Employment-Injury-only rate.
+            const employer_amount =
+              isOver60 || isForeign
+                ? Math.round(
+                    parseFloat(socsoRate.employer_rate_over_60 || 0) * 100
+                  ) / 100
+                : Math.round(parseFloat(socsoRate.employer_rate || 0) * 100) /
+                  100;
             deductions.push({
               deduction_type: "socso",
               employee_amount,
@@ -1654,7 +1659,11 @@ export default function (pool) {
                 rate_id: socsoRate.id,
                 employee_rate: `RM${employee_amount.toFixed(2)}`,
                 employer_rate: `RM${employer_amount.toFixed(2)}`,
-                age_group: isOver60 ? "60_and_above" : "under_60",
+                age_group: isForeign
+                  ? "foreign"
+                  : isOver60
+                    ? "60_and_above"
+                    : "under_60",
                 keilatan_amount: keilatan,
                 skbbk_amount: skbbk,
               },

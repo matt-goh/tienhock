@@ -20,6 +20,16 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-22",
+    ms: "Pekerja asing kini tidak lagi dikenakan potongan PERKESO bahagian pekerja (mereka hanya dilindungi Skim Bencana Kerja yang dibayar majikan). Ini menaikkan gaji bersih dan jumlah Bank pekerja asing. Tetapan warganegara EPF/PERKESO kini diselaraskan supaya satu tetapan memandu kedua-duanya.",
+    en: "Foreign workers are no longer charged the employee portion of SOCSO (they are covered only by the employer-paid Employment Injury Scheme). This raises foreign workers' net pay and Bank amounts. The EPF/SOCSO nationality setting now drives both together.",
+  },
+  {
+    date: "2026-06-22",
+    ms: "Semasa memproses gaji, komisen dan rekod Lain-lain (Kerja Luar) kini dikumpulkan mengikut nama pekerja, sama seperti cuti. Ini membetulkan jumlah gaji dan amaun Bank bagi pekerja yang mempunyai lebih daripada satu ID staf, yang sebelum ini tertinggal komisen atau bayaran tertentu.",
+    en: "When processing payroll, commission and Others (Kerja Luar) records are now gathered by employee name, just like leave. This corrects the gross pay and Bank amounts for employees with more than one staff ID, who could previously have certain commission or payments left out.",
+  },
+  {
+    date: "2026-06-22",
     ms: "Dalam Butiran Gaji, keseluruhan kad Pinjam kini boleh diklik untuk membuka halaman Pinjam bagi bulan dan pekerja tersebut. Halaman Pinjam akan terus memilih bulan yang betul dan mengisi carian pekerja, termasuk pada senarai rekod di bawah.",
     en: "In Payroll Details, the whole Pinjam card can now be clicked to open Pinjam for that month and employee. Pinjam immediately selects the correct month and pre-fills the employee search, including for the records list below.",
   },
