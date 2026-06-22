@@ -24,6 +24,7 @@ import productPayCodesRouter from "./catalogue/product-pay-codes.js";
 import jobDetailsRouter from "./catalogue/job-details.js";
 import customerRouter from "./catalogue/customers.js";
 import payCodesRouter from "./catalogue/pay-codes.js";
+import payRateSchedulesRouter from "./catalogue/pay-rate-schedules.js";
 import productRouter from "./catalogue/products.js";
 import staffRouter from "./catalogue/staffs.js";
 import taxRouter from "./catalogue/taxes.js";
@@ -304,6 +305,7 @@ export default function setupRoutes(app, pool) {
   app.use("/api/taxes", taxRouter(pool));
   app.use("/api/jobs", jobRouter(pool));
   app.use("/api/pay-codes", payCodesRouter(pool));
+  app.use("/api/pay-rate-schedules", payRateSchedulesRouter(pool));
   app.use("/api/job-details", jobDetailsRouter(pool));
   app.use("/api/job-pay-codes", jobPayCodesRouter(pool));
   app.use("/api/job-location-mappings", jobLocationMappingsRouter(pool));

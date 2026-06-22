@@ -1,5 +1,6 @@
 // src/components/Payroll/LoadingOverlay.tsx
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import LoadingSpinner from "../LoadingSpinner";
 
 interface LoadingOverlayProps {
@@ -37,7 +38,7 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
     return () => clearTimeout(timer);
   }, [onClose, timeout]);
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 flex items-center justify-center z-50">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 min-w-[300px] transform scale-110">
@@ -58,7 +59,8 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 

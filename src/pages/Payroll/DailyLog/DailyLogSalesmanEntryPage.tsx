@@ -21,6 +21,7 @@ import toast from "react-hot-toast";
 import { useJobsCache } from "../../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
 import { useJobPayCodeMappings } from "../../../utils/catalogue/useJobPayCodeMappings";
+import { useEffectiveRates } from "../../../utils/payroll/useEffectiveRates";
 import { api } from "../../../routes/utils/api";
 import { useHolidayCache } from "../../../utils/payroll/useHolidayCache";
 import {
@@ -263,6 +264,22 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     loading: loadingPayCodeMappings,
     refreshData: refreshPayCodeMappings,
   } = useJobPayCodeMappings();
+  // Month-effective rate overlay (keeps the previewed rate in step with the
+  // payslip when a scheduled rate change applies to the log's month).
+  const { resolveEffectiveRates, getEffectiveRate } = useEffectiveRates();
+  const applyEffectiveRate = useCallback(
+    (payCode: any, employeeId: string, jobTypeId: string) => {
+      const eff = getEffectiveRate(employeeId, jobTypeId, payCode?.id);
+      if (!eff) return payCode;
+      return {
+        ...payCode,
+        override_rate_biasa: eff.rate_biasa,
+        override_rate_ahad: eff.rate_ahad,
+        override_rate_umum: eff.rate_umum,
+      };
+    },
+    [getEffectiveRate],
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [selectAll, setSelectAll] = useState(false);
   const [initialState, setInitialState] = useState<{
@@ -2692,6 +2709,45 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     loadingPayCodeMappings,
     mode,
     existingWorkLog,
+    getEffectiveRate,
+  ]);
+
+  // Resolve month-effective rates for the selected workers/jobs whenever the log
+  // month or selection changes, so generated activities preview the rate in force
+  // for that month (matching payroll processing).
+  useEffect(() => {
+    const logDate = formData.logDate;
+    if (!logDate || loadingPayCodeMappings) return;
+    const year = parseInt(logDate.slice(0, 4), 10);
+    const month = parseInt(logDate.slice(5, 7), 10);
+    const seen = new Set<string>();
+    const tuples: { employee_id: string; job_id: string; pay_code_id: string }[] =
+      [];
+    Object.entries(employeeSelectionState.selectedJobs).forEach(
+      ([empId, jobTypes]) => {
+        (jobTypes as string[]).forEach((jt) => {
+          const codes = [
+            ...(jobPayCodeDetails[jt] || []),
+            ...(employeeMappings[empId] || []),
+          ];
+          codes.forEach((pc: any) => {
+            const k = `${empId}|${jt}|${pc.id}`;
+            if (!seen.has(k)) {
+              seen.add(k);
+              tuples.push({ employee_id: empId, job_id: jt, pay_code_id: pc.id });
+            }
+          });
+        });
+      },
+    );
+    resolveEffectiveRates(year, month, tuples);
+  }, [
+    formData.logDate,
+    employeeSelectionState.selectedJobs,
+    jobPayCodeDetails,
+    employeeMappings,
+    loadingPayCodeMappings,
+    resolveEffectiveRates,
   ]);
 
   const fetchAndApplyActivities = () => {
@@ -2737,7 +2793,9 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
           });
 
           // Convert map back to array
-          const mergedPayCodes = Array.from(allPayCodes.values());
+          const mergedPayCodes = Array.from(allPayCodes.values()).map((pc) =>
+            applyEffectiveRate(pc, employeeId, jobType)
+          );
 
           // Check if this employee was originally saved in the work log
           const wasOriginallySaved = savedEmployeeRowKeysRef.current.has(rowKey);
@@ -3206,7 +3264,9 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
         allPayCodes.set(pc.id, { ...pc, source: "employee" })
       );
 
-      const activities = Array.from(allPayCodes.values()).map((payCode) => {
+      const activities = Array.from(allPayCodes.values())
+        .map((pc) => applyEffectiveRate(pc, employeeId, primaryJobType))
+        .map((payCode) => {
         const rate = payCode.override_rate_biasa || payCode.rate_biasa;
         const isSelected =
           payCode.is_default_setting && payCode.pay_type === "Base";
@@ -3249,6 +3309,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
       employeeMappings,
       jobConfig?.defaultHours,
       formData.logDate,
+      applyEffectiveRate,
     ]
   );
 

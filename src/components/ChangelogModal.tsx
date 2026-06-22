@@ -19,14 +19,39 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
-    date: "2026-06-22",
-    ms: "Laporan Gaji kini mengira jumlah setiap Kod Gaji daripada jumlah jam/unit dahulu sebelum dibundarkan, sama seperti Butiran Gaji dan sistem lama. Ini membetulkan perbezaan beberapa sen pada lajur seperti Gaji, OT dan C/I/O tanpa mengubah rekod kerja asal.",
-    en: "Salary Report now totals each Pay Code's hours/units before rounding, matching Payroll Details and the legacy system. This fixes a few-sen difference in columns such as Gaji, OT, and C/I/O without changing the underlying work records.",
+    date: "2026-06-23",
+    ms: "Kadar gaji kini boleh ditetapkan mengikut bulan berkuat kuasa. Pada skrin kadar Kod Gaji, kakitangan, dan kerja, anda kini boleh menambah \"perubahan kadar\" yang bermula dari bulan tertentu, dengan senarai sejarah perubahan. Setiap bulan gaji akan menggunakan kadar yang berkuat kuasa untuk bulan itu apabila diproses semula — jadi menaikkan kadar mulai bulan tertentu tidak lagi mengubah bulan-bulan sebelumnya. Skrin kemasukan kerja harian, bulanan dan jurujual kini memaparkan kadar mengikut bulan log tersebut supaya sepadan dengan slip gaji.",
+    en: "Pay rates can now be set to take effect from a specific month. On the Pay Code, employee, and job rate screens you can add a \"rate change\" that starts from a chosen month, with a history list of changes. Each payroll month uses the rate in force for that month when re-processed — so raising a rate from a certain month no longer alters earlier months. The daily, monthly, and salesman work-log entry screens now preview the rate for that log's month so it matches the payslip.",
   },
   {
     date: "2026-06-22",
-    ms: "Panduan lajur Laporan Gaji kini boleh ditukar antara Bahasa Melayu dan English, dengan Kod Gaji dipaparkan sebagai label kod untuk lebih mudah dibaca.",
-    en: "The Salary Report column guide can now be switched between Bahasa Melayu and English, with Pay Codes shown as code-style labels for easier reading.",
+    ms: "Potongan SIP (Sistem Insurans Pekerjaan) kini tidak dikenakan ke atas pekerja bawah umur 18 tahun. Kelayakan ditentukan mengikut umur pekerja pada bulan gaji berkenaan — jadi apabila pekerja mencecah umur 18 pada bulan kemudian, bulan-bulan terdahulu tidak akan terjejas dan tidak perlu diubah semula.",
+    en: "SIP (Employment Insurance) is no longer deducted from employees under 18. Eligibility is decided from the employee's age during that payroll month — so when an employee turns 18 in a later month, earlier months are unaffected and don't need to be changed.",
+  },
+  {
+    date: "2026-06-22",
+    ms: "Slip gaji jurujual kini menunjukkan bilangan beg produk yang termasuk beg percuma (FOC). Sebelum ini bilangan beg hanya menunjukkan beg yang dijual walaupun jumlah bayaran sudah mengira beg percuma, jadi bilangan beg kini sepadan dengan jumlah bayaran.",
+    en: "Salesman payslips now show product bag counts that include free (FOC) bags. Previously the bag count showed only sold bags even though the amount already counted the free bags, so the bag count now matches the amount.",
+  },
+  {
+    date: "2026-06-22",
+    ms: "Fail eksport Bank Gaji Pertengahan Bulan kini menggabungkan pekerja yang mempunyai lebih daripada satu ID staf menjadi satu baris sahaja, menggunakan nama dan akaun bank ketua (utama) dengan jumlah dicampurkan. Sebelum ini setiap ID muncul sebagai baris berasingan.",
+    en: "The Mid-month Payroll Bank export file now combines employees who have more than one staff ID into a single line, using the head (main) name and bank account with the amounts added together. Previously each ID appeared as a separate line.",
+  },
+  {
+    date: "2026-06-22",
+    ms: "Semasa memproses gaji, komisen dan rekod Lain-lain (Kerja Luar) kini dikumpulkan mengikut nama pekerja, sama seperti cuti. Ini membetulkan jumlah gaji dan amaun Bank bagi pekerja yang mempunyai lebih daripada satu ID staf, yang sebelum ini tertinggal komisen atau bayaran tertentu.",
+    en: "When processing payroll, commission and Others (Kerja Luar) records are now gathered by employee name, just like leave. This corrects the gross pay and Bank amounts for employees with more than one staff ID, who could previously have certain commission or payments left out.",
+  },
+  {
+    date: "2026-06-22",
+    ms: "Dalam Butiran Gaji, keseluruhan kad Pinjam kini boleh diklik untuk membuka halaman Pinjam bagi bulan dan pekerja tersebut. Halaman Pinjam akan terus memilih bulan yang betul dan mengisi carian pekerja, termasuk pada senarai rekod di bawah.",
+    en: "In Payroll Details, the whole Pinjam card can now be clicked to open Pinjam for that month and employee. Pinjam immediately selects the correct month and pre-fills the employee search, including for the records list below.",
+  },
+  {
+    date: "2026-06-22",
+    ms: "Laporan Gaji kini mengira jumlah setiap Kod Gaji daripada jumlah jam/unit dahulu sebelum dibundarkan, sama seperti Butiran Gaji dan sistem lama. Ini membetulkan perbezaan beberapa sen pada lajur seperti Gaji, OT dan C/I/O tanpa mengubah rekod kerja asal.",
+    en: "Salary Report now totals each Pay Code's hours/units before rounding, matching Payroll Details and the legacy system. This fixes a few-sen difference in columns such as Gaji, OT, and C/I/O without changing the underlying work records.",
   },
   {
     date: "2026-06-21",

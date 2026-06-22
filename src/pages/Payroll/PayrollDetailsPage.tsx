@@ -22,6 +22,7 @@ import {
   IconClockHour4,
   IconBuildingBank,
   IconWallet,
+  IconChevronRight,
   IconRefresh,
 } from "@tabler/icons-react";
 import { format } from "date-fns";
@@ -3248,23 +3249,25 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         {pinjamRecords.length > 0 && (
           <div
             id="pinjam-section"
-            className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800"
+            className="mb-4 overflow-hidden rounded-lg border border-default-200 bg-white dark:border-gray-700 dark:bg-gray-800"
           >
-            <div className="px-4 py-2 bg-red-50 dark:bg-red-900/20 border-b border-red-100 dark:border-red-800/50">
+            <Link
+              to={`/payroll/pinjam?year=${payroll.year}&month=${payroll.month}&search=${encodeURIComponent(payroll.employee_name || payroll.employee_id)}`}
+              className="group flex items-center justify-between gap-3 border-b border-red-100 bg-red-50 px-4 py-2 transition-colors hover:bg-red-100/70 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-red-400 dark:border-red-800/50 dark:bg-red-900/20 dark:hover:bg-red-900/35"
+              title={`Open Pinjam for ${payroll.employee_name || payroll.employee_id}`}
+            >
               <h3 className="text-md font-semibold text-red-800 dark:text-red-300 flex items-center gap-2">
                 <IconWallet
                   size={18}
                   className="text-red-600 dark:text-red-400"
                 />
-                <Link
-                  to={`/payroll/pinjam?year=${payroll.year}&month=${payroll.month}`}
-                  className="hover:underline"
-                  title="Open Pinjam System"
-                >
-                  Pinjam
-                </Link>
+                <span>Pinjam</span>
               </h3>
-            </div>
+              <span className="flex items-center gap-1 text-xs font-semibold text-red-700 group-hover:underline dark:text-red-300">
+                Open Pinjam
+                <IconChevronRight size={16} aria-hidden="true" />
+              </span>
+            </Link>
             <div className="p-4">
               <div
                 className={`flex flex-col ${
