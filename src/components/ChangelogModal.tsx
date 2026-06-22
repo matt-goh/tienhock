@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-22",
+    ms: "Dalam Butiran Gaji, keseluruhan kad Pinjam kini boleh diklik untuk membuka halaman Pinjam bagi bulan dan pekerja tersebut. Halaman Pinjam akan terus memilih bulan yang betul dan mengisi carian pekerja, termasuk pada senarai rekod di bawah.",
+    en: "In Payroll Details, the whole Pinjam card can now be clicked to open Pinjam for that month and employee. Pinjam immediately selects the correct month and pre-fills the employee search, including for the records list below.",
+  },
+  {
+    date: "2026-06-22",
     ms: "Laporan Gaji kini mengira jumlah setiap Kod Gaji daripada jumlah jam/unit dahulu sebelum dibundarkan, sama seperti Butiran Gaji dan sistem lama. Ini membetulkan perbezaan beberapa sen pada lajur seperti Gaji, OT dan C/I/O tanpa mengubah rekod kerja asal.",
     en: "Salary Report now totals each Pay Code's hours/units before rounding, matching Payroll Details and the legacy system. This fixes a few-sen difference in columns such as Gaji, OT, and C/I/O without changing the underlying work records.",
   },
