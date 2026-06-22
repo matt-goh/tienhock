@@ -4,7 +4,10 @@ import {
   recalculateAndUpdatePayroll,
   removeLeaveDayWorkItems,
 } from "./employee-payrolls.js";
-import { resolveContributionContext } from "./contributionOverrides.js";
+import {
+  resolveContributionContext,
+  ageAtPayrollMonth,
+} from "./contributionOverrides.js";
 
 const SOCSO_SKBBK_EFFECTIVE_YEAR = 2026;
 const SOCSO_SKBBK_EFFECTIVE_MONTH = 6;
@@ -495,9 +498,9 @@ export default function (pool) {
               'pay_type', pc.pay_type,
               'rate_unit', pc.rate_unit,
               'rate_used', dwla.rate_used,
-              'rate_biasa', COALESCE(epc.override_rate_biasa, jpc.override_rate_biasa, pc.rate_biasa),
-              'rate_ahad', COALESCE(epc.override_rate_ahad, jpc.override_rate_ahad, pc.rate_ahad),
-              'rate_umum', COALESCE(epc.override_rate_umum, jpc.override_rate_umum, pc.rate_umum),
+              'rate_biasa', eff.rate_biasa,
+              'rate_ahad', eff.rate_ahad,
+              'rate_umum', eff.rate_umum,
               'hours_applied', dwla.hours_applied,
               'units_produced', dwla.units_produced,
               'foc_units', dwla.foc_units,
@@ -507,12 +510,15 @@ export default function (pool) {
           JOIN daily_work_log_entries dwle ON dwl.id = dwle.work_log_id
           LEFT JOIN daily_work_log_activities dwla ON dwla.log_entry_id = dwle.id
           LEFT JOIN pay_codes pc ON dwla.pay_code_id = pc.id
-          LEFT JOIN job_pay_codes jpc ON jpc.job_id = dwle.job_id AND jpc.pay_code_id = dwla.pay_code_id
-          LEFT JOIN employee_pay_codes epc ON epc.employee_id = dwle.employee_id AND epc.pay_code_id = dwla.pay_code_id
+          -- Rate effective for the payroll month (schedule overrides layered over
+          -- employee/job/pay-code base; see get_effective_pay_rate).
+          LEFT JOIN LATERAL get_effective_pay_rate(
+            dwle.employee_id, dwle.job_id, dwla.pay_code_id, $3, $4
+          ) eff ON dwla.pay_code_id IS NOT NULL
           WHERE dwl.log_date BETWEEN $1 AND $2 AND dwl.status = 'Submitted'
           GROUP BY dwl.id, dwl.log_date, dwl.day_type, dwle.employee_id, dwle.job_id, dwle.total_hours
         `,
-            [startDate, endDate],
+            [startDate, endDate, year, month],
           ),
 
           // Monthly work logs with activities
@@ -528,9 +534,9 @@ export default function (pool) {
               'pay_type', pc.pay_type,
               'rate_unit', pc.rate_unit,
               'rate_used', mwla.rate_used,
-              'rate_biasa', COALESCE(epc.override_rate_biasa, jpc.override_rate_biasa, pc.rate_biasa),
-              'rate_ahad', COALESCE(epc.override_rate_ahad, jpc.override_rate_ahad, pc.rate_ahad),
-              'rate_umum', COALESCE(epc.override_rate_umum, jpc.override_rate_umum, pc.rate_umum),
+              'rate_biasa', eff.rate_biasa,
+              'rate_ahad', eff.rate_ahad,
+              'rate_umum', eff.rate_umum,
               'hours_applied', mwla.hours_applied,
               'calculated_amount', mwla.calculated_amount
             )) as activities
@@ -538,8 +544,10 @@ export default function (pool) {
           JOIN monthly_work_log_entries mwle ON mwl.id = mwle.monthly_log_id
           LEFT JOIN monthly_work_log_activities mwla ON mwla.monthly_entry_id = mwle.id
           LEFT JOIN pay_codes pc ON mwla.pay_code_id = pc.id
-          LEFT JOIN job_pay_codes jpc ON jpc.job_id = mwle.job_id AND jpc.pay_code_id = mwla.pay_code_id
-          LEFT JOIN employee_pay_codes epc ON epc.employee_id = mwle.employee_id AND epc.pay_code_id = mwla.pay_code_id
+          -- Rate effective for the payroll month (see get_effective_pay_rate).
+          LEFT JOIN LATERAL get_effective_pay_rate(
+            mwle.employee_id, mwle.job_id, mwla.pay_code_id, mwl.log_year, mwl.log_month
+          ) eff ON mwla.pay_code_id IS NOT NULL
           WHERE mwl.log_month = $1 AND mwl.log_year = $2 AND mwl.status = 'Submitted'
           GROUP BY mwl.id, mwl.log_month, mwl.log_year, mwle.employee_id, mwle.job_id,
             mwle.total_hours, mwle.overtime_hours,
@@ -615,17 +623,24 @@ export default function (pool) {
             [startDate, endDate],
           ),
 
-          // Product to pay code mappings
-          client.query(`
+          // Product to pay code mappings (pay-code-scoped rate effective for the
+          // payroll month; see get_effective_pay_rate).
+          client.query(
+            `
           SELECT ppc.product_id, ppc.pay_code_id,
             pc.description, pc.pay_type, pc.rate_unit,
-            CAST(pc.rate_biasa AS NUMERIC(10,2)) as rate_biasa,
-            CAST(pc.rate_ahad AS NUMERIC(10,2)) as rate_ahad,
-            CAST(pc.rate_umum AS NUMERIC(10,2)) as rate_umum
+            CAST(eff.rate_biasa AS NUMERIC(10,2)) as rate_biasa,
+            CAST(eff.rate_ahad AS NUMERIC(10,2)) as rate_ahad,
+            CAST(eff.rate_umum AS NUMERIC(10,2)) as rate_umum
           FROM product_pay_codes ppc
           JOIN pay_codes pc ON ppc.pay_code_id = pc.id
+          LEFT JOIN LATERAL get_effective_pay_rate(
+            NULL::varchar, NULL::varchar, ppc.pay_code_id, $1, $2
+          ) eff ON true
           WHERE pc.is_active = true
-        `),
+        `,
+            [year, month],
+          ),
 
           // Machine broken status for production threshold bonus override
           client.query(
@@ -1381,6 +1396,13 @@ export default function (pool) {
       for (const [employeeName, employeeJobCombos] of employeesByName) {
         try {
           const primaryEmployee = employeeJobCombos[0];
+          // Sibling ids that are actually part of this payroll row (the ids with
+          // work being grouped here). Commission/Others are scoped to these — NOT
+          // all same-name siblings — so a same-name id with no work this month
+          // (and therefore no payroll row) does not leak its records onto this row.
+          const groupEmployeeIds = [
+            ...new Set(employeeJobCombos.map((c) => c.employeeId)),
+          ];
           const staff = staffsMap.get(primaryEmployee.employeeId);
           if (!staff) {
             errors.push({
@@ -1448,9 +1470,10 @@ export default function (pool) {
                 SUM(amount) as total,
                 SUM(CASE WHEN COALESCE(is_advance, true) THEN amount ELSE 0 END) as advance_total
               FROM commission_records
-              WHERE employee_id = $1 AND DATE(commission_date) >= $2 AND DATE(commission_date) <= $3
+              WHERE employee_id = ANY($1)
+                AND DATE(commission_date) >= $2 AND DATE(commission_date) <= $3
             `,
-                [primaryEmployee.employeeId, startDate, endDate],
+                [groupEmployeeIds, startDate, endDate],
               ),
               client.query(
                 `
@@ -1459,9 +1482,10 @@ export default function (pool) {
                 SUM(CASE WHEN pc.pay_type ILIKE 'overtime' THEN orec.amount ELSE 0 END) as overtime_total
               FROM others_records orec
               LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
-              WHERE orec.employee_id = $1 AND DATE(orec.record_date) >= $2 AND DATE(orec.record_date) <= $3
+              WHERE orec.employee_id = ANY($1)
+                AND DATE(orec.record_date) >= $2 AND DATE(orec.record_date) <= $3
             `,
-                [primaryEmployee.employeeId, startDate, endDate],
+                [groupEmployeeIds, startDate, endDate],
               ),
             ]);
 
@@ -1554,7 +1578,9 @@ export default function (pool) {
             (Date.now() - new Date(staff.birthdate).getTime()) /
               (365.25 * 24 * 60 * 60 * 1000),
           );
-          const contributionCtx = resolveContributionContext(staff, age);
+          // SIP/EIS age-18 check uses the age during the payroll month, not today.
+          const sipAge = ageAtPayrollMonth(staff.birthdate, year, month);
+          const contributionCtx = resolveContributionContext(staff, age, sipAge);
 
           // Group items by pay type for EPF calculation (leave-day items excluded)
           const groupedItems = { Base: [], Tambahan: [], Overtime: [] };

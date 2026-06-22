@@ -851,9 +851,9 @@ const getBaseItemQuantityLabel = (item: ConsolidatedPayrollItem): string => {
   if (isDirectAmountFixedItem(item)) return "-";
 
   if (item.rate_unit === "Bag") {
-    return `${formatUnitQuantity(item.total_quantity)} Bag${
-      item.total_quantity > 1 ? "s" : ""
-    }`;
+    const totalBags =
+      (Number(item.total_quantity) || 0) + (Number(item.total_foc_units) || 0);
+    return `${formatUnitQuantity(totalBags)} Bag${totalBags > 1 ? "s" : ""}`;
   }
 
   if (item.rate_unit === "Hour") {
@@ -1577,7 +1577,7 @@ const buildMainPayrollPage = (
           alignment: "right",
           fontSize: 8,
         },
-        { text: "SOCSO (Pekerja)", fontSize: 8 },
+        { text: "SOCSO (Pekerja) - KEILATAN + SKBBK", fontSize: 8 },
         {
           text: `(${formatCurrency(socsoDeduction.employee_amount)})`,
           alignment: "right",
@@ -1655,7 +1655,7 @@ const buildMainPayrollPage = (
   // Mid-month payment deduction
   if (hasMidMonthAdvance) {
     tableBody.push([
-      { text: "BAYARAN PENDAHULUAN (ADVANCES PAYMENT)", fontSize: 8 },
+      { text: "BAYARAN PENDAHULUAN", fontSize: 8 },
       { text: "", fontSize: 8 },
       { text: "", fontSize: 8 },
       {
@@ -1672,7 +1672,7 @@ const buildMainPayrollPage = (
       { text: "", fontSize: 8, fillColor: "#f8f9fa" },
       { text: "", fontSize: 8, fillColor: "#f8f9fa" },
       {
-        text: "Jumlah Selepas Advances",
+        text: "Jumlah",
         bold: true,
         fontSize: 8,
         fillColor: "#f8f9fa",
@@ -2365,7 +2365,7 @@ const buildIndividualJobPage = (
           alignment: "right",
           fontSize: 8,
         },
-        { text: "SOCSO (Pekerja)", fontSize: 8 },
+        { text: "SOCSO (Pekerja) - KEILATAN + SKBBK", fontSize: 8 },
         {
           text: `(${formatCurrency(socsoDeduction.employee_amount)})`,
           alignment: "right",
@@ -2450,7 +2450,7 @@ const buildIndividualJobPage = (
     });
     if (jobAdvance > 0) {
       tableBody.push([
-        { text: "BAYARAN PENDAHULUAN (ADVANCES PAYMENT)", fontSize: 8 },
+        { text: "BAYARAN PENDAHULUAN", fontSize: 8 },
         { text: "", fontSize: 8 },
         { text: "", fontSize: 8 },
         {
@@ -2464,7 +2464,7 @@ const buildIndividualJobPage = (
       { text: "", fillColor: "#f8f9fa", fontSize: 8 },
       { text: "", fillColor: "#f8f9fa", fontSize: 8 },
       {
-        text: "Jumlah Selepas Advances",
+        text: "Jumlah",
         bold: true,
         fillColor: "#f8f9fa",
         fontSize: 8,

@@ -14,6 +14,7 @@ import Button from "../Button";
 import { EmployeePayCodeDetails } from "../../utils/catalogue/useJobPayCodeMappings";
 import { api } from "../../routes/utils/api";
 import Checkbox from "../Checkbox";
+import PayRateScheduleManager from "./PayRateScheduleManager";
 
 interface EditRatesState {
   biasa: string;
@@ -175,42 +176,54 @@ const EditEmployeePayCodeRatesModal: React.FC<
     }
   };
 
-  const renderRateInput = (
+  const renderRateField = (
     label: string,
     name: "biasa" | "ahad" | "umum",
     defaultValue: number | undefined | null
-  ) => (
-    <div className="flex items-end space-x-2">
-      <div className="flex-1">
+  ) => {
+    const overridden = editRates[name] !== "";
+    return (
+      <div>
         <label
           htmlFor={name}
-          className="block text-sm font-medium text-default-600 dark:text-gray-300"
+          className="block text-xs font-medium text-default-500 dark:text-gray-400"
         >
           {label}
         </label>
-        <input
-          type="text"
-          inputMode="decimal"
-          id={name}
-          name={name}
-          value={editRates[name]}
-          onChange={handleInputChange}
-          className="mt-1 w-full rounded border border-default-300 dark:border-gray-600 p-1.5 text-right text-sm focus:border-sky-500 focus:ring-sky-500 disabled:bg-gray-100 dark:disabled:bg-gray-800 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-          disabled={isSaving}
-          placeholder={`Default: ${(defaultValue ?? 0).toFixed(2)}`}
-        />
+        <div className="relative mt-1">
+          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+            RM
+          </span>
+          <input
+            type="text"
+            inputMode="decimal"
+            id={name}
+            name={name}
+            value={editRates[name]}
+            onChange={handleInputChange}
+            placeholder={(defaultValue ?? 0).toFixed(2)}
+            disabled={isSaving}
+            className={`w-full rounded-lg border ${
+              overridden
+                ? "border-sky-400 dark:border-sky-500"
+                : "border-default-300 dark:border-gray-600"
+            } bg-white dark:bg-gray-700 py-1.5 pl-9 pr-7 text-right text-sm text-gray-900 dark:text-gray-100 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 disabled:bg-gray-100 dark:disabled:bg-gray-800`}
+          />
+          {overridden && (
+            <button
+              type="button"
+              onClick={() => handleResetRate(name)}
+              title={`Reset ${label} to default`}
+              disabled={isSaving}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-sky-600 dark:hover:text-sky-400"
+            >
+              <IconRotateClockwise size={14} />
+            </button>
+          )}
+        </div>
       </div>
-      <button
-        type="button"
-        onClick={() => handleResetRate(name)}
-        className="mb-1 p-1 text-gray-500 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 disabled:text-gray-300 dark:disabled:text-gray-600"
-        title={`Reset ${label} to Default`}
-        disabled={isSaving || editRates[name] === ""}
-      >
-        <IconRotateClockwise size={18} />
-      </button>
-    </div>
-  );
+    );
+  };
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
@@ -222,7 +235,7 @@ const EditEmployeePayCodeRatesModal: React.FC<
         <div className="fixed inset-0 overflow-y-auto">
           <div className="flex min-h-full items-center justify-center p-4 text-center">
             <TransitionChild as={Fragment}>
-              <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 text-left align-middle shadow-xl transition-all">
+              <DialogPanel className="w-full max-w-2xl transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 text-left align-middle shadow-xl transition-all">
                 <DialogTitle
                   as="h3"
                   className="text-lg font-semibold leading-6 text-default-800 dark:text-gray-100"
@@ -236,21 +249,49 @@ const EditEmployeePayCodeRatesModal: React.FC<
                 <div className="mt-6 space-y-4">
                   {payCodeDetail && (
                     <>
-                      {renderRateInput(
-                        "Normal Rate Override (Biasa)",
-                        "biasa",
-                        payCodeDetail.rate_biasa
-                      )}
-                      {renderRateInput(
-                        "Sunday Rate Override (Ahad)",
-                        "ahad",
-                        payCodeDetail.rate_ahad
-                      )}
-                      {renderRateInput(
-                        "Holiday Rate Override (Umum)",
-                        "umum",
-                        payCodeDetail.rate_umum
-                      )}
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-default-700 dark:text-gray-200">
+                            Rate overrides
+                          </span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            Blank = use the default rate
+                          </span>
+                        </div>
+                        <div className="mt-2 grid grid-cols-3 gap-3">
+                          {renderRateField(
+                            "Biasa (Normal)",
+                            "biasa",
+                            payCodeDetail.rate_biasa
+                          )}
+                          {renderRateField(
+                            "Ahad (Sunday)",
+                            "ahad",
+                            payCodeDetail.rate_ahad
+                          )}
+                          {renderRateField(
+                            "Umum (Holiday)",
+                            "umum",
+                            payCodeDetail.rate_umum
+                          )}
+                        </div>
+                      </div>
+                      <PayRateScheduleManager
+                        scope="employee"
+                        payCodeId={payCodeDetail.id}
+                        employeeId={employeeId}
+                        baseRates={{
+                          biasa:
+                            payCodeDetail.override_rate_biasa ??
+                            payCodeDetail.rate_biasa,
+                          ahad:
+                            payCodeDetail.override_rate_ahad ??
+                            payCodeDetail.rate_ahad,
+                          umum:
+                            payCodeDetail.override_rate_umum ??
+                            payCodeDetail.rate_umum,
+                        }}
+                      />
                     </>
                   )}
                   {/* Default checkbox and unlink button only for non-Tambahan pay codes */}

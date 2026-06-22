@@ -31,6 +31,8 @@ import {
 } from "../../../utils/payroll/MidMonthPayrollReportPDF";
 import { api } from "../../../routes/utils/api";
 import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
+import { groupStaffsByName } from "../../../utils/payroll/groupStaffsByName";
+import { Employee } from "../../../types/types";
 import toast from "react-hot-toast";
 
 const MidMonthPayrollPage: React.FC = () => {
@@ -277,22 +279,55 @@ const MidMonthPayrollPage: React.FC = () => {
         "(O) - Char: 40 - AN",
       ];
 
-      const dataRows = bankPayrolls
-        .map((payroll) => {
-          const gross = Number(payroll.amount) || 0;
-          const pinjam = pinjamByEmp[payroll.employee_id] ?? 0;
-          const net = gross - pinjam;
-          if (net <= 0) return null;
+      // Roll up multi-ID (same-name) staff into a single bank line, mirroring
+      // the salary report which groups mid-month by staff name. Use the
+      // canonical (senior/head) sibling for the displayed name and bank details.
+      const canonicalByName = new Map<string, Employee>(
+        groupStaffsByName(staffs).map((s: Employee) => [s.name, s])
+      );
 
-          const staff = staffById.get(payroll.employee_id);
+      interface ConsolidatedRow {
+        canonical: Employee | undefined;
+        fallbackName: string;
+        net: number;
+      }
+      const groupedByName = new Map<string, ConsolidatedRow>();
+
+      for (const payroll of bankPayrolls) {
+        const staff = staffById.get(payroll.employee_id);
+        const gross = Number(payroll.amount) || 0;
+        const pinjam = pinjamByEmp[payroll.employee_id] ?? 0;
+        const net = gross - pinjam;
+
+        // Group by employee name so siblings collapse into one row; fall back to
+        // the id when the staff record is missing from the cache.
+        const key = staff?.name ?? payroll.employee_id;
+        const existing = groupedByName.get(key);
+        if (existing) {
+          existing.net += net;
+        } else {
+          groupedByName.set(key, {
+            canonical: staff
+              ? canonicalByName.get(staff.name) ?? staff
+              : undefined,
+            fallbackName: payroll.employee_name,
+            net,
+          });
+        }
+      }
+
+      const dataRows = Array.from(groupedByName.values())
+        .filter((group) => group.net > 0)
+        .map((group) => {
+          const staff = group.canonical;
           return [
             "PBB",
             (staff?.bankAccountNumber || "").replace(/-/g, ""),
             "PBBEMYKL",
-            (payroll.employee_name || "").replace(/,/g, " "),
+            (staff?.name || group.fallbackName || "").replace(/,/g, " "),
             staff?.document || "",
             (staff?.icNo || "").replace(/-/g, ""),
-            net.toFixed(2),
+            group.net.toFixed(2),
             "Mid-Month",
             "",
             "",
@@ -308,8 +343,7 @@ const MidMonthPayrollPage: React.FC = () => {
             "Content Line 4",
             "Content Line 5",
           ];
-        })
-        .filter((row): row is string[] => row !== null);
+        });
 
       if (dataRows.length === 0) {
         toast.error("No payable rows after deducting pinjam");
