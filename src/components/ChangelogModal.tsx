@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-22",
+    ms: "Potongan SIP (Sistem Insurans Pekerjaan) kini tidak dikenakan ke atas pekerja bawah umur 18 tahun. Kelayakan ditentukan mengikut umur pekerja pada bulan gaji berkenaan — jadi apabila pekerja mencecah umur 18 pada bulan kemudian, bulan-bulan terdahulu tidak akan terjejas dan tidak perlu diubah semula.",
+    en: "SIP (Employment Insurance) is no longer deducted from employees under 18. Eligibility is decided from the employee's age during that payroll month — so when an employee turns 18 in a later month, earlier months are unaffected and don't need to be changed.",
+  },
+  {
+    date: "2026-06-22",
     ms: "Slip gaji jurujual kini menunjukkan bilangan beg produk yang termasuk beg percuma (FOC). Sebelum ini bilangan beg hanya menunjukkan beg yang dijual walaupun jumlah bayaran sudah mengira beg percuma, jadi bilangan beg kini sepadan dengan jumlah bayaran.",
     en: "Salesman payslips now show product bag counts that include free (FOC) bags. Previously the bag count showed only sold bags even though the amount already counted the free bags, so the bag count now matches the amount.",
   },

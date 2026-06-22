@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Three of four staff in the May 2026 Bank report discrepancy are **fixed and
-confirmed**. Two remain: **NISON (+16.00)** and **AZLIM (+4.00)**. Their cause
-could not be reverse-engineered from our data alone (unlike the others), so we
-are **waiting for the user to supply the legacy payslip line items**. This doc
-tells you exactly what to do once those numbers arrive.
+Of the four staff in the May 2026 Bank report discrepancy, **only NISON (+16.00)
+remains**. AZLIM (+4.00) has since been **fixed** — see "AZLIM (RESOLVED)" below.
+For NISON the cause could not be reverse-engineered from our data alone (unlike
+the others), so we are **waiting for the user to supply the legacy payslip line
+items**. This doc tells you exactly what to do once those numbers arrive.
 
 **Do not change payroll calculation code until you have the legacy numbers and a
 rule that produces an EXACT match.** Our system is internally consistent; a wrong
@@ -48,7 +48,9 @@ There is also a client mirror `src/utils/payroll/contributionCalculations.ts`
 Stored values do NOT recompute themselves — the user must **reprocess May 2026**
 for any change to take effect.
 
-## Already fixed (do NOT redo — uncommitted in working tree)
+## Already fixed (do NOT redo)
+
+Items 1-3 are committed; item 4 (AZLIM) is in the working tree at time of writing.
 
 1. **JIRIM (+29):** `process-all` scoped commission/others by a single sibling id
    instead of by name. Fixed: both now `WHERE employee_id IN (SELECT id FROM
@@ -64,8 +66,11 @@ for any change to take effect.
    ("Exclude from EPF" checkbox). EPF base now filters epf_exempt work items and
    subtracts epf_exempt others at both calc sites.
 
-RAMBU and JIRIM now match legacy exactly. Changelog + CLAUDE.md/AGENTS.md schema
-docs updated for all three.
+4. **AZLIM (+4):** under-18 employee was charged SIP in May. Fixed via a payroll-
+   month age check on the SIP age-18 lower bound — see "AZLIM (RESOLVED)" below.
+
+JIRIM, RAMBU, and AZLIM now match legacy exactly. Changelog + CLAUDE.md/AGENTS.md
+schema docs updated for all four.
 
 Working-tree files touched: `AGENTS.md`, `CLAUDE.md`,
 `src/components/ChangelogModal.tsx`, `src/components/Catalogue/PayCodeModal.tsx`,
@@ -106,31 +111,27 @@ The answer brackets 2320–2322, so it's in the **EPF base and/or SIP base**, bu
 no single clean rule hits 2321 exactly. Leading lead: `HARI_AHAD_JAM` (Sunday
 rest-day pay) excluded from EPF base.
 
-### MOHAMMAD AZLIM BIN SHAFIE — row `employee_payrolls.id = 339` (employee_id `AZLIM`)
+### MOHAMMAD AZLIM BIN SHAFIE — row `employee_payrolls.id = 339` (RESOLVED)
 - NOTE: `staffs.name` has a DOUBLE space: `'MOHAMMAD  AZLIM BIN SHAFIE'`. Match by
   id `AZLIM` or `name ILIKE '%AZLIM%'`, not a single-spaced literal.
-- Work items: Base 1116.16 only (no OT).
-- Leave: 3 × 69.76 = 209.28.
-- Commission (all `is_advance=true`): 160.00 + 80.24 (Insentif Tidak Tetap) +
-  69.76 (Cuti Tahunan) = 310.00.
-- Others: none.
-- **Gross 1635.44**; EPF base = full gross 1635.44 (no OT).
-- Deductions: EPF **181** (ceil(1640 × 11%)); SOCSO **8.25**; SIP **3.30** (all on
-  1635.44, commission included in every base).
-- net 1132.89; midMonth advance **400.00**; **setelah 733**; no monthly pinjam;
-  **Bank 733**. **Legacy 737 → +4.00.**
-
-Hypotheses tested (none exact): excluding commission from SOCSO/SIP bases gives
-only +2 (→735); adding EPF exclusion of commission massively overshoots. The
-`Cuti Tahunan` 69.76 commission is suspicious (it mirrors the leave amount) but
-no clean rule lands on 737.
+- **Cause:** AZLIM was born 2008-06-16 and turned 18 on 2026-06-16. SIP/EIS only
+  covers ages 18–60, so May 2026 (age 17) should have **no SIP**. The system was
+  charging SIP **3.30** because (a) SIP had no age-18 lower bound and (b) age was
+  computed from `Date.now()` (today, when he is already 18) instead of the payroll
+  month. Removing the 3.30 SIP → net 1136.19 → setelah `ceil(1136.19 − 400)` =
+  **737** = legacy, exactly.
+- **Fix (shipped):** `contributionOverrides.js` now gates SIP on `sipAge >= 18`,
+  where `sipAge = ageAtPayrollMonth(birthdate, year, month)` (age on the last day
+  of the payroll month) — passed from both calc sites. EPF/SOCSO over-60 logic
+  still uses the old `Date.now()` age basis (scoped deliberately small). So May
+  auto-excludes SIP and June auto-includes it with no per-month manual edits.
 
 ## WHAT TO DO when the user provides legacy numbers
 
-Ask for / expect, per staff: legacy **EPF**, **SOCSO**, **SIP**, and ideally the
+Ask for / expect, for NISON: legacy **EPF**, **SOCSO**, **SIP**, and ideally the
 **EPF wage base** printed on the legacy payslip (and the final take-home).
 
-Decision tree (NISON shown; same logic for AZLIM):
+Decision tree (NISON):
 1. **Compare legacy EPF to ours.**
    - Legacy EPF ≈ **222–223** (ours 238) → the rule is **EPF-base composition**.
      Find which earning legacy drops from the EPF base. Most likely candidate:
@@ -154,9 +155,9 @@ Decision tree (NISON shown; same logic for AZLIM):
    unless legacy clearly rounds to nearest) and re-examine which earning is
    excluded.
 3. **Check generality:** whatever rule you adopt, confirm it does NOT move JIRIM,
-   RAMBU, or a sample of currently-correct staff away from their legacy values.
-   AZLIM and NISON may have DIFFERENT causes — solve each independently; do not
-   force a shared rule that breaks the other.
+   RAMBU, AZLIM, or a sample of currently-correct staff away from their legacy
+   values. NISON's cause is its own — do not assume it shares a rule with the
+   already-fixed staff.
 4. Apply to BOTH calc sites (+ client mirror if SOCSO), add a changelog entry
    (`CHANGELOG_ENTRIES` in `src/components/ChangelogModal.tsx`, newest first, ms+en,
    end-user language), and update CLAUDE.md/AGENTS.md if a pay-code flag or schema

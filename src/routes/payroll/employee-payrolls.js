@@ -1,6 +1,9 @@
 // src/routes/payroll/employee-payrolls.js
 import { Router } from "express";
-import { resolveContributionContext } from "./contributionOverrides.js";
+import {
+  resolveContributionContext,
+  ageAtPayrollMonth,
+} from "./contributionOverrides.js";
 
 const SOCSO_SKBBK_EFFECTIVE_YEAR = 2026;
 const SOCSO_SKBBK_EFFECTIVE_MONTH = 6;
@@ -442,7 +445,13 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       (Date.now() - new Date(employeeInfo.birthdate).getTime()) /
         (365.25 * 24 * 60 * 60 * 1000),
     );
-    const contributionCtx = resolveContributionContext(employeeInfo, age);
+    // SIP/EIS age-18 check uses the age during the payroll month, not today.
+    const sipAge = ageAtPayrollMonth(employeeInfo.birthdate, year, month);
+    const contributionCtx = resolveContributionContext(
+      employeeInfo,
+      age,
+      sipAge,
+    );
 
     const deductions = [];
 
