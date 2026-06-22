@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-22",
+    ms: "Fail eksport Bank Gaji Pertengahan Bulan kini menggabungkan pekerja yang mempunyai lebih daripada satu ID staf menjadi satu baris sahaja, menggunakan nama dan akaun bank ketua (utama) dengan jumlah dicampurkan. Sebelum ini setiap ID muncul sebagai baris berasingan.",
+    en: "The Mid-month Payroll Bank export file now combines employees who have more than one staff ID into a single line, using the head (main) name and bank account with the amounts added together. Previously each ID appeared as a separate line.",
+  },
+  {
+    date: "2026-06-22",
     ms: "Kod Gaji kini mempunyai pilihan \"Kecualikan daripada EPF\" (contohnya Bonus). Apabila ditanda, jumlah itu masih dikira dalam gaji kasar serta PERKESO/SIP, tetapi tidak lagi dimasukkan dalam pengiraan EPF. Bonus kini ditetapkan dikecualikan, sepadan dengan sistem lama.",
     en: "Pay Codes now have an \"Exclude from EPF\" option (e.g. Bonus). When ticked, the amount still counts towards gross pay and SOCSO/SIP, but is no longer included in the EPF calculation. Bonus is now set as excluded, matching the legacy system.",
   },
