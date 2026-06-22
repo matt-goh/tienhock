@@ -158,7 +158,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     // Get employee payroll details to fetch year and month for leave records
     const payrollInfoRes = await pool.query(
       `
-      SELECT ep.employee_id, ep.job_type, s.name as employee_name, mp.year, mp.month
+      SELECT ep.employee_id, ep.job_type, ep.employee_job_mapping, s.name as employee_name, mp.year, mp.month
       FROM employee_payrolls ep
       JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
       JOIN staffs s ON s.id = ep.employee_id
@@ -171,7 +171,17 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       throw new Error("Employee payroll not found");
     }
 
-    const { year, month, employee_name, job_type } = payrollInfoRes.rows[0];
+    const { year, month, employee_name, job_type, employee_job_mapping } =
+      payrollInfoRes.rows[0];
+    // Sibling ids that make up this payroll row. Commission/Others are scoped to
+    // these (the ids with work in the row) rather than all same-name siblings, so
+    // a same-name id with no work this month does not leak its records onto this
+    // row. Fall back to the row owner if the mapping is missing.
+    const groupEmployeeIds = employee_job_mapping
+      ? Object.keys(employee_job_mapping)
+      : [employee_id];
+    const scopedGroupEmployeeIds =
+      groupEmployeeIds.length > 0 ? groupEmployeeIds : [employee_id];
 
     // Get leave records for this employee for the specific month/year
     const leaveRecordsRes = await pool.query(
@@ -211,13 +221,13 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       `
       SELECT amount, description, is_advance
       FROM commission_records
-      WHERE employee_id IN (SELECT id FROM staffs WHERE name = $1)
+      WHERE employee_id = ANY($1)
         AND DATE(commission_date) >= $2
         AND DATE(commission_date) <= $3
       ORDER BY commission_date DESC
     `,
       [
-        employee_name,
+        scopedGroupEmployeeIds,
         `${year}-${month.toString().padStart(2, "0")}-01`,
         `${year}-${month.toString().padStart(2, "0")}-${new Date(year, month, 0).getDate().toString().padStart(2, "0")}`,
       ],
@@ -234,13 +244,13 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       SELECT orec.amount, orec.description, pc.pay_type
       FROM others_records orec
       LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
-      WHERE orec.employee_id IN (SELECT id FROM staffs WHERE name = $1)
+      WHERE orec.employee_id = ANY($1)
         AND DATE(orec.record_date) >= $2
         AND DATE(orec.record_date) <= $3
       ORDER BY orec.record_date DESC
     `,
       [
-        employee_name,
+        scopedGroupEmployeeIds,
         `${year}-${month.toString().padStart(2, "0")}-01`,
         `${year}-${month.toString().padStart(2, "0")}-${new Date(year, month, 0).getDate().toString().padStart(2, "0")}`,
       ],
