@@ -498,9 +498,9 @@ export default function (pool) {
               'pay_type', pc.pay_type,
               'rate_unit', pc.rate_unit,
               'rate_used', dwla.rate_used,
-              'rate_biasa', COALESCE(epc.override_rate_biasa, jpc.override_rate_biasa, pc.rate_biasa),
-              'rate_ahad', COALESCE(epc.override_rate_ahad, jpc.override_rate_ahad, pc.rate_ahad),
-              'rate_umum', COALESCE(epc.override_rate_umum, jpc.override_rate_umum, pc.rate_umum),
+              'rate_biasa', eff.rate_biasa,
+              'rate_ahad', eff.rate_ahad,
+              'rate_umum', eff.rate_umum,
               'hours_applied', dwla.hours_applied,
               'units_produced', dwla.units_produced,
               'foc_units', dwla.foc_units,
@@ -510,12 +510,15 @@ export default function (pool) {
           JOIN daily_work_log_entries dwle ON dwl.id = dwle.work_log_id
           LEFT JOIN daily_work_log_activities dwla ON dwla.log_entry_id = dwle.id
           LEFT JOIN pay_codes pc ON dwla.pay_code_id = pc.id
-          LEFT JOIN job_pay_codes jpc ON jpc.job_id = dwle.job_id AND jpc.pay_code_id = dwla.pay_code_id
-          LEFT JOIN employee_pay_codes epc ON epc.employee_id = dwle.employee_id AND epc.pay_code_id = dwla.pay_code_id
+          -- Rate effective for the payroll month (schedule overrides layered over
+          -- employee/job/pay-code base; see get_effective_pay_rate).
+          LEFT JOIN LATERAL get_effective_pay_rate(
+            dwle.employee_id, dwle.job_id, dwla.pay_code_id, $3, $4
+          ) eff ON dwla.pay_code_id IS NOT NULL
           WHERE dwl.log_date BETWEEN $1 AND $2 AND dwl.status = 'Submitted'
           GROUP BY dwl.id, dwl.log_date, dwl.day_type, dwle.employee_id, dwle.job_id, dwle.total_hours
         `,
-            [startDate, endDate],
+            [startDate, endDate, year, month],
           ),
 
           // Monthly work logs with activities
@@ -531,9 +534,9 @@ export default function (pool) {
               'pay_type', pc.pay_type,
               'rate_unit', pc.rate_unit,
               'rate_used', mwla.rate_used,
-              'rate_biasa', COALESCE(epc.override_rate_biasa, jpc.override_rate_biasa, pc.rate_biasa),
-              'rate_ahad', COALESCE(epc.override_rate_ahad, jpc.override_rate_ahad, pc.rate_ahad),
-              'rate_umum', COALESCE(epc.override_rate_umum, jpc.override_rate_umum, pc.rate_umum),
+              'rate_biasa', eff.rate_biasa,
+              'rate_ahad', eff.rate_ahad,
+              'rate_umum', eff.rate_umum,
               'hours_applied', mwla.hours_applied,
               'calculated_amount', mwla.calculated_amount
             )) as activities
@@ -541,8 +544,10 @@ export default function (pool) {
           JOIN monthly_work_log_entries mwle ON mwl.id = mwle.monthly_log_id
           LEFT JOIN monthly_work_log_activities mwla ON mwla.monthly_entry_id = mwle.id
           LEFT JOIN pay_codes pc ON mwla.pay_code_id = pc.id
-          LEFT JOIN job_pay_codes jpc ON jpc.job_id = mwle.job_id AND jpc.pay_code_id = mwla.pay_code_id
-          LEFT JOIN employee_pay_codes epc ON epc.employee_id = mwle.employee_id AND epc.pay_code_id = mwla.pay_code_id
+          -- Rate effective for the payroll month (see get_effective_pay_rate).
+          LEFT JOIN LATERAL get_effective_pay_rate(
+            mwle.employee_id, mwle.job_id, mwla.pay_code_id, mwl.log_year, mwl.log_month
+          ) eff ON mwla.pay_code_id IS NOT NULL
           WHERE mwl.log_month = $1 AND mwl.log_year = $2 AND mwl.status = 'Submitted'
           GROUP BY mwl.id, mwl.log_month, mwl.log_year, mwle.employee_id, mwle.job_id,
             mwle.total_hours, mwle.overtime_hours,
@@ -618,17 +623,24 @@ export default function (pool) {
             [startDate, endDate],
           ),
 
-          // Product to pay code mappings
-          client.query(`
+          // Product to pay code mappings (pay-code-scoped rate effective for the
+          // payroll month; see get_effective_pay_rate).
+          client.query(
+            `
           SELECT ppc.product_id, ppc.pay_code_id,
             pc.description, pc.pay_type, pc.rate_unit,
-            CAST(pc.rate_biasa AS NUMERIC(10,2)) as rate_biasa,
-            CAST(pc.rate_ahad AS NUMERIC(10,2)) as rate_ahad,
-            CAST(pc.rate_umum AS NUMERIC(10,2)) as rate_umum
+            CAST(eff.rate_biasa AS NUMERIC(10,2)) as rate_biasa,
+            CAST(eff.rate_ahad AS NUMERIC(10,2)) as rate_ahad,
+            CAST(eff.rate_umum AS NUMERIC(10,2)) as rate_umum
           FROM product_pay_codes ppc
           JOIN pay_codes pc ON ppc.pay_code_id = pc.id
+          LEFT JOIN LATERAL get_effective_pay_rate(
+            NULL::varchar, NULL::varchar, ppc.pay_code_id, $1, $2
+          ) eff ON true
           WHERE pc.is_active = true
-        `),
+        `,
+            [year, month],
+          ),
 
           // Machine broken status for production threshold bonus override
           client.query(
