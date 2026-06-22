@@ -98,6 +98,31 @@ const getDefaultPinjamMonth = (
   return { year: d.getFullYear(), month: d.getMonth() + 1 };
 };
 
+const getInitialPinjamPeriod = (): { year: number; month: number } => {
+  const fallbackPeriod = getDefaultPinjamMonth();
+  const params = new URLSearchParams(window.location.search);
+  const year = Number(params.get("year"));
+  const month = Number(params.get("month"));
+
+  if (
+    Number.isInteger(year) &&
+    year >= 2000 &&
+    year <= 2100 &&
+    Number.isInteger(month) &&
+    month >= 1 &&
+    month <= 12
+  ) {
+    return { year, month };
+  }
+
+  return fallbackPeriod;
+};
+
+const getInitialSearchQuery = (): string => {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("search")?.trim() || "";
+};
+
 const getPinjamActivityTime = (
   record: Pick<PinjamRecord, "created_at" | "updated_at">
 ): number => {
@@ -131,13 +156,15 @@ const PinjamListPage: React.FC = () => {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   // Filters
-  const [currentYear, setCurrentYear] = useState(
-    () => getDefaultPinjamMonth().year
+  const [currentYear, setCurrentYear] = useState<number>(
+    () => getInitialPinjamPeriod().year
   );
-  const [currentMonth, setCurrentMonth] = useState(
-    () => getDefaultPinjamMonth().month
+  const [currentMonth, setCurrentMonth] = useState<number>(
+    () => getInitialPinjamPeriod().month
   );
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState<string>(
+    getInitialSearchQuery
+  );
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   // Create Date object for MonthNavigator
@@ -329,6 +356,17 @@ const PinjamListPage: React.FC = () => {
     );
   }, [employeeData, searchQuery]);
 
+  const filteredPinjamRecords = useMemo<PinjamRecord[]>(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return sortedPinjamRecords;
+
+    return sortedPinjamRecords.filter(
+      (record: PinjamRecord) =>
+        record.employee_name.toLowerCase().includes(q) ||
+        record.employee_id.toLowerCase().includes(q)
+    );
+  }, [searchQuery, sortedPinjamRecords]);
+
   // Calculate totals (reflect the filtered/visible set)
   const totalMidMonthPinjam = filteredEmployeeData.reduce(
     (sum, emp) => sum + emp.midMonthPinjam,
@@ -517,7 +555,7 @@ const PinjamListPage: React.FC = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search staff"
-                className="w-full rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 pl-8 pr-8 text-sm text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
+                className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 pl-8 pr-8 text-sm text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
               />
               {searchQuery && (
                 <button
@@ -868,11 +906,19 @@ const PinjamListPage: React.FC = () => {
           </h3>
         </div>
 
-        {pinjamRecords.length === 0 ? (
+        {filteredPinjamRecords.length === 0 ? (
           <div className="text-center py-12 text-default-500 dark:text-gray-400">
             <IconCash className="mx-auto h-12 w-12 text-default-300 mb-4" />
-            <p className="text-lg font-medium">No pinjam records found</p>
-            <p>Click "Record Pinjam" to add pinjam records</p>
+            <p className="text-lg font-medium">
+              {searchQuery.trim()
+                ? "No pinjam records match your search"
+                : "No pinjam records found"}
+            </p>
+            <p>
+              {searchQuery.trim()
+                ? "Try a different name or staff ID"
+                : 'Click "Record Pinjam" to add pinjam records'}
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -900,7 +946,7 @@ const PinjamListPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                {sortedPinjamRecords.map((record) => (
+                {filteredPinjamRecords.map((record) => (
                   <tr key={record.id} className="hover:bg-default-50 dark:hover:bg-gray-700">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-900 dark:text-gray-100">
                       <div>
