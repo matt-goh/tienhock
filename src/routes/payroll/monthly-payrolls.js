@@ -672,15 +672,6 @@ export default function (pool) {
       const sipRates = sipRatesResult.rows;
       const incomeTaxRates = incomeTaxRatesResult.rows;
 
-      // Pay codes excluded from the EPF wage base (e.g. BONUS). Looked up once so
-      // work items and "Others" can be filtered out of the EPF base below.
-      const epfExemptResult = await client.query(
-        "SELECT id FROM pay_codes WHERE epf_exempt = true",
-      );
-      const epfExemptPayCodes = new Set(
-        epfExemptResult.rows.map((row) => row.id),
-      );
-
       // Group manual items by employee
       const manualItemsByEmployee = {};
       manualItemsResult.rows.forEach((item) => {
@@ -1470,8 +1461,7 @@ export default function (pool) {
                 `
               SELECT
                 SUM(orec.amount) as total,
-                SUM(CASE WHEN pc.pay_type ILIKE 'overtime' THEN orec.amount ELSE 0 END) as overtime_total,
-                SUM(CASE WHEN pc.epf_exempt AND NOT pc.pay_type ILIKE 'overtime' THEN orec.amount ELSE 0 END) as epf_exempt_total
+                SUM(CASE WHEN pc.pay_type ILIKE 'overtime' THEN orec.amount ELSE 0 END) as overtime_total
               FROM others_records orec
               LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
               WHERE orec.employee_id IN (
@@ -1502,10 +1492,6 @@ export default function (pool) {
           // gross pay but are excluded from the EPF wage base (OT is not EPF-able).
           const othersOvertimePay =
             parseFloat(othersResult.rows[0]?.overtime_total) || 0;
-          // EPF-exempt "Others" (e.g. BONUS) count towards gross but are excluded
-          // from the EPF wage base (already de-duplicated from overtime in SQL).
-          const othersEpfExemptPay =
-            parseFloat(othersResult.rows[0]?.epf_exempt_total) || 0;
 
           // Exclude daily work items dated on a leave day — they pay nothing as
           // work (the day is paid via leave) and would otherwise inflate gross
@@ -1587,22 +1573,14 @@ export default function (pool) {
             groupedItems[type].push(item);
           });
 
-          // EPF wage base excludes all overtime (Overtime work items aren't in
-          // Base/Tambahan; overtime "Others" via othersOvertimePay) and any
-          // EPF-exempt pay codes such as BONUS (filtered from work items here and
-          // removed from "Others" via othersEpfExemptPay).
+          // EPF wage base excludes all overtime: Overtime work items are not in
+          // Base/Tambahan, and overtime "Others" are removed via othersOvertimePay.
           const epfGrossPay =
-            groupedItems.Base.reduce(
-              (s, i) => s + (epfExemptPayCodes.has(i.pay_code_id) ? 0 : i.amount),
-              0,
-            ) +
-            groupedItems.Tambahan.reduce(
-              (s, i) => s + (epfExemptPayCodes.has(i.pay_code_id) ? 0 : i.amount),
-              0,
-            ) +
+            groupedItems.Base.reduce((s, i) => s + i.amount, 0) +
+            groupedItems.Tambahan.reduce((s, i) => s + i.amount, 0) +
             leaveGrossPay +
             commissionGrossPay +
-            (othersGrossPay - othersOvertimePay - othersEpfExemptPay);
+            (othersGrossPay - othersOvertimePay);
 
           const deductions = [];
 
@@ -1653,30 +1631,25 @@ export default function (pool) {
             : null;
           if (socsoRate) {
             const isOver60 = contributionCtx.socso.isOver60;
-            const isForeign = contributionCtx.socso.isForeign;
             const shouldApplySKBBK = isSOCSOSKBBKEffective(year, month);
-            // Foreign workers (Employment Injury Scheme only): employee pays nothing.
             const skbbk =
-              shouldApplySKBBK && !isForeign
+              shouldApplySKBBK
                 ? Math.round(
                     parseFloat(socsoRate.employee_rate_skbbk || 0) * 100
                   ) / 100
                 : 0;
-            const keilatan =
-              isOver60 || isForeign
-                ? 0
-                : Math.round(parseFloat(socsoRate.employee_rate || 0) * 100) /
-                  100;
+            const keilatan = isOver60
+              ? 0
+              : Math.round(parseFloat(socsoRate.employee_rate || 0) * 100) /
+                100;
             const employee_amount =
               Math.round((keilatan + skbbk) * 100) / 100;
-            // Foreign and over-60 employers both pay the Employment-Injury-only rate.
-            const employer_amount =
-              isOver60 || isForeign
-                ? Math.round(
-                    parseFloat(socsoRate.employer_rate_over_60 || 0) * 100
-                  ) / 100
-                : Math.round(parseFloat(socsoRate.employer_rate || 0) * 100) /
-                  100;
+            const employer_amount = isOver60
+              ? Math.round(
+                  parseFloat(socsoRate.employer_rate_over_60 || 0) * 100
+                ) / 100
+              : Math.round(parseFloat(socsoRate.employer_rate || 0) * 100) /
+                100;
             deductions.push({
               deduction_type: "socso",
               employee_amount,
@@ -1686,11 +1659,7 @@ export default function (pool) {
                 rate_id: socsoRate.id,
                 employee_rate: `RM${employee_amount.toFixed(2)}`,
                 employer_rate: `RM${employer_amount.toFixed(2)}`,
-                age_group: isForeign
-                  ? "foreign"
-                  : isOver60
-                    ? "60_and_above"
-                    : "under_60",
+                age_group: isOver60 ? "60_and_above" : "under_60",
                 keilatan_amount: keilatan,
                 skbbk_amount: skbbk,
               },

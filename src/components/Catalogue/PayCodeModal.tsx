@@ -32,7 +32,6 @@ const defaultPayCode: Omit<PayCode, "code"> = {
   is_active: true,
   requires_units_input: false,
   report_column: null,
-  epf_exempt: false,
 };
 
 const PayCodeModal: React.FC<PayCodeModalProps> = ({
@@ -495,23 +494,6 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                         ? "Requires Units Input (Units = Direct Amount)"
                         : "Requires Units Input"
                       }
-                      />
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        checked={!!formData.epf_exempt}
-                        onChange={() =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            epf_exempt: !prev.epf_exempt,
-                          }))
-                        }
-                        size={20}
-                        checkedColor="text-sky-600"
-                        uncheckedColor="text-default-400"
-                        disabled={isSaving}
-                        labelPosition="right"
-                        label="Exclude from EPF (e.g. Bonus) — still counts towards gross, SOCSO & SIP"
                       />
                     </div>
                   </div>
