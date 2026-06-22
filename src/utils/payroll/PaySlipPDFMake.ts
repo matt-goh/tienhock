@@ -1672,7 +1672,7 @@ const buildMainPayrollPage = (
       { text: "", fontSize: 8, fillColor: "#f8f9fa" },
       { text: "", fontSize: 8, fillColor: "#f8f9fa" },
       {
-        text: "Jumlah Selepas Advances",
+        text: "Jumlah",
         bold: true,
         fontSize: 8,
         fillColor: "#f8f9fa",
@@ -2464,7 +2464,7 @@ const buildIndividualJobPage = (
       { text: "", fillColor: "#f8f9fa", fontSize: 8 },
       { text: "", fillColor: "#f8f9fa", fontSize: 8 },
       {
-        text: "Jumlah Selepas Advances",
+        text: "Jumlah",
         bold: true,
         fillColor: "#f8f9fa",
         fontSize: 8,
