@@ -4,7 +4,10 @@ import {
   recalculateAndUpdatePayroll,
   removeLeaveDayWorkItems,
 } from "./employee-payrolls.js";
-import { resolveContributionContext } from "./contributionOverrides.js";
+import {
+  resolveContributionContext,
+  ageAtPayrollMonth,
+} from "./contributionOverrides.js";
 
 const SOCSO_SKBBK_EFFECTIVE_YEAR = 2026;
 const SOCSO_SKBBK_EFFECTIVE_MONTH = 6;
@@ -1572,7 +1575,9 @@ export default function (pool) {
             (Date.now() - new Date(staff.birthdate).getTime()) /
               (365.25 * 24 * 60 * 60 * 1000),
           );
-          const contributionCtx = resolveContributionContext(staff, age);
+          // SIP/EIS age-18 check uses the age during the payroll month, not today.
+          const sipAge = ageAtPayrollMonth(staff.birthdate, year, month);
+          const contributionCtx = resolveContributionContext(staff, age, sipAge);
 
           // Group items by pay type for EPF calculation (leave-day items excluded)
           const groupedItems = { Base: [], Tambahan: [], Overtime: [] };

@@ -7,7 +7,25 @@
 //   *_age_override:           'under_60' | 'over_60' | 'none' (not eligible) | null (auto)
 //   epf_nationality_override: 'local' | 'foreign' | null (auto)
 
-export function resolveContributionContext(staff, age) {
+// Integer age on the last day of a payroll month (year, 1-based month). Used for
+// the SIP/EIS minimum-age check so eligibility follows the employee's age during
+// the payroll period rather than the date processing happens to run.
+export function ageAtPayrollMonth(birthdate, year, month) {
+  const ref = new Date(year, month, 0); // day 0 of next month = last day of this one
+  const birth = new Date(birthdate);
+  let age = ref.getFullYear() - birth.getFullYear();
+  if (
+    ref.getMonth() < birth.getMonth() ||
+    (ref.getMonth() === birth.getMonth() && ref.getDate() < birth.getDate())
+  ) {
+    age--;
+  }
+  return age;
+}
+
+// `sipAge` defaults to `age` so callers that don't track a payroll month keep
+// their previous behaviour; the payroll calc sites pass the payroll-month age.
+export function resolveContributionContext(staff, age, sipAge = age) {
   const derivedLocal = (staff.nationality || "").toLowerCase() === "malaysian";
   const derivedUnder60 = age < 60;
 
@@ -37,8 +55,11 @@ export function resolveContributionContext(staff, age) {
     : derivedLocal;
   const socsoForeign = !socsoLocal;
 
-  // SIP (Malaysian-only stays auto-derived from nationality)
-  const sipEligible = staff.sip_age_override !== "none";
+  // SIP (Malaysian-only stays auto-derived from nationality). EIS covers ages
+  // 18-60: the under-60 bound honours the override, while the age-18 lower bound
+  // is automatic from the payroll-month age (an employee turning 18 next month
+  // is not charged SIP this month).
+  const sipEligible = staff.sip_age_override !== "none" && sipAge >= 18;
   const sipUnder60 = pickUnder60(staff.sip_age_override, derivedUnder60);
 
   return {
