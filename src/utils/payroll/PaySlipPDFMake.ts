@@ -1577,7 +1577,7 @@ const buildMainPayrollPage = (
           alignment: "right",
           fontSize: 8,
         },
-        { text: "SOCSO (Pekerja)", fontSize: 8 },
+        { text: "SOCSO (Pekerja) - KEILATAN + SKBBK", fontSize: 8 },
         {
           text: `(${formatCurrency(socsoDeduction.employee_amount)})`,
           alignment: "right",
@@ -2365,7 +2365,7 @@ const buildIndividualJobPage = (
           alignment: "right",
           fontSize: 8,
         },
-        { text: "SOCSO (Pekerja)", fontSize: 8 },
+        { text: "SOCSO (Pekerja) - KEILATAN + SKBBK", fontSize: 8 },
         {
           text: `(${formatCurrency(socsoDeduction.employee_amount)})`,
           alignment: "right",
