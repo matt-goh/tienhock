@@ -698,6 +698,9 @@ export interface PayCode {
   // Optional Salary Report column override: "GAJI" | "OT" | "BONUS" | "CIO" | "CUTI".
   // null = use automatic bucketing. Sits below the per-entry others_records.report_column override.
   report_column?: string | null;
+  // When true, this pay code is excluded from the EPF wage base (e.g. BONUS).
+  // Still counts towards gross pay and the SOCSO/SIP bases.
+  epf_exempt?: boolean;
   created_at?: string;
   updated_at?: string;
   section_id?: string; // Optional field to indicate the section when used in section_pay_codes

@@ -40,7 +40,7 @@ export default function (pool) {
           CAST(rate_biasa AS NUMERIC(10, 2)) as rate_biasa,
           CAST(rate_ahad AS NUMERIC(10, 2)) as rate_ahad,
           CAST(rate_umum AS NUMERIC(10, 2)) as rate_umum,
-          is_active, requires_units_input, report_column, created_at, updated_at
+          is_active, requires_units_input, report_column, epf_exempt, created_at, updated_at
         FROM pay_codes ORDER BY updated_at DESC, created_at DESC`; // Order by latest modified/created
       const result = await pool.query(query);
       // Parse numeric values
@@ -76,7 +76,7 @@ export default function (pool) {
           CAST(rate_biasa AS NUMERIC(10, 2)) as rate_biasa,
           CAST(rate_ahad AS NUMERIC(10, 2)) as rate_ahad,
           CAST(rate_umum AS NUMERIC(10, 2)) as rate_umum,
-          is_active, requires_units_input, report_column, created_at, updated_at
+          is_active, requires_units_input, report_column, epf_exempt, created_at, updated_at
         FROM pay_codes WHERE id = $1`;
       const result = await pool.query(query, [id]);
       if (result.rows.length === 0)
@@ -121,6 +121,7 @@ export default function (pool) {
       is_active,
       requires_units_input,
       report_column,
+      epf_exempt,
     } = req.body;
 
     // ID is now the main identifier besides description
@@ -154,8 +155,8 @@ export default function (pool) {
         INSERT INTO pay_codes (
           id, description, pay_type, rate_unit,
           rate_biasa, rate_ahad, rate_umum,
-          is_active, requires_units_input, report_column
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) -- Adjusted parameter count
+          is_active, requires_units_input, report_column, epf_exempt
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) -- Adjusted parameter count
         RETURNING *
       `;
       const values = [
@@ -169,6 +170,7 @@ export default function (pool) {
         is_active === undefined ? true : !!is_active,
         requires_units_input === undefined ? false : !!requires_units_input,
         normalizedReportColumn,
+        epf_exempt === undefined ? false : !!epf_exempt,
       ];
 
       const result = await pool.query(query, values);
@@ -219,6 +221,7 @@ export default function (pool) {
       is_active,
       requires_units_input,
       report_column,
+      epf_exempt,
     } = req.body;
 
     if (!id) {
@@ -271,8 +274,9 @@ export default function (pool) {
           rate_umum = $6,
           is_active = $7,
           requires_units_input = $8,
-          report_column = $9
-        WHERE id = $10 -- Adjusted parameter count
+          report_column = $9,
+          epf_exempt = $10
+        WHERE id = $11 -- Adjusted parameter count
         RETURNING *
       `;
       const values = [
@@ -285,6 +289,7 @@ export default function (pool) {
         is_active === undefined ? true : !!is_active,
         requires_units_input === undefined ? false : !!requires_units_input,
         normalizedReportColumn,
+        epf_exempt === undefined ? false : !!epf_exempt,
         id,
       ];
 

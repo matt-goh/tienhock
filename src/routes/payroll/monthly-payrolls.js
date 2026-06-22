@@ -669,6 +669,15 @@ export default function (pool) {
       const sipRates = sipRatesResult.rows;
       const incomeTaxRates = incomeTaxRatesResult.rows;
 
+      // Pay codes excluded from the EPF wage base (e.g. BONUS). Looked up once so
+      // work items and "Others" can be filtered out of the EPF base below.
+      const epfExemptResult = await client.query(
+        "SELECT id FROM pay_codes WHERE epf_exempt = true",
+      );
+      const epfExemptPayCodes = new Set(
+        epfExemptResult.rows.map((row) => row.id),
+      );
+
       // Group manual items by employee
       const manualItemsByEmployee = {};
       manualItemsResult.rows.forEach((item) => {
@@ -1458,7 +1467,8 @@ export default function (pool) {
                 `
               SELECT
                 SUM(orec.amount) as total,
-                SUM(CASE WHEN pc.pay_type ILIKE 'overtime' THEN orec.amount ELSE 0 END) as overtime_total
+                SUM(CASE WHEN pc.pay_type ILIKE 'overtime' THEN orec.amount ELSE 0 END) as overtime_total,
+                SUM(CASE WHEN pc.epf_exempt AND NOT pc.pay_type ILIKE 'overtime' THEN orec.amount ELSE 0 END) as epf_exempt_total
               FROM others_records orec
               LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
               WHERE orec.employee_id IN (
@@ -1489,6 +1499,10 @@ export default function (pool) {
           // gross pay but are excluded from the EPF wage base (OT is not EPF-able).
           const othersOvertimePay =
             parseFloat(othersResult.rows[0]?.overtime_total) || 0;
+          // EPF-exempt "Others" (e.g. BONUS) count towards gross but are excluded
+          // from the EPF wage base (already de-duplicated from overtime in SQL).
+          const othersEpfExemptPay =
+            parseFloat(othersResult.rows[0]?.epf_exempt_total) || 0;
 
           // Exclude daily work items dated on a leave day — they pay nothing as
           // work (the day is paid via leave) and would otherwise inflate gross
@@ -1568,14 +1582,22 @@ export default function (pool) {
             groupedItems[type].push(item);
           });
 
-          // EPF wage base excludes all overtime: Overtime work items are not in
-          // Base/Tambahan, and overtime "Others" are removed via othersOvertimePay.
+          // EPF wage base excludes all overtime (Overtime work items aren't in
+          // Base/Tambahan; overtime "Others" via othersOvertimePay) and any
+          // EPF-exempt pay codes such as BONUS (filtered from work items here and
+          // removed from "Others" via othersEpfExemptPay).
           const epfGrossPay =
-            groupedItems.Base.reduce((s, i) => s + i.amount, 0) +
-            groupedItems.Tambahan.reduce((s, i) => s + i.amount, 0) +
+            groupedItems.Base.reduce(
+              (s, i) => s + (epfExemptPayCodes.has(i.pay_code_id) ? 0 : i.amount),
+              0,
+            ) +
+            groupedItems.Tambahan.reduce(
+              (s, i) => s + (epfExemptPayCodes.has(i.pay_code_id) ? 0 : i.amount),
+              0,
+            ) +
             leaveGrossPay +
             commissionGrossPay +
-            (othersGrossPay - othersOvertimePay);
+            (othersGrossPay - othersOvertimePay - othersEpfExemptPay);
 
           const deductions = [];
 
