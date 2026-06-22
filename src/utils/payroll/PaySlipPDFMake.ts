@@ -1655,7 +1655,7 @@ const buildMainPayrollPage = (
   // Mid-month payment deduction
   if (hasMidMonthAdvance) {
     tableBody.push([
-      { text: "BAYARAN PENDAHULUAN (ADVANCES PAYMENT)", fontSize: 8 },
+      { text: "BAYARAN PENDAHULUAN", fontSize: 8 },
       { text: "", fontSize: 8 },
       { text: "", fontSize: 8 },
       {
@@ -2450,7 +2450,7 @@ const buildIndividualJobPage = (
     });
     if (jobAdvance > 0) {
       tableBody.push([
-        { text: "BAYARAN PENDAHULUAN (ADVANCES PAYMENT)", fontSize: 8 },
+        { text: "BAYARAN PENDAHULUAN", fontSize: 8 },
         { text: "", fontSize: 8 },
         { text: "", fontSize: 8 },
         {
