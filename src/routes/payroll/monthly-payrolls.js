@@ -1448,9 +1448,11 @@ export default function (pool) {
                 SUM(amount) as total,
                 SUM(CASE WHEN COALESCE(is_advance, true) THEN amount ELSE 0 END) as advance_total
               FROM commission_records
-              WHERE employee_id = $1 AND DATE(commission_date) >= $2 AND DATE(commission_date) <= $3
+              WHERE employee_id IN (
+                SELECT id FROM staffs WHERE name = $1
+              ) AND DATE(commission_date) >= $2 AND DATE(commission_date) <= $3
             `,
-                [primaryEmployee.employeeId, startDate, endDate],
+                [employeeName, startDate, endDate],
               ),
               client.query(
                 `
@@ -1459,9 +1461,11 @@ export default function (pool) {
                 SUM(CASE WHEN pc.pay_type ILIKE 'overtime' THEN orec.amount ELSE 0 END) as overtime_total
               FROM others_records orec
               LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
-              WHERE orec.employee_id = $1 AND DATE(orec.record_date) >= $2 AND DATE(orec.record_date) <= $3
+              WHERE orec.employee_id IN (
+                SELECT id FROM staffs WHERE name = $1
+              ) AND DATE(orec.record_date) >= $2 AND DATE(orec.record_date) <= $3
             `,
-                [primaryEmployee.employeeId, startDate, endDate],
+                [employeeName, startDate, endDate],
               ),
             ]);
 
