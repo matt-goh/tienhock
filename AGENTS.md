@@ -135,7 +135,7 @@ This is a comprehensive ERP system supporting three companies:
 
 **Payroll:**
 
-- `pay_codes` - id, description, pay_type, rate_unit (constraint: Hour/Bill/Day/Bag/Trip/Fixed/Percent), rate_biasa, rate_ahad, rate_umum, is_active, requires_units_input, report_column (nullable; one of GAJI/OT/BONUS/CIO/CUTI — pay-code-level Salary Report column override applied to both regular payroll items and Others records; NULL = automatic bucketing. Priority: automatic < pay_codes.report_column < others_records.report_column), created_at, updated_at
+- `pay_codes` - id, description, pay_type, rate_unit (constraint: Hour/Bill/Day/Bag/Trip/Fixed/Percent), rate_biasa, rate_ahad, rate_umum, is_active, requires_units_input, report_column (nullable; one of GAJI/OT/BONUS/CIO/CUTI — pay-code-level Salary Report column override applied to both regular payroll items and Others records; NULL = automatic bucketing. Priority: automatic < pay_codes.report_column < others_records.report_column), epf_exempt (boolean, default false; when true the pay code is excluded from the EPF wage base — e.g. BONUS — but still counts towards gross pay and the SOCSO/SIP bases. Honoured by both payroll processing and recalculation, for work items and Others records), created_at, updated_at
 - `employee_pay_codes` - id, employee_id, pay_code_id, is_default, override_rate_biasa, override_rate_ahad, override_rate_umum
 - `monthly_payrolls` - id, year, month, status, created_at, updated_at, created_by
 - `employee_payrolls` - id, monthly_payroll_id, employee_id, job_type, section, gross_pay, net_pay, status, created_at, employee_job_mapping, digenapkan, setelah_digenapkan

@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-22",
+    ms: "Kod Gaji kini mempunyai pilihan \"Kecualikan daripada EPF\" (contohnya Bonus). Apabila ditanda, jumlah itu masih dikira dalam gaji kasar serta PERKESO/SIP, tetapi tidak lagi dimasukkan dalam pengiraan EPF. Bonus kini ditetapkan dikecualikan, sepadan dengan sistem lama.",
+    en: "Pay Codes now have an \"Exclude from EPF\" option (e.g. Bonus). When ticked, the amount still counts towards gross pay and SOCSO/SIP, but is no longer included in the EPF calculation. Bonus is now set as excluded, matching the legacy system.",
+  },
+  {
+    date: "2026-06-22",
     ms: "Pekerja asing kini tidak lagi dikenakan potongan PERKESO bahagian pekerja (mereka hanya dilindungi Skim Bencana Kerja yang dibayar majikan). Ini menaikkan gaji bersih dan jumlah Bank pekerja asing. Tetapan warganegara EPF/PERKESO kini diselaraskan supaya satu tetapan memandu kedua-duanya.",
     en: "Foreign workers are no longer charged the employee portion of SOCSO (they are covered only by the employer-paid Employment Injury Scheme). This raises foreign workers' net pay and Bank amounts. The EPF/SOCSO nationality setting now drives both together.",
   },
