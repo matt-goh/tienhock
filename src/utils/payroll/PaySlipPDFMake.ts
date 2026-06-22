@@ -851,9 +851,9 @@ const getBaseItemQuantityLabel = (item: ConsolidatedPayrollItem): string => {
   if (isDirectAmountFixedItem(item)) return "-";
 
   if (item.rate_unit === "Bag") {
-    return `${formatUnitQuantity(item.total_quantity)} Bag${
-      item.total_quantity > 1 ? "s" : ""
-    }`;
+    const totalBags =
+      (Number(item.total_quantity) || 0) + (Number(item.total_foc_units) || 0);
+    return `${formatUnitQuantity(totalBags)} Bag${totalBags > 1 ? "s" : ""}`;
   }
 
   if (item.rate_unit === "Hour") {

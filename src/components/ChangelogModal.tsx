@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-22",
+    ms: "Slip gaji jurujual kini menunjukkan bilangan beg produk yang termasuk beg percuma (FOC). Sebelum ini bilangan beg hanya menunjukkan beg yang dijual walaupun jumlah bayaran sudah mengira beg percuma, jadi bilangan beg kini sepadan dengan jumlah bayaran.",
+    en: "Salesman payslips now show product bag counts that include free (FOC) bags. Previously the bag count showed only sold bags even though the amount already counted the free bags, so the bag count now matches the amount.",
+  },
+  {
+    date: "2026-06-22",
     ms: "Fail eksport Bank Gaji Pertengahan Bulan kini menggabungkan pekerja yang mempunyai lebih daripada satu ID staf menjadi satu baris sahaja, menggunakan nama dan akaun bank ketua (utama) dengan jumlah dicampurkan. Sebelum ini setiap ID muncul sebagai baris berasingan.",
     en: "The Mid-month Payroll Bank export file now combines employees who have more than one staff ID into a single line, using the head (main) name and bank account with the amounts added together. Previously each ID appeared as a separate line.",
   },
