@@ -290,17 +290,18 @@ export default function (pool) {
           COALESCE(pmd.pinjam_details, '[]'::json) as pinjam_details,
           -- GAJI = regular wage. Worker WITH an Hour/Day base: all non-piece work (base + hourly
           -- maintenance/Sunday). Worker with NO hourly base (pure piece / office salary): Base +
-          -- production F/HARIAN codes (FULL_*). The generic FULL incentive code and other
-          -- allowances remain C/I/O. Kerja-Luar matched by name.
+          -- production F/HARIAN codes (FULL_*). FULL and HADIR_MEETING always count as GAJI for
+          -- all workers; other allowances/incentives remain C/I/O. Kerja-Luar matched by name.
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
              WHERE pid.employee_id = ebd.employee_id
                AND (pid.report_column = 'GAJI' OR (pid.report_column IS NULL
                AND COALESCE(pid.pay_type, 'Tambahan') <> 'Overtime'
-               AND (pid.pay_code_id IS NULL OR pid.pay_code_id NOT IN ('BONUS', 'IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA'))
+               AND (pid.pay_code_id IS NULL OR pid.pay_code_id NOT IN ('BONUS', 'IXT', 'ADD_COMM', 'T-SALESMAN', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA'))
                AND lower(btrim(coalesce(pid.description, ''))) <> 'cuti tahunan'
                AND (
-                 (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                 pid.pay_code_id IN ('FULL', 'HADIR_MEETING')
+                 OR (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(pid.rate_unit, 'Hour') IN ('Hour', 'Day', 'Fixed'))
                  OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(pid.pay_type, 'Tambahan') = 'Base')
@@ -312,10 +313,11 @@ export default function (pool) {
              WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
                AND (od.report_column = 'GAJI' OR (od.report_column IS NULL
                AND od.pay_type <> 'Overtime'
-               AND (od.pay_code_id IS NULL OR od.pay_code_id NOT IN ('BONUS', 'IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA'))
+               AND (od.pay_code_id IS NULL OR od.pay_code_id NOT IN ('BONUS', 'IXT', 'ADD_COMM', 'T-SALESMAN', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA'))
                AND od.desc_key <> 'cuti tahunan'
                AND (
-                 (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                 od.pay_code_id IN ('FULL', 'HADIR_MEETING')
+                 OR (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(od.rate_unit, 'Hour') IN ('Hour', 'Day', 'Fixed'))
                  OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND od.pay_type = 'Base')
@@ -337,18 +339,19 @@ export default function (pool) {
                AND od.pay_type = 'Overtime'
                AND od.desc_key <> 'cuti tahunan'))), 0
           ) as others_overtime,
-          -- C/I/O = incentive/allowance codes (IXT/ADD_COMM/T-SALESMAN/FULL/HADIR_MEETING) +
+          -- C/I/O = incentive/allowance codes (IXT/ADD_COMM/T-SALESMAN/IKUT_BX/...) +
           -- everything that is NOT the worker's GAJI: piece-rate for an hourly worker, or any
-          -- non-Base extra for a pure-piece worker. Excl. Overtime, BONUS code, Cuti-Tahunan.
+          -- non-Base extra for a pure-piece worker. Excl. Overtime, BONUS code, Cuti-Tahunan,
+          -- and FULL/HADIR_MEETING (always GAJI).
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
              WHERE pid.employee_id = ebd.employee_id
                AND (pid.report_column = 'CIO' OR (pid.report_column IS NULL
                AND COALESCE(pid.pay_type, 'Tambahan') <> 'Overtime'
-               AND (pid.pay_code_id IS NULL OR pid.pay_code_id <> 'BONUS')
+               AND (pid.pay_code_id IS NULL OR pid.pay_code_id NOT IN ('BONUS', 'FULL', 'HADIR_MEETING'))
                AND lower(btrim(coalesce(pid.description, ''))) <> 'cuti tahunan'
                AND (
-                 pid.pay_code_id IN ('IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA')
+                 pid.pay_code_id IN ('IXT', 'ADD_COMM', 'T-SALESMAN', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA')
                  OR (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(pid.rate_unit, 'Hour') NOT IN ('Hour', 'Day', 'Fixed'))
                  OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
@@ -360,10 +363,10 @@ export default function (pool) {
              WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
                AND (od.report_column = 'CIO' OR (od.report_column IS NULL
                AND od.pay_type <> 'Overtime'
-               AND (od.pay_code_id IS NULL OR od.pay_code_id <> 'BONUS')
+               AND (od.pay_code_id IS NULL OR od.pay_code_id NOT IN ('BONUS', 'FULL', 'HADIR_MEETING'))
                AND od.desc_key <> 'cuti tahunan'
                AND (
-                 od.pay_code_id IN ('IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA')
+                 od.pay_code_id IN ('IXT', 'ADD_COMM', 'T-SALESMAN', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA')
                  OR (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(od.rate_unit, 'Hour') NOT IN ('Hour', 'Day', 'Fixed'))
                  OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
@@ -1310,17 +1313,18 @@ export default function (pool) {
           COALESCE(pmd.pinjam_details, '[]'::json) as pinjam_details,
           -- GAJI = regular wage. Worker WITH an Hour/Day base: all non-piece work (base + hourly
           -- maintenance/Sunday). Worker with NO hourly base (pure piece / office salary): Base +
-          -- production F/HARIAN codes (FULL_*). The generic FULL incentive code and other
-          -- allowances remain C/I/O. Kerja-Luar matched by name.
+          -- production F/HARIAN codes (FULL_*). FULL and HADIR_MEETING always count as GAJI for
+          -- all workers; other allowances/incentives remain C/I/O. Kerja-Luar matched by name.
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
              WHERE pid.employee_id = ebd.employee_id
                AND (pid.report_column = 'GAJI' OR (pid.report_column IS NULL
                AND COALESCE(pid.pay_type, 'Tambahan') <> 'Overtime'
-               AND (pid.pay_code_id IS NULL OR pid.pay_code_id NOT IN ('BONUS', 'IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA'))
+               AND (pid.pay_code_id IS NULL OR pid.pay_code_id NOT IN ('BONUS', 'IXT', 'ADD_COMM', 'T-SALESMAN', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA'))
                AND lower(btrim(coalesce(pid.description, ''))) <> 'cuti tahunan'
                AND (
-                 (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                 pid.pay_code_id IN ('FULL', 'HADIR_MEETING')
+                 OR (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(pid.rate_unit, 'Hour') IN ('Hour', 'Day', 'Fixed'))
                  OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(pid.pay_type, 'Tambahan') = 'Base')
@@ -1332,10 +1336,11 @@ export default function (pool) {
              WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
                AND (od.report_column = 'GAJI' OR (od.report_column IS NULL
                AND od.pay_type <> 'Overtime'
-               AND (od.pay_code_id IS NULL OR od.pay_code_id NOT IN ('BONUS', 'IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA'))
+               AND (od.pay_code_id IS NULL OR od.pay_code_id NOT IN ('BONUS', 'IXT', 'ADD_COMM', 'T-SALESMAN', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA'))
                AND od.desc_key <> 'cuti tahunan'
                AND (
-                 (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                 od.pay_code_id IN ('FULL', 'HADIR_MEETING')
+                 OR (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(od.rate_unit, 'Hour') IN ('Hour', 'Day', 'Fixed'))
                  OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND od.pay_type = 'Base')
@@ -1357,18 +1362,19 @@ export default function (pool) {
                AND od.pay_type = 'Overtime'
                AND od.desc_key <> 'cuti tahunan'))), 0
           ) as others_overtime,
-          -- C/I/O = incentive/allowance codes (IXT/ADD_COMM/T-SALESMAN/FULL/HADIR_MEETING) +
+          -- C/I/O = incentive/allowance codes (IXT/ADD_COMM/T-SALESMAN/IKUT_BX/...) +
           -- everything that is NOT the worker's GAJI: piece-rate for an hourly worker, or any
-          -- non-Base extra for a pure-piece worker. Excl. Overtime, BONUS code, Cuti-Tahunan.
+          -- non-Base extra for a pure-piece worker. Excl. Overtime, BONUS code, Cuti-Tahunan,
+          -- and FULL/HADIR_MEETING (always GAJI).
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
              WHERE pid.employee_id = ebd.employee_id
                AND (pid.report_column = 'CIO' OR (pid.report_column IS NULL
                AND COALESCE(pid.pay_type, 'Tambahan') <> 'Overtime'
-               AND (pid.pay_code_id IS NULL OR pid.pay_code_id <> 'BONUS')
+               AND (pid.pay_code_id IS NULL OR pid.pay_code_id NOT IN ('BONUS', 'FULL', 'HADIR_MEETING'))
                AND lower(btrim(coalesce(pid.description, ''))) <> 'cuti tahunan'
                AND (
-                 pid.pay_code_id IN ('IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA')
+                 pid.pay_code_id IN ('IXT', 'ADD_COMM', 'T-SALESMAN', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA')
                  OR (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(pid.rate_unit, 'Hour') NOT IN ('Hour', 'Day', 'Fixed'))
                  OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
@@ -1380,10 +1386,10 @@ export default function (pool) {
              WHERE od.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)
                AND (od.report_column = 'CIO' OR (od.report_column IS NULL
                AND od.pay_type <> 'Overtime'
-               AND (od.pay_code_id IS NULL OR od.pay_code_id <> 'BONUS')
+               AND (od.pay_code_id IS NULL OR od.pay_code_id NOT IN ('BONUS', 'FULL', 'HADIR_MEETING'))
                AND od.desc_key <> 'cuti tahunan'
                AND (
-                 od.pay_code_id IN ('IXT', 'ADD_COMM', 'T-SALESMAN', 'FULL', 'HADIR_MEETING', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA')
+                 od.pay_code_id IN ('IXT', 'ADD_COMM', 'T-SALESMAN', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA')
                  OR (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(od.rate_unit, 'Hour') NOT IN ('Hour', 'Day', 'Fixed'))
                  OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
