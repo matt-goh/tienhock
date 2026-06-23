@@ -95,7 +95,7 @@ const isAdvanceRecord = (record: AdvanceRecord): boolean =>
 const getCommissionQuantityLabel = (record: MergedAdvance): string =>
   record.rows.every((row: AdvanceRecord) => row.is_advance === false)
     ? "Bonus"
-    : "Advance";
+    : "";
 
 interface CombinedAdvanceDisplay {
   // Commission records with no same-description Others row — rendered as their
@@ -180,7 +180,7 @@ const getAdvanceStatusDescriptionNote = (
 
   if (summary.regularCount === 0 || summary.advanceCount === 0) return "";
 
-  return ` (Regular: ${formatCurrency(summary.regularAmount)} x${summary.regularCount}; Advance: ${formatCurrency(summary.advanceAmount)} x${summary.advanceCount})`;
+  return ` (Regular: ${formatCurrency(summary.regularAmount)} x${summary.regularCount}; ${formatCurrency(summary.advanceAmount)} x${summary.advanceCount})`;
 };
 
 interface GroupedLeaveRecord {
@@ -1640,7 +1640,7 @@ const buildMainPayrollPage = (
   if (mergedAdvanceCommissionRecords.length > 0) {
     mergedAdvanceCommissionRecords.forEach((commission) => {
       tableBody.push([
-        { text: `${commission.description} (Advance)`, fontSize: 8 },
+        { text: `${commission.description}`, fontSize: 8 },
         { text: "", fontSize: 8 },
         { text: "", fontSize: 8 },
         {
@@ -2438,7 +2438,7 @@ const buildIndividualJobPage = (
   if (commissionAdvanceTotal > 0 || jobAdvance > 0) {
     mergedAdvanceCommissionRecords.forEach((commission) => {
       tableBody.push([
-        { text: `${commission.description} (Advance)`, fontSize: 8 },
+        { text: `${commission.description}`, fontSize: 8 },
         { text: "", fontSize: 8 },
         { text: "", fontSize: 8 },
         {
