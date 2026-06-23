@@ -63,6 +63,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
     { id: "Bill", name: "Bill" },
     { id: "Day", name: "Day" },
     { id: "Bag", name: "Bag" },
+    { id: "Ctn", name: "Ctn (Carton)" },
     { id: "Kg", name: "Kilogram" },
     { id: "Karung", name: "Karung" },
     { id: "Bundle", name: "Bundle" },
@@ -151,7 +152,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
     (name: keyof Omit<PayCode, "code">) => (value: string) => {
       if (
         name === "rate_unit" &&
-        ["Percent", "Trip", "Day", "Bag", "Kg", "Karung", "Bundle", "Fixed", "Tray"].includes(value)
+        ["Percent", "Trip", "Day", "Bag", "Ctn", "Kg", "Karung", "Bundle", "Fixed", "Tray"].includes(value)
       ) {
         // When rate unit is production-based, automatically set requires_units_input to true
         setFormData((prev) => ({
@@ -463,9 +464,10 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                       // Disable for production-based units (auto-managed)
                       disabled={
                         isSaving ||
-                        formData.rate_unit === "Percent" ||
-                        formData.rate_unit === "Bag" ||
-                        formData.rate_unit === "Kg" ||
+                          formData.rate_unit === "Percent" ||
+                          formData.rate_unit === "Bag" ||
+                          formData.rate_unit === "Ctn" ||
+                          formData.rate_unit === "Kg" ||
                         formData.rate_unit === "Karung" ||
                         formData.rate_unit === "Bundle" ||
                         formData.rate_unit === "Hour" ||
@@ -479,6 +481,8 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                         ? "Requires Units Input (Required for Percentage)"
                         : formData.rate_unit === "Bag"
                         ? "Requires Units Input (Required for Bag)"
+                        : formData.rate_unit === "Ctn"
+                        ? "Requires Units Input (Required for Carton)"
                         : formData.rate_unit === "Kg"
                         ? "Requires Units Input (Required for Kilogram)"
                         : formData.rate_unit === "Karung"

@@ -544,6 +544,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
           if (
             isContextLinked ||
             payCode.rate_unit === "Bag" ||
+            payCode.rate_unit === "Ctn" ||
             payCode.rate_unit === "Trip" ||
             payCode.rate_unit === "Day"
           ) {

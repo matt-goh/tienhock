@@ -1112,7 +1112,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     0,
   );
 
-  type BaseRateSummaryUnit = "Bag" | "Hour";
+  type BaseRateSummaryUnit = "Bag" | "Ctn" | "Hour";
 
   type BaseRateSummary = {
     unit: BaseRateSummaryUnit;
@@ -1121,12 +1121,12 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     totalAmount: number;
   };
 
-  const BASE_RATE_SUMMARY_UNITS: BaseRateSummaryUnit[] = ["Bag", "Hour"];
+  const BASE_RATE_SUMMARY_UNITS: BaseRateSummaryUnit[] = ["Bag", "Ctn", "Hour"];
 
   const isBaseRateSummaryUnit = (
     rateUnit: string,
   ): rateUnit is BaseRateSummaryUnit => {
-    return rateUnit === "Bag" || rateUnit === "Hour";
+    return rateUnit === "Bag" || rateUnit === "Ctn" || rateUnit === "Hour";
   };
 
   const formatUnitQuantity = (quantity: number): string => {
@@ -1218,6 +1218,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     summaryItems: ConsolidatedPayrollItem[],
     unit: BaseRateSummaryUnit,
   ): boolean => {
+    if (unit === "Ctn") return true;
     return unit !== "Bag" || summaryItems.length > 1;
   };
 
@@ -1233,7 +1234,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       0,
     );
 
-    if (unit === "Bag") {
+    if (unit === "Bag" || unit === "Ctn") {
       const totalUnits: number = unitItems.reduce(
         (sum, item) => sum + getTotalUnitQuantity(item),
         0,
@@ -1499,7 +1500,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     totalLabel: string,
   ): React.ReactElement => {
     const summary: BaseRateSummary = calculateBaseRateSummary(baseItems, unit);
-    const unitLabel: string = unit === "Bag" ? "Bag" : "Jam";
+    const unitLabel: string = unit === "Hour" ? "Jam" : unit;
     const summaryLabel: string = shouldShowBaseFinalTotal(baseItems)
       ? `${unitLabel} Summary`
       : totalLabel;
