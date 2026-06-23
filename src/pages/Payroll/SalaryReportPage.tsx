@@ -86,6 +86,7 @@ interface SalaryReportData {
   payment_preference: string;
   gaji_genap: number;
   total_pinjam: number;
+  pinjam_details?: { description: string; amount: number }[];
   final_total: number;
   net_pay: number;
   mid_month_amount: number;
@@ -2442,6 +2443,23 @@ const SalaryReportPage: React.FC = () => {
                 <div className="text-sm text-default-900 dark:text-gray-100 font-medium">
                   {item.staff_id} - {item.staff_name}
                 </div>
+                {item.pinjam_details && item.pinjam_details.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {item.pinjam_details.map((detail, dIndex) => (
+                      <span
+                        key={dIndex}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-rose-100 bg-rose-50 px-2 py-0.5 text-xs dark:border-rose-900/40 dark:bg-rose-900/20"
+                      >
+                        <span className="text-default-600 dark:text-gray-300">
+                          {detail.description}
+                        </span>
+                        <span className="font-semibold tabular-nums text-rose-600 dark:text-rose-400">
+                          {formatCurrency(detail.amount)}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </td>
               <td className="px-2 py-1 text-sm text-default-600 dark:text-gray-300 text-right">
                 {formatCurrency(item.gaji_genap)}

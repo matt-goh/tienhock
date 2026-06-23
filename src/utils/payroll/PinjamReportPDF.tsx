@@ -126,12 +126,17 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     color: colors.textSecondary,
   },
+  // Whole employee block (main row + its pinjam breakdown). The separating
+  // line lives here so it sits below the breakdown, not between it and the row.
+  employeeBlock: {
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.borderLight,
+    paddingBottom: 2,
+  },
   tableRow: {
     flexDirection: "row",
     paddingVertical: 3,
     paddingHorizontal: 3,
-    borderBottomWidth: 0.5,
-    borderBottomColor: colors.borderLight,
     minHeight: 18,
   },
 
@@ -162,6 +167,31 @@ const styles = StyleSheet.create({
   colPayment: {
     width: "10%",
     textAlign: "center",
+  },
+
+  // Pinjam detail sub-rows
+  detailRow: {
+    flexDirection: "row",
+    paddingHorizontal: 3,
+    paddingBottom: 1.5,
+    marginTop: -2,
+  },
+  detailSpacer: {
+    width: "4%",
+  },
+  detailDesc: {
+    width: "50%",
+    fontSize: 7.5,
+    fontFamily: "Helvetica-Oblique",
+    color: colors.textMuted,
+    paddingLeft: 10,
+  },
+  detailAmount: {
+    width: "14%",
+    fontSize: 7.5,
+    color: colors.textMuted,
+    textAlign: "right",
+    paddingRight: 4,
   },
 
   // Text formatting
@@ -258,6 +288,11 @@ const getMonthName = (month: number): string => {
 };
 
 // Interfaces
+export interface PinjamDetail {
+  description: string;
+  amount: number;
+}
+
 export interface PinjamReportData {
   no: number;
   staff_id: string;
@@ -265,6 +300,7 @@ export interface PinjamReportData {
   payment_preference: string;
   gaji_genap: number;
   total_pinjam: number;
+  pinjam_details?: PinjamDetail[];
   final_total: number;
   net_pay: number;
   mid_month_amount: number;
@@ -285,31 +321,46 @@ export interface PinjamReportPDFData {
 // PDF Components
 const PinjamRow: React.FC<{
   employee: PinjamReportData;
-}> = ({ employee }) => (
-  <View style={styles.tableRow} wrap={false}>
-    <Text style={styles.colNo}>{employee.no}</Text>
-    <Text style={styles.colStaffId}>
-      {employee.staff_id} - {employee.staff_name}
-    </Text>
-    <Text style={[styles.colGajiGenap, styles.bold]}>
-      {formatCurrency(employee.gaji_genap)}
-    </Text>
-    <Text
-      style={[
-        styles.colPinjam,
-        {
-          color: employee.total_pinjam > 0 ? colors.danger : colors.textPrimary,
-        },
-      ]}
-    >
-      {formatCurrency(employee.total_pinjam)}
-    </Text>
-    <Text style={[styles.colTotal, styles.bold, { color: colors.primary }]}>
-      {formatCurrency(employee.final_total)}
-    </Text>
-    <Text style={styles.colPayment}>{employee.payment_preference}</Text>
-  </View>
-);
+}> = ({ employee }) => {
+  const details = employee.pinjam_details ?? [];
+  return (
+    <View style={styles.employeeBlock} wrap={false}>
+      <View style={styles.tableRow}>
+        <Text style={styles.colNo}>{employee.no}</Text>
+        <Text style={styles.colStaffId}>
+          {employee.staff_id} - {employee.staff_name}
+        </Text>
+        <Text style={[styles.colGajiGenap, styles.bold]}>
+          {formatCurrency(employee.gaji_genap)}
+        </Text>
+        <Text
+          style={[
+            styles.colPinjam,
+            {
+              color:
+                employee.total_pinjam > 0 ? colors.danger : colors.textPrimary,
+            },
+          ]}
+        >
+          {formatCurrency(employee.total_pinjam)}
+        </Text>
+        <Text style={[styles.colTotal, styles.bold, { color: colors.primary }]}>
+          {formatCurrency(employee.final_total)}
+        </Text>
+        <Text style={styles.colPayment}>{employee.payment_preference}</Text>
+      </View>
+      {details.map((detail, index) => (
+        <View style={styles.detailRow} key={index}>
+          <Text style={styles.detailSpacer} />
+          <Text style={styles.detailDesc}>{`•  ${detail.description}`}</Text>
+          <Text style={styles.detailAmount}>
+            {formatCurrency(detail.amount)}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+};
 
 const PinjamReportPDF: React.FC<{
   data: PinjamReportPDFData;
@@ -349,7 +400,7 @@ const PinjamReportPDF: React.FC<{
         </View>
 
         {/* Enhanced Footer Summary */}
-        <View style={styles.footerSection}>
+        <View style={styles.footerSection} wrap={false}>
           <Text style={styles.footerTitle}>Pinjam Report Summary</Text>
 
           {/* Main Summary Row */}
