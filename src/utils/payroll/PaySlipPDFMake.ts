@@ -94,7 +94,7 @@ const isAdvanceRecord = (record: AdvanceRecord): boolean =>
 
 const getCommissionQuantityLabel = (record: MergedAdvance): string =>
   record.rows.every((row: AdvanceRecord) => row.is_advance === false)
-    ? "Bonus"
+    ? ""
     : "";
 
 interface CombinedAdvanceDisplay {
