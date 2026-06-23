@@ -2262,8 +2262,9 @@ const SalaryReportPage: React.FC = () => {
             "Pilihan lajur pada entri Lain-lain/Kerja Luar didahulukan, diikuti tetapan Salary Report Column pada Kod Gaji. Jika kedua-duanya Automatic, peraturan di bawah digunakan.",
           gajiTitle: "GAJI",
           gajiBefore:
-            "Bagi pekerja yang mempunyai item Base berkadar Hour atau Day, kerja biasa berkadar Hour, Day dan Fixed masuk ke Gaji. Bagi pekerja pembungkusan tulen tanpa Base Hour/Day, Gaji ialah Base pembungkusan serta bayaran F/HARIAN ",
-          gajiAfter: ".",
+            "Bagi pekerja yang mempunyai item Base berkadar Hour atau Day, kerja biasa berkadar Hour, Day dan Fixed masuk ke Gaji. Bagi pekerja pembungkusan tulen tanpa Base Hour/Day, Gaji ialah Base pembungkusan serta bayaran F/HARIAN produksi ",
+          gajiMid: ". Kod ",
+          gajiAfter: " sentiasa dikira sebagai Gaji untuk semua pekerja.",
           otTitle: "OT",
           ot: "Semua item payroll dan Lain-lain/Kerja Luar yang Kod Gajinya bertipe Overtime.",
           bonusTitle: "BONUS",
@@ -2293,7 +2294,8 @@ const SalaryReportPage: React.FC = () => {
           gajiTitle: "GAJI",
           gajiBefore:
             "For workers with a Base item using an Hour or Day rate, regular Hour, Day, and Fixed work goes to Gaji. For pure packing workers without an Hour/Day Base, Gaji is Base packing pay plus F/HARIAN ",
-          gajiAfter: ".",
+          gajiMid: ". The ",
+          gajiAfter: " Pay Codes always count as Gaji for all workers.",
           otTitle: "OT",
           ot: "All payroll and Others/Kerja Luar entries whose Pay Code type is Overtime.",
           bonusTitle: "BONUS",
@@ -2411,7 +2413,8 @@ const SalaryReportPage: React.FC = () => {
                 <section>
                   <h4 className="font-semibold text-default-900 dark:text-gray-100">{columnGuideText.gajiTitle}</h4>
                   <p className="mt-1">
-                    {columnGuideText.gajiBefore}<PayCode>FULL_*</PayCode>{columnGuideText.gajiAfter}
+                    {columnGuideText.gajiBefore}<PayCode>FULL_*</PayCode>{columnGuideText.gajiMid}
+                    <PayCode>FULL</PayCode><PayCode>HADIR_MEETING</PayCode>{columnGuideText.gajiAfter}
                   </p>
                 </section>
 
@@ -2432,7 +2435,7 @@ const SalaryReportPage: React.FC = () => {
                   <p className="mt-1">
                     {columnGuideText.cioBefore}
                     <PayCode>IXT</PayCode><PayCode>ADD_COMM</PayCode><PayCode>T-SALESMAN</PayCode>
-                    <PayCode>FULL</PayCode><PayCode>HADIR_MEETING</PayCode><PayCode>IKUT_BX</PayCode>
+                    <PayCode>IKUT_BX</PayCode>
                     <PayCode>JAGA_GATE</PayCode><PayCode>BH_JG_FORKLIFT</PayCode><PayCode>BH_SUSUN</PayCode>
                     <PayCode>T_KERJA</PayCode>{columnGuideText.cioAfter}<PayCode>FULL_*</PayCode>
                     {columnGuideText.cioEnd}
