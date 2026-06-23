@@ -20,6 +20,26 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-23",
+    ms: "Slip Gaji dan Butiran Gaji untuk jualan Jelly Polly kini menggunakan unit Ctn (carton). Jumlah carton termasuk unit percuma (FOC), dan kadar serta jumlah bayaran tidak berubah.",
+    en: "Jelly Polly sales now use the Ctn (carton) unit on Payslips and Payroll Details. Carton totals include free (FOC) units, while rates and payment amounts are unchanged.",
+  },
+  {
+    date: "2026-06-23",
+    ms: "Laporan Pinjam kini mempunyai bahagian \"Pinjam Breakdown\" yang menunjukkan jumlah keseluruhan bagi setiap jenis pinjam (contoh: ROSE, AIR, PINJAM, OTHERS) beserta jumlah besar. Pada skrin, anda boleh klik mana-mana jenis untuk melihat siapa yang menyumbang kepada jenis itu dan jumlahnya. Terdapat juga butang \"Breakdown\" baharu untuk mencetak/memuat turun PDF pecahan mengikut jenis (senarai pekerja bagi setiap jenis) berasingan daripada laporan pinjam biasa. Jenis dikumpulkan secara automatik mengikut keterangan yang dimasukkan.",
+    en: "The Pinjam Report now has a \"Pinjam Breakdown\" section showing the grand total for each pinjam type (e.g. ROSE, AIR, PINJAM, OTHERS) plus an overall total. On screen you can click any type to expand and see who contributed to it and their amounts. There is also a new \"Breakdown\" button to print/download a by-type breakdown PDF (staff listed under each type) separately from the regular pinjam report. Types are grouped automatically by the description entered.",
+  },
+  {
+    date: "2026-06-23",
+    ms: "Laporan Pinjam (skrin dan PDF) kini memaparkan butiran setiap pinjam (keterangan dan jumlah) di bawah nama setiap pekerja, supaya anda tahu pinjam tersebut untuk apa. Pekerja yang mempunyai lebih daripada satu pinjam akan menunjukkan setiap satu secara berasingan. Jumlah Pinjam dan jumlah keseluruhan tidak berubah.",
+    en: "The Pinjam Report (on-screen and PDF) now shows the details of each pinjam (description and amount) under each employee's name, so you can tell what each deduction is for. Employees with more than one pinjam show each one separately. The Total Pinjam and grand totals are unchanged.",
+  },
+  {
+    date: "2026-06-23",
+    ms: "Laporan Gaji: bayaran kod FULL (FULL HARIAN) dan HADIR_MEETING (SEMINAR/MESYUARAT) kini sentiasa dipaparkan di lajur Gaji untuk semua pekerja, bukan lagi di lajur C/I/O. Jumlah Gaji Kasar tidak berubah — hanya lajur paparan diperbetulkan.",
+    en: "Salary Report: payments using the FULL (FULL HARIAN) and HADIR_MEETING (SEMINAR/MESYUARAT) pay codes now always show in the Gaji column for all employees, instead of C/I/O. The Gross (Gaji Kasar) total is unchanged — only the display column is corrected.",
+  },
+  {
+    date: "2026-06-23",
     ms: "Kadar gaji kini boleh ditetapkan mengikut bulan berkuat kuasa. Pada skrin kadar Kod Gaji, kakitangan, dan kerja, anda kini boleh menambah \"perubahan kadar\" yang bermula dari bulan tertentu, dengan senarai sejarah perubahan. Setiap bulan gaji akan menggunakan kadar yang berkuat kuasa untuk bulan itu apabila diproses semula — jadi menaikkan kadar mulai bulan tertentu tidak lagi mengubah bulan-bulan sebelumnya. Skrin kemasukan kerja harian, bulanan dan jurujual kini memaparkan kadar mengikut bulan log tersebut supaya sepadan dengan slip gaji.",
     en: "Pay rates can now be set to take effect from a specific month. On the Pay Code, employee, and job rate screens you can add a \"rate change\" that starts from a chosen month, with a history list of changes. Each payroll month uses the rate in force for that month when re-processed — so raising a rate from a certain month no longer alters earlier months. The daily, monthly, and salesman work-log entry screens now preview the rate for that log's month so it matches the payslip.",
   },

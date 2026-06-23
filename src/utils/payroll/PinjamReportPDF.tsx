@@ -126,12 +126,17 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     color: colors.textSecondary,
   },
+  // Whole employee block (main row + its pinjam breakdown). The separating
+  // line lives here so it sits below the breakdown, not between it and the row.
+  employeeBlock: {
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.borderLight,
+    paddingBottom: 2,
+  },
   tableRow: {
     flexDirection: "row",
     paddingVertical: 3,
     paddingHorizontal: 3,
-    borderBottomWidth: 0.5,
-    borderBottomColor: colors.borderLight,
     minHeight: 18,
   },
 
@@ -164,10 +169,142 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
+  // Pinjam detail sub-rows
+  detailRow: {
+    flexDirection: "row",
+    paddingHorizontal: 3,
+    paddingBottom: 1.5,
+    marginTop: -2,
+  },
+  detailSpacer: {
+    width: "4%",
+  },
+  detailDesc: {
+    width: "50%",
+    fontSize: 7.5,
+    fontFamily: "Helvetica-Oblique",
+    color: colors.textMuted,
+    paddingLeft: 10,
+  },
+  detailAmount: {
+    width: "14%",
+    fontSize: 7.5,
+    color: colors.textMuted,
+    textAlign: "right",
+    paddingRight: 4,
+  },
+
   // Text formatting
   bold: { fontFamily: "Helvetica-Bold" },
   textCenter: { textAlign: "center" },
   textRight: { textAlign: "right" },
+
+  // Pinjam by Type card
+  byTypeSection: {
+    marginBottom: 10,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 4,
+  },
+  byTypeTitle: {
+    fontSize: 10,
+    fontFamily: "Helvetica-Bold",
+    color: colors.textPrimary,
+    marginBottom: 6,
+  },
+  byTypeGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  byTypeItem: {
+    width: "50%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 1.5,
+    paddingRight: 12,
+  },
+  byTypeLabel: {
+    fontSize: 8.5,
+    color: colors.textSecondary,
+    paddingRight: 6,
+  },
+  byTypeValue: {
+    fontSize: 8.5,
+    fontFamily: "Helvetica-Bold",
+    color: colors.danger,
+  },
+  byTypeTotalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 6,
+    paddingTop: 5,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  byTypeTotalLabel: {
+    fontSize: 9.5,
+    fontFamily: "Helvetica-Bold",
+    color: colors.textPrimary,
+  },
+  byTypeTotalValue: {
+    fontSize: 9.5,
+    fontFamily: "Helvetica-Bold",
+    color: colors.danger,
+  },
+
+  // Pinjam Breakdown page (contributors grouped by type)
+  typeGroup: {
+    marginBottom: 10,
+  },
+  typeGroupHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 3,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderDark,
+    marginBottom: 4,
+  },
+  typeGroupName: {
+    fontSize: 10,
+    fontFamily: "Helvetica-Bold",
+    color: colors.textPrimary,
+  },
+  typeGroupCount: {
+    fontSize: 8,
+    fontFamily: "Helvetica",
+    color: colors.textMuted,
+  },
+  typeGroupTotal: {
+    fontSize: 10,
+    fontFamily: "Helvetica-Bold",
+    color: colors.danger,
+  },
+  contribGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  contribItem: {
+    width: "50%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 1.5,
+    paddingRight: 14,
+    paddingLeft: 4,
+  },
+  contribName: {
+    flex: 1,
+    fontSize: 8.5,
+    color: colors.textSecondary,
+    paddingRight: 6,
+  },
+  contribAmount: {
+    fontSize: 8.5,
+    color: colors.textPrimary,
+    textAlign: "right",
+  },
 
   // Enhanced Footer Section
   footerSection: {
@@ -258,6 +395,84 @@ const getMonthName = (month: number): string => {
 };
 
 // Interfaces
+export interface PinjamDetail {
+  description: string;
+  amount: number;
+}
+
+// Roll the per-employee pinjam details up into per-type totals (grouped by
+// description, case-insensitive), sorted by amount descending. The summed
+// total equals summary.total_pinjam since every pinjam record yields a detail.
+export const aggregatePinjamByType = (
+  rows: PinjamReportData[]
+): PinjamDetail[] => {
+  const map = new Map<string, PinjamDetail>();
+  for (const row of rows) {
+    for (const d of row.pinjam_details ?? []) {
+      const description = d.description.trim();
+      const key = description.toUpperCase();
+      const existing = map.get(key);
+      if (existing) existing.amount += d.amount;
+      else map.set(key, { description, amount: d.amount });
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.amount - a.amount);
+};
+
+export interface PinjamTypeContributors {
+  description: string;
+  total: number;
+  contributors: { staff_id: string; staff_name: string; amount: number }[];
+}
+
+// Group pinjam by type (description), listing the staff who contributed to each
+// type with their summed amount. Types sorted by total desc, contributors by
+// amount desc. Drives the on-screen breakdown and the PDF "Pinjam Breakdown" page.
+export const aggregatePinjamContributorsByType = (
+  rows: PinjamReportData[]
+): PinjamTypeContributors[] => {
+  const typeMap = new Map<
+    string,
+    {
+      description: string;
+      total: number;
+      staff: Map<
+        string,
+        { staff_id: string; staff_name: string; amount: number }
+      >;
+    }
+  >();
+  for (const row of rows) {
+    for (const d of row.pinjam_details ?? []) {
+      const description = d.description.trim();
+      const key = description.toUpperCase();
+      let entry = typeMap.get(key);
+      if (!entry) {
+        entry = { description, total: 0, staff: new Map() };
+        typeMap.set(key, entry);
+      }
+      entry.total += d.amount;
+      const existing = entry.staff.get(row.staff_id);
+      if (existing) existing.amount += d.amount;
+      else
+        entry.staff.set(row.staff_id, {
+          staff_id: row.staff_id,
+          staff_name: row.staff_name,
+          amount: d.amount,
+        });
+    }
+  }
+  return Array.from(typeMap.values())
+    .map((e) => ({
+      description: e.description,
+      total: e.total,
+      contributors: Array.from(e.staff.values()).sort(
+        (a, b) => b.amount - a.amount
+      ),
+    }))
+    .sort((a, b) => b.total - a.total);
+};
+
 export interface PinjamReportData {
   no: number;
   staff_id: string;
@@ -265,6 +480,7 @@ export interface PinjamReportData {
   payment_preference: string;
   gaji_genap: number;
   total_pinjam: number;
+  pinjam_details?: PinjamDetail[];
   final_total: number;
   net_pay: number;
   mid_month_amount: number;
@@ -285,37 +501,53 @@ export interface PinjamReportPDFData {
 // PDF Components
 const PinjamRow: React.FC<{
   employee: PinjamReportData;
-}> = ({ employee }) => (
-  <View style={styles.tableRow} wrap={false}>
-    <Text style={styles.colNo}>{employee.no}</Text>
-    <Text style={styles.colStaffId}>
-      {employee.staff_id} - {employee.staff_name}
-    </Text>
-    <Text style={[styles.colGajiGenap, styles.bold]}>
-      {formatCurrency(employee.gaji_genap)}
-    </Text>
-    <Text
-      style={[
-        styles.colPinjam,
-        {
-          color: employee.total_pinjam > 0 ? colors.danger : colors.textPrimary,
-        },
-      ]}
-    >
-      {formatCurrency(employee.total_pinjam)}
-    </Text>
-    <Text style={[styles.colTotal, styles.bold, { color: colors.primary }]}>
-      {formatCurrency(employee.final_total)}
-    </Text>
-    <Text style={styles.colPayment}>{employee.payment_preference}</Text>
-  </View>
-);
+}> = ({ employee }) => {
+  const details = employee.pinjam_details ?? [];
+  return (
+    <View style={styles.employeeBlock} wrap={false}>
+      <View style={styles.tableRow}>
+        <Text style={styles.colNo}>{employee.no}</Text>
+        <Text style={styles.colStaffId}>
+          {employee.staff_id} - {employee.staff_name}
+        </Text>
+        <Text style={[styles.colGajiGenap, styles.bold]}>
+          {formatCurrency(employee.gaji_genap)}
+        </Text>
+        <Text
+          style={[
+            styles.colPinjam,
+            {
+              color:
+                employee.total_pinjam > 0 ? colors.danger : colors.textPrimary,
+            },
+          ]}
+        >
+          {formatCurrency(employee.total_pinjam)}
+        </Text>
+        <Text style={[styles.colTotal, styles.bold, { color: colors.primary }]}>
+          {formatCurrency(employee.final_total)}
+        </Text>
+        <Text style={styles.colPayment}>{employee.payment_preference}</Text>
+      </View>
+      {details.map((detail, index) => (
+        <View style={styles.detailRow} key={index}>
+          <Text style={styles.detailSpacer} />
+          <Text style={styles.detailDesc}>{`•  ${detail.description}`}</Text>
+          <Text style={styles.detailAmount}>
+            {formatCurrency(detail.amount)}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+};
 
 const PinjamReportPDF: React.FC<{
   data: PinjamReportPDFData;
   companyName?: string;
 }> = ({ data, companyName = TIENHOCK_INFO.name }) => {
   const reportTitle = `${getMonthName(data.month)} ${data.year} Pinjam Report`;
+  const pinjamByType = aggregatePinjamByType(data.data);
 
   return (
     <Document title={`Pinjam Report ${getMonthName(data.month)} ${data.year}`}>
@@ -348,8 +580,31 @@ const PinjamReportPDF: React.FC<{
           ))}
         </View>
 
+        {/* Pinjam by Type */}
+        {pinjamByType.length > 0 && (
+          <View style={styles.byTypeSection} wrap={false}>
+            <Text style={styles.byTypeTitle}>Pinjam by Type</Text>
+            <View style={styles.byTypeGrid}>
+              {pinjamByType.map((type, index) => (
+                <View style={styles.byTypeItem} key={index}>
+                  <Text style={styles.byTypeLabel}>{type.description}</Text>
+                  <Text style={styles.byTypeValue}>
+                    {formatCurrency(type.amount)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+            <View style={styles.byTypeTotalRow}>
+              <Text style={styles.byTypeTotalLabel}>TOTAL PINJAM</Text>
+              <Text style={styles.byTypeTotalValue}>
+                {formatCurrency(data.summary.total_pinjam)}
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* Enhanced Footer Summary */}
-        <View style={styles.footerSection}>
+        <View style={styles.footerSection} wrap={false}>
           <Text style={styles.footerTitle}>Pinjam Report Summary</Text>
 
           {/* Main Summary Row */}
@@ -393,51 +648,158 @@ const PinjamReportPDF: React.FC<{
   );
 };
 
+// Pinjam Breakdown PDF - "Pinjam by Type" overview + contributors grouped by type
+const PinjamBreakdownPDF: React.FC<{
+  data: PinjamReportPDFData;
+  companyName?: string;
+}> = ({ data, companyName = TIENHOCK_INFO.name }) => {
+  const reportTitle = `${getMonthName(data.month)} ${data.year} Pinjam Breakdown`;
+  const pinjamByType = aggregatePinjamByType(data.data);
+  const contributorsByType = aggregatePinjamContributorsByType(data.data);
+
+  return (
+    <Document
+      title={`Pinjam Breakdown ${getMonthName(data.month)} ${data.year}`}
+    >
+      <Page size="A4" style={styles.page}>
+        <View style={styles.header}>
+          <Image src={TienHockLogo} style={styles.logo} />
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.companyName}>{companyName}</Text>
+            <Text style={styles.reportTitle}>{reportTitle}</Text>
+          </View>
+        </View>
+
+        {/* Pinjam by Type overview */}
+        {pinjamByType.length > 0 && (
+          <View style={styles.byTypeSection} wrap={false}>
+            <Text style={styles.byTypeTitle}>Pinjam by Type</Text>
+            <View style={styles.byTypeGrid}>
+              {pinjamByType.map((type, index) => (
+                <View style={styles.byTypeItem} key={index}>
+                  <Text style={styles.byTypeLabel}>{type.description}</Text>
+                  <Text style={styles.byTypeValue}>
+                    {formatCurrency(type.amount)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+            <View style={styles.byTypeTotalRow}>
+              <Text style={styles.byTypeTotalLabel}>TOTAL PINJAM</Text>
+              <Text style={styles.byTypeTotalValue}>
+                {formatCurrency(data.summary.total_pinjam)}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Contributors grouped by type */}
+        {contributorsByType.map((type, index) => (
+          <View style={styles.typeGroup} key={index}>
+            <View style={styles.typeGroupHeader} wrap={false}>
+              <Text style={styles.typeGroupName}>
+                {type.description}{" "}
+                <Text style={styles.typeGroupCount}>
+                  ({type.contributors.length})
+                </Text>
+              </Text>
+              <Text style={styles.typeGroupTotal}>
+                {formatCurrency(type.total)}
+              </Text>
+            </View>
+            <View style={styles.contribGrid}>
+              {type.contributors.map((c, cIndex) => (
+                <View style={styles.contribItem} key={cIndex}>
+                  <Text style={styles.contribName}>{c.staff_name}</Text>
+                  <Text style={styles.contribAmount}>
+                    {formatCurrency(c.amount)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ))}
+
+        <Text
+          style={styles.pageNumber}
+          render={({ pageNumber, totalPages }) =>
+            `Page ${pageNumber} of ${totalPages}`
+          }
+          fixed
+        />
+      </Page>
+    </Document>
+  );
+};
+
 // PDF Generation Function
+const outputPdf = async (
+  doc: React.ReactElement,
+  fileName: string,
+  action: "download" | "print",
+  logLabel: string
+) => {
+  const pdfBlob = await pdf(doc).toBlob();
+  const url = URL.createObjectURL(pdfBlob);
+
+  if (action === "download") {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } else {
+    const printFrame = document.createElement("iframe");
+    printFrame.style.display = "none";
+    document.body.appendChild(printFrame);
+
+    printFrame.onload = () => {
+      if (printFrame.contentWindow) {
+        printPdfFrameWithFallback(printFrame, url, { logLabel });
+        const cleanup = () => {
+          if (document.body.contains(printFrame)) {
+            document.body.removeChild(printFrame);
+          }
+          URL.revokeObjectURL(url);
+          window.removeEventListener("focus", cleanup);
+        };
+        window.addEventListener("focus", cleanup, { once: true });
+      }
+    };
+    printFrame.src = url;
+  }
+};
+
 export const generatePinjamReportPDF = async (
   data: PinjamReportPDFData,
   action: "download" | "print"
 ) => {
   try {
-    const doc = <PinjamReportPDF data={data} />;
-    const pdfBlob = await pdf(doc).toBlob();
+    await outputPdf(
+      <PinjamReportPDF data={data} />,
+      `Pinjam_Report_${getMonthName(data.month)}_${data.year}.pdf`,
+      action,
+      "pinjam report PDF"
+    );
+  } catch (error) {
+    console.error("Error generating PDF:", error);
+    throw error;
+  }
+};
 
-    const fileName = `Pinjam_Report_${getMonthName(data.month)}_${
-      data.year
-    }.pdf`;
-
-    if (action === "download") {
-      const url = URL.createObjectURL(pdfBlob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } else {
-      const url = URL.createObjectURL(pdfBlob);
-      const printFrame = document.createElement("iframe");
-      printFrame.style.display = "none";
-      document.body.appendChild(printFrame);
-
-      printFrame.onload = () => {
-        if (printFrame.contentWindow) {
-          printPdfFrameWithFallback(printFrame, url, {
-            logLabel: "pinjam report PDF",
-          });
-          const cleanup = () => {
-            if (document.body.contains(printFrame)) {
-              document.body.removeChild(printFrame);
-            }
-            URL.revokeObjectURL(url);
-            window.removeEventListener("focus", cleanup);
-          };
-          window.addEventListener("focus", cleanup, { once: true });
-        }
-      };
-      printFrame.src = url;
-    }
+export const generatePinjamBreakdownPDF = async (
+  data: PinjamReportPDFData,
+  action: "download" | "print"
+) => {
+  try {
+    await outputPdf(
+      <PinjamBreakdownPDF data={data} />,
+      `Pinjam_Breakdown_${getMonthName(data.month)}_${data.year}.pdf`,
+      action,
+      "pinjam breakdown PDF"
+    );
   } catch (error) {
     console.error("Error generating PDF:", error);
     throw error;

@@ -94,8 +94,8 @@ const isAdvanceRecord = (record: AdvanceRecord): boolean =>
 
 const getCommissionQuantityLabel = (record: MergedAdvance): string =>
   record.rows.every((row: AdvanceRecord) => row.is_advance === false)
-    ? "Bonus"
-    : "Advance";
+    ? ""
+    : "";
 
 interface CombinedAdvanceDisplay {
   // Commission records with no same-description Others row — rendered as their
@@ -180,7 +180,7 @@ const getAdvanceStatusDescriptionNote = (
 
   if (summary.regularCount === 0 || summary.advanceCount === 0) return "";
 
-  return ` (Regular: ${formatCurrency(summary.regularAmount)} x${summary.regularCount}; Advance: ${formatCurrency(summary.advanceAmount)} x${summary.advanceCount})`;
+  return ` (Regular: ${formatCurrency(summary.regularAmount)} x${summary.regularCount}; ${formatCurrency(summary.advanceAmount)} x${summary.advanceCount})`;
 };
 
 interface GroupedLeaveRecord {
@@ -631,18 +631,18 @@ const createJobSubtotalRow = (
   ];
 };
 
-type BaseRateSummaryUnit = "Bag" | "Hour";
+type BaseRateSummaryUnit = "Bag" | "Ctn" | "Hour";
 type BaseSectionCell = TableCell & {
   baseSectionBorder?: boolean;
   baseSubtotalBorder?: boolean;
 };
 
-const BASE_RATE_SUMMARY_UNITS: BaseRateSummaryUnit[] = ["Bag", "Hour"];
+const BASE_RATE_SUMMARY_UNITS: BaseRateSummaryUnit[] = ["Bag", "Ctn", "Hour"];
 
 const isBaseRateSummaryUnit = (
   rateUnit: string,
 ): rateUnit is BaseRateSummaryUnit => {
-  return rateUnit === "Bag" || rateUnit === "Hour";
+  return rateUnit === "Bag" || rateUnit === "Ctn" || rateUnit === "Hour";
 };
 
 const formatUnitQuantity = (quantity: number): string => {
@@ -850,10 +850,12 @@ const getConsolidatedRateLabel = (item: ConsolidatedPayrollItem): string => {
 const getBaseItemQuantityLabel = (item: ConsolidatedPayrollItem): string => {
   if (isDirectAmountFixedItem(item)) return "-";
 
-  if (item.rate_unit === "Bag") {
-    const totalBags =
+  if (item.rate_unit === "Bag" || item.rate_unit === "Ctn") {
+    const totalUnits =
       (Number(item.total_quantity) || 0) + (Number(item.total_foc_units) || 0);
-    return `${formatUnitQuantity(totalBags)} Bag${totalBags > 1 ? "s" : ""}`;
+    return item.rate_unit === "Bag"
+      ? `${formatUnitQuantity(totalUnits)} Bag${totalUnits > 1 ? "s" : ""}`
+      : `${formatUnitQuantity(totalUnits)} Ctn`;
   }
 
   if (item.rate_unit === "Hour") {
@@ -913,7 +915,9 @@ const appendBasePayRows = (
       );
 
       tableBody.push(
-        index > 0 && itemIndex === 0 ? markBaseSectionBorder(row) : row,
+        index > 0 && unit !== "Ctn" && itemIndex === 0
+          ? markBaseSectionBorder(row)
+          : row,
       );
     });
   });
@@ -937,11 +941,9 @@ const appendBasePayRows = (
     );
   });
 
-  // Rate/Jam: the combined per-hour rate for the base section, shown only when
-  // base pay is Hour-based. Hourly rows repeat the same hours across multiple
-  // tasks, so divide the total hourly amount by one representative hour quantity
-  // (not the summed/duplicated hours) — this equals the sum of the per-hour rates.
-  // When it applies it replaces the "Jumlah Biasa" subtotal label.
+  // Hourly rows repeat the same hours across multiple tasks, so divide the
+  // total hourly amount by one representative hour quantity (not summed hours).
+  // When it applies it replaces the generic "Jumlah Biasa" subtotal label.
   const hourItems: ConsolidatedPayrollItem[] = consolidatedBaseItems.filter(
     (item) => item.rate_unit === "Hour",
   );
@@ -1640,7 +1642,7 @@ const buildMainPayrollPage = (
   if (mergedAdvanceCommissionRecords.length > 0) {
     mergedAdvanceCommissionRecords.forEach((commission) => {
       tableBody.push([
-        { text: `${commission.description} (Advance)`, fontSize: 8 },
+        { text: `${commission.description}`, fontSize: 8 },
         { text: "", fontSize: 8 },
         { text: "", fontSize: 8 },
         {
@@ -1747,7 +1749,7 @@ const buildMainPayrollPage = (
 
     // Payslip title
     {
-      text: `Slip Gaji Pajak (Jam/Bag/Commission) Untuk Bulan ${monthName} ${year}`,
+      text: `Slip Gaji Pajak (Jam/Bag/Ctn/Commission) Untuk Bulan ${monthName} ${year}`,
       style: "payslipTitle",
       margin: [0, 0, 0, 4],
     },
@@ -2438,7 +2440,7 @@ const buildIndividualJobPage = (
   if (commissionAdvanceTotal > 0 || jobAdvance > 0) {
     mergedAdvanceCommissionRecords.forEach((commission) => {
       tableBody.push([
-        { text: `${commission.description} (Advance)`, fontSize: 8 },
+        { text: `${commission.description}`, fontSize: 8 },
         { text: "", fontSize: 8 },
         { text: "", fontSize: 8 },
         {
