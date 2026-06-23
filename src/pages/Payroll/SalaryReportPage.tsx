@@ -2867,8 +2867,8 @@ const SalaryReportPage: React.FC = () => {
       {/* Salary Report Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
         <div className="px-6 py-3 border-b border-default-200 dark:border-gray-700">
-          {/* Large screens (2xl/1536px+): Single row layout */}
-          <div className="hidden 2xl:flex 2xl:justify-between 2xl:items-center gap-3">
+          {/* Large screens (xl/1280px+): Single row layout */}
+          <div className="hidden xl:flex xl:justify-between xl:items-center gap-3">
             <div className="flex items-center gap-3">
               {/* Tab buttons */}
               <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
@@ -2882,7 +2882,14 @@ const SalaryReportPage: React.FC = () => {
                         : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
                     } ${index > 0 ? "border-l border-default-200 dark:border-gray-600" : ""}`}
                   >
-                    {label}
+                    {label === "Employee" ? (
+                      <>
+                        <span className="hidden min-[1450px]:inline">Employee</span>
+                        <span className="min-[1450px]:hidden">Emp</span>
+                      </>
+                    ) : (
+                      label
+                    )}
                   </button>
                 ))}
               </div>
@@ -2963,12 +2970,12 @@ const SalaryReportPage: React.FC = () => {
               {displayedReportData && activeTab !== 4 && (
                 <>
                   <span className="text-default-300 dark:text-gray-600">|</span>
-                  <div className="flex items-center gap-4 text-sm text-default-600 dark:text-gray-300">
-                    <span className="font-medium">
+                  <div className="text-sm text-default-600 dark:text-gray-300">
+                    <span className="block font-medium">
                       {displayedReportData.total_records} employees
                     </span>
-                    <span className="font-medium">
-                      Total: {formatCurrency(displayedHeaderTotal)}
+                    <span className="block font-medium">
+                      {formatCurrency(displayedHeaderTotal)}
                     </span>
                   </div>
                 </>
@@ -2981,8 +2988,22 @@ const SalaryReportPage: React.FC = () => {
                 variant="outline"
                 disabled={activeTab === 4 ? cutiLoading : displayedLoading}
                 size="sm"
+                aria-label={activeTab === 0 ? "Refresh" : undefined}
+                className={
+                  activeTab === 0
+                    ? "min-[1280px]:max-[1449px]:px-2 min-[1280px]:max-[1449px]:[&>span>svg]:mr-0"
+                    : ""
+                }
               >
-                Refresh
+                <span
+                  className={
+                    activeTab === 0
+                      ? "min-[1280px]:max-[1449px]:hidden"
+                      : ""
+                  }
+                >
+                  Refresh
+                </span>
               </Button>
               <div
                 className="relative"
@@ -3001,8 +3022,22 @@ const SalaryReportPage: React.FC = () => {
                     isGeneratingPDF
                   }
                   size="sm"
+                  aria-label={activeTab === 0 ? "Print" : undefined}
+                  className={
+                    activeTab === 0
+                      ? "min-[1280px]:max-[1449px]:px-2 min-[1280px]:max-[1449px]:[&>span>svg]:mr-0"
+                      : ""
+                  }
                 >
-                  Print
+                  <span
+                    className={
+                      activeTab === 0
+                        ? "min-[1280px]:max-[1449px]:hidden"
+                        : ""
+                    }
+                  >
+                    Print
+                  </span>
                 </Button>
                 {isPrintDropdownOpen && (
                   <div className="absolute right-0 top-full mt-1 z-50">
@@ -3062,8 +3097,8 @@ const SalaryReportPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Smaller screens (<2xl/1536px): Multi-row layout */}
-          <div className="2xl:hidden space-y-3">
+          {/* Smaller screens (<xl/1280px): Multi-row layout */}
+          <div className="xl:hidden space-y-3">
             {/* Row 1: Title + Tabs + Action buttons */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -3083,7 +3118,14 @@ const SalaryReportPage: React.FC = () => {
                           : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
                       } ${index > 0 ? "border-l border-default-200 dark:border-gray-600" : ""}`}
                     >
-                      {label}
+                      {label === "Employee" ? (
+                        <>
+                          <span className="hidden min-[1450px]:inline">Employee</span>
+                          <span className="min-[1450px]:hidden">Emp</span>
+                        </>
+                      ) : (
+                        label
+                      )}
                     </button>
                   ))}
                 </div>
@@ -3250,12 +3292,12 @@ const SalaryReportPage: React.FC = () => {
               {displayedReportData && activeTab !== 4 && (
                 <>
                   <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
-                  <div className="flex items-center gap-2 sm:gap-4 text-sm text-default-600 dark:text-gray-300">
-                    <span className="font-medium">
+                  <div className="text-sm text-default-600 dark:text-gray-300">
+                    <span className="block font-medium">
                       {displayedReportData.total_records} employees
                     </span>
-                    <span className="font-medium">
-                      Total: {formatCurrency(displayedHeaderTotal)}
+                    <span className="block font-medium">
+                      {formatCurrency(displayedHeaderTotal)}
                     </span>
                   </div>
                 </>
