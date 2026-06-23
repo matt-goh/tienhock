@@ -64,6 +64,7 @@ export function calculateActivityAmount(
 
     case "Day":
     case "Bag":
+    case "Ctn":
     case "Trip":
     case "Tray":
     case "Bill":
@@ -136,6 +137,7 @@ export function calculateActivitiesAmounts(
       !activity.isContextLinked &&
       !activity.isSelected &&
       activity.rateUnit !== "Bag" &&
+      activity.rateUnit !== "Ctn" &&
       activity.rateUnit !== "Trip" &&
       activity.rateUnit !== "Day" &&
       activity.rateUnit !== "Tray";

@@ -2460,6 +2460,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               if (
                 isContextLinked ||
                 payCode.rate_unit === "Bag" ||
+                payCode.rate_unit === "Ctn" ||
                 payCode.rate_unit === "Trip" ||
                 payCode.rate_unit === "Day"
               ) {
