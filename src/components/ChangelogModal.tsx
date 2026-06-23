@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-23",
+    ms: "Laporan Pinjam (skrin dan PDF) kini memaparkan butiran setiap pinjam (keterangan dan jumlah) di bawah nama setiap pekerja, supaya anda tahu pinjam tersebut untuk apa. Pekerja yang mempunyai lebih daripada satu pinjam akan menunjukkan setiap satu secara berasingan. Jumlah Pinjam dan jumlah keseluruhan tidak berubah.",
+    en: "The Pinjam Report (on-screen and PDF) now shows the details of each pinjam (description and amount) under each employee's name, so you can tell what each deduction is for. Employees with more than one pinjam show each one separately. The Total Pinjam and grand totals are unchanged.",
+  },
+  {
+    date: "2026-06-23",
     ms: "Laporan Gaji: bayaran kod FULL (FULL HARIAN) dan HADIR_MEETING (SEMINAR/MESYUARAT) kini sentiasa dipaparkan di lajur Gaji untuk semua pekerja, bukan lagi di lajur C/I/O. Jumlah Gaji Kasar tidak berubah — hanya lajur paparan diperbetulkan.",
     en: "Salary Report: payments using the FULL (FULL HARIAN) and HADIR_MEETING (SEMINAR/MESYUARAT) pay codes now always show in the Gaji column for all employees, instead of C/I/O. The Gross (Gaji Kasar) total is unchanged — only the display column is corrected.",
   },

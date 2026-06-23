@@ -856,6 +856,7 @@ export default function (pool) {
           payment_preference: emp.payment_preference,
           gaji_genap: emp.gaji_genap,
           total_pinjam: emp.total_pinjam,
+          pinjam_details: emp.pinjam_details || [],
           final_total: emp.final_total,
           net_pay: emp.net_pay,
           mid_month_amount: emp.mid_month_amount,
@@ -1278,7 +1279,11 @@ export default function (pool) {
           -- Aggregate pinjam by employee NAME so amounts recorded under any
           -- sibling ID (multi-ID staff) roll up to the person, mirroring how
           -- the combined payroll is keyed.
-          SELECT s.name AS staff_name, COALESCE(SUM(pr.amount), 0) as total_pinjam
+          SELECT s.name AS staff_name, COALESCE(SUM(pr.amount), 0) as total_pinjam,
+                 json_agg(json_build_object(
+                   'description', COALESCE(NULLIF(btrim(pr.description), ''), 'Pinjam'),
+                   'amount', pr.amount
+                 ) ORDER BY pr.amount DESC) AS pinjam_details
           FROM pinjam_records pr
           JOIN staffs s ON pr.employee_id = s.id
           WHERE pr.year = $1
@@ -1294,7 +1299,7 @@ export default function (pool) {
           GROUP BY staff_name
         ),
         pinjam_yearly_data AS (
-          SELECT pr.employee_id, pbn.total_pinjam
+          SELECT pr.employee_id, pbn.total_pinjam, pbn.pinjam_details
           FROM pinjam_rep pr
           JOIN pinjam_by_name pbn ON pbn.staff_name = pr.staff_name
         )
@@ -1302,6 +1307,7 @@ export default function (pool) {
           ebd.*,
           COALESCE(mmd.mid_month_amount, 0) as mid_month_amount,
           COALESCE(pmd.total_pinjam, 0) as total_pinjam,
+          COALESCE(pmd.pinjam_details, '[]'::json) as pinjam_details,
           -- GAJI = regular wage. Worker WITH an Hour/Day base: all non-piece work (base + hourly
           -- maintenance/Sunday). Worker with NO hourly base (pure piece / office salary): Base +
           -- production F/HARIAN codes (FULL_*). The generic FULL incentive code and other
@@ -1722,6 +1728,7 @@ export default function (pool) {
               setelah_digenapkan: setelahDigenapkan,
               gaji_genap: setelahDigenapkan,
               total_pinjam: 0,
+              pinjam_details: [],
               final_total: setelahDigenapkan,
               net_pay: commAmount,
               mid_month_amount: midMonthAmount,
@@ -1833,6 +1840,7 @@ export default function (pool) {
           payment_preference: emp.payment_preference,
           gaji_genap: emp.gaji_genap,
           total_pinjam: emp.total_pinjam,
+          pinjam_details: emp.pinjam_details || [],
           final_total: emp.final_total,
           net_pay: emp.net_pay,
           mid_month_amount: emp.mid_month_amount,
