@@ -21,6 +21,7 @@ import toast from "react-hot-toast";
 import { useJobsCache } from "../../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
 import { useJobPayCodeMappings } from "../../../utils/catalogue/useJobPayCodeMappings";
+import { useProductsCache } from "../../../utils/invoice/useProductsCache";
 import { useEffectiveRates } from "../../../utils/payroll/useEffectiveRates";
 import { api } from "../../../routes/utils/api";
 import { useHolidayCache } from "../../../utils/payroll/useHolidayCache";
@@ -133,6 +134,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
   const navigate = useNavigate();
   const { jobs: allJobs, loading: loadingJobs, refreshJobs } = useJobsCache();
   const { staffs: allStaffs, loading: loadingStaffs, refreshStaffs } = useStaffsCache();
+  const { products: payrollProducts } = useProductsCache(["MEE", "BH", "JP"]);
   const [isRefreshingCache, setIsRefreshingCache] = useState(false);
   const [employeeSelectionState, setEmployeeSelectionState] = useState<{
     selectedJobs: Record<string, string[]>; // employeeId -> list of selected jobIds
@@ -179,6 +181,10 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
   const contextLinkedPayCodes = jobConfig
     ? getContextLinkedPayCodes(jobConfig)
     : {};
+  const payrollProductIds = useMemo<Set<string>>(
+    () => new Set(payrollProducts.map((product) => String(product.id))),
+    [payrollProducts],
+  );
 
   // Hardcoded Muat paycodes for SALESMAN_IKUT
   const MUAT_MEE_PAYCODE = "4-COMM_MUAT_MEE";
@@ -1793,9 +1799,10 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
           // No products for this date - clear all product-based pay codes
           // Product pay codes are those matching product IDs (like "1-2UDG", "2-BH", etc.)
           updatedActivities.forEach((activity, index) => {
-            // Check if this is a product-based paycode (starts with number or "WE-")
+            // Product pay codes use the product ID. Using the catalogue list also
+            // covers Jelly Polly IDs such as MEQ-25ML and S-60ML.
             const payCodeId = String(activity.payCodeId);
-            const isProductPaycode = /^(\d|WE-)/.test(payCodeId);
+            const isProductPaycode = payrollProductIds.has(payCodeId);
 
             if (isProductPaycode && (activity.unitsProduced > 0 || activity.unitsFOC > 0)) {
               updatedActivities[index] = {
@@ -1812,7 +1819,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
           // Update or clear each product-based activity
           updatedActivities.forEach((activity, index) => {
             const payCodeId = String(activity.payCodeId);
-            const isProductPaycode = /^(\d|WE-)/.test(payCodeId);
+            const isProductPaycode = payrollProductIds.has(payCodeId);
 
             if (isProductPaycode) {
               const product = products.find((p) => String(p.product_id) === payCodeId);
@@ -1874,7 +1881,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     });
   // Note: We intentionally exclude employeeActivities from deps to avoid cascading updates
   // when SALESMAN_IKUT activities change. The ref tracking ensures we process when products change.
-  }, [salesmanProducts, formData.contextData, formData.logDate, locationTypes, employeeSelectionState.selectedJobs]);
+  }, [salesmanProducts, formData.contextData, formData.logDate, locationTypes, employeeSelectionState.selectedJobs, payrollProductIds]);
 
   const handleManageActivities = (employee: EmployeeWithHours) => {
     // Ensure rowKey is available
@@ -2884,6 +2891,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
                 if (
                   isContextLinked ||
                   payCode.rate_unit === "Bag" ||
+                  payCode.rate_unit === "Ctn" ||
                   payCode.rate_unit === "Trip" ||
                   payCode.rate_unit === "Day"
                 ) {
@@ -2953,7 +2961,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
             jobType === "SALESMAN"
               ? activities.map((activity) => {
                   const payCodeId = String(activity.payCodeId);
-                  const isProductPaycode = /^(\d|WE-)/.test(payCodeId);
+                  const isProductPaycode = payrollProductIds.has(payCodeId);
                   if (!isProductPaycode) return activity;
 
                   const currentProducts =

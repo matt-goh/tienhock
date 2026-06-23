@@ -30,6 +30,7 @@ export const calculateAmount = (
     case "Bill":
     case "Day":
     case "Bag":
+    case "Ctn":
     case "Kg":
     case "Karung":
     case "Bundle":

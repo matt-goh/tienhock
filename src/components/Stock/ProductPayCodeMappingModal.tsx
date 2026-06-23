@@ -122,9 +122,9 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
 
     const jobPayCodes = detailedMappings[jobId] || [];
 
-    // Filter to only show pay codes with Bag rate unit (piece rate codes)
+    // Filter to only show piece-rate pay codes.
     return jobPayCodes
-      .filter((pc) => pc.rate_unit === "Bag")
+      .filter((pc) => pc.rate_unit === "Bag" || pc.rate_unit === "Ctn")
       .map((pc) => ({
         id: pc.id,
         description: pc.description,

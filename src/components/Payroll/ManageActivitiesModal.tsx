@@ -85,6 +85,7 @@ const applyDoubling = (activities: ActivityItem[], isDoubled: boolean): Activity
 const showUnitsInput = (activity: ActivityItem): boolean => {
   return (
     activity.rateUnit === "Bag" ||
+    activity.rateUnit === "Ctn" ||
     activity.rateUnit === "Trip" ||
     activity.rateUnit === "Day" ||
     activity.rateUnit === "Tray" ||
@@ -168,7 +169,11 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
               continue;
             }
 
-            if (isSalesman && activity.rateUnit === jobConfig?.replaceUnits) {
+            if (
+              isSalesman &&
+              (activity.rateUnit === jobConfig?.replaceUnits ||
+                activity.rateUnit === "Ctn")
+            ) {
               const matchingProduct = salesmanProducts.find(
                 (p) => String(p.product_id) === String(activity.payCodeId)
               );
