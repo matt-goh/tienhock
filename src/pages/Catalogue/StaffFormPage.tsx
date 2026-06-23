@@ -430,8 +430,8 @@ const StaffFormPage: React.FC = () => {
     [executeBatchEmployeeDefault, executeBatchJobDefault]
   );
 
-  // Check if all groups are collapsed
-  const areAllGroupsCollapsed = collapsedGroups.size >= 9;
+  // Show "Expand All" whenever any group is collapsed; only show "Collapse All" when everything is expanded
+  const areAllGroupsCollapsed = collapsedGroups.size > 0;
 
   // Color scheme for each pay type
   const payTypeColors: Record<PayType, { bg: string; border: string; headerBg: string; headerText: string }> = {
