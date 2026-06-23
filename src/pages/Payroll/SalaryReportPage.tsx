@@ -8,6 +8,7 @@ import {
   IconFileExport,
   IconLink,
   IconInfoCircle,
+  IconChevronRight,
 } from "@tabler/icons-react";
 import {
   Dialog,
@@ -26,7 +27,9 @@ import { api } from "../../routes/utils/api";
 import { getMonthName } from "../../utils/payroll/midMonthPayrollUtils";
 import {
   generatePinjamReportPDF,
+  generatePinjamBreakdownPDF,
   PinjamReportPDFData,
+  aggregatePinjamContributorsByType,
 } from "../../utils/payroll/PinjamReportPDF";
 import {
   generateBankReportPDF,
@@ -233,10 +236,17 @@ const SalaryReportPage: React.FC = () => {
   const [isGeneratingExport, setIsGeneratingExport] = useState<boolean>(false);
   const [showExportDialog, setShowExportDialog] = useState<boolean>(false);
   const [showColumnGuide, setShowColumnGuide] = useState<boolean>(false);
+  // Expanded pinjam types (by uppercased description) in the Pinjam Breakdown card
+  const [expandedPinjamTypes, setExpandedPinjamTypes] = useState<Set<string>>(
+    new Set()
+  );
   const [columnGuideLanguage, setColumnGuideLanguage] =
     useState<ColumnGuideLanguage>("bm");
   const [isPrintDropdownOpen, setIsPrintDropdownOpen] = useState<boolean>(false);
   const printDropdownTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const [isBreakdownDropdownOpen, setIsBreakdownDropdownOpen] =
+    useState<boolean>(false);
+  const breakdownDropdownTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   const [exportYear, setExportYear] = useState<number>(
     new Date().getFullYear()
   );
@@ -566,6 +576,99 @@ const SalaryReportPage: React.FC = () => {
     printDropdownTimeoutRef.current = setTimeout(() => {
       setIsPrintDropdownOpen(false);
     }, 300);
+  };
+
+  // Breakdown (Pinjam by Type) dropdown handlers
+  const handleBreakdownDropdownMouseEnter = () => {
+    if (breakdownDropdownTimeoutRef.current) {
+      clearTimeout(breakdownDropdownTimeoutRef.current);
+      breakdownDropdownTimeoutRef.current = null;
+    }
+    setIsBreakdownDropdownOpen(true);
+  };
+
+  const handleBreakdownDropdownMouseLeave = () => {
+    breakdownDropdownTimeoutRef.current = setTimeout(() => {
+      setIsBreakdownDropdownOpen(false);
+    }, 300);
+  };
+
+  // Generate the separate Pinjam Breakdown PDF (Pinjam by Type + contributors)
+  const generateBreakdownPDF = async (action: "download" | "print") => {
+    if (!reportData || reportData.data.length === 0) {
+      toast.error("No data available to generate PDF");
+      return;
+    }
+    setIsGeneratingPDF(true);
+    try {
+      const pdfData: PinjamReportPDFData = {
+        year: reportData.year,
+        month: reportData.month,
+        data: reportData.data,
+        total_records: reportData.total_records,
+        summary: reportData.summary,
+      };
+      await generatePinjamBreakdownPDF(pdfData, action);
+      const actionText =
+        action === "download" ? "downloaded" : "generated for printing";
+      toast.success(`Pinjam breakdown ${actionText} successfully`);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
+  // Renders the "Breakdown" print/download split button (Pinjam tab only).
+  // Used in both the wide and narrow toolbars to avoid duplicating the markup.
+  const renderBreakdownButton = () => {
+    const disabled =
+      !reportData || reportData.data.length === 0 || isGeneratingPDF;
+    return (
+      <div
+        className="relative"
+        onMouseEnter={handleBreakdownDropdownMouseEnter}
+        onMouseLeave={handleBreakdownDropdownMouseLeave}
+      >
+        <Button
+          onClick={() => generateBreakdownPDF("print")}
+          icon={IconFileText}
+          color="teal"
+          variant="outline"
+          disabled={disabled}
+          size="sm"
+        >
+          Breakdown
+        </Button>
+        {isBreakdownDropdownOpen && (
+          <div className="absolute right-0 top-full mt-1 z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-default-200 dark:border-gray-700 py-1 min-w-[140px]">
+              <button
+                onClick={() => {
+                  setIsBreakdownDropdownOpen(false);
+                  generateBreakdownPDF("print");
+                }}
+                disabled={disabled}
+                className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Print
+              </button>
+              <button
+                onClick={() => {
+                  setIsBreakdownDropdownOpen(false);
+                  generateBreakdownPDF("download");
+                }}
+                disabled={disabled}
+                className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Download PDF
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   // PDF Generation
@@ -2440,26 +2543,26 @@ const SalaryReportPage: React.FC = () => {
                 {item.no}
               </td>
               <td className="px-2 py-1">
-                <div className="text-sm text-default-900 dark:text-gray-100 font-medium">
-                  {item.staff_id} - {item.staff_name}
-                </div>
-                {item.pinjam_details && item.pinjam_details.length > 0 && (
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {item.pinjam_details.map((detail, dIndex) => (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                  <span className="text-sm text-default-900 dark:text-gray-100 font-medium">
+                    {item.staff_id} - {item.staff_name}
+                  </span>
+                  {item.pinjam_details &&
+                    item.pinjam_details.length > 0 &&
+                    item.pinjam_details.map((detail, dIndex) => (
                       <span
                         key={dIndex}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-rose-100 bg-rose-50 px-2 py-0.5 text-xs dark:border-rose-900/40 dark:bg-rose-900/20"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-xs dark:border-teal-700/50 dark:bg-teal-900/30"
                       >
-                        <span className="text-default-600 dark:text-gray-300">
+                        <span className="text-default-600 dark:text-gray-200">
                           {detail.description}
                         </span>
-                        <span className="font-semibold tabular-nums text-rose-600 dark:text-rose-400">
+                        <span className="font-semibold tabular-nums text-teal-600 dark:text-teal-300">
                           {formatCurrency(detail.amount)}
                         </span>
                       </span>
                     ))}
-                  </div>
-                )}
+                </div>
               </td>
               <td className="px-2 py-1 text-sm text-default-600 dark:text-gray-300 text-right">
                 {formatCurrency(item.gaji_genap)}
@@ -2487,6 +2590,108 @@ const SalaryReportPage: React.FC = () => {
       </table>
     </div>
   );
+
+  // Pinjam Breakdown - grand total per pinjam type, each expandable to reveal
+  // the staff who contributed to that type and their amounts.
+  const PinjamBreakdown = () => {
+    const byType = aggregatePinjamContributorsByType(reportData?.data ?? []);
+    if (byType.length === 0) return null;
+
+    const togglePinjamType = (key: string) => {
+      setExpandedPinjamTypes((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        return next;
+      });
+    };
+
+    const allKeys = byType.map((type) => type.description.toUpperCase());
+    const allExpanded = allKeys.every((key) => expandedPinjamTypes.has(key));
+
+    return (
+      <div className="mb-2 mt-1 rounded-lg border border-teal-200 bg-teal-50/50 p-4 dark:border-teal-700/50 dark:bg-teal-900/20">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-default-700 dark:text-gray-100">
+            Pinjam Breakdown
+          </h3>
+          <button
+            type="button"
+            onClick={() =>
+              setExpandedPinjamTypes(allExpanded ? new Set() : new Set(allKeys))
+            }
+            className="text-xs font-medium text-teal-600 hover:text-teal-700 dark:text-teal-300 dark:hover:text-teal-200"
+          >
+            {allExpanded ? "Collapse all" : "Expand all"}
+          </button>
+        </div>
+        <div className="divide-y divide-teal-200/70 dark:divide-teal-700/30">
+          {byType.map((type) => {
+            const key = type.description.toUpperCase();
+            const isExpanded = expandedPinjamTypes.has(key);
+            return (
+              <div key={key}>
+                <button
+                  type="button"
+                  onClick={() => togglePinjamType(key)}
+                  className="flex w-full items-center justify-between gap-2 py-1.5 text-left"
+                >
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <IconChevronRight
+                      size={15}
+                      className={`shrink-0 text-teal-500 transition-transform dark:text-teal-300 ${
+                        isExpanded ? "rotate-90" : ""
+                      }`}
+                    />
+                    <span
+                      className="truncate text-sm text-default-700 dark:text-gray-100"
+                      title={type.description}
+                    >
+                      {type.description}
+                    </span>
+                    <span className="shrink-0 text-xs text-default-400 dark:text-gray-400">
+                      ({type.contributors.length})
+                    </span>
+                  </span>
+                  <span className="whitespace-nowrap text-sm font-semibold tabular-nums text-default-800 dark:text-gray-100">
+                    {formatCurrency(type.total)}
+                  </span>
+                </button>
+                {isExpanded && (
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-1 px-1 pb-2 pl-6 sm:grid-cols-3 lg:grid-cols-4">
+                    {type.contributors.map((c) => (
+                      <div
+                        key={c.staff_id}
+                        className="flex items-baseline justify-between gap-2"
+                      >
+                        <span
+                          className="truncate text-xs text-default-500 dark:text-gray-300"
+                          title={`${c.staff_id} - ${c.staff_name}`}
+                        >
+                          {c.staff_name}
+                        </span>
+                        <span className="whitespace-nowrap text-xs tabular-nums text-default-600 dark:text-gray-300">
+                          {formatCurrency(c.amount)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-3 flex items-baseline justify-between border-t border-teal-300 pt-2 dark:border-teal-700/50">
+          <span className="text-sm font-semibold text-default-800 dark:text-gray-100">
+            Total Pinjam
+          </span>
+          <span className="whitespace-nowrap text-base font-bold tabular-nums text-default-900 dark:text-gray-50">
+            {formatCurrency(reportData?.summary.total_pinjam ?? 0)}
+          </span>
+        </div>
+      </div>
+    );
+  };
 
   // Cuti (leave) Summary Table - one row per employee, four leave-type groups
   // each showing Days + Amount. Aggregation follows the Monthly/Yearly toggle.
@@ -2826,6 +3031,7 @@ const SalaryReportPage: React.FC = () => {
                   </div>
                 )}
               </div>
+              {activeTab === 3 && renderBreakdownButton()}
               {activeTab === 2 && (
                 <>
                   <Button
@@ -3103,7 +3309,12 @@ const SalaryReportPage: React.FC = () => {
               )}
               {activeTab === 1 && <ComprehensiveSalaryTable />}
               {activeTab === 2 && <BankTable />}
-              {activeTab === 3 && <PinjamTable />}
+              {activeTab === 3 && (
+                <>
+                  <PinjamTable />
+                  <PinjamBreakdown />
+                </>
+              )}
             </div>
 
             {/* Summary Footer */}
