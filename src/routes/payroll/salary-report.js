@@ -260,7 +260,11 @@ export default function (pool) {
           -- Aggregate pinjam by employee NAME so amounts recorded under any
           -- sibling ID (multi-ID staff) roll up to the person, mirroring how
           -- the combined payroll is keyed.
-          SELECT s.name AS staff_name, COALESCE(SUM(pr.amount), 0) as total_pinjam
+          SELECT s.name AS staff_name, COALESCE(SUM(pr.amount), 0) as total_pinjam,
+                 json_agg(json_build_object(
+                   'description', COALESCE(NULLIF(btrim(pr.description), ''), 'Pinjam'),
+                   'amount', pr.amount
+                 ) ORDER BY pr.amount DESC) AS pinjam_details
           FROM pinjam_records pr
           JOIN staffs s ON pr.employee_id = s.id
           WHERE pr.year = $1 AND pr.month = $2
@@ -275,14 +279,15 @@ export default function (pool) {
           GROUP BY staff_name
         ),
         pinjam_monthly_data AS (
-          SELECT pr.employee_id, pbn.total_pinjam
+          SELECT pr.employee_id, pbn.total_pinjam, pbn.pinjam_details
           FROM pinjam_rep pr
           JOIN pinjam_by_name pbn ON pbn.staff_name = pr.staff_name
         )
-        SELECT 
+        SELECT
           ebd.*,
           COALESCE(mmd.mid_month_amount, 0) as mid_month_amount,
           COALESCE(pmd.total_pinjam, 0) as total_pinjam,
+          COALESCE(pmd.pinjam_details, '[]'::json) as pinjam_details,
           -- GAJI = regular wage. Worker WITH an Hour/Day base: all non-piece work (base + hourly
           -- maintenance/Sunday). Worker with NO hourly base (pure piece / office salary): Base +
           -- production F/HARIAN codes (FULL_*). The generic FULL incentive code and other
@@ -535,6 +540,7 @@ export default function (pool) {
           // Bank/Pinjam tab data (actual take-home: advance already deducted)
           gaji_genap: takeHomeSetelah,
           total_pinjam: totalPinjam,
+          pinjam_details: row.pinjam_details || [],
           final_total: takeHomeSetelah - totalPinjam,
           net_pay: parseFloat(row.net_pay || 0),
           mid_month_amount: parseFloat(row.mid_month_amount || 0),
@@ -729,6 +735,7 @@ export default function (pool) {
               // For Bank/Pinjam tabs
               gaji_genap: setelahDigenapkan,
               total_pinjam: 0,
+              pinjam_details: [],
               final_total: setelahDigenapkan,
               net_pay: commAmount,
               mid_month_amount: midMonthAmount,
@@ -1542,6 +1549,7 @@ export default function (pool) {
           // Bank/Pinjam tab data (actual take-home: advance already deducted)
           gaji_genap: takeHomeSetelah,
           total_pinjam: totalPinjam,
+          pinjam_details: row.pinjam_details || [],
           final_total: takeHomeSetelah - totalPinjam,
           net_pay: parseFloat(row.net_pay || 0),
           mid_month_amount: parseFloat(row.mid_month_amount || 0),

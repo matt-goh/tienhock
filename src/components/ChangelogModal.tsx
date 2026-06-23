@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-23",
+    ms: "Laporan Gaji: bayaran kod FULL (FULL HARIAN) dan HADIR_MEETING (SEMINAR/MESYUARAT) kini sentiasa dipaparkan di lajur Gaji untuk semua pekerja, bukan lagi di lajur C/I/O. Jumlah Gaji Kasar tidak berubah — hanya lajur paparan diperbetulkan.",
+    en: "Salary Report: payments using the FULL (FULL HARIAN) and HADIR_MEETING (SEMINAR/MESYUARAT) pay codes now always show in the Gaji column for all employees, instead of C/I/O. The Gross (Gaji Kasar) total is unchanged — only the display column is corrected.",
+  },
+  {
+    date: "2026-06-23",
     ms: "Kadar gaji kini boleh ditetapkan mengikut bulan berkuat kuasa. Pada skrin kadar Kod Gaji, kakitangan, dan kerja, anda kini boleh menambah \"perubahan kadar\" yang bermula dari bulan tertentu, dengan senarai sejarah perubahan. Setiap bulan gaji akan menggunakan kadar yang berkuat kuasa untuk bulan itu apabila diproses semula — jadi menaikkan kadar mulai bulan tertentu tidak lagi mengubah bulan-bulan sebelumnya. Skrin kemasukan kerja harian, bulanan dan jurujual kini memaparkan kadar mengikut bulan log tersebut supaya sepadan dengan slip gaji.",
     en: "Pay rates can now be set to take effect from a specific month. On the Pay Code, employee, and job rate screens you can add a \"rate change\" that starts from a chosen month, with a history list of changes. Each payroll month uses the rate in force for that month when re-processed — so raising a rate from a certain month no longer alters earlier months. The daily, monthly, and salesman work-log entry screens now preview the rate for that log's month so it matches the payslip.",
   },
