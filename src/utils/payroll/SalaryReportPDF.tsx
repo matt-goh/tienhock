@@ -158,6 +158,9 @@ const styles = StyleSheet.create({
   // EPF/SOCSO/SIP columns: padding 1 horizontal (matching px-1 py-2 scaled down)
   colBil: { width: "2.5%", textAlign: "center", paddingVertical: 1, paddingHorizontal: 1, borderRightWidth: 0.5, borderRightColor: colors.border },
   colName: { width: "13.5%", textAlign: "left", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
+  // Breakdown view leading columns (BIL + MONTH + NAMA = same 16% as BIL + NAMA above)
+  colMonthB: { width: "4%", textAlign: "center", paddingVertical: 1, paddingHorizontal: 1, borderRightWidth: 0.5, borderRightColor: colors.border },
+  colNameB: { width: "9.5%", textAlign: "left", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
   colGaji: { width: "5%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
   colOt: { width: "4%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
   colBonus: { width: "4.5%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
@@ -282,22 +285,57 @@ interface ComprehensiveSalaryData {
   grand_totals: GrandTotals;
 }
 
+// Annual summary: yearly totals by month and by location (both share the columns).
+interface AnnualSummaryData {
+  year: number;
+  monthly: { month: number; totals: GrandTotals }[];
+  locations: { location: string; totals: GrandTotals }[];
+  grand_totals: GrandTotals;
+}
+
+// Annual breakdown: per location, each employee expanded into one row per month.
+interface AnnualBreakdownData {
+  year: number;
+  locations: {
+    location: string;
+    employees: {
+      staff_id: string;
+      staff_name: string;
+      months: (GrandTotals & { month: number })[];
+      total: GrandTotals;
+    }[];
+    totals: GrandTotals;
+  }[];
+  grand_totals: GrandTotals;
+}
+
 interface LocationOrderItem {
   type: "location" | "header";
   id?: string;
   text?: string;
 }
 
+type SalaryReportType =
+  | "employee-individual"
+  | "employee-grouped"
+  | "location"
+  | "annual"
+  | "annual-breakdown";
+
 export interface SalaryReportPDFProps {
-  reportType: "employee-individual" | "employee-grouped" | "location";
+  reportType: SalaryReportType;
   periodType: "monthly" | "yearly";
   year: number;
   month?: number;
   employees?: EmployeeSalaryData[];
   comprehensiveData?: ComprehensiveSalaryData | null;
+  annualData?: AnnualSummaryData | null;
+  annualBreakdownData?: AnnualBreakdownData | null;
   grandTotals?: GrandTotals;
   locationMap: Record<string, string>;
   locationOrder: LocationOrderItem[];
+  // Optional filename suffix (e.g. "Batch_1") for batched downloads.
+  fileNameSuffix?: string;
 }
 
 // Helper functions
@@ -369,9 +407,7 @@ const buildReportTitle = (
   return `REPORT : SALARY WAGES FOR THE MONTH OF ${monthName}, ${year}`;
 };
 
-const buildViewSubtitle = (
-  reportType: "employee-individual" | "employee-grouped" | "location"
-): string => {
+const buildViewSubtitle = (reportType: SalaryReportType): string => {
   switch (reportType) {
     case "employee-individual":
       return "BY NAME (GROUP)";
@@ -379,16 +415,23 @@ const buildViewSubtitle = (
       return "BY LOCATION";
     case "location":
       return "LOCATION:-";
+    case "annual":
+      return "ANNUAL SUMMARY (BY MONTH & BY LOCATION)";
+    case "annual-breakdown":
+      return "ANNUAL BREAKDOWN (BY LOCATION, EACH EMPLOYEE BY MONTH)";
     default:
       return "";
   }
 };
 
 // Table Header Component
-const TableHeader: React.FC<{ isLocationReport: boolean }> = ({
-  isLocationReport,
-}) => {
-  const nameHeader = isLocationReport ? "BAHAGIAN KERJA" : "NAMA PEKERJA";
+const TableHeader: React.FC<{
+  isLocationReport?: boolean;
+  nameLabel?: string;
+  repeat?: boolean;
+}> = ({ isLocationReport = false, nameLabel, repeat = true }) => {
+  const nameHeader =
+    nameLabel ?? (isLocationReport ? "BAHAGIAN KERJA" : "NAMA PEKERJA");
 
   // Combined widths for spanning headers
   const epfWidth = "8%"; // 4% + 4%
@@ -396,7 +439,7 @@ const TableHeader: React.FC<{ isLocationReport: boolean }> = ({
   const sipWidth = "8%"; // 4% + 4%
 
   return (
-    <View fixed>
+    <View fixed={repeat}>
       {/* Main Header Row */}
       <View style={styles.tableHeader} wrap={false}>
         <View style={styles.colBil}>
@@ -522,7 +565,7 @@ const SectionHeaderRow: React.FC<{ text: string }> = ({ text }) => (
   <View style={styles.sectionHeaderRow} wrap={false} minPresenceAhead={30}>
     <View style={styles.fullWidthCell}>
       <Text style={[styles.sectionText, { textAlign: "center" }]}>
-        --- {text} ---
+        {text ? `--- ${text} ---` : ""}
       </Text>
     </View>
   </View>
@@ -806,6 +849,243 @@ const LocationTotalsContent: React.FC<{
   </>
 );
 
+// Annual Summary Content - by-month table, then by-location table (new page)
+const AnnualSummaryContent: React.FC<{
+  annualData: AnnualSummaryData;
+  locationMap: Record<string, string>;
+  locationOrder: LocationOrderItem[];
+}> = ({ annualData, locationMap, locationOrder }) => {
+  const emptyData: GrandTotals = {
+    gaji: 0, ot: 0, bonus: 0, comm: 0, cuti: 0, gaji_kasar: 0,
+    epf_majikan: 0, epf_pekerja: 0, socso_majikan: 0, socso_pekerja: 0,
+    sip_majikan: 0, sip_pekerja: 0, pcb: 0, gaji_bersih: 0,
+    setengah_bulan: 0, jumlah: 0, digenapkan: 0, setelah_digenapkan: 0,
+  };
+
+  return (
+    <>
+      {/* BY MONTH */}
+      <TableHeader nameLabel="MONTH" repeat={false} />
+      {annualData.monthly.map((m) => (
+        <DataRow
+          key={`m-${m.month}`}
+          bil={m.month}
+          name={getMonthName(m.month).toUpperCase()}
+          data={m.totals}
+        />
+      ))}
+      <View wrap={false}>
+        <DataRow bil="" name="TOTAL :" data={annualData.grand_totals} isBold rowStyle={styles.totalRow} />
+        <CarumanTotalsRow totals={annualData.grand_totals} />
+      </View>
+
+      {/* BY LOCATION (start on a new page so each table keeps its header) */}
+      <View break>
+        <TableHeader nameLabel="BAHAGIAN KERJA" repeat={false} />
+        {locationOrder.map((item, idx) => {
+          if (item.type === "header") {
+            return <SectionHeaderRow key={`header-${idx}`} text={item.text || ""} />;
+          }
+          const locData = annualData.locations.find(
+            (l) => l.location === item.id
+          );
+          const locationName = locationMap[item.id || ""] || item.id || "";
+          return (
+            <DataRow
+              key={`loc-${item.id}`}
+              bil={item.id || ""}
+              name={truncateName(locationName, 35)}
+              data={locData?.totals ?? emptyData}
+            />
+          );
+        })}
+        <View wrap={false}>
+          <DataRow bil="" name="TOTAL :" data={annualData.grand_totals} isBold rowStyle={styles.totalRow} />
+          <CarumanTotalsRow totals={annualData.grand_totals} />
+        </View>
+      </View>
+    </>
+  );
+};
+
+// Shared 18 amount cells (GAJI..SETELAH DIGENAPKAN) for the breakdown rows.
+const AmountCells: React.FC<{ data: GrandTotals; textStyle: any }> = ({
+  data,
+  textStyle,
+}) => (
+  <>
+    <View style={styles.colGaji}><Text style={textStyle}>{formatCurrency(data.gaji)}</Text></View>
+    <View style={styles.colOt}><Text style={textStyle}>{formatCurrency(data.ot)}</Text></View>
+    <View style={styles.colBonus}><Text style={textStyle}>{formatCurrency(data.bonus)}</Text></View>
+    <View style={styles.colComm}><Text style={textStyle}>{formatCurrency(data.comm)}</Text></View>
+    <View style={styles.colCuti}><Text style={textStyle}>{formatCurrency(data.cuti)}</Text></View>
+    <View style={styles.colGajiKasar}><Text style={textStyle}>{formatCurrency(data.gaji_kasar)}</Text></View>
+    <View style={styles.colEpfMaj}><Text style={textStyle}>{formatCurrency(data.epf_majikan)}</Text></View>
+    <View style={styles.colEpfPkj}><Text style={textStyle}>{formatCurrency(data.epf_pekerja)}</Text></View>
+    <View style={styles.colSocsoMaj}><Text style={textStyle}>{formatCurrency(data.socso_majikan)}</Text></View>
+    <View style={styles.colSocsoPkj}><Text style={textStyle}>{formatCurrency(data.socso_pekerja)}</Text></View>
+    <View style={styles.colSipMaj}><Text style={textStyle}>{formatCurrency(data.sip_majikan)}</Text></View>
+    <View style={styles.colSipPkj}><Text style={textStyle}>{formatCurrency(data.sip_pekerja)}</Text></View>
+    <View style={styles.colPcb}><Text style={textStyle}>{formatCurrency(data.pcb)}</Text></View>
+    <View style={styles.colGajiBersih}><Text style={textStyle}>{formatCurrency(data.gaji_bersih)}</Text></View>
+    <View style={styles.colSetengah}><Text style={textStyle}>{formatCurrency(data.setengah_bulan)}</Text></View>
+    <View style={styles.colJumlah}><Text style={textStyle}>{formatCurrency(data.jumlah)}</Text></View>
+    <View style={styles.colDigenapkan}><Text style={textStyle}>{formatCurrency(data.digenapkan)}</Text></View>
+    <View style={styles.colSetelah}><Text style={textStyle}>{formatCurrency(data.setelah_digenapkan)}</Text></View>
+  </>
+);
+
+// Breakdown table header (3 leading columns: BIL | MTH | NAMA PEKERJA)
+const BreakdownTableHeader: React.FC = () => {
+  const epfWidth = "8%";
+  const socsoWidth = "8%";
+  const sipWidth = "8%";
+  const span = { paddingVertical: 1, borderLeftWidth: 0.5, borderLeftColor: colors.border, borderRightWidth: 0.5, borderRightColor: colors.border } as const;
+  return (
+    <View>
+      <View style={styles.tableHeader} wrap={false}>
+        <View style={styles.colBil}><Text style={styles.headerText}>BIL</Text></View>
+        <View style={styles.colMonthB}><Text style={styles.headerText}>MTH</Text></View>
+        <View style={styles.colNameB}><Text style={styles.headerText}>NAMA PEKERJA</Text></View>
+        <View style={styles.colGaji}><Text style={styles.headerText}>GAJI</Text></View>
+        <View style={styles.colOt}><Text style={styles.headerText}>OT</Text></View>
+        <View style={styles.colBonus}><Text style={styles.headerText}>BONUS</Text></View>
+        <View style={styles.colComm}><Text style={styles.headerTextSmall}>C/I/O</Text></View>
+        <View style={styles.colCuti}><Text style={styles.headerText}>CUTI</Text></View>
+        <View style={styles.colGajiKasar}><Text style={styles.headerText}>G. KASAR</Text></View>
+        <View style={{ width: epfWidth, textAlign: "center", ...span }}><Text style={[styles.headerText, { textAlign: "center" }]}>EPF</Text></View>
+        <View style={{ width: socsoWidth, textAlign: "center", ...span }}><Text style={[styles.headerText, { textAlign: "center" }]}>SOCSO</Text></View>
+        <View style={{ width: sipWidth, textAlign: "center", ...span }}><Text style={[styles.headerText, { textAlign: "center" }]}>SIP</Text></View>
+        <View style={styles.colPcb}><Text style={styles.headerText}>PCB</Text></View>
+        <View style={styles.colGajiBersih}><Text style={styles.headerText}>G. BERSIH</Text></View>
+        <View style={styles.colSetengah}><Text style={styles.headerText}>1/2 BULAN</Text></View>
+        <View style={styles.colJumlah}><Text style={styles.headerText}>JUMLAH</Text></View>
+        <View style={styles.colDigenapkan}><Text style={styles.headerText}>DIGENAP</Text></View>
+        <View style={styles.colSetelah}><Text style={styles.headerText}>S. DIGENAP</Text></View>
+      </View>
+      <View style={styles.tableHeaderSub} wrap={false}>
+        <View style={styles.colBil}><Text style={styles.subHeaderText}></Text></View>
+        <View style={styles.colMonthB}><Text style={styles.subHeaderText}></Text></View>
+        <View style={styles.colNameB}><Text style={styles.subHeaderText}></Text></View>
+        <View style={styles.colGaji}><Text style={styles.subHeaderText}></Text></View>
+        <View style={styles.colOt}><Text style={styles.subHeaderText}></Text></View>
+        <View style={styles.colBonus}><Text style={styles.subHeaderText}></Text></View>
+        <View style={styles.colComm}><Text style={styles.subHeaderText}></Text></View>
+        <View style={styles.colCuti}><Text style={styles.subHeaderText}></Text></View>
+        <View style={styles.colGajiKasar}><Text style={styles.subHeaderText}></Text></View>
+        <View style={[styles.colEpfMaj, { textAlign: "center" }]}><Text style={styles.subHeaderText}>MAJ</Text></View>
+        <View style={[styles.colEpfPkj, { textAlign: "center" }]}><Text style={styles.subHeaderText}>PKJ</Text></View>
+        <View style={[styles.colSocsoMaj, { textAlign: "center" }]}><Text style={styles.subHeaderText}>MAJ</Text></View>
+        <View style={[styles.colSocsoPkj, { textAlign: "center" }]}><Text style={styles.subHeaderText}>PKJ</Text></View>
+        <View style={[styles.colSipMaj, { textAlign: "center" }]}><Text style={styles.subHeaderText}>MAJ</Text></View>
+        <View style={[styles.colSipPkj, { textAlign: "center" }]}><Text style={styles.subHeaderText}>PKJ</Text></View>
+        <View style={styles.colPcb}><Text style={styles.subHeaderText}></Text></View>
+        <View style={styles.colGajiBersih}><Text style={styles.subHeaderText}></Text></View>
+        <View style={styles.colSetengah}><Text style={styles.subHeaderText}></Text></View>
+        <View style={styles.colJumlah}><Text style={styles.subHeaderText}></Text></View>
+        <View style={styles.colDigenapkan}><Text style={styles.subHeaderText}></Text></View>
+        <View style={styles.colSetelah}><Text style={styles.subHeaderText}></Text></View>
+      </View>
+    </View>
+  );
+};
+
+// Breakdown data row (BIL | MTH | NAMA | 18 amount cells)
+const BreakdownRow: React.FC<{
+  bil: string | number;
+  month: string;
+  name: string;
+  data: GrandTotals;
+  isBold?: boolean;
+  rowStyle?: any;
+}> = ({ bil, month, name, data, isBold = false, rowStyle }) => {
+  const textStyle = isBold ? styles.dataTextBold : styles.dataText;
+  return (
+    <View style={rowStyle || styles.tableRow} wrap={false}>
+      <View style={styles.colBil}><Text style={textStyle}>{bil}</Text></View>
+      <View style={styles.colMonthB}><Text style={textStyle}>{month}</Text></View>
+      <View style={styles.colNameB}><Text style={textStyle}>{name}</Text></View>
+      <AmountCells data={data} textStyle={textStyle} />
+    </View>
+  );
+};
+
+// Annual Breakdown Content - one location per page, each employee by month
+const AnnualBreakdownContent: React.FC<{
+  annualBreakdownData: AnnualBreakdownData;
+  locationMap: Record<string, string>;
+  locationOrder: LocationOrderItem[];
+}> = ({ annualBreakdownData, locationMap, locationOrder }) => {
+  const locById = new Map(
+    annualBreakdownData.locations.map(
+      (l): [string, AnnualBreakdownData["locations"][0]] => [l.location, l]
+    )
+  );
+  const ordered = locationOrder
+    .filter((item) => item.type === "location")
+    .map((item) => locById.get(item.id || ""))
+    .filter(
+      (l): l is AnnualBreakdownData["locations"][0] =>
+        !!l && l.employees.length > 0
+    );
+
+  if (ordered.length === 0) return <NoDataContent />;
+
+  return (
+    <>
+      {ordered.map((loc, locIdx) => {
+        const locationName = locationMap[loc.location] || loc.location;
+        return (
+          <View key={loc.location} break={locIdx > 0}>
+            <Text style={styles.viewSubtitle}>
+              BY LOCATION : {loc.location} - {locationName.toUpperCase()}
+            </Text>
+            <BreakdownTableHeader />
+            {loc.employees.map((emp, eIdx) => (
+              <View key={emp.staff_id} wrap={false}>
+                {emp.months.map((m, mIdx) => (
+                  <BreakdownRow
+                    key={`${emp.staff_id}-${m.month}`}
+                    bil={mIdx === 0 ? eIdx + 1 : ""}
+                    month={String(m.month)}
+                    name={
+                      mIdx === 0
+                        ? truncateName(
+                            `${(emp.staff_id || "").toUpperCase()} - ${(emp.staff_name || "").toUpperCase()}`,
+                            20
+                          )
+                        : ""
+                    }
+                    data={m}
+                  />
+                ))}
+                <BreakdownRow
+                  bil=""
+                  month=""
+                  name="TOTAL :"
+                  data={emp.total}
+                  isBold
+                  rowStyle={styles.subtotalRow}
+                />
+              </View>
+            ))}
+            <View wrap={false}>
+              <BreakdownRow
+                bil=""
+                month=""
+                name="GRAND TOTAL :"
+                data={loc.totals}
+                isBold
+                rowStyle={styles.totalRow}
+              />
+            </View>
+          </View>
+        );
+      })}
+    </>
+  );
+};
+
 // No Data Content
 const NoDataContent: React.FC = () => (
   <>
@@ -828,6 +1108,8 @@ const SalaryReportPDF: React.FC<SalaryReportPDFProps> = ({
   month,
   employees,
   comprehensiveData,
+  annualData,
+  annualBreakdownData,
   grandTotals,
   locationMap,
   locationOrder,
@@ -837,7 +1119,27 @@ const SalaryReportPDF: React.FC<SalaryReportPDFProps> = ({
 
   let content: React.ReactNode = <NoDataContent />;
 
-  if (reportType === "employee-individual" && employees && employees.length > 0 && grandTotals) {
+  if (
+    reportType === "annual-breakdown" &&
+    annualBreakdownData &&
+    annualBreakdownData.locations.length > 0
+  ) {
+    content = (
+      <AnnualBreakdownContent
+        annualBreakdownData={annualBreakdownData}
+        locationMap={locationMap}
+        locationOrder={locationOrder}
+      />
+    );
+  } else if (reportType === "annual" && annualData && annualData.monthly.length > 0) {
+    content = (
+      <AnnualSummaryContent
+        annualData={annualData}
+        locationMap={locationMap}
+        locationOrder={locationOrder}
+      />
+    );
+  } else if (reportType === "employee-individual" && employees && employees.length > 0 && grandTotals) {
     content = <EmployeeIndividualContent employees={employees} grandTotals={grandTotals} />;
   } else if (reportType === "employee-grouped" && comprehensiveData && comprehensiveData.locations.length > 0 && grandTotals) {
     content = (
@@ -889,22 +1191,28 @@ const SalaryReportPDF: React.FC<SalaryReportPDFProps> = ({
 
 // Generate filename
 const generateFileName = (
-  reportType: "employee-individual" | "employee-grouped" | "location",
+  reportType: SalaryReportType,
   periodType: "monthly" | "yearly",
   year: number,
-  month?: number
+  month?: number,
+  fileNameSuffix?: string
 ): string => {
   const reportName =
     reportType === "employee-individual"
       ? "Employee"
       : reportType === "employee-grouped"
       ? "Employee_ByLocation"
+      : reportType === "annual"
+      ? "Annual"
+      : reportType === "annual-breakdown"
+      ? "Annual_Breakdown"
       : "Location";
 
   const periodStr =
     periodType === "yearly" ? `${year}` : `${getMonthName(month || 1)}_${year}`;
 
-  return `Salary_Report_${reportName}_${periodStr}.pdf`;
+  const suffix = fileNameSuffix ? `_${fileNameSuffix}` : "";
+  return `Salary_Report_${reportName}_${periodStr}${suffix}.pdf`;
 };
 
 // Main export function - generate and download/print PDF
@@ -915,7 +1223,7 @@ export const generateSalaryReportPDF = async (
   try {
     const doc = <SalaryReportPDF {...props} />;
     const pdfBlob = await pdf(doc).toBlob();
-    const fileName = generateFileName(props.reportType, props.periodType, props.year, props.month);
+    const fileName = generateFileName(props.reportType, props.periodType, props.year, props.month, props.fileNameSuffix);
 
     if (action === "download") {
       const url = URL.createObjectURL(pdfBlob);
