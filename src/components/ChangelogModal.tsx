@@ -19,6 +19,21 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-06-25",
+    ms: "Laporan Gaji kini memaparkan Cuti Tahunan bagi pekerja yang tiada rekod gaji aktif pada bulan tersebut tanpa menolak Gaji Pertengahan Bulan sekali lagi. Jumlah cuti tidak lagi kelihatan negatif, dan baris tersebut tidak akan dimasukkan ke dalam senarai bayaran bank kerana bayaran telah dibuat sebelum ini.",
+    en: "Salary Report now shows Annual Leave for employees without an active payroll that month without deducting their mid-month salary again. The leave amount no longer appears as a negative figure, and those rows are excluded from the bank payment list because the payment was already made.",
+  },
+  {
+    date: "2026-06-25",
+    ms: "Laporan Gaji mengikut lokasi (tab \"Location\" untuk Bulanan/Tahunan, dan jadual lokasi di bahagian bawah tab \"Annual\") kini lebih kemas: baris lokasi yang tidak digunakan (16, 17, 19, 20, 21, 22, 24, 05, 12, 15) telah dialih keluar, dan label pemisah \"COMMISSION\" telah dibuang (baris pemisah kekal). Berlaku pada paparan skrin dan PDF. Jumlah besar tidak berubah.",
+    en: "The by-location Salary Report (the \"Location\" tab for Monthly/Yearly, and the location table at the bottom of the \"Annual\" tab) is tidier: the unused location rows (16, 17, 19, 20, 21, 22, 24, 05, 12, 15) have been removed, and the \"COMMISSION\" divider label is gone (the spacer row stays). Applies on screen and in the PDFs. Grand totals are unchanged.",
+  },
+  {
+    date: "2026-06-24",
+    ms: "Tab \"Annual\" pada Laporan Gaji kini mempunyai dua paparan melalui suis \"Summary\" / \"Breakdown\": Summary menunjukkan jumlah setahun mengikut bulan dan lokasi (seperti sebelum ini), manakala Breakdown yang baharu memaparkan pekerja dipecahkan ikut bulan (Januari–Disember), beserta jumlah bagi setiap pekerja dan jumlah besar lokasi — sepadan dengan laporan kertas lama. Kerana laporan ini besar, ia dipaparkan satu halaman pada satu masa — setiap halaman mengumpulkan lokasi secara automatik sehingga kira-kira 30 pekerja (guna butang Prev/Next atau senarai pilihan halaman). Butang Print/Download mengeluarkan halaman yang sedang dipaparkan, dan butang \"Batch Print\" membolehkan anda mencetak/memuat turun mana-mana halaman terus.",
+    en: "The Salary Report's \"Annual\" tab now has two views via a \"Summary\" / \"Breakdown\" switch: Summary shows the year's totals by month and by location (as before), while the new Breakdown shows employees broken down month-by-month (January–December), plus a per-employee total and a location grand total — matching the old paper report. Because this report is large, it is shown one page at a time — each page automatically groups locations up to about 30 staff (use Prev/Next or the page dropdown). The Print/Download buttons output the page currently shown, and a \"Batch Print\" button lets you print or download any page directly.",
+  },
+  {
     date: "2026-06-24",
     ms: "Laporan Gaji kini mempunyai tab \"Annual\" baharu yang memaparkan jumlah gaji setahun: jadual mengikut bulan (Januari–Disember) di atas, dan jadual mengikut lokasi di bawah, kedua-duanya berkongsi lajur yang sama dan menjumlah kepada jumlah besar yang sama.",
     en: "The Salary Report now has a new \"Annual\" tab showing the year's totals: a table broken down by month (January–December) on top, and a table by location below, both sharing the same columns and reconciling to the same grand total.",
