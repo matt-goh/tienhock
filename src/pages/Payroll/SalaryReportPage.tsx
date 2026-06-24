@@ -221,6 +221,61 @@ interface ComprehensiveSalaryData {
   grand_totals: GrandTotals;
 }
 
+// Annual summary (Annual tab): yearly totals broken down by month and by location.
+// Both tables share the same columns and reconcile to the same grand total.
+interface AnnualMonthlyEntry {
+  month: number;
+  totals: GrandTotals;
+}
+
+interface AnnualLocationEntry {
+  location: string;
+  totals: GrandTotals;
+}
+
+interface AnnualSummaryResponse {
+  year: number;
+  monthly: AnnualMonthlyEntry[];
+  locations: AnnualLocationEntry[];
+  grand_totals: GrandTotals;
+}
+
+// Annual breakdown (Annual tab → Breakdown): per location, each employee expanded
+// into one row per month, plus a per-employee total and a location grand total.
+interface AnnualBreakdownMonth extends GrandTotals {
+  month: number;
+}
+
+interface AnnualBreakdownEmployee {
+  staff_id: string;
+  staff_name: string;
+  months: AnnualBreakdownMonth[];
+  total: GrandTotals;
+}
+
+interface AnnualBreakdownLocation {
+  location: string;
+  employees: AnnualBreakdownEmployee[];
+  totals: GrandTotals;
+}
+
+// Lightweight per-page index (one entry per page/batch) returned with every breakdown
+// response so the client can render the pager + batch-print list without the full year.
+interface AnnualBreakdownPageMeta {
+  staff: number;
+  locations: string[]; // location codes on this page
+}
+
+// Paginated breakdown response: only the requested page's heavy detail, plus the index.
+interface AnnualBreakdownResponse {
+  year: number;
+  page: number; // 1-based
+  total_pages: number;
+  pages: AnnualBreakdownPageMeta[];
+  locations: AnnualBreakdownLocation[]; // detail for the current page only
+  grand_totals: GrandTotals;
+}
+
 const SalaryReportPage: React.FC = () => {
   // URL search params
   const [searchParams, setSearchParams] = useSearchParams();
@@ -236,6 +291,9 @@ const SalaryReportPage: React.FC = () => {
   const [isGeneratingExport, setIsGeneratingExport] = useState<boolean>(false);
   const [showExportDialog, setShowExportDialog] = useState<boolean>(false);
   const [showColumnGuide, setShowColumnGuide] = useState<boolean>(false);
+  // Annual → Breakdown is paginated one location at a time to keep the UI light;
+  // printing follows the current page (that one location).
+  const [breakdownPage, setBreakdownPage] = useState<number>(0);
   // Expanded pinjam types (by uppercased description) in the Pinjam Breakdown card
   const [expandedPinjamTypes, setExpandedPinjamTypes] = useState<Set<string>>(
     new Set()
@@ -247,6 +305,11 @@ const SalaryReportPage: React.FC = () => {
   const [isBreakdownDropdownOpen, setIsBreakdownDropdownOpen] =
     useState<boolean>(false);
   const breakdownDropdownTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  // Annual Breakdown batch printing (auto-grouped by a staff-count cap).
+  const [isBatchDropdownOpen, setIsBatchDropdownOpen] = useState<boolean>(false);
+  const batchDropdownTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  // Which batch is currently being generated (e.g. "2-print"), to disable buttons.
+  const [batchPrintingKey, setBatchPrintingKey] = useState<string | null>(null);
   const [exportYear, setExportYear] = useState<number>(
     new Date().getFullYear()
   );
@@ -267,6 +330,15 @@ const SalaryReportPage: React.FC = () => {
   const [yearlyReportData, setYearlyReportData] = useState<SalaryReportResponse | null>(null);
   const [yearlyComprehensiveSalaryData, setYearlyComprehensiveSalaryData] = useState<ComprehensiveSalaryData | null>(null);
   const [isLoadingYearly, setIsLoadingYearly] = useState<boolean>(false);
+
+  // Annual tab states (by-month + by-location yearly summary)
+  const [annualData, setAnnualData] = useState<AnnualSummaryResponse | null>(null);
+  const [isLoadingAnnual, setIsLoadingAnnual] = useState<boolean>(false);
+
+  // Annual tab sub-view: 'summary' (totals) or 'breakdown' (per-employee monthly)
+  const [annualViewMode, setAnnualViewMode] = useState<'summary' | 'breakdown'>('summary');
+  const [annualBreakdownData, setAnnualBreakdownData] = useState<AnnualBreakdownResponse | null>(null);
+  const [isLoadingAnnualBreakdown, setIsLoadingAnnualBreakdown] = useState<boolean>(false);
 
   // Cuti (leave) tab states - batch leave report is fetched per year
   const [cutiEmployees, setCutiEmployees] = useState<CutiBatchEmployee[]>([]);
@@ -303,11 +375,11 @@ const SalaryReportPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<number>(() => {
     const tabParam = searchParams.get("tab");
     const tabIndex = tabParam ? parseInt(tabParam, 10) : 0;
-    // Validate tab index (0-4 are valid)
-    return tabParam && tabIndex >= 0 && tabIndex <= 4
+    // Validate tab index (0-5 are valid)
+    return tabParam && tabIndex >= 0 && tabIndex <= 5
       ? tabIndex
       : readLastAccessedSalaryReportTab() ?? 0;
-  }); // 0 = Employee, 1 = Salary, 2 = Bank, 3 = Pinjam, 4 = Cuti
+  }); // 0 = Employee, 1 = Location, 2 = Bank, 3 = Pinjam, 4 = Cuti, 5 = Annual
 
   // Update URL params when tab, year, month, or period changes
   useEffect(() => {
@@ -332,11 +404,14 @@ const SalaryReportPage: React.FC = () => {
     saveLastAccessedSalaryReportTab(activeTab);
   }, [activeTab]);
 
-  // Cleanup print dropdown timeout on unmount
+  // Cleanup dropdown timeouts on unmount
   useEffect(() => {
     return () => {
       if (printDropdownTimeoutRef.current) {
         clearTimeout(printDropdownTimeoutRef.current);
+      }
+      if (batchDropdownTimeoutRef.current) {
+        clearTimeout(batchDropdownTimeoutRef.current);
       }
     };
   }, []);
@@ -360,7 +435,22 @@ const SalaryReportPage: React.FC = () => {
 
     const orderStructure: LocationOrderItem[] = [];
 
+    // Locations intentionally hidden from the location views/totals (unused/always empty).
+    const removedLocations = new Set([
+      "16",
+      "17",
+      "19",
+      "20",
+      "21",
+      "22",
+      "24",
+      "05",
+      "12",
+      "15",
+    ]);
+
     const addLocation = (id: string) => {
+      if (removedLocations.has(id)) return;
       if (locations.find((loc) => loc.id === id)) {
         orderStructure.push({ type: "location", id });
       }
@@ -386,20 +476,22 @@ const SalaryReportPage: React.FC = () => {
       addLocation("14");
     }
 
-    // Commission section
-    const commissionLocs = ["16", "17", "18", "19", "20", "21"];
-    if (commissionLocs.some((id) => locations.find((loc) => loc.id === id))) {
-      orderStructure.push({ type: "header", text: "COMMISSION" });
-      commissionLocs.forEach(addLocation);
+    // Commission section — keep the header row as a blank separator (text removed),
+    // and only location 18 remains here (16/17/19/20/21 are hidden). 23 follows below.
+    if (
+      locations.find((loc) => loc.id === "18") ||
+      locations.find((loc) => loc.id === "23")
+    ) {
+      orderStructure.push({ type: "header", text: "" });
+      addLocation("18");
     }
 
     // Other locations
-    addLocation("22");
     addLocation("23");
-    addLocation("24");
 
-    // Add any new locations not in the predefined list (at the end)
+    // Add any remaining (new) locations at the end, except the hidden ones.
     locations.forEach((loc) => {
+      if (removedLocations.has(loc.id)) return;
       const alreadyAdded = orderStructure.some(
         (item) => item.type === "location" && item.id === loc.id
       );
@@ -440,6 +532,8 @@ const SalaryReportPage: React.FC = () => {
   // Handle year change from YearNavigator
   const handleYearChange = (newYear: number) => {
     setSelectedMonth(new Date(newYear, selectedMonth.getMonth(), 1));
+    // The breakdown's pages differ per year — restart at the first page.
+    setBreakdownPage(0);
   };
 
   // Load monthly salary report - always on mount and when month changes
@@ -454,6 +548,18 @@ const SalaryReportPage: React.FC = () => {
       fetchYearlySalaryReport();
     }
   }, [currentYear, periodType]);
+
+  // Load the active Annual sub-view when the tab/year/mode/page changes. The breakdown
+  // is fetched one page at a time, so navigating pages refetches just that page.
+  useEffect(() => {
+    if (activeTab !== 5) return;
+    if (annualViewMode === 'breakdown') {
+      fetchAnnualBreakdown(breakdownPage);
+    } else {
+      fetchAnnualReport();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, currentYear, annualViewMode, breakdownPage]);
 
   // Load Cuti (leave) report when the Cuti tab is active and the year changes.
   // The batch report is yearly; the Monthly/Yearly toggle only changes how we
@@ -482,10 +588,12 @@ const SalaryReportPage: React.FC = () => {
     }
   };
 
-  const fetchYearlySalaryReport = async () => {
+  const fetchYearlySalaryReport = async (forceRefresh = false) => {
     setIsLoadingYearly(true);
     try {
-      const response = await api.get(`/api/salary-report/yearly?year=${currentYear}`);
+      const response = await api.get(
+        `/api/salary-report/yearly?year=${currentYear}${forceRefresh ? "&refresh=true" : ""}`
+      );
       setYearlyReportData(response);
       setYearlyComprehensiveSalaryData(response.comprehensive);
     } catch (error) {
@@ -494,6 +602,55 @@ const SalaryReportPage: React.FC = () => {
       setYearlyComprehensiveSalaryData(null);
     } finally {
       setIsLoadingYearly(false);
+    }
+  };
+
+  const fetchAnnualReport = async (forceRefresh = false) => {
+    setIsLoadingAnnual(true);
+    try {
+      const response = await api.get(
+        `/api/salary-report/annual?year=${currentYear}${forceRefresh ? "&refresh=true" : ""}`
+      );
+      setAnnualData(response);
+    } catch (error) {
+      console.error("Error fetching annual salary report:", error);
+      setAnnualData(null);
+    } finally {
+      setIsLoadingAnnual(false);
+    }
+  };
+
+  // Fetch one page of the breakdown (1-based). The response also carries the page index
+  // (pages metadata) so the pager/batch list can render without the full year.
+  const fetchAnnualBreakdown = async (
+    pageIndex: number,
+    forceRefresh = false
+  ) => {
+    setIsLoadingAnnualBreakdown(true);
+    try {
+      const response = await api.get(
+        `/api/salary-report/annual-breakdown?year=${currentYear}&page=${pageIndex + 1}${forceRefresh ? "&refresh=true" : ""}`
+      );
+      setAnnualBreakdownData(response);
+    } catch (error) {
+      console.error("Error fetching annual breakdown salary report:", error);
+      setAnnualBreakdownData(null);
+    } finally {
+      setIsLoadingAnnualBreakdown(false);
+    }
+  };
+
+  // Fetch a specific page's detail without touching the on-screen state (for batch print).
+  const fetchAnnualBreakdownPage = async (
+    pageNo: number
+  ): Promise<AnnualBreakdownResponse | null> => {
+    try {
+      return await api.get(
+        `/api/salary-report/annual-breakdown?year=${currentYear}&page=${pageNo}`
+      );
+    } catch (error) {
+      console.error("Error fetching annual breakdown page:", error);
+      return null;
     }
   };
 
@@ -538,7 +695,39 @@ const SalaryReportPage: React.FC = () => {
   const displayedFinalTotal: number = bankPinjamTabsUseMonthlyData
     ? displayedReportData?.summary.total_final ?? 0
     : displayedReportData?.employees_grand_totals?.setelah_digenapkan ?? 0;
+  // Whether the Print/Download PDF buttons should be enabled. The Annual tab (5)
+  // uses its own annualData; Cuti (4) has no PDF; the rest use displayedReportData.
+  const pdfHasData: boolean =
+    activeTab === 5
+      ? annualViewMode === 'breakdown'
+        ? !!annualBreakdownData && annualBreakdownData.locations.length > 0
+        : !!annualData && annualData.monthly.length > 0
+      : !!displayedReportData && displayedReportData.data.length > 0;
+  const pdfDisabled: boolean = activeTab === 4 || !pdfHasData || isGeneratingPDF;
+  // The yearly views (Annual, and the Yearly period on Employee/Location) are briefly
+  // saved on the server to load faster, so they can be a couple of minutes behind.
+  const dataMayBeCached: boolean =
+    activeTab === 5 ||
+    (periodType === 'yearly' && (activeTab === 0 || activeTab === 1));
+  const refreshDisabled: boolean =
+    activeTab === 4
+      ? cutiLoading
+      : activeTab === 5
+      ? annualViewMode === 'breakdown'
+        ? isLoadingAnnualBreakdown
+        : isLoadingAnnual
+      : displayedLoading;
   const refreshDisplayedReport = (): void => {
+    if (activeTab === 5) {
+      // Refresh forces a fresh server recompute (bypasses the cache).
+      if (annualViewMode === 'breakdown') {
+        void fetchAnnualBreakdown(breakdownPage, true);
+      } else {
+        void fetchAnnualReport(true);
+      }
+      return;
+    }
+
     if (activeTab === 4) {
       // Force a refetch even when the year is unchanged.
       setCutiFetchedYear(null);
@@ -551,7 +740,7 @@ const SalaryReportPage: React.FC = () => {
       return;
     }
 
-    void fetchYearlySalaryReport();
+    void fetchYearlySalaryReport(true);
   };
 
   const formatCurrency = (amount: number): string => {
@@ -590,6 +779,21 @@ const SalaryReportPage: React.FC = () => {
   const handleBreakdownDropdownMouseLeave = () => {
     breakdownDropdownTimeoutRef.current = setTimeout(() => {
       setIsBreakdownDropdownOpen(false);
+    }, 300);
+  };
+
+  // Annual Breakdown batch-print dropdown handlers
+  const handleBatchDropdownMouseEnter = () => {
+    if (batchDropdownTimeoutRef.current) {
+      clearTimeout(batchDropdownTimeoutRef.current);
+      batchDropdownTimeoutRef.current = null;
+    }
+    setIsBatchDropdownOpen(true);
+  };
+
+  const handleBatchDropdownMouseLeave = () => {
+    batchDropdownTimeoutRef.current = setTimeout(() => {
+      setIsBatchDropdownOpen(false);
     }, 300);
   };
 
@@ -673,6 +877,64 @@ const SalaryReportPage: React.FC = () => {
 
   // PDF Generation
   const generatePDF = async (action: "download" | "print") => {
+    // Annual tab - summary (all totals) or breakdown (current page's location only)
+    if (activeTab === 5) {
+      if (annualViewMode === 'breakdown') {
+        // Printing follows the page: only the current page's locations (already loaded).
+        if (!annualBreakdownData || annualBreakdownData.locations.length === 0) {
+          toast.error("No data available to generate PDF");
+          return;
+        }
+        setIsGeneratingPDF(true);
+        try {
+          await generateSalaryReportPDF({
+            reportType: 'annual-breakdown',
+            periodType: 'yearly',
+            year: currentYear,
+            annualBreakdownData: {
+              year: currentYear,
+              locations: annualBreakdownData.locations,
+              grand_totals: annualBreakdownData.grand_totals,
+            },
+            fileNameSuffix: `Batch_${annualBreakdownData.page}`,
+            locationMap: LOCATION_MAP,
+            locationOrder: LOCATION_ORDER,
+          }, action);
+          const actionText = action === "download" ? "downloaded" : "generated for printing";
+          toast.success(`Batch ${annualBreakdownData.page} ${actionText} successfully`);
+        } catch (error) {
+          console.error("Error generating PDF:", error);
+          toast.error("Failed to generate PDF");
+        } finally {
+          setIsGeneratingPDF(false);
+        }
+        return;
+      }
+
+      if (!annualData || annualData.monthly.length === 0) {
+        toast.error("No data available to generate PDF");
+        return;
+      }
+      setIsGeneratingPDF(true);
+      try {
+        await generateSalaryReportPDF({
+          reportType: 'annual',
+          periodType: 'yearly',
+          year: currentYear,
+          annualData,
+          locationMap: LOCATION_MAP,
+          locationOrder: LOCATION_ORDER,
+        }, action);
+        const actionText = action === "download" ? "downloaded" : "generated for printing";
+        toast.success(`Annual salary report ${actionText} successfully`);
+      } catch (error) {
+        console.error("Error generating PDF:", error);
+        toast.error("Failed to generate PDF");
+      } finally {
+        setIsGeneratingPDF(false);
+      }
+      return;
+    }
     // For Employee (tab 0) and Salary (tab 1) tabs, use activeReportData which respects periodType
     // For Bank (tab 2) and Pinjam (tab 3) tabs, use monthly reportData
     const dataToCheck = (activeTab === 0 || activeTab === 1) ? activeReportData : reportData;
@@ -758,6 +1020,130 @@ const SalaryReportPage: React.FC = () => {
     } finally {
       setIsGeneratingPDF(false);
     }
+  };
+
+  // Annual Breakdown is paginated server-side: each page (a batch capped at ~30 staff)
+  // is fetched on demand. These derive the pager from the current page's response; the
+  // on-screen page IS the print batch, so what you see is exactly what prints.
+  const breakdownTotalPages = annualBreakdownData?.total_pages ?? 0;
+  const breakdownPagesMeta = annualBreakdownData?.pages ?? [];
+  const breakdownPageIndex = Math.min(
+    breakdownPage,
+    Math.max(0, breakdownTotalPages - 1)
+  );
+
+  // Print/download a specific page's batch: fetch its detail, then build the PDF.
+  const generateBreakdownBatch = async (
+    pageNo: number,
+    action: "download" | "print"
+  ) => {
+    setBatchPrintingKey(`${pageNo}-${action}`);
+    try {
+      const detail = await fetchAnnualBreakdownPage(pageNo);
+      if (!detail || detail.locations.length === 0) {
+        toast.error("No data available to generate PDF");
+        return;
+      }
+      await generateSalaryReportPDF({
+        reportType: 'annual-breakdown',
+        periodType: 'yearly',
+        year: currentYear,
+        annualBreakdownData: {
+          year: currentYear,
+          locations: detail.locations,
+          grand_totals: detail.grand_totals,
+        },
+        fileNameSuffix: `Batch_${pageNo}`,
+        locationMap: LOCATION_MAP,
+        locationOrder: LOCATION_ORDER,
+      }, action);
+      const actionText = action === "download" ? "downloaded" : "generated for printing";
+      toast.success(`Batch ${pageNo} ${actionText} successfully`);
+    } catch (error) {
+      console.error("Error generating batch PDF:", error);
+      toast.error("Failed to generate batch PDF");
+    } finally {
+      setBatchPrintingKey(null);
+    }
+  };
+
+  // "Batch Print" split button (Annual → Breakdown). The auto-computed batches are
+  // listed on hover, each ready to print/download as its own (capped) PDF.
+  const renderBatchPrintButton = () => {
+    const busy = batchPrintingKey !== null;
+    const disabled = breakdownPagesMeta.length === 0 || isGeneratingPDF;
+    return (
+      <div
+        className="relative"
+        onMouseEnter={handleBatchDropdownMouseEnter}
+        onMouseLeave={handleBatchDropdownMouseLeave}
+      >
+        <Button
+          onClick={() => setIsBatchDropdownOpen(true)}
+          icon={IconPrinter}
+          color="sky"
+          variant="outline"
+          disabled={disabled}
+          size="sm"
+        >
+          Batch Print
+        </Button>
+        {isBatchDropdownOpen && breakdownPagesMeta.length > 0 && (
+          <div className="absolute right-0 top-full mt-1 z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-default-200 dark:border-gray-700 py-1 min-w-[300px] max-h-[60vh] overflow-auto">
+              <div className="px-3 py-1.5 text-[11px] font-medium text-default-500 dark:text-gray-400 border-b border-default-200 dark:border-gray-700">
+                {breakdownPagesMeta.length} batch
+                {breakdownPagesMeta.length > 1 ? "es" : ""}
+              </div>
+              {breakdownPagesMeta.map((meta, idx) => {
+                const n = idx + 1;
+                const names = meta.locations
+                  .map((code) => LOCATION_MAP[code] || code)
+                  .join(", ");
+                const printing = batchPrintingKey === `${n}-print`;
+                const downloading = batchPrintingKey === `${n}-download`;
+                return (
+                  <div
+                    key={n}
+                    className="px-3 py-2 border-t border-default-100 dark:border-gray-700 first:border-t-0"
+                  >
+                    <div className="text-xs font-medium text-default-800 dark:text-gray-100">
+                      Batch {n} · {meta.staff} staff · {meta.locations.length}{" "}
+                      location{meta.locations.length > 1 ? "s" : ""}
+                    </div>
+                    <div className="text-[11px] text-default-500 dark:text-gray-400 whitespace-normal break-words">
+                      {names}
+                    </div>
+                    <div className="flex gap-1.5 mt-1.5">
+                      <Button
+                        onClick={() => generateBreakdownBatch(n, "print")}
+                        icon={IconPrinter}
+                        color="green"
+                        variant="outline"
+                        size="sm"
+                        disabled={busy}
+                      >
+                        {printing ? "…" : "Print"}
+                      </Button>
+                      <Button
+                        onClick={() => generateBreakdownBatch(n, "download")}
+                        icon={IconFileText}
+                        color="sky"
+                        variant="outline"
+                        size="sm"
+                        disabled={busy}
+                      >
+                        {downloading ? "…" : "Download"}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   // Text Export Generation
@@ -2262,8 +2648,9 @@ const SalaryReportPage: React.FC = () => {
             "Pilihan lajur pada entri Lain-lain/Kerja Luar didahulukan, diikuti tetapan Salary Report Column pada Kod Gaji. Jika kedua-duanya Automatic, peraturan di bawah digunakan.",
           gajiTitle: "GAJI",
           gajiBefore:
-            "Bagi pekerja yang mempunyai item Base berkadar Hour atau Day, kerja biasa berkadar Hour, Day dan Fixed masuk ke Gaji. Bagi pekerja pembungkusan tulen tanpa Base Hour/Day, Gaji ialah Base pembungkusan serta bayaran F/HARIAN ",
-          gajiAfter: ".",
+            "Bagi pekerja yang mempunyai item Base berkadar Hour atau Day, kerja biasa berkadar Hour, Day dan Fixed masuk ke Gaji. Bagi pekerja pembungkusan tulen tanpa Base Hour/Day, Gaji ialah Base pembungkusan serta bayaran F/HARIAN produksi ",
+          gajiMid: ". Kod ",
+          gajiAfter: " sentiasa dikira sebagai Gaji untuk semua pekerja.",
           otTitle: "OT",
           ot: "Semua item payroll dan Lain-lain/Kerja Luar yang Kod Gajinya bertipe Overtime.",
           bonusTitle: "BONUS",
@@ -2293,7 +2680,8 @@ const SalaryReportPage: React.FC = () => {
           gajiTitle: "GAJI",
           gajiBefore:
             "For workers with a Base item using an Hour or Day rate, regular Hour, Day, and Fixed work goes to Gaji. For pure packing workers without an Hour/Day Base, Gaji is Base packing pay plus F/HARIAN ",
-          gajiAfter: ".",
+          gajiMid: ". The ",
+          gajiAfter: " Pay Codes always count as Gaji for all workers.",
           otTitle: "OT",
           ot: "All payroll and Others/Kerja Luar entries whose Pay Code type is Overtime.",
           bonusTitle: "BONUS",
@@ -2411,7 +2799,8 @@ const SalaryReportPage: React.FC = () => {
                 <section>
                   <h4 className="font-semibold text-default-900 dark:text-gray-100">{columnGuideText.gajiTitle}</h4>
                   <p className="mt-1">
-                    {columnGuideText.gajiBefore}<PayCode>FULL_*</PayCode>{columnGuideText.gajiAfter}
+                    {columnGuideText.gajiBefore}<PayCode>FULL_*</PayCode>{columnGuideText.gajiMid}
+                    <PayCode>FULL</PayCode><PayCode>HADIR_MEETING</PayCode>{columnGuideText.gajiAfter}
                   </p>
                 </section>
 
@@ -2432,7 +2821,7 @@ const SalaryReportPage: React.FC = () => {
                   <p className="mt-1">
                     {columnGuideText.cioBefore}
                     <PayCode>IXT</PayCode><PayCode>ADD_COMM</PayCode><PayCode>T-SALESMAN</PayCode>
-                    <PayCode>FULL</PayCode><PayCode>HADIR_MEETING</PayCode><PayCode>IKUT_BX</PayCode>
+                    <PayCode>IKUT_BX</PayCode>
                     <PayCode>JAGA_GATE</PayCode><PayCode>BH_JG_FORKLIFT</PayCode><PayCode>BH_SUSUN</PayCode>
                     <PayCode>T_KERJA</PayCode>{columnGuideText.cioAfter}<PayCode>FULL_*</PayCode>
                     {columnGuideText.cioEnd}
@@ -2860,15 +3249,488 @@ const SalaryReportPage: React.FC = () => {
     );
   };
 
-  const tabLabels = ["Employee", "Location", "Bank", "Pinjam", "Cuti"];
+  // Annual tab: by-month table (rows = Jan..Dec) on top, by-location table below.
+  // Both share the same 20 columns and reconcile to the same grand total.
+  const AnnualSummaryView = () => {
+    if (isLoadingAnnual) {
+      return (
+        <div className="flex justify-center py-12">
+          <LoadingSpinner />
+        </div>
+      );
+    }
+
+    if (!annualData || annualData.monthly.length === 0) {
+      return (
+        <div className="text-center py-12 text-default-500 dark:text-gray-400">
+          <IconFileText className="mx-auto h-12 w-12 text-default-300 mb-4" />
+          <p className="text-lg font-medium">No salary data found</p>
+          <p>No salary data available for {currentYear}</p>
+        </div>
+      );
+    }
+
+    const EMPTY_TOTALS: GrandTotals = {
+      gaji: 0, ot: 0, bonus: 0, comm: 0, cuti: 0, gaji_kasar: 0,
+      epf_majikan: 0, epf_pekerja: 0, socso_majikan: 0, socso_pekerja: 0,
+      sip_majikan: 0, sip_pekerja: 0, pcb: 0, gaji_bersih: 0,
+      setengah_bulan: 0, jumlah: 0, digenapkan: 0, setelah_digenapkan: 0,
+    };
+
+    const cellBase =
+      "px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center";
+    const cellNarrow =
+      "px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center";
+    const borderL = " border-l border-default-300 dark:border-gray-600";
+
+    const renderAmountCells = (t: GrandTotals, extra: string = "") => (
+      <>
+        <td className={cellBase + extra}>{formatCurrency(t.gaji)}</td>
+        <td className={cellBase + extra}>{formatCurrency(t.ot)}</td>
+        <td className={cellBase + extra}>{formatCurrency(t.bonus)}</td>
+        <td className={cellBase + extra}>{formatCurrency(t.comm)}</td>
+        <td className={cellBase + extra}>{formatCurrency(t.cuti)}</td>
+        <td className={cellBase + extra}>{formatCurrency(t.gaji_kasar)}</td>
+        <td className={cellNarrow + borderL + extra}>{formatCurrency(t.epf_majikan)}</td>
+        <td className={cellNarrow + extra}>{formatCurrency(t.epf_pekerja)}</td>
+        <td className={cellNarrow + borderL + extra}>{formatCurrency(t.socso_majikan)}</td>
+        <td className={cellNarrow + extra}>{formatCurrency(t.socso_pekerja)}</td>
+        <td className={cellNarrow + borderL + extra}>{formatCurrency(t.sip_majikan)}</td>
+        <td className={cellNarrow + extra}>{formatCurrency(t.sip_pekerja)}</td>
+        <td className={cellBase + borderL + extra}>{formatCurrency(t.pcb)}</td>
+        <td className={cellBase + extra}>{formatCurrency(t.gaji_bersih)}</td>
+        <td className={cellBase + extra}>{formatCurrency(t.setengah_bulan)}</td>
+        <td className={cellBase + extra}>{formatCurrency(t.jumlah)}</td>
+        <td className={cellBase + extra}>{formatCurrency(t.digenapkan)}</td>
+        <td className={cellBase + extra}>{formatCurrency(t.setelah_digenapkan)}</td>
+      </>
+    );
+
+    const headCell =
+      "px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700";
+    const headGroup =
+      "px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900";
+    const headSub =
+      "px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700";
+    const headBlank =
+      "bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700";
+
+    const renderHead = (firstLabel: string) => (
+      <thead className="sticky top-0 z-20 bg-default-50 dark:bg-gray-900">
+        <tr>
+          <th className={headCell}>BIL</th>
+          <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+            {firstLabel}
+          </th>
+          <th className={headCell}>GAJI</th>
+          <th className={headCell}>OT</th>
+          <th className={headCell}>BONUS</th>
+          <th className={headCell} title="Commission / Insentif / Lain-lain">
+            C/I/O
+          </th>
+          <th className={headCell}>CUTI</th>
+          <th className={headCell}>GAJI KASAR</th>
+          <th className={headGroup} colSpan={2}>EPF</th>
+          <th className={headGroup} colSpan={2}>SOCSO</th>
+          <th className={headGroup} colSpan={2}>SIP</th>
+          <th className={`${headCell} border-l border-default-300 dark:border-gray-600`}>
+            PCB
+          </th>
+          <th className={headCell}>GAJI BERSIH</th>
+          <th className={headCell}>1/2 BULAN</th>
+          <th className={headCell}>JUMLAH</th>
+          <th className={headCell}>DIGENAPKAN</th>
+          <th className={headCell}>SETELAH DIGENAPKAN</th>
+        </tr>
+        <tr>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+          <th className={headSub}>MAJ</th>
+          <th className={headSub}>PKJ</th>
+          <th className={headSub}>MAJ</th>
+          <th className={headSub}>PKJ</th>
+          <th className={headSub}>MAJ</th>
+          <th className={headSub}>PKJ</th>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+        </tr>
+      </thead>
+    );
+
+    const totalRow = (label: string) => (
+      <tr className="font-semibold border-t-2 border-default-300 dark:border-gray-600">
+        <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-900"></td>
+        <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 text-left uppercase bg-default-100 dark:bg-gray-900">
+          {label}
+        </td>
+        {renderAmountCells(annualData.grand_totals, " bg-default-100 dark:bg-gray-900")}
+      </tr>
+    );
+
+    return (
+      <div className="space-y-6">
+        {/* By month */}
+        <div>
+          <div className="overflow-auto max-h-[75vh] border border-default-200 dark:border-gray-700 rounded-lg">
+            <table className="w-full">
+              {renderHead("MONTH")}
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
+                {annualData.monthly.map((m, idx) => (
+                  <tr
+                    key={m.month}
+                    className={idx % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-default-25 dark:bg-gray-750"}
+                  >
+                    <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 text-center">
+                      {m.month}
+                    </td>
+                    <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-left">
+                      {getMonthName(m.month)}
+                    </td>
+                    {renderAmountCells(m.totals)}
+                  </tr>
+                ))}
+                {totalRow("Total")}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* By location */}
+        <div>
+          <div className="overflow-auto max-h-[75vh] border border-default-200 dark:border-gray-700 rounded-lg">
+            <table className="w-full">
+              {renderHead("BAHAGIAN KERJA")}
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
+                {LOCATION_ORDER.map((item, index) => {
+                  if (item.type === "header") {
+                    return (
+                      <tr key={`header-${index}`} className="bg-default-100 dark:bg-gray-800">
+                        <td
+                          colSpan={20}
+                          className="px-2 py-2 text-center text-xs font-medium text-default-600 dark:text-gray-300 border-t border-default-300 dark:border-gray-600"
+                        >
+                          {item.text}
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  const locTotals =
+                    annualData.locations.find((l) => l.location === item.id)
+                      ?.totals ?? EMPTY_TOTALS;
+
+                  return (
+                    <tr
+                      key={item.id}
+                      className={index % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-default-25 dark:bg-gray-750"}
+                    >
+                      <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 text-center">
+                        {item.id}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-left max-w-[130px]">
+                        <span className="block truncate" title={LOCATION_MAP[item.id!]}>
+                          {LOCATION_MAP[item.id!]}
+                        </span>
+                      </td>
+                      {renderAmountCells(locTotals)}
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot className="sticky bottom-0 z-20">
+                {totalRow("Total")}
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Annual tab → Breakdown: per location, each employee expanded into one row per
+  // month, with a per-employee TOTAL and a location GRAND TOTAL. Mirrors the legacy
+  // "BY LOCATION" printouts. Shares the 18 amount columns with the other views, plus
+  // a leading MONTH column.
+  const AnnualBreakdownView = () => {
+    // Spinner only on the initial load; during page navigation we keep the pager visible.
+    if (isLoadingAnnualBreakdown && !annualBreakdownData) {
+      return (
+        <div className="flex justify-center py-12">
+          <LoadingSpinner />
+        </div>
+      );
+    }
+
+    if (!annualBreakdownData || annualBreakdownData.total_pages === 0) {
+      return (
+        <div className="text-center py-12 text-default-500 dark:text-gray-400">
+          <IconFileText className="mx-auto h-12 w-12 text-default-300 mb-4" />
+          <p className="text-lg font-medium">No salary data found</p>
+          <p>No salary data available for {currentYear}</p>
+        </div>
+      );
+    }
+
+    const cellBase =
+      "px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center";
+    const cellNarrow =
+      "px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center";
+    const borderL = " border-l border-default-300 dark:border-gray-600";
+
+    const renderAmountCells = (t: GrandTotals, extra: string = "") => (
+      <>
+        <td className={cellBase + extra}>{formatCurrency(t.gaji)}</td>
+        <td className={cellBase + extra}>{formatCurrency(t.ot)}</td>
+        <td className={cellBase + extra}>{formatCurrency(t.bonus)}</td>
+        <td className={cellBase + extra}>{formatCurrency(t.comm)}</td>
+        <td className={cellBase + extra}>{formatCurrency(t.cuti)}</td>
+        <td className={cellBase + extra}>{formatCurrency(t.gaji_kasar)}</td>
+        <td className={cellNarrow + borderL + extra}>{formatCurrency(t.epf_majikan)}</td>
+        <td className={cellNarrow + extra}>{formatCurrency(t.epf_pekerja)}</td>
+        <td className={cellNarrow + borderL + extra}>{formatCurrency(t.socso_majikan)}</td>
+        <td className={cellNarrow + extra}>{formatCurrency(t.socso_pekerja)}</td>
+        <td className={cellNarrow + borderL + extra}>{formatCurrency(t.sip_majikan)}</td>
+        <td className={cellNarrow + extra}>{formatCurrency(t.sip_pekerja)}</td>
+        <td className={cellBase + borderL + extra}>{formatCurrency(t.pcb)}</td>
+        <td className={cellBase + extra}>{formatCurrency(t.gaji_bersih)}</td>
+        <td className={cellBase + extra}>{formatCurrency(t.setengah_bulan)}</td>
+        <td className={cellBase + extra}>{formatCurrency(t.jumlah)}</td>
+        <td className={cellBase + extra}>{formatCurrency(t.digenapkan)}</td>
+        <td className={cellBase + extra}>{formatCurrency(t.setelah_digenapkan)}</td>
+      </>
+    );
+
+    const headCell =
+      "px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700";
+    const headGroup =
+      "px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900";
+    const headSub =
+      "px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700";
+    const headBlank =
+      "bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700";
+
+    const head = (
+      <thead className="sticky top-0 z-20 bg-default-50 dark:bg-gray-900">
+        <tr>
+          <th className={headCell}>BIL</th>
+          <th className={headCell}>MONTH</th>
+          <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+            NAMA PEKERJA
+          </th>
+          <th className={headCell}>GAJI</th>
+          <th className={headCell}>OT</th>
+          <th className={headCell}>BONUS</th>
+          <th className={headCell} title="Commission / Insentif / Lain-lain">C/I/O</th>
+          <th className={headCell}>CUTI</th>
+          <th className={headCell}>GAJI KASAR</th>
+          <th className={headGroup} colSpan={2}>EPF</th>
+          <th className={headGroup} colSpan={2}>SOCSO</th>
+          <th className={headGroup} colSpan={2}>SIP</th>
+          <th className={`${headCell} border-l border-default-300 dark:border-gray-600`}>PCB</th>
+          <th className={headCell}>GAJI BERSIH</th>
+          <th className={headCell}>1/2 BULAN</th>
+          <th className={headCell}>JUMLAH</th>
+          <th className={headCell}>DIGENAPKAN</th>
+          <th className={headCell}>SETELAH DIGENAPKAN</th>
+        </tr>
+        <tr>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+          <th className={headSub}>MAJ</th>
+          <th className={headSub}>PKJ</th>
+          <th className={headSub}>MAJ</th>
+          <th className={headSub}>PKJ</th>
+          <th className={headSub}>MAJ</th>
+          <th className={headSub}>PKJ</th>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+          <th className={headBlank}></th>
+        </tr>
+      </thead>
+    );
+
+    // Each page (a batch of locations capped at ~30 staff) is fetched from the API on
+    // demand; printing follows the page.
+    const total = breakdownTotalPages;
+    const pageStaff = breakdownPagesMeta[breakdownPageIndex]?.staff ?? 0;
+    const locations = annualBreakdownData.locations;
+
+    return (
+      <div className="space-y-3">
+        {/* Batch pager — elevated (z-40) so its dropdown sits above the sticky headers */}
+        <div className="relative z-40 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setBreakdownPage((p) => Math.max(0, p - 1))}
+              icon={IconChevronRight}
+              variant="outline"
+              size="sm"
+              disabled={breakdownPageIndex <= 0 || isLoadingAnnualBreakdown}
+              className="[&>span>svg]:rotate-180"
+            >
+              Prev
+            </Button>
+            <Button
+              onClick={() => setBreakdownPage((p) => Math.min(total - 1, p + 1))}
+              variant="outline"
+              size="sm"
+              disabled={breakdownPageIndex >= total - 1 || isLoadingAnnualBreakdown}
+            >
+              Next
+            </Button>
+            <span className="text-sm text-default-600 dark:text-gray-300">
+              Page {breakdownPageIndex + 1} of {total} · {pageStaff} staff
+              {isLoadingAnnualBreakdown && (
+                <span className="ml-2 text-default-400">Loading…</span>
+              )}
+            </span>
+          </div>
+          <div className="w-full sm:w-auto sm:min-w-[320px]">
+            <FormListbox
+              name="breakdownPage"
+              value={breakdownPageIndex}
+              disabled={isLoadingAnnualBreakdown}
+              onChange={(v) => setBreakdownPage(Number(v))}
+              options={breakdownPagesMeta.map((meta, i) => ({
+                id: i,
+                name: `Page ${i + 1}: ${meta.locations
+                  .map((code) => LOCATION_MAP[code] || code)
+                  .join(", ")} (${meta.staff} staff)`,
+              }))}
+              renderOption={(option, selected) => (
+                <span
+                  className={`block whitespace-normal break-words ${
+                    selected ? "font-medium" : "font-normal"
+                  }`}
+                >
+                  {option.name}
+                </span>
+              )}
+            />
+          </div>
+        </div>
+
+        {/* Locations in the current page/batch */}
+        {locations.map((loc) => {
+          const locationName =
+            LOCATION_MAP[loc.location] || `Location ${loc.location}`;
+          return (
+            <div
+              key={loc.location}
+              className="overflow-auto border border-default-200 dark:border-gray-700 rounded-lg"
+            >
+              <div className="bg-sky-50 dark:bg-sky-900/20 px-4 py-2 border-b border-default-200 dark:border-gray-700 sticky top-0 z-30">
+                <h3 className="text-sm font-semibold text-sky-800 dark:text-sky-300">
+                  {loc.location} - {locationName.toUpperCase()}
+                </h3>
+              </div>
+              <table className="w-full">
+                {head}
+                <tbody className="bg-white dark:bg-gray-800">
+                  {loc.employees.map((emp, eIdx) => (
+                    <React.Fragment key={emp.staff_id}>
+                      {emp.months.map((m, mIdx) => (
+                        <tr
+                          key={`${emp.staff_id}-${m.month}`}
+                          className={`${mIdx === 0 ? "border-t border-default-200 dark:border-gray-700" : ""}`}
+                        >
+                          <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 text-center">
+                            {mIdx === 0 ? eIdx + 1 : ""}
+                          </td>
+                          <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                            {m.month}
+                          </td>
+                          <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-left max-w-[160px]">
+                            {mIdx === 0 ? (
+                              <span
+                                className="block truncate"
+                                title={`${emp.staff_id.toUpperCase()} - ${emp.staff_name.toUpperCase()}`}
+                              >
+                                {emp.staff_id.toUpperCase()} - {emp.staff_name.toUpperCase()}
+                              </span>
+                            ) : (
+                              ""
+                            )}
+                          </td>
+                          {renderAmountCells(m)}
+                        </tr>
+                      ))}
+                      <tr className="font-semibold border-t border-default-300 dark:border-gray-600">
+                        <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 bg-default-50 dark:bg-gray-700" colSpan={3}>
+                          <span className="pl-2 uppercase">Total</span>
+                        </td>
+                        {renderAmountCells(emp.total, " bg-default-50 dark:bg-gray-700")}
+                      </tr>
+                    </React.Fragment>
+                  ))}
+                  <tr className="font-bold border-t-2 border-default-400 dark:border-gray-500">
+                    <td
+                      className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 text-left uppercase bg-default-100 dark:bg-gray-900"
+                      colSpan={3}
+                    >
+                      Grand Total
+                    </td>
+                    {renderAmountCells(loc.totals, " bg-default-100 dark:bg-gray-900")}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const tabLabels = ["Employee", "Location", "Bank", "Pinjam", "Cuti", "Annual"];
+
+  // Tab label with abbreviations shown below 2xl (compact single-row range).
+  const renderTabLabel = (label: string) => {
+    if (label === "Employee") {
+      return (
+        <>
+          <span className="hidden 2xl:inline">Employee</span>
+          <span className="2xl:hidden">Emp</span>
+        </>
+      );
+    }
+    if (label === "Location") {
+      return (
+        <>
+          <span className="hidden 2xl:inline">Location</span>
+          <span className="2xl:hidden">Loc</span>
+        </>
+      );
+    }
+    return label;
+  };
 
   return (
     <div className="space-y-3">
       {/* Salary Report Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
         <div className="px-6 py-3 border-b border-default-200 dark:border-gray-700">
-          {/* Large screens (2xl/1536px+): Single row layout */}
-          <div className="hidden 2xl:flex 2xl:justify-between 2xl:items-center gap-3">
+          {/* Large screens (xl/1280px+): Single row layout */}
+          <div className="hidden xl:flex xl:justify-between xl:items-center gap-3">
             <div className="flex items-center gap-3">
               {/* Tab buttons */}
               <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
@@ -2882,7 +3744,7 @@ const SalaryReportPage: React.FC = () => {
                         : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
                     } ${index > 0 ? "border-l border-default-200 dark:border-gray-600" : ""}`}
                   >
-                    {label}
+                    {renderTabLabel(label)}
                   </button>
                 ))}
               </div>
@@ -2910,6 +3772,34 @@ const SalaryReportPage: React.FC = () => {
                       }`}
                     >
                       Location
+                    </button>
+                  </div>
+                </>
+              )}
+              {/* Sub-view toggle for Annual tab */}
+              {activeTab === 5 && (
+                <>
+                  <span className="text-default-300 dark:text-gray-600">|</span>
+                  <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
+                    <button
+                      onClick={() => setAnnualViewMode('summary')}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                        annualViewMode === 'summary'
+                          ? "bg-sky-500 text-white"
+                          : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      Summary
+                    </button>
+                    <button
+                      onClick={() => setAnnualViewMode('breakdown')}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-default-200 dark:border-gray-600 ${
+                        annualViewMode === 'breakdown'
+                          ? "bg-sky-500 text-white"
+                          : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      Breakdown
                     </button>
                   </div>
                 </>
@@ -2949,7 +3839,7 @@ const SalaryReportPage: React.FC = () => {
                   onChange={handleYearChange}
                   showGoToCurrentButton={false}
                 />
-                {periodType === 'monthly' && (
+                {periodType === 'monthly' && activeTab !== 5 && (
                   <MonthNavigator
                     selectedMonth={selectedMonth}
                     onChange={setSelectedMonth}
@@ -2960,29 +3850,51 @@ const SalaryReportPage: React.FC = () => {
                   />
                 )}
               </div>
-              {displayedReportData && activeTab !== 4 && (
+              {displayedReportData && activeTab !== 4 && activeTab !== 5 && (
                 <>
                   <span className="text-default-300 dark:text-gray-600">|</span>
-                  <div className="flex items-center gap-4 text-sm text-default-600 dark:text-gray-300">
-                    <span className="font-medium">
+                  <div className="text-sm text-default-600 dark:text-gray-300">
+                    <span className="block font-medium">
                       {displayedReportData.total_records} employees
                     </span>
-                    <span className="font-medium">
-                      Total: {formatCurrency(displayedHeaderTotal)}
+                    <span className="block font-medium">
+                      {formatCurrency(displayedHeaderTotal)}
                     </span>
                   </div>
                 </>
               )}
             </div>
             <div className="flex items-center gap-2">
+              {dataMayBeCached && (
+                <span
+                  className="block max-w-[170px] text-right text-[11px] leading-tight text-default-400 dark:text-gray-500"
+                  title="To load faster, this report is briefly saved on the server and can be a couple of minutes behind. Click Refresh to load the latest numbers."
+                >
+                  Figures may be a few minutes old. Refresh for the latest.
+                </span>
+              )}
               <Button
                 onClick={refreshDisplayedReport}
                 icon={IconRefresh}
                 variant="outline"
-                disabled={activeTab === 4 ? cutiLoading : displayedLoading}
+                disabled={refreshDisabled}
                 size="sm"
+                aria-label={activeTab === 0 ? "Refresh" : undefined}
+                className={
+                  activeTab === 0
+                    ? "xl:max-2xl:px-2 xl:max-2xl:[&>span>svg]:mr-0"
+                    : ""
+                }
               >
-                Refresh
+                <span
+                  className={
+                    activeTab === 0
+                      ? "xl:max-2xl:hidden"
+                      : ""
+                  }
+                >
+                  Refresh
+                </span>
               </Button>
               <div
                 className="relative"
@@ -2994,15 +3906,24 @@ const SalaryReportPage: React.FC = () => {
                   icon={IconPrinter}
                   color="green"
                   variant="outline"
-                  disabled={
-                    activeTab === 4 ||
-                    !displayedReportData ||
-                    displayedReportData.data.length === 0 ||
-                    isGeneratingPDF
-                  }
+                  disabled={pdfDisabled}
                   size="sm"
+                  aria-label={activeTab === 0 ? "Print" : undefined}
+                  className={
+                    activeTab === 0
+                      ? "xl:max-2xl:px-2 xl:max-2xl:[&>span>svg]:mr-0"
+                      : ""
+                  }
                 >
-                  Print
+                  <span
+                    className={
+                      activeTab === 0
+                        ? "xl:max-2xl:hidden"
+                        : ""
+                    }
+                  >
+                    Print
+                  </span>
                 </Button>
                 {isPrintDropdownOpen && (
                   <div className="absolute right-0 top-full mt-1 z-50">
@@ -3012,7 +3933,7 @@ const SalaryReportPage: React.FC = () => {
                           setIsPrintDropdownOpen(false);
                           generatePDF("print");
                         }}
-                        disabled={activeTab === 4 || !displayedReportData || displayedReportData.data.length === 0 || isGeneratingPDF}
+                        disabled={pdfDisabled}
                         className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Print
@@ -3022,7 +3943,7 @@ const SalaryReportPage: React.FC = () => {
                           setIsPrintDropdownOpen(false);
                           generatePDF("download");
                         }}
-                        disabled={activeTab === 4 || !displayedReportData || displayedReportData.data.length === 0 || isGeneratingPDF}
+                        disabled={pdfDisabled}
                         className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Download PDF
@@ -3031,6 +3952,7 @@ const SalaryReportPage: React.FC = () => {
                   </div>
                 )}
               </div>
+              {activeTab === 5 && annualViewMode === 'breakdown' && renderBatchPrintButton()}
               {activeTab === 3 && renderBreakdownButton()}
               {activeTab === 2 && (
                 <>
@@ -3062,8 +3984,8 @@ const SalaryReportPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Smaller screens (<2xl/1536px): Multi-row layout */}
-          <div className="2xl:hidden space-y-3">
+          {/* Smaller screens (<xl/1280px): Multi-row layout */}
+          <div className="xl:hidden space-y-3">
             {/* Row 1: Title + Tabs + Action buttons */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -3083,7 +4005,7 @@ const SalaryReportPage: React.FC = () => {
                           : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
                       } ${index > 0 ? "border-l border-default-200 dark:border-gray-600" : ""}`}
                     >
-                      {label}
+                      {renderTabLabel(label)}
                     </button>
                   ))}
                 </div>
@@ -3115,14 +4037,50 @@ const SalaryReportPage: React.FC = () => {
                     </div>
                   </>
                 )}
+                {/* Sub-view toggle for Annual tab */}
+                {activeTab === 5 && (
+                  <>
+                    <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
+                    <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
+                      <button
+                        onClick={() => setAnnualViewMode('summary')}
+                        className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                          annualViewMode === 'summary'
+                            ? "bg-sky-500 text-white"
+                            : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        Summary
+                      </button>
+                      <button
+                        onClick={() => setAnnualViewMode('breakdown')}
+                        className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-default-200 dark:border-gray-600 ${
+                          annualViewMode === 'breakdown'
+                            ? "bg-sky-500 text-white"
+                            : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        Breakdown
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
               {/* Action buttons on the right */}
               <div className="flex items-center gap-2">
+                {dataMayBeCached && (
+                  <span
+                    className="hidden sm:block max-w-[160px] text-right text-[11px] leading-tight text-default-400 dark:text-gray-500"
+                    title="To load faster, this report is briefly saved on the server and can be a couple of minutes behind. Click Refresh to load the latest numbers."
+                  >
+                    Figures may be a few minutes old. Refresh for the latest.
+                  </span>
+                )}
                 <Button
                   onClick={refreshDisplayedReport}
                   icon={IconRefresh}
                   variant="outline"
-                  disabled={displayedLoading}
+                  disabled={refreshDisabled}
                   size="sm"
                 >
                   Refresh
@@ -3137,11 +4095,7 @@ const SalaryReportPage: React.FC = () => {
                     icon={IconPrinter}
                     color="green"
                     variant="outline"
-                    disabled={
-                      !displayedReportData ||
-                      displayedReportData.data.length === 0 ||
-                      isGeneratingPDF
-                    }
+                    disabled={pdfDisabled}
                     size="sm"
                   >
                     Print
@@ -3154,7 +4108,7 @@ const SalaryReportPage: React.FC = () => {
                             setIsPrintDropdownOpen(false);
                             generatePDF("print");
                           }}
-                          disabled={activeTab === 4 || !displayedReportData || displayedReportData.data.length === 0 || isGeneratingPDF}
+                          disabled={pdfDisabled}
                           className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Print
@@ -3164,7 +4118,7 @@ const SalaryReportPage: React.FC = () => {
                             setIsPrintDropdownOpen(false);
                             generatePDF("download");
                           }}
-                          disabled={activeTab === 4 || !displayedReportData || displayedReportData.data.length === 0 || isGeneratingPDF}
+                          disabled={pdfDisabled}
                           className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Download PDF
@@ -3173,6 +4127,7 @@ const SalaryReportPage: React.FC = () => {
                     </div>
                   )}
                 </div>
+                {activeTab === 5 && annualViewMode === 'breakdown' && renderBatchPrintButton()}
                 {activeTab === 2 && (
                   <>
                     <Button
@@ -3236,7 +4191,7 @@ const SalaryReportPage: React.FC = () => {
                   onChange={handleYearChange}
                   showGoToCurrentButton={false}
                 />
-                {periodType === 'monthly' && (
+                {periodType === 'monthly' && activeTab !== 5 && (
                   <MonthNavigator
                     selectedMonth={selectedMonth}
                     onChange={setSelectedMonth}
@@ -3247,15 +4202,15 @@ const SalaryReportPage: React.FC = () => {
                   />
                 )}
               </div>
-              {displayedReportData && activeTab !== 4 && (
+              {displayedReportData && activeTab !== 4 && activeTab !== 5 && (
                 <>
                   <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
-                  <div className="flex items-center gap-2 sm:gap-4 text-sm text-default-600 dark:text-gray-300">
-                    <span className="font-medium">
+                  <div className="text-sm text-default-600 dark:text-gray-300">
+                    <span className="block font-medium">
                       {displayedReportData.total_records} employees
                     </span>
-                    <span className="font-medium">
-                      Total: {formatCurrency(displayedHeaderTotal)}
+                    <span className="block font-medium">
+                      {formatCurrency(displayedHeaderTotal)}
                     </span>
                   </div>
                 </>
@@ -3264,7 +4219,15 @@ const SalaryReportPage: React.FC = () => {
           </div>
         </div>
 
-        {activeTab === 4 ? (
+        {activeTab === 5 ? (
+          <div className="px-6 pt-2 pb-4">
+            {annualViewMode === 'breakdown' ? (
+              <AnnualBreakdownView />
+            ) : (
+              <AnnualSummaryView />
+            )}
+          </div>
+        ) : activeTab === 4 ? (
           cutiLoading ? (
             <div className="flex justify-center py-12">
               <LoadingSpinner />
@@ -3364,6 +4327,21 @@ const SalaryReportPage: React.FC = () => {
       {/* Export Dialog */}
       <ExportDialog />
       <ColumnGuideDialog />
+
+      {/* Loading overlay while a PDF is being generated for print/download */}
+      {(isGeneratingPDF || batchPrintingKey !== null || isGeneratingExport) && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
+          <div className="flex flex-col items-center gap-3 rounded-2xl bg-white dark:bg-gray-800 px-10 py-8 shadow-xl">
+            <LoadingSpinner />
+            <p className="text-sm font-medium text-default-800 dark:text-gray-100">
+              {isGeneratingExport ? "Preparing export…" : "Preparing document…"}
+            </p>
+            <p className="text-xs text-default-500 dark:text-gray-400">
+              This may take a moment for large reports.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

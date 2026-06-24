@@ -1753,8 +1753,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             midMonthPayroll={midMonthPayroll}
             buttonText={
               payroll.job_type?.includes(", ")
-                ? "Download Full PDF"
-                : "Download PDF"
+                ? "Full PDF"
+                : "PDF"
             }
             variant="default"
             color="sky"
@@ -1768,7 +1768,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               color="default"
               className="flex-1 md:flex-none"
             >
-              Add Manual Item
+              Manual Item
             </Button>
           )}
         </div>
@@ -3238,7 +3238,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 variant="outline"
                 className="mt-4"
               >
-                Add Manual Item
+                Manual Item
               </Button>
             )}
           </div>

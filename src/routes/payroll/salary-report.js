@@ -4,21 +4,10 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
 
-  // Get comprehensive salary report data for all tabs
-  router.get("/", async (req, res) => {
-    const { year, month } = req.query;
-
-    // Validate required parameters
-    if (!year || !month) {
-      return res.status(400).json({
-        message: "Year and month parameters are required",
-      });
-    }
-
-    const yearInt = parseInt(year);
-    const monthInt = parseInt(month);
-
-    try {
+  // Compute the full monthly salary report (all tabs) for the given year/month.
+  // Returns the exact object shape the "/" route responds with. Reused by the
+  // "/yearly" and "/annual" routes so they build on the verified monthly logic.
+  async function computeMonthlySalaryReport(pool, yearInt, monthInt) {
       // Main comprehensive query to get all employee data with payroll details
       // Dual-location logic: employee appears in BOTH job-based AND direct-mapped locations
       const comprehensiveQuery = `
@@ -672,12 +661,27 @@ export default function (pool) {
 
       // Track commission-only employees (those not in regular payroll)
       const commissionOnlyEmployees = [];
+      // Bank payment for commission-only employees excludes Location 23 (Cuti Tahunan).
+      // Keep that subtotal separately because one employee can have both Location 23
+      // and a normal commission location in the same month.
+      const commissionOnlyBankIncome = new Map();
 
       // Group commissions by location (16-24), defaulting to "18" if no location_code
-      commissionResult.rows.forEach((row) => {
+      // Process normal commission before Location 23 so mixed employees retain the
+      // mid-month deduction in their combined employee total.
+      const sortedCommissionRows = commissionResult.rows
+        .slice()
+        .sort(
+          (a, b) =>
+            Number(a.location_code === "23") - Number(b.location_code === "23"),
+        );
+      sortedCommissionRows.forEach((row) => {
         const locCode = row.location_code || "18"; // Default to COMM-KILANG if no location
         const commAmount = parseFloat(row.commission_amount || 0);
-        const midMonthAmount = midMonthMap.get(row.employee_id) || 0;
+        // Cuti Tahunan (loc 23) is report-only for commission-only employees: it was
+        // paid already, so it does not offset the mid-month advance or go to the bank.
+        const midMonthAmount =
+          locCode === "23" ? 0 : midMonthMap.get(row.employee_id) || 0;
         // Location 23 = Cuti Tahunan: route the amount to the Cuti column, not COMM.
         const commField = locCode === "23" ? "cuti" : "comm";
 
@@ -708,6 +712,13 @@ export default function (pool) {
             const jumlah = commAmount - midMonthAmount;
             const setelahDigenapkan = Math.ceil(jumlah);
             const digenapkan = setelahDigenapkan - jumlah;
+            const bankIncome = locCode === "23" ? 0 : commAmount;
+            const bankMidMonthAmount =
+              bankIncome > 0 ? midMonthMap.get(row.employee_id) || 0 : 0;
+            const bankSetelahDigenapkan =
+              bankIncome > 0
+                ? Math.ceil(bankIncome - bankMidMonthAmount)
+                : 0;
 
             const commissionEmployeeData = {
               employee_payroll_id: baseEmp?.employee_payroll_id || null,
@@ -736,10 +747,10 @@ export default function (pool) {
               digenapkan: digenapkan,
               setelah_digenapkan: setelahDigenapkan,
               // For Bank/Pinjam tabs
-              gaji_genap: setelahDigenapkan,
+              gaji_genap: bankSetelahDigenapkan,
               total_pinjam: 0,
               pinjam_details: [],
-              final_total: setelahDigenapkan,
+              final_total: bankSetelahDigenapkan,
               net_pay: commAmount,
               mid_month_amount: midMonthAmount,
             };
@@ -762,6 +773,7 @@ export default function (pool) {
               );
               if (!existingCommOnly) {
                 commissionOnlyEmployees.push(commissionEmployeeData);
+                commissionOnlyBankIncome.set(row.employee_id, bankIncome);
                 // Add to grand totals for commission-only employees
                 grandTotals[commField] += commAmount;
                 grandTotals.gaji_kasar += commAmount;
@@ -787,9 +799,18 @@ export default function (pool) {
                 existingCommOnly.digenapkan =
                   existingCommOnly.setelah_digenapkan -
                   existingCommOnly.jumlah;
+                const bankIncome =
+                  (commissionOnlyBankIncome.get(row.employee_id) || 0) +
+                  (locCode === "23" ? 0 : commAmount);
+                const bankMidMonthAmount =
+                  bankIncome > 0 ? midMonthMap.get(row.employee_id) || 0 : 0;
+                commissionOnlyBankIncome.set(row.employee_id, bankIncome);
                 existingCommOnly.gaji_genap =
-                  existingCommOnly.setelah_digenapkan;
+                  bankIncome > 0
+                    ? Math.ceil(bankIncome - bankMidMonthAmount)
+                    : 0;
                 existingCommOnly.final_total = existingCommOnly.gaji_genap;
+                existingCommOnly.mid_month_amount = bankMidMonthAmount;
                 existingCommOnly.net_pay = existingCommOnly.gaji_bersih;
                 // Update grand totals
                 grandTotals[commField] += commAmount;
@@ -848,7 +869,7 @@ export default function (pool) {
       })();
 
       // Response with all data for all tabs
-      res.json({
+      return {
         year: yearInt,
         month: monthInt,
         // Original format for Bank/Pinjam tabs (unique employees only)
@@ -985,7 +1006,27 @@ export default function (pool) {
             payment_preference: emp.payment_preference,
           }));
         })(),
+      };
+  }
+
+  // Get comprehensive salary report data for all tabs (monthly)
+  router.get("/", async (req, res) => {
+    const { year, month } = req.query;
+
+    // Validate required parameters
+    if (!year || !month) {
+      return res.status(400).json({
+        message: "Year and month parameters are required",
       });
+    }
+
+    try {
+      const result = await computeMonthlySalaryReport(
+        pool,
+        parseInt(year),
+        parseInt(month),
+      );
+      res.json(result);
     } catch (error) {
       console.error("Error fetching comprehensive salary report:", error);
       res.status(500).json({
@@ -994,6 +1035,32 @@ export default function (pool) {
       });
     }
   });
+
+  // Short-lived per-year cache of the 12 monthly reports. Computing them is the heavy
+  // part (~2s), shared by "/yearly", "/annual", and the paginated "/annual-breakdown",
+  // so caching makes page navigation feel instant. The TTL bounds staleness, and any
+  // request with ?refresh=true rebuilds it (the UI's Refresh button uses that), so the
+  // user can always force fresh numbers after reprocessing payroll.
+  const YEARLY_REPORTS_TTL_MS = 2 * 60 * 1000; // 2 minutes
+  const yearlyReportsCache = new Map(); // yearInt -> { data, expires }
+
+  // Run computeMonthlySalaryReport for all 12 months of a year (in parallel), cached.
+  // Shared by "/yearly" (for per-month rounding) and "/annual" (full summary).
+  async function computeYearlyMonthlyReports(pool, yearInt, forceRefresh = false) {
+    const cached = yearlyReportsCache.get(yearInt);
+    if (!forceRefresh && cached && cached.expires > Date.now()) {
+      return cached.data;
+    }
+    const months = Array.from({ length: 12 }, (_, i) => i + 1);
+    const data = await Promise.all(
+      months.map((m) => computeMonthlySalaryReport(pool, yearInt, m)),
+    );
+    yearlyReportsCache.set(yearInt, {
+      data,
+      expires: Date.now() + YEARLY_REPORTS_TTL_MS,
+    });
+    return data;
+  }
 
   // Get comprehensive salary report data for full year (aggregated across all months)
   router.get("/yearly", async (req, res) => {
@@ -1489,6 +1556,15 @@ export default function (pool) {
 
       const result = await pool.query(comprehensiveQuery, [yearInt]);
 
+      // 12 monthly reports — used below to replace the annual-rounded
+      // DIGENAPKAN / SETELAH DIGENAPKAN with the sum of each month's rounded
+      // figure, so yearly numbers match the monthly view and the legacy report.
+      const monthlyReports = await computeYearlyMonthlyReports(
+        pool,
+        yearInt,
+        req.query.refresh === "true",
+      );
+
       // Process the data for different views
       const processedData = result.rows.map((row, index) => {
         // GAJI = regular wage (non-OT Hour/Day work from payroll + Kerja Luar).
@@ -1677,12 +1753,24 @@ export default function (pool) {
 
       // Track commission-only employees
       const commissionOnlyEmployees = [];
+      const commissionOnlyBankIncome = new Map();
 
       // Group commissions by location (16-24)
-      commissionResult.rows.forEach((row) => {
+      // Process normal commission before Location 23 so mixed employees retain the
+      // mid-month deduction in their combined employee total.
+      const sortedCommissionRows = commissionResult.rows
+        .slice()
+        .sort(
+          (a, b) =>
+            Number(a.location_code === "23") - Number(b.location_code === "23"),
+        );
+      sortedCommissionRows.forEach((row) => {
         const locCode = row.location_code || "18";
         const commAmount = parseFloat(row.commission_amount || 0);
-        const midMonthAmount = midMonthMap.get(row.employee_id) || 0;
+        // Cuti Tahunan (loc 23) is report-only for commission-only employees: it was
+        // paid already, so it does not offset the mid-month advance or go to the bank.
+        const midMonthAmount =
+          locCode === "23" ? 0 : midMonthMap.get(row.employee_id) || 0;
         // Location 23 = Cuti Tahunan: route the amount to the Cuti column, not COMM.
         const commField = locCode === "23" ? "cuti" : "comm";
 
@@ -1705,6 +1793,13 @@ export default function (pool) {
             const jumlah = commAmount - midMonthAmount;
             const setelahDigenapkan = Math.ceil(jumlah);
             const digenapkan = setelahDigenapkan - jumlah;
+            const bankIncome = locCode === "23" ? 0 : commAmount;
+            const bankMidMonthAmount =
+              bankIncome > 0 ? midMonthMap.get(row.employee_id) || 0 : 0;
+            const bankSetelahDigenapkan =
+              bankIncome > 0
+                ? Math.ceil(bankIncome - bankMidMonthAmount)
+                : 0;
 
             const commissionEmployeeData = {
               employee_payroll_id: null,
@@ -1732,10 +1827,10 @@ export default function (pool) {
               jumlah: jumlah,
               digenapkan: digenapkan,
               setelah_digenapkan: setelahDigenapkan,
-              gaji_genap: setelahDigenapkan,
+              gaji_genap: bankSetelahDigenapkan,
               total_pinjam: 0,
               pinjam_details: [],
-              final_total: setelahDigenapkan,
+              final_total: bankSetelahDigenapkan,
               net_pay: commAmount,
               mid_month_amount: midMonthAmount,
             };
@@ -1756,6 +1851,7 @@ export default function (pool) {
               );
               if (!existingCommOnly) {
                 commissionOnlyEmployees.push(commissionEmployeeData);
+                commissionOnlyBankIncome.set(row.employee_id, bankIncome);
                 grandTotals[commField] += commAmount;
                 grandTotals.gaji_kasar += commAmount;
                 grandTotals.gaji_bersih += commAmount;
@@ -1779,9 +1875,18 @@ export default function (pool) {
                 existingCommOnly.digenapkan =
                   existingCommOnly.setelah_digenapkan -
                   existingCommOnly.jumlah;
+                const bankIncome =
+                  (commissionOnlyBankIncome.get(row.employee_id) || 0) +
+                  (locCode === "23" ? 0 : commAmount);
+                const bankMidMonthAmount =
+                  bankIncome > 0 ? midMonthMap.get(row.employee_id) || 0 : 0;
+                commissionOnlyBankIncome.set(row.employee_id, bankIncome);
                 existingCommOnly.gaji_genap =
-                  existingCommOnly.setelah_digenapkan;
+                  bankIncome > 0
+                    ? Math.ceil(bankIncome - bankMidMonthAmount)
+                    : 0;
                 existingCommOnly.final_total = existingCommOnly.gaji_genap;
+                existingCommOnly.mid_month_amount = bankMidMonthAmount;
                 existingCommOnly.net_pay = existingCommOnly.gaji_bersih;
                 grandTotals[commField] += commAmount;
                 grandTotals.gaji_kasar += commAmount;
@@ -1808,6 +1913,65 @@ export default function (pool) {
           }
         }
       });
+
+      // "Fix everywhere": replace the annual-rounded DIGENAPKAN / SETELAH
+      // DIGENAPKAN with the SUM of each month's rounded figure, so yearly
+      // figures match the monthly view and the legacy paper report. All other
+      // columns are already correct annual sums and are left untouched.
+      //
+      // Per-employee rounding (Employee tab rows): sum each month's per-employee
+      // SETELAH DIGENAPKAN, then re-derive DIGENAPKAN against the annual jumlah.
+      const monthlyRoundingByStaff = new Map();
+      for (const rep of monthlyReports) {
+        for (const e of rep.employees) {
+          monthlyRoundingByStaff.set(
+            e.staff_id,
+            (monthlyRoundingByStaff.get(e.staff_id) || 0) +
+              (e.setelah_digenapkan || 0),
+          );
+        }
+      }
+      const applyMonthlyRounding = (emp) => {
+        const summed = monthlyRoundingByStaff.get(emp.staff_id);
+        if (summed == null) return; // keep annual-ceil fallback if no monthly rows
+        emp.setelah_digenapkan = summed;
+        emp.digenapkan = summed - emp.jumlah;
+      };
+      processedData.forEach(applyMonthlyRounding);
+      commissionOnlyEmployees.forEach(applyMonthlyRounding);
+
+      // Per-location rounding (Location tab totals): sum each month's per-location
+      // rounded figures. Correct even for employees split across multiple
+      // locations, and identical to the "/annual" summary.
+      const monthlyRoundingByLocation = new Map();
+      for (const rep of monthlyReports) {
+        for (const loc of rep.comprehensive.locations) {
+          const cur = monthlyRoundingByLocation.get(loc.location) || {
+            digenapkan: 0,
+            setelah_digenapkan: 0,
+          };
+          cur.digenapkan += loc.totals.digenapkan || 0;
+          cur.setelah_digenapkan += loc.totals.setelah_digenapkan || 0;
+          monthlyRoundingByLocation.set(loc.location, cur);
+        }
+      }
+      allLocations.forEach((loc) => {
+        const summed = monthlyRoundingByLocation.get(loc) || {
+          digenapkan: 0,
+          setelah_digenapkan: 0,
+        };
+        locationData[loc].totals.digenapkan = summed.digenapkan;
+        locationData[loc].totals.setelah_digenapkan = summed.setelah_digenapkan;
+      });
+
+      // Grand-total rounding: sum each month's employee-deduped grand totals.
+      grandTotals.digenapkan = 0;
+      grandTotals.setelah_digenapkan = 0;
+      for (const rep of monthlyReports) {
+        grandTotals.digenapkan += rep.comprehensive.grand_totals.digenapkan || 0;
+        grandTotals.setelah_digenapkan +=
+          rep.comprehensive.grand_totals.setelah_digenapkan || 0;
+      }
 
       // Convert locationData object to array for response
       const locationsArray = allLocations.map((loc) => locationData[loc]);
@@ -1970,6 +2134,269 @@ export default function (pool) {
       console.error("Error fetching yearly salary report:", error);
       res.status(500).json({
         message: "Error fetching yearly salary report",
+        error: error.message,
+      });
+    }
+  });
+
+  // Annual summary: a by-month table (rows = Jan..Dec) and a by-location table,
+  // both sharing the same columns and reconciling to the same grand total.
+  // Built by summing the 12 verified monthly reports, so DIGENAPKAN /
+  // SETELAH DIGENAPKAN use per-month rounding (matches the legacy paper report).
+  router.get("/annual", async (req, res) => {
+    const { year } = req.query;
+
+    if (!year) {
+      return res.status(400).json({ message: "Year parameter is required" });
+    }
+
+    try {
+      const yearInt = parseInt(year);
+      const monthlyReports = await computeYearlyMonthlyReports(
+        pool,
+        yearInt,
+        req.query.refresh === "true",
+      );
+
+      const TOTAL_KEYS = [
+        "gaji",
+        "ot",
+        "bonus",
+        "comm",
+        "cuti",
+        "gaji_kasar",
+        "epf_majikan",
+        "epf_pekerja",
+        "socso_majikan",
+        "socso_pekerja",
+        "sip_majikan",
+        "sip_pekerja",
+        "pcb",
+        "gaji_bersih",
+        "setengah_bulan",
+        "jumlah",
+        "digenapkan",
+        "setelah_digenapkan",
+      ];
+      const emptyTotals = () =>
+        TOTAL_KEYS.reduce((acc, k) => ((acc[k] = 0), acc), {});
+      const addInto = (target, src) => {
+        TOTAL_KEYS.forEach((k) => {
+          target[k] += parseFloat(src?.[k] || 0);
+        });
+      };
+
+      // By-month rows: each month's employee-deduped grand totals.
+      const monthly = monthlyReports.map((rep, i) => {
+        const totals = emptyTotals();
+        addInto(totals, rep.comprehensive?.grand_totals);
+        return { month: i + 1, totals };
+      });
+
+      // By-location rows: sum each location's totals across the 12 months.
+      const locationTotalsMap = new Map();
+      const locationOrder = [];
+      monthlyReports.forEach((rep) => {
+        (rep.comprehensive?.locations || []).forEach((loc) => {
+          if (!locationTotalsMap.has(loc.location)) {
+            locationTotalsMap.set(loc.location, emptyTotals());
+            locationOrder.push(loc.location);
+          }
+          addInto(locationTotalsMap.get(loc.location), loc.totals);
+        });
+      });
+      const locations = locationOrder.map((loc) => ({
+        location: loc,
+        totals: locationTotalsMap.get(loc),
+      }));
+
+      // Grand totals = sum of the 12 monthly grand totals (both tables tie out).
+      const grand_totals = emptyTotals();
+      monthly.forEach((m) => addInto(grand_totals, m.totals));
+
+      res.json({ year: yearInt, monthly, locations, grand_totals });
+    } catch (error) {
+      console.error("Error fetching annual salary report:", error);
+      res.status(500).json({
+        message: "Error fetching annual salary report",
+        error: error.message,
+      });
+    }
+  });
+
+  // Annual breakdown (paginated): per location, each employee expanded into one row per
+  // month (Jan..Dec) + a per-employee total, ending in a location grand total. Built from
+  // the same 12 monthly reports as "/annual", so the per-location and grand totals
+  // reconcile exactly with the Annual Summary (summed-monthly rounding).
+  //
+  // Locations are auto-grouped into PAGES capped at ANNUAL_BREAKDOWN_BATCH_STAFF staff
+  // (locations kept whole). Only the requested page's heavy per-employee detail is built
+  // and returned; every response also carries a lightweight `pages` index (per page:
+  // staff count + location codes) so the client can render the pager and batch-print list
+  // without holding the whole year in memory.
+  const ANNUAL_BREAKDOWN_BATCH_STAFF = 30;
+  router.get("/annual-breakdown", async (req, res) => {
+    const { year, page } = req.query;
+
+    if (!year) {
+      return res.status(400).json({ message: "Year parameter is required" });
+    }
+
+    try {
+      const yearInt = parseInt(year);
+      const monthlyReports = await computeYearlyMonthlyReports(
+        pool,
+        yearInt,
+        req.query.refresh === "true",
+      );
+
+      const TOTAL_KEYS = [
+        "gaji",
+        "ot",
+        "bonus",
+        "comm",
+        "cuti",
+        "gaji_kasar",
+        "epf_majikan",
+        "epf_pekerja",
+        "socso_majikan",
+        "socso_pekerja",
+        "sip_majikan",
+        "sip_pekerja",
+        "pcb",
+        "gaji_bersih",
+        "setengah_bulan",
+        "jumlah",
+        "digenapkan",
+        "setelah_digenapkan",
+      ];
+      const emptyTotals = () =>
+        TOTAL_KEYS.reduce((acc, k) => ((acc[k] = 0), acc), {});
+      const addInto = (target, src) => {
+        TOTAL_KEYS.forEach((k) => {
+          target[k] += parseFloat(src?.[k] || 0);
+        });
+      };
+
+      // Pass 1 (cheap): staff per location + display order, to determine page boundaries.
+      const staffByLocation = new Map();
+      const locationOrder = [];
+      monthlyReports.forEach((rep) => {
+        (rep.comprehensive?.locations || []).forEach((loc) => {
+          if (!staffByLocation.has(loc.location)) {
+            staffByLocation.set(loc.location, new Set());
+            locationOrder.push(loc.location);
+          }
+          const set = staffByLocation.get(loc.location);
+          (loc.employees || []).forEach((emp) => set.add(emp.staff_id));
+        });
+      });
+      const orderedLocs = locationOrder.filter(
+        (loc) => staffByLocation.get(loc).size > 0,
+      );
+
+      // Greedy batching by staff cap (locations kept whole).
+      const batches = [];
+      let current = { locations: [], staff: 0 };
+      orderedLocs.forEach((loc) => {
+        const locStaff = staffByLocation.get(loc).size;
+        if (
+          current.locations.length > 0 &&
+          current.staff + locStaff > ANNUAL_BREAKDOWN_BATCH_STAFF
+        ) {
+          batches.push(current);
+          current = { locations: [], staff: 0 };
+        }
+        current.locations.push(loc);
+        current.staff += locStaff;
+      });
+      if (current.locations.length > 0) batches.push(current);
+
+      const totalPages = batches.length;
+      let pageInt = parseInt(page) || 1;
+      if (pageInt < 1) pageInt = 1;
+      if (pageInt > totalPages) pageInt = totalPages || 1;
+
+      const pagesMeta = batches.map((b) => ({
+        staff: b.staff,
+        locations: b.locations,
+      }));
+
+      // Grand totals = sum of the 12 employee-deduped monthly grand totals.
+      const grand_totals = emptyTotals();
+      monthlyReports.forEach((rep) =>
+        addInto(grand_totals, rep.comprehensive?.grand_totals),
+      );
+
+      // Pass 2 (heavy, current page only): build per-employee monthly detail for the
+      // locations on the requested page.
+      const pageLocCodes = batches[pageInt - 1]
+        ? batches[pageInt - 1].locations
+        : [];
+      const pageLocSet = new Set(pageLocCodes);
+      const detailMap = new Map();
+      monthlyReports.forEach((rep, i) => {
+        const month = i + 1;
+        (rep.comprehensive?.locations || []).forEach((loc) => {
+          if (!pageLocSet.has(loc.location)) return;
+          if (!detailMap.has(loc.location)) {
+            detailMap.set(loc.location, {
+              employees: new Map(),
+              totals: emptyTotals(),
+            });
+          }
+          const bucket = detailMap.get(loc.location);
+          addInto(bucket.totals, loc.totals);
+          (loc.employees || []).forEach((emp) => {
+            if (!bucket.employees.has(emp.staff_id)) {
+              bucket.employees.set(emp.staff_id, {
+                staff_id: emp.staff_id,
+                staff_name: emp.staff_name,
+                monthsMap: new Map(),
+                total: emptyTotals(),
+              });
+            }
+            const e = bucket.employees.get(emp.staff_id);
+            const monthTotals = emptyTotals();
+            addInto(monthTotals, emp);
+            e.monthsMap.set(month, monthTotals);
+            addInto(e.total, emp);
+          });
+        });
+      });
+
+      const locations = pageLocCodes.map((loc) => {
+        const bucket = detailMap.get(loc);
+        const employees = Array.from(bucket.employees.values())
+          .map((e) => ({
+            staff_id: e.staff_id,
+            staff_name: e.staff_name,
+            // Always emit all 12 months (zeros where the employee had no data in
+            // this location that month) so every employee shows a full Jan–Dec block.
+            months: Array.from({ length: 12 }, (_, i) => i + 1).map((month) => ({
+              month,
+              ...(e.monthsMap.get(month) || emptyTotals()),
+            })),
+            total: e.total,
+          }))
+          .sort((a, b) =>
+            (a.staff_name || "").localeCompare(b.staff_name || ""),
+          );
+        return { location: loc, employees, totals: bucket.totals };
+      });
+
+      res.json({
+        year: yearInt,
+        page: pageInt,
+        total_pages: totalPages,
+        pages: pagesMeta,
+        locations,
+        grand_totals,
+      });
+    } catch (error) {
+      console.error("Error fetching annual breakdown salary report:", error);
+      res.status(500).json({
+        message: "Error fetching annual breakdown salary report",
         error: error.message,
       });
     }

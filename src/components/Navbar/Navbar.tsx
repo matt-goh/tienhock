@@ -44,7 +44,7 @@ export default function Navbar() {
   return (
     <>
       <header className="flex-shrink-0 z-50 h-16 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-b border-default-200 dark:border-gray-700 shadow-sm">
-        <div className="h-full max-w-[1920px] mx-auto px-4 flex items-center justify-between">
+        <div className="h-full px-4 flex items-center justify-between">
           {/* Left Section: Mobile Menu Button + Logo + Company */}
           <div className="flex items-center gap-2">
             {/* Mobile Menu Button */}
