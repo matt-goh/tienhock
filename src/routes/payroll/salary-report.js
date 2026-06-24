@@ -4,21 +4,10 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
 
-  // Get comprehensive salary report data for all tabs
-  router.get("/", async (req, res) => {
-    const { year, month } = req.query;
-
-    // Validate required parameters
-    if (!year || !month) {
-      return res.status(400).json({
-        message: "Year and month parameters are required",
-      });
-    }
-
-    const yearInt = parseInt(year);
-    const monthInt = parseInt(month);
-
-    try {
+  // Compute the full monthly salary report (all tabs) for the given year/month.
+  // Returns the exact object shape the "/" route responds with. Reused by the
+  // "/yearly" and "/annual" routes so they build on the verified monthly logic.
+  async function computeMonthlySalaryReport(pool, yearInt, monthInt) {
       // Main comprehensive query to get all employee data with payroll details
       // Dual-location logic: employee appears in BOTH job-based AND direct-mapped locations
       const comprehensiveQuery = `
@@ -848,7 +837,7 @@ export default function (pool) {
       })();
 
       // Response with all data for all tabs
-      res.json({
+      return {
         year: yearInt,
         month: monthInt,
         // Original format for Bank/Pinjam tabs (unique employees only)
@@ -985,7 +974,27 @@ export default function (pool) {
             payment_preference: emp.payment_preference,
           }));
         })(),
+      };
+  }
+
+  // Get comprehensive salary report data for all tabs (monthly)
+  router.get("/", async (req, res) => {
+    const { year, month } = req.query;
+
+    // Validate required parameters
+    if (!year || !month) {
+      return res.status(400).json({
+        message: "Year and month parameters are required",
       });
+    }
+
+    try {
+      const result = await computeMonthlySalaryReport(
+        pool,
+        parseInt(year),
+        parseInt(month),
+      );
+      res.json(result);
     } catch (error) {
       console.error("Error fetching comprehensive salary report:", error);
       res.status(500).json({
@@ -994,6 +1003,15 @@ export default function (pool) {
       });
     }
   });
+
+  // Run computeMonthlySalaryReport for all 12 months of a year (in parallel).
+  // Shared by "/yearly" (for per-month rounding) and "/annual" (full summary).
+  async function computeYearlyMonthlyReports(pool, yearInt) {
+    const months = Array.from({ length: 12 }, (_, i) => i + 1);
+    return Promise.all(
+      months.map((m) => computeMonthlySalaryReport(pool, yearInt, m)),
+    );
+  }
 
   // Get comprehensive salary report data for full year (aggregated across all months)
   router.get("/yearly", async (req, res) => {
@@ -1489,6 +1507,11 @@ export default function (pool) {
 
       const result = await pool.query(comprehensiveQuery, [yearInt]);
 
+      // 12 monthly reports — used below to replace the annual-rounded
+      // DIGENAPKAN / SETELAH DIGENAPKAN with the sum of each month's rounded
+      // figure, so yearly numbers match the monthly view and the legacy report.
+      const monthlyReports = await computeYearlyMonthlyReports(pool, yearInt);
+
       // Process the data for different views
       const processedData = result.rows.map((row, index) => {
         // GAJI = regular wage (non-OT Hour/Day work from payroll + Kerja Luar).
@@ -1809,6 +1832,65 @@ export default function (pool) {
         }
       });
 
+      // "Fix everywhere": replace the annual-rounded DIGENAPKAN / SETELAH
+      // DIGENAPKAN with the SUM of each month's rounded figure, so yearly
+      // figures match the monthly view and the legacy paper report. All other
+      // columns are already correct annual sums and are left untouched.
+      //
+      // Per-employee rounding (Employee tab rows): sum each month's per-employee
+      // SETELAH DIGENAPKAN, then re-derive DIGENAPKAN against the annual jumlah.
+      const monthlyRoundingByStaff = new Map();
+      for (const rep of monthlyReports) {
+        for (const e of rep.employees) {
+          monthlyRoundingByStaff.set(
+            e.staff_id,
+            (monthlyRoundingByStaff.get(e.staff_id) || 0) +
+              (e.setelah_digenapkan || 0),
+          );
+        }
+      }
+      const applyMonthlyRounding = (emp) => {
+        const summed = monthlyRoundingByStaff.get(emp.staff_id);
+        if (summed == null) return; // keep annual-ceil fallback if no monthly rows
+        emp.setelah_digenapkan = summed;
+        emp.digenapkan = summed - emp.jumlah;
+      };
+      processedData.forEach(applyMonthlyRounding);
+      commissionOnlyEmployees.forEach(applyMonthlyRounding);
+
+      // Per-location rounding (Location tab totals): sum each month's per-location
+      // rounded figures. Correct even for employees split across multiple
+      // locations, and identical to the "/annual" summary.
+      const monthlyRoundingByLocation = new Map();
+      for (const rep of monthlyReports) {
+        for (const loc of rep.comprehensive.locations) {
+          const cur = monthlyRoundingByLocation.get(loc.location) || {
+            digenapkan: 0,
+            setelah_digenapkan: 0,
+          };
+          cur.digenapkan += loc.totals.digenapkan || 0;
+          cur.setelah_digenapkan += loc.totals.setelah_digenapkan || 0;
+          monthlyRoundingByLocation.set(loc.location, cur);
+        }
+      }
+      allLocations.forEach((loc) => {
+        const summed = monthlyRoundingByLocation.get(loc) || {
+          digenapkan: 0,
+          setelah_digenapkan: 0,
+        };
+        locationData[loc].totals.digenapkan = summed.digenapkan;
+        locationData[loc].totals.setelah_digenapkan = summed.setelah_digenapkan;
+      });
+
+      // Grand-total rounding: sum each month's employee-deduped grand totals.
+      grandTotals.digenapkan = 0;
+      grandTotals.setelah_digenapkan = 0;
+      for (const rep of monthlyReports) {
+        grandTotals.digenapkan += rep.comprehensive.grand_totals.digenapkan || 0;
+        grandTotals.setelah_digenapkan +=
+          rep.comprehensive.grand_totals.setelah_digenapkan || 0;
+      }
+
       // Convert locationData object to array for response
       const locationsArray = allLocations.map((loc) => locationData[loc]);
 
@@ -1970,6 +2052,87 @@ export default function (pool) {
       console.error("Error fetching yearly salary report:", error);
       res.status(500).json({
         message: "Error fetching yearly salary report",
+        error: error.message,
+      });
+    }
+  });
+
+  // Annual summary: a by-month table (rows = Jan..Dec) and a by-location table,
+  // both sharing the same columns and reconciling to the same grand total.
+  // Built by summing the 12 verified monthly reports, so DIGENAPKAN /
+  // SETELAH DIGENAPKAN use per-month rounding (matches the legacy paper report).
+  router.get("/annual", async (req, res) => {
+    const { year } = req.query;
+
+    if (!year) {
+      return res.status(400).json({ message: "Year parameter is required" });
+    }
+
+    try {
+      const yearInt = parseInt(year);
+      const monthlyReports = await computeYearlyMonthlyReports(pool, yearInt);
+
+      const TOTAL_KEYS = [
+        "gaji",
+        "ot",
+        "bonus",
+        "comm",
+        "cuti",
+        "gaji_kasar",
+        "epf_majikan",
+        "epf_pekerja",
+        "socso_majikan",
+        "socso_pekerja",
+        "sip_majikan",
+        "sip_pekerja",
+        "pcb",
+        "gaji_bersih",
+        "setengah_bulan",
+        "jumlah",
+        "digenapkan",
+        "setelah_digenapkan",
+      ];
+      const emptyTotals = () =>
+        TOTAL_KEYS.reduce((acc, k) => ((acc[k] = 0), acc), {});
+      const addInto = (target, src) => {
+        TOTAL_KEYS.forEach((k) => {
+          target[k] += parseFloat(src?.[k] || 0);
+        });
+      };
+
+      // By-month rows: each month's employee-deduped grand totals.
+      const monthly = monthlyReports.map((rep, i) => {
+        const totals = emptyTotals();
+        addInto(totals, rep.comprehensive?.grand_totals);
+        return { month: i + 1, totals };
+      });
+
+      // By-location rows: sum each location's totals across the 12 months.
+      const locationTotalsMap = new Map();
+      const locationOrder = [];
+      monthlyReports.forEach((rep) => {
+        (rep.comprehensive?.locations || []).forEach((loc) => {
+          if (!locationTotalsMap.has(loc.location)) {
+            locationTotalsMap.set(loc.location, emptyTotals());
+            locationOrder.push(loc.location);
+          }
+          addInto(locationTotalsMap.get(loc.location), loc.totals);
+        });
+      });
+      const locations = locationOrder.map((loc) => ({
+        location: loc,
+        totals: locationTotalsMap.get(loc),
+      }));
+
+      // Grand totals = sum of the 12 monthly grand totals (both tables tie out).
+      const grand_totals = emptyTotals();
+      monthly.forEach((m) => addInto(grand_totals, m.totals));
+
+      res.json({ year: yearInt, monthly, locations, grand_totals });
+    } catch (error) {
+      console.error("Error fetching annual salary report:", error);
+      res.status(500).json({
+        message: "Error fetching annual salary report",
         error: error.message,
       });
     }

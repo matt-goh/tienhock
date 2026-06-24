@@ -282,19 +282,34 @@ interface ComprehensiveSalaryData {
   grand_totals: GrandTotals;
 }
 
+// Annual summary: yearly totals by month and by location (both share the columns).
+interface AnnualSummaryData {
+  year: number;
+  monthly: { month: number; totals: GrandTotals }[];
+  locations: { location: string; totals: GrandTotals }[];
+  grand_totals: GrandTotals;
+}
+
 interface LocationOrderItem {
   type: "location" | "header";
   id?: string;
   text?: string;
 }
 
+type SalaryReportType =
+  | "employee-individual"
+  | "employee-grouped"
+  | "location"
+  | "annual";
+
 export interface SalaryReportPDFProps {
-  reportType: "employee-individual" | "employee-grouped" | "location";
+  reportType: SalaryReportType;
   periodType: "monthly" | "yearly";
   year: number;
   month?: number;
   employees?: EmployeeSalaryData[];
   comprehensiveData?: ComprehensiveSalaryData | null;
+  annualData?: AnnualSummaryData | null;
   grandTotals?: GrandTotals;
   locationMap: Record<string, string>;
   locationOrder: LocationOrderItem[];
@@ -369,9 +384,7 @@ const buildReportTitle = (
   return `REPORT : SALARY WAGES FOR THE MONTH OF ${monthName}, ${year}`;
 };
 
-const buildViewSubtitle = (
-  reportType: "employee-individual" | "employee-grouped" | "location"
-): string => {
+const buildViewSubtitle = (reportType: SalaryReportType): string => {
   switch (reportType) {
     case "employee-individual":
       return "BY NAME (GROUP)";
@@ -379,16 +392,21 @@ const buildViewSubtitle = (
       return "BY LOCATION";
     case "location":
       return "LOCATION:-";
+    case "annual":
+      return "ANNUAL SUMMARY (BY MONTH & BY LOCATION)";
     default:
       return "";
   }
 };
 
 // Table Header Component
-const TableHeader: React.FC<{ isLocationReport: boolean }> = ({
-  isLocationReport,
-}) => {
-  const nameHeader = isLocationReport ? "BAHAGIAN KERJA" : "NAMA PEKERJA";
+const TableHeader: React.FC<{
+  isLocationReport?: boolean;
+  nameLabel?: string;
+  repeat?: boolean;
+}> = ({ isLocationReport = false, nameLabel, repeat = true }) => {
+  const nameHeader =
+    nameLabel ?? (isLocationReport ? "BAHAGIAN KERJA" : "NAMA PEKERJA");
 
   // Combined widths for spanning headers
   const epfWidth = "8%"; // 4% + 4%
@@ -396,7 +414,7 @@ const TableHeader: React.FC<{ isLocationReport: boolean }> = ({
   const sipWidth = "8%"; // 4% + 4%
 
   return (
-    <View fixed>
+    <View fixed={repeat}>
       {/* Main Header Row */}
       <View style={styles.tableHeader} wrap={false}>
         <View style={styles.colBil}>
@@ -806,6 +824,65 @@ const LocationTotalsContent: React.FC<{
   </>
 );
 
+// Annual Summary Content - by-month table, then by-location table (new page)
+const AnnualSummaryContent: React.FC<{
+  annualData: AnnualSummaryData;
+  locationMap: Record<string, string>;
+  locationOrder: LocationOrderItem[];
+}> = ({ annualData, locationMap, locationOrder }) => {
+  const emptyData: GrandTotals = {
+    gaji: 0, ot: 0, bonus: 0, comm: 0, cuti: 0, gaji_kasar: 0,
+    epf_majikan: 0, epf_pekerja: 0, socso_majikan: 0, socso_pekerja: 0,
+    sip_majikan: 0, sip_pekerja: 0, pcb: 0, gaji_bersih: 0,
+    setengah_bulan: 0, jumlah: 0, digenapkan: 0, setelah_digenapkan: 0,
+  };
+
+  return (
+    <>
+      {/* BY MONTH */}
+      <TableHeader nameLabel="MONTH" repeat={false} />
+      {annualData.monthly.map((m) => (
+        <DataRow
+          key={`m-${m.month}`}
+          bil={m.month}
+          name={getMonthName(m.month).toUpperCase()}
+          data={m.totals}
+        />
+      ))}
+      <View wrap={false}>
+        <DataRow bil="" name="TOTAL :" data={annualData.grand_totals} isBold rowStyle={styles.totalRow} />
+        <CarumanTotalsRow totals={annualData.grand_totals} />
+      </View>
+
+      {/* BY LOCATION (start on a new page so each table keeps its header) */}
+      <View break>
+        <TableHeader nameLabel="BAHAGIAN KERJA" repeat={false} />
+        {locationOrder.map((item, idx) => {
+          if (item.type === "header") {
+            return <SectionHeaderRow key={`header-${idx}`} text={item.text || ""} />;
+          }
+          const locData = annualData.locations.find(
+            (l) => l.location === item.id
+          );
+          const locationName = locationMap[item.id || ""] || item.id || "";
+          return (
+            <DataRow
+              key={`loc-${item.id}`}
+              bil={item.id || ""}
+              name={truncateName(locationName, 35)}
+              data={locData?.totals ?? emptyData}
+            />
+          );
+        })}
+        <View wrap={false}>
+          <DataRow bil="" name="TOTAL :" data={annualData.grand_totals} isBold rowStyle={styles.totalRow} />
+          <CarumanTotalsRow totals={annualData.grand_totals} />
+        </View>
+      </View>
+    </>
+  );
+};
+
 // No Data Content
 const NoDataContent: React.FC = () => (
   <>
@@ -828,6 +905,7 @@ const SalaryReportPDF: React.FC<SalaryReportPDFProps> = ({
   month,
   employees,
   comprehensiveData,
+  annualData,
   grandTotals,
   locationMap,
   locationOrder,
@@ -837,7 +915,15 @@ const SalaryReportPDF: React.FC<SalaryReportPDFProps> = ({
 
   let content: React.ReactNode = <NoDataContent />;
 
-  if (reportType === "employee-individual" && employees && employees.length > 0 && grandTotals) {
+  if (reportType === "annual" && annualData && annualData.monthly.length > 0) {
+    content = (
+      <AnnualSummaryContent
+        annualData={annualData}
+        locationMap={locationMap}
+        locationOrder={locationOrder}
+      />
+    );
+  } else if (reportType === "employee-individual" && employees && employees.length > 0 && grandTotals) {
     content = <EmployeeIndividualContent employees={employees} grandTotals={grandTotals} />;
   } else if (reportType === "employee-grouped" && comprehensiveData && comprehensiveData.locations.length > 0 && grandTotals) {
     content = (
@@ -889,7 +975,7 @@ const SalaryReportPDF: React.FC<SalaryReportPDFProps> = ({
 
 // Generate filename
 const generateFileName = (
-  reportType: "employee-individual" | "employee-grouped" | "location",
+  reportType: SalaryReportType,
   periodType: "monthly" | "yearly",
   year: number,
   month?: number
@@ -899,6 +985,8 @@ const generateFileName = (
       ? "Employee"
       : reportType === "employee-grouped"
       ? "Employee_ByLocation"
+      : reportType === "annual"
+      ? "Annual"
       : "Location";
 
   const periodStr =
