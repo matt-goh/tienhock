@@ -19,6 +19,16 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-06-24",
+    ms: "Laporan Gaji kini mempunyai tab \"Annual\" baharu yang memaparkan jumlah gaji setahun: jadual mengikut bulan (Januari–Disember) di atas, dan jadual mengikut lokasi di bawah, kedua-duanya berkongsi lajur yang sama dan menjumlah kepada jumlah besar yang sama.",
+    en: "The Salary Report now has a new \"Annual\" tab showing the year's totals: a table broken down by month (January–December) on top, and a table by location below, both sharing the same columns and reconciling to the same grand total.",
+  },
+  {
+    date: "2026-06-24",
+    ms: "Paparan Tahunan (Yearly) bagi Laporan Gaji: lajur DIGENAPKAN dan SETELAH DIGENAPKAN kini menjumlahkan angka digenapkan setiap bulan, bukan menggenapkan jumlah setahun sekali. Angka tahunan kini sepadan dengan jumlah 12 bulan dan dengan laporan kertas. Lajur lain tidak berubah.",
+    en: "Yearly view of the Salary Report: the DIGENAPKAN and SETELAH DIGENAPKAN columns now add up each month's rounded figure instead of rounding the whole-year total once. The yearly numbers now match the sum of the 12 months and the paper report. All other columns are unchanged.",
+  },
+  {
     date: "2026-06-23",
     ms: "Slip Gaji dan Butiran Gaji untuk jualan Jelly Polly kini menggunakan unit Ctn (carton). Jumlah carton termasuk unit percuma (FOC), dan kadar serta jumlah bayaran tidak berubah.",
     en: "Jelly Polly sales now use the Ctn (carton) unit on Payslips and Payroll Details. Carton totals include free (FOC) units, while rates and payment amounts are unchanged.",
