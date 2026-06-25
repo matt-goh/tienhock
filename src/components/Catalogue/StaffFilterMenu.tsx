@@ -102,10 +102,12 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
             <Combobox
               multiple
               value={
-                currentFilters.jobFilter?.map(
-                  (job) =>
-                    uniqueJobOptions.find((option) => option.name === job)?.id
-                ) ?? []
+                currentFilters.jobFilter
+                  ?.map(
+                    (job) =>
+                      uniqueJobOptions.find((option) => option.name === job)?.id
+                  )
+                  .filter((id): id is string => id !== undefined) ?? []
               }
               onChange={handleJobSelection}
               disabled={!currentFilters.applyJobFilter}
