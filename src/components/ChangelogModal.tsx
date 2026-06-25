@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-25",
+    ms: "Halaman Rekod Pengeluaran kini menyenaraikan pekerja dalam setiap produk mengikut susunan kad pekerja yang sama (susunan seret-dan-lepas) seperti halaman Kemasukan Pengeluaran, bukan lagi mengikut abjad.",
+    en: "The Production Records page now lists workers under each product in the same worker order (the drag-and-drop arrangement) as the Production Entry page, instead of alphabetically.",
+  },
+  {
+    date: "2026-06-25",
     ms: "Laporan Gaji kini memaparkan Cuti Tahunan bagi pekerja yang tiada rekod gaji aktif pada bulan tersebut tanpa menolak Gaji Pertengahan Bulan sekali lagi. Jumlah cuti tidak lagi kelihatan negatif, dan baris tersebut tidak akan dimasukkan ke dalam senarai bayaran bank kerana bayaran telah dibuat sebelum ini.",
     en: "Salary Report now shows Annual Leave for employees without an active payroll that month without deducting their mid-month salary again. The leave amount no longer appears as a negative figure, and those rows are excluded from the bank payment list because the payment was already made.",
   },
