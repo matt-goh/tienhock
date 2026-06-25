@@ -17,7 +17,12 @@ import MonthNavigator from "../../components/MonthNavigator";
 import ProductSelector from "../../components/Stock/ProductSelector";
 import YearNavigator from "../../components/YearNavigator";
 import { api } from "../../routes/utils/api";
-import { ProductionEntry, StockProduct } from "../../types/types";
+import {
+  ProductionEntry,
+  ProductionWorkerOrderResponse,
+  ProductionWorkerOrderScope,
+  StockProduct,
+} from "../../types/types";
 import { getSpecialItemConfig } from "../../config/specialItems";
 import { OTH_PRODUCTION_IDS } from "../../config/othProductionProducts";
 import toast from "react-hot-toast";
@@ -126,6 +131,25 @@ const getCategory = (entry: ProductionEntry): CategoryKey => {
   return "OTH";
 };
 
+// Map a product group to the shared worker-order scope used by the Production
+// Entry page so worker rows display in the same drag-and-drop order. OTH is
+// stock-only (no workers), so it has no scope.
+const getWorkerOrderScope = (
+  group: ProductGroup
+): ProductionWorkerOrderScope | null => {
+  switch (group.category) {
+    case "MEE":
+      return "MEE_PACKING";
+    case "BH":
+    case "HANCUR":
+      return "BH_PACKING";
+    case "BUNDLE":
+      return group.productId === "BUNDLE_MEE" ? "MEE_PACKING" : "BH_PACKING";
+    default:
+      return null;
+  }
+};
+
 const getUnitLabel = (entry: ProductionEntry): string => {
   const specialConfig = getSpecialItemConfig(entry.product_id);
   if (specialConfig) return specialConfig.unit;
@@ -169,6 +193,9 @@ const ProductionListPage: React.FC = () => {
   const [entries, setEntries] = useState<ProductionEntry[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+  const [workerOrderByScope, setWorkerOrderByScope] = useState<
+    Record<ProductionWorkerOrderScope, string[]>
+  >({ BH_PACKING: [], MEE_PACKING: [] });
 
   const dateRange: DateRange = useMemo(() => {
     if (viewMode === "day") {
@@ -203,6 +230,38 @@ const ProductionListPage: React.FC = () => {
   useEffect(() => {
     fetchEntries();
   }, [fetchEntries]);
+
+  // Load the shared worker order for both packing scopes so worker rows can be
+  // displayed in the same order as the Production Entry page.
+  useEffect(() => {
+    let isCurrent: boolean = true;
+    const scopes: ProductionWorkerOrderScope[] = ["BH_PACKING", "MEE_PACKING"];
+
+    Promise.all(
+      scopes.map((scope: ProductionWorkerOrderScope) =>
+        api
+          .get(
+            `/api/production-entries/worker-order?scope=${encodeURIComponent(
+              scope
+            )}`
+          )
+          .then((response: ProductionWorkerOrderResponse): string[] =>
+            response.worker_ids || []
+          )
+          .catch((): string[] => [])
+      )
+    ).then((results: string[][]) => {
+      if (!isCurrent) return;
+      setWorkerOrderByScope({
+        BH_PACKING: results[0],
+        MEE_PACKING: results[1],
+      });
+    });
+
+    return (): void => {
+      isCurrent = false;
+    };
+  }, []);
 
   const productionProductFilter = useCallback(
     (product: StockProduct): boolean =>
@@ -242,6 +301,53 @@ const ProductionListPage: React.FC = () => {
 
   const dateGroups: DateGroup[] = useMemo(() => {
     const groupedByDate: Map<string, Map<string, ProductGroup>> = new Map();
+
+    const orderIndexByScope: Record<
+      ProductionWorkerOrderScope,
+      Map<string, number>
+    > = {
+      BH_PACKING: new Map(
+        workerOrderByScope.BH_PACKING.map(
+          (workerId: string, index: number): [string, number] => [
+            workerId,
+            index,
+          ]
+        )
+      ),
+      MEE_PACKING: new Map(
+        workerOrderByScope.MEE_PACKING.map(
+          (workerId: string, index: number): [string, number] => [
+            workerId,
+            index,
+          ]
+        )
+      ),
+    };
+
+    // Sort by the saved worker order; workers without a saved position (and
+    // stock-only rows) fall back to alphabetical and land after ordered ones.
+    const compareRows = (
+      orderIndex: Map<string, number>,
+      first: ProductionEntry,
+      second: ProductionEntry
+    ): number => {
+      const firstOrder: number | undefined = first.worker_id
+        ? orderIndex.get(first.worker_id)
+        : undefined;
+      const secondOrder: number | undefined = second.worker_id
+        ? orderIndex.get(second.worker_id)
+        : undefined;
+
+      if (firstOrder !== undefined && secondOrder !== undefined) {
+        return firstOrder - secondOrder;
+      }
+      if (firstOrder !== undefined) return -1;
+      if (secondOrder !== undefined) return 1;
+
+      return (first.worker_name || first.worker_id || "Stock Only").localeCompare(
+        second.worker_name || second.worker_id || "Stock Only"
+      );
+    };
 
     entries
       .filter(productMatchesFilter)
@@ -298,10 +404,13 @@ const ProductionListPage: React.FC = () => {
             return first.productId.localeCompare(second.productId);
           })
           .forEach((group: ProductGroup) => {
+            const scope: ProductionWorkerOrderScope | null =
+              getWorkerOrderScope(group);
+            const orderIndex: Map<string, number> = scope
+              ? orderIndexByScope[scope]
+              : new Map<string, number>();
             group.rows.sort((first: ProductionEntry, second: ProductionEntry) =>
-              (first.worker_name || first.worker_id || "Stock Only").localeCompare(
-                second.worker_name || second.worker_id || "Stock Only"
-              )
+              compareRows(orderIndex, first, second)
             );
             categories[group.category].push(group);
           });
@@ -316,7 +425,7 @@ const ProductionListPage: React.FC = () => {
           ),
         };
       });
-  }, [entries, productMatchesFilter, searchMatchesEntry]);
+  }, [entries, productMatchesFilter, searchMatchesEntry, workerOrderByScope]);
 
   const summaryStats = useMemo(() => {
     const productCount: number = dateGroups.reduce(
