@@ -381,7 +381,10 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
       {/* Conditionally set 'multiple' prop */}
       <Combobox
         value={selectedOptions} // Pass selected option object(s)
-        onChange={handleChange} // Use internal handler
+        // The dynamic `multiple` prop stops Headless UI from narrowing the value
+        // type, so its inferred onChange union (which includes `null[]`) no longer
+        // matches handleChange. handleChange covers both shapes at runtime.
+        onChange={handleChange as (value: unknown) => void} // Use internal handler
         disabled={disabled}
         name={name}
         multiple={isMultiple} // Set based on mode

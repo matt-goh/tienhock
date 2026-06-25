@@ -245,7 +245,7 @@ const MaterialCombobox: React.FC<MaterialComboboxProps> = ({
   return (
     <Combobox
       value={value}
-      onChange={onChange}
+      onChange={(materialId: string | null) => onChange(materialId ?? "")}
       disabled={disabled}
     >
       <div className="relative">

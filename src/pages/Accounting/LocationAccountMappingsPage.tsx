@@ -1120,7 +1120,7 @@ const LocationAccountMappingsPage: React.FC = () => {
                   </label>
                   <Combobox
                     value={selectedLocation}
-                    onChange={(value: string) =>
+                    onChange={(value: string | null) =>
                       setSelectedLocation(value || "")
                     }
                   >
