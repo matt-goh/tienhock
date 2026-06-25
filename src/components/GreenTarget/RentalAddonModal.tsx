@@ -241,7 +241,7 @@ const RentalAddonModal = ({
                               Type
                             </label>
                             <Listbox
-                              value={selectedPaycode}
+                              value={selectedPaycode ?? undefined}
                               onChange={handlePaycodeSelect}
                             >
                               <div className="relative">
