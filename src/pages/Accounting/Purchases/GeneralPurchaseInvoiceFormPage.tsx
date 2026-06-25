@@ -1349,6 +1349,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                                   )
                                 }
                                 options={generalStockCategoryOptions}
+                                optionsPosition="top"
                                 className="[&_button]:py-1"
                               />
                             ) : (
@@ -1420,6 +1421,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                       )
                     }
                     options={generalStockCategoryOptions}
+                    optionsPosition="top"
                     disabled={!canEditRecords}
                     className="[&_button]:py-2"
                   />
