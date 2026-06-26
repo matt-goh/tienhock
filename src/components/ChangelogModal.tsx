@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-26",
+    ms: "Dalam menu navigasi yang dipaparkan sebagai grid berbilang lajur (seperti Catalogue dan Payroll), pintasan akses pantas (cth. \"New Entry\") kini muncul sebagai butang \"+\" terus di dalam baris item, bukan lagi popover yang terbuka ke kanan dan menutup item di lajur sebelah. Klik \"+\" untuk terus ke halaman cipta baharu. Menu satu lajur kekal seperti biasa.",
+    en: "In navigation menus shown as a multi-column grid (like Catalogue and Payroll), the quick-access shortcuts (e.g. \"New Entry\") now appear as a \"+\" button right inside the item row, instead of a popover that opened to the right and covered the item in the next column. Click the \"+\" to go straight to the create page. Single-column menus are unchanged.",
+  },
+  {
+    date: "2026-06-26",
     ms: "Laporan Debtors kini mempunyai butang buka/tutup semua yang membuka kumpulan salesman dan semua butiran pelanggan sekaligus. Laporan Tien Hock dan Jelly Polly juga boleh buka/tutup setiap salesman bersama semua pelanggan di bawahnya, dengan ruang yang lebih selesa apabila kumpulan dibuka. Jumlah kecil pelanggan kini turut dipaparkan di bawah jadual invois seperti dalam PDF, dan jumlah keseluruhan juga ditunjukkan di bahagian bawah laporan.",
     en: "Debtors Reports now have an expand/collapse-all button that opens both salesman groups and every customer detail at once. Tien Hock and Jelly Polly can also expand/collapse each salesman together with all customers under that salesman, with more breathing room when a group is open. Customer subtotals now also appear below the invoice table like the PDF, and the overall total is shown at the bottom of the report.",
   },
