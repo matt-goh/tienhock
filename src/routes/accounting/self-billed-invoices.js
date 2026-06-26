@@ -1531,6 +1531,17 @@ export default function (pool, config) {
 
   router.get("/general-stock", async (req, res) => {
     try {
+      const year = Number.parseInt(req.query.year, 10);
+      const month = Number.parseInt(req.query.month, 10);
+      const hasMonthFilter =
+        Number.isInteger(year) && Number.isInteger(month) && month >= 1 && month <= 12;
+
+      const monthFilterClause = hasMonthFilter
+        ? `AND EXTRACT(YEAR FROM sbi.purchase_date) = $1
+              AND EXTRACT(MONTH FROM sbi.purchase_date) = $2`
+        : "";
+      const monthFilterParams = hasMonthFilter ? [year, month] : [];
+
       const [result, categoriesResult] = await Promise.all([
         pool.query(
           `WITH adjustment_totals AS (
@@ -1579,10 +1590,12 @@ export default function (pool, config) {
            LEFT JOIN general_stock_categories gsc ON gsc.id = sbil.general_stock_category_id
            LEFT JOIN adjustment_totals at ON at.self_billed_invoice_line_id = sbil.id
            LEFT JOIN used_adjustments ua ON ua.self_billed_invoice_line_id = sbil.id
-           WHERE sbil.balance_quantity IS NOT NULL
-              OR sbil.general_stock_category_id IS NOT NULL
+           WHERE (sbil.balance_quantity IS NOT NULL
+              OR sbil.general_stock_category_id IS NOT NULL)
+             ${monthFilterClause}
            ORDER BY COALESCE(gsc.sort_order, 9999), COALESCE(gsc.name, 'Uncategorised'),
-                    sbi.purchase_date DESC, sbi.id DESC, sbil.line_number ASC`
+                    sbi.purchase_date DESC, sbi.id DESC, sbil.line_number ASC`,
+          monthFilterParams
         ),
         pool.query(
           `SELECT id, name, sort_order, is_active, created_at, updated_at
