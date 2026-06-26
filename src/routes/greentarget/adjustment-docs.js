@@ -477,10 +477,12 @@ export default function (pool, myInvoisGTConfig) {
     try {
       const params = [];
       let sql = `
-        SELECT a.*, c.name AS joined_customer_name,
+        SELECT a.*, i.einvoice_status AS original_invoice_einvoice_status,
+               c.name AS joined_customer_name,
                p.id AS paired_doc_id, p.type AS paired_type, p.status AS paired_status,
                p.einvoice_status AS paired_einvoice_status
           FROM greentarget.adjustment_documents a
+     LEFT JOIN greentarget.invoices i ON a.original_invoice_id = i.invoice_id
      LEFT JOIN greentarget.customers c ON a.customer_id = c.customer_id
      LEFT JOIN greentarget.adjustment_documents p ON a.paired_with_id = p.id
          WHERE 1=1
