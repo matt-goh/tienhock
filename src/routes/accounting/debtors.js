@@ -209,18 +209,30 @@ export default function (pool, config) {
 
       const customer = customerResult.rows[0];
 
-      // 2. Get previous balance (unpaid invoices before the selected month)
+      // 2. Get previous balance = true outstanding as at the start of the month
+      //    (all invoiced amounts before the month) - (all active payments before the month).
+      //    Using the residual balance_due here would double-count payments made during the
+      //    statement month against prior-month invoices, since those payments are also
+      //    subtracted as in-month credits below.
       const previousBalanceQuery = `
-        SELECT COALESCE(SUM(balance_due), 0) as previous_balance
-        FROM invoices
-        WHERE customerid = $1
-          AND invoice_status IN ('Unpaid', 'Overdue')
-          AND balance_due > 0.01
-          AND createddate::bigint < $2
+        SELECT
+          (SELECT COALESCE(SUM(totalamountpayable), 0)
+             FROM invoices
+             WHERE customerid = $1
+               AND createddate::bigint < $2)
+          -
+          (SELECT COALESCE(SUM(p.amount_paid), 0)
+             FROM payments p
+             JOIN invoices i ON p.invoice_id = i.id
+             WHERE i.customerid = $1
+               AND p.status NOT IN ('cancelled', 'pending')
+               AND p.payment_date < $3)
+          AS previous_balance
       `;
       const previousBalanceResult = await pool.query(previousBalanceQuery, [
         customerId,
         startOfMonthTs,
+        startOfMonth.toISOString(),
       ]);
       const previousBalance = parseFloat(
         previousBalanceResult.rows[0]?.previous_balance || 0
