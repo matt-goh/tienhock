@@ -44,7 +44,8 @@ import SupplierPaymentFormPage from "./Accounting/Purchases/SupplierPaymentFormP
 // Stock - Materials
 import MaterialsListPage from "./Stock/Materials/MaterialsListPage";
 import MaterialFormPage from "./Stock/Materials/MaterialFormPage";
-import MaterialAndGeneralStockPage from "./Stock/Materials/MaterialAndGeneralStockPage";
+import GeneralStockPage from "./Stock/Materials/GeneralStockPage";
+import MaterialStockPage from "./Stock/Materials/MaterialStockPage";
 
 // Invoice related imports
 import InvoiceListPage from "./Invoice/InvoiceListPage";
@@ -485,9 +486,9 @@ export const TienHockNavData: SidebarItem[] = [
         component: ProductStockMovementPage,
       },
       {
-        name: "General Stock",
-        path: "/stock/entry",
-        component: MaterialAndGeneralStockPage,
+        name: "Production Records",
+        path: "/stock/production-records",
+        component: ProductionListPage,
       },
       {
         name: "Production Entry",
@@ -495,14 +496,14 @@ export const TienHockNavData: SidebarItem[] = [
         component: ProductionEntryPage,
       },
       {
-        name: "Production Records",
-        path: "/stock/production-records",
-        component: ProductionListPage,
-      },
-      {
         name: "Product Adjustments",
         path: "/stock/adjustments",
         component: ProductStockAdjustmentEntryPage,
+      },
+      {
+        name: "Material Stock",
+        path: "/stock/material-stock",
+        component: MaterialStockPage,
       },
       {
         name: "Material Purchases",
@@ -521,6 +522,11 @@ export const TienHockNavData: SidebarItem[] = [
             component: MaterialPurchaseFormPage,
           },
         ],
+      },
+      {
+        name: "General Stock",
+        path: "/stock/entry",
+        component: GeneralStockPage,
       },
       {
         name: "General Purchases",

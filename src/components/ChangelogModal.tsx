@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-26",
+    ms: "Stok General dan Stok Material kini dipisahkan kepada dua halaman berasingan dalam menu Stock. Halaman General Stock hanya memaparkan stok General, manakala halaman Material Stock mengandungi tab Mee, Bihun dan Shared.",
+    en: "General Stock and Material Stock are now split into two separate pages in the Stock menu. General Stock now only shows general stock, while Material Stock contains the Mee, Bihun and Shared tabs.",
+  },
+  {
+    date: "2026-06-26",
     ms: "Halaman Pelarasan Stok kini mempunyai tab baharu \"Other Products\" yang membolehkan anda merekod pelarasan ADJ+/ADJ- untuk Sisa Mi, Sisa Mihun, Empty Bag dan Empty Bag (Small), selain produk Bihun dan Mee yang sedia ada. Keempat-empat produk ini juga kini boleh dipilih dalam halaman Pergerakan Stok.",
     en: "The Stock Adjustments page now has a new \"Other Products\" tab that lets you record ADJ+/ADJ- adjustments for Sisa Mi, Sisa Mihun, Empty Bag and Empty Bag (Small), in addition to the existing Bihun and Mee products. These four products can now also be selected on the Stock Movement page.",
   },
