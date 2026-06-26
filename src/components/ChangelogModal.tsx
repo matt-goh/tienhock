@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-26",
+    ms: "Tab \"General\" dalam halaman Pelarasan Stok kini mempunyai kotak carian untuk menapis baris mengikut kategori, penerangan item, pembekal, atau nombor pembelian (bukan nombor/kuantiti). Pemilih bulan juga ditambah pada tab ini, jadi senarai kini hanya memaparkan pembelian bagi bulan yang dipilih.",
+    en: "The \"General\" tab on the Stock Adjustments page now has a search box to filter rows by category, item description, supplier, or purchase number (not numbers/quantities). A month selector was also added to this tab, so the list now only shows purchases from the selected month.",
+  },
+  {
+    date: "2026-06-26",
     ms: "Nombor dokumen pelarasan (Nota Kredit/Debit/Bayaran Balik) kini menggunakan format baharu seperti TH/CN/26/1 — kependekan syarikat (TH, JP, GT), jenis nota (CN/DN/RN), tahun, dan nombor berjalan. Penomboran bermula semula dari 1 untuk setiap syarikat, jenis, dan tahun. Dokumen lama kekal dengan nombor asalnya. Format baharu ini dipaparkan dalam senarai, halaman butiran, PDF, dan e-invois.",
     en: "Adjustment document numbers (Credit/Debit/Refund Notes) now use a new format like TH/CN/26/1 — company code (TH, JP, GT), note type (CN/DN/RN), year, and a running number. Numbering restarts from 1 per company, type, and year. Existing documents keep their original numbers. The new format shows on the list, details page, PDF, and e-invoice.",
   },

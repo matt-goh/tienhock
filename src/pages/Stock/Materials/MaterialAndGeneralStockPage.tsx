@@ -23,6 +23,7 @@ import {
   IconChevronRight,
   IconPlus,
   IconX,
+  IconSearch,
 } from "@tabler/icons-react";
 import clsx from "clsx";
 import Button from "../../../components/Button";
@@ -165,6 +166,7 @@ const MaterialAndGeneralStockPage: React.FC = () => {
   const [generalStockRows, setGeneralStockRows] = useState<GeneralStockRow[]>([]);
   const [generalStockCategories, setGeneralStockCategories] = useState<GeneralStockCategory[]>([]);
   const [generalAdjustmentInputs, setGeneralAdjustmentInputs] = useState<Record<number, string>>({});
+  const [generalSearchQuery, setGeneralSearchQuery] = useState<string>("");
   const [newGeneralCategoryName, setNewGeneralCategoryName] = useState<string>("");
   const [editingGeneralCategoryId, setEditingGeneralCategoryId] = useState<number | null>(null);
   const [editingGeneralCategoryName, setEditingGeneralCategoryName] = useState<string>("");
@@ -195,7 +197,9 @@ const MaterialAndGeneralStockPage: React.FC = () => {
     if (activeTab === "general") {
       setIsLoading(true);
       try {
-        const stockResponse = await api.get<{ rows: GeneralStockRow[]; categories: GeneralStockCategory[] }>("/api/general-purchases/general-stock");
+        const stockResponse = await api.get<{ rows: GeneralStockRow[]; categories: GeneralStockCategory[] }>(
+          `/api/general-purchases/general-stock?year=${year}&month=${month}`
+        );
 
         setGeneralStockRows(stockResponse.rows || []);
         setGeneralStockCategories(stockResponse.categories || []);
@@ -844,20 +848,39 @@ const MaterialAndGeneralStockPage: React.FC = () => {
     return materials.filter((material) => material.closing_quantity < 0).length;
   }, [materials]);
 
+  const filteredGeneralStockRows = useMemo(() => {
+    const query = generalSearchQuery.trim().toLowerCase();
+    if (!query) return generalStockRows;
+
+    return generalStockRows.filter((row) => {
+      const haystack = [
+        row.category_name,
+        row.description,
+        row.supplier_name,
+        row.purchase_no,
+        row.purchase_date,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [generalStockRows, generalSearchQuery]);
+
   const groupedGeneralStockRows = useMemo(() => {
     const groups = new Map<string, GeneralStockRow[]>();
-    generalStockRows.forEach((row) => {
+    filteredGeneralStockRows.forEach((row) => {
       const key = row.category_name || "Uncategorised";
       const rows = groups.get(key) || [];
       rows.push(row);
       groups.set(key, rows);
     });
     return Array.from(groups.entries());
-  }, [generalStockRows]);
+  }, [filteredGeneralStockRows]);
 
   const generalStockTotal = useMemo(() => {
-    return generalStockRows.reduce((sum, row) => sum + makeNumber(row.current_stock), 0);
-  }, [generalStockRows]);
+    return filteredGeneralStockRows.reduce((sum, row) => sum + makeNumber(row.current_stock), 0);
+  }, [filteredGeneralStockRows]);
 
   const tooltipRow = tooltipState
     ? generalStockRows.find((r) => r.line_id === tooltipState.lineId) ?? null
@@ -911,7 +934,7 @@ const MaterialAndGeneralStockPage: React.FC = () => {
             <div className="flex items-center gap-3 text-sm">
               <span className="text-default-500 dark:text-gray-400">
                 {activeTab === "general"
-                  ? `${generalStockRows.length} general items`
+                  ? `${filteredGeneralStockRows.length} general items`
                   : `${materials.length} materials`}
               </span>
               {activeTab === "general" ? (
@@ -971,17 +994,13 @@ const MaterialAndGeneralStockPage: React.FC = () => {
               ))}
             </div>
 
-            {activeTab !== "general" && (
-              <>
-                <span className="text-default-300 dark:text-gray-600">|</span>
-                <MonthNavigator
-                  selectedMonth={selectedMonth}
-                  onChange={setSelectedMonth}
-                  beforeChange={handleBeforeMonthChange}
-                />
-                <span className="text-default-300 dark:text-gray-600">|</span>
-              </>
-            )}
+            <span className="text-default-300 dark:text-gray-600">|</span>
+            <MonthNavigator
+              selectedMonth={selectedMonth}
+              onChange={setSelectedMonth}
+              beforeChange={handleBeforeMonthChange}
+            />
+            <span className="text-default-300 dark:text-gray-600">|</span>
 
             <Button
               color="sky"
@@ -1090,6 +1109,33 @@ const MaterialAndGeneralStockPage: React.FC = () => {
                 </span>
               )}
             </div>
+          </div>
+
+          <div className="relative max-w-sm">
+            <IconSearch
+              size={16}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-500"
+            />
+            <input
+              type="text"
+              value={generalSearchQuery}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                setGeneralSearchQuery(event.target.value)
+              }
+              placeholder="Search category, item, supplier..."
+              className="h-9 w-full rounded-lg border border-default-300 bg-white pl-9 pr-9 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+            />
+            {generalSearchQuery && (
+              <button
+                type="button"
+                onClick={() => setGeneralSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-default-400 hover:bg-default-100 hover:text-default-700 dark:text-gray-500 dark:hover:bg-gray-600 dark:hover:text-gray-200"
+                title="Clear search"
+                aria-label="Clear search"
+              >
+                <IconX size={14} />
+              </button>
+            )}
           </div>
 
           <div className="overflow-hidden rounded-lg border border-default-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
@@ -1207,11 +1253,15 @@ const MaterialAndGeneralStockPage: React.FC = () => {
                   );
                 })}
 
-                {generalStockRows.length === 0 && (
+                {filteredGeneralStockRows.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-4 py-12 text-center text-default-500 dark:text-gray-400">
                       <IconPackage size={32} className="mx-auto mb-2 text-default-300 dark:text-gray-600" />
-                      <p>No General stock rows found.</p>
+                      <p>
+                        {generalSearchQuery.trim()
+                          ? "No General stock rows match your search."
+                          : "No General stock rows found."}
+                      </p>
                     </td>
                   </tr>
                 )}
