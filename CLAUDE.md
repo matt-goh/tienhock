@@ -106,7 +106,7 @@ This is a comprehensive ERP system supporting three companies:
 - `production_worker_orders` - scope (BH_PACKING/MEE_PACKING), worker_id (FK staffs), sort_order, updated_at, updated_by (shared drag-and-drop worker card order for Production Entry worker grids)
 - `product_pay_codes` - id, product_id, pay_code_id, created_at, updated_at
 - `stock_adjustments` - id, entry_date, product_id, adjustment_type, quantity, reason, created_at, created_by, reference
-- `stock_opening_balances` - id, product_id, balance, effective_date, created_at, updated_at, created_by, notes
+- `stock_opening_balances` - id, product_id, balance, effective_date, created_at, updated_at, created_by, notes (unique: product_id, effective_date). One opening balance per product. `effective_date` is an anchor: `balance` represents stock as of the START of that date. The Stock Movement / closing-stock calculations seed from the anchor and sum production + sales + adjustments on/after `effective_date`, ignoring everything before it. Defaults to the stock system start date (2026-01-01) when not set.
 - `taxes` - name, rate
 
 **Materials (Ingredients/Raw/Packing):**
