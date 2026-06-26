@@ -3834,19 +3834,17 @@ const SalaryReportPage: React.FC = () => {
               )}
               <span className="text-default-300 dark:text-gray-600">|</span>
               <div className="flex items-center gap-2">
-                <YearNavigator
-                  selectedYear={currentYear}
-                  onChange={handleYearChange}
-                  showGoToCurrentButton={false}
-                />
-                {periodType === 'monthly' && activeTab !== 5 && (
+                {periodType === 'monthly' && activeTab !== 5 ? (
                   <MonthNavigator
                     selectedMonth={selectedMonth}
                     onChange={setSelectedMonth}
                     showGoToCurrentButton={false}
-                    formatDisplay={(date) =>
-                      date.toLocaleDateString("en-MY", { month: "long" })
-                    }
+                  />
+                ) : (
+                  <YearNavigator
+                    selectedYear={currentYear}
+                    onChange={handleYearChange}
+                    showGoToCurrentButton={false}
                   />
                 )}
               </div>
@@ -4186,19 +4184,17 @@ const SalaryReportPage: React.FC = () => {
                 </div>
               )}
               <div className="flex items-center gap-2">
-                <YearNavigator
-                  selectedYear={currentYear}
-                  onChange={handleYearChange}
-                  showGoToCurrentButton={false}
-                />
-                {periodType === 'monthly' && activeTab !== 5 && (
+                {periodType === 'monthly' && activeTab !== 5 ? (
                   <MonthNavigator
                     selectedMonth={selectedMonth}
                     onChange={setSelectedMonth}
                     showGoToCurrentButton={false}
-                    formatDisplay={(date) =>
-                      date.toLocaleDateString("en-MY", { month: "long" })
-                    }
+                  />
+                ) : (
+                  <YearNavigator
+                    selectedYear={currentYear}
+                    onChange={handleYearChange}
+                    showGoToCurrentButton={false}
                   />
                 )}
               </div>
