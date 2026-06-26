@@ -20,6 +20,10 @@ import {
 } from "@tabler/icons-react";
 import MonthNavigator from "../../components/MonthNavigator";
 import clsx from "clsx";
+import {
+  OTH_PRODUCTION_IDS,
+  isOthProductionProduct,
+} from "../../config/othProductionProducts";
 
 const FAVORITES_STORAGE_KEY = "stock-product-favorites";
 
@@ -82,14 +86,39 @@ const ProductStockMovementPage: React.FC = () => {
       window.removeEventListener("favorites-changed", handleFavoritesChange);
   }, []);
 
-  // Get favorite products (only BH and MEE types)
+  // Get favorite products (BH, MEE, and the whitelisted OTH stock products)
   const favoriteProducts = useMemo(() => {
     return products.filter(
       (product) =>
         favorites.has(product.id) &&
-        (product.type === "BH" || product.type === "MEE")
+        (product.type === "BH" ||
+          product.type === "MEE" ||
+          isOthProductionProduct(product.id))
     ) as StockProduct[];
   }, [products, favorites]);
+
+  // Selectable products grouped by category, for the empty-state picker
+  const selectableProductGroups = useMemo(() => {
+    const bh: StockProduct[] = [];
+    const mee: StockProduct[] = [];
+    const oth: StockProduct[] = [];
+
+    (products as StockProduct[]).forEach((product) => {
+      if (product.type === "BH") bh.push(product);
+      else if (product.type === "MEE") mee.push(product);
+      else if (isOthProductionProduct(product.id)) oth.push(product);
+    });
+
+    oth.sort(
+      (a, b) => OTH_PRODUCTION_IDS.indexOf(a.id) - OTH_PRODUCTION_IDS.indexOf(b.id)
+    );
+
+    return [
+      { label: "Bihun Products", products: bh },
+      { label: "Mee Products", products: mee },
+      { label: "Other Products", products: oth },
+    ].filter((group) => group.products.length > 0);
+  }, [products]);
 
   // Format date to YYYY-MM-DD in local timezone (not UTC)
   const formatDateLocal = (date: Date): string => {
@@ -219,7 +248,10 @@ const ProductStockMovementPage: React.FC = () => {
               label="Product"
               value={selectedProductId}
               onChange={setSelectedProductId}
-              productTypes={["BH", "MEE"]}
+              productTypes={["BH", "MEE", "OTH"]}
+              productFilter={(product) =>
+                product.type !== "OTH" || isOthProductionProduct(product.id)
+              }
               showCategories={true}
               required
             />
@@ -553,11 +585,40 @@ const ProductStockMovementPage: React.FC = () => {
 
       {/* Stock Movement Table */}
       {!selectedProductId ? (
-        <div className="rounded-lg border border-dashed border-default-300 dark:border-gray-600 p-12 text-center">
-          <IconPackage className="mx-auto h-12 w-12 text-default-300 dark:text-gray-600" />
-          <p className="mt-4 text-default-500 dark:text-gray-400">
-            Please select a product to view stock movements
-          </p>
+        <div className="rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-sm">
+          <div className="mb-4 flex items-center gap-2">
+            <IconPackage className="h-5 w-5 text-default-400 dark:text-gray-500" />
+            <p className="text-sm text-default-500 dark:text-gray-400">
+              Select a product to view its stock movements
+            </p>
+          </div>
+          {selectableProductGroups.length > 0 ? (
+            <div className="space-y-4">
+              {selectableProductGroups.map((group) => (
+                <div key={group.label}>
+                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-default-500 dark:text-gray-400">
+                    {group.label}
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {group.products.map((product) => (
+                      <button
+                        key={product.id}
+                        onClick={() => setSelectedProductId(product.id)}
+                        title={product.description}
+                        className="rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm font-medium text-default-700 dark:text-gray-200 transition-colors hover:border-sky-500 hover:bg-sky-50 dark:hover:bg-sky-900/30 hover:text-sky-700 dark:hover:text-sky-300"
+                      >
+                        {product.id}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-default-400 dark:text-gray-500">
+              No products available.
+            </p>
+          )}
         </div>
       ) : viewType === "custom" && (!customStartDate || !customEndDate) ? (
         <div className="rounded-lg border border-dashed border-default-300 dark:border-gray-600 p-12 text-center">

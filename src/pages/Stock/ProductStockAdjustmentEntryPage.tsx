@@ -19,8 +19,9 @@ import {
 import clsx from "clsx";
 import Button from "../../components/Button";
 import MonthNavigator from "../../components/MonthNavigator";
+import { OTH_PRODUCTION_IDS } from "../../config/othProductionProducts";
 
-type ProductTab = "BH" | "MEE";
+type ProductTab = "BH" | "MEE" | "OTH";
 
 const ProductStockAdjustmentEntryPage: React.FC = () => {
   // Month selection state
@@ -61,8 +62,22 @@ const ProductStockAdjustmentEntryPage: React.FC = () => {
     return products.filter((p) => p.type === "MEE") as StockProduct[];
   }, [products]);
 
+  const othProducts = useMemo(() => {
+    return (products.filter((p) =>
+      OTH_PRODUCTION_IDS.includes(p.id)
+    ) as StockProduct[]).sort(
+      (a, b) =>
+        OTH_PRODUCTION_IDS.indexOf(a.id) - OTH_PRODUCTION_IDS.indexOf(b.id)
+    );
+  }, [products]);
+
   // Get current tab products
-  const currentProducts = activeTab === "BH" ? bhProducts : meeProducts;
+  const currentProducts =
+    activeTab === "BH"
+      ? bhProducts
+      : activeTab === "MEE"
+      ? meeProducts
+      : othProducts;
 
   // Format month for API calls (YYYY-MM)
   const monthString = useMemo(() => {
@@ -511,7 +526,7 @@ const ProductStockAdjustmentEntryPage: React.FC = () => {
               {/* Tabs */}
               <div className="border-b border-default-200 dark:border-gray-700">
                 <div className="flex">
-                  {(["BH", "MEE"] as ProductTab[]).map((tab) => (
+                  {(["BH", "MEE", "OTH"] as ProductTab[]).map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
@@ -522,9 +537,18 @@ const ProductStockAdjustmentEntryPage: React.FC = () => {
                           : "border-transparent text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
                       )}
                     >
-                      {tab === "BH" ? "Bihun" : "Mee"} Products
+                      {tab === "BH"
+                        ? "Bihun"
+                        : tab === "MEE"
+                        ? "Mee"
+                        : "Other"}{" "}
+                      Products
                       <span className="ml-2 rounded-full bg-default-200 dark:bg-gray-700 px-2 py-0.5 text-xs">
-                        {tab === "BH" ? bhProducts.length : meeProducts.length}
+                        {tab === "BH"
+                          ? bhProducts.length
+                          : tab === "MEE"
+                          ? meeProducts.length
+                          : othProducts.length}
                       </span>
                     </button>
                   ))}
