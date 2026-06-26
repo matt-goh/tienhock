@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-26",
+    ms: "Halaman Pelarasan Stok kini mempunyai tab baharu \"Other Products\" yang membolehkan anda merekod pelarasan ADJ+/ADJ- untuk Sisa Mi, Sisa Mihun, Empty Bag dan Empty Bag (Small), selain produk Bihun dan Mee yang sedia ada. Keempat-empat produk ini juga kini boleh dipilih dalam halaman Pergerakan Stok.",
+    en: "The Stock Adjustments page now has a new \"Other Products\" tab that lets you record ADJ+/ADJ- adjustments for Sisa Mi, Sisa Mihun, Empty Bag and Empty Bag (Small), in addition to the existing Bihun and Mee products. These four products can now also be selected on the Stock Movement page.",
+  },
+  {
+    date: "2026-06-26",
     ms: "Dalam menu navigasi yang dipaparkan sebagai grid berbilang lajur (seperti Catalogue dan Payroll), pintasan akses pantas (cth. \"New Entry\") kini muncul sebagai butang \"+\" terus di dalam baris item, bukan lagi popover yang terbuka ke kanan dan menutup item di lajur sebelah. Klik \"+\" untuk terus ke halaman cipta baharu. Menu satu lajur kekal seperti biasa.",
     en: "In navigation menus shown as a multi-column grid (like Catalogue and Payroll), the quick-access shortcuts (e.g. \"New Entry\") now appear as a \"+\" button right inside the item row, instead of a popover that opened to the right and covered the item in the next column. Click the \"+\" to go straight to the create page. Single-column menus are unchanged.",
   },
