@@ -1,7 +1,7 @@
 // src/components/Navbar/NavbarDropdown.tsx
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Transition } from "@headlessui/react";
 import {
   IconChevronRight,
@@ -72,6 +72,7 @@ export default function NavbarDropdown({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
+  const navigate = useNavigate();
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 });
@@ -197,12 +198,18 @@ export default function NavbarDropdown({
     const popoverOptions = getPopoverOptions(item);
     const hasPopover = popoverOptions.length > 0;
     const isHovered = hoveredItem === item.name;
+    // In the grid (mega menu) layout, a flyout to the right would land on the
+    // adjacent column and be unreachable. There, render the quick-action(s)
+    // inline in the row instead. Lists keep the right-side flyout.
+    const useInlineQuickActions = isMegaMenu && hasPopover;
 
     return (
       <div
         key={item.path}
         ref={(el) => { itemRefs.current[item.name] = el; }}
-        onMouseEnter={() => hasPopover && handleItemMouseEnter(item.name)}
+        onMouseEnter={() =>
+          !isMegaMenu && hasPopover && handleItemMouseEnter(item.name)
+        }
         onMouseLeave={handleItemMouseLeave}
         className="relative"
       >
@@ -236,7 +243,43 @@ export default function NavbarDropdown({
                 )}
               </button>
             )}
-            {hasPopover ? (
+            {useInlineQuickActions ? (
+              <button
+                type="button"
+                title={
+                  popoverOptions.length === 1
+                    ? popoverOptions[0].name
+                    : "Quick create"
+                }
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (popoverOptions.length === 1) {
+                    // Single shortcut: go straight to the create page.
+                    onItemClick();
+                    navigate(popoverOptions[0].path);
+                    return;
+                  }
+                  // Multiple shortcuts: toggle a small menu below the button.
+                  // Click-controlled so it can't be swapped out by hovering a
+                  // sibling, and opening downward never covers the next column.
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const MENU_WIDTH = 200;
+                  setPopoverPosition({
+                    top: rect.bottom + 4,
+                    left: Math.min(rect.left, window.innerWidth - MENU_WIDTH - 8),
+                  });
+                  setHoveredItem((cur) => (cur === item.name ? null : item.name));
+                }}
+                className={`p-0.5 rounded transition-colors ${
+                  isHovered
+                    ? "bg-sky-100 dark:bg-sky-900/40 text-sky-600 dark:text-sky-300"
+                    : "text-sky-500 dark:text-sky-400 hover:bg-sky-100 dark:hover:bg-sky-900/40"
+                }`}
+              >
+                <IconPlus size={16} />
+              </button>
+            ) : hasPopover ? (
               <IconChevronRight
                 size={14}
                 className={`transition-colors ${isHovered ? "text-sky-500 dark:text-sky-400" : "text-default-400 dark:text-gray-500"}`}
