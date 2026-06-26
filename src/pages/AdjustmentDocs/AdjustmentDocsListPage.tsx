@@ -16,6 +16,12 @@ import {
   IconPrinter,
   IconDownload,
 } from "@tabler/icons-react";
+import {
+  Dialog,
+  DialogPanel,
+  Transition,
+  TransitionChild,
+} from "@headlessui/react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import MonthNavigator from "../../components/MonthNavigator";
@@ -67,6 +73,13 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitProgress, setSubmitProgress] = useState<{
+    current: number;
+    total: number;
+    success: number;
+    failed: number;
+    currentId: string;
+  } | null>(null);
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
   const [batchPrintDocs, setBatchPrintDocs] = useState<
     AdjustmentDocument[] | null
@@ -201,6 +214,13 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
     const targets = eligibleSelectedDocs;
     if (targets.length === 0) return;
     setIsSubmitting(true);
+    setSubmitProgress({
+      current: 0,
+      total: targets.length,
+      success: 0,
+      failed: 0,
+      currentId: targets[0].id,
+    });
     const toastId = toast.loading(
       `Submitting ${targets.length} document(s) to MyInvois...`
     );
@@ -208,6 +228,13 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
     let failed = 0;
     for (let i = 0; i < targets.length; i++) {
       const d = targets[i];
+      setSubmitProgress({
+        current: i + 1,
+        total: targets.length,
+        success,
+        failed,
+        currentId: d.id,
+      });
       toast.loading(
         `Submitting ${i + 1}/${targets.length}: ${d.id}...`,
         { id: toastId }
@@ -236,6 +263,7 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
       );
     }
     setIsSubmitting(false);
+    setSubmitProgress(null);
     setSelectedIds(new Set());
     fetchDocs();
   }, [eligibleSelectedDocs, paths.apiBase, fetchDocs]);
@@ -726,6 +754,93 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
         confirmButtonText={isSubmitting ? "Submitting..." : "Submit"}
         variant="default"
       />
+
+      {/* Blocking submission progress overlay — prevents any interaction/navigation while a batch e-invoice submission is in flight */}
+      <Transition appear show={isSubmitting} as={React.Fragment}>
+        <Dialog
+          as="div"
+          className="fixed inset-0 z-[60] overflow-y-auto"
+          onClose={() => {
+            /* non-dismissible while submitting */
+          }}
+        >
+          <div className="min-h-screen px-4 text-center">
+            <TransitionChild
+              as={React.Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0"
+              enterTo="opacity-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100"
+              leaveTo="opacity-0"
+            >
+              <div className="fixed inset-0 bg-black/40 dark:bg-black/60" />
+            </TransitionChild>
+
+            <span
+              className="inline-block h-screen align-middle"
+              aria-hidden="true"
+            >
+              &#8203;
+            </span>
+
+            <TransitionChild
+              as={React.Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 scale-95"
+              enterTo="opacity-100 scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 scale-100"
+              leaveTo="opacity-0 scale-95"
+            >
+              <DialogPanel className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-center align-middle transition-all transform bg-white dark:bg-gray-800 border border-transparent dark:border-gray-700 shadow-xl rounded-2xl">
+                <div className="flex justify-center mb-4">
+                  <LoadingSpinner />
+                </div>
+                <h3 className="text-lg font-medium leading-6 text-default-900 dark:text-gray-100">
+                  Submitting e-Invoices to MyInvois
+                </h3>
+                <p className="mt-2 text-sm text-default-500 dark:text-gray-400">
+                  Please don't close or navigate away from this page. Submitting{" "}
+                  {submitProgress?.current ?? 0} of {submitProgress?.total ?? 0}
+                  …
+                </p>
+                {submitProgress && (
+                  <>
+                    <p className="mt-1 text-xs font-medium text-default-700 dark:text-gray-300 truncate">
+                      {submitProgress.currentId}
+                    </p>
+                    <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-default-100 dark:bg-gray-700">
+                      <div
+                        className="h-full rounded-full bg-sky-500 transition-all duration-300"
+                        style={{
+                          width: `${
+                            submitProgress.total > 0
+                              ? (submitProgress.current /
+                                  submitProgress.total) *
+                                100
+                              : 0
+                          }%`,
+                        }}
+                      />
+                    </div>
+                    <div className="mt-3 flex justify-center gap-4 text-xs">
+                      <span className="text-emerald-600 dark:text-emerald-400">
+                        {submitProgress.success} succeeded
+                      </span>
+                      {submitProgress.failed > 0 && (
+                        <span className="text-rose-600 dark:text-rose-400">
+                          {submitProgress.failed} failed
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
+              </DialogPanel>
+            </TransitionChild>
+          </div>
+        </Dialog>
+      </Transition>
 
       {batchPrintDocs && (
         <AdjustmentDocPrintOverlay
