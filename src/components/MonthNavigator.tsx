@@ -1,11 +1,26 @@
 // src/components/MonthNavigator.tsx
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   IconChevronLeft,
   IconChevronRight,
   IconChevronsRight,
 } from "@tabler/icons-react";
 import clsx from "clsx";
+
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 
 interface MonthNavigatorProps {
   /** The currently selected month */
@@ -66,39 +81,6 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
     );
   }, [selectedMonth, minDate]);
 
-  // Check if the full month is selected (dateRange covers entire month)
-  const isFullMonthSelected = useMemo(() => {
-    if (!dateRange) return true; // If no dateRange provided, assume full month
-
-    const monthStart = new Date(
-      selectedMonth.getFullYear(),
-      selectedMonth.getMonth(),
-      1
-    );
-    monthStart.setHours(0, 0, 0, 0);
-
-    const monthEnd = new Date(
-      selectedMonth.getFullYear(),
-      selectedMonth.getMonth() + 1,
-      0
-    );
-    monthEnd.setHours(23, 59, 59, 999);
-
-    // Check if dateRange start is the first day of the month
-    const startMatches =
-      dateRange.start.getFullYear() === monthStart.getFullYear() &&
-      dateRange.start.getMonth() === monthStart.getMonth() &&
-      dateRange.start.getDate() === monthStart.getDate();
-
-    // Check if dateRange end is the last day of the month
-    const endMatches =
-      dateRange.end.getFullYear() === monthEnd.getFullYear() &&
-      dateRange.end.getMonth() === monthEnd.getMonth() &&
-      dateRange.end.getDate() === monthEnd.getDate();
-
-    return startMatches && endMatches;
-  }, [dateRange, selectedMonth]);
-
   // Default format function
   const defaultFormatDisplay = (date: Date): string => {
     return date.toLocaleDateString("en-MY", {
@@ -133,26 +115,80 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
     onChange(new Date());
   };
 
-  // Handle month display click - prioritizes selecting full month, then navigating to current month
+  // Dropdown month picker state
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [viewYear, setViewYear] = useState(selectedMonth.getFullYear());
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  // Reset the viewed year to the selected month's year whenever the picker opens
+  useEffect(() => {
+    if (isPickerOpen) {
+      setViewYear(selectedMonth.getFullYear());
+    }
+  }, [isPickerOpen, selectedMonth]);
+
+  // Close the picker when clicking outside or pressing Escape
+  useEffect(() => {
+    if (!isPickerOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
+        setIsPickerOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsPickerOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isPickerOpen]);
+
+  // Toggle the dropdown month picker
   const handleMonthDisplayClick = () => {
+    setIsPickerOpen((prev) => !prev);
+  };
+
+  // Determine if a given year/month is disabled in the picker
+  const now = new Date();
+  const isMonthOptionDisabled = (year: number, month: number): boolean => {
+    if (
+      !allowFutureMonths &&
+      (year > now.getFullYear() ||
+        (year === now.getFullYear() && month > now.getMonth()))
+    ) {
+      return true;
+    }
+    if (
+      minDate &&
+      (year < minDate.getFullYear() ||
+        (year === minDate.getFullYear() && month < minDate.getMonth()))
+    ) {
+      return true;
+    }
+    return false;
+  };
+
+  // Select a month from the dropdown
+  const handleSelectMonth = (year: number, month: number) => {
+    if (isMonthOptionDisabled(year, month)) return;
     // Check beforeChange callback if provided
     if (beforeChange && !beforeChange()) {
       return;
     }
-
-    // If not full month selected, select the full month first
-    if (!isFullMonthSelected) {
-      const fullMonth = new Date(
-        selectedMonth.getFullYear(),
-        selectedMonth.getMonth(),
-        1
-      );
-      onChange(fullMonth);
-    } else if (!isCurrentMonth) {
-      // If full month is selected but not current month, go to current month
-      onChange(new Date());
-    }
+    onChange(new Date(year, month, 1));
+    setIsPickerOpen(false);
   };
+
+  // Year navigation within the dropdown
+  const isPrevYearDisabled = minDate
+    ? viewYear <= minDate.getFullYear()
+    : false;
+  const isNextYearDisabled = !allowFutureMonths
+    ? viewYear >= now.getFullYear()
+    : false;
 
   // Size-based classes
   const buttonClasses = clsx(
@@ -196,30 +232,95 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
           <IconChevronLeft size={iconSize} />
         </button>
 
-        {/* Month Display - Clickable when full month is not selected OR not on current month */}
-        {isFullMonthSelected && isCurrentMonth ? (
-          <div className={clsx(displayClasses, "bg-default-50 dark:bg-gray-900/50")}>
-            {displayFormatter(selectedMonth)}
-          </div>
-        ) : (
+        {/* Month Display - Click to open a dropdown to pick any (previous) month */}
+        <div className="relative flex-1" ref={pickerRef}>
           <button
+            type="button"
             onClick={handleMonthDisplayClick}
             className={clsx(
               displayClasses,
-              "bg-default-50 dark:bg-gray-900/50 hover:bg-sky-50 dark:hover:bg-sky-900/30 hover:border-sky-300 dark:hover:border-sky-700 hover:text-sky-700 dark:hover:text-sky-300 cursor-pointer"
+              "w-full bg-default-50 dark:bg-gray-900/50 hover:bg-sky-50 dark:hover:bg-sky-900/30 hover:border-sky-300 dark:hover:border-sky-700 hover:text-sky-700 dark:hover:text-sky-300 cursor-pointer"
             )}
-            title={
-              !isFullMonthSelected
-                ? "Click to select full month"
-                : "Click to go to current month"
-            }
-            aria-label={
-              !isFullMonthSelected ? "Select full month" : "Go to current month"
-            }
+            title="Click to select a month"
+            aria-label="Select a month"
+            aria-haspopup="true"
+            aria-expanded={isPickerOpen}
           >
             {displayFormatter(selectedMonth)}
           </button>
-        )}
+
+          {isPickerOpen && (
+            <div
+              className={clsx(
+                "absolute left-1/2 z-50 mt-2 -translate-x-1/2 rounded-lg border border-default-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-lg p-3",
+                size === "sm" ? "w-56" : "w-64"
+              )}
+            >
+              {/* Year navigation */}
+              <div className="flex items-center justify-between mb-2">
+                <button
+                  type="button"
+                  onClick={() => setViewYear((y) => y - 1)}
+                  disabled={isPrevYearDisabled}
+                  className={clsx(
+                    "p-1 rounded-md transition-colors",
+                    isPrevYearDisabled
+                      ? "cursor-not-allowed text-default-300 dark:text-gray-600"
+                      : "text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700"
+                  )}
+                  aria-label="Previous year"
+                >
+                  <IconChevronLeft size={18} />
+                </button>
+                <span className="text-sm font-semibold text-default-900 dark:text-gray-100">
+                  {viewYear}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setViewYear((y) => y + 1)}
+                  disabled={isNextYearDisabled}
+                  className={clsx(
+                    "p-1 rounded-md transition-colors",
+                    isNextYearDisabled
+                      ? "cursor-not-allowed text-default-300 dark:text-gray-600"
+                      : "text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700"
+                  )}
+                  aria-label="Next year"
+                >
+                  <IconChevronRight size={18} />
+                </button>
+              </div>
+
+              {/* Month grid */}
+              <div className="grid grid-cols-3 gap-1.5">
+                {MONTH_LABELS.map((monthLabel, monthIndex) => {
+                  const disabled = isMonthOptionDisabled(viewYear, monthIndex);
+                  const isSelected =
+                    selectedMonth.getFullYear() === viewYear &&
+                    selectedMonth.getMonth() === monthIndex;
+                  return (
+                    <button
+                      key={monthLabel}
+                      type="button"
+                      onClick={() => handleSelectMonth(viewYear, monthIndex)}
+                      disabled={disabled}
+                      className={clsx(
+                        "py-1.5 text-sm rounded-md transition-colors",
+                        disabled
+                          ? "cursor-not-allowed text-default-300 dark:text-gray-600"
+                          : isSelected
+                          ? "bg-sky-500 text-white hover:bg-sky-600"
+                          : "text-default-700 dark:text-gray-200 hover:bg-sky-50 dark:hover:bg-sky-900/30"
+                      )}
+                    >
+                      {monthLabel}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Next Month Button */}
         <button
