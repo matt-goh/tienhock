@@ -1,5 +1,5 @@
 // src/components/MonthNavigator.tsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   IconChevronLeft,
   IconChevronRight,
@@ -47,6 +47,8 @@ interface MonthNavigatorProps {
   fixedHeight?: boolean;
   /** Optional minimum navigable date (prevents navigation before this month) */
   minDate?: Date;
+  /** Dropdown placement relative to the month button (default: bottom-center) */
+  pickerPlacement?: "bottom-center" | "bottom-right" | "bottom-left-button";
 }
 
 const MonthNavigator: React.FC<MonthNavigatorProps> = ({
@@ -62,6 +64,7 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
   dateRange,
   fixedHeight = true,
   minDate,
+  pickerPlacement = "bottom-center",
 }) => {
   // Check if current month is the current calendar month
   const isCurrentMonth = useMemo(() => {
@@ -119,6 +122,8 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [viewYear, setViewYear] = useState(selectedMonth.getFullYear());
   const pickerRef = useRef<HTMLDivElement>(null);
+  const navigatorRowRef = useRef<HTMLDivElement>(null);
+  const [pickerLeftOffset, setPickerLeftOffset] = useState<number>(0);
 
   // Reset the viewed year to the selected month's year whenever the picker opens
   useEffect(() => {
@@ -126,6 +131,23 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
       setViewYear(selectedMonth.getFullYear());
     }
   }, [isPickerOpen, selectedMonth]);
+
+  useLayoutEffect(() => {
+    if (
+      !isPickerOpen ||
+      pickerPlacement !== "bottom-left-button" ||
+      !navigatorRowRef.current ||
+      !pickerRef.current
+    ) {
+      setPickerLeftOffset(0);
+      return;
+    }
+
+    const navigatorRowRect: DOMRect = navigatorRowRef.current.getBoundingClientRect();
+    const pickerAnchorRect: DOMRect = pickerRef.current.getBoundingClientRect();
+
+    setPickerLeftOffset(navigatorRowRect.left - pickerAnchorRect.left);
+  }, [isPickerOpen, pickerPlacement, selectedMonth, size, showGoToCurrentButton]);
 
   // Close the picker when clicking outside or pressing Escape
   useEffect(() => {
@@ -204,6 +226,16 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
     size === "sm" ? "px-3 text-xs" : "px-4 text-sm",
     fixedHeight ? (size === "sm" ? "h-[34px]" : "h-[40px]") : (size === "sm" ? "py-1.5" : "py-2")
   );
+  const pickerPlacementClasses = clsx(
+    pickerPlacement === "bottom-center" && "left-1/2 -translate-x-1/2",
+    (pickerPlacement === "bottom-right" ||
+      pickerPlacement === "bottom-left-button") &&
+      "left-0"
+  );
+  const pickerPlacementStyle: React.CSSProperties | undefined =
+    pickerPlacement === "bottom-left-button"
+      ? { transform: `translateX(${pickerLeftOffset}px)` }
+      : undefined;
 
   // Determine if next button should be disabled
   const isNextDisabled = !allowFutureMonths && isCurrentMonth;
@@ -215,7 +247,7 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
           {label}
         </label>
       )}
-      <div className="flex items-center gap-2">
+      <div ref={navigatorRowRef} className="flex items-center gap-2">
         {/* Previous Month Button */}
         <button
           onClick={() => navigateMonth("prev")}
@@ -252,9 +284,11 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
           {isPickerOpen && (
             <div
               className={clsx(
-                "absolute left-1/2 z-50 mt-2 -translate-x-1/2 rounded-lg border border-default-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-lg p-3",
+                "absolute z-50 mt-2 rounded-lg border border-default-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-lg p-3",
+                pickerPlacementClasses,
                 size === "sm" ? "w-56" : "w-64"
               )}
+              style={pickerPlacementStyle}
             >
               {/* Year navigation */}
               <div className="flex items-center justify-between mb-2">

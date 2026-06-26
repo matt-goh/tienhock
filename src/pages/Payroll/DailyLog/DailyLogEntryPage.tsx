@@ -45,6 +45,7 @@ import { IconChevronDown, IconCheck, IconRefresh } from "@tabler/icons-react";
 import { useUnsavedChanges } from "../../../hooks/useUnsavedChanges";
 import SafeLink from "../../../components/SafeLink";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
+import TimeNavigator, { type TimeRange } from "../../../components/TimeNavigator";
 
 interface EmployeeWithHours extends Employee {
   rowKey?: string; // Unique key for each row
@@ -76,6 +77,19 @@ interface DailyLogEntryPageProps {
 
 type LeaveType = "cuti_umum" | "cuti_sakit" | "cuti_tahunan" | "cuti_rawatan";
 type BulkLeaveTypeValue = LeaveType | "mixed";
+
+const parseLocalDateString = (dateString: string): Date => {
+  const [yearString, monthString, dayString] = dateString.split("-");
+  const year: number = Number(yearString);
+  const month: number = Number(monthString);
+  const day: number = Number(dayString);
+
+  if (!year || !month || !day) {
+    return new Date();
+  }
+
+  return new Date(year, month - 1, day);
+};
 
 interface LeaveEntry {
   selected: boolean;
@@ -753,16 +767,33 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     return allSameType ? firstLeaveType : "mixed";
   }, [leaveEmployees, selectedLeaveEmployeesForBulk]);
 
+  const selectedDateRange = useMemo<TimeRange>(() => {
+    const selectedDate: Date = parseLocalDateString(formData.logDate);
+
+    return {
+      start: selectedDate,
+      end: new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate(),
+        23,
+        59,
+        59,
+        999
+      ),
+    };
+  }, [formData.logDate]);
+
   // Update day type and hours when date changes
-  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newDate = new Date(e.target.value);
+  const handleDateChange = (newDateString: string): void => {
+    const newDate = parseLocalDateString(newDateString);
     const newDayType = determineDayType(newDate);
-    const newDefaultHours = getDefaultHours(e.target.value);
+    const newDefaultHours = getDefaultHours(newDateString);
     const oldDefaultHours = getDefaultHours(formData.logDate);
 
     setFormData({
       ...formData,
-      logDate: e.target.value,
+      logDate: newDateString,
       dayType: newDayType,
     });
 
@@ -787,6 +818,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         };
       });
     }
+  };
+
+  const handleTimeNavigatorChange = (range: TimeRange): void => {
+    handleDateChange(format(range.start, "yyyy-MM-dd"));
   };
 
   // Function to fetch leave balances for multiple employees in batch
@@ -3019,17 +3054,16 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         <div className="mb-4 flex flex-wrap items-end gap-4">
           {/* Date */}
           <div>
-            <label htmlFor="logDate" className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
+            <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
               Date
             </label>
-            <input
-              id="logDate"
-              name="logDate"
-              type="date"
-              value={formData.logDate}
-              onChange={handleDateChange}
-              required
-              className="px-3 py-2 text-sm border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+            <TimeNavigator
+              range={selectedDateRange}
+              onChange={handleTimeNavigatorChange}
+              modes={["day"]}
+              presets={false}
+              allowFuture
+              size="sm"
             />
           </div>
 

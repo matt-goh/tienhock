@@ -26,8 +26,7 @@ import {
   FormInput,
   FormListbox,
 } from "../../../components/FormComponents";
-import YearNavigator from "../../../components/YearNavigator";
-import MonthNavigator from "../../../components/MonthNavigator";
+import TimeNavigator from "../../../components/TimeNavigator";
 import { api } from "../../../routes/utils/api";
 import { getMonthName } from "../../../utils/payroll/payrollUtils";
 import toast from "react-hot-toast";
@@ -287,11 +286,19 @@ const GTMidMonthPayrollPage: React.FC = () => {
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
 
-  // Create Date object for MonthNavigator
-  const selectedMonth = useMemo(
-    () => new Date(currentYear, currentMonth - 1, 1),
+  // Month range for the TimeNavigator (the page always targets one month).
+  const monthRange = useMemo(
+    () => ({
+      start: new Date(currentYear, currentMonth - 1, 1),
+      end: new Date(currentYear, currentMonth, 0, 23, 59, 59, 999),
+    }),
     [currentYear, currentMonth]
   );
+
+  const handleTimeNavigatorChange = (range: { start: Date; end: Date }) => {
+    setCurrentYear(range.start.getFullYear());
+    setCurrentMonth(range.start.getMonth() + 1);
+  };
 
   // Load payrolls on mount and filter changes
   useEffect(() => {
@@ -402,18 +409,11 @@ const GTMidMonthPayrollPage: React.FC = () => {
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm p-4">
         <div className="flex flex-col md:flex-row gap-4 items-end justify-between">
           <div className="flex gap-4 items-end">
-            <YearNavigator
-              selectedYear={currentYear}
-              onChange={setCurrentYear}
-              showGoToCurrentButton={false}
-            />
-            <MonthNavigator
-              selectedMonth={selectedMonth}
-              onChange={(date) => {
-                setCurrentYear(date.getFullYear());
-                setCurrentMonth(date.getMonth() + 1);
-              }}
-              showGoToCurrentButton={false}
+            <TimeNavigator
+              range={monthRange}
+              onChange={handleTimeNavigatorChange}
+              modes={["month"]}
+              presets={false}
             />
           </div>
           <div className="text-sm text-default-600 dark:text-gray-300">

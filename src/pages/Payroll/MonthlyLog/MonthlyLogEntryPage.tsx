@@ -20,8 +20,7 @@ import {
   getContextLinkedPayCodes,
 } from "../../../configs/payrollJobConfigs";
 import StyledListbox from "../../../components/StyledListbox";
-import MonthNavigator from "../../../components/MonthNavigator";
-import YearNavigator from "../../../components/YearNavigator";
+import TimeNavigator from "../../../components/TimeNavigator";
 import { Link } from "react-router-dom";
 import ManageActivitiesModal, {
   ActivityItem,
@@ -278,25 +277,18 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     [],
   );
 
-  // Computed date for MonthNavigator
-  const selectedMonthDate = useMemo(() => {
-    return new Date(formData.logYear, formData.logMonth - 1, 1);
+  const selectedMonthRange = useMemo(() => {
+    return {
+      start: new Date(formData.logYear, formData.logMonth - 1, 1),
+      end: new Date(formData.logYear, formData.logMonth, 0, 23, 59, 59, 999),
+    };
   }, [formData.logMonth, formData.logYear]);
 
-  // Handler for MonthNavigator
-  const handleMonthNavigatorChange = (date: Date) => {
+  const handleTimeNavigatorChange = (range: { start: Date; end: Date }): void => {
     setFormData({
       ...formData,
-      logMonth: date.getMonth() + 1,
-      logYear: date.getFullYear(),
-    });
-  };
-
-  // Handler for YearNavigator
-  const handleYearNavigatorChange = (year: number) => {
-    setFormData({
-      ...formData,
-      logYear: year,
+      logMonth: range.start.getMonth() + 1,
+      logYear: range.start.getFullYear(),
     });
   };
 
@@ -1395,18 +1387,11 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
               </div>
             ) : (
               <div className="flex gap-4 items-center">
-                <MonthNavigator
-                  selectedMonth={selectedMonthDate}
-                  onChange={handleMonthNavigatorChange}
-                  formatDisplay={(date) =>
-                    date.toLocaleDateString("en-MY", { month: "long" })
-                  }
-                  showGoToCurrentButton={false}
-                />
-                <YearNavigator
-                  selectedYear={formData.logYear}
-                  onChange={handleYearNavigatorChange}
-                  showGoToCurrentButton={false}
+                <TimeNavigator
+                  range={selectedMonthRange}
+                  onChange={handleTimeNavigatorChange}
+                  modes={["month"]}
+                  presets={false}
                 />
               </div>
             )}

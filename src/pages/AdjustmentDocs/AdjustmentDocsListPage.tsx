@@ -24,7 +24,7 @@ import {
 } from "@headlessui/react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import MonthNavigator from "../../components/MonthNavigator";
+import TimeNavigator from "../../components/TimeNavigator";
 import StyledListbox from "../../components/StyledListbox";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { api } from "../../routes/utils/api";
@@ -342,17 +342,18 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
     }
   }, [selectedIds, isBatchProcessing, fetchSelectedDocsWithLines]);
 
-  const handleMonthChange = useCallback((newDate: Date) => {
-    setSelectedMonth(newDate);
-    const startDate = new Date(newDate.getFullYear(), newDate.getMonth(), 1);
-    startDate.setHours(0, 0, 0, 0);
-    const endDate = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0);
-    endDate.setHours(23, 59, 59, 999);
-    setFilters((prev) => ({
-      ...prev,
-      dateRange: { start: startDate, end: endDate },
-    }));
-  }, []);
+  // Unified Time Navigator change handler. Handles day, month, and custom-range
+  // selections from the single TimeNavigator control.
+  const handleTimeNavigatorChange = useCallback(
+    (range: { start: Date; end: Date }) => {
+      setSelectedMonth(range.start);
+      setFilters((prev) => ({
+        ...prev,
+        dateRange: { start: range.start, end: range.end },
+      }));
+    },
+    []
+  );
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: docs.length };
@@ -448,14 +449,9 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
       <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 flex-shrink-0">
         {/* Left: Date controls */}
         <div className="flex flex-wrap items-center gap-3">
-          <MonthNavigator
-            selectedMonth={selectedMonth}
-            onChange={handleMonthChange}
-            showGoToCurrentButton={false}
-            dateRange={{
-              start: filters.dateRange.start || new Date(),
-              end: filters.dateRange.end || new Date(),
-            }}
+          <TimeNavigator
+            range={filters.dateRange}
+            onChange={handleTimeNavigatorChange}
           />
         </div>
 

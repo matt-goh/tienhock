@@ -14,8 +14,7 @@ import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import { getMonthName } from "../../../utils/payroll/payrollUtils";
-import YearNavigator from "../../../components/YearNavigator";
-import MonthNavigator from "../../../components/MonthNavigator";
+import TimeNavigator from "../../../components/TimeNavigator";
 import AddIncentiveModal from "../../../components/Payroll/AddIncentiveModal";
 import EditIncentiveModal from "../../../components/Payroll/EditIncentiveModal";
 import { api } from "../../../routes/utils/api";
@@ -83,11 +82,19 @@ const OthersAdvancePage: React.FC = () => {
   const [currentYear, setCurrentYear] = useState(getInitialYear);
   const [currentMonth, setCurrentMonth] = useState(getInitialMonth);
 
-  // Create Date object for MonthNavigator
-  const selectedMonth = useMemo(
-    () => new Date(currentYear, currentMonth - 1, 1),
+  // Month range for the TimeNavigator (the page always targets one month).
+  const monthRange = useMemo(
+    () => ({
+      start: new Date(currentYear, currentMonth - 1, 1),
+      end: new Date(currentYear, currentMonth, 0, 23, 59, 59, 999),
+    }),
     [currentYear, currentMonth]
   );
+
+  const handleTimeNavigatorChange = (range: { start: Date; end: Date }) => {
+    setCurrentYear(range.start.getFullYear());
+    setCurrentMonth(range.start.getMonth() + 1);
+  };
 
   // Update URL when year/month changes
   useEffect(() => {
@@ -223,18 +230,11 @@ const OthersAdvancePage: React.FC = () => {
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm p-4 transition-shadow duration-200 hover:shadow-md dark:hover:shadow-black/20">
         <div className="flex flex-col md:flex-row gap-4 items-end justify-between">
           <div className="flex gap-4 items-end">
-            <YearNavigator
-              selectedYear={currentYear}
-              onChange={setCurrentYear}
-              showGoToCurrentButton={false}
-            />
-            <MonthNavigator
-              selectedMonth={selectedMonth}
-              onChange={(date) => {
-                setCurrentYear(date.getFullYear());
-                setCurrentMonth(date.getMonth() + 1);
-              }}
-              showGoToCurrentButton={false}
+            <TimeNavigator
+              range={monthRange}
+              onChange={handleTimeNavigatorChange}
+              modes={["month"]}
+              presets={false}
             />
           </div>
           <div className="flex w-full flex-wrap items-center justify-end gap-3 md:w-auto">

@@ -19,8 +19,7 @@ import {
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import DateRangePicker from "../../../components/DateRangePicker";
-import MonthNavigator from "../../../components/MonthNavigator";
+import TimeNavigator from "../../../components/TimeNavigator";
 import StyledListbox from "../../../components/StyledListbox";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
@@ -197,24 +196,18 @@ const GTAdjustmentDocsListPage: React.FC = () => {
     fetchDocs();
   }, [fetchDocs]);
 
-  const handleDateChange = useCallback(
-    (newDateRange: { start: Date; end: Date }) => {
-      setFilters((prev) => ({ ...prev, dateRange: newDateRange }));
+  // Unified Time Navigator change handler. Handles day, month, and custom-range
+  // selections from the single TimeNavigator control.
+  const handleTimeNavigatorChange = useCallback(
+    (range: { start: Date; end: Date }) => {
+      setSelectedMonth(range.start);
+      setFilters((prev) => ({
+        ...prev,
+        dateRange: { start: range.start, end: range.end },
+      }));
     },
     []
   );
-
-  const handleMonthChange = useCallback((newDate: Date) => {
-    setSelectedMonth(newDate);
-    const startDate = new Date(newDate.getFullYear(), newDate.getMonth(), 1);
-    startDate.setHours(0, 0, 0, 0);
-    const endDate = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0);
-    endDate.setHours(23, 59, 59, 999);
-    setFilters((prev) => ({
-      ...prev,
-      dateRange: { start: startDate, end: endDate },
-    }));
-  }, []);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: docs.length };
@@ -317,22 +310,9 @@ const GTAdjustmentDocsListPage: React.FC = () => {
               />
             </div>
 
-            <DateRangePicker
-              dateRange={{
-                start: filters.dateRange.start || new Date(),
-                end: filters.dateRange.end || new Date(),
-              }}
-              onDateChange={handleDateChange}
-            />
-
-            <MonthNavigator
-              selectedMonth={selectedMonth}
-              onChange={handleMonthChange}
-              showGoToCurrentButton={false}
-              dateRange={{
-                start: filters.dateRange.start || new Date(),
-                end: filters.dateRange.end || new Date(),
-              }}
+            <TimeNavigator
+              range={filters.dateRange}
+              onChange={handleTimeNavigatorChange}
             />
 
             <div className="w-40">

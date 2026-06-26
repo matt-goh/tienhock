@@ -27,8 +27,7 @@ import {
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
-import YearNavigator from "../../../components/YearNavigator";
-import MonthNavigator from "../../../components/MonthNavigator";
+import TimeNavigator from "../../../components/TimeNavigator";
 import AddOthersModal from "../../../components/Payroll/AddOthersModal";
 import EditOthersModal from "../../../components/Payroll/EditOthersModal";
 import { api } from "../../../routes/utils/api";
@@ -95,10 +94,19 @@ const OthersKerjaLuarOtPage: React.FC = () => {
     new Set(),
   );
 
-  const selectedMonth = useMemo(
-    () => new Date(currentYear, currentMonth - 1, 1),
+  // Month range for the TimeNavigator (the page always targets one month).
+  const monthRange = useMemo(
+    () => ({
+      start: new Date(currentYear, currentMonth - 1, 1),
+      end: new Date(currentYear, currentMonth, 0, 23, 59, 59, 999),
+    }),
     [currentYear, currentMonth],
   );
+
+  const handleTimeNavigatorChange = (range: { start: Date; end: Date }) => {
+    setCurrentYear(range.start.getFullYear());
+    setCurrentMonth(range.start.getMonth() + 1);
+  };
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -404,18 +412,11 @@ const OthersKerjaLuarOtPage: React.FC = () => {
         {/* Row 1: Month/Year navigators + summary */}
         <div className="flex flex-col md:flex-row gap-4 items-end justify-between">
           <div className="flex gap-4 items-end">
-            <YearNavigator
-              selectedYear={currentYear}
-              onChange={setCurrentYear}
-              showGoToCurrentButton={false}
-            />
-            <MonthNavigator
-              selectedMonth={selectedMonth}
-              onChange={(date) => {
-                setCurrentYear(date.getFullYear());
-                setCurrentMonth(date.getMonth() + 1);
-              }}
-              showGoToCurrentButton={false}
+            <TimeNavigator
+              range={monthRange}
+              onChange={handleTimeNavigatorChange}
+              modes={["month"]}
+              presets={false}
             />
           </div>
           <div className="flex w-full flex-wrap items-center justify-end gap-3 md:w-auto">
