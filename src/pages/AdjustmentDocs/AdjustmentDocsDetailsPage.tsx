@@ -247,7 +247,8 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
   const handleOriginalInvoiceKeyDown = (
     event: React.KeyboardEvent<HTMLDivElement>
   ): void => {
-    if (event.key === "Enter") {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
       handleOpenOriginalInvoice();
     }
   };
@@ -389,32 +390,34 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
           tabIndex={0}
           onClick={handleOpenOriginalInvoice}
           onKeyDown={handleOriginalInvoiceKeyDown}
-          className="p-4 border-b border-default-200 dark:border-gray-700 cursor-pointer transition hover:bg-default-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-sky-500 dark:hover:bg-gray-700/50"
+          className="p-4 sm:p-5 border-b border-default-200 dark:border-gray-700 cursor-pointer transition hover:bg-default-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-sky-500 dark:hover:bg-gray-700/50"
           title="Open invoice"
         >
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-            <div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 sm:gap-4 text-sm">
+            <div className="min-w-0">
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
                 Original Invoice
               </div>
-              <div className="font-medium text-default-900 dark:text-gray-100 flex items-center gap-1">
-                {doc.original_invoice_id}
+              <div className="font-medium text-default-900 dark:text-gray-100 flex min-w-0 items-center gap-1.5">
+                <span className="min-w-0 break-all">
+                  {doc.original_invoice_id}
+                </span>
                 <IconExternalLink
                   size={14}
-                  className="text-sky-600 dark:text-sky-400"
+                  className="flex-shrink-0 text-sky-600 dark:text-sky-400"
                   aria-hidden="true"
                 />
               </div>
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
                 Customer
               </div>
-              <div className="font-medium text-default-900 dark:text-gray-100">
+              <div className="font-medium text-default-900 dark:text-gray-100 break-words">
                 {doc.customer_name || doc.customerid}
               </div>
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
                 Created
               </div>
@@ -422,7 +425,7 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
                 {date ? formatDisplayDate(date) : "—"}
               </div>
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
                 Total Amount
               </div>
@@ -430,7 +433,7 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
                 {formatCurrency(doc.totalamountpayable)}
               </div>
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider mb-0.5">
                 Invoice e-Status
               </div>
@@ -450,17 +453,17 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
               </div>
             </div>
             {doc.references_consolidated_id && (
-              <div className="col-span-2 md:col-span-5">
+              <div className="min-w-0 sm:col-span-2 lg:col-span-1">
                 <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
                   Referenced Consolidated Invoice
                 </div>
-                <div className="font-mono text-sm text-default-900 dark:text-gray-100">
+                <div className="font-mono text-sm text-default-900 dark:text-gray-100 break-all">
                   {doc.references_consolidated_id}
                 </div>
               </div>
             )}
             {doc.reason && (
-              <div className="col-span-2 md:col-span-5">
+              <div className="min-w-0 sm:col-span-2 lg:col-span-1">
                 <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
                   Reason
                 </div>
