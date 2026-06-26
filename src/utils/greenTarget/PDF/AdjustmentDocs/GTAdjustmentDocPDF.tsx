@@ -9,6 +9,7 @@ import { Page, StyleSheet, View, Text, Image } from "@react-pdf/renderer";
 import type { AdjustmentDocType } from "../../../../types/types";
 import { GREENTARGET_INFO } from "../../../invoice/einvoice/companyInfo";
 import GreenTargetLogo from "../../../GreenTargetLogo.png";
+import { formatAdjustmentDocId } from "../../../adjustments/formatDocId";
 
 const TYPE_LABEL: Record<AdjustmentDocType, { title: string; footer: string }> = {
   credit_note: { title: "CREDIT NOTE", footer: "Credit Note" },
@@ -278,7 +279,9 @@ const GTAdjustmentDocPDF: React.FC<Props> = ({ data, qrCodeData }) => {
       <View style={styles.invoiceDetails}>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Doc No.</Text>
-          <Text style={styles.detailValue}>{data.doc.id}</Text>
+          <Text style={styles.detailValue}>
+            {formatAdjustmentDocId(data.doc.id)}
+          </Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Original Invoice No.</Text>

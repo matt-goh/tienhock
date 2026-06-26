@@ -33,6 +33,7 @@ import {
 } from "../../../components/AdjustmentDocs/AdjustmentDocBadge";
 import GTAdjustmentDocPDFHandler from "../../../utils/greenTarget/PDF/AdjustmentDocs/GTAdjustmentDocPDFHandler";
 import GTAdjustmentDocPrintOverlay from "../../../utils/greenTarget/PDF/AdjustmentDocs/GTAdjustmentDocPrintOverlay";
+import { formatAdjustmentDocId } from "../../../utils/adjustments/formatDocId";
 
 const API_BASE = "/greentarget/api/adjustment-docs";
 const UI_BASE = "/greentarget/adjustment-docs";
@@ -340,7 +341,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
             <BackButton onClick={() => navigate(UI_BASE)} />
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
             <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100 flex items-center gap-2">
-              {meta.label} {doc.id}
+              {meta.label} {formatAdjustmentDocId(doc.id)}
               <AdjustmentDocTypeBadge type={doc.type} />
               <AdjustmentDocStatusBadge
                 status={doc.status}
@@ -575,7 +576,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
                 </span>
                 <AdjustmentDocTypeBadge type={pairedDoc.type} />
                 <span className="font-medium text-default-900 dark:text-gray-100">
-                  {pairedDoc.id}
+                  {formatAdjustmentDocId(pairedDoc.id)}
                 </span>
                 <AdjustmentDocStatusBadge
                   status={pairedDoc.status}

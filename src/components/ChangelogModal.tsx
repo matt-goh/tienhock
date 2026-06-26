@@ -20,6 +20,16 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-26",
+    ms: "Nombor dokumen pelarasan (Nota Kredit/Debit/Bayaran Balik) kini menggunakan format baharu seperti TH/CN/26/1 — kependekan syarikat (TH, JP, GT), jenis nota (CN/DN/RN), tahun, dan nombor berjalan. Penomboran bermula semula dari 1 untuk setiap syarikat, jenis, dan tahun. Dokumen lama kekal dengan nombor asalnya. Format baharu ini dipaparkan dalam senarai, halaman butiran, PDF, dan e-invois.",
+    en: "Adjustment document numbers (Credit/Debit/Refund Notes) now use a new format like TH/CN/26/1 — company code (TH, JP, GT), note type (CN/DN/RN), year, and a running number. Numbering restarts from 1 per company, type, and year. Existing documents keep their original numbers. The new format shows on the list, details page, PDF, and e-invoice.",
+  },
+  {
+    date: "2026-06-26",
+    ms: "Semasa menghantar beberapa e-invois dokumen pelarasan sekaligus, satu tetingkap kemajuan kini menghalang sebarang tindakan sehingga penghantaran selesai, supaya proses besar tidak terganggu.",
+    en: "When submitting several adjustment-document e-invoices at once, a progress dialog now blocks any interaction until the submission finishes, so large batches can't be interrupted mid-way.",
+  },
+  {
+    date: "2026-06-26",
     ms: "Laporan Gaji mengikut lokasi kini meletakkan setiap pekerja di SATU lokasi sahaja, jadi jumlah kecil (subtotal) setiap lokasi kini benar-benar menjumlah kepada jumlah besar. Sebelum ini, pekerja yang dipetakan ke beberapa lokasi dikira penuh di setiap lokasi, menyebabkan jumlah kecil lokasi melebihi jumlah besar. Lokasi pekerja kini mengikut lokasi KETUA (Head) pekerja tersebut — semua ID di bawah nama yang sama masuk ke lokasi Ketua. Terpakai pada tab \"Location\" (Bulanan/Tahunan), paparan Pekerja mengikut Lokasi, serta jadual mengikut lokasi dalam tab \"Annual\". Jumlah besar tidak berubah.",
     en: "The by-location Salary Report now places each employee in just ONE location, so each location's subtotal truly adds up to the grand total. Previously an employee mapped to several locations was counted in full under each one, making the location subtotals exceed the grand total. An employee's location now follows their HEAD's location — all IDs under the same name go into the Head's location. Applies to the \"Location\" tab (Monthly/Yearly), the Employee-by-Location view, and the by-location table in the \"Annual\" tab. Grand totals are unchanged.",
   },

@@ -36,6 +36,7 @@ import {
 import { generateGTAdjustmentDocPDFFilename } from "../../../utils/greenTarget/PDF/AdjustmentDocs/generateGTAdjustmentDocPDFFilename";
 import { generateGTAdjustmentDocPDFBlob } from "../../../utils/greenTarget/PDF/AdjustmentDocs/GTAdjustmentDocPDFHandler";
 import { GTAdjustmentDocFull } from "../../../services/gt-adjustment-doc-pdf.service";
+import { formatAdjustmentDocId } from "../../../utils/adjustments/formatDocId";
 
 const API_BASE = "/greentarget/api/adjustment-docs";
 const UI_BASE = "/greentarget/adjustment-docs";
@@ -446,13 +447,15 @@ const GTAdjustmentDocsListPage: React.FC = () => {
                     onClick={() => navigate(`${UI_BASE}/${doc.id}`)}
                   >
                     <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-default-900 dark:text-gray-100">
-                      {doc.id}
+                      {formatAdjustmentDocId(doc.id)}
                       {doc.paired_doc_id && (
                         <span
                           className="block text-xs text-default-500 dark:text-gray-400"
-                          title={`Paired with ${doc.paired_doc_id}`}
+                          title={`Paired with ${formatAdjustmentDocId(
+                            doc.paired_doc_id
+                          )}`}
                         >
-                          ↔ {doc.paired_doc_id}
+                          ↔ {formatAdjustmentDocId(doc.paired_doc_id)}
                         </span>
                       )}
                     </td>

@@ -7,6 +7,7 @@ import { Page, StyleSheet, View, Text, Image } from "@react-pdf/renderer";
 import { AdjustmentDocType } from "../../../types/types";
 import { CompanyInfo, JELLYPOLLY_INFO } from "../../invoice/einvoice/companyInfo";
 import TienHockLogo from "../../tienhock.png";
+import { formatAdjustmentDocId } from "../formatDocId";
 
 const stateOptions = [
   { id: "01", name: "Johor" },
@@ -328,7 +329,9 @@ const AdjustmentDocPDF: React.FC<Props> = ({
       <View style={styles.invoiceDetails}>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Doc No.</Text>
-          <Text style={styles.detailValue}>{data.doc.id}</Text>
+          <Text style={styles.detailValue}>
+            {formatAdjustmentDocId(data.doc.id)}
+          </Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Original Invoice No.</Text>
