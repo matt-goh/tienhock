@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-26",
+    ms: "Laporan Debtors kini mempunyai butang buka/tutup semua yang membuka kumpulan salesman dan semua butiran pelanggan sekaligus. Laporan Tien Hock dan Jelly Polly juga boleh buka/tutup setiap salesman bersama semua pelanggan di bawahnya, dengan ruang yang lebih selesa apabila kumpulan dibuka. Jumlah kecil pelanggan kini turut dipaparkan di bawah jadual invois seperti dalam PDF, dan jumlah keseluruhan juga ditunjukkan di bahagian bawah laporan.",
+    en: "Debtors Reports now have an expand/collapse-all button that opens both salesman groups and every customer detail at once. Tien Hock and Jelly Polly can also expand/collapse each salesman together with all customers under that salesman, with more breathing room when a group is open. Customer subtotals now also appear below the invoice table like the PDF, and the overall total is shown at the bottom of the report.",
+  },
+  {
+    date: "2026-06-26",
     ms: "Senarai Dokumen Pelarasan kini menunjukkan status e-invois invois asal bersebelahan status e-invois dokumen pelarasan, supaya lebih mudah tahu sama ada invois asal sudah sedia sebelum menghantar nota pelarasan.",
     en: "The Adjustment Docs list now shows the original invoice e-invoice status next to the adjustment document e-invoice status, so it is easier to see whether the original invoice is ready before submitting an adjustment note.",
   },
