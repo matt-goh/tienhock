@@ -447,6 +447,7 @@ export interface AdjustmentDocument {
   updated_at: string;
 
   // Joined fields when fetching list
+  original_invoice_einvoice_status?: EInvoiceStatus;
   paired_doc_id?: string | null;
   paired_type?: AdjustmentDocType | null;
   paired_status?: "active" | "cancelled" | null;

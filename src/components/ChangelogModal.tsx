@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-26",
+    ms: "Senarai Dokumen Pelarasan kini menunjukkan status e-invois invois asal bersebelahan status e-invois dokumen pelarasan, supaya lebih mudah tahu sama ada invois asal sudah sedia sebelum menghantar nota pelarasan.",
+    en: "The Adjustment Docs list now shows the original invoice e-invoice status next to the adjustment document e-invoice status, so it is easier to see whether the original invoice is ready before submitting an adjustment note.",
+  },
+  {
+    date: "2026-06-26",
     ms: "Tab \"General\" dalam halaman Pelarasan Stok kini mempunyai kotak carian untuk menapis baris mengikut kategori, penerangan item, pembekal, atau nombor pembelian (bukan nombor/kuantiti). Pemilih bulan juga ditambah pada tab ini, jadi senarai kini hanya memaparkan pembelian bagi bulan yang dipilih.",
     en: "The \"General\" tab on the Stock Adjustments page now has a search box to filter rows by category, item description, supplier, or purchase number (not numbers/quantities). A month selector was also added to this tab, so the list now only shows purchases from the selected month.",
   },

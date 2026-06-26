@@ -540,7 +540,9 @@ async function resolveReferencedDocument(client, doc) {
     try {
       const params = [];
       let sql = `
-        SELECT a.*, i.customerid AS inv_customerid, c.name AS customer_name,
+        SELECT a.*, i.customerid AS inv_customerid,
+               i.einvoice_status AS original_invoice_einvoice_status,
+               c.name AS customer_name,
                p.id AS paired_doc_id, p.type AS paired_type, p.status AS paired_status,
                p.einvoice_status AS paired_einvoice_status
           FROM ${T.docs} a

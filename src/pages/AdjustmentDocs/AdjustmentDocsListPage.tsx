@@ -644,6 +644,9 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
                     Original Invoice
                   </th>
+                  <th className="px-4 py-2.5 text-center text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
+                    Original e-Invoice
+                  </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
                     Customer
                   </th>
@@ -651,7 +654,7 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
                     Amount
                   </th>
                   <th className="px-4 py-2.5 text-center text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                    Status
+                    Adj. e-Invoice
                   </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
                     Created
@@ -717,6 +720,12 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-default-700 dark:text-gray-200">
                         {doc.original_invoice_id}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-center">
+                        <AdjustmentDocStatusBadge
+                          status="active"
+                          einvoiceStatus={doc.original_invoice_einvoice_status}
+                        />
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-default-700 dark:text-gray-200">
                         {doc.customer_name || doc.customerid}

@@ -46,6 +46,7 @@ interface GTAdjDoc {
   type: AdjustmentDocType;
   original_invoice_id: number;
   original_invoice_number: string;
+  original_invoice_einvoice_status: EInvoiceStatus;
   customer_id: number | null;
   customer_name: string | null;
   joined_customer_name?: string | null;
@@ -422,6 +423,9 @@ const GTAdjustmentDocsListPage: React.FC = () => {
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
                     Original Invoice
                   </th>
+                  <th className="px-4 py-2.5 text-center text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
+                    Original e-Invoice
+                  </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
                     Customer
                   </th>
@@ -429,7 +433,7 @@ const GTAdjustmentDocsListPage: React.FC = () => {
                     Amount
                   </th>
                   <th className="px-4 py-2.5 text-center text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                    Status
+                    Adj. e-Invoice
                   </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
                     Date Issued
@@ -464,6 +468,12 @@ const GTAdjustmentDocsListPage: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-default-700 dark:text-gray-200">
                       {doc.original_invoice_number}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-center">
+                      <AdjustmentDocStatusBadge
+                        status="active"
+                        einvoiceStatus={doc.original_invoice_einvoice_status}
+                      />
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-default-700 dark:text-gray-200">
                       {doc.customer_name ||
