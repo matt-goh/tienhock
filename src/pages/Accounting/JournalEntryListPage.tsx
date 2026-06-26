@@ -8,9 +8,7 @@ import { useJournalEntryTypesCache } from "../../utils/accounting/useAccountingC
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
-import DateRangePicker from "../../components/DateRangePicker";
-import DateNavigator from "../../components/DateNavigator";
-import MonthNavigator from "../../components/MonthNavigator";
+import TimeNavigator from "../../components/TimeNavigator";
 import {
   IconPlus,
   IconSearch,
@@ -122,9 +120,6 @@ const JournalEntryListPage: React.FC = () => {
   const [selectedType, setSelectedType] = useState<string>("All");
   const [selectedStatus, setSelectedStatus] = useState<string>("All");
   const [dateRange, setDateRange] = useState(loadCachedDateRange);
-  const [selectedMonth, setSelectedMonth] = useState<Date>(
-    () => loadCachedDateRange().start
-  );
 
   // Apply URL params on mount
   useEffect(() => {
@@ -133,7 +128,6 @@ const JournalEntryListPage: React.FC = () => {
       setSearchTerm(initialState.search);
       setSelectedType(initialState.type);
       setDateRange(initialState.dateRange);
-      setSelectedMonth(initialState.selectedMonth);
       setInitialized(true);
     }
   }, [searchParams, initialized]);
@@ -163,26 +157,10 @@ const JournalEntryListPage: React.FC = () => {
     return `${year}-${month}-${day}`;
   };
 
-  // Handle month selection
-  const handleMonthChange = (newDate: Date) => {
-    setSelectedMonth(newDate);
-    // Create start date (1st of the selected month)
-    const startDate = new Date(newDate.getFullYear(), newDate.getMonth(), 1);
-    startDate.setHours(0, 0, 0, 0);
-    // Create end date (last day of the selected month)
-    const endDate = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0);
-    endDate.setHours(23, 59, 59, 999);
-    setDateRange({ start: startDate, end: endDate });
-    setPage(1);
-  };
-
-  // Handle date navigator change (single day selection)
-  const handleDateNavigatorChange = (newDate: Date) => {
-    const startOfDay = new Date(newDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(newDate);
-    endOfDay.setHours(23, 59, 59, 999);
-    setDateRange({ start: startOfDay, end: endOfDay });
+  // Unified Time Navigator change handler. Handles day, month, and custom-range
+  // selections from the single TimeNavigator control.
+  const handleTimeNavigatorChange = (range: { start: Date; end: Date }) => {
+    setDateRange({ start: range.start, end: range.end });
     setPage(1);
   };
 
@@ -382,31 +360,10 @@ const JournalEntryListPage: React.FC = () => {
 
         {/* Date Controls and Actions */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          {/* Date Range Picker */}
-          <div className="w-full sm:w-auto">
-            <DateRangePicker
-              dateRange={dateRange}
-              onDateChange={(newDateRange) => {
-                setDateRange(newDateRange);
-                setPage(1);
-              }}
-              className="w-full"
-            />
-          </div>
-
-          {/* Date Navigator */}
-          <DateNavigator
-            selectedDate={dateRange.start || new Date()}
-            onChange={handleDateNavigatorChange}
-            showGoToTodayButton={false}
-          />
-
-          {/* Month Navigator */}
-          <MonthNavigator
-            selectedMonth={selectedMonth}
-            onChange={handleMonthChange}
-            showGoToCurrentButton={false}
-            dateRange={dateRange}
+          {/* Time Navigator */}
+          <TimeNavigator
+            range={dateRange}
+            onChange={handleTimeNavigatorChange}
           />
 
           <Button

@@ -9,7 +9,7 @@ import {
 import clsx from "clsx";
 
 // --- Public types ---
-export type TimeMode = "day" | "month" | "range";
+export type TimeMode = "day" | "month" | "range" | "year";
 
 export interface TimeRange {
   start: Date;
@@ -30,7 +30,7 @@ interface TimeNavigatorProps {
   range: { start: Date | null; end: Date | null };
   /** Called with the new range whenever the user picks/steps a selection */
   onChange: (range: TimeRange, meta: { mode: TimeMode }) => void;
-  /** Which granularity tabs are available (default: all three). Order is preserved. */
+  /** Which granularity tabs are available (default: day/month/range). Order is preserved. */
   modes?: TimeMode[];
   /** Quick presets: `true`/omitted = sensible defaults, `false` = none, or a custom list */
   presets?: TimePreset[] | boolean;
@@ -62,6 +62,9 @@ const startOfMonth = (d: Date): Date =>
   new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
 const endOfMonth = (d: Date): Date =>
   new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+const startOfYear = (d: Date): Date => new Date(d.getFullYear(), 0, 1, 0, 0, 0, 0);
+const endOfYear = (d: Date): Date =>
+  new Date(d.getFullYear(), 11, 31, 23, 59, 59, 999);
 const addDays = (d: Date, n: number): Date => {
   const x = new Date(d);
   x.setDate(x.getDate() + n);
@@ -132,6 +135,15 @@ const classifyMode = (start: Date | null, end: Date | null): TimeMode => {
   if (!start || !end) return "range";
   if (isSameDay(start, end)) return "day";
   if (
+    start.getMonth() === 0 &&
+    start.getDate() === 1 &&
+    end.getMonth() === 11 &&
+    end.getDate() === 31 &&
+    start.getFullYear() === end.getFullYear()
+  ) {
+    return "year";
+  }
+  if (
     start.getDate() === 1 &&
     isSameDay(start, startOfMonth(start)) &&
     isSameDay(end, endOfMonth(start))
@@ -145,6 +157,7 @@ const fmtDay = (d: Date): string =>
   d.toLocaleDateString("en-MY", { day: "numeric", month: "short", year: "numeric" });
 const fmtMonth = (d: Date): string =>
   d.toLocaleDateString("en-MY", { month: "long", year: "numeric" });
+const fmtYear = (d: Date): string => String(d.getFullYear());
 const fmtRange = (s: Date, e: Date): string => {
   const sameYear = s.getFullYear() === e.getFullYear();
   const startStr = s.toLocaleDateString(
@@ -410,6 +423,106 @@ const MonthGrid: React.FC<MonthGridProps> = ({
   );
 };
 
+// --- Year grid (year selection) ---
+interface YearGridProps {
+  /** First year shown in the 12-year window */
+  viewStartYear: number;
+  onViewChange: (startYear: number) => void;
+  selected: number | null;
+  onPick: (year: number) => void;
+  allowFuture: boolean;
+  minDate?: Date;
+}
+
+const YEAR_WINDOW = 12;
+
+const YearGrid: React.FC<YearGridProps> = ({
+  viewStartYear,
+  onViewChange,
+  selected,
+  onPick,
+  allowFuture,
+  minDate,
+}) => {
+  const now = new Date();
+  const years = Array.from({ length: YEAR_WINDOW }, (_, i) => viewStartYear + i);
+
+  const isYearDisabled = (year: number): boolean => {
+    if (!allowFuture && year > now.getFullYear()) return true;
+    if (minDate && year < minDate.getFullYear()) return true;
+    return false;
+  };
+
+  const prevDisabled = minDate
+    ? viewStartYear <= minDate.getFullYear()
+    : false;
+  const nextDisabled = !allowFuture
+    ? viewStartYear + YEAR_WINDOW - 1 >= now.getFullYear()
+    : false;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <button
+          type="button"
+          onClick={() => onViewChange(viewStartYear - YEAR_WINDOW)}
+          disabled={prevDisabled}
+          className={clsx(
+            "p-1 rounded-md transition-colors",
+            prevDisabled
+              ? "cursor-not-allowed text-default-300 dark:text-gray-600"
+              : "text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700"
+          )}
+          aria-label="Previous years"
+        >
+          <IconChevronLeft size={18} />
+        </button>
+        <span className="text-sm font-semibold text-default-900 dark:text-gray-100">
+          {viewStartYear} – {viewStartYear + YEAR_WINDOW - 1}
+        </span>
+        <button
+          type="button"
+          onClick={() => onViewChange(viewStartYear + YEAR_WINDOW)}
+          disabled={nextDisabled}
+          className={clsx(
+            "p-1 rounded-md transition-colors",
+            nextDisabled
+              ? "cursor-not-allowed text-default-300 dark:text-gray-600"
+              : "text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700"
+          )}
+          aria-label="Next years"
+        >
+          <IconChevronRight size={18} />
+        </button>
+      </div>
+      <div className="grid grid-cols-3 gap-1.5">
+        {years.map((year) => {
+          const disabled = isYearDisabled(year);
+          const isSelected = selected === year;
+          return (
+            <button
+              key={year}
+              type="button"
+              onClick={() => onPick(year)}
+              disabled={disabled}
+              className={clsx(
+                "py-2 text-sm rounded-md transition-colors",
+                disabled
+                  ? "cursor-not-allowed text-default-300 dark:text-gray-600"
+                  : isSelected
+                  ? "bg-sky-500 text-white hover:bg-sky-600"
+                  : "text-default-700 dark:text-gray-200 hover:bg-sky-50 dark:hover:bg-sky-900/30"
+              )}
+            >
+              {year}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 // --- Main component ---
 const TimeNavigator: React.FC<TimeNavigatorProps> = ({
   range,
@@ -424,7 +537,10 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
   className,
 }) => {
   const availableModes = useMemo(
-    () => (["day", "month", "range"] as TimeMode[]).filter((m) => modes.includes(m)),
+    () =>
+      (["day", "month", "range", "year"] as TimeMode[]).filter((m) =>
+        modes.includes(m)
+      ),
     [modes]
   );
 
@@ -450,6 +566,11 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
   const [viewYear, setViewYear] = useState<number>(
     (range.start ?? new Date()).getFullYear()
   );
+  // First year of the 12-year window shown in the year grid.
+  const [yearViewStart, setYearViewStart] = useState<number>(() => {
+    const y = (range.start ?? new Date()).getFullYear();
+    return y - (((y % YEAR_WINDOW) + YEAR_WINDOW) % YEAR_WINDOW);
+  });
   const [pendingStart, setPendingStart] = useState<Date | null>(null);
   const [hoverDate, setHoverDate] = useState<Date | null>(null);
 
@@ -466,6 +587,10 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
       );
       setViewDate(anchor);
       setViewYear(anchor.getFullYear());
+      setYearViewStart(
+        anchor.getFullYear() -
+          (((anchor.getFullYear() % YEAR_WINDOW) + YEAR_WINDOW) % YEAR_WINDOW)
+      );
       setPendingStart(null);
       setHoverDate(null);
     }
@@ -511,6 +636,7 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
     if (activePreset) return activePreset.label;
     if (displayMode === "day") return fmtDay(range.start!);
     if (displayMode === "month") return fmtMonth(range.start!);
+    if (displayMode === "year") return fmtYear(range.start!);
     return fmtRange(range.start!, range.end!);
   }, [hasRange, activePreset, displayMode, range.start, range.end, placeholder]);
 
@@ -522,6 +648,8 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
     if (displayMode === "day") return startOfDay(range.start!).getTime() < today.getTime();
     if (displayMode === "month")
       return startOfMonth(range.start!).getTime() < startOfMonth(today).getTime();
+    if (displayMode === "year")
+      return range.start!.getFullYear() < today.getFullYear();
     return endOfDay(range.end!).getTime() < endOfDay(today).getTime();
   }, [hasRange, allowFuture, displayMode, range.start, range.end, today]);
 
@@ -540,14 +668,26 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
     } else if (displayMode === "month") {
       const d = new Date(range.start.getFullYear(), range.start.getMonth() + sign, 1);
       emit(startOfMonth(d), endOfMonth(d), "month");
+    } else if (displayMode === "year") {
+      const d = new Date(range.start.getFullYear() + sign, 0, 1);
+      emit(startOfYear(d), endOfYear(d), "year");
     } else {
       const len =
         Math.round(
           (startOfDay(range.end).getTime() - startOfDay(range.start).getTime()) /
             86400000
         ) + 1;
-      const s = addDays(range.start, sign * len);
-      const e = addDays(range.end, sign * len);
+      let s = addDays(range.start, sign * len);
+      let e = addDays(range.end, sign * len);
+      // Clamp a forward step so the window never extends past today (unless
+      // future navigation is explicitly allowed). Window length is preserved.
+      if (!allowFuture && dir === "next") {
+        const todayEnd = endOfDay(new Date());
+        if (endOfDay(e).getTime() > todayEnd.getTime()) {
+          e = new Date(todayEnd);
+          s = addDays(startOfDay(e), -(len - 1));
+        }
+      }
       emit(startOfDay(s), endOfDay(e), "range");
     }
   };
@@ -567,6 +707,12 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
   const handleMonthPick = (year: number, month: number) => {
     const anchor = new Date(year, month, 1);
     emit(startOfMonth(anchor), endOfMonth(anchor), "month");
+    setIsOpen(false);
+  };
+
+  const handleYearPick = (year: number) => {
+    const anchor = new Date(year, 0, 1);
+    emit(startOfYear(anchor), endOfYear(anchor), "year");
     setIsOpen(false);
   };
 
@@ -719,7 +865,16 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
           )}
 
           {/* Body */}
-          {activeMode === "month" ? (
+          {activeMode === "year" ? (
+            <YearGrid
+              viewStartYear={yearViewStart}
+              onViewChange={setYearViewStart}
+              selected={displayMode === "year" ? range.start!.getFullYear() : null}
+              onPick={handleYearPick}
+              allowFuture={allowFuture}
+              minDate={minDate}
+            />
+          ) : activeMode === "month" ? (
             <MonthGrid
               viewYear={viewYear}
               onViewYearChange={setViewYear}

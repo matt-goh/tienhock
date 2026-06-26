@@ -1,5 +1,5 @@
 // src/pages/Payroll/ECarumanPage.tsx
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   IconFileDownload,
@@ -11,8 +11,7 @@ import {
   IconExternalLink,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
-import MonthNavigator from "../../../components/MonthNavigator";
-import YearNavigator from "../../../components/YearNavigator";
+import TimeNavigator from "../../../components/TimeNavigator";
 import { api } from "../../../routes/utils/api";
 import MissingEPFNumberDialog, {
   MissingEPFEmployee,
@@ -155,12 +154,19 @@ const ECarumanPage: React.FC = () => {
   });
 
   // Derived values for API calls
-  const selectedMonth = selectedDate.getMonth() + 1;
-  const selectedYear = selectedDate.getFullYear();
+  const selectedMonth: number = selectedDate.getMonth() + 1;
+  const selectedYear: number = selectedDate.getFullYear();
 
-  // Handle year change from YearNavigator
-  const handleYearChange = (newYear: number) => {
-    setSelectedDate(new Date(newYear, selectedDate.getMonth(), 1));
+  const monthRange = useMemo(
+    () => ({
+      start: new Date(selectedYear, selectedMonth - 1, 1),
+      end: new Date(selectedYear, selectedMonth, 0, 23, 59, 59, 999),
+    }),
+    [selectedMonth, selectedYear]
+  );
+
+  const handleTimeNavigatorChange = (range: { start: Date; end: Date }): void => {
+    setSelectedDate(new Date(range.start.getFullYear(), range.start.getMonth(), 1));
   };
 
   const [loadingType, setLoadingType] = useState<string | null>(null);
@@ -419,21 +425,12 @@ const ECarumanPage: React.FC = () => {
       <div className="mb-4 flex items-center gap-4">
         <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">e-Caruman</h1>
         <span className="text-gray-300 dark:text-gray-600">|</span>
-        <YearNavigator
-          selectedYear={selectedYear}
-          onChange={handleYearChange}
-          showGoToCurrentButton={false}
+        <TimeNavigator
+          range={monthRange}
+          onChange={handleTimeNavigatorChange}
+          modes={["month"]}
+          presets={false}
           size="sm"
-        />
-        <span className="text-gray-300 dark:text-gray-600">|</span>
-        <MonthNavigator
-          selectedMonth={selectedDate}
-          onChange={setSelectedDate}
-          showGoToCurrentButton={false}
-          size="sm"
-          formatDisplay={(date) =>
-            date.toLocaleDateString("en-MY", { month: "long" })
-          }
         />
         <span className="text-gray-300 dark:text-gray-600 ml-auto">|</span>
         <Link
