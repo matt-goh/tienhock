@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-06-26",
+    ms: "Laporan Gaji mengikut lokasi kini meletakkan setiap pekerja di SATU lokasi sahaja, jadi jumlah kecil (subtotal) setiap lokasi kini benar-benar menjumlah kepada jumlah besar. Sebelum ini, pekerja yang dipetakan ke beberapa lokasi dikira penuh di setiap lokasi, menyebabkan jumlah kecil lokasi melebihi jumlah besar. Lokasi pekerja kini mengikut lokasi KETUA (Head) pekerja tersebut — semua ID di bawah nama yang sama masuk ke lokasi Ketua. Terpakai pada tab \"Location\" (Bulanan/Tahunan), paparan Pekerja mengikut Lokasi, serta jadual mengikut lokasi dalam tab \"Annual\". Jumlah besar tidak berubah.",
+    en: "The by-location Salary Report now places each employee in just ONE location, so each location's subtotal truly adds up to the grand total. Previously an employee mapped to several locations was counted in full under each one, making the location subtotals exceed the grand total. An employee's location now follows their HEAD's location — all IDs under the same name go into the Head's location. Applies to the \"Location\" tab (Monthly/Yearly), the Employee-by-Location view, and the by-location table in the \"Annual\" tab. Grand totals are unchanged.",
+  },
+  {
     date: "2026-06-25",
     ms: "Halaman Rekod Pengeluaran kini menyenaraikan pekerja dalam setiap produk mengikut susunan kad pekerja yang sama (susunan seret-dan-lepas) seperti halaman Kemasukan Pengeluaran, bukan lagi mengikut abjad.",
     en: "The Production Records page now lists workers under each product in the same worker order (the drag-and-drop arrangement) as the Production Entry page, instead of alphabetically.",
