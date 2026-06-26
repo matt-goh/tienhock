@@ -2,6 +2,34 @@
 
 Created 2026-06-24. This document is for the next task: fix the Employee -> Location Yearly view so an employee assigned to more than one location does not make location subtotals disagree with the grand total.
 
+## STATUS: IMPLEMENTED 2026-06-26
+
+Fixed in `src/routes/payroll/salary-report.js` in BOTH the shared `computeMonthlySalaryReport`
+(drives the Monthly Location views, the Annual summary/breakdown) AND the `/yearly` route
+(drives the Yearly Employee->Location view). Each employee now reports under exactly ONE
+location via a single `employee_all_locations` row (no more multi-location `UNION ALL`),
+`employee_base_data` is `DISTINCT ON (employee_id)`, and `employee_direct_locations` was removed.
+
+Confirmed allocation policy (with staff): amounts follow the **HEAD's first direct
+`staffs.location`**, then the employee's own first direct location, then the job location
+(mostly the `18` incentive bucket — see below), then `'02'`. Tie-break for multiple direct
+locations = first entry in the array (data with >1 entry is being cleaned up by staff).
+
+Key data finding: `job_location_mappings` is an incentive bucket — 17 production jobs all map
+to `18` ("Insentif Tidak Tetap"), real locations live in `staffs.location`. So the location
+source is the direct location, NOT the job location. `LocationAccountMappingsPage` /
+`location_account_mappings` is unrelated (GL account mapping only).
+
+Pending data cleanup (NOT a code issue): some HEAD records have an empty `staffs.location`
+(e.g. JIRIM), so their siblings fall back to own/`18` and scatter until the head's location is
+set. Re-check the report after staff fixes those head locations.
+
+Verified at the SQL level for 2026: 0 duplicate staff rows; sum of location rows == deduped
+grand total exactly (gross 496,400.96); employees grouped under real locations.
+
+---
+(original handover below, kept for context)
+
 ## Problem
 
 In `SalaryReportPage`, choose **Employee -> Location -> Yearly**. The location subtotals do not add up to the displayed grand total when one staff member is associated with multiple locations.

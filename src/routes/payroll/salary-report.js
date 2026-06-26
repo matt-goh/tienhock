@@ -16,14 +16,6 @@ export default function (pool) {
           FROM job_location_mappings
           WHERE is_active = true
         ),
-        -- Employee's direct locations from staffs.location JSONB array
-        employee_direct_locations AS (
-          SELECT s.id as employee_id, loc.value as location_code
-          FROM staffs s,
-            LATERAL jsonb_array_elements_text(COALESCE(s.location, '[]'::jsonb)) AS loc(value)
-          WHERE s.location IS NOT NULL
-            AND jsonb_array_length(s.location) > 0
-        ),
         -- Exclusions: employee-job-location combinations to filter out
         employee_exclusions AS (
           SELECT employee_id, job_id, location_code
@@ -50,7 +42,15 @@ export default function (pool) {
             COALESCE(
               head_jlm.location_code,  -- HEAD's job location (when head_staff_id is set)
               jlm.location_code        -- Fallback to direct job location
-            ) as job_location_code
+            ) as job_location_code,
+            -- Reporting-location source: the HEAD's first direct staffs.location entry
+            -- (amounts follow the HEAD), falling back to the employee's own first direct
+            -- location. job_location_mappings is an incentive bucket (mostly '18'), so it
+            -- is only a last resort in employee_all_locations below.
+            COALESCE(
+              NULLIF(head_s.location->>0, ''),
+              NULLIF(s.location->>0, '')
+            ) as head_direct_location
           FROM employee_payrolls ep
           JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
           JOIN staffs s ON ep.employee_id = s.id
@@ -69,38 +69,38 @@ export default function (pool) {
           WHERE mp.year = $1 AND mp.month = $2
           AND (s.date_resigned IS NULL OR s.date_resigned > CURRENT_DATE)
         ),
-        -- UNION all location sources (employee appears in all applicable locations)
+        -- Each employee reports under exactly ONE location so location subtotals
+        -- reconcile to the (employee-deduped) grand total. Per the confirmed business
+        -- rule "amounts follow the HEAD's location", the priority is:
+        --   1) the HEAD's first direct staffs.location (head_direct_location already
+        --      falls back to the employee's own first direct location);
+        --   2) the job location (mostly the '18' incentive bucket) when no direct
+        --      location exists, unless that combo is explicitly excluded;
+        --   3) the '02' fallback.
         employee_all_locations AS (
-          -- Direct employee mapping (from staffs.location)
-          SELECT epb.*, edl.location_code, 'direct' as location_source
+          SELECT
+            epb.*,
+            COALESCE(
+              epb.head_direct_location,
+              CASE
+                WHEN epb.job_location_code IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM employee_exclusions ex
+                    WHERE ex.employee_id = epb.employee_id
+                      AND ex.job_id = epb.job_type
+                      AND ex.location_code = epb.job_location_code
+                  )
+                THEN epb.job_location_code
+                ELSE NULL
+              END,
+              '02'
+            ) as location_code,
+            'reporting' as location_source
           FROM employee_payroll_base epb
-          JOIN employee_direct_locations edl ON epb.employee_id = edl.employee_id
-
-          UNION ALL
-
-          -- Job-based mapping (filtered by exclusions)
-          SELECT epb.*, epb.job_location_code as location_code, 'job' as location_source
-          FROM employee_payroll_base epb
-          WHERE epb.job_location_code IS NOT NULL
-            -- Filter out excluded employee-job-location combinations
-            AND NOT EXISTS (
-              SELECT 1 FROM employee_exclusions ex
-              WHERE ex.employee_id = epb.employee_id
-                AND ex.job_id = epb.job_type
-                AND ex.location_code = epb.job_location_code
-            )
-
-          UNION ALL
-
-          -- Default fallback (only if NO locations from either source)
-          SELECT epb.*, '02' as location_code, 'default' as location_source
-          FROM employee_payroll_base epb
-          WHERE epb.job_location_code IS NULL
-            AND NOT EXISTS (SELECT 1 FROM employee_direct_locations edl WHERE edl.employee_id = epb.employee_id)
         ),
-        -- Deduplicate same employee in same location (keep first occurrence)
+        -- Exactly one row per employee (the single reporting location above).
         employee_base_data AS (
-          SELECT DISTINCT ON (employee_id, location_code)
+          SELECT DISTINCT ON (employee_id)
             employee_payroll_id,
             employee_id,
             staff_id,
@@ -117,7 +117,7 @@ export default function (pool) {
             section,
             location_source
           FROM employee_all_locations
-          ORDER BY employee_id, location_code, location_source
+          ORDER BY employee_id, location_code
         ),
         payroll_items_data AS (
           SELECT
@@ -1084,14 +1084,6 @@ export default function (pool) {
           FROM job_location_mappings
           WHERE is_active = true
         ),
-        -- Employee's direct locations from staffs.location JSONB array
-        employee_direct_locations AS (
-          SELECT s.id as employee_id, loc.value as location_code
-          FROM staffs s,
-            LATERAL jsonb_array_elements_text(COALESCE(s.location, '[]'::jsonb)) AS loc(value)
-          WHERE s.location IS NOT NULL
-            AND jsonb_array_length(s.location) > 0
-        ),
         -- Exclusions: employee-job-location combinations to filter out
         employee_exclusions AS (
           SELECT employee_id, job_id, location_code
@@ -1150,7 +1142,12 @@ export default function (pool) {
             COALESCE(
               (ARRAY_AGG(head_jlm.location_code ORDER BY mp.month DESC))[1],
               (ARRAY_AGG(jlm.location_code ORDER BY mp.month DESC))[1]
-            ) as job_location_code
+            ) as job_location_code,
+            -- Reporting-location source: the HEAD's first direct staffs.location entry
+            -- (amounts follow the HEAD), falling back to the employee's own first direct
+            -- location. job_location_mappings is an incentive bucket (mostly '18'), so it
+            -- is only a last resort in employee_all_locations below.
+            (ARRAY_AGG(COALESCE(NULLIF(head_s.location->>0, ''), NULLIF(s.location->>0, '')) ORDER BY mp.month DESC))[1] as head_direct_location
           FROM employee_payrolls ep
           JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
           JOIN staffs s ON ep.employee_id = s.id
@@ -1173,38 +1170,38 @@ export default function (pool) {
           GROUP BY ep.employee_id, s.id, s.name, s.ic_no, s.bank_account_number, s.payment_preference,
                    eyr.total_digenapkan, eyr.total_setelah_digenapkan
         ),
-        -- UNION all location sources (employee appears in all applicable locations)
+        -- Each employee reports under exactly ONE location so location subtotals
+        -- reconcile to the (employee-deduped) grand total. Per the confirmed business
+        -- rule "amounts follow the HEAD's location", the priority is:
+        --   1) the HEAD's first direct staffs.location (head_direct_location already
+        --      falls back to the employee's own first direct location);
+        --   2) the job location (mostly the '18' incentive bucket) when no direct
+        --      location exists, unless that combo is explicitly excluded;
+        --   3) the '02' fallback.
         employee_all_locations AS (
-          -- Direct employee mapping (from staffs.location)
-          SELECT epb.*, edl.location_code, 'direct' as location_source
+          SELECT
+            epb.*,
+            COALESCE(
+              epb.head_direct_location,
+              CASE
+                WHEN epb.job_location_code IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM employee_exclusions ex
+                    WHERE ex.employee_id = epb.employee_id
+                      AND ex.job_id = epb.job_type
+                      AND ex.location_code = epb.job_location_code
+                  )
+                THEN epb.job_location_code
+                ELSE NULL
+              END,
+              '02'
+            ) as location_code,
+            'reporting' as location_source
           FROM employee_payroll_base epb
-          JOIN employee_direct_locations edl ON epb.employee_id = edl.employee_id
-
-          UNION ALL
-
-          -- Job-based mapping (filtered by exclusions)
-          SELECT epb.*, epb.job_location_code as location_code, 'job' as location_source
-          FROM employee_payroll_base epb
-          WHERE epb.job_location_code IS NOT NULL
-            -- Filter out excluded employee-job-location combinations
-            AND NOT EXISTS (
-              SELECT 1 FROM employee_exclusions ex
-              WHERE ex.employee_id = epb.employee_id
-                AND ex.job_id = epb.job_type
-                AND ex.location_code = epb.job_location_code
-            )
-
-          UNION ALL
-
-          -- Default fallback (only if NO locations from either source)
-          SELECT epb.*, '02' as location_code, 'default' as location_source
-          FROM employee_payroll_base epb
-          WHERE epb.job_location_code IS NULL
-            AND NOT EXISTS (SELECT 1 FROM employee_direct_locations edl WHERE edl.employee_id = epb.employee_id)
         ),
-        -- Deduplicate same employee in same location (keep first occurrence)
+        -- Exactly one row per employee (the single reporting location above).
         employee_base_data AS (
-          SELECT DISTINCT ON (employee_id, location_code)
+          SELECT DISTINCT ON (employee_id)
             employee_id,
             staff_id,
             staff_name,
@@ -1220,7 +1217,7 @@ export default function (pool) {
             section,
             location_source
           FROM employee_all_locations
-          ORDER BY employee_id, location_code, location_source
+          ORDER BY employee_id, location_code
         ),
         payroll_items_data AS (
           SELECT
