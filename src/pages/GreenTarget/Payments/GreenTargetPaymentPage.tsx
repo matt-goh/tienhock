@@ -4,19 +4,10 @@ import {
   IconCash,
   IconPlus,
   IconSearch,
-  IconChevronDown,
-  IconCheck,
 } from "@tabler/icons-react";
-import {
-  Listbox,
-  ListboxButton,
-  ListboxOption,
-  ListboxOptions,
-  Transition,
-} from "@headlessui/react";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import DateRangePicker from "../../../components/DateRangePicker";
+import TimeNavigator from "../../../components/TimeNavigator";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import toast from "react-hot-toast";
 import { Payment } from "../../../types/types";
@@ -35,26 +26,6 @@ interface PaymentFilters {
   searchTerm: string;
 }
 
-interface MonthOption {
-  id: number;
-  name: string;
-}
-
-const monthOptions: MonthOption[] = [
-  { id: 0, name: "January" },
-  { id: 1, name: "February" },
-  { id: 2, name: "March" },
-  { id: 3, name: "April" },
-  { id: 4, name: "May" },
-  { id: 5, name: "June" },
-  { id: 6, name: "July" },
-  { id: 7, name: "August" },
-  { id: 8, name: "September" },
-  { id: 9, name: "October" },
-  { id: 10, name: "November" },
-  { id: 11, name: "December" },
-];
-
 const GreenTargetPaymentPage: React.FC = () => {
   const navigate = useNavigate();
   const [payments, setPayments] = useState<GreenTargetPayment[]>([]);
@@ -64,10 +35,6 @@ const GreenTargetPaymentPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<MonthOption>(() => {
-    const now = new Date();
-    return monthOptions[now.getMonth()];
-  });
 
   const [filters, setFilters] = useState<PaymentFilters>(() => {
     const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -182,36 +149,17 @@ const GreenTargetPaymentPage: React.FC = () => {
     fetchPayments();
   }, []); // Only fetch once on mount
 
-  const handleDateChange = useCallback(
-    (newDateRange: { start: Date; end: Date }) => {
+  // Unified Time Navigator change handler. Handles day, month, and custom-range
+  // selections from the single TimeNavigator control.
+  const handleTimeNavigatorChange = useCallback(
+    (range: { start: Date; end: Date }) => {
       setFilters((prev) => ({
         ...prev,
-        dateRange: newDateRange,
+        dateRange: { start: range.start, end: range.end },
       }));
     },
     []
   );
-
-  const handleMonthChange = useCallback((month: MonthOption) => {
-    setSelectedMonth(month);
-
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonthIndex = now.getMonth();
-
-    const targetYear =
-      month.id > currentMonthIndex ? currentYear - 1 : currentYear;
-
-    const startDate = new Date(targetYear, month.id, 1);
-    startDate.setHours(0, 0, 0, 0);
-    const endDate = new Date(targetYear, month.id + 1, 0);
-    endDate.setHours(23, 59, 59, 999);
-
-    setFilters((prev) => ({
-      ...prev,
-      dateRange: { start: startDate, end: endDate },
-    }));
-  }, []);
 
   const handleNewPayment = () => {
     setSelectedPayment(null);
@@ -267,76 +215,12 @@ const GreenTargetPaymentPage: React.FC = () => {
               />
             </div>
 
-            {/* Date Range Picker */}
+            {/* Time Navigator */}
             <div className="w-full sm:w-auto">
-              <DateRangePicker
-                dateRange={{
-                  start: filters.dateRange.start || new Date(),
-                  end: filters.dateRange.end || new Date(),
-                }}
-                onDateChange={handleDateChange}
+              <TimeNavigator
+                range={filters.dateRange}
+                onChange={handleTimeNavigatorChange}
               />
-            </div>
-
-            {/* Month Selector */}
-            <div className="w-full sm:w-40">
-              <Listbox value={selectedMonth} onChange={handleMonthChange}>
-                <div className="relative">
-                  <ListboxButton className="w-full h-[42px] rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500 text-sm text-default-900 dark:text-gray-100">
-                    <span className="block truncate pl-1">
-                      {selectedMonth.name}
-                    </span>
-                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <IconChevronDown
-                        className="h-5 w-5 text-default-400 dark:text-gray-500"
-                        aria-hidden="true"
-                      />
-                    </span>
-                  </ListboxButton>
-                  <Transition
-                    leave="transition ease-in duration-100"
-                    leaveFrom="opacity-100"
-                    leaveTo="opacity-0"
-                  >
-                    <ListboxOptions className="absolute z-50 w-full p-1 mt-1 border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg text-sm">
-                      {monthOptions.map((month) => (
-                        <ListboxOption
-                          key={month.id}
-                          value={month}
-                          className={({ active }) =>
-                            `relative cursor-pointer select-none py-2 pl-4 pr-4 rounded-md ${
-                              active
-                                ? "bg-default-100 dark:bg-gray-700 text-default-900 dark:text-gray-100"
-                                : "text-gray-900 dark:text-gray-100"
-                            }`
-                          }
-                        >
-                          {({ selected }) => (
-                            <>
-                              <span
-                                className={`block truncate ${
-                                  selected ? "font-medium" : "font-normal"
-                                }`}
-                              >
-                                {month.name}
-                              </span>
-                              {selected && (
-                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600 dark:text-sky-400">
-                                  <IconCheck
-                                    className="h-5 w-5"
-                                    aria-hidden="true"
-                                    stroke={2.5}
-                                  />
-                                </span>
-                              )}
-                            </>
-                          )}
-                        </ListboxOption>
-                      ))}
-                    </ListboxOptions>
-                  </Transition>
-                </div>
-              </Listbox>
             </div>
 
             {/* Payment Method Filter */}

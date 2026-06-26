@@ -20,8 +20,7 @@ import {
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { FormListbox } from "../../components/FormComponents";
-import MonthNavigator from "../../components/MonthNavigator";
-import YearNavigator from "../../components/YearNavigator";
+import TimeNavigator from "../../components/TimeNavigator";
 import SalaryAmountTooltip from "../../components/Payroll/SalaryAmountTooltip";
 import { api } from "../../routes/utils/api";
 import { getMonthName } from "../../utils/payroll/midMonthPayrollUtils";
@@ -529,11 +528,45 @@ const SalaryReportPage: React.FC = () => {
     []
   );
 
-  // Handle year change from YearNavigator
+  // Handle year change (keeps the selected month, swaps the year)
   const handleYearChange = (newYear: number) => {
     setSelectedMonth(new Date(newYear, selectedMonth.getMonth(), 1));
     // The breakdown's pages differ per year — restart at the first page.
     setBreakdownPage(0);
+  };
+
+  // Period navigator: monthly sections step by month; yearly/annual step by year.
+  const isMonthlyNav = periodType === "monthly" && activeTab !== 5;
+  const periodNavRange = useMemo(() => {
+    if (isMonthlyNav) {
+      return {
+        start: new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1),
+        end: new Date(
+          selectedMonth.getFullYear(),
+          selectedMonth.getMonth() + 1,
+          0,
+          23,
+          59,
+          59,
+          999
+        ),
+      };
+    }
+    return {
+      start: new Date(currentYear, 0, 1),
+      end: new Date(currentYear, 11, 31, 23, 59, 59, 999),
+    };
+  }, [isMonthlyNav, selectedMonth, currentYear]);
+
+  const handlePeriodNavChange = (
+    range: { start: Date; end: Date },
+    meta: { mode: string }
+  ) => {
+    if (meta.mode === "year") {
+      handleYearChange(range.start.getFullYear());
+    } else {
+      setSelectedMonth(range.start);
+    }
   };
 
   // Load monthly salary report - always on mount and when month changes
@@ -3834,21 +3867,12 @@ const SalaryReportPage: React.FC = () => {
               )}
               <span className="text-default-300 dark:text-gray-600">|</span>
               <div className="flex items-center gap-2">
-                <YearNavigator
-                  selectedYear={currentYear}
-                  onChange={handleYearChange}
-                  showGoToCurrentButton={false}
+                <TimeNavigator
+                  range={periodNavRange}
+                  onChange={handlePeriodNavChange}
+                  modes={isMonthlyNav ? ["month"] : ["year"]}
+                  presets={false}
                 />
-                {periodType === 'monthly' && activeTab !== 5 && (
-                  <MonthNavigator
-                    selectedMonth={selectedMonth}
-                    onChange={setSelectedMonth}
-                    showGoToCurrentButton={false}
-                    formatDisplay={(date) =>
-                      date.toLocaleDateString("en-MY", { month: "long" })
-                    }
-                  />
-                )}
               </div>
               {displayedReportData && activeTab !== 4 && activeTab !== 5 && (
                 <>
@@ -4186,21 +4210,12 @@ const SalaryReportPage: React.FC = () => {
                 </div>
               )}
               <div className="flex items-center gap-2">
-                <YearNavigator
-                  selectedYear={currentYear}
-                  onChange={handleYearChange}
-                  showGoToCurrentButton={false}
+                <TimeNavigator
+                  range={periodNavRange}
+                  onChange={handlePeriodNavChange}
+                  modes={isMonthlyNav ? ["month"] : ["year"]}
+                  presets={false}
                 />
-                {periodType === 'monthly' && activeTab !== 5 && (
-                  <MonthNavigator
-                    selectedMonth={selectedMonth}
-                    onChange={setSelectedMonth}
-                    showGoToCurrentButton={false}
-                    formatDisplay={(date) =>
-                      date.toLocaleDateString("en-MY", { month: "long" })
-                    }
-                  />
-                )}
               </div>
               {displayedReportData && activeTab !== 4 && activeTab !== 5 && (
                 <>

@@ -14,8 +14,7 @@ import {
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
-import DateRangePicker from "../../../components/DateRangePicker";
-import MonthNavigator from "../../../components/MonthNavigator";
+import TimeNavigator from "../../../components/TimeNavigator";
 import StyledListbox from "../../../components/StyledListbox";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
@@ -75,10 +74,29 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
         // Fall back to default if parsing fails
       }
     }
+    // Default to the "Last 7 days" preset (today-6 .. today, inclusive) so the
+    // TimeNavigator highlights that pill instead of showing a custom range.
+    const now = new Date();
     return {
       dateRange: {
-        start: new Date(new Date().setDate(new Date().getDate() - 7)),
-        end: new Date(),
+        start: new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate() - 6,
+          0,
+          0,
+          0,
+          0
+        ),
+        end: new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+          23,
+          59,
+          59,
+          999
+        ),
       },
       shift: null,
       status: null,
@@ -86,22 +104,6 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
   });
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [logToDelete, setLogToDelete] = useState<WorkLog | null>(null);
-
-  // Use Date object for month navigation - initialize based on cached date range
-  const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
-    const cached = localStorage.getItem(dateRangeCacheKey);
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        const startDate = new Date(parsed.start);
-        return new Date(startDate.getFullYear(), startDate.getMonth(), 1);
-      } catch {
-        // Fall back to default
-      }
-    }
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
 
   // Cache date range whenever it changes
   useEffect(() => {
@@ -179,20 +181,10 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
     return { totalRecords, totalHours, totalWorkers };
   }, [workLogs]);
 
-  // Handle month change from MonthNavigator
-  const handleMonthChange = (newDate: Date) => {
-    setSelectedMonth(newDate);
-
-    // Create start date (1st of the selected month)
-    const startDate = new Date(newDate.getFullYear(), newDate.getMonth(), 1);
-    startDate.setHours(0, 0, 0, 0);
-
-    // Create end date (last day of the selected month)
-    const endDate = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0);
-    endDate.setHours(23, 59, 59, 999);
-
-    // Update date range
-    setFilters({ ...filters, dateRange: { start: startDate, end: endDate } });
+  // Unified Time Navigator change handler. Handles day, month, and custom-range
+  // selections from the single TimeNavigator control.
+  const handleTimeNavigatorChange = (range: { start: Date; end: Date }) => {
+    setFilters({ ...filters, dateRange: { start: range.start, end: range.end } });
   };
 
   const handleAddEntry = () => {
@@ -286,17 +278,9 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
 
           {/* Right: Filters + Button */}
           <div className="flex flex-wrap items-center gap-3">
-            <DateRangePicker
-              dateRange={filters.dateRange}
-              onDateChange={(newRange) =>
-                setFilters({ ...filters, dateRange: newRange })
-              }
-            />
-            <MonthNavigator
-              selectedMonth={selectedMonth}
-              onChange={handleMonthChange}
-              showGoToCurrentButton={false}
-              dateRange={filters.dateRange}
+            <TimeNavigator
+              range={filters.dateRange}
+              onChange={handleTimeNavigatorChange}
             />
             <div className="w-32">
               <StyledListbox

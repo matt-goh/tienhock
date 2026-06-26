@@ -899,6 +899,7 @@ const PayrollPage: React.FC = () => {
               selectedMonth={selectedMonth}
               onChange={handleMonthChange}
               showGoToCurrentButton={false}
+              pickerPlacement="bottom-left-button"
             />
           </div>
 
@@ -993,6 +994,7 @@ const PayrollPage: React.FC = () => {
               onChange={handleMonthChange}
               showGoToCurrentButton={false}
               size="sm"
+              pickerPlacement="bottom-left-button"
             />
             {/* Compact Stats */}
             <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm">

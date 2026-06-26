@@ -12,10 +12,8 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import clsx from "clsx";
-import DateNavigator from "../../components/DateNavigator";
-import MonthNavigator from "../../components/MonthNavigator";
+import TimeNavigator from "../../components/TimeNavigator";
 import ProductSelector from "../../components/Stock/ProductSelector";
-import YearNavigator from "../../components/YearNavigator";
 import { api } from "../../routes/utils/api";
 import {
   ProductionEntry,
@@ -466,25 +464,17 @@ const ProductionListPage: React.FC = () => {
     );
   }, [expandedKeys, visibleProductKeys]);
 
-  const handleDateChange = (date: Date): void => {
+  // Unified Time Navigator change handler. The chosen granularity (day/month/year)
+  // drives both the view mode and the synced selected date/month/year values.
+  const handleTimeNavigatorChange = (
+    range: { start: Date; end: Date },
+    meta: { mode: string }
+  ): void => {
+    const date = range.start;
     setSelectedDate(date);
     setSelectedMonth(new Date(date.getFullYear(), date.getMonth(), 1));
     setSelectedYear(date.getFullYear());
-    setViewMode("day");
-  };
-
-  const handleMonthChange = (date: Date): void => {
-    setSelectedMonth(new Date(date.getFullYear(), date.getMonth(), 1));
-    setSelectedDate(new Date(date.getFullYear(), date.getMonth(), 1));
-    setSelectedYear(date.getFullYear());
-    setViewMode("month");
-  };
-
-  const handleYearChange = (year: number): void => {
-    setSelectedYear(year);
-    setSelectedMonth(new Date(year, 0, 1));
-    setSelectedDate(new Date(year, 0, 1));
-    setViewMode("year");
+    setViewMode(meta.mode as ViewMode);
   };
 
   const toggleExpanded = (groupKey: string): void => {
@@ -580,23 +570,11 @@ const ProductionListPage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <DateNavigator
-              selectedDate={selectedDate}
-              onChange={handleDateChange}
-              showGoToTodayButton={false}
-              size="sm"
-            />
-            <MonthNavigator
-              selectedMonth={selectedMonth}
-              onChange={handleMonthChange}
-              showGoToCurrentButton={false}
-              dateRange={dateRange}
-              size="sm"
-            />
-            <YearNavigator
-              selectedYear={selectedYear}
-              onChange={handleYearChange}
-              showGoToCurrentButton={false}
+            <TimeNavigator
+              range={dateRange}
+              onChange={handleTimeNavigatorChange}
+              modes={["day", "month", "year"]}
+              presets={false}
               size="sm"
             />
           </div>

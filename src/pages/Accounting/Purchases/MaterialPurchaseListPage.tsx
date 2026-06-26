@@ -17,6 +17,21 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import Button from "../../../components/Button";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import { FormListbox } from "../../../components/FormComponents";
+import TimeNavigator from "../../../components/TimeNavigator";
+
+// Parse a yyyy-MM-dd string into a local Date (null when empty/invalid).
+const parseYmd = (s: string): Date | null => {
+  if (!s) return null;
+  const [y, m, d] = s.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const date = new Date(y, m - 1, d);
+  return isNaN(date.getTime()) ? null : date;
+};
+// Format a local Date into yyyy-MM-dd (timezone-safe; never via toISOString).
+const toYmd = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
 
 const MaterialPurchaseListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -259,19 +274,13 @@ const MaterialPurchaseListPage: React.FC = () => {
         />
 
         {/* Date Range */}
-        <input
-          type="date"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-          className="rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 py-2 px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-          placeholder="Start Date"
-        />
-        <input
-          type="date"
-          value={endDate}
-          onChange={(e) => setEndDate(e.target.value)}
-          className="rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 py-2 px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-          placeholder="End Date"
+        <TimeNavigator
+          range={{ start: parseYmd(startDate), end: parseYmd(endDate) }}
+          onChange={(range) => {
+            setStartDate(toYmd(range.start));
+            setEndDate(toYmd(range.end));
+          }}
+          placeholder="All dates"
         />
 
         {/* Search */}

@@ -106,21 +106,29 @@ export default function (pool) {
 
       const product = productResult.rows[0];
 
-      // Get initial balance (admin-set migration balance)
+      // Get initial balance (admin-set migration/opening balance) and its anchor date.
+      // The balance represents stock as of the START of `anchorDate`; movements on/after
+      // that date are applied on top, and anything before it is ignored. When no opening
+      // balance is set, fall back to the system start date with a zero balance.
       const initialBalanceQuery = `
-        SELECT balance
+        SELECT balance, effective_date::text AS effective_date
         FROM stock_opening_balances
         WHERE product_id = $1
         ORDER BY effective_date DESC
         LIMIT 1
       `;
       const initialResult = await pool.query(initialBalanceQuery, [product_id]);
-      const initialBalance =
-        initialResult.rows.length > 0 ? initialResult.rows[0].balance : 0;
+      const hasInitialBalance = initialResult.rows.length > 0;
+      const initialBalance = hasInitialBalance
+        ? parseInt(initialResult.rows[0].balance) || 0
+        : 0;
+      const anchorDate = hasInitialBalance
+        ? initialResult.rows[0].effective_date
+        : STOCK_SYSTEM_START_DATE;
 
-      // Calculate brought forward (B/F) by summing movements from STOCK_SYSTEM_START_DATE to before start date
+      // Calculate brought forward (B/F) by summing movements from the anchor date to before start date
       // B/F = Initial Balance + (production + returns + adj_in) - (sold + foc + adj_out)
-      // Data before STOCK_SYSTEM_START_DATE is ignored - initial balance represents stock as of that date
+      // Data before the anchor date is ignored - initial balance represents stock as of that date
       // Use DATE comparison for consistency (not timestamp)
 
       // Get prior production total (only from system start date onwards)
@@ -133,7 +141,7 @@ export default function (pool) {
       `;
       const priorProductionResult = await pool.query(priorProductionQuery, [
         product_id,
-        STOCK_SYSTEM_START_DATE,
+        anchorDate,
         startDate,
       ]);
       const priorProduction = parseInt(priorProductionResult.rows[0]?.total || 0);
@@ -156,7 +164,7 @@ export default function (pool) {
       `;
       const priorSalesResult = await pool.query(priorSalesQuery, [
         product_id,
-        STOCK_SYSTEM_START_DATE,
+        anchorDate,
         startDate,
       ]);
       const priorSold = parseInt(priorSalesResult.rows[0]?.sold || 0);
@@ -175,22 +183,27 @@ export default function (pool) {
       `;
       const priorAdjustmentsResult = await pool.query(priorAdjustmentsQuery, [
         product_id,
-        STOCK_SYSTEM_START_DATE,
+        anchorDate,
         startDate,
       ]);
       const priorAdjIn = parseInt(priorAdjustmentsResult.rows[0]?.adj_in || 0);
       const priorAdjOut = parseInt(priorAdjustmentsResult.rows[0]?.adj_out || 0);
 
-      // Calculate opening balance (B/F)
+      // Calculate opening balance (B/F) at the start of the viewed period.
+      // If the anchor date is after the period start, the product has not been
+      // "opened" yet at the period start, so B/F starts at 0 and the anchor
+      // balance is injected on its effective date in the daily loop below.
       // Returns DEDUCT from stock (products returned to supplier/factory)
       const openingBalance =
-        initialBalance +
-        priorProduction +
-        priorAdjIn -
-        priorSold -
-        priorFoc -
-        priorAdjOut -
-        priorReturns;
+        anchorDate <= startDate
+          ? initialBalance +
+            priorProduction +
+            priorAdjIn -
+            priorSold -
+            priorFoc -
+            priorAdjOut -
+            priorReturns
+          : 0;
 
       // Get production data grouped by date
       const productionQuery = `
@@ -278,16 +291,16 @@ export default function (pool) {
         currentDate.setDate(currentDate.getDate() + 1);
       }
 
-      // Merge production data
+      // Merge production data (ignore anything before the anchor date)
       for (const row of productionResult.rows) {
-        if (dataByDate.has(row.date)) {
+        if (dataByDate.has(row.date) && row.date >= anchorDate) {
           dataByDate.get(row.date).production = parseInt(row.production) || 0;
         }
       }
 
-      // Merge sales data
+      // Merge sales data (ignore anything before the anchor date)
       for (const row of salesResult.rows) {
-        if (dataByDate.has(row.date)) {
+        if (dataByDate.has(row.date) && row.date >= anchorDate) {
           const data = dataByDate.get(row.date);
           data.sold_out = parseInt(row.sold) || 0;
           data.foc = parseInt(row.foc) || 0;
@@ -295,9 +308,9 @@ export default function (pool) {
         }
       }
 
-      // Merge adjustments data
+      // Merge adjustments data (ignore anything before the anchor date)
       for (const row of adjustmentsResult.rows) {
-        if (dataByDate.has(row.date)) {
+        if (dataByDate.has(row.date) && row.date >= anchorDate) {
           const data = dataByDate.get(row.date);
           data.adj_in = parseInt(row.adj_in) || 0;
           data.adj_out = parseInt(row.adj_out) || 0;
@@ -309,6 +322,13 @@ export default function (pool) {
       let runningBalance = openingBalance;
 
       for (const [, data] of dataByDate) {
+        // When the anchor date falls inside the viewed period (i.e. the opening
+        // balance becomes effective mid-period), seed the running balance with the
+        // initial balance at the start of that day.
+        if (data.date === anchorDate) {
+          runningBalance = initialBalance;
+        }
+
         data.bf = runningBalance;
 
         // C/F = B/F + PRODUCTION + ADJ_IN - SOLD_OUT - ADJ_OUT - FOC - RETURNS
@@ -353,6 +373,7 @@ export default function (pool) {
         product_type: product.type,
         opening_balance: openingBalance,
         initial_balance: initialBalance,
+        initial_balance_date: hasInitialBalance ? anchorDate : null,
         date_range: {
           start_date: startDate,
           end_date: endDate,
@@ -408,16 +429,20 @@ export default function (pool) {
       await Promise.all(
         productIdList.map(async (product_id) => {
           try {
-            // Get initial balance
+            // Get initial balance and its anchor (effective) date
             const initialResult = await pool.query(
-              `SELECT balance FROM stock_opening_balances
+              `SELECT balance, effective_date::text AS effective_date FROM stock_opening_balances
                WHERE product_id = $1
                ORDER BY effective_date DESC LIMIT 1`,
               [product_id]
             );
-            const initialBalance = initialResult.rows.length > 0
+            const hasInitialBalance = initialResult.rows.length > 0;
+            const initialBalance = hasInitialBalance
               ? parseInt(initialResult.rows[0].balance) || 0
               : 0;
+            const anchorDate = hasInitialBalance
+              ? initialResult.rows[0].effective_date
+              : STOCK_SYSTEM_START_DATE;
 
             // Get all production from system start date up to and including end date
             const productionResult = await pool.query(
@@ -426,7 +451,7 @@ export default function (pool) {
                WHERE product_id = $1
                  AND entry_date >= $2::date
                  AND entry_date <= $3::date`,
-              [product_id, STOCK_SYSTEM_START_DATE, endDateStr]
+              [product_id, anchorDate, endDateStr]
             );
             const totalProduction = parseInt(productionResult.rows[0]?.total) || 0;
 
@@ -444,7 +469,7 @@ export default function (pool) {
                  AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
                  AND DATE(TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) >= $2::date
                  AND DATE(TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) <= $3::date`,
-              [product_id, STOCK_SYSTEM_START_DATE, endDateStr]
+              [product_id, anchorDate, endDateStr]
             );
             const totalSold = parseInt(salesResult.rows[0]?.sold) || 0;
             const totalFoc = parseInt(salesResult.rows[0]?.foc) || 0;
@@ -459,21 +484,25 @@ export default function (pool) {
                WHERE product_id = $1
                  AND entry_date >= $2
                  AND entry_date <= $3`,
-              [product_id, STOCK_SYSTEM_START_DATE, endDateStr]
+              [product_id, anchorDate, endDateStr]
             );
             const totalAdjIn = parseInt(adjustmentsResult.rows[0]?.adj_in) || 0;
             const totalAdjOut = parseInt(adjustmentsResult.rows[0]?.adj_out) || 0;
 
             // Calculate closing balance
             // CF = Initial + Production + AdjIn - Sold - FOC - AdjOut - Returns
+            // If the anchor date is after the period end, the product is not yet
+            // "opened" within this period, so closing stock is 0.
             const closingBalance =
-              initialBalance +
-              totalProduction +
-              totalAdjIn -
-              totalSold -
-              totalFoc -
-              totalAdjOut -
-              totalReturns;
+              anchorDate > endDateStr
+                ? 0
+                : initialBalance +
+                  totalProduction +
+                  totalAdjIn -
+                  totalSold -
+                  totalFoc -
+                  totalAdjOut -
+                  totalReturns;
 
             results[product_id] = closingBalance;
           } catch (err) {
@@ -576,14 +605,25 @@ export default function (pool) {
   });
 
   // POST /api/stock/opening-balance - Set/update opening balance
-  // Opening balance is now global per product (not tied to a specific date)
+  // One opening balance per product, effective from a chosen anchor date. The
+  // balance represents stock as of the START of that date; movements on/after it
+  // are applied on top and anything before it is ignored in B/F calculations.
   router.post("/opening-balance", async (req, res) => {
     try {
-      const { product_id, balance, notes, created_by } = req.body;
+      const { product_id, balance, effective_date, notes, created_by } =
+        req.body;
 
       if (!product_id || balance === undefined) {
         return res.status(400).json({
           message: "product_id and balance are required",
+        });
+      }
+
+      // Anchor date the balance is effective from; defaults to the system start date.
+      const anchorDate = effective_date || STOCK_SYSTEM_START_DATE;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(anchorDate)) {
+        return res.status(400).json({
+          message: "effective_date must be in YYYY-MM-DD format",
         });
       }
 
@@ -599,13 +639,10 @@ export default function (pool) {
         });
       }
 
-      // Use a far-future date for global balance (ensures it's always picked first by ORDER BY effective_date DESC)
-      const fixedDate = "9999-12-31";
-
-      // First, delete any old date-specific records for this product (migration cleanup)
+      // Keep a single opening balance per product: remove any record on a different date
       await pool.query(
         "DELETE FROM stock_opening_balances WHERE product_id = $1 AND effective_date != $2",
-        [product_id, fixedDate]
+        [product_id, anchorDate]
       );
 
       const query = `
@@ -622,7 +659,7 @@ export default function (pool) {
       const result = await pool.query(query, [
         product_id,
         balance,
-        fixedDate,
+        anchorDate,
         notes || null,
         created_by || null,
       ]);

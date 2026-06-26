@@ -19,6 +19,56 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-06-27",
+    ms: "Pemilih tarikh baharu yang lebih ringkas kini digunakan di banyak halaman bersenarai data dan laporan — antaranya Senarai Invois (Tien Hock, Jelly Polly, Green Target), Pembayaran, Jurnal, Nota Pelarasan, Log Harian, laporan Jualan, Pembelian Material & General, Bayaran Pembekal, Senarai Pengeluaran, Log Bulanan, Laporan Gaji, serta halaman tambahan Payroll (Bonus, Bayaran Pertengahan Bulan, Pinjam, Others). Ia menggantikan kotak tarikh serta penanda hari/bulan/tahun yang berasingan. Klik butang tarikh untuk menukar antara mod Hari, Bulan, Julat dan Tahun (mengikut halaman), memilih pintasan pantas (Hari Ini, Bulan Ini, 7/30 Hari Lepas dan lain-lain), atau pilih dari kalendar. Anak panah kiri/kanan di sebelahnya melangkah mengikut pilihan semasa, dan tidak akan melepasi tarikh hari ini.",
+    en: "A new, more compact date picker is now used across many data-list and report pages — including Invoice lists (Tien Hock, Jelly Polly, Green Target), Payments, Journal Entries, Adjustment Documents, Daily Logs, the Sales reports, Material & General Purchases, Supplier Payments, the Production list, Monthly Logs, the Salary Report, and the Payroll add-on pages (Bonus, Mid-Month, Pinjam, Others). It replaces the separate date boxes and day/month/year steppers. Click the date button to switch between Day, Month, Range and Year modes (depending on the page), pick a quick preset (Today, This Month, Last 7/30 Days and more), or choose from the calendar. The left/right arrows beside it step through your current selection and won't move past today.",
+  },
+  {
+    date: "2026-06-26",
+    ms: "Stok General dan Stok Material kini dipisahkan kepada dua halaman berasingan dalam menu Stock. Halaman General Stock hanya memaparkan stok General, manakala halaman Material Stock mengandungi tab Mee, Bihun dan Shared.",
+    en: "General Stock and Material Stock are now split into two separate pages in the Stock menu. General Stock now only shows general stock, while Material Stock contains the Mee, Bihun and Shared tabs.",
+  },
+  {
+    date: "2026-06-26",
+    ms: "Halaman Pelarasan Stok kini mempunyai tab baharu \"Other Products\" yang membolehkan anda merekod pelarasan ADJ+/ADJ- untuk Sisa Mi, Sisa Mihun, Empty Bag dan Empty Bag (Small), selain produk Bihun dan Mee yang sedia ada. Keempat-empat produk ini juga kini boleh dipilih dalam halaman Pergerakan Stok.",
+    en: "The Stock Adjustments page now has a new \"Other Products\" tab that lets you record ADJ+/ADJ- adjustments for Sisa Mi, Sisa Mihun, Empty Bag and Empty Bag (Small), in addition to the existing Bihun and Mee products. These four products can now also be selected on the Stock Movement page.",
+  },
+  {
+    date: "2026-06-26",
+    ms: "Dalam menu navigasi yang dipaparkan sebagai grid berbilang lajur (seperti Catalogue dan Payroll), pintasan akses pantas (cth. \"New Entry\") kini muncul sebagai butang \"+\" terus di dalam baris item, bukan lagi popover yang terbuka ke kanan dan menutup item di lajur sebelah. Klik \"+\" untuk terus ke halaman cipta baharu. Menu satu lajur kekal seperti biasa.",
+    en: "In navigation menus shown as a multi-column grid (like Catalogue and Payroll), the quick-access shortcuts (e.g. \"New Entry\") now appear as a \"+\" button right inside the item row, instead of a popover that opened to the right and covered the item in the next column. Click the \"+\" to go straight to the create page. Single-column menus are unchanged.",
+  },
+  {
+    date: "2026-06-26",
+    ms: "Laporan Debtors kini mempunyai butang buka/tutup semua yang membuka kumpulan salesman dan semua butiran pelanggan sekaligus. Laporan Tien Hock dan Jelly Polly juga boleh buka/tutup setiap salesman bersama semua pelanggan di bawahnya, dengan ruang yang lebih selesa apabila kumpulan dibuka. Jumlah kecil pelanggan kini turut dipaparkan di bawah jadual invois seperti dalam PDF, dan jumlah keseluruhan juga ditunjukkan di bahagian bawah laporan.",
+    en: "Debtors Reports now have an expand/collapse-all button that opens both salesman groups and every customer detail at once. Tien Hock and Jelly Polly can also expand/collapse each salesman together with all customers under that salesman, with more breathing room when a group is open. Customer subtotals now also appear below the invoice table like the PDF, and the overall total is shown at the bottom of the report.",
+  },
+  {
+    date: "2026-06-26",
+    ms: "Senarai Dokumen Pelarasan kini menunjukkan status e-invois invois asal bersebelahan status e-invois dokumen pelarasan, supaya lebih mudah tahu sama ada invois asal sudah sedia sebelum menghantar nota pelarasan.",
+    en: "The Adjustment Docs list now shows the original invoice e-invoice status next to the adjustment document e-invoice status, so it is easier to see whether the original invoice is ready before submitting an adjustment note.",
+  },
+  {
+    date: "2026-06-26",
+    ms: "Tab \"General\" dalam halaman Pelarasan Stok kini mempunyai kotak carian untuk menapis baris mengikut kategori, penerangan item, pembekal, atau nombor pembelian (bukan nombor/kuantiti). Pemilih bulan juga ditambah pada tab ini, jadi senarai kini hanya memaparkan pembelian bagi bulan yang dipilih.",
+    en: "The \"General\" tab on the Stock Adjustments page now has a search box to filter rows by category, item description, supplier, or purchase number (not numbers/quantities). A month selector was also added to this tab, so the list now only shows purchases from the selected month.",
+  },
+  {
+    date: "2026-06-26",
+    ms: "Nombor dokumen pelarasan (Nota Kredit/Debit/Bayaran Balik) kini menggunakan format baharu seperti TH/CN/26/1 — kependekan syarikat (TH, JP, GT), jenis nota (CN/DN/RN), tahun, dan nombor berjalan. Penomboran bermula semula dari 1 untuk setiap syarikat, jenis, dan tahun. Dokumen lama kekal dengan nombor asalnya. Format baharu ini dipaparkan dalam senarai, halaman butiran, PDF, dan e-invois.",
+    en: "Adjustment document numbers (Credit/Debit/Refund Notes) now use a new format like TH/CN/26/1 — company code (TH, JP, GT), note type (CN/DN/RN), year, and a running number. Numbering restarts from 1 per company, type, and year. Existing documents keep their original numbers. The new format shows on the list, details page, PDF, and e-invoice.",
+  },
+  {
+    date: "2026-06-26",
+    ms: "Semasa menghantar beberapa e-invois dokumen pelarasan sekaligus, satu tetingkap kemajuan kini menghalang sebarang tindakan sehingga penghantaran selesai, supaya proses besar tidak terganggu.",
+    en: "When submitting several adjustment-document e-invoices at once, a progress dialog now blocks any interaction until the submission finishes, so large batches can't be interrupted mid-way.",
+  },
+  {
+    date: "2026-06-26",
+    ms: "Laporan Gaji mengikut lokasi kini meletakkan setiap pekerja di SATU lokasi sahaja, jadi jumlah kecil (subtotal) setiap lokasi kini benar-benar menjumlah kepada jumlah besar. Sebelum ini, pekerja yang dipetakan ke beberapa lokasi dikira penuh di setiap lokasi, menyebabkan jumlah kecil lokasi melebihi jumlah besar. Lokasi pekerja kini mengikut lokasi KETUA (Head) pekerja tersebut — semua ID di bawah nama yang sama masuk ke lokasi Ketua. Terpakai pada tab \"Location\" (Bulanan/Tahunan), paparan Pekerja mengikut Lokasi, serta jadual mengikut lokasi dalam tab \"Annual\". Jumlah besar tidak berubah.",
+    en: "The by-location Salary Report now places each employee in just ONE location, so each location's subtotal truly adds up to the grand total. Previously an employee mapped to several locations was counted in full under each one, making the location subtotals exceed the grand total. An employee's location now follows their HEAD's location — all IDs under the same name go into the Head's location. Applies to the \"Location\" tab (Monthly/Yearly), the Employee-by-Location view, and the by-location table in the \"Annual\" tab. Grand totals are unchanged.",
+  },
+  {
     date: "2026-06-25",
     ms: "Halaman Rekod Pengeluaran kini menyenaraikan pekerja dalam setiap produk mengikut susunan kad pekerja yang sama (susunan seret-dan-lepas) seperti halaman Kemasukan Pengeluaran, bukan lagi mengikut abjad.",
     en: "The Production Records page now lists workers under each product in the same worker order (the drag-and-drop arrangement) as the Production Entry page, instead of alphabetically.",

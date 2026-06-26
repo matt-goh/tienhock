@@ -16,9 +16,15 @@ import {
   IconPrinter,
   IconDownload,
 } from "@tabler/icons-react";
+import {
+  Dialog,
+  DialogPanel,
+  Transition,
+  TransitionChild,
+} from "@headlessui/react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import MonthNavigator from "../../components/MonthNavigator";
+import TimeNavigator from "../../components/TimeNavigator";
 import StyledListbox from "../../components/StyledListbox";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { api } from "../../routes/utils/api";
@@ -39,6 +45,7 @@ import { parseDatabaseTimestamp, formatDisplayDate } from "../../utils/invoice/d
 import AdjustmentDocPrintOverlay from "../../utils/adjustments/PDF/AdjustmentDocPrintOverlay";
 import { generateAdjustmentDocPDFFilename } from "../../utils/adjustments/PDF/generateAdjustmentDocPDFFilename";
 import { generateAdjustmentDocPDFBlob } from "../../utils/adjustments/PDF/AdjustmentDocPDFHandler";
+import { formatAdjustmentDocId } from "../../utils/adjustments/formatDocId";
 
 interface FilterState {
   type: AdjustmentDocType | "all";
@@ -67,6 +74,13 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitProgress, setSubmitProgress] = useState<{
+    current: number;
+    total: number;
+    success: number;
+    failed: number;
+    currentId: string;
+  } | null>(null);
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
   const [batchPrintDocs, setBatchPrintDocs] = useState<
     AdjustmentDocument[] | null
@@ -201,6 +215,13 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
     const targets = eligibleSelectedDocs;
     if (targets.length === 0) return;
     setIsSubmitting(true);
+    setSubmitProgress({
+      current: 0,
+      total: targets.length,
+      success: 0,
+      failed: 0,
+      currentId: targets[0].id,
+    });
     const toastId = toast.loading(
       `Submitting ${targets.length} document(s) to MyInvois...`
     );
@@ -208,6 +229,13 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
     let failed = 0;
     for (let i = 0; i < targets.length; i++) {
       const d = targets[i];
+      setSubmitProgress({
+        current: i + 1,
+        total: targets.length,
+        success,
+        failed,
+        currentId: d.id,
+      });
       toast.loading(
         `Submitting ${i + 1}/${targets.length}: ${d.id}...`,
         { id: toastId }
@@ -236,6 +264,7 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
       );
     }
     setIsSubmitting(false);
+    setSubmitProgress(null);
     setSelectedIds(new Set());
     fetchDocs();
   }, [eligibleSelectedDocs, paths.apiBase, fetchDocs]);
@@ -313,17 +342,18 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
     }
   }, [selectedIds, isBatchProcessing, fetchSelectedDocsWithLines]);
 
-  const handleMonthChange = useCallback((newDate: Date) => {
-    setSelectedMonth(newDate);
-    const startDate = new Date(newDate.getFullYear(), newDate.getMonth(), 1);
-    startDate.setHours(0, 0, 0, 0);
-    const endDate = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0);
-    endDate.setHours(23, 59, 59, 999);
-    setFilters((prev) => ({
-      ...prev,
-      dateRange: { start: startDate, end: endDate },
-    }));
-  }, []);
+  // Unified Time Navigator change handler. Handles day, month, and custom-range
+  // selections from the single TimeNavigator control.
+  const handleTimeNavigatorChange = useCallback(
+    (range: { start: Date; end: Date }) => {
+      setSelectedMonth(range.start);
+      setFilters((prev) => ({
+        ...prev,
+        dateRange: { start: range.start, end: range.end },
+      }));
+    },
+    []
+  );
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: docs.length };
@@ -419,14 +449,9 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
       <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 flex-shrink-0">
         {/* Left: Date controls */}
         <div className="flex flex-wrap items-center gap-3">
-          <MonthNavigator
-            selectedMonth={selectedMonth}
-            onChange={handleMonthChange}
-            showGoToCurrentButton={false}
-            dateRange={{
-              start: filters.dateRange.start || new Date(),
-              end: filters.dateRange.end || new Date(),
-            }}
+          <TimeNavigator
+            range={filters.dateRange}
+            onChange={handleTimeNavigatorChange}
           />
         </div>
 
@@ -615,6 +640,9 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
                     Original Invoice
                   </th>
+                  <th className="px-4 py-2.5 text-center text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
+                    Original e-Invoice
+                  </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
                     Customer
                   </th>
@@ -622,7 +650,7 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
                     Amount
                   </th>
                   <th className="px-4 py-2.5 text-center text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                    Status
+                    Adj. e-Invoice
                   </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
                     Created
@@ -671,13 +699,15 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
                         </button>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-default-900 dark:text-gray-100">
-                        {doc.id}
+                        {formatAdjustmentDocId(doc.id)}
                         {doc.paired_doc_id && (
                           <span
                             className="block text-xs text-default-500 dark:text-gray-400"
-                            title={`Paired with ${doc.paired_doc_id}`}
+                            title={`Paired with ${formatAdjustmentDocId(
+                              doc.paired_doc_id
+                            )}`}
                           >
-                            ↔ {doc.paired_doc_id}
+                            ↔ {formatAdjustmentDocId(doc.paired_doc_id)}
                           </span>
                         )}
                       </td>
@@ -686,6 +716,12 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-default-700 dark:text-gray-200">
                         {doc.original_invoice_id}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-center">
+                        <AdjustmentDocStatusBadge
+                          status="active"
+                          einvoiceStatus={doc.original_invoice_einvoice_status}
+                        />
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-default-700 dark:text-gray-200">
                         {doc.customer_name || doc.customerid}
@@ -726,6 +762,93 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
         confirmButtonText={isSubmitting ? "Submitting..." : "Submit"}
         variant="default"
       />
+
+      {/* Blocking submission progress overlay — prevents any interaction/navigation while a batch e-invoice submission is in flight */}
+      <Transition appear show={isSubmitting} as={React.Fragment}>
+        <Dialog
+          as="div"
+          className="fixed inset-0 z-[60] overflow-y-auto"
+          onClose={() => {
+            /* non-dismissible while submitting */
+          }}
+        >
+          <div className="min-h-screen px-4 text-center">
+            <TransitionChild
+              as={React.Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0"
+              enterTo="opacity-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100"
+              leaveTo="opacity-0"
+            >
+              <div className="fixed inset-0 bg-black/40 dark:bg-black/60" />
+            </TransitionChild>
+
+            <span
+              className="inline-block h-screen align-middle"
+              aria-hidden="true"
+            >
+              &#8203;
+            </span>
+
+            <TransitionChild
+              as={React.Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 scale-95"
+              enterTo="opacity-100 scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 scale-100"
+              leaveTo="opacity-0 scale-95"
+            >
+              <DialogPanel className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-center align-middle transition-all transform bg-white dark:bg-gray-800 border border-transparent dark:border-gray-700 shadow-xl rounded-2xl">
+                <div className="flex justify-center mb-4">
+                  <LoadingSpinner />
+                </div>
+                <h3 className="text-lg font-medium leading-6 text-default-900 dark:text-gray-100">
+                  Submitting e-Invoices to MyInvois
+                </h3>
+                <p className="mt-2 text-sm text-default-500 dark:text-gray-400">
+                  Please don't close or navigate away from this page. Submitting{" "}
+                  {submitProgress?.current ?? 0} of {submitProgress?.total ?? 0}
+                  …
+                </p>
+                {submitProgress && (
+                  <>
+                    <p className="mt-1 text-xs font-medium text-default-700 dark:text-gray-300 truncate">
+                      {submitProgress.currentId}
+                    </p>
+                    <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-default-100 dark:bg-gray-700">
+                      <div
+                        className="h-full rounded-full bg-sky-500 transition-all duration-300"
+                        style={{
+                          width: `${
+                            submitProgress.total > 0
+                              ? (submitProgress.current /
+                                  submitProgress.total) *
+                                100
+                              : 0
+                          }%`,
+                        }}
+                      />
+                    </div>
+                    <div className="mt-3 flex justify-center gap-4 text-xs">
+                      <span className="text-emerald-600 dark:text-emerald-400">
+                        {submitProgress.success} succeeded
+                      </span>
+                      {submitProgress.failed > 0 && (
+                        <span className="text-rose-600 dark:text-rose-400">
+                          {submitProgress.failed} failed
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
+              </DialogPanel>
+            </TransitionChild>
+          </div>
+        </Dialog>
+      </Transition>
 
       {batchPrintDocs && (
         <AdjustmentDocPrintOverlay

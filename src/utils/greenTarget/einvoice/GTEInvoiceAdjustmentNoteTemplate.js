@@ -6,6 +6,7 @@
 //
 // Defaults supplierInfo to GREENTARGET_INFO.
 import { GREENTARGET_INFO } from "../../invoice/einvoice/companyInfo.js";
+import { formatAdjustmentDocId } from "../../adjustments/formatDocId.js";
 
 const TYPE_CODE = {
   credit_note: "02",
@@ -289,7 +290,7 @@ export async function GTEInvoiceAdjustmentNoteTemplate(
          xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">`;
 
   xml += `
-  <cbc:ID>${escapeXml(adjustmentDoc.id)}</cbc:ID>
+  <cbc:ID>${escapeXml(formatAdjustmentDocId(adjustmentDoc.id))}</cbc:ID>
   <cbc:IssueDate>${formattedDate}</cbc:IssueDate>
   <cbc:IssueTime>${formattedTime}</cbc:IssueTime>
   <cbc:InvoiceTypeCode listVersionID="1.0">${typeCode}</cbc:InvoiceTypeCode>

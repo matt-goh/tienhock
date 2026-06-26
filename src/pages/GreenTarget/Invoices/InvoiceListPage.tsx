@@ -1,7 +1,7 @@
 // src/pages/GreenTarget/Invoices/InvoiceListPage.tsx
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import DateRangePicker from "../../../components/DateRangePicker";
+import TimeNavigator from "../../../components/TimeNavigator";
 import {
   IconSearch,
   IconChevronLeft,
@@ -56,8 +56,6 @@ import { pdf, Document } from "@react-pdf/renderer";
 import { generateQRDataUrl } from "../../../utils/invoice/einvoice/generateQRCode";
 import { FormCombobox, SelectOption } from "../../../components/FormComponents";
 import GTStatementModal from "../../../components/GreenTarget/GTStatementModal";
-import DateNavigator from "../../../components/DateNavigator";
-import MonthNavigator from "../../../components/MonthNavigator";
 
 interface InvoiceCardProps {
   invoice: InvoiceGT;
@@ -862,7 +860,7 @@ const InvoiceListPage: React.FC = () => {
     };
   };
 
-  // Month state for MonthNavigator
+  // Month state - drives the consolidation modals; synced with the TimeNavigator.
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
 
   // Define default filter values as constants
@@ -959,43 +957,16 @@ const InvoiceListPage: React.FC = () => {
     return `${year}-${month}-${day}`;
   };
 
-  // Handle month selection
-  const handleMonthChange = (newDate: Date) => {
-    setSelectedMonth(newDate);
+  // Unified Time Navigator change handler. Handles day, month, and custom-range
+  // selections from the single TimeNavigator control.
+  const handleTimeNavigatorChange = (range: { start: Date; end: Date }) => {
+    // Keep the consolidation modals' month in sync with the selection.
+    setSelectedMonth(range.start);
 
-    // Create start date (1st of the selected month)
-    const startDate = new Date(newDate.getFullYear(), newDate.getMonth(), 1);
-    startDate.setHours(0, 0, 0, 0);
-
-    // Create end date (last day of the selected month)
-    const endDate = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0);
-    endDate.setHours(23, 59, 59, 999);
-
-    // Save to storage and update state
-    saveDatesToStorage(startDate, endDate);
-
-    // Update state and then fetch
-    setDateRange({
-      start: startDate,
-      end: endDate,
-    });
+    saveDatesToStorage(range.start, range.end);
+    setDateRange({ start: range.start, end: range.end });
 
     // Reset to first page when date changes
-    setCurrentPage(1);
-  };
-
-  // Handle date navigator change (single day selection)
-  const handleDateNavigatorChange = (newDate: Date) => {
-    const startOfDay = new Date(newDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(newDate);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    saveDatesToStorage(startOfDay, endOfDay);
-    setDateRange({
-      start: startOfDay,
-      end: endOfDay,
-    });
     setCurrentPage(1);
   };
 
@@ -1907,32 +1878,10 @@ const InvoiceListPage: React.FC = () => {
 
           {/* Filters and Actions */}
           <div className="w-full lg:w-auto flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-            {/* DateRangePicker */}
-            <div className="w-full sm:w-auto">
-              <DateRangePicker
-                dateRange={dateRange}
-                onDateChange={(newDateRange) => {
-                  saveDatesToStorage(newDateRange.start, newDateRange.end);
-                  setDateRange(newDateRange);
-                  setCurrentPage(1);
-                }}
-                className="w-full"
-              />
-            </div>
-
-            {/* Date Navigator */}
-            <DateNavigator
-              selectedDate={dateRange.start || new Date()}
-              onChange={handleDateNavigatorChange}
-              showGoToTodayButton={false}
-            />
-
-            {/* Month Navigator */}
-            <MonthNavigator
-              selectedMonth={selectedMonth}
-              onChange={handleMonthChange}
-              showGoToCurrentButton={false}
-              dateRange={dateRange}
+            {/* Time Navigator */}
+            <TimeNavigator
+              range={dateRange}
+              onChange={handleTimeNavigatorChange}
             />
 
             {/* Filters button */}

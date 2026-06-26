@@ -4,9 +4,21 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { FormInput, FormListbox } from "../../../components/FormComponents";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import TimeNavigator from "../../../components/TimeNavigator";
 import { api } from "../../../routes/utils/api";
 
 type InvoiceSource = "purchase_invoices" | "self_billed_invoices";
+
+// Parse a yyyy-MM-dd string into a local Date (null when empty/invalid).
+const parseYmd = (s: string): Date | null => {
+  if (!s) return null;
+  const [y, m, d] = s.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const date = new Date(y, m - 1, d);
+  return isNaN(date.getTime()) ? null : date;
+};
+// Format a local Date into yyyy-MM-dd (timezone-safe via date-fns local format).
+const toYmd = (d: Date): string => format(d, "yyyy-MM-dd");
 
 interface SupplierPaymentRow {
   payment_id: number;
@@ -145,7 +157,7 @@ const SupplierPaymentListPage: React.FC = () => {
       </div>
 
       <section className="rounded-lg border border-default-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
-        <div className="grid gap-3 md:grid-cols-5">
+        <div className="grid gap-3 md:grid-cols-4">
           <FormListbox
             name="source"
             label="Source"
@@ -155,24 +167,25 @@ const SupplierPaymentListPage: React.FC = () => {
             }
             options={sourceOptions}
           />
-          <FormInput
-            name="start_date"
-            label="Start Date"
-            type="date"
-            value={filters.start_date}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-              updateFilter("start_date", event.target.value)
-            }
-          />
-          <FormInput
-            name="end_date"
-            label="End Date"
-            type="date"
-            value={filters.end_date}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-              updateFilter("end_date", event.target.value)
-            }
-          />
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+              Date Range
+            </label>
+            <TimeNavigator
+              range={{
+                start: parseYmd(filters.start_date),
+                end: parseYmd(filters.end_date),
+              }}
+              onChange={(range) => {
+                setFilters((prev) => ({
+                  ...prev,
+                  start_date: toYmd(range.start),
+                  end_date: toYmd(range.end),
+                }));
+              }}
+              placeholder="All dates"
+            />
+          </div>
           <FormListbox
             name="status"
             label="Status"

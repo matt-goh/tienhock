@@ -16,8 +16,7 @@ import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 import StyledListbox from "../../../components/StyledListbox";
 import { getJobConfig } from "../../../configs/payrollJobConfigs";
-import MonthNavigator from "../../../components/MonthNavigator";
-import YearNavigator from "../../../components/YearNavigator";
+import TimeNavigator from "../../../components/TimeNavigator";
 
 interface MonthlyLogListPageProps {
   jobType: string;
@@ -48,7 +47,6 @@ const MonthlyLogListPage: React.FC<MonthlyLogListPageProps> = ({ jobType }) => {
   const supportsDayTypeHours = jobType !== "OFFICE";
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
-  const currentMonth = currentDate.getMonth() + 1; // 1-12
 
   const [filters, setFilters] = useState({
     year: currentYear,
@@ -59,35 +57,35 @@ const MonthlyLogListPage: React.FC<MonthlyLogListPageProps> = ({ jobType }) => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [logToDelete, setLogToDelete] = useState<MonthlyWorkLog | null>(null);
 
-  // Computed date for MonthNavigator (use current month if filter.month is null)
-  const selectedMonthDate = useMemo(() => {
-    const month = filters.month ?? currentMonth;
-    return new Date(filters.year, month - 1, 1);
-  }, [filters.month, filters.year, currentMonth]);
+  // Range for the TimeNavigator: a whole year when no specific month is set
+  // (month === null = "all months"), otherwise the selected month.
+  const dateRange = useMemo(() => {
+    if (filters.month === null) {
+      return {
+        start: new Date(filters.year, 0, 1),
+        end: new Date(filters.year, 11, 31, 23, 59, 59, 999),
+      };
+    }
+    return {
+      start: new Date(filters.year, filters.month - 1, 1),
+      end: new Date(filters.year, filters.month, 0, 23, 59, 59, 999),
+    };
+  }, [filters.year, filters.month]);
 
-  // Handler for MonthNavigator
-  const handleMonthNavigatorChange = (date: Date) => {
-    setFilters({
-      ...filters,
-      month: date.getMonth() + 1,
-      year: date.getFullYear(),
-    });
-  };
-
-  // Handler for YearNavigator
-  const handleYearNavigatorChange = (year: number) => {
-    setFilters({
-      ...filters,
-      year: year,
-    });
-  };
-
-  // Toggle all months filter
-  const handleToggleAllMonths = () => {
-    setFilters({
-      ...filters,
-      month: filters.month === null ? currentMonth : null,
-    });
+  // Year selection = all months of that year; Month selection = specific month.
+  const handleTimeNavigatorChange = (
+    range: { start: Date; end: Date },
+    meta: { mode: string }
+  ) => {
+    if (meta.mode === "year") {
+      setFilters({ ...filters, year: range.start.getFullYear(), month: null });
+    } else {
+      setFilters({
+        ...filters,
+        year: range.start.getFullYear(),
+        month: range.start.getMonth() + 1,
+      });
+    }
   };
 
   const statusOptions = [
@@ -274,37 +272,12 @@ const MonthlyLogListPage: React.FC<MonthlyLogListPageProps> = ({ jobType }) => {
 
           {/* Right: Filters + Button */}
           <div className="flex flex-wrap items-center gap-3">
-            <YearNavigator
-              selectedYear={filters.year}
-              onChange={handleYearNavigatorChange}
-              showGoToCurrentButton={false}
+            <TimeNavigator
+              range={dateRange}
+              onChange={handleTimeNavigatorChange}
+              modes={["month", "year"]}
+              presets={false}
             />
-            <div className="flex items-center gap-2">
-              <div
-                className={
-                  filters.month === null ? "opacity-50 pointer-events-none" : ""
-                }
-              >
-                <MonthNavigator
-                  selectedMonth={selectedMonthDate}
-                  onChange={handleMonthNavigatorChange}
-                  formatDisplay={(date) =>
-                    date.toLocaleDateString("en-MY", { month: "long" })
-                  }
-                  showGoToCurrentButton={false}
-                />
-              </div>
-              <button
-                onClick={handleToggleAllMonths}
-                className={`px-3 h-[40px] text-xs font-medium rounded-lg border transition-colors ${
-                  filters.month === null
-                    ? "bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 border-sky-300 dark:border-sky-700"
-                    : "bg-white dark:bg-gray-700 text-default-600 dark:text-gray-200 border-default-300 dark:border-gray-600 hover:bg-default-50 dark:hover:bg-gray-600"
-                }`}
-              >
-                All
-              </button>
-            </div>
             <div className="w-32">
               <StyledListbox
                 value={filters.status || "all"}
