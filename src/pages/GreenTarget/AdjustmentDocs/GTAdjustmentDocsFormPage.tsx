@@ -22,6 +22,7 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import { FormInput, FormListbox } from "../../../components/FormComponents";
 import { api } from "../../../routes/utils/api";
+import { formatAdjustmentDocId } from "../../../utils/adjustments/formatDocId";
 import toast from "react-hot-toast";
 import { AdjustmentDocType } from "../../../types/types";
 import {
@@ -153,6 +154,9 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showBackConfirm, setShowBackConfirm] = useState(false);
+  // Predicted next document id for this type (preview only — the final id is
+  // assigned on save and may differ if another doc is created in between).
+  const [previewDocId, setPreviewDocId] = useState<string>("");
 
   const [invoice, setInvoice] = useState<GTInvoice | null>(null);
   const [payments, setPayments] = useState<GTPayment[]>([]);
@@ -172,6 +176,23 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
   const [refundReference, setRefundReference] = useState("");
 
   const [issuePairedRefund, setIssuePairedRefund] = useState(false);
+
+  // Fetch the predicted next document id to preview in the header.
+  useEffect(() => {
+    if (!type) return;
+    let cancelled = false;
+    api
+      .get(`${API_BASE}/next-number/${type}`)
+      .then((res: { next_id?: string }) => {
+        if (!cancelled) setPreviewDocId(res?.next_id || "");
+      })
+      .catch(() => {
+        if (!cancelled) setPreviewDocId("");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [type]);
 
   const isCN = type === "credit_note";
   const isDN = type === "debit_note";
@@ -333,7 +354,9 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
           setLines([
             {
               uid: crypto.randomUUID(),
-              description: `Refund excess from Credit Note ${loadedPairedCreditNote.id}`,
+              description: `Refund excess from Credit Note ${formatAdjustmentDocId(
+                loadedPairedCreditNote.id
+              )}`,
               quantity: 1,
               price: refundableExcess,
               tax: 0,
@@ -508,11 +531,15 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
         );
         if (maxReplacementRefundAmount <= MONEY_TOLERANCE) {
           errors.push(
-            `Refund Note cannot be paired because Credit Note ${pairedCreditNote.id} did not create a refundable excess.`
+            `Refund Note cannot be paired because Credit Note ${formatAdjustmentDocId(
+              pairedCreditNote.id
+            )} did not create a refundable excess.`
           );
         } else if (totals.total_amount > maxReplacementRefundAmount + MONEY_TOLERANCE) {
           errors.push(
-            `Refund amount cannot exceed refundable excess RM ${maxReplacementRefundAmount.toFixed(2)} from Credit Note ${pairedCreditNote.id}.`
+            `Refund amount cannot exceed refundable excess RM ${maxReplacementRefundAmount.toFixed(
+              2
+            )} from Credit Note ${formatAdjustmentDocId(pairedCreditNote.id)}.`
           );
         }
       }
@@ -774,7 +801,18 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
 
         {/* Original invoice summary */}
         <div className="p-4 border-b border-default-200 dark:border-gray-700 bg-default-50/60 dark:bg-gray-900/30">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-sm">
+            <div>
+              <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
+                Document No.
+              </div>
+              <div
+                className="font-medium text-default-900 dark:text-gray-100 w-fit"
+                title="Predicted next number — the final number is assigned when you save"
+              >
+                {previewDocId ? formatAdjustmentDocId(previewDocId) : "—"}
+              </div>
+            </div>
             <div>
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
                 Original Invoice
@@ -839,7 +877,8 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
           {pairedCreditNote && (
             <div className="mt-3 p-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 text-sm">
               <span className="font-medium text-indigo-800 dark:text-indigo-300">
-                Reissuing Refund Note for Credit Note {pairedCreditNote.id}
+                Reissuing Refund Note for Credit Note{" "}
+                {formatAdjustmentDocId(pairedCreditNote.id)}
               </span>
               <span className="ml-2 text-indigo-700 dark:text-indigo-400">
                 (Credit Note amount: RM {Number(pairedCreditNote.total_amount).toFixed(2)})
@@ -863,7 +902,9 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
                   : isDN
                   ? "e.g. Additional rental period billed"
                   : isReplacementPairedRefund
-                  ? `Replacement refund for Credit Note ${pairedCreditNoteId}`
+                  ? `Replacement refund for Credit Note ${formatAdjustmentDocId(
+                      pairedCreditNoteId
+                    )}`
                   : "Reason for this adjustment"
               }
               rows={2}

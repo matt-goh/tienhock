@@ -45,6 +45,7 @@ import { parseDatabaseTimestamp, formatDisplayDate } from "../../utils/invoice/d
 import AdjustmentDocPrintOverlay from "../../utils/adjustments/PDF/AdjustmentDocPrintOverlay";
 import { generateAdjustmentDocPDFFilename } from "../../utils/adjustments/PDF/generateAdjustmentDocPDFFilename";
 import { generateAdjustmentDocPDFBlob } from "../../utils/adjustments/PDF/AdjustmentDocPDFHandler";
+import { formatAdjustmentDocId } from "../../utils/adjustments/formatDocId";
 
 interface FilterState {
   type: AdjustmentDocType | "all";
@@ -699,13 +700,15 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
                         </button>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-default-900 dark:text-gray-100">
-                        {doc.id}
+                        {formatAdjustmentDocId(doc.id)}
                         {doc.paired_doc_id && (
                           <span
                             className="block text-xs text-default-500 dark:text-gray-400"
-                            title={`Paired with ${doc.paired_doc_id}`}
+                            title={`Paired with ${formatAdjustmentDocId(
+                              doc.paired_doc_id
+                            )}`}
                           >
-                            ↔ {doc.paired_doc_id}
+                            ↔ {formatAdjustmentDocId(doc.paired_doc_id)}
                           </span>
                         )}
                       </td>

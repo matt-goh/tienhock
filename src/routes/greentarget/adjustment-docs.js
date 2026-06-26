@@ -12,6 +12,7 @@
 // eligible-for-consolidation, submit-consolidated, consolidated-history).
 import { Router } from "express";
 import { determineBankAccount } from "../../utils/payment-helpers.js";
+import { formatAdjustmentDocId } from "../../utils/adjustments/formatDocId.js";
 import GTEInvoiceApiClientFactory from "../../utils/greenTarget/einvoice/GTEInvoiceApiClientFactory.js";
 import GTEInvoiceSubmissionHandler from "../../utils/greenTarget/einvoice/GTEInvoiceSubmissionHandler.js";
 import { GTEInvoiceAdjustmentNoteTemplate } from "../../utils/greenTarget/einvoice/GTEInvoiceAdjustmentNoteTemplate.js";
@@ -39,24 +40,29 @@ export default function (pool, myInvoisGTConfig) {
   //                                 HELPERS
   // ============================================================================
 
+  // New scheme: GT-{TYPE}-{YY}-{N} e.g. "GT-CN-26-1" (stored URL-safe; rendered
+  // as "GT/CN/26/1"). Running number is unpadded, so resolve the max
+  // numerically rather than by lexical id sort.
   async function generateNextDocId(client, type, year) {
     const prefix = TYPE_PREFIX[type];
-    const pattern = `${prefix}-${year}-%`;
+    const yy = String(year).slice(-2);
+    const pattern = `${prefix}-${yy}-%`;
     const result = await client.query(
       `SELECT id FROM greentarget.adjustment_documents
         WHERE id LIKE $1
-        ORDER BY id DESC LIMIT 1
+        ORDER BY split_part(id, '-', 4)::int DESC
+        LIMIT 1
         FOR UPDATE SKIP LOCKED`,
       [pattern]
     );
     let next = 1;
     if (result.rows.length > 0) {
       const m = result.rows[0].id.match(
-        new RegExp(`^${prefix}-${year}-(\\d+)$`)
+        new RegExp(`^${prefix}-${yy}-(\\d+)$`)
       );
       if (m) next = parseInt(m[1], 10) + 1;
     }
-    return `${prefix}-${year}-${String(next).padStart(4, "0")}`;
+    return `${prefix}-${yy}-${next}`;
   }
 
   // Returns { id: integer, invoice_number: string } of the parent consolidated
@@ -521,7 +527,12 @@ export default function (pool, myInvoisGTConfig) {
       if (search) {
         params.push(`%${search}%`);
         const sp = `$${p++}`;
-        sql += ` AND (a.id ILIKE ${sp} OR a.original_invoice_number ILIKE ${sp} OR COALESCE(a.customer_name, c.name) ILIKE ${sp})`;
+        // Ids are stored URL-safe with dashes ("GT-CN-26-1") but shown with
+        // slashes ("GT/CN/26/1"); normalise slashes so searching the displayed
+        // form still matches the stored id.
+        params.push(`%${search.replace(/\//g, "-")}%`);
+        const spId = `$${p++}`;
+        sql += ` AND (a.id ILIKE ${spId} OR a.original_invoice_number ILIKE ${sp} OR COALESCE(a.customer_name, c.name) ILIKE ${sp})`;
       }
       sql += ` ORDER BY a.created_at DESC`;
 
@@ -1196,8 +1207,12 @@ export default function (pool, myInvoisGTConfig) {
       const fresh = await fetchDocWithRelations(client, docId);
       res.status(201).json({
         message: pairedDoc
-          ? `Credit Note ${docId} and paired Refund Note ${pairedDoc.id} created`
-          : `${TYPE_PREFIX[type]} ${docId} created`,
+          ? `Credit Note ${formatAdjustmentDocId(
+              docId
+            )} and paired Refund Note ${formatAdjustmentDocId(
+              pairedDoc.id
+            )} created`
+          : `${TYPE_PREFIX[type]} ${formatAdjustmentDocId(docId)} created`,
         document: {
           ...fresh,
           amount_before_tax: parseFloat(fresh.amount_before_tax || 0),
