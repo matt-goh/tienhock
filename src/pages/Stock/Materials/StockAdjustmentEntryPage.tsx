@@ -1,4 +1,4 @@
-// src/pages/Stock/Materials/MaterialAndGeneralStockPage.tsx
+// src/pages/Stock/Materials/StockAdjustmentEntryPage.tsx
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../../routes/utils/api";
@@ -49,6 +49,11 @@ interface StockResponse {
 type EditableStockField = "adjustment_quantity" | "unit_cost";
 type NewVariantField = "variant_name" | EditableStockField;
 type StockEntryTab = ProductLine | "general";
+type StockEntryMode = "general" | "material";
+
+interface StockAdjustmentEntryPageProps {
+  mode: StockEntryMode;
+}
 
 const categoryLabels: Record<MaterialCategory, string> = {
   ingredient: "Ingredients",
@@ -69,18 +74,44 @@ const stockTabs: { id: StockEntryTab; label: string; activeClass: string }[] = [
   { id: "shared", label: "SHARED", activeClass: "bg-teal-500 text-white shadow-sm" },
 ];
 
-const STOCK_TAB_STORAGE_KEY = "materialAndGeneralStock.activeTab";
+const MATERIAL_STOCK_TAB_STORAGE_KEY = "materialStock.activeTab";
+const LEGACY_STOCK_TAB_STORAGE_KEY = "materialAndGeneralStock.activeTab";
 
 const isStockEntryTab = (value: string | null): value is StockEntryTab => {
   return value === "general" || value === "mee" || value === "bihun" || value === "shared";
 };
 
-const readStoredStockEntryTab = (): StockEntryTab | null => {
+const getAvailableStockTabs = (mode: StockEntryMode): StockEntryTab[] => {
+  if (mode === "general") return ["general"];
+  return ["mee", "bihun", "shared"];
+};
+
+const getDefaultStockEntryTab = (mode: StockEntryMode): StockEntryTab => {
+  return mode === "general" ? "general" : "bihun";
+};
+
+const isAllowedStockEntryTab = (
+  value: string | null,
+  availableTabs: StockEntryTab[]
+): value is StockEntryTab => {
+  return isStockEntryTab(value) && availableTabs.includes(value);
+};
+
+const readStoredStockEntryTab = (availableTabs: StockEntryTab[]): StockEntryTab | null => {
   if (typeof window === "undefined") return null;
 
   try {
-    const storedTab: string | null = window.localStorage.getItem(STOCK_TAB_STORAGE_KEY);
-    return isStockEntryTab(storedTab) ? storedTab : null;
+    const storageKeys: string[] = [
+      MATERIAL_STOCK_TAB_STORAGE_KEY,
+      LEGACY_STOCK_TAB_STORAGE_KEY,
+    ];
+
+    for (const storageKey of storageKeys) {
+      const storedTab: string | null = window.localStorage.getItem(storageKey);
+      if (isAllowedStockEntryTab(storedTab, availableTabs)) return storedTab;
+    }
+
+    return null;
   } catch (_error: unknown) {
     return null;
   }
@@ -90,17 +121,21 @@ const storeStockEntryTab = (tab: StockEntryTab): void => {
   if (typeof window === "undefined") return;
 
   try {
-    window.localStorage.setItem(STOCK_TAB_STORAGE_KEY, tab);
+    window.localStorage.setItem(MATERIAL_STOCK_TAB_STORAGE_KEY, tab);
   } catch (_error: unknown) {
     // URL tab preservation still works when browser storage is unavailable.
   }
 };
 
-const getStockEntryTab = (searchParams: URLSearchParams): StockEntryTab => {
+const getStockEntryTab = (
+  searchParams: URLSearchParams,
+  availableTabs: StockEntryTab[],
+  defaultTab: StockEntryTab
+): StockEntryTab => {
   const tabParam: string | null = searchParams.get("tab");
-  if (isStockEntryTab(tabParam)) return tabParam;
+  if (isAllowedStockEntryTab(tabParam, availableTabs)) return tabParam;
 
-  return readStoredStockEntryTab() || "bihun";
+  return readStoredStockEntryTab(availableTabs) || defaultTab;
 };
 
 const makeNumber = (value: number | string | null | undefined): number => {
@@ -149,11 +184,21 @@ const makeNewVariantRow = (defaultUnitCost: number): StockEntryRow => ({
   notes: null,
 });
 
-const MaterialAndGeneralStockPage: React.FC = () => {
+const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({ mode }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => new Date());
-  const activeTab = useMemo<StockEntryTab>(() => getStockEntryTab(searchParams), [searchParams]);
+  const availableTabs = useMemo<StockEntryTab[]>(() => getAvailableStockTabs(mode), [mode]);
+  const defaultTab = useMemo<StockEntryTab>(() => getDefaultStockEntryTab(mode), [mode]);
+  const visibleStockTabs = useMemo(
+    () => stockTabs.filter((tab) => availableTabs.includes(tab.id)),
+    [availableTabs]
+  );
+  const activeTab = useMemo<StockEntryTab>(
+    () => getStockEntryTab(searchParams, availableTabs, defaultTab),
+    [availableTabs, defaultTab, searchParams]
+  );
+  const pageTitle = mode === "general" ? "General Stock" : "Material Stock";
   const [materials, setMaterials] = useState<MaterialWithStock[]>([]);
   const [originalMaterials, setOriginalMaterials] = useState<MaterialWithStock[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -183,7 +228,16 @@ const MaterialAndGeneralStockPage: React.FC = () => {
   useEffect(() => {
     const tabParam: string | null = searchParams.get("tab");
 
-    if (isStockEntryTab(tabParam)) {
+    if (mode === "general") {
+      if (!tabParam) return;
+
+      const nextSearchParams: URLSearchParams = new URLSearchParams(searchParams);
+      nextSearchParams.delete("tab");
+      setSearchParams(nextSearchParams, { replace: true });
+      return;
+    }
+
+    if (isAllowedStockEntryTab(tabParam, availableTabs)) {
       storeStockEntryTab(tabParam);
       return;
     }
@@ -191,7 +245,7 @@ const MaterialAndGeneralStockPage: React.FC = () => {
     const nextSearchParams: URLSearchParams = new URLSearchParams(searchParams);
     nextSearchParams.set("tab", activeTab);
     setSearchParams(nextSearchParams, { replace: true });
-  }, [activeTab, searchParams, setSearchParams]);
+  }, [activeTab, availableTabs, mode, searchParams, setSearchParams]);
 
   const fetchData = useCallback(async () => {
     if (activeTab === "general") {
@@ -509,6 +563,7 @@ const MaterialAndGeneralStockPage: React.FC = () => {
   }, [hasUnsavedChanges]);
 
   const handleTabChange = (tab: StockEntryTab): void => {
+    if (!availableTabs.includes(tab)) return;
     if (tab === activeTab) return;
     if (hasUnsavedChanges && !window.confirm("You have unsaved changes. Do you want to discard them?")) {
       return;
@@ -927,7 +982,7 @@ const MaterialAndGeneralStockPage: React.FC = () => {
             <div className="flex items-center gap-2">
               <IconBox size={22} className="text-default-500 dark:text-gray-400" />
               <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">
-                Stock Adjustments
+                {pageTitle}
               </h1>
             </div>
             <span className="text-default-300 dark:text-gray-600">|</span>
@@ -977,24 +1032,28 @@ const MaterialAndGeneralStockPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="flex items-center bg-default-100 dark:bg-gray-700 rounded-full p-0.5">
-              {stockTabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabChange(tab.id)}
-                  className={clsx(
-                    "px-4 py-1 rounded-full text-sm font-medium transition-colors",
-                    activeTab === tab.id
-                      ? tab.activeClass
-                      : "text-default-600 dark:text-gray-400 hover:text-default-800 dark:hover:text-gray-200"
-                  )}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+            {visibleStockTabs.length > 1 && (
+              <>
+                <div className="flex items-center bg-default-100 dark:bg-gray-700 rounded-full p-0.5">
+                  {visibleStockTabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => handleTabChange(tab.id)}
+                      className={clsx(
+                        "px-4 py-1 rounded-full text-sm font-medium transition-colors",
+                        activeTab === tab.id
+                          ? tab.activeClass
+                          : "text-default-600 dark:text-gray-400 hover:text-default-800 dark:hover:text-gray-200"
+                      )}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
 
-            <span className="text-default-300 dark:text-gray-600">|</span>
+                <span className="text-default-300 dark:text-gray-600">|</span>
+              </>
+            )}
             <MonthNavigator
               selectedMonth={selectedMonth}
               onChange={setSelectedMonth}
@@ -1841,4 +1900,4 @@ const MaterialAndGeneralStockPage: React.FC = () => {
   );
 };
 
-export default MaterialAndGeneralStockPage;
+export default StockAdjustmentEntryPage;
