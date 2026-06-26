@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import {
   IconSearch,
   IconDownload,
+  IconChevronsDown,
+  IconChevronsUp,
   IconAlertCircle,
   IconPhone,
 } from "@tabler/icons-react";
@@ -28,6 +30,7 @@ const DebtorsReportPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [showDebtorRows, setShowDebtorRows] = useState(true);
   const [sortBy, setSortBy] = useState<{
     field: keyof Debtor;
     direction: "asc" | "desc";
@@ -116,6 +119,20 @@ const DebtorsReportPage: React.FC = () => {
     return sortedDebtors.reduce((sum, debtor) => sum + debtor.balance, 0);
   }, [sortedDebtors]);
 
+  const totalInvoiced = useMemo((): number => {
+    return sortedDebtors.reduce(
+      (sum: number, debtor: Debtor): number => sum + debtor.total_invoiced,
+      0
+    );
+  }, [sortedDebtors]);
+
+  const totalPaid = useMemo((): number => {
+    return sortedDebtors.reduce(
+      (sum: number, debtor: Debtor): number => sum + debtor.total_paid,
+      0
+    );
+  }, [sortedDebtors]);
+
   if (loading) {
     return (
       <div className="mt-40 w-full flex items-center justify-center">
@@ -170,6 +187,14 @@ const DebtorsReportPage: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          <Button
+            onClick={() => setShowDebtorRows((prev: boolean): boolean => !prev)}
+            icon={showDebtorRows ? IconChevronsUp : IconChevronsDown}
+            variant="outline"
+            className="w-full md:w-auto"
+          >
+            {showDebtorRows ? "Collapse Rows" : "Expand Rows"}
+          </Button>
           <Button
             onClick={handlePrint}
             icon={IconDownload}
@@ -285,7 +310,8 @@ const DebtorsReportPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                {sortedDebtors.map((debtor) => (
+                {showDebtorRows &&
+                  sortedDebtors.map((debtor: Debtor) => (
                   <tr
                     key={debtor.customer_id}
                     className="hover:bg-sky-50 dark:hover:bg-sky-900/20 cursor-pointer transition-colors"
@@ -339,6 +365,25 @@ const DebtorsReportPage: React.FC = () => {
                   </tr>
                 ))}
               </tbody>
+              <tfoot className="bg-default-50 dark:bg-gray-900/50">
+                <tr className="border-t-2 border-default-300 dark:border-gray-600">
+                  <td
+                    className="px-6 py-3 text-sm font-semibold text-default-900 dark:text-gray-100"
+                    colSpan={2}
+                  >
+                    Subtotal
+                  </td>
+                  <td className="px-6 py-3 text-right text-sm font-semibold text-default-900 dark:text-gray-100">
+                    {formatCurrency(totalInvoiced)}
+                  </td>
+                  <td className="px-6 py-3 text-right text-sm font-semibold text-green-600 dark:text-green-400">
+                    {formatCurrency(totalPaid)}
+                  </td>
+                  <td className="px-6 py-3 text-right text-sm font-semibold text-red-600 dark:text-red-400">
+                    {formatCurrency(totalOutstanding)}
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>

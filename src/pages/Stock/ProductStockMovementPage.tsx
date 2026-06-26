@@ -20,6 +20,10 @@ import {
 } from "@tabler/icons-react";
 import MonthNavigator from "../../components/MonthNavigator";
 import clsx from "clsx";
+import {
+  OTH_PRODUCTION_IDS,
+  isOthProductionProduct,
+} from "../../config/othProductionProducts";
 
 const FAVORITES_STORAGE_KEY = "stock-product-favorites";
 
@@ -43,6 +47,9 @@ const ProductStockMovementPage: React.FC = () => {
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [openingBalance, setOpeningBalance] = useState<number>(0); // Calculated B/F
   const [initialBalance, setInitialBalance] = useState<number>(0); // Admin-set migration balance
+  const [initialBalanceDate, setInitialBalanceDate] = useState<string | null>(
+    null
+  ); // Anchor date the balance is effective from
   const [monthlyTotals, setMonthlyTotals] = useState<
     StockMovementResponse["monthly_totals"] | null
   >(null);
@@ -51,7 +58,14 @@ const ProductStockMovementPage: React.FC = () => {
   // Opening balance edit state
   const [isEditingBalance, setIsEditingBalance] = useState(false);
   const [editBalanceValue, setEditBalanceValue] = useState<string>("");
+  const [editBalanceDate, setEditBalanceDate] = useState<string>("");
   const [isSavingBalance, setIsSavingBalance] = useState(false);
+
+  // Format a YYYY-MM-DD string to DD/MM/YYYY for display (no Date round-trip)
+  const formatDisplayDate = (value: string): string => {
+    const [year, month, day] = value.split("-");
+    return `${day}/${month}/${year}`;
+  };
 
   // Get products cache for favorites
   const { products } = useProductsCache("all");
@@ -82,14 +96,39 @@ const ProductStockMovementPage: React.FC = () => {
       window.removeEventListener("favorites-changed", handleFavoritesChange);
   }, []);
 
-  // Get favorite products (only BH and MEE types)
+  // Get favorite products (BH, MEE, and the whitelisted OTH stock products)
   const favoriteProducts = useMemo(() => {
     return products.filter(
       (product) =>
         favorites.has(product.id) &&
-        (product.type === "BH" || product.type === "MEE")
+        (product.type === "BH" ||
+          product.type === "MEE" ||
+          isOthProductionProduct(product.id))
     ) as StockProduct[];
   }, [products, favorites]);
+
+  // Selectable products grouped by category, for the empty-state picker
+  const selectableProductGroups = useMemo(() => {
+    const bh: StockProduct[] = [];
+    const mee: StockProduct[] = [];
+    const oth: StockProduct[] = [];
+
+    (products as StockProduct[]).forEach((product) => {
+      if (product.type === "BH") bh.push(product);
+      else if (product.type === "MEE") mee.push(product);
+      else if (isOthProductionProduct(product.id)) oth.push(product);
+    });
+
+    oth.sort(
+      (a, b) => OTH_PRODUCTION_IDS.indexOf(a.id) - OTH_PRODUCTION_IDS.indexOf(b.id)
+    );
+
+    return [
+      { label: "Bihun Products", products: bh },
+      { label: "Mee Products", products: mee },
+      { label: "Other Products", products: oth },
+    ].filter((group) => group.products.length > 0);
+  }, [products]);
 
   // Format date to YYYY-MM-DD in local timezone (not UTC)
   const formatDateLocal = (date: Date): string => {
@@ -143,6 +182,7 @@ const ProductStockMovementPage: React.FC = () => {
       setMovements(response.movements || []);
       setOpeningBalance(response.opening_balance || 0);
       setInitialBalance(response.initial_balance || 0);
+      setInitialBalanceDate(response.initial_balance_date || null);
       setMonthlyTotals(response.monthly_totals || null);
     } catch (error) {
       console.error("Error fetching stock movements:", error);
@@ -163,12 +203,23 @@ const ProductStockMovementPage: React.FC = () => {
   // Handle initial balance edit
   const handleEditBalance = () => {
     setEditBalanceValue(initialBalance.toString());
+    // Pre-fill the date: existing anchor, else the start of the selected month,
+    // never earlier than the stock system start date.
+    const monthStart = formatDateLocal(
+      new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1)
+    );
+    const defaultDate =
+      monthStart < STOCK_SYSTEM_START_DATE_STRING
+        ? STOCK_SYSTEM_START_DATE_STRING
+        : monthStart;
+    setEditBalanceDate(initialBalanceDate || defaultDate);
     setIsEditingBalance(true);
   };
 
   const handleCancelEditBalance = () => {
     setIsEditingBalance(false);
     setEditBalanceValue("");
+    setEditBalanceDate("");
   };
 
   const handleSaveBalance = async () => {
@@ -176,7 +227,12 @@ const ProductStockMovementPage: React.FC = () => {
 
     const newBalance = parseInt(editBalanceValue, 10);
     if (isNaN(newBalance) || newBalance < 0) {
-      toast.error("Please enter a valid positive number");
+      toast.error("Sila masukkan nombor yang sah (0 atau lebih)");
+      return;
+    }
+
+    if (!editBalanceDate) {
+      toast.error("Sila pilih tarikh berkuat kuasa baki permulaan");
       return;
     }
 
@@ -185,16 +241,18 @@ const ProductStockMovementPage: React.FC = () => {
       await api.post("/api/stock/opening-balance", {
         product_id: selectedProductId,
         balance: newBalance,
+        effective_date: editBalanceDate,
       });
 
-      toast.success("Initial balance updated");
+      toast.success("Baki permulaan dikemas kini");
       setInitialBalance(newBalance);
+      setInitialBalanceDate(editBalanceDate);
       setIsEditingBalance(false);
       // Refresh movements to recalculate B/F with new initial balance
       fetchMovements();
     } catch (error) {
       console.error("Error saving opening balance:", error);
-      toast.error("Failed to save opening balance");
+      toast.error("Gagal menyimpan baki permulaan");
     } finally {
       setIsSavingBalance(false);
     }
@@ -219,7 +277,10 @@ const ProductStockMovementPage: React.FC = () => {
               label="Product"
               value={selectedProductId}
               onChange={setSelectedProductId}
-              productTypes={["BH", "MEE"]}
+              productTypes={["BH", "MEE", "OTH"]}
+              productFilter={(product) =>
+                product.type !== "OTH" || isOthProductionProduct(product.id)
+              }
               showCategories={true}
               required
             />
@@ -494,24 +555,33 @@ const ProductStockMovementPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Divider - only visible on hover */}
-            <div className="h-12 w-px bg-default-200 dark:bg-gray-600 opacity-0 group-hover:opacity-100 transition-opacity ml-3" />
+            {/* Divider */}
+            <div className="h-12 w-px bg-default-200 dark:bg-gray-600 ml-3" />
 
-            {/* Right side - Initial Balance (editable for migration) - only visible on hover */}
+            {/* Right side - Baki Permulaan (opening balance, effective from a chosen date) */}
             {viewType === "month" && (
-              <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-start gap-3">
                 <div>
-                  <p className="text-xs text-default-400 dark:text-gray-500 text-right">
-                    Initial Balance
+                  <p className="text-right text-xs font-medium text-default-500 dark:text-gray-400">
+                    Baki Permulaan
                   </p>
-                  <div className="flex justify-end items-center gap-2">
-                    {isEditingBalance ? (
-                      <>
+                  {isEditingBalance ? (
+                    <div className="mt-1 space-y-1.5">
+                      <div className="flex items-center justify-end gap-2">
+                        <input
+                          type="date"
+                          value={editBalanceDate}
+                          onChange={(e) => setEditBalanceDate(e.target.value)}
+                          min={STOCK_SYSTEM_START_DATE_STRING}
+                          max={formatDateLocal(new Date())}
+                          className="rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 px-2 py-1 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                        />
                         <input
                           type="number"
                           value={editBalanceValue}
                           onChange={(e) => setEditBalanceValue(e.target.value)}
                           min="0"
+                          placeholder="0"
                           className="w-24 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 px-2 py-1 text-sm font-bold text-right focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                           autoFocus
                         />
@@ -529,21 +599,36 @@ const ProductStockMovementPage: React.FC = () => {
                         >
                           <IconX size={16} />
                         </button>
-                      </>
-                    ) : (
-                      <>
+                      </div>
+                      <p className="max-w-xs text-right text-[11px] leading-snug text-default-400 dark:text-gray-500">
+                        Jumlah stok sedia ada pada permulaan tarikh yang dipilih.
+                        Baki dikira bermula dari tarikh ini; sebarang rekod
+                        sebelum tarikh ini diabaikan.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mt-0.5 flex items-center justify-end gap-2">
+                      <div className="text-right">
                         <p className="text-lg font-bold tabular-nums text-default-800 dark:text-gray-100">
-                          {initialBalance.toLocaleString()}
+                          {initialBalance.toLocaleString()}{" "}
+                          <span className="text-xs font-normal text-default-400 dark:text-gray-500">
+                            bag
+                          </span>
                         </p>
-                        <button
-                          onClick={handleEditBalance}
-                          className="rounded-lg p-1 text-default-400 hover:bg-default-100 dark:hover:bg-gray-700 hover:text-default-600 dark:text-gray-500 dark:hover:text-gray-300 transition-all"
-                        >
-                          <IconEdit size={16} />
-                        </button>
-                      </>
-                    )}
-                  </div>
+                        <p className="text-[11px] text-default-400 dark:text-gray-500">
+                          {initialBalanceDate
+                            ? `pada ${formatDisplayDate(initialBalanceDate)}`
+                            : "Belum ditetapkan"}
+                        </p>
+                      </div>
+                      <button
+                        onClick={handleEditBalance}
+                        className="rounded-lg p-1 text-default-400 hover:bg-default-100 dark:hover:bg-gray-700 hover:text-default-600 dark:text-gray-500 dark:hover:text-gray-300 transition-all"
+                      >
+                        <IconEdit size={16} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -553,11 +638,40 @@ const ProductStockMovementPage: React.FC = () => {
 
       {/* Stock Movement Table */}
       {!selectedProductId ? (
-        <div className="rounded-lg border border-dashed border-default-300 dark:border-gray-600 p-12 text-center">
-          <IconPackage className="mx-auto h-12 w-12 text-default-300 dark:text-gray-600" />
-          <p className="mt-4 text-default-500 dark:text-gray-400">
-            Please select a product to view stock movements
-          </p>
+        <div className="rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-sm">
+          <div className="mb-4 flex items-center gap-2">
+            <IconPackage className="h-5 w-5 text-default-400 dark:text-gray-500" />
+            <p className="text-sm text-default-500 dark:text-gray-400">
+              Select a product to view its stock movements
+            </p>
+          </div>
+          {selectableProductGroups.length > 0 ? (
+            <div className="space-y-4">
+              {selectableProductGroups.map((group) => (
+                <div key={group.label}>
+                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-default-500 dark:text-gray-400">
+                    {group.label}
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {group.products.map((product) => (
+                      <button
+                        key={product.id}
+                        onClick={() => setSelectedProductId(product.id)}
+                        title={product.description}
+                        className="rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm font-medium text-default-700 dark:text-gray-200 transition-colors hover:border-sky-500 hover:bg-sky-50 dark:hover:bg-sky-900/30 hover:text-sky-700 dark:hover:text-sky-300"
+                      >
+                        {product.id}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-default-400 dark:text-gray-500">
+              No products available.
+            </p>
+          )}
         </div>
       ) : viewType === "custom" && (!customStartDate || !customEndDate) ? (
         <div className="rounded-lg border border-dashed border-default-300 dark:border-gray-600 p-12 text-center">

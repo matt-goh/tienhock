@@ -235,23 +235,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
             <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
               <IconSearch className="h-4 w-4 text-default-400 dark:text-gray-400" />
             </div>
-            {value ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onChange(null);
-                }}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-                className="absolute inset-y-0 right-0 flex items-center pr-2 text-default-400 dark:text-gray-400 hover:text-default-600 dark:hover:text-gray-200 z-10"
-              >
-                <IconX className="h-5 w-5" aria-hidden="true" />
-              </button>
-            ) : (
+            {!value && (
               <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                 <IconChevronDown
                   className="h-5 w-5 text-default-400 dark:text-gray-400"
@@ -260,6 +244,23 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
               </div>
             )}
           </ComboboxButton>
+
+          {/* Clear button - rendered outside ComboboxButton so the click is not
+              intercepted by Headless UI's button handlers */}
+          {value && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onChange(null);
+              }}
+              className="absolute inset-y-0 right-0 flex items-center pr-2 text-default-400 dark:text-gray-400 hover:text-default-600 dark:hover:text-gray-200 z-20"
+              aria-label="Clear selection"
+            >
+              <IconX className="h-5 w-5" aria-hidden="true" />
+            </button>
+          )}
 
           <ComboboxOptions
             className={clsx(

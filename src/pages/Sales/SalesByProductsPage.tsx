@@ -4,9 +4,7 @@ import { api } from "../../routes/utils/api";
 import { FormCombobox } from "../../components/FormComponents";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { IconSortAscending, IconSortDescending } from "@tabler/icons-react";
-import DateRangePicker from "../../components/DateRangePicker";
-import MonthNavigator from "../../components/MonthNavigator";
-import DateNavigator from "../../components/DateNavigator";
+import TimeNavigator from "../../components/TimeNavigator";
 import toast from "react-hot-toast";
 import {
   XAxis,
@@ -81,7 +79,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
   scope = "tienhock",
 }) => {
   const isJp = scope === "jp";
-  // Month selection - uses Date object for MonthNavigator
+  // Month derived from the time selection; drives the monthSelectionChanged event.
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
     return new Date(currentYear, currentMonth, 1);
   });
@@ -153,34 +151,11 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
     return result;
   }, [salesData]);
 
-  // Handle month selection change from MonthNavigator
-  const handleMonthChange = (newDate: Date) => {
-    setSelectedMonth(newDate);
-
-    // Create start date (1st of the selected month)
-    const startDate = new Date(newDate.getFullYear(), newDate.getMonth(), 1);
-    startDate.setHours(0, 0, 0, 0);
-
-    // Create end date (last day of the selected month)
-    const endDate = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0);
-    endDate.setHours(23, 59, 59, 999);
-
-    // Update date range
-    setDateRange({ start: startDate, end: endDate });
-  };
-
-  // Handle date selection change from DateNavigator
-  const handleDateChange = (newDate: Date) => {
-    // Create start date (beginning of the selected day)
-    const startDate = new Date(newDate);
-    startDate.setHours(0, 0, 0, 0);
-
-    // Create end date (end of the selected day)
-    const endDate = new Date(newDate);
-    endDate.setHours(23, 59, 59, 999);
-
-    // Update date range
-    setDateRange({ start: startDate, end: endDate });
+  // Unified Time Navigator change handler. Handles day, month, and custom-range
+  // selections from the single TimeNavigator control.
+  const handleTimeNavigatorChange = (range: { start: Date; end: Date }) => {
+    setSelectedMonth(range.start);
+    setDateRange({ start: range.start, end: range.end });
   };
 
   const productOptions = useMemo(() => {
@@ -691,27 +666,10 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            {/* Date Range Picker */}
-            <DateRangePicker
-              dateRange={dateRange}
-              onDateChange={(newDateRange) => {
-                setDateRange(newDateRange);
-              }}
-            />
-
-            {/* Month Selection */}
-            <MonthNavigator
-              selectedMonth={selectedMonth}
-              onChange={handleMonthChange}
-              showGoToCurrentButton={false}
-              dateRange={dateRange}
-            />
-
-            {/* Date Navigation */}
-            <DateNavigator
-              selectedDate={dateRange.start}
-              onChange={handleDateChange}
-              showGoToTodayButton={false}
+            {/* Time Navigator */}
+            <TimeNavigator
+              range={dateRange}
+              onChange={handleTimeNavigatorChange}
             />
 
             {/* Separator */}

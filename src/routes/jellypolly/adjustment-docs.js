@@ -14,5 +14,6 @@ export default function (pool, myInvoisConfig) {
       payments: "jellypolly.payments",
     },
     supplierInfo: JELLYPOLLY_INFO,
+    companyPrefix: "JP",
   });
 }

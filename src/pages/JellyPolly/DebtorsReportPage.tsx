@@ -6,9 +6,12 @@ import {
   IconDownload,
   IconChevronDown,
   IconChevronRight,
+  IconChevronsDown,
+  IconChevronsUp,
   IconAlertCircle,
   IconUser,
   IconCalendar,
+  IconListDetails,
   IconBuildingStore,
   IconRefresh,
   IconPhone,
@@ -63,6 +66,37 @@ interface DebtorsData {
   grand_total_balance: number;
   report_date: string | number;
 }
+
+interface DebtorsTotals {
+  totalAmount: number;
+  totalPaid: number;
+  totalBalance: number;
+}
+
+const calculateCustomerTotals = (customers: Customer[]): DebtorsTotals => {
+  return customers.reduce<DebtorsTotals>(
+    (totals: DebtorsTotals, customer: Customer): DebtorsTotals => ({
+      totalAmount: totals.totalAmount + customer.total_amount,
+      totalPaid: totals.totalPaid + customer.total_paid,
+      totalBalance: totals.totalBalance + customer.total_balance,
+    }),
+    { totalAmount: 0, totalPaid: 0, totalBalance: 0 }
+  );
+};
+
+const calculateSalesmenTotals = (salesmen: Salesman[]): DebtorsTotals => {
+  return salesmen.reduce<DebtorsTotals>(
+    (totals: DebtorsTotals, salesman: Salesman): DebtorsTotals => {
+      const salesmanTotals = calculateCustomerTotals(salesman.customers);
+      return {
+        totalAmount: totals.totalAmount + salesmanTotals.totalAmount,
+        totalPaid: totals.totalPaid + salesmanTotals.totalPaid,
+        totalBalance: totals.totalBalance + salesmanTotals.totalBalance,
+      };
+    },
+    { totalAmount: 0, totalPaid: 0, totalBalance: 0 }
+  );
+};
 
 const DebtorsReportPage: React.FC = () => {
   const navigate = useNavigate();
@@ -192,6 +226,88 @@ const DebtorsReportPage: React.FC = () => {
     });
   };
 
+  const getCustomerIdsForSalesmen = (salesmen: Salesman[]): string[] => {
+    return salesmen.flatMap((salesman: Salesman): string[] =>
+      salesman.customers.map((customer: Customer): string => customer.customer_id)
+    );
+  };
+
+  const isSalesmanFullyExpanded = (salesman: Salesman): boolean => {
+    return (
+      expandedSalesmen.has(salesman.salesman_id) &&
+      salesman.customers.every((customer: Customer): boolean =>
+        expandedCustomers.has(customer.customer_id)
+      )
+    );
+  };
+
+  const toggleSalesmanAndCustomers = (salesman: Salesman): void => {
+    const customerIds = salesman.customers.map(
+      (customer: Customer): string => customer.customer_id
+    );
+    const isFullyExpanded = isSalesmanFullyExpanded(salesman);
+
+    setExpandedSalesmen((prev: Set<string>): Set<string> => {
+      const newSet = new Set(prev);
+      if (isFullyExpanded) {
+        newSet.delete(salesman.salesman_id);
+      } else {
+        newSet.add(salesman.salesman_id);
+      }
+      return newSet;
+    });
+
+    setExpandedCustomers((prev: Set<string>): Set<string> => {
+      const newSet = new Set(prev);
+      customerIds.forEach((customerId: string): void => {
+        if (isFullyExpanded) {
+          newSet.delete(customerId);
+        } else {
+          newSet.add(customerId);
+        }
+      });
+      return newSet;
+    });
+  };
+
+  const toggleAllDebtors = (salesmen: Salesman[]): void => {
+    const visibleSalesmanIds = salesmen.map(
+      (salesman: Salesman): string => salesman.salesman_id
+    );
+    const visibleCustomerIds = getCustomerIdsForSalesmen(salesmen);
+    const allVisibleExpanded =
+      visibleSalesmanIds.every((salesmanId: string): boolean =>
+        expandedSalesmen.has(salesmanId)
+      ) &&
+      visibleCustomerIds.every((customerId: string): boolean =>
+        expandedCustomers.has(customerId)
+      );
+
+    setExpandedSalesmen((prev: Set<string>): Set<string> => {
+      const newSet = new Set(prev);
+      visibleSalesmanIds.forEach((salesmanId: string): void => {
+        if (allVisibleExpanded) {
+          newSet.delete(salesmanId);
+        } else {
+          newSet.add(salesmanId);
+        }
+      });
+      return newSet;
+    });
+
+    setExpandedCustomers((prev: Set<string>): Set<string> => {
+      const newSet = new Set(prev);
+      visibleCustomerIds.forEach((customerId: string): void => {
+        if (allVisibleExpanded) {
+          newSet.delete(customerId);
+        } else {
+          newSet.add(customerId);
+        }
+      });
+      return newSet;
+    });
+  };
+
   const toggleCustomerExpansion = (customerId: string): void => {
     setExpandedCustomers((prev) => {
       const newSet = new Set(prev);
@@ -204,22 +320,48 @@ const DebtorsReportPage: React.FC = () => {
     });
   };
 
-  const filteredData = debtorsData
-    ? {
-        ...debtorsData,
-        salesmen: debtorsData.salesmen
-          .map((salesman) => ({
-            ...salesman,
-            customers: salesman.customers.filter(
-              (customer) =>
-                customer.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                customer.customer_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                salesman.salesman_name.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredData: DebtorsData | null = debtorsData
+    ? ((): DebtorsData => {
+        const filtered: DebtorsData = {
+          ...debtorsData,
+          salesmen: debtorsData.salesmen
+            .map((salesman: Salesman): Salesman => {
+              const customers = salesman.customers.filter(
+                (customer: Customer): boolean =>
+                  customer.customer_name
+                    .toLowerCase()
+                    .includes(searchTerm.toLowerCase()) ||
+                  customer.customer_id
+                    .toLowerCase()
+                    .includes(searchTerm.toLowerCase()) ||
+                  salesman.salesman_name
+                    .toLowerCase()
+                    .includes(searchTerm.toLowerCase())
+              );
+              const totals = calculateCustomerTotals(customers);
+              return {
+                ...salesman,
+                customers,
+                total_balance: totals.totalBalance,
+              };
+            })
+            .filter(
+              (salesman: Salesman): boolean => salesman.customers.length > 0
             ),
-          }))
-          .filter((salesman) => salesman.customers.length > 0),
-      }
+        };
+        const totals = calculateSalesmenTotals(filtered.salesmen);
+        filtered.grand_total_amount = totals.totalAmount;
+        filtered.grand_total_paid = totals.totalPaid;
+        filtered.grand_total_balance = totals.totalBalance;
+        return filtered;
+      })()
     : null;
+  const allDebtorsExpanded =
+    !!filteredData &&
+    filteredData.salesmen.length > 0 &&
+    filteredData.salesmen.every((salesman: Salesman): boolean =>
+      isSalesmanFullyExpanded(salesman)
+    );
 
   const handleExportPDF = async (): Promise<void> => {
     if (!filteredData) return;
@@ -341,7 +483,7 @@ const DebtorsReportPage: React.FC = () => {
       </div>
 
       {/* Search */}
-      <div className="mb-6">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="relative max-w-md">
           <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
           <input
@@ -352,12 +494,24 @@ const DebtorsReportPage: React.FC = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+        <Button
+          onClick={() => toggleAllDebtors(filteredData.salesmen)}
+          variant="outline"
+          icon={allDebtorsExpanded ? IconChevronsUp : IconChevronsDown}
+        >
+          {allDebtorsExpanded ? "Collapse All" : "Expand All"}
+        </Button>
       </div>
 
       {/* Debtors List */}
       <div className="space-y-4" ref={printRef}>
         {filteredData.salesmen.map((salesman) => (
-          <div key={salesman.salesman_id} className="bg-white dark:bg-gray-800 rounded-lg border shadow-sm">
+          <div
+            key={salesman.salesman_id}
+            className={`bg-white dark:bg-gray-800 rounded-lg border shadow-sm ${
+              expandedSalesmen.has(salesman.salesman_id) ? "pb-2" : ""
+            }`}
+          >
             <div
               className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
               onClick={() => toggleSalesmanExpansion(salesman.salesman_id)}
@@ -372,8 +526,35 @@ const DebtorsReportPage: React.FC = () => {
                   <h3 className="font-semibold text-gray-900 dark:text-gray-100">
                     {salesman.salesman_name} ({salesman.salesman_id})
                   </h3>
-                  <p className="text-sm text-gray-600">
-                    {salesman.customers.length} customer(s)
+                  <p className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                    <span>{salesman.customers.length} customer(s)</span>
+                    <button
+                      type="button"
+                      className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 transition-colors hover:border-blue-300 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:border-blue-700 dark:hover:bg-blue-900/50 dark:hover:text-blue-200"
+                      title={
+                        isSalesmanFullyExpanded(salesman)
+                          ? "Collapse salesman details"
+                          : "Expand all customer details for this salesman"
+                      }
+                      aria-label={
+                        isSalesmanFullyExpanded(salesman)
+                          ? "Collapse salesman details"
+                          : "Expand all customer details for this salesman"
+                      }
+                      onClick={(
+                        e: React.MouseEvent<HTMLButtonElement>
+                      ): void => {
+                        e.stopPropagation();
+                        toggleSalesmanAndCustomers(salesman);
+                      }}
+                    >
+                      <IconListDetails size={14} />
+                      <span>
+                        {isSalesmanFullyExpanded(salesman)
+                          ? "Collapse details"
+                          : "Expand details"}
+                      </span>
+                    </button>
                   </p>
                 </div>
               </div>
@@ -386,7 +567,7 @@ const DebtorsReportPage: React.FC = () => {
             </div>
 
             {expandedSalesmen.has(salesman.salesman_id) && (
-              <div className="border-t border-gray-200">
+              <div className="mt-2 border-t border-gray-200">
                 {salesman.customers.map((customer) => (
                   <div key={customer.customer_id} className="border-b border-gray-100 last:border-b-0">
                     <div
@@ -470,6 +651,7 @@ const DebtorsReportPage: React.FC = () => {
                                     </td>
                                     <td className="py-2 text-center">
                                       <span
+                                        title={category}
                                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                                           days <= 30
                                             ? "bg-green-100 text-green-800"
@@ -487,6 +669,23 @@ const DebtorsReportPage: React.FC = () => {
                                 );
                               })}
                             </tbody>
+                            <tfoot>
+                              <tr className="border-t-2 border-gray-300 bg-white dark:bg-gray-800 font-semibold text-gray-900 dark:text-gray-100">
+                                <td className="py-2" colSpan={2}>
+                                  Subtotal for {customer.customer_id}
+                                </td>
+                                <td className="py-2 text-right">
+                                  {formatCurrency(customer.total_amount)}
+                                </td>
+                                <td className="py-2 text-right text-green-600">
+                                  {formatCurrency(customer.total_paid)}
+                                </td>
+                                <td className="py-2 text-right text-red-600">
+                                  {formatCurrency(customer.total_balance)}
+                                </td>
+                                <td className="py-2"></td>
+                              </tr>
+                            </tfoot>
                           </table>
                         </div>
                       </div>
@@ -497,6 +696,26 @@ const DebtorsReportPage: React.FC = () => {
             )}
           </div>
         ))}
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+          <div className="flex justify-between py-1 text-sm text-gray-600 dark:text-gray-300">
+            <span>Total Invoice Amount</span>
+            <span className="font-semibold text-gray-900 dark:text-gray-100">
+              {formatCurrency(filteredData.grand_total_amount)}
+            </span>
+          </div>
+          <div className="flex justify-between py-1 text-sm text-gray-600 dark:text-gray-300">
+            <span>Total Amount Paid</span>
+            <span className="font-semibold text-green-600">
+              {formatCurrency(filteredData.grand_total_paid)}
+            </span>
+          </div>
+          <div className="mt-2 flex justify-between border-t border-gray-200 dark:border-gray-700 pt-3 text-base font-bold text-gray-900 dark:text-gray-100">
+            <span>Total Outstanding Balance</span>
+            <span className="text-red-600">
+              {formatCurrency(filteredData.grand_total_balance)}
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );

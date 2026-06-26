@@ -15,8 +15,7 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import PinjamFormModal from "../../../components/Payroll/PinjamFormModal";
 import { api } from "../../../routes/utils/api";
-import YearNavigator from "../../../components/YearNavigator";
-import MonthNavigator from "../../../components/MonthNavigator";
+import TimeNavigator from "../../../components/TimeNavigator";
 import toast from "react-hot-toast";
 
 interface PinjamRecord {
@@ -118,11 +117,19 @@ const GTPinjamListPage: React.FC = () => {
     () => getDefaultPinjamMonth().month
   );
 
-  // Create Date object for MonthNavigator
-  const selectedMonth = useMemo(
-    () => new Date(currentYear, currentMonth - 1, 1),
+  // Month range for the TimeNavigator (the page always targets one month).
+  const monthRange = useMemo(
+    () => ({
+      start: new Date(currentYear, currentMonth - 1, 1),
+      end: new Date(currentYear, currentMonth, 0, 23, 59, 59, 999),
+    }),
     [currentYear, currentMonth]
   );
+
+  const handleTimeNavigatorChange = (range: { start: Date; end: Date }) => {
+    setCurrentYear(range.start.getFullYear());
+    setCurrentMonth(range.start.getMonth() + 1);
+  };
 
   // Load data on mount and filter changes
   useEffect(() => {
@@ -258,18 +265,11 @@ const GTPinjamListPage: React.FC = () => {
               Pinjam (Green Target)
             </h1>
             <div className="self-center h-8 border-l border-default-300 dark:border-gray-600" />
-            <YearNavigator
-              selectedYear={currentYear}
-              onChange={setCurrentYear}
-              showGoToCurrentButton={false}
-            />
-            <MonthNavigator
-              selectedMonth={selectedMonth}
-              onChange={(date) => {
-                setCurrentYear(date.getFullYear());
-                setCurrentMonth(date.getMonth() + 1);
-              }}
-              showGoToCurrentButton={false}
+            <TimeNavigator
+              range={monthRange}
+              onChange={handleTimeNavigatorChange}
+              modes={["month"]}
+              presets={false}
             />
           </div>
           <div className="flex items-center gap-3">

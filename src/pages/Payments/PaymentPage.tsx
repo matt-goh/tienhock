@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { IconCash, IconPlus, IconSearch } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import DateRangePicker from "../../components/DateRangePicker";
-import MonthNavigator from "../../components/MonthNavigator";
+import TimeNavigator from "../../components/TimeNavigator";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import { Payment } from "../../types/types";
@@ -29,12 +28,6 @@ const PaymentPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
-
-  // Use Date object for month navigation
-  const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
 
   const [filters, setFilters] = useState<PaymentFilters>(() => {
     const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -112,33 +105,17 @@ const PaymentPage: React.FC = () => {
     fetchPayments();
   }, [fetchPayments]);
 
-  const handleDateChange = useCallback(
-    (newDateRange: { start: Date; end: Date }) => {
+  // Unified Time Navigator change handler. Handles day, month, and custom-range
+  // selections from the single TimeNavigator control.
+  const handleTimeNavigatorChange = useCallback(
+    (range: { start: Date; end: Date }) => {
       setFilters((prev) => ({
         ...prev,
-        dateRange: newDateRange,
+        dateRange: { start: range.start, end: range.end },
       }));
     },
     []
   );
-
-  // Handle month change from MonthNavigator
-  const handleMonthChange = useCallback((newDate: Date) => {
-    setSelectedMonth(newDate);
-
-    // Create start date (1st of the selected month)
-    const startDate = new Date(newDate.getFullYear(), newDate.getMonth(), 1);
-    startDate.setHours(0, 0, 0, 0);
-
-    // Create end date (last day of the selected month)
-    const endDate = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0);
-    endDate.setHours(23, 59, 59, 999);
-
-    setFilters((prev) => ({
-      ...prev,
-      dateRange: { start: startDate, end: endDate },
-    }));
-  }, []);
 
   const handleNewPayment = () => {
     setSelectedPayment(null);
@@ -194,24 +171,10 @@ const PaymentPage: React.FC = () => {
               />
             </div>
 
-            {/* Date Range Picker */}
-            <DateRangePicker
-              dateRange={{
-                start: filters.dateRange.start || new Date(),
-                end: filters.dateRange.end || new Date(),
-              }}
-              onDateChange={handleDateChange}
-            />
-
-            {/* Month Navigator */}
-            <MonthNavigator
-              selectedMonth={selectedMonth}
-              onChange={handleMonthChange}
-              showGoToCurrentButton={false}
-              dateRange={{
-                start: filters.dateRange.start || new Date(),
-                end: filters.dateRange.end || new Date(),
-              }}
+            {/* Time Navigator */}
+            <TimeNavigator
+              range={filters.dateRange}
+              onChange={handleTimeNavigatorChange}
             />
 
             {/* Payment Method Filter */}

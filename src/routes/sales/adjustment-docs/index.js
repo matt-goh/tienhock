@@ -9,6 +9,7 @@ import {
   cancelAdjustmentJournalEntry,
 } from "./accounting.js";
 import { determineBankAccount } from "../../../utils/payment-helpers.js";
+import { formatAdjustmentDocId } from "../../../utils/adjustments/formatDocId.js";
 import EInvoiceApiClientFactory from "../../../utils/invoice/einvoice/EInvoiceApiClientFactory.js";
 import EInvoiceSubmissionHandler from "../../../utils/invoice/einvoice/EInvoiceSubmissionHandler.js";
 import { EInvoiceAdjustmentNoteTemplate } from "../../../utils/invoice/einvoice/EInvoiceAdjustmentNoteTemplate.js";
@@ -41,6 +42,7 @@ const DEFAULT_TABLES = {
 export default function (pool, myInvoisConfig, options = {}) {
   const T = { ...DEFAULT_TABLES, ...(options.tables || {}) };
   const SUPPLIER = options.supplierInfo || TIENHOCK_INFO;
+  const COMPANY_PREFIX = options.companyPrefix || "TH";
 
   const router = Router();
   const apiClient = myInvoisConfig
@@ -51,22 +53,29 @@ export default function (pool, myInvoisConfig, options = {}) {
     : null;
 
 // ---------- ID generation ----------
+// New scheme: {COMPANY}-{TYPE}-{YY}-{N} e.g. "TH-CN-26-1" (stored URL-safe;
+// rendered as "TH/CN/26/1"). Running number is unpadded, so the max must be
+// resolved numerically rather than by lexical id sort.
 async function generateNextDocId(client, type, year) {
-  const prefix = TYPE_PREFIX[type];
-  const pattern = `${prefix}-${year}-%`;
+  const prefix = `${COMPANY_PREFIX}-${TYPE_PREFIX[type]}`;
+  const yy = String(year).slice(-2);
+  const pattern = `${prefix}-${yy}-%`;
   const result = await client.query(
     `SELECT id FROM ${T.docs}
       WHERE id LIKE $1
-      ORDER BY id DESC LIMIT 1
+      ORDER BY split_part(id, '-', 4)::int DESC
+      LIMIT 1
       FOR UPDATE SKIP LOCKED`,
     [pattern]
   );
   let next = 1;
   if (result.rows.length > 0) {
-    const m = result.rows[0].id.match(new RegExp(`^${prefix}-${year}-(\\d+)$`));
+    const m = result.rows[0].id.match(
+      new RegExp(`^${prefix}-${yy}-(\\d+)$`)
+    );
     if (m) next = parseInt(m[1], 10) + 1;
   }
-  return `${prefix}-${year}-${String(next).padStart(4, "0")}`;
+  return `${prefix}-${yy}-${next}`;
 }
 
 // ---------- consolidation lookup ----------
@@ -531,7 +540,9 @@ async function resolveReferencedDocument(client, doc) {
     try {
       const params = [];
       let sql = `
-        SELECT a.*, i.customerid AS inv_customerid, c.name AS customer_name,
+        SELECT a.*, i.customerid AS inv_customerid,
+               i.einvoice_status AS original_invoice_einvoice_status,
+               c.name AS customer_name,
                p.id AS paired_doc_id, p.type AS paired_type, p.status AS paired_status,
                p.einvoice_status AS paired_einvoice_status
           FROM ${T.docs} a
@@ -578,7 +589,12 @@ async function resolveReferencedDocument(client, doc) {
       if (search) {
         params.push(`%${search}%`);
         const sp = `$${p++}`;
-        sql += ` AND (a.id ILIKE ${sp} OR a.original_invoice_id ILIKE ${sp} OR c.name ILIKE ${sp})`;
+        // Ids are stored URL-safe with dashes ("TH-CN-26-1") but shown with
+        // slashes ("TH/CN/26/1"); normalise slashes so searching the displayed
+        // form still matches the stored id.
+        params.push(`%${search.replace(/\//g, "-")}%`);
+        const spId = `$${p++}`;
+        sql += ` AND (a.id ILIKE ${spId} OR a.original_invoice_id ILIKE ${sp} OR c.name ILIKE ${sp})`;
       }
       sql += ` ORDER BY a.created_at DESC`;
 
@@ -957,8 +973,12 @@ async function resolveReferencedDocument(client, doc) {
       const fresh = await fetchDocWithRelations(client, docId);
       res.status(201).json({
         message: pairedDoc
-          ? `Credit Note ${docId} and paired Refund Note ${pairedDoc.id} created`
-          : `${TYPE_PREFIX[type]} ${docId} created`,
+          ? `Credit Note ${formatAdjustmentDocId(
+              docId
+            )} and paired Refund Note ${formatAdjustmentDocId(
+              pairedDoc.id
+            )} created`
+          : `${TYPE_PREFIX[type]} ${formatAdjustmentDocId(docId)} created`,
         document: {
           ...fresh,
           total_excluding_tax: parseFloat(fresh.total_excluding_tax || 0),

@@ -447,6 +447,7 @@ export interface AdjustmentDocument {
   updated_at: string;
 
   // Joined fields when fetching list
+  original_invoice_einvoice_status?: EInvoiceStatus;
   paired_doc_id?: string | null;
   paired_type?: AdjustmentDocType | null;
   paired_status?: "active" | "cancelled" | null;
@@ -1244,7 +1245,8 @@ export interface StockMovementResponse {
   product_description: string;
   product_type: string;
   opening_balance: number; // Calculated B/F from prior movements
-  initial_balance: number; // Admin-set migration balance
+  initial_balance: number; // Admin-set migration/opening balance
+  initial_balance_date: string | null; // Anchor date (YYYY-MM-DD) the balance is effective from; null if none set
   date_range: {
     start_date: string;
     end_date: string;

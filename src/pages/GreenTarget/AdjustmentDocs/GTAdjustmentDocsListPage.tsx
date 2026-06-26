@@ -19,8 +19,7 @@ import {
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import DateRangePicker from "../../../components/DateRangePicker";
-import MonthNavigator from "../../../components/MonthNavigator";
+import TimeNavigator from "../../../components/TimeNavigator";
 import StyledListbox from "../../../components/StyledListbox";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
@@ -36,6 +35,7 @@ import {
 import { generateGTAdjustmentDocPDFFilename } from "../../../utils/greenTarget/PDF/AdjustmentDocs/generateGTAdjustmentDocPDFFilename";
 import { generateGTAdjustmentDocPDFBlob } from "../../../utils/greenTarget/PDF/AdjustmentDocs/GTAdjustmentDocPDFHandler";
 import { GTAdjustmentDocFull } from "../../../services/gt-adjustment-doc-pdf.service";
+import { formatAdjustmentDocId } from "../../../utils/adjustments/formatDocId";
 
 const API_BASE = "/greentarget/api/adjustment-docs";
 const UI_BASE = "/greentarget/adjustment-docs";
@@ -45,6 +45,7 @@ interface GTAdjDoc {
   type: AdjustmentDocType;
   original_invoice_id: number;
   original_invoice_number: string;
+  original_invoice_einvoice_status: EInvoiceStatus;
   customer_id: number | null;
   customer_name: string | null;
   joined_customer_name?: string | null;
@@ -195,24 +196,18 @@ const GTAdjustmentDocsListPage: React.FC = () => {
     fetchDocs();
   }, [fetchDocs]);
 
-  const handleDateChange = useCallback(
-    (newDateRange: { start: Date; end: Date }) => {
-      setFilters((prev) => ({ ...prev, dateRange: newDateRange }));
+  // Unified Time Navigator change handler. Handles day, month, and custom-range
+  // selections from the single TimeNavigator control.
+  const handleTimeNavigatorChange = useCallback(
+    (range: { start: Date; end: Date }) => {
+      setSelectedMonth(range.start);
+      setFilters((prev) => ({
+        ...prev,
+        dateRange: { start: range.start, end: range.end },
+      }));
     },
     []
   );
-
-  const handleMonthChange = useCallback((newDate: Date) => {
-    setSelectedMonth(newDate);
-    const startDate = new Date(newDate.getFullYear(), newDate.getMonth(), 1);
-    startDate.setHours(0, 0, 0, 0);
-    const endDate = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0);
-    endDate.setHours(23, 59, 59, 999);
-    setFilters((prev) => ({
-      ...prev,
-      dateRange: { start: startDate, end: endDate },
-    }));
-  }, []);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: docs.length };
@@ -315,22 +310,9 @@ const GTAdjustmentDocsListPage: React.FC = () => {
               />
             </div>
 
-            <DateRangePicker
-              dateRange={{
-                start: filters.dateRange.start || new Date(),
-                end: filters.dateRange.end || new Date(),
-              }}
-              onDateChange={handleDateChange}
-            />
-
-            <MonthNavigator
-              selectedMonth={selectedMonth}
-              onChange={handleMonthChange}
-              showGoToCurrentButton={false}
-              dateRange={{
-                start: filters.dateRange.start || new Date(),
-                end: filters.dateRange.end || new Date(),
-              }}
+            <TimeNavigator
+              range={filters.dateRange}
+              onChange={handleTimeNavigatorChange}
             />
 
             <div className="w-40">
@@ -421,6 +403,9 @@ const GTAdjustmentDocsListPage: React.FC = () => {
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
                     Original Invoice
                   </th>
+                  <th className="px-4 py-2.5 text-center text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
+                    Original e-Invoice
+                  </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
                     Customer
                   </th>
@@ -428,7 +413,7 @@ const GTAdjustmentDocsListPage: React.FC = () => {
                     Amount
                   </th>
                   <th className="px-4 py-2.5 text-center text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                    Status
+                    Adj. e-Invoice
                   </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
                     Date Issued
@@ -446,13 +431,15 @@ const GTAdjustmentDocsListPage: React.FC = () => {
                     onClick={() => navigate(`${UI_BASE}/${doc.id}`)}
                   >
                     <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-default-900 dark:text-gray-100">
-                      {doc.id}
+                      {formatAdjustmentDocId(doc.id)}
                       {doc.paired_doc_id && (
                         <span
                           className="block text-xs text-default-500 dark:text-gray-400"
-                          title={`Paired with ${doc.paired_doc_id}`}
+                          title={`Paired with ${formatAdjustmentDocId(
+                            doc.paired_doc_id
+                          )}`}
                         >
-                          ↔ {doc.paired_doc_id}
+                          ↔ {formatAdjustmentDocId(doc.paired_doc_id)}
                         </span>
                       )}
                     </td>
@@ -461,6 +448,12 @@ const GTAdjustmentDocsListPage: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-default-700 dark:text-gray-200">
                       {doc.original_invoice_number}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-center">
+                      <AdjustmentDocStatusBadge
+                        status="active"
+                        einvoiceStatus={doc.original_invoice_einvoice_status}
+                      />
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-default-700 dark:text-gray-200">
                       {doc.customer_name ||
