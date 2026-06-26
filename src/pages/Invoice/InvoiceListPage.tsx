@@ -14,7 +14,7 @@ import {
 } from "../../types/types";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import DateRangePicker from "../../components/DateRangePicker";
+import TimeNavigator from "../../components/TimeNavigator";
 import InvoiceFilterMenu from "../../components/Invoice/InvoiceFilterMenu";
 import InvoiceGrid from "../../components/Invoice/InvoiceGrid";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
@@ -55,8 +55,6 @@ import Pagination from "../../components/Invoice/Pagination";
 import ConsolidatedInvoiceModal from "../../components/Invoice/ConsolidatedInvoiceModal";
 import InvoiceDailyPrintMenu from "../../components/Invoice/InvoiceDailyPrintMenu";
 import StyledListbox from "../../components/StyledListbox";
-import DateNavigator from "../../components/DateNavigator";
-import MonthNavigator from "../../components/MonthNavigator";
 import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 
 // --- Constants ---
@@ -390,7 +388,8 @@ const InvoiceListPage: React.FC = () => {
     });
   }, [filters, searchTerm]);
 
-  // Month Selector State - used for MonthNavigator
+  // Month state - drives the Consolidated Invoice modal's target month; kept in
+  // sync with the TimeNavigator selection.
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
 
   // Data Hooks
@@ -664,67 +663,23 @@ const InvoiceListPage: React.FC = () => {
     [currentPage, selectedInvoiceIds]
   );
 
-  // --- Specific Filter Handlers (Date, Month, Remove Tag) ---
+  // --- Specific Filter Handlers (Time, Remove Tag) ---
   // These handlers construct the *full* new filter state and call handleApplyFilters
 
-  // Date Range Change Handler (Applies Immediately)
-  const handleDateChange = useCallback(
-    (range: { start: Date | null; end: Date | null }) => {
-      // Construct the new *full* filter state
+  // Unified Time Navigator change handler (Applies Immediately). Handles day,
+  // month, and custom-range selections from the single TimeNavigator control.
+  const handleTimeNavigatorChange = useCallback(
+    (range: { start: Date; end: Date }) => {
+      // Keep the consolidation modal's month in sync with the selection.
+      setSelectedMonth(range.start);
+
       const updatedFilters: InvoiceFilters = {
         ...filters, // Keep existing filters
-        dateRange: {
-          // Update only the date range
-          start: range.start || filters.dateRange.start, // Use existing if null
-          end: range.end || filters.dateRange.end,
-        },
-      };
-      // Apply the combined filter state
-      handleApplyFilters(updatedFilters);
-    },
-    [filters, handleApplyFilters]
-  ); // Depends on current filters and the apply function
-
-  // Date Navigator change handler
-  const handleDateNavigatorChange = useCallback(
-    (newDate: Date) => {
-      const startOfDay = new Date(newDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(newDate);
-      endOfDay.setHours(23, 59, 59, 999);
-
-      const updatedFilters: InvoiceFilters = {
-        ...filters,
-        dateRange: {
-          start: startOfDay,
-          end: endOfDay,
-        },
+        dateRange: { start: range.start, end: range.end },
       };
       handleApplyFilters(updatedFilters);
     },
     [filters, handleApplyFilters]
-  );
-
-  // Month Change Handler (Applies Immediately)
-  const handleMonthChange = useCallback(
-    (newDate: Date) => {
-      setSelectedMonth(newDate); // Update local state for the navigator display
-
-      // Calculate start and end dates for the selected month
-      const startDate = new Date(newDate.getFullYear(), newDate.getMonth(), 1);
-      startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0);
-      endDate.setHours(23, 59, 59, 999);
-
-      // Construct the new *full* filter state
-      const updatedFilters: InvoiceFilters = {
-        ...filters, // Keep existing filters
-        dateRange: { start: startDate, end: endDate }, // Update date range
-      };
-      // Apply the combined filter state
-      handleApplyFilters(updatedFilters);
-    },
-    [filters, handleApplyFilters] // Depends on current filters and the apply function
   );
 
   // Single Salesman Selection Handler
@@ -1459,36 +1414,16 @@ const InvoiceListPage: React.FC = () => {
       <div className="space-y-3">
         {/* --- Combined Header and Filters --- */}
         <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 flex-shrink-0">
-          {/* Left: Count + Title + Date Controls */}
+          {/* Left: Count + Title + Time Navigator */}
           <div className="flex items-center gap-3 min-w-0">
             <h1 className="truncate min-w-0 text-xl font-semibold text-default-900 dark:text-gray-100">
               {totalItems > 0 && !isLoading ? `${totalItems} ` : ""}Invoices
             </h1>
             <span className="flex-shrink-0 hidden sm:inline text-default-300 dark:text-gray-600">|</span>
             <div className="flex-shrink-0">
-              <DateRangePicker
-                dateRange={{
-                  start: filters.dateRange.start || new Date(),
-                  end: filters.dateRange.end || new Date(),
-                }}
-                onDateChange={handleDateChange}
-              />
-            </div>
-            <span className="flex-shrink-0 hidden sm:inline text-default-300 dark:text-gray-600">|</span>
-            <div className="flex-shrink-0 flex items-center gap-1">
-              <DateNavigator
-                selectedDate={filters.dateRange.start || new Date()}
-                onChange={handleDateNavigatorChange}
-                showGoToTodayButton={false}
-              />
-              <MonthNavigator
-                selectedMonth={selectedMonth}
-                onChange={handleMonthChange}
-                showGoToCurrentButton={false}
-                dateRange={{
-                  start: filters.dateRange.start || new Date(),
-                  end: filters.dateRange.end || new Date(),
-                }}
+              <TimeNavigator
+                range={filters.dateRange}
+                onChange={handleTimeNavigatorChange}
               />
             </div>
           </div>

@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-06-27",
+    ms: "Senarai Invois kini menggunakan satu pemilih masa baharu yang lebih ringkas menggantikan kotak tarikh, penanda hari dan penanda bulan yang berasingan. Klik butang tarikh untuk menukar antara mod Hari, Bulan dan Julat, memilih pintasan pantas (Hari Ini, Bulan Ini, 7 Hari Lepas, 30 Hari Lepas dan lain-lain), atau pilih julat tarikh tersuai dari kalendar. Anak panah kiri/kanan di sebelahnya melangkah mengikut pilihan semasa (hari, bulan atau julat).",
+    en: "The Invoice list now uses a single, more compact time picker that replaces the separate date boxes, day stepper and month stepper. Click the date button to switch between Day, Month and Range modes, pick a quick preset (Today, This Month, Last 7 Days, Last 30 Days and more), or choose a custom date range from the calendar. The left/right arrows beside it step through your current selection (day, month or range).",
+  },
+  {
     date: "2026-06-26",
     ms: "Stok General dan Stok Material kini dipisahkan kepada dua halaman berasingan dalam menu Stock. Halaman General Stock hanya memaparkan stok General, manakala halaman Material Stock mengandungi tab Mee, Bihun dan Shared.",
     en: "General Stock and Material Stock are now split into two separate pages in the Stock menu. General Stock now only shows general stock, while Material Stock contains the Mee, Bihun and Shared tabs.",
