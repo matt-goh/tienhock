@@ -190,8 +190,8 @@ export default function (pool) {
       }
 
       const insertQuery = `
-        INSERT INTO greentarget.monthly_payrolls (year, month, status, created_by)
-        VALUES ($1, $2, 'Processing', $3)
+        INSERT INTO greentarget.monthly_payrolls (year, month, created_by)
+        VALUES ($1, $2, $3)
         RETURNING *
       `;
       const insertResult = await pool.query(insertQuery, [
@@ -222,18 +222,15 @@ export default function (pool) {
       return res.status(400).json({ message: "No employees selected for processing" });
     }
 
-    // 1. Get payroll details and block re-processing once finalized
+    // 1. Get payroll details
     let year, month;
     try {
       const payrollResult = await pool.query(
-        "SELECT year, month, status FROM greentarget.monthly_payrolls WHERE id = $1",
+        "SELECT year, month FROM greentarget.monthly_payrolls WHERE id = $1",
         [id]
       );
       if (payrollResult.rows.length === 0) {
         return res.status(404).json({ message: "Monthly payroll not found" });
-      }
-      if (payrollResult.rows[0].status === "Finalized") {
-        return res.status(400).json({ message: "Cannot process a finalized payroll" });
       }
       ({ year, month } = payrollResult.rows[0]);
     } catch (error) {
@@ -853,64 +850,18 @@ export default function (pool) {
     }
   });
 
-  // Update payroll status
-  router.put("/:id/status", async (req, res) => {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    if (!status || !["Processing", "Finalized"].includes(status)) {
-      return res.status(400).json({
-        message: "Valid status is required (Processing, Finalized)",
-      });
-    }
-
-    try {
-      const serverTimestamp = new Date().toISOString();
-      const query = `
-        UPDATE greentarget.monthly_payrolls
-        SET status = $1, updated_at = $2
-        WHERE id = $3
-        RETURNING *
-      `;
-
-      const result = await pool.query(query, [status, serverTimestamp, id]);
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({ message: "Monthly payroll not found" });
-      }
-
-      res.json({
-        message: "Payroll status updated successfully",
-        payroll: result.rows[0],
-      });
-    } catch (error) {
-      console.error("Error updating GT payroll status:", error);
-      res.status(500).json({
-        message: "Error updating payroll status",
-        error: error.message,
-      });
-    }
-  });
-
   // Delete monthly payroll
   router.delete("/:id", async (req, res) => {
     const { id } = req.params;
 
     try {
-      // Check if finalized
       const checkResult = await pool.query(
-        "SELECT status FROM greentarget.monthly_payrolls WHERE id = $1",
+        "SELECT id FROM greentarget.monthly_payrolls WHERE id = $1",
         [id]
       );
 
       if (checkResult.rows.length === 0) {
         return res.status(404).json({ message: "Monthly payroll not found" });
-      }
-
-      if (checkResult.rows[0].status === "Finalized") {
-        return res.status(400).json({
-          message: "Cannot delete finalized payroll",
-        });
       }
 
       // Delete (cascade will handle child records)

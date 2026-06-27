@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Customer } from "../../types/types";
 import {
@@ -50,6 +50,13 @@ const CustomerPage: React.FC = () => {
   );
   const { salesmen: salesmenData } = useSalesmanCache();
   const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Focus the search box once the page has finished loading (the input isn't
+  // mounted yet while the loading spinner is shown).
+  useEffect(() => {
+    if (!isLoading) searchInputRef.current?.focus();
+  }, [isLoading]);
 
   useEffect(() => {
     sessionStorage.setItem("customerSearchTerm", searchTerm);
@@ -296,6 +303,7 @@ const CustomerPage: React.FC = () => {
               size={22}
             />
             <input
+              ref={searchInputRef}
               type="text"
               placeholder="Search"
               className="w-full pl-11 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent text-default-900 dark:text-gray-100 focus:border-default-500 dark:focus:border-gray-500 rounded-full"

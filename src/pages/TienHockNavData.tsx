@@ -107,6 +107,7 @@ import SalaryReportPage from "./Payroll/SalaryReportPage";
 import StaffPage from "./Catalogue/StaffPage";
 import StaffAddPage from "./Catalogue/StaffAddPage";
 import StaffFormPage from "./Catalogue/StaffFormPage";
+import StaffDetailsPage from "./Catalogue/StaffDetailsPage";
 import StaffRecords from "./Catalogue/StaffRecords";
 
 // Customer
@@ -580,8 +581,13 @@ export const TienHockNavData: SidebarItem[] = [
             component: StaffRecords,
           },
           {
-            name: "Staff Edit",
+            name: "Staff Details",
             path: "/catalogue/staff/:id",
+            component: StaffDetailsPage,
+          },
+          {
+            name: "Staff Edit",
+            path: "/catalogue/staff/:id/edit",
             component: StaffFormPage,
           },
         ],

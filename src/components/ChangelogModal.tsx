@@ -19,6 +19,41 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-06-28",
+    ms: "Mengklik kad kakitangan kini membuka halaman butiran ringkas (baca sahaja) yang memaparkan semua maklumat kakitangan tersebut dengan pantas, dengan hanya bahagian Pay Codes yang masih boleh diedit di situ. Untuk menyunting maklumat lain, klik butang \"Edit\" untuk membuka borang penuh seperti biasa. Kad kakitangan juga kini mempunyai butang Edit (sebelah butang padam) yang terus membuka borang suntingan. Kotak carian di halaman Staff dan Customer kini difokuskan secara automatik apabila halaman dibuka. Kad pelanggan pula kini mempunyai dua butang pintasan baharu: terus ke tab \"Credit & Pricing\" dan ke tab \"Transaction History\".",
+    en: "Clicking a staff card now opens a quick read-only details page showing all of that staff member's information at a glance, with only the Pay Codes section still editable there. To edit other information, click the \"Edit\" button to open the full form as before. Staff cards also now have an Edit button (next to the delete button) that goes straight to the edit form. The search box on the Staff and Customer pages is now auto-focused when the page opens. Customer cards now have two new shortcut buttons: jump straight to the \"Credit & Pricing\" tab and to the \"Transaction History\" tab.",
+  },
+  {
+    date: "2026-06-28",
+    ms: "Halaman pelanggan kini mempunyai tab baharu \"Transaction History\" yang memaparkan semua aktiviti pelanggan tersebut di satu tempat — invois, pembayaran, serta Nota Kredit/Debit/Bayaran Balik — disusun mengikut tarikh (terkini di atas). Terdapat penapis tarikh (Bulan/Julat/Tahun) yang lalai kepada 30 hari lepas, kad ringkasan Jumlah Diinvois / Jumlah Dibayar / bilangan pelarasan, dan setiap baris boleh diklik untuk terus membuka invois atau dokumen berkenaan.",
+    en: "The customer page now has a new \"Transaction History\" tab that shows everything for that customer in one place — invoices, payments, and Credit/Debit/Refund Notes — sorted by date (newest first). It has a date filter (Month/Range/Year) defaulting to the last 30 days, summary cards for Total Invoiced / Total Paid / number of adjustments, and every row is clickable to jump straight to the related invoice or document.",
+  },
+  {
+    date: "2026-06-27",
+    ms: "Foreign General Purchase kini menyokong beberapa item dalam satu pembelian. Daripada memasukkan semua barang dalam satu kotak penerangan, anda kini boleh tambah baris item berasingan dengan kuantiti, harga seunit, jumlah foreign, jumlah MYR, akaun GL, kategori stok General, dan cukai masing-masing.",
+    en: "Foreign General Purchase now supports multiple items in one purchase. Instead of typing every item into one description box, you can now add separate item rows with their own quantity, unit price, foreign amount, MYR amount, GL account, General stock category, and tax.",
+  },
+  {
+    date: "2026-06-27",
+    ms: "Butang kemas kini status e-invois untuk Foreign General Purchase kini lebih jelas sebagai \"Refresh E-Invoice\". Senarai General Purchases juga kini mempunyai butang refresh e-invois pada setiap pembelian foreign yang sudah dihantar, jadi status Pending boleh disemak terus dari senarai tanpa membuka rekod.",
+    en: "The Foreign General Purchase status refresh button is now clearer as \"Refresh E-Invoice\". The General Purchases list also has an e-invoice refresh button on each submitted foreign purchase, so Pending statuses can be checked directly from the list without opening the record.",
+  },
+  {
+    date: "2026-06-27",
+    ms: "Ciri \"Finalize\" / muktamadkan payroll telah dibuang sepenuhnya (Tien Hock dan Green Target). Tiada lagi butang Finalize/Revert/Unlock atau label status Processing/Finalized — payroll kini sentiasa boleh diedit. Sebagai gantinya, halaman Payroll mempunyai butang teks baharu untuk menukar paparan antara \"Groups\" (pekerja dikumpulkan ikut kerja) dan \"Recent\" (senarai rata tanpa kumpulan). Kedua-dua paparan kini disusun dengan yang terkini diakses/diproses di atas — kumpulan atau pekerja yang baru dibuka akan naik ke atas. Pilihan paparan diingati oleh sistem. Butang buka/tutup semua hanya muncul dalam paparan Groups. Setiap baris pekerja kini mempunyai butang Process untuk memproses semula pekerja itu sahaja terus dari senarai.",
+    en: "The payroll \"Finalize\" feature has been removed entirely (Tien Hock and Green Target). There are no more Finalize/Revert/Unlock buttons or Processing/Finalized status labels — payrolls are now always editable. In its place, the Payroll page has a new text button to switch the view between \"Groups\" (employees grouped by job) and \"Recent\" (a flat, ungrouped list). Both views are now ordered with the most recently opened/processed at the top — a group or employee you just opened floats to the top. Your chosen view is remembered. The expand/collapse-all button only appears in the Groups view. Each employee row now has a Process button to re-process just that person straight from the list.",
+  },
+  {
+    date: "2026-06-27",
+    ms: "Catatan Jurnal jenis \"C - Cash Payment\" kini mempunyai medan \"Cheque No\" baharu untuk nombor cek. Nombor cek diisi secara automatik mengikut turutan (bermula dari PBB350779, kemudian PBB350780 dan seterusnya) tetapi masih boleh diubah secara manual. Nombor cek turut dipaparkan pada halaman butiran catatan jurnal.",
+    en: "Journal Entries of type \"C - Cash Payment\" now have a new \"Cheque No\" field for the cheque number. The cheque number is auto-filled in sequence (starting from PBB350779, then PBB350780 and so on) but can still be edited manually. The cheque number is also shown on the journal entry details page.",
+  },
+  {
+    date: "2026-06-27",
+    ms: "Jumlah keseluruhan di bahagian atas halaman Payroll kini menunjukkan jumlah \"Setelah Digenapkan\" (gaji penuh yang diperoleh) dan bukan lagi gaji kasar. Angka ini sepadan dengan Laporan Gaji. Nota ringkas di sebelahnya memaparkan jumlah tunai dibawa pulang serta jumlah pendahuluan komisen/bonus yang telah dibayar lebih awal — menerangkan sebab jumlah ini lebih tinggi daripada lajur \"Net\" di bawah.",
+    en: "The grand total at the top of the Payroll page now shows the \"Setelah Digenapkan\" total (full earned salary) instead of gross pay. This figure matches the Salary Report. A compact note beside it shows the take-home amount and the commission/bonus advances already paid earlier — explaining why this total is higher than the \"Net\" column below.",
+  },
+  {
     date: "2026-06-27",
     ms: "Pemilih tarikh baharu yang lebih ringkas kini digunakan di banyak halaman bersenarai data dan laporan — antaranya Senarai Invois (Tien Hock, Jelly Polly, Green Target), Pembayaran, Jurnal, Nota Pelarasan, Log Harian, laporan Jualan, Pembelian Material & General, Bayaran Pembekal, Senarai Pengeluaran, Log Bulanan, Laporan Gaji, serta halaman tambahan Payroll (Bonus, Bayaran Pertengahan Bulan, Pinjam, Others). Ia menggantikan kotak tarikh serta penanda hari/bulan/tahun yang berasingan. Klik butang tarikh untuk menukar antara mod Hari, Bulan, Julat dan Tahun (mengikut halaman), memilih pintasan pantas (Hari Ini, Bulan Ini, 7/30 Hari Lepas dan lain-lain), atau pilih dari kalendar. Anak panah kiri/kanan di sebelahnya melangkah mengikut pilihan semasa, dan tidak akan melepasi tarikh hari ini.",
     en: "A new, more compact date picker is now used across many data-list and report pages — including Invoice lists (Tien Hock, Jelly Polly, Green Target), Payments, Journal Entries, Adjustment Documents, Daily Logs, the Sales reports, Material & General Purchases, Supplier Payments, the Production list, Monthly Logs, the Salary Report, and the Payroll add-on pages (Bonus, Mid-Month, Pinjam, Others). It replaces the separate date boxes and day/month/year steppers. Click the date button to switch between Day, Month, Range and Year modes (depending on the page), pick a quick preset (Today, This Month, Last 7/30 Days and more), or choose from the calendar. The left/right arrows beside it step through your current selection and won't move past today.",

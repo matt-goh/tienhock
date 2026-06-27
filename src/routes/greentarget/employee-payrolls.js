@@ -143,7 +143,7 @@ export default function (pool) {
 
       // Query all payrolls
       const payrollsResult = await pool.query(`
-        SELECT ep.*, mp.year, mp.month, mp.status as payroll_status,
+        SELECT ep.*, mp.year, mp.month,
                s.name as employee_name, s.ic_no
         FROM greentarget.employee_payrolls ep
         JOIN greentarget.monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
@@ -227,7 +227,7 @@ export default function (pool) {
     try {
       // Get employee payroll details
       const payrollQuery = `
-        SELECT ep.*, mp.year, mp.month, mp.status as payroll_status,
+        SELECT ep.*, mp.year, mp.month,
                s.name as employee_name, s.ic_no, s.bank_account_number,
                s.epf_no, s.socso_no, s.income_tax_no
         FROM greentarget.employee_payrolls ep
@@ -344,20 +344,15 @@ export default function (pool) {
     }
 
     try {
-      // Verify payroll exists and is not finalized
+      // Verify payroll exists
       const checkResult = await pool.query(`
-        SELECT ep.id, mp.status as payroll_status
+        SELECT ep.id
         FROM greentarget.employee_payrolls ep
-        JOIN greentarget.monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
         WHERE ep.id = $1
       `, [id]);
 
       if (checkResult.rows.length === 0) {
         return res.status(404).json({ message: "Employee payroll not found" });
-      }
-
-      if (checkResult.rows[0].payroll_status === "Finalized") {
-        return res.status(400).json({ message: "Cannot add items to a finalized payroll" });
       }
 
       const parsedRate = parseFloat(rate);
@@ -400,21 +395,15 @@ export default function (pool) {
     const { itemId } = req.params;
 
     try {
-      // Check if item exists and get payroll info
+      // Check if item exists
       const checkResult = await pool.query(`
-        SELECT pi.id, pi.employee_payroll_id, mp.status as payroll_status
+        SELECT pi.id, pi.employee_payroll_id
         FROM greentarget.payroll_items pi
-        JOIN greentarget.employee_payrolls ep ON pi.employee_payroll_id = ep.id
-        JOIN greentarget.monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
         WHERE pi.id = $1
       `, [itemId]);
 
       if (checkResult.rows.length === 0) {
         return res.status(404).json({ message: "Payroll item not found" });
-      }
-
-      if (checkResult.rows[0].payroll_status === "Finalized") {
-        return res.status(400).json({ message: "Cannot delete items from a finalized payroll" });
       }
 
       const employeePayrollId = checkResult.rows[0].employee_payroll_id;

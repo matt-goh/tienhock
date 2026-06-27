@@ -1,11 +1,7 @@
 // src/components/Payroll/EmployeePayrollTableRow.tsx
 import React, { useState } from "react";
 import clsx from "clsx";
-import {
-  IconPrinter,
-  IconLock,
-  IconLoader2,
-} from "@tabler/icons-react";
+import { IconPrinter, IconLoader2, IconRefresh } from "@tabler/icons-react";
 import Checkbox from "../Checkbox";
 import { EmployeePayroll } from "../../types/types";
 import { MidMonthPayroll } from "../../utils/payroll/midMonthPayrollUtils";
@@ -19,7 +15,11 @@ interface EmployeePayrollTableRowProps {
   isSelected: boolean;
   onSelect: (id: number, isSelected: boolean, event: React.MouseEvent) => void;
   onViewDetails: (id: number | undefined) => void;
-  payrollStatus: string;
+  onProcess: (employeePayroll: EmployeePayroll) => void;
+  // True while any payroll processing is running (disables the per-row button).
+  isProcessingDisabled: boolean;
+  // True while this specific row is being processed (shows the inline spinner).
+  isProcessingThis: boolean;
   midMonthPayroll?: MidMonthPayroll | null;
   formatCurrency: (amount: number) => string;
 }
@@ -29,7 +29,9 @@ const EmployeePayrollTableRow: React.FC<EmployeePayrollTableRowProps> = ({
   isSelected,
   onSelect,
   onViewDetails,
-  payrollStatus,
+  onProcess,
+  isProcessingDisabled,
+  isProcessingThis,
   midMonthPayroll,
   formatCurrency,
 }) => {
@@ -56,6 +58,12 @@ const EmployeePayrollTableRow: React.FC<EmployeePayrollTableRowProps> = ({
     if (employeePayroll.id) {
       onSelect(employeePayroll.id, checked, e);
     }
+  };
+
+  const handleProcess = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isProcessingDisabled) return;
+    onProcess(employeePayroll);
   };
 
   const handlePrint = async (e: React.MouseEvent) => {
@@ -113,9 +121,12 @@ const EmployeePayrollTableRow: React.FC<EmployeePayrollTableRowProps> = ({
 
         {/* Employee Name */}
         <td className="px-3 py-2">
-          <span className="font-medium text-default-700 dark:text-gray-200">
+          <div
+            className="truncate font-medium text-default-700 dark:text-gray-200"
+            title={employeePayroll.employee_name || "Unknown"}
+          >
             {employeePayroll.employee_name || "Unknown"}
-          </span>
+          </div>
         </td>
 
         {/* Employee ID */}
@@ -151,35 +162,37 @@ const EmployeePayrollTableRow: React.FC<EmployeePayrollTableRowProps> = ({
           )}
         </td>
 
-        {/* Status Badge */}
-        <td className="px-3 py-2">
-          <span
+        {/* Actions */}
+        <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
+          <div
             className={clsx(
-              "inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium",
-              payrollStatus === "Finalized"
-                ? "bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300"
-                : "bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300"
+              "flex items-center justify-center gap-1 transition-opacity",
+              isProcessingThis ? "opacity-100" : "opacity-0 group-hover:opacity-100"
             )}
           >
-            {payrollStatus === "Finalized" && (
-              <IconLock size={10} className="mr-0.5" />
-            )}
-            {payrollStatus}
-          </span>
-        </td>
-
-        {/* Actions */}
-        <td
-          className="p-0"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center justify-center h-full opacity-0 group-hover:opacity-100 group-hover:rounded-lg group-hover:border group-hover:border-sky-100 dark:group-hover:border-sky-800 transition-opacity">
-            {/* Print Button */}
+            {/* Process this employee */}
+            <button
+              onClick={handleProcess}
+              disabled={isProcessingDisabled}
+              className={clsx(
+                "flex items-center justify-center p-1.5 rounded-lg border border-sky-100 dark:border-sky-800 transition-colors",
+                isProcessingDisabled
+                  ? "text-default-400 dark:text-gray-500 cursor-wait"
+                  : "hover:bg-sky-100 dark:hover:bg-sky-900/50 text-sky-600 dark:text-sky-400"
+              )}
+              title="Process this employee"
+            >
+              <IconRefresh
+                size={16}
+                className={isProcessingThis ? "animate-spin" : ""}
+              />
+            </button>
+            {/* Print Payslip */}
             <button
               onClick={handlePrint}
               disabled={isPrinting}
               className={clsx(
-                "w-full h-full flex items-center justify-center py-2 px-3 transition-colors rounded-lg border border-sky-100 dark:border-sky-800",
+                "flex items-center justify-center p-1.5 rounded-lg border border-sky-100 dark:border-sky-800 transition-colors",
                 isPrinting
                   ? "text-default-400 dark:text-gray-500 cursor-wait"
                   : "hover:bg-sky-100 dark:hover:bg-sky-900/50 text-sky-600 dark:text-sky-400"

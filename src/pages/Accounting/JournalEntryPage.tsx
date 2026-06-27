@@ -48,6 +48,7 @@ interface JournalEntryFormData {
   entry_type: JournalEntryType;
   entry_date: string;
   description: string;
+  cheque_no: string;
   lines: JournalLineFormData[];
 }
 
@@ -255,6 +256,7 @@ const JournalEntryPage: React.FC = () => {
     entry_type: "J",
     entry_date: format(new Date(), "yyyy-MM-dd"),
     description: "",
+    cheque_no: "",
     lines: [emptyLine(1), emptyLine(2)],
   });
 
@@ -307,6 +309,17 @@ const JournalEntryPage: React.FC = () => {
     []
   );
 
+  // Fetch next sequential cheque number (Cash Payment / C entries only)
+  const fetchNextChequeNo = useCallback(async () => {
+    try {
+      const response = await api.get("/api/journal-entries/next-cheque-no");
+      const data = response as { cheque_no: string };
+      setFormData((prev) => ({ ...prev, cheque_no: data.cheque_no }));
+    } catch (err: unknown) {
+      console.error("Error fetching next cheque number:", err);
+    }
+  }, []);
+
   // Fetch entry data for editing
   const fetchEntryData = useCallback(async () => {
     if (!id) return;
@@ -339,6 +352,7 @@ const JournalEntryPage: React.FC = () => {
         entry_type: entry.entry_type,
         entry_date: entry.entry_date.split("T")[0],
         description: entry.description || "",
+        cheque_no: entry.cheque_no || "",
         lines,
       };
 
@@ -385,11 +399,20 @@ const JournalEntryPage: React.FC = () => {
   // Handle entry type change
   const handleEntryTypeChange = async (value: string) => {
     const newType = value as JournalEntryType;
-    setFormData((prev) => ({ ...prev, entry_type: newType }));
+    // Clear the cheque number when switching away from Cash Payment
+    setFormData((prev) => ({
+      ...prev,
+      entry_type: newType,
+      cheque_no: newType === "C" ? prev.cheque_no : "",
+    }));
 
     // Only fetch new reference if creating new entry
     if (isCreateMode) {
       await fetchNextReference(newType);
+      // Pre-fill the next sequential cheque number for Cash Payment entries
+      if (newType === "C") {
+        await fetchNextChequeNo();
+      }
     }
   };
 
@@ -537,6 +560,10 @@ const JournalEntryPage: React.FC = () => {
         entry_type: formData.entry_type,
         entry_date: formData.entry_date,
         description: formData.description.trim() || undefined,
+        cheque_no:
+          formData.entry_type === "C"
+            ? formData.cheque_no.trim() || undefined
+            : undefined,
         lines,
       };
 
@@ -750,6 +777,28 @@ const JournalEntryPage: React.FC = () => {
                     className="w-full px-3 py-2 text-sm border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-lg focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
                   />
                 </div>
+
+                {/* Cheque Number - Cash Payment (C) entries only */}
+                {formData.entry_type === "C" && (
+                  <div>
+                    <label className="block text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wide mb-1.5">
+                      Cheque No
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.cheque_no}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          cheque_no: e.target.value,
+                        }))
+                      }
+                      placeholder="e.g., PBB350779"
+                      disabled={isSaving}
+                      className="w-full px-3 py-2 text-sm border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-lg focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:cursor-not-allowed font-mono"
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
