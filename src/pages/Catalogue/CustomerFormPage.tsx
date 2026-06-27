@@ -1,6 +1,6 @@
 // src/pages/Catalogue/CustomerFormPage.tsx
 import React, { useState, useEffect, useRef, useCallback } from "react"; // Added useCallback
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { Customer, CustomProduct } from "../../types/types";
@@ -34,6 +34,15 @@ const CustomerFormPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
+  // Deep-link to a specific tab via ?tab=credit | ?tab=transactions (from the
+  // customer card shortcut buttons). Defaults to the Info tab.
+  const [searchParams] = useSearchParams();
+  const initialTab =
+    searchParams.get("tab") === "credit"
+      ? 1
+      : searchParams.get("tab") === "transactions"
+      ? 2
+      : 0;
 
   // Add this helper function at the component level
   const getIdNumberPlaceholder = (idType: string) => {
@@ -750,6 +759,7 @@ const CustomerFormPage: React.FC = () => {
           >
             <div className="px-6 py-3">
               <Tab
+                defaultActiveTab={initialTab}
                 labels={
                   isEditMode
                     ? ["Info", "Credit & Pricing", "Transaction History"]
