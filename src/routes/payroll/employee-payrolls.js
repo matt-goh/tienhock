@@ -487,7 +487,9 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     }
 
     // Calculate SOCSO. SKBBK applies from June 2026 payrolls onward.
-    const socsoRate = contributionCtx.socso.eligible
+    // No wage means no contribution: skip when grossPay is 0 so the lowest
+    // bracket (wage_from = 0) does not charge the minimum on a zero-wage month.
+    const socsoRate = contributionCtx.socso.eligible && grossPay > 0
       ? findRateByWage(socsoRates, grossPay)
       : null;
     if (socsoRate) {
@@ -523,8 +525,10 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       });
     }
 
-    // Calculate SIP (only for Malaysian citizens under 60)
+    // Calculate SIP (only for Malaysian citizens under 60).
+    // No wage means no contribution: skip when grossPay is 0.
     if (
+      grossPay > 0 &&
       contributionCtx.sip.eligible &&
       contributionCtx.sip.under60 &&
       contributionCtx.isMalaysian
