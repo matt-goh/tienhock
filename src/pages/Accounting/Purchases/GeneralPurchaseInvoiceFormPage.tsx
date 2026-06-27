@@ -5,6 +5,7 @@ import {
   IconEye,
   IconExternalLink,
   IconFile,
+  IconPlus,
   IconRefresh,
   IconSend,
   IconTrash,
@@ -254,8 +255,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
     existingInvoice?.einvoice_status !== "cancelled";
   const canEditRecords: boolean =
     !isEditMode || existingInvoice?.invoice_status !== "cancelled";
-  const hasMultipleSavedLines: boolean = isEditMode && lines.length > 1;
-  const canEditSummary: boolean = canEdit && !hasMultipleSavedLines;
+  const canEditLineItems: boolean = canEdit;
   const canRecordSupplierPayment: boolean =
     !isEditMode ||
     Boolean(
@@ -263,7 +263,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
         existingInvoice.invoice_status !== "cancelled" &&
         existingInvoice.payment_status !== "paid"
     );
-  const summaryLine = lines[0] || createDefaultLine(1);
+  const itemCount: number = lines.length;
   const canViewMyInvoisPortal =
     isEditMode &&
     Boolean(existingInvoice?.uuid) &&
@@ -438,14 +438,12 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       const newRate = toNumber(value as string);
       if (newRate > 0) {
         setLines((previousLines: SelfBilledInvoiceLine[]) =>
-          isEditMode && previousLines.length > 1
-            ? previousLines
-            : previousLines.map((line: SelfBilledInvoiceLine) => ({
-                ...line,
-                amount_myr: Number(
-                  (toNumber(line.amount_foreign) * newRate).toFixed(2)
-                ),
-              }))
+          previousLines.map((line: SelfBilledInvoiceLine) => ({
+            ...line,
+            amount_myr: Number(
+              (toNumber(line.amount_foreign) * newRate).toFixed(2)
+            ),
+          }))
         );
       }
     }
@@ -475,16 +473,52 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
         const nextLine: SelfBilledInvoiceLine = { ...line };
         nextLine[field] = value as never;
 
+        if (field === "quantity" || field === "unit_price_foreign") {
+          const quantity = Math.max(0, toNumber(nextLine.quantity));
+          const unitPriceForeign = Math.max(
+            0,
+            toNumber(nextLine.unit_price_foreign)
+          );
+          const amountForeign = Number((quantity * unitPriceForeign).toFixed(2));
+          nextLine.quantity = quantity;
+          nextLine.unit_price_foreign = unitPriceForeign;
+          nextLine.amount_foreign = amountForeign;
+          nextLine.amount_myr = Number((amountForeign * fxRate).toFixed(2));
+        }
+
         if (field === "amount_foreign") {
-          const amountForeign = toNumber(value);
-          nextLine.quantity = 1;
-          nextLine.unit_price_foreign = amountForeign;
+          const amountForeign = Math.max(0, toNumber(value));
+          const quantity = toNumber(nextLine.quantity) || 1;
+          nextLine.quantity = quantity;
+          nextLine.unit_price_foreign = Number(
+            (amountForeign / quantity).toFixed(4)
+          );
           nextLine.amount_foreign = amountForeign;
           nextLine.amount_myr = Number((amountForeign * fxRate).toFixed(2));
         }
 
         return nextLine;
       })
+    );
+  };
+
+  const addLineItem = (): void => {
+    setLines((previousLines: SelfBilledInvoiceLine[]) => [
+      ...previousLines,
+      createDefaultLine(previousLines.length + 1),
+    ]);
+  };
+
+  const removeLineItem = (index: number): void => {
+    setLines((previousLines: SelfBilledInvoiceLine[]) =>
+      previousLines.length <= 1
+        ? previousLines
+        : previousLines
+            .filter((_, lineIndex: number) => lineIndex !== index)
+            .map((line: SelfBilledInvoiceLine, lineIndex: number) => ({
+              ...line,
+              line_number: lineIndex + 1,
+            }))
     );
   };
 
@@ -501,11 +535,10 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       toast.error("At least one line is required");
       return false;
     }
-    const linesToValidate = hasMultipleSavedLines ? lines : [summaryLine];
-    const invalidLineIndex = linesToValidate.findIndex(
+    const invalidLineIndex = lines.findIndex(
       (line: SelfBilledInvoiceLine) =>
         !line.description.trim() ||
-        (hasMultipleSavedLines && toNumber(line.quantity) <= 0) ||
+        toNumber(line.quantity) <= 0 ||
         toNumber(line.amount_foreign) <= 0 ||
         toNumber(line.amount_myr) <= 0
     );
@@ -513,7 +546,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       toast.error(`Line ${invalidLineIndex + 1} is incomplete`);
       return false;
     }
-    const missingAccountIndex = linesToValidate.findIndex(
+    const missingAccountIndex = lines.findIndex(
       (line: SelfBilledInvoiceLine) => !(line.account_code && line.account_code.trim())
     );
     if (missingAccountIndex >= 0) {
@@ -553,36 +586,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
     notes: line.notes || null,
   });
 
-  const buildSummaryLinePayload = (
-    line: SelfBilledInvoiceLine
-  ): SelfBilledInvoiceLine => {
-    const amountForeign = toNumber(line.amount_foreign);
-
-    return {
-      ...line,
-      line_number: 1,
-      quantity: 1,
-      unit_price_foreign: amountForeign,
-      amount_foreign: amountForeign,
-      amount_myr: toNumber(line.amount_myr),
-      tax_rate: toNumber(line.tax_rate),
-      tax_amount_myr: toNumber(line.tax_amount_myr),
-      classification_code: "034",
-      tax_type: line.tax_type || "06",
-      customs_form_reference: null,
-      tax_exemption_reason: null,
-      balance_quantity: toNullableNumber(line.balance_quantity),
-      general_stock_category_id: line.general_stock_category_id || null,
-      account_code: line.account_code ? line.account_code.trim() : null,
-      notes: line.notes || null,
-    };
-  };
-
   const buildPayload = (): SelfBilledInvoiceInput => {
-    const payloadLines = hasMultipleSavedLines
-      ? lines.map(buildLinePayload)
-      : [buildSummaryLinePayload(summaryLine)];
-
     return {
       purchase_kind: "foreign",
       foreign_supplier_id:
@@ -616,7 +620,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       currency_code: formData.currency_code,
       fx_rate: toNumber(formData.fx_rate),
       notes: formData.notes.trim() || null,
-      lines: payloadLines,
+      lines: lines.map(buildLinePayload),
     };
   };
 
@@ -1020,7 +1024,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               className="h-8 rounded-lg"
               onClick={refreshStatus}
             >
-              Refresh
+              Refresh E-Invoice
             </Button>
           )}
           {isEditMode && existingInvoice?.einvoice_status && canEdit && (
@@ -1290,167 +1294,237 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
             </div>
           </section>
 
-          {/* ── Purchase Summary ── */}
+          {/* Purchase Items */}
           <section className="rounded-lg border border-default-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-            {hasMultipleSavedLines ? (
-              <div className="p-3">
-                <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
-                  Multiple saved lines detected — edit Balance Qty below and click Save Records.
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="min-w-[700px] w-full divide-y divide-default-200 text-sm dark:divide-gray-700">
-                    <thead className="bg-default-50 dark:bg-gray-900/50">
-                      <tr>
-                        <th className="w-10 px-2 py-2 text-left text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">#</th>
-                        <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">Description</th>
-                        <th className="w-20 px-2 py-2 text-right text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">Qty</th>
-                        <th className="w-28 px-2 py-2 text-right text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">Foreign</th>
-                        <th className="w-28 px-2 py-2 text-right text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">MYR</th>
-                        <th className="w-28 px-2 py-2 text-right text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">Tax MYR</th>
-                        <th className="w-32 px-2 py-2 text-right text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">Balance Qty</th>
-                        <th className="w-44 px-2 py-2 text-left text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">General Category</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-default-200 dark:divide-gray-700">
-                      {lines.map((line: SelfBilledInvoiceLine, index: number) => (
-                        <tr key={`${line.id || "new"}-${index}`} className="hover:bg-default-50 dark:hover:bg-gray-700/40">
-                          <td className="px-2 py-2 text-default-500 dark:text-gray-400">{index + 1}</td>
-                          <td className="whitespace-pre-wrap px-2 py-2 text-default-900 dark:text-gray-100">{line.description || "-"}</td>
-                          <td className="px-2 py-2 text-right font-mono text-default-700 dark:text-gray-300">{toNumber(line.quantity)}</td>
-                          <td className="px-2 py-2 text-right font-mono text-default-900 dark:text-gray-100">{toNumber(line.amount_foreign).toFixed(2)}</td>
-                          <td className="px-2 py-2 text-right font-mono text-default-900 dark:text-gray-100">{toNumber(line.amount_myr).toFixed(2)}</td>
-                          <td className="px-2 py-2 text-right font-mono text-default-900 dark:text-gray-100">{toNumber(line.tax_amount_myr).toFixed(2)}</td>
-                          <td className="px-2 py-2 text-right">
-                            {canEditRecords ? (
-                              <input
-                                type="number"
-                                value={line.balance_quantity ?? ""}
-                                min={0}
-                                step="1"
-                                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                                  updateLineField(index, "balance_quantity", event.target.value)
-                                }
-                                className="w-24 rounded-md border border-default-300 bg-white px-2 py-0.5 text-right text-sm font-mono text-default-900 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                              />
-                            ) : (
-                              <span className="font-mono text-default-900 dark:text-gray-100">{line.balance_quantity ?? "-"}</span>
-                            )}
-                          </td>
-                          <td className="px-2 py-2">
-                            {canEditRecords ? (
-                              <FormListbox
-                                name={`general_stock_category_${index}`}
-                                value={line.general_stock_category_id ? String(line.general_stock_category_id) : ""}
-                                onChange={(value: string) =>
-                                  updateLineField(
-                                    index,
-                                    "general_stock_category_id",
-                                    value ? Number.parseInt(value, 10) : ""
-                                  )
-                                }
-                                options={generalStockCategoryOptions}
-                                optionsPosition="top"
-                                className="[&_button]:py-1"
-                              />
-                            ) : (
-                              <span className="text-default-700 dark:text-gray-300">
-                                {generalStockCategories.find((category) => category.id === line.general_stock_category_id)?.name || "-"}
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-default-200 px-3 py-2 dark:border-gray-700">
+              <div>
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
+                  Purchase Items
+                </h2>
+                <p className="text-xs text-default-500 dark:text-gray-400">
+                  {itemCount} item{itemCount === 1 ? "" : "s"}
+                </p>
               </div>
-            ) : (
-              <div className="space-y-3 p-3">
-                {/* Description — full width */}
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
-                    Description <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    value={summaryLine.description}
-                    onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) =>
-                      updateLineField(0, "description", event.target.value)
-                    }
-                    disabled={!canEditSummary}
-                    placeholder="Paste grouped item details here"
-                    rows={4}
-                    className="w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 placeholder:text-default-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
-                  />
-                </div>
+              {canEditLineItems && (
+                <Button
+                  type="button"
+                  icon={IconPlus}
+                  variant="outline"
+                  size="sm"
+                  className="h-8 rounded-lg"
+                  onClick={addLineItem}
+                >
+                  Add Item
+                </Button>
+              )}
+            </div>
 
-                {/* GL Account — row */}
-                <AccountCodeCombobox
-                  label="GL Account"
-                  required
-                  value={summaryLine.account_code || ""}
-                  onChange={(value: string) =>
-                    updateLineField(0, "account_code", value)
-                  }
-                  disabled={!canEditSummary}
-                  placeholder="Pick the expense account to debit"
-                />
-
-                {/* Tax + Balance — row */}
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                  <FormInput
-                    name="balance_quantity"
-                    label="Balance Quantity"
-                    value={summaryLine.balance_quantity ?? ""}
-                    type="number"
-                    min={0}
-                    step="1"
-                    onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                      updateLineField(0, "balance_quantity", event.target.value)
-                    }
-                    disabled={!canEditRecords}
-                  />
-                  <FormListbox
-                    name="general_stock_category"
-                    label="General Category"
-                    value={summaryLine.general_stock_category_id ? String(summaryLine.general_stock_category_id) : ""}
-                    onChange={(value: string) =>
-                      updateLineField(
-                        0,
-                        "general_stock_category_id",
-                        value ? Number.parseInt(value, 10) : ""
-                      )
-                    }
-                    options={generalStockCategoryOptions}
-                    optionsPosition="top"
-                    disabled={!canEditRecords}
-                    className="[&_button]:py-2"
-                  />
-                  <FormListbox
-                    name="summary_tax_type"
-                    label="Tax Type"
-                    value={summaryLine.tax_type}
-                    onChange={(value: string) =>
-                      updateLineField(0, "tax_type", value)
-                    }
-                    options={taxTypeOptions}
-                    disabled={!canEditSummary}
-                    className="[&_button]:py-2"
-                  />
-                  <FormInput
-                    name="tax_amount_myr"
-                    label="Tax (MYR)"
-                    value={summaryLine.tax_amount_myr}
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                      updateLineField(0, "tax_amount_myr", event.target.value)
-                    }
-                    disabled={!canEditSummary}
-                  />
-                </div>
+            {!canEditLineItems && canEditRecords && (
+              <div className="mx-3 mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                Only Balance Qty, General Category and supporting records can be edited for this purchase.
               </div>
             )}
+
+            <div className="space-y-3 p-3">
+              {lines.map((line: SelfBilledInvoiceLine, index: number) => (
+                <div
+                  key={`${line.id || "new"}-${index}`}
+                  className="rounded-lg border border-default-200 bg-default-50/60 p-3 dark:border-gray-700 dark:bg-gray-900/30"
+                >
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-sky-100 px-2 text-xs font-semibold text-sky-800 dark:bg-sky-900/40 dark:text-sky-200">
+                        {index + 1}
+                      </span>
+                      <span className="text-sm font-medium text-default-800 dark:text-gray-100">
+                        Item {index + 1}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-sm font-semibold text-default-900 dark:text-gray-100">
+                        {formatAmount(
+                          toNumber(line.amount_myr) + toNumber(line.tax_amount_myr),
+                          "MYR"
+                        )}
+                      </span>
+                      {canEditLineItems && lines.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeLineItem(index)}
+                          className="rounded p-1 text-rose-600 hover:bg-rose-50 hover:text-rose-800 focus:outline-none focus:ring-2 focus:ring-rose-500 dark:text-rose-300 dark:hover:bg-rose-900/30 dark:hover:text-rose-100"
+                          title="Remove item"
+                        >
+                          <IconTrash size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid items-stretch gap-3 xl:grid-cols-[minmax(260px,1.4fr)_minmax(360px,1fr)]">
+                    <div className="flex h-full flex-col gap-1.5">
+                      <label className="block text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">
+                        Item Description
+                      </label>
+                      {canEditLineItems ? (
+                        <textarea
+                          value={line.description}
+                          onChange={(
+                            event: React.ChangeEvent<HTMLTextAreaElement>
+                          ) =>
+                            updateLineField(
+                              index,
+                              "description",
+                              event.target.value
+                            )
+                          }
+                          rows={4}
+                          className="min-h-[110px] flex-1 resize-y rounded-md border border-default-300 bg-white px-3 py-2 text-sm text-default-900 placeholder:text-default-400 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500"
+                          placeholder="e.g. PVC tarpaulin 0.5mm, 2m x 100m"
+                        />
+                      ) : (
+                        <div className="min-h-[110px] flex-1 whitespace-pre-wrap rounded-md border border-default-200 bg-white px-3 py-2 text-sm text-default-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
+                          {line.description || "-"}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <FormInput
+                        name={`quantity_${index}`}
+                        label="Qty"
+                        value={line.quantity}
+                        type="number"
+                        min={0}
+                        step="0.0001"
+                        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                          updateLineField(index, "quantity", event.target.value)
+                        }
+                        disabled={!canEditLineItems}
+                      />
+                      <FormInput
+                        name={`unit_price_foreign_${index}`}
+                        label={`Unit (${formData.currency_code})`}
+                        value={line.unit_price_foreign}
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                          updateLineField(
+                            index,
+                            "unit_price_foreign",
+                            event.target.value
+                          )
+                        }
+                        disabled={!canEditLineItems}
+                      />
+                      <FormInput
+                        name={`amount_foreign_${index}`}
+                        label={`Amount (${formData.currency_code})`}
+                        value={line.amount_foreign}
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                          updateLineField(
+                            index,
+                            "amount_foreign",
+                            event.target.value
+                          )
+                        }
+                        disabled={!canEditLineItems}
+                      />
+                      <FormInput
+                        name={`amount_myr_${index}`}
+                        label="Amount (MYR)"
+                        value={line.amount_myr}
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                          updateLineField(index, "amount_myr", event.target.value)
+                        }
+                        disabled={!canEditLineItems}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(240px,1fr)_repeat(4,minmax(150px,0.7fr))]">
+                    <AccountCodeCombobox
+                      label="GL Account"
+                      value={line.account_code || ""}
+                      onChange={(value: string) =>
+                        updateLineField(index, "account_code", value)
+                      }
+                      disabled={!canEditLineItems}
+                      placeholder="Account"
+                    />
+                    <FormInput
+                      name={`balance_quantity_${index}`}
+                      label="Balance Qty"
+                      value={line.balance_quantity ?? ""}
+                      type="number"
+                      min={0}
+                      step="0.0001"
+                      onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                        updateLineField(
+                          index,
+                          "balance_quantity",
+                          event.target.value
+                        )
+                      }
+                      disabled={!canEditRecords}
+                    />
+                    <FormListbox
+                      name={`general_stock_category_${index}`}
+                      label="General Category"
+                      value={
+                        line.general_stock_category_id
+                          ? String(line.general_stock_category_id)
+                          : ""
+                      }
+                      onChange={(value: string) =>
+                        updateLineField(
+                          index,
+                          "general_stock_category_id",
+                          value ? Number.parseInt(value, 10) : ""
+                        )
+                      }
+                      options={generalStockCategoryOptions}
+                      optionsPosition="top"
+                      disabled={!canEditRecords}
+                      className="[&_button]:py-2"
+                    />
+                    <FormListbox
+                      name={`tax_type_${index}`}
+                      label="Tax Type"
+                      value={line.tax_type}
+                      onChange={(value: string) =>
+                        updateLineField(index, "tax_type", value)
+                      }
+                      options={taxTypeOptions}
+                      disabled={!canEditLineItems}
+                      className="[&_button]:py-2"
+                    />
+                    <FormInput
+                      name={`tax_amount_myr_${index}`}
+                      label="Tax (MYR)"
+                      value={line.tax_amount_myr}
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                        updateLineField(
+                          index,
+                          "tax_amount_myr",
+                          event.target.value
+                        )
+                      }
+                      disabled={!canEditLineItems}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
           </section>
 
           {/* ── Supporting Document & Notes ── */}
@@ -1594,7 +1668,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                 value={formData.currency_code}
                 onChange={(value: string) => updateFormField("currency_code", value)}
                 options={CURRENCY_OPTIONS}
-                disabled={!canEdit || hasMultipleSavedLines}
+                disabled={!canEdit}
                 className="[&_button]:py-1.5"
               />
               <FormInput
@@ -1607,35 +1681,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   updateFormField("fx_rate", event.target.value)
                 }
-                disabled={!canEdit || hasMultipleSavedLines}
-                required
-              />
-              <div className="border-t border-default-100 pt-3 dark:border-gray-700">
-                <FormInput
-                  name="amount_foreign"
-                  label={`Amount (${formData.currency_code})`}
-                  value={summaryLine.amount_foreign}
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                    updateLineField(0, "amount_foreign", event.target.value)
-                  }
-                  disabled={!canEditSummary}
-                  required
-                />
-              </div>
-              <FormInput
-                name="amount_myr"
-                label="Amount (MYR)"
-                value={summaryLine.amount_myr}
-                type="number"
-                min={0}
-                step="0.01"
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                  updateLineField(0, "amount_myr", event.target.value)
-                }
-                disabled={!canEditSummary}
+                disabled={!canEdit}
                 required
               />
             </div>
