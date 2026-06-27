@@ -20,8 +20,8 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-27",
-    ms: "Ciri \"Finalize\" / muktamadkan payroll telah dibuang sepenuhnya (Tien Hock dan Green Target). Tiada lagi butang Finalize/Revert/Unlock atau label status Processing/Finalized — payroll kini sentiasa boleh diedit. Sebagai gantinya, halaman Payroll mempunyai butang teks baharu untuk menukar paparan antara \"Groups\" (pekerja dikumpulkan ikut kerja) dan \"Recent\" (senarai rata tanpa kumpulan). Kedua-dua paparan kini disusun dengan yang terkini diakses/diproses di atas — kumpulan atau pekerja yang baru dibuka akan naik ke atas. Pilihan paparan diingati oleh sistem. Butang buka/tutup semua hanya muncul dalam paparan Groups.",
-    en: "The payroll \"Finalize\" feature has been removed entirely (Tien Hock and Green Target). There are no more Finalize/Revert/Unlock buttons or Processing/Finalized status labels — payrolls are now always editable. In its place, the Payroll page has a new text button to switch the view between \"Groups\" (employees grouped by job) and \"Recent\" (a flat, ungrouped list). Both views are now ordered with the most recently opened/processed at the top — a group or employee you just opened floats to the top. Your chosen view is remembered. The expand/collapse-all button only appears in the Groups view.",
+    ms: "Butang kemas kini status e-invois untuk Foreign General Purchase kini lebih jelas sebagai \"Refresh E-Invoice\". Senarai General Purchases juga kini mempunyai butang refresh e-invois pada setiap pembelian foreign yang sudah dihantar, jadi status Pending boleh disemak terus dari senarai tanpa membuka rekod.",
+    en: "The Foreign General Purchase status refresh button is now clearer as \"Refresh E-Invoice\". The General Purchases list also has an e-invoice refresh button on each submitted foreign purchase, so Pending statuses can be checked directly from the list without opening the record.",
   },
   {
     date: "2026-06-27",
