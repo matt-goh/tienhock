@@ -276,6 +276,8 @@ const JournalDetailsPage: React.FC = () => {
                 <p className="mt-0.5 text-sm text-default-500 dark:text-gray-400">
                   {getEntryTypeName(entry.entry_type)} |{" "}
                   {formatDate(entry.entry_date)} | {entry.description || "-"}
+                  {entry.cheque_no &&
+                    ` | Cheque: ${entry.cheque_no}`}
                 </p>
               </div>
             </div>

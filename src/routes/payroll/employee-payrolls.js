@@ -487,7 +487,9 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     }
 
     // Calculate SOCSO. SKBBK applies from June 2026 payrolls onward.
-    const socsoRate = contributionCtx.socso.eligible
+    // No wage means no contribution: skip when grossPay is 0 so the lowest
+    // bracket (wage_from = 0) does not charge the minimum on a zero-wage month.
+    const socsoRate = contributionCtx.socso.eligible && grossPay > 0
       ? findRateByWage(socsoRates, grossPay)
       : null;
     if (socsoRate) {
@@ -523,8 +525,10 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       });
     }
 
-    // Calculate SIP (only for Malaysian citizens under 60)
+    // Calculate SIP (only for Malaysian citizens under 60).
+    // No wage means no contribution: skip when grossPay is 0.
     if (
+      grossPay > 0 &&
       contributionCtx.sip.eligible &&
       contributionCtx.sip.under60 &&
       contributionCtx.isMalaysian
@@ -638,7 +642,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
 
     // Update gross pay, net pay, and rounding columns
     await pool.query(
-      `UPDATE employee_payrolls SET gross_pay = $1, net_pay = $2, digenapkan = $3, setelah_digenapkan = $4 WHERE id = $5`,
+      `UPDATE employee_payrolls SET gross_pay = $1, net_pay = $2, digenapkan = $3, setelah_digenapkan = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5`,
       [
         grossPay.toFixed(2),
         netPay.toFixed(2),
@@ -681,7 +685,7 @@ export default function (pool) {
 
       // Query all payrolls in a single database call
       const query = `
-      SELECT ep.*, mp.year, mp.month, mp.status as payroll_status, s.name as employee_name,
+      SELECT ep.*, mp.year, mp.month, s.name as employee_name,
              s.head_staff_id as head_employee_id
       FROM employee_payrolls ep
       JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
@@ -1102,7 +1106,7 @@ export default function (pool) {
     try {
       // Get employee payroll details
       const payrollQuery = `
-        SELECT ep.*, mp.year, mp.month, mp.status as payroll_status, s.name as employee_name,
+        SELECT ep.*, mp.year, mp.month, s.name as employee_name,
                s.head_staff_id as head_employee_id
         FROM employee_payrolls ep
         JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
@@ -1518,7 +1522,7 @@ export default function (pool) {
     try {
       // Get employee payroll details
       const payrollQuery = `
-        SELECT ep.*, mp.year, mp.month, mp.status as payroll_status, s.name as employee_name,
+        SELECT ep.*, mp.year, mp.month, s.name as employee_name,
                s.head_staff_id as head_employee_id
         FROM employee_payrolls ep
         JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
@@ -1954,7 +1958,6 @@ export default function (pool) {
           section,
           gross_pay,
           net_pay,
-          status = "Processing",
           items = [],
           deductions = [],
         } = payroll;
@@ -2002,9 +2005,9 @@ export default function (pool) {
 
             const updateQuery = `
               UPDATE employee_payrolls
-              SET job_type = $1, section = $2, gross_pay = $3, net_pay = $4, status = $5,
-                  digenapkan = $6, setelah_digenapkan = $7
-              WHERE id = $8
+              SET job_type = $1, section = $2, gross_pay = $3, net_pay = $4,
+                  digenapkan = $5, setelah_digenapkan = $6, updated_at = CURRENT_TIMESTAMP
+              WHERE id = $7
               RETURNING *
             `;
 
@@ -2013,7 +2016,6 @@ export default function (pool) {
               section,
               gross_pay || 0,
               net_pay || 0,
-              status,
               digenapkan.toFixed(2),
               setelahDigenapkan.toFixed(2),
               employeePayrollId,
@@ -2029,9 +2031,9 @@ export default function (pool) {
             const insertQuery = `
               INSERT INTO employee_payrolls (
                 monthly_payroll_id, employee_id, job_type, section,
-                gross_pay, net_pay, status, digenapkan, setelah_digenapkan
+                gross_pay, net_pay, digenapkan, setelah_digenapkan
               )
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
               RETURNING id
             `;
 
@@ -2042,7 +2044,6 @@ export default function (pool) {
               section,
               gross_pay || 0,
               net_pay || 0,
-              status,
               digenapkan.toFixed(2),
               setelahDigenapkan.toFixed(2),
             ]);
@@ -2163,7 +2164,6 @@ export default function (pool) {
       section,
       gross_pay,
       net_pay,
-      status = "Processing",
       items = [],
       deductions = [],
     } = req.body;
@@ -2226,9 +2226,9 @@ export default function (pool) {
 
         const updateQuery = `
           UPDATE employee_payrolls
-          SET job_type = $1, section = $2, gross_pay = $3, net_pay = $4, status = $5,
-              digenapkan = $6, setelah_digenapkan = $7
-          WHERE id = $8
+          SET job_type = $1, section = $2, gross_pay = $3, net_pay = $4,
+              digenapkan = $5, setelah_digenapkan = $6, updated_at = CURRENT_TIMESTAMP
+          WHERE id = $7
           RETURNING *
         `;
 
@@ -2237,7 +2237,6 @@ export default function (pool) {
           section,
           gross_pay || 0,
           net_pay || 0,
-          status,
           digenapkan.toFixed(2),
           setelahDigenapkan.toFixed(2),
           employeePayrollId,
@@ -2253,9 +2252,9 @@ export default function (pool) {
         const insertQuery = `
           INSERT INTO employee_payrolls (
             monthly_payroll_id, employee_id, job_type, section,
-            gross_pay, net_pay, status, digenapkan, setelah_digenapkan
+            gross_pay, net_pay, digenapkan, setelah_digenapkan
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
           RETURNING id
         `;
 
@@ -2266,7 +2265,6 @@ export default function (pool) {
           section,
           gross_pay || 0,
           net_pay || 0,
-          status,
           digenapkan.toFixed(2),
           setelahDigenapkan.toFixed(2),
         ]);
@@ -2382,11 +2380,10 @@ export default function (pool) {
     try {
       await client.query("BEGIN");
 
-      // Verify employee payroll exists and monthly payroll is not finalized
+      // Verify employee payroll exists
       const checkQuery = `
-        SELECT ep.id, mp.status as payroll_status
+        SELECT ep.id
         FROM employee_payrolls ep
-        JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
         WHERE ep.id = $1
       `;
       const checkResult = await client.query(checkQuery, [id]);
@@ -2394,13 +2391,6 @@ export default function (pool) {
       if (checkResult.rows.length === 0) {
         await client.query("ROLLBACK");
         return res.status(404).json({ message: "Employee payroll not found" });
-      }
-
-      if (checkResult.rows[0].payroll_status === "Finalized") {
-        await client.query("ROLLBACK");
-        return res.status(400).json({
-          message: "Cannot add items to a finalized payroll",
-        });
       }
 
       // Calculate amount if not provided
@@ -2469,24 +2459,16 @@ export default function (pool) {
     const { itemId } = req.params;
 
     try {
-      // Check if item exists and if the payroll is not finalized
+      // Check if item exists
       const checkQuery = `
-        SELECT pi.id, mp.status as payroll_status, pi.employee_payroll_id
+        SELECT pi.id, pi.employee_payroll_id
         FROM payroll_items pi
-        JOIN employee_payrolls ep ON pi.employee_payroll_id = ep.id
-        JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
         WHERE pi.id = $1
       `;
       const checkResult = await pool.query(checkQuery, [itemId]);
 
       if (checkResult.rows.length === 0) {
         return res.status(404).json({ message: "Payroll item not found" });
-      }
-
-      if (checkResult.rows[0].payroll_status === "Finalized") {
-        return res.status(400).json({
-          message: "Cannot delete items from a finalized payroll",
-        });
       }
 
       const employeePayrollId = checkResult.rows[0].employee_payroll_id;

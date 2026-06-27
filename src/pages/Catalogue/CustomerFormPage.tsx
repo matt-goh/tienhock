@@ -1,6 +1,6 @@
 // src/pages/Catalogue/CustomerFormPage.tsx
 import React, { useState, useEffect, useRef, useCallback } from "react"; // Added useCallback
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { Customer, CustomProduct } from "../../types/types";
@@ -22,6 +22,11 @@ import {
 } from "../../utils/catalogue/useCustomerCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import CustomerProductsTab from "../../components/Catalogue/CustomerProductsTab";
+import CustomerTransactionsTab, {
+  TxnCache,
+  getDefaultTransactionsRange,
+} from "../../components/Catalogue/CustomerTransactionsTab";
+import { TimeRange } from "../../components/TimeNavigator";
 import Tab from "../../components/Tab";
 import { IconBuildingSkyscraper, IconBuildingStore } from "@tabler/icons-react";
 
@@ -29,6 +34,15 @@ const CustomerFormPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
+  // Deep-link to a specific tab via ?tab=credit | ?tab=transactions (from the
+  // customer card shortcut buttons). Defaults to the Info tab.
+  const [searchParams] = useSearchParams();
+  const initialTab =
+    searchParams.get("tab") === "credit"
+      ? 1
+      : searchParams.get("tab") === "transactions"
+      ? 2
+      : 0;
 
   // Add this helper function at the component level
   const getIdNumberPlaceholder = (idType: string) => {
@@ -89,6 +103,10 @@ const CustomerFormPage: React.FC = () => {
     phoneNumber?: boolean;
   }>({});
   const [salesmen, setSalesmen] = useState<SelectOption[]>([]);
+  // Transaction History tab: range + fetched-row cache lifted here so they
+  // survive tab switches within a visit but reset when the page is re-opened.
+  const [txnRange, setTxnRange] = useState<TimeRange>(getDefaultTransactionsRange);
+  const [txnCache, setTxnCache] = useState<TxnCache | null>(null);
 
   const closenessOptions: SelectOption[] = [
     { id: "Local", name: "Local" },
@@ -740,7 +758,14 @@ const CustomerFormPage: React.FC = () => {
             noValidate // Prevent browser default validation
           >
             <div className="px-6 py-3">
-              <Tab labels={["Info", "Credit & Pricing"]}>
+              <Tab
+                defaultActiveTab={initialTab}
+                labels={
+                  isEditMode
+                    ? ["Info", "Credit & Pricing", "Transaction History"]
+                    : ["Info", "Credit & Pricing"]
+                }
+              >
                 {/* === First tab - Customer Info === */}
                 <div className="space-y-6 mt-5">
                   <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
@@ -1016,6 +1041,19 @@ const CustomerFormPage: React.FC = () => {
                     disabled={isSaving} // Pass disabled state
                   />
                 </div>
+
+                {/* === Third tab - Transaction History (edit mode only) === */}
+                {isEditMode && id ? (
+                  <CustomerTransactionsTab
+                    customerId={id}
+                    range={txnRange}
+                    onRangeChange={setTxnRange}
+                    cache={txnCache}
+                    onCacheChange={setTxnCache}
+                  />
+                ) : (
+                  <></>
+                )}
               </Tab>
             </div>
 

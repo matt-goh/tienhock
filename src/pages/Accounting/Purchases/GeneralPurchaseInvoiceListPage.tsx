@@ -207,6 +207,9 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
   const [submissionResults, setSubmissionResults] =
     useState<SelfBilledSubmissionResult | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [refreshingInvoiceId, setRefreshingInvoiceId] = useState<number | null>(
+    null
+  );
 
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
     const param = searchParams.get("month");
@@ -395,6 +398,28 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
           ? error.message
           : "Failed to download supporting document"
       );
+    }
+  };
+
+  const refreshEInvoiceStatus = async (
+    event: React.MouseEvent<HTMLButtonElement>,
+    invoice: SelfBilledInvoiceListItem
+  ): Promise<void> => {
+    event.stopPropagation();
+    if (!invoice.uuid || refreshingInvoiceId !== null) return;
+
+    setRefreshingInvoiceId(invoice.id);
+    try {
+      await api.put(`/api/general-purchases/${invoice.id}/refresh-status`, {});
+      toast.success("E-Invoice status refreshed");
+      await fetchInvoices();
+    } catch (error: unknown) {
+      console.error("Error refreshing self-billed status:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to refresh E-Invoice"
+      );
+    } finally {
+      setRefreshingInvoiceId(null);
     }
   };
 
@@ -824,6 +849,26 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
                           >
                             <IconExternalLink size={15} />
                           </a>
+                        )}
+                        {invoice.purchase_kind !== "local" && invoice.uuid && (
+                          <button
+                            type="button"
+                            onClick={(
+                              event: React.MouseEvent<HTMLButtonElement>
+                            ) => refreshEInvoiceStatus(event, invoice)}
+                            disabled={refreshingInvoiceId !== null}
+                            className="rounded p-1 text-default-500 hover:bg-default-100 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-sky-300"
+                            title="Refresh E-Invoice status"
+                          >
+                            <IconRefresh
+                              size={15}
+                              className={
+                                refreshingInvoiceId === invoice.id
+                                  ? "animate-spin"
+                                  : undefined
+                              }
+                            />
+                          </button>
                         )}
                       </div>
                     </td>

@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   IconSearch,
   IconChevronLeft,
   IconChevronRight,
   IconPlus,
   IconTrash,
+  IconPencil,
   IconBriefcase,
   IconPhone,
   IconId,
@@ -42,6 +43,12 @@ const EmployeeCard = ({
     onDeleteClick(employee);
   };
 
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    navigate(`/catalogue/staff/${employee.id}/edit`);
+  };
+
   const handleMoreJobsClick = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent card navigation
     setExpandedJobs(!expandedJobs);
@@ -64,23 +71,32 @@ const EmployeeCard = ({
             : "bg-default-50 dark:bg-gray-900/50 border-default-100 dark:border-gray-700"
         } transition-colors duration-200`}
       >
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center gap-2">
           <h3
-            className="font-semibold text-default-800 dark:text-gray-100 truncate pr-6"
+            className="font-semibold text-default-800 dark:text-gray-100 truncate flex-1 min-w-0"
             title={employee.name}
           >
             {employee.name}
           </h3>
-          <div className="absolute top-3 right-3">
-            {isCardHovered && (
-              <button
-                onClick={handleDeleteClick}
-                className="p-1.5 rounded-lg bg-white dark:bg-gray-800 hover:bg-rose-50 text-default-500 dark:text-gray-400 hover:text-rose-600 transition-colors duration-150 shadow-sm"
-                title="Delete employee"
-              >
-                <IconTrash size={16} stroke={1.5} />
-              </button>
-            )}
+          <div
+            className={`flex items-center gap-1.5 flex-shrink-0 transition-opacity duration-150 ${
+              isCardHovered ? "opacity-100" : "opacity-0 pointer-events-none"
+            }`}
+          >
+            <button
+              onClick={handleEditClick}
+              className="p-1.5 rounded-lg bg-white dark:bg-gray-800 hover:bg-sky-50 dark:hover:bg-sky-900/50 text-default-500 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors duration-150 shadow-sm"
+              title="Edit employee"
+            >
+              <IconPencil size={16} stroke={1.5} />
+            </button>
+            <button
+              onClick={handleDeleteClick}
+              className="p-1.5 rounded-lg bg-white dark:bg-gray-800 hover:bg-rose-50 text-default-500 dark:text-gray-400 hover:text-rose-600 transition-colors duration-150 shadow-sm"
+              title="Delete employee"
+            >
+              <IconTrash size={16} stroke={1.5} />
+            </button>
           </div>
         </div>
         <div className="text-sm text-default-500 dark:text-gray-400 mt-0.5 flex items-center">
@@ -178,6 +194,13 @@ const StaffPage = () => {
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const navigate = useNavigate();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Focus the search box once the page has finished loading (the input isn't
+  // mounted yet while the loading spinner is shown).
+  useEffect(() => {
+    if (!loading) searchInputRef.current?.focus();
+  }, [loading]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -404,6 +427,7 @@ const StaffPage = () => {
               size={18}
             />
             <input
+              ref={searchInputRef}
               type="text"
               placeholder="Search name, ID or phone..."
               className="w-full pl-10 pr-10 py-2.5 border border-default-300 dark:border-gray-600 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded-full text-sm dark:bg-transparent dark:text-gray-100"

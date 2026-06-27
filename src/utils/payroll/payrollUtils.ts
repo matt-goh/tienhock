@@ -176,27 +176,6 @@ export const processMonthlyPayrolls = async (
 };
 
 /**
- * Updates a monthly payroll status
- * @param id Monthly payroll ID
- * @param status New status (Processing, Finalized)
- * @returns Updated payroll data
- */
-export const updateMonthlyPayrollStatus = async (
-  id: number,
-  status: "Processing" | "Finalized"
-) => {
-  try {
-    const response = await api.put(`/api/monthly-payrolls/${id}/status`, {
-      status,
-    });
-    return response;
-  } catch (error) {
-    console.error("Error updating monthly payroll status:", error);
-    throw error;
-  }
-};
-
-/**
  * Fetches eligible employees for a monthly payroll
  * @param id Monthly payroll ID
  * @returns API response with eligible employees
@@ -350,7 +329,6 @@ export const saveEmployeePayroll = async (
       section: employeePayroll.section,
       gross_pay: employeePayroll.gross_pay,
       net_pay: employeePayroll.net_pay,
-      status: employeePayroll.status || "Processing",
       items: employeePayroll.items,
       deductions: employeePayroll.deductions,
     });
@@ -380,7 +358,6 @@ export const saveEmployeePayrollsBatch = async (
         section: payroll.section,
         gross_pay: payroll.gross_pay,
         net_pay: payroll.net_pay,
-        status: payroll.status || "Processing",
         items: payroll.items,
         deductions: payroll.deductions,
         grouped_employee_ids: (payroll as any).grouped_employee_ids || null,

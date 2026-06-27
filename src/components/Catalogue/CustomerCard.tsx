@@ -11,6 +11,8 @@ import {
   IconCheck,
   IconBuildingStore,
   IconBuildingSkyscraper,
+  IconCreditCard,
+  IconHistory,
 } from "@tabler/icons-react";
 
 interface CustomerCardProps {
@@ -41,6 +43,18 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
     onDeleteClick(customer);
   };
 
+  const handleCreditClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    navigate(`/catalogue/customer/${customer.id}?tab=credit`);
+  };
+
+  const handleTransactionsClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    navigate(`/catalogue/customer/${customer.id}?tab=transactions`);
+  };
+
   // Determine e-Invoice status based on having both tin_number and id_number
   const hasEInvoiceInfo =
     Boolean(customer.tin_number) && Boolean(customer.id_number);
@@ -62,20 +76,39 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
             : "bg-default-50 dark:bg-gray-900/50 border-default-100 dark:border-gray-700"
         } transition-colors duration-200`}
       >
-        <div className="flex justify-between items-center">
-          <h3 className="font-semibold text-default-800 dark:text-gray-100 truncate pr-6">
+        <div className="flex justify-between items-center gap-2">
+          <h3
+            className="font-semibold text-default-800 dark:text-gray-100 truncate flex-1 min-w-0"
+            title={customer.name}
+          >
             {customer.name}
           </h3>
-          <div className="absolute top-3 right-3">
-            {isCardHovered && (
-              <button
-                onClick={handleDeleteClick}
-                className="p-1.5 rounded-full bg-white dark:bg-gray-700 hover:bg-rose-50 dark:hover:bg-rose-900/50 text-default-500 dark:text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors duration-150 shadow-sm"
-                title="Delete customer"
-              >
-                <IconTrash size={16} stroke={1.5} />
-              </button>
-            )}
+          <div
+            className={`flex items-center gap-1.5 flex-shrink-0 transition-opacity duration-150 ${
+              isCardHovered ? "opacity-100" : "opacity-0 pointer-events-none"
+            }`}
+          >
+            <button
+              onClick={handleCreditClick}
+              className="p-1.5 rounded-full bg-white dark:bg-gray-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/50 text-default-500 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors duration-150 shadow-sm"
+              title="Credit & Pricing"
+            >
+              <IconCreditCard size={16} stroke={1.5} />
+            </button>
+            <button
+              onClick={handleTransactionsClick}
+              className="p-1.5 rounded-full bg-white dark:bg-gray-700 hover:bg-sky-50 dark:hover:bg-sky-900/50 text-default-500 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors duration-150 shadow-sm"
+              title="Transaction History"
+            >
+              <IconHistory size={16} stroke={1.5} />
+            </button>
+            <button
+              onClick={handleDeleteClick}
+              className="p-1.5 rounded-full bg-white dark:bg-gray-700 hover:bg-rose-50 dark:hover:bg-rose-900/50 text-default-500 dark:text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors duration-150 shadow-sm"
+              title="Delete customer"
+            >
+              <IconTrash size={16} stroke={1.5} />
+            </button>
           </div>
         </div>
         <div className="text-sm text-default-500 dark:text-gray-400 mt-0.5 flex items-center">

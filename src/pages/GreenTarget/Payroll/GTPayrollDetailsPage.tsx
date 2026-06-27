@@ -80,7 +80,6 @@ interface GTEmployeePayroll {
   setelah_digenapkan?: number | null;
   year: number;
   month: number;
-  payroll_status: string;
   ic_no: string;
   bank_account_number: string;
   epf_no: string;
@@ -153,7 +152,6 @@ const GTPayrollDetailsPage: React.FC = () => {
       net_pay: payroll.net_pay,
       digenapkan: payroll.digenapkan,
       setelah_digenapkan: payroll.setelah_digenapkan ?? undefined,
-      status: payroll.payroll_status,
       year: payroll.year,
       month: payroll.month,
       items: payroll.items.map(item => ({
@@ -274,7 +272,8 @@ const GTPayrollDetailsPage: React.FC = () => {
     0
   );
 
-  const isFinalized = payroll.payroll_status === "Finalized";
+  // Finalize/status system removed: payrolls are always editable.
+  const isFinalized = false;
   const { pdfPayroll, staffDetails, midMonthForPdf } = buildPayslipData(payroll);
 
   // Mid-month advance + rounding (mirrors the backend processing math)
@@ -342,15 +341,6 @@ const GTPayrollDetailsPage: React.FC = () => {
             variant="outline"
             buttonText="Download"
           />
-          <span
-            className={`px-3 py-1 rounded-full text-sm font-medium ${
-              isFinalized
-                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-            }`}
-          >
-            {payroll.payroll_status}
-          </span>
         </div>
       </div>
 
