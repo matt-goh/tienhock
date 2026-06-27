@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-06-28",
+    ms: "Halaman pelanggan kini mempunyai tab baharu \"Transaction History\" yang memaparkan semua aktiviti pelanggan tersebut di satu tempat — invois, pembayaran, serta Nota Kredit/Debit/Bayaran Balik — disusun mengikut tarikh (terkini di atas). Terdapat penapis tarikh (Bulan/Julat/Tahun) yang lalai kepada 30 hari lepas, kad ringkasan Jumlah Diinvois / Jumlah Dibayar / bilangan pelarasan, dan setiap baris boleh diklik untuk terus membuka invois atau dokumen berkenaan.",
+    en: "The customer page now has a new \"Transaction History\" tab that shows everything for that customer in one place — invoices, payments, and Credit/Debit/Refund Notes — sorted by date (newest first). It has a date filter (Month/Range/Year) defaulting to the last 30 days, summary cards for Total Invoiced / Total Paid / number of adjustments, and every row is clickable to jump straight to the related invoice or document.",
+  },
+  {
     date: "2026-06-27",
     ms: "Foreign General Purchase kini menyokong beberapa item dalam satu pembelian. Daripada memasukkan semua barang dalam satu kotak penerangan, anda kini boleh tambah baris item berasingan dengan kuantiti, harga seunit, jumlah foreign, jumlah MYR, akaun GL, kategori stok General, dan cukai masing-masing.",
     en: "Foreign General Purchase now supports multiple items in one purchase. Instead of typing every item into one description box, you can now add separate item rows with their own quantity, unit price, foreign amount, MYR amount, GL account, General stock category, and tax.",

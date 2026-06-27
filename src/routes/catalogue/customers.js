@@ -278,6 +278,85 @@ export default function (pool) {
     }
   });
 
+  // Unified transaction history (invoices + payments + adjustment docs) for one
+  // customer, optionally limited to a date range (startDate/endDate as ms).
+  // Returns the three sources in a single response so the customer page's
+  // Transaction History tab needs only one request. Queries select only the
+  // columns the tab renders (no per-invoice adjustment subqueries) to stay fast.
+  router.get("/:id/transactions", async (req, res) => {
+    const { id } = req.params;
+    const { startDate, endDate } = req.query;
+
+    try {
+      const startMs = startDate != null ? parseInt(startDate, 10) : NaN;
+      const endMs = endDate != null ? parseInt(endDate, 10) : NaN;
+      const hasRange = !isNaN(startMs) && !isNaN(endMs);
+
+      // Invoices (DEBIT) — exclude cancelled, mirroring the main invoice list.
+      let invSql = `
+        SELECT id, createddate, totalamountpayable, invoice_status, einvoice_status
+        FROM invoices
+        WHERE customerid = $1 AND invoice_status != 'cancelled'`;
+      const invParams = [id];
+      if (hasRange) {
+        invParams.push(String(startMs), String(endMs));
+        invSql += ` AND CAST(createddate AS bigint) BETWEEN $2::bigint AND $3::bigint`;
+      }
+
+      // Payments (CREDIT) — include cancelled so the history is complete.
+      let paySql = `
+        SELECT p.payment_id, p.invoice_id, p.payment_date, p.amount_paid,
+               p.payment_method, p.internal_reference, p.payment_reference, p.status
+        FROM payments p
+        JOIN invoices i ON p.invoice_id = i.id
+        WHERE i.customerid = $1`;
+      const payParams = [id];
+      if (hasRange) {
+        payParams.push(new Date(startMs), new Date(endMs));
+        paySql += ` AND p.payment_date BETWEEN $2 AND $3`;
+      }
+
+      // Adjustment documents (CN/DN/RN) — include cancelled.
+      let adjSql = `
+        SELECT id, type, original_invoice_id, createddate, totalamountpayable,
+               status, einvoice_status
+        FROM adjustment_documents
+        WHERE customerid = $1`;
+      const adjParams = [id];
+      if (hasRange) {
+        adjParams.push(String(startMs), String(endMs));
+        adjSql += ` AND CAST(createddate AS bigint) BETWEEN $2::bigint AND $3::bigint`;
+      }
+
+      const [invoices, payments, adjustments] = await Promise.all([
+        pool.query(invSql, invParams),
+        pool.query(paySql, payParams),
+        pool.query(adjSql, adjParams),
+      ]);
+
+      res.json({
+        invoices: invoices.rows.map((r) => ({
+          ...r,
+          totalamountpayable: parseFloat(r.totalamountpayable || 0),
+        })),
+        payments: payments.rows.map((r) => ({
+          ...r,
+          amount_paid: parseFloat(r.amount_paid || 0),
+        })),
+        adjustments: adjustments.rows.map((r) => ({
+          ...r,
+          totalamountpayable: parseFloat(r.totalamountpayable || 0),
+        })),
+      });
+    } catch (error) {
+      console.error("Error fetching customer transactions:", error);
+      res.status(500).json({
+        message: "Error fetching customer transactions",
+        error: error.message,
+      });
+    }
+  });
+
   // Create a new customer
   router.post("/", async (req, res) => {
     const {

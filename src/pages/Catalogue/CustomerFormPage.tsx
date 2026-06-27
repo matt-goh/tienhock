@@ -22,6 +22,11 @@ import {
 } from "../../utils/catalogue/useCustomerCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import CustomerProductsTab from "../../components/Catalogue/CustomerProductsTab";
+import CustomerTransactionsTab, {
+  TxnCache,
+  getDefaultTransactionsRange,
+} from "../../components/Catalogue/CustomerTransactionsTab";
+import { TimeRange } from "../../components/TimeNavigator";
 import Tab from "../../components/Tab";
 import { IconBuildingSkyscraper, IconBuildingStore } from "@tabler/icons-react";
 
@@ -89,6 +94,10 @@ const CustomerFormPage: React.FC = () => {
     phoneNumber?: boolean;
   }>({});
   const [salesmen, setSalesmen] = useState<SelectOption[]>([]);
+  // Transaction History tab: range + fetched-row cache lifted here so they
+  // survive tab switches within a visit but reset when the page is re-opened.
+  const [txnRange, setTxnRange] = useState<TimeRange>(getDefaultTransactionsRange);
+  const [txnCache, setTxnCache] = useState<TxnCache | null>(null);
 
   const closenessOptions: SelectOption[] = [
     { id: "Local", name: "Local" },
@@ -740,7 +749,13 @@ const CustomerFormPage: React.FC = () => {
             noValidate // Prevent browser default validation
           >
             <div className="px-6 py-3">
-              <Tab labels={["Info", "Credit & Pricing"]}>
+              <Tab
+                labels={
+                  isEditMode
+                    ? ["Info", "Credit & Pricing", "Transaction History"]
+                    : ["Info", "Credit & Pricing"]
+                }
+              >
                 {/* === First tab - Customer Info === */}
                 <div className="space-y-6 mt-5">
                   <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
@@ -1016,6 +1031,19 @@ const CustomerFormPage: React.FC = () => {
                     disabled={isSaving} // Pass disabled state
                   />
                 </div>
+
+                {/* === Third tab - Transaction History (edit mode only) === */}
+                {isEditMode && id ? (
+                  <CustomerTransactionsTab
+                    customerId={id}
+                    range={txnRange}
+                    onRangeChange={setTxnRange}
+                    cache={txnCache}
+                    onCacheChange={setTxnCache}
+                  />
+                ) : (
+                  <></>
+                )}
               </Tab>
             </div>
 
