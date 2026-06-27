@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-27",
+    ms: "Ciri \"Finalize\" / muktamadkan payroll telah dibuang sepenuhnya (Tien Hock dan Green Target). Tiada lagi butang Finalize/Revert/Unlock atau label status Processing/Finalized — payroll kini sentiasa boleh diedit. Sebagai gantinya, halaman Payroll mempunyai butang teks baharu untuk menukar paparan antara \"Groups\" (pekerja dikumpulkan ikut kerja) dan \"Recent\" (senarai rata tanpa kumpulan). Kedua-dua paparan kini disusun dengan yang terkini diakses/diproses di atas — kumpulan atau pekerja yang baru dibuka akan naik ke atas. Pilihan paparan diingati oleh sistem. Butang buka/tutup semua hanya muncul dalam paparan Groups.",
+    en: "The payroll \"Finalize\" feature has been removed entirely (Tien Hock and Green Target). There are no more Finalize/Revert/Unlock buttons or Processing/Finalized status labels — payrolls are now always editable. In its place, the Payroll page has a new text button to switch the view between \"Groups\" (employees grouped by job) and \"Recent\" (a flat, ungrouped list). Both views are now ordered with the most recently opened/processed at the top — a group or employee you just opened floats to the top. Your chosen view is remembered. The expand/collapse-all button only appears in the Groups view.",
+  },
+  {
+    date: "2026-06-27",
     ms: "Catatan Jurnal jenis \"C - Cash Payment\" kini mempunyai medan \"Cheque No\" baharu untuk nombor cek. Nombor cek diisi secara automatik mengikut turutan (bermula dari PBB350779, kemudian PBB350780 dan seterusnya) tetapi masih boleh diubah secara manual. Nombor cek turut dipaparkan pada halaman butiran catatan jurnal.",
     en: "Journal Entries of type \"C - Cash Payment\" now have a new \"Cheque No\" field for the cheque number. The cheque number is auto-filled in sequence (starting from PBB350779, then PBB350780 and so on) but can still be edited manually. The cheque number is also shown on the journal entry details page.",
   },

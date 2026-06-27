@@ -1,11 +1,7 @@
 // src/components/Payroll/EmployeePayrollTableRow.tsx
 import React, { useState } from "react";
 import clsx from "clsx";
-import {
-  IconPrinter,
-  IconLock,
-  IconLoader2,
-} from "@tabler/icons-react";
+import { IconPrinter, IconLoader2 } from "@tabler/icons-react";
 import Checkbox from "../Checkbox";
 import { EmployeePayroll } from "../../types/types";
 import { MidMonthPayroll } from "../../utils/payroll/midMonthPayrollUtils";
@@ -19,7 +15,6 @@ interface EmployeePayrollTableRowProps {
   isSelected: boolean;
   onSelect: (id: number, isSelected: boolean, event: React.MouseEvent) => void;
   onViewDetails: (id: number | undefined) => void;
-  payrollStatus: string;
   midMonthPayroll?: MidMonthPayroll | null;
   formatCurrency: (amount: number) => string;
 }
@@ -29,7 +24,6 @@ const EmployeePayrollTableRow: React.FC<EmployeePayrollTableRowProps> = ({
   isSelected,
   onSelect,
   onViewDetails,
-  payrollStatus,
   midMonthPayroll,
   formatCurrency,
 }) => {
@@ -149,23 +143,6 @@ const EmployeePayrollTableRow: React.FC<EmployeePayrollTableRowProps> = ({
               ? parseFloat(employeePayroll.setelah_digenapkan.toString())
               : parseFloat(employeePayroll.net_pay.toString())
           )}
-        </td>
-
-        {/* Status Badge */}
-        <td className="px-3 py-2">
-          <span
-            className={clsx(
-              "inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium",
-              payrollStatus === "Finalized"
-                ? "bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300"
-                : "bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300"
-            )}
-          >
-            {payrollStatus === "Finalized" && (
-              <IconLock size={10} className="mr-0.5" />
-            )}
-            {payrollStatus}
-          </span>
         </td>
 
         {/* Actions */}
