@@ -777,10 +777,11 @@ export interface EmployeePayroll {
   section: string;
   gross_pay: number;
   net_pay: number;
-  status?: string;
-  payroll_status?: string;
   year?: number;
   month?: number;
+  // Timestamps used by the Payroll page "Recent" view recency fallback.
+  created_at?: string;
+  updated_at?: string;
   items: PayrollItem[];
   deductions?: PayrollDeduction[];
   leave_records?: LeaveRecord[];
@@ -881,7 +882,6 @@ export interface MonthlyPayroll {
   id: number;
   year: number;
   month: number;
-  status: "Processing" | "Finalized";
   created_at: string;
   updated_at: string;
   created_by: string | null;

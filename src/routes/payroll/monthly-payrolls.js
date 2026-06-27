@@ -289,8 +289,8 @@ export default function (pool) {
     try {
       // Create new monthly payroll
       const insertQuery = `
-        INSERT INTO monthly_payrolls (year, month, status, created_by)
-        VALUES ($1, $2, 'Processing', $3)
+        INSERT INTO monthly_payrolls (year, month, created_by)
+        VALUES ($1, $2, $3)
         RETURNING *
       `;
       const insertResult = await pool.query(insertQuery, [
@@ -1856,7 +1856,7 @@ export default function (pool) {
 
             // Update existing - also update job_type, employee_id, employee_job_mapping, and rounding columns for traceability
             await client.query(
-              `UPDATE employee_payrolls SET gross_pay = $1, net_pay = $2, section = $3, job_type = $4, employee_id = $5, employee_job_mapping = $6, digenapkan = $7, setelah_digenapkan = $8 WHERE id = $9`,
+              `UPDATE employee_payrolls SET gross_pay = $1, net_pay = $2, section = $3, job_type = $4, employee_id = $5, employee_job_mapping = $6, digenapkan = $7, setelah_digenapkan = $8, updated_at = CURRENT_TIMESTAMP WHERE id = $9`,
               [
                 grossPay.toFixed(2),
                 netPay.toFixed(2),
@@ -2075,46 +2075,6 @@ export default function (pool) {
       });
     } finally {
       client.release();
-    }
-  });
-
-  // Update payroll status
-  router.put("/:id/status", async (req, res) => {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    if (!status || !["Processing", "Finalized"].includes(status)) {
-      return res.status(400).json({
-        message: "Valid status is required (Processing, Finalized)",
-      });
-    }
-
-    try {
-      // Use Node.js server time to avoid Docker container clock sync issues
-      const serverTimestamp = new Date().toISOString();
-      const query = `
-      UPDATE monthly_payrolls
-      SET status = $1, updated_at = $2
-      WHERE id = $3
-      RETURNING *
-    `;
-
-      const result = await pool.query(query, [status, serverTimestamp, id]);
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({ message: "Monthly payroll not found" });
-      }
-
-      res.json({
-        message: "Payroll status updated successfully",
-        payroll: result.rows[0],
-      });
-    } catch (error) {
-      console.error("Error updating payroll status:", error);
-      res.status(500).json({
-        message: "Error updating payroll status",
-        error: error.message,
-      });
     }
   });
 

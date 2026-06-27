@@ -636,7 +636,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     );
   }
 
-  const isEditable = payroll.payroll_status !== "Finalized";
+  // Payrolls are always editable now that the finalize/status system is removed.
+  const isEditable = true;
 
   // Merge duplicates within commission_records / others_records by description
   // so a description repeated across multiple rows collapses into one display line.
@@ -1848,24 +1849,6 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 <p className="text-sm text-default-500 dark:text-gray-400 mt-1">
                   {payroll.section}
                 </p>
-              </div>
-
-              {/* Status */}
-              <div>
-                <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-400 mb-1">
-                  Status
-                </p>
-                <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium ${
-                    payroll.payroll_status === "CONFIRMED"
-                      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
-                      : payroll.payroll_status === "PENDING"
-                        ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
-                        : "bg-default-100 text-default-800 dark:bg-gray-700 dark:text-gray-300"
-                  }`}
-                >
-                  {payroll.payroll_status}
-                </span>
               </div>
             </div>
           </div>

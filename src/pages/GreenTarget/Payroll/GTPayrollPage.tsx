@@ -4,7 +4,6 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   IconCash,
   IconUsers,
-  IconLock,
   IconRefresh,
   IconPlus,
   IconUser,
@@ -17,19 +16,16 @@ import {
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import MonthNavigator from "../../../components/MonthNavigator";
 import PayrollEmployeeManagementModal from "../../../components/GreenTarget/PayrollEmployeeManagementModal";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
-import { formatDistanceToNow } from "date-fns";
 
 interface GTMonthlyPayroll {
   id: number;
   year: number;
   month: number;
-  status: "Processing" | "Finalized";
   created_at: string;
   updated_at: string;
   employeePayrolls: GTEmployeePayroll[];
@@ -86,8 +82,6 @@ const GTPayrollPage: React.FC = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showManageModal, setShowManageModal] = useState(false);
-  const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     OFFICE: true,
     DRIVER: true,
@@ -189,43 +183,6 @@ const GTPayrollPage: React.FC = () => {
     }
   };
 
-  const handleFinalizePayroll = async () => {
-    if (!payroll) return;
-
-    setIsUpdatingStatus(true);
-    try {
-      await api.put(`/greentarget/api/monthly-payrolls/${payroll.id}/status`, {
-        status: "Finalized",
-      });
-      toast.success("Payroll finalized");
-      await fetchPayrollData();
-    } catch (error) {
-      console.error("Error finalizing payroll:", error);
-      toast.error("Failed to finalize payroll");
-    } finally {
-      setIsUpdatingStatus(false);
-      setShowFinalizeDialog(false);
-    }
-  };
-
-  const handleUnlockPayroll = async () => {
-    if (!payroll) return;
-
-    setIsUpdatingStatus(true);
-    try {
-      await api.put(`/greentarget/api/monthly-payrolls/${payroll.id}/status`, {
-        status: "Processing",
-      });
-      toast.success("Payroll unlocked for editing");
-      await fetchPayrollData();
-    } catch (error) {
-      console.error("Error unlocking payroll:", error);
-      toast.error("Failed to unlock payroll");
-    } finally {
-      setIsUpdatingStatus(false);
-    }
-  };
-
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({
       ...prev,
@@ -286,65 +243,18 @@ const GTPayrollPage: React.FC = () => {
                 </span>
               </div>
               <span className="text-default-300 dark:text-gray-600">|</span>
-              <span
-                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                  payroll.status === "Finalized"
-                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                    : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                }`}
+              <button
+                onClick={handleProcessPayroll}
+                disabled={isProcessing}
+                className="inline-flex items-center gap-1.5 text-default-400 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors disabled:opacity-50"
+                title="Process payroll"
               >
-                {payroll.status === "Finalized" ? (
-                  <IconLock size={12} className="mr-1" />
-                ) : (
-                  <IconRefresh size={12} className="mr-1" />
-                )}
-                {payroll.status}
-              </span>
-              {payroll.status === "Processing" && (
-                <>
-                  <span className="text-default-300 dark:text-gray-600">•</span>
-                  <button
-                    onClick={handleProcessPayroll}
-                    disabled={isProcessing}
-                    className="inline-flex items-center gap-1.5 text-default-400 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors disabled:opacity-50"
-                    title="Process payroll"
-                  >
-                    <IconRefresh
-                      size={14}
-                      className={isProcessing ? "animate-spin" : ""}
-                    />
-                    <span>{isProcessing ? "Processing..." : "Process"}</span>
-                  </button>
-                  <span className="text-default-300 dark:text-gray-600">•</span>
-                  <button
-                    onClick={() => setShowFinalizeDialog(true)}
-                    disabled={!payroll.employeePayrolls?.length}
-                    className="inline-flex items-center gap-1.5 text-default-400 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors disabled:opacity-50"
-                    title="Finalize payroll"
-                  >
-                    <IconLock size={14} />
-                    <span>Finalize</span>
-                  </button>
-                </>
-              )}
-              {payroll.status === "Finalized" && (
-                <>
-                  <span className="text-default-300 dark:text-gray-600">•</span>
-                  <span className="text-default-500 dark:text-gray-400 text-xs">
-                    {formatDistanceToNow(new Date(payroll.updated_at), { addSuffix: true })}
-                  </span>
-                  <span className="text-default-300 dark:text-gray-600">•</span>
-                  <button
-                    onClick={handleUnlockPayroll}
-                    disabled={isUpdatingStatus}
-                    className="inline-flex items-center gap-1.5 text-default-400 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors disabled:opacity-50"
-                    title="Unlock payroll"
-                  >
-                    <IconLock size={14} />
-                    <span>{isUpdatingStatus ? "Unlocking..." : "Unlock"}</span>
-                  </button>
-                </>
-              )}
+                <IconRefresh
+                  size={14}
+                  className={isProcessing ? "animate-spin" : ""}
+                />
+                <span>{isProcessing ? "Processing..." : "Process"}</span>
+              </button>
             </div>
           )}
         </div>
@@ -582,17 +492,6 @@ const GTPayrollPage: React.FC = () => {
         onClose={() => setShowManageModal(false)}
         availableEmployees={allStaffs}
         onUpdate={fetchPayrollData}
-      />
-
-      {/* Finalize Dialog */}
-      <ConfirmationDialog
-        isOpen={showFinalizeDialog}
-        onClose={() => setShowFinalizeDialog(false)}
-        onConfirm={handleFinalizePayroll}
-        title="Finalize Payroll"
-        message={`Are you sure you want to finalize the payroll for ${getMonthName(month)} ${year}? This will lock the payroll from further edits.`}
-        confirmButtonText="Finalize"
-        variant="success"
       />
     </div>
   );

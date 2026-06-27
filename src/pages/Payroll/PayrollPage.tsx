@@ -12,19 +12,16 @@ import {
   IconChevronsUp,
   IconCash,
   IconUsers,
-  IconLock,
-  IconClockPlay,
   IconRefresh,
   IconPlus,
   IconClock,
+  IconArrowsSort,
 } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import ConfirmationDialog from "../../components/ConfirmationDialog";
 import {
   getMonthlyPayrollByYearMonth,
   getMonthName,
-  updateMonthlyPayrollStatus,
   createMonthlyPayroll,
   getEligibleEmployees,
   processMonthlyPayrolls,
@@ -35,7 +32,6 @@ import MissingIncomeTaxRatesDialog, {
   MissingIncomeTaxEmployee,
 } from "../../components/Payroll/MissingIncomeTaxRatesDialog";
 import toast from "react-hot-toast";
-import FinalizePayrollDialog from "../../components/Payroll/FinalizePayrollDialog";
 import { EmployeePayroll, MonthlyPayroll } from "../../types/types";
 import { PrintBatchPayslipsButton } from "../../utils/payroll/PayslipButtons";
 import {
@@ -58,6 +54,79 @@ const SEARCH_TERM_STORAGE_KEY: string = "payroll-search-term";
 const CLEAR_SEARCH_ON_RETURN_STORAGE_KEY: string =
   "payroll-clear-search-on-return";
 const CLEAR_SEARCH_ON_RETURN_WINDOW_MS: number = 10000;
+// Persisted choice of how the payroll list is displayed.
+//  - "groups": employees grouped by job, groups ordered by recency
+//  - "recent": flat list of all employees ordered by recency
+const VIEW_MODE_STORAGE_KEY: string = "payroll-view-mode";
+type PayrollViewMode = "groups" | "recent";
+// Per-month map of employee_id -> last-opened timestamp (ms). Drives the
+// "recently accessed" ordering; falls back to the processed/created time.
+const OPEN_RECENCY_STORAGE_PREFIX: string = "payroll-open-recency:";
+
+const readViewModeFromStorage = (): PayrollViewMode => {
+  try {
+    const stored: string | null = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+    return stored === "recent" ? "recent" : "groups";
+  } catch {
+    return "groups";
+  }
+};
+
+const saveViewModeToStorage = (mode: PayrollViewMode): void => {
+  try {
+    localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode);
+  } catch {
+    // Ignore storage failures so the payroll page remains usable.
+  }
+};
+
+const readOpenRecencyFromStorage = (
+  storageKey: string
+): Record<string, number> => {
+  try {
+    const stored: string | null = localStorage.getItem(storageKey);
+    if (!stored) return {};
+
+    const parsed: unknown = JSON.parse(stored);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+
+    return Object.entries(parsed).reduce<Record<string, number>>(
+      (valid, [employeeId, timestamp]) => {
+        if (typeof timestamp === "number" && Number.isFinite(timestamp)) {
+          valid[employeeId] = timestamp;
+        }
+        return valid;
+      },
+      {}
+    );
+  } catch {
+    return {};
+  }
+};
+
+const saveOpenRecencyToStorage = (
+  storageKey: string,
+  recency: Record<string, number>
+): void => {
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(recency));
+  } catch {
+    // Ignore storage failures so the payroll page remains usable.
+  }
+};
+
+// Processed/created time (ms) used as the recency fallback for never-opened rows.
+const getProcessedTime = (
+  employeePayroll: Pick<EmployeePayroll, "updated_at" | "created_at">
+): number => {
+  const source: string | undefined =
+    employeePayroll.updated_at ?? employeePayroll.created_at;
+  if (!source) return 0;
+  const parsed: number = Date.parse(source);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
 
 const getDefaultPayrollMonth = (today: Date = new Date()): Date => {
   const monthOffset: number =
@@ -193,12 +262,10 @@ const PayrollPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [expandedJobs, setExpandedJobs] = useState<Record<string, boolean>>({});
-  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
-  const [newStatus, setNewStatus] = useState<"Processing" | "Finalized">(
-    "Finalized"
+  const [viewMode, setViewMode] = useState<PayrollViewMode>(
+    readViewModeFromStorage
   );
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-  const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
+  const [openRecency, setOpenRecency] = useState<Record<string, number>>({});
   const [searchTerm, setSearchTerm] = useState<string>(
     readSearchTermFromStorage
   );
@@ -247,6 +314,22 @@ const PayrollPage: React.FC = () => {
   const expandedJobsStorageKey = useMemo(() => {
     return `${EXPANDED_JOBS_STORAGE_PREFIX}${scrollKey}`;
   }, [scrollKey]);
+  const openRecencyStorageKey = useMemo(() => {
+    const year = selectedMonth.getFullYear();
+    const month = selectedMonth.getMonth() + 1;
+    return `${OPEN_RECENCY_STORAGE_PREFIX}${year}-${month}`;
+  }, [selectedMonth]);
+
+  // Load the per-month "recently opened" map so both views can order by it.
+  useEffect(() => {
+    setOpenRecency(readOpenRecencyFromStorage(openRecencyStorageKey));
+  }, [openRecencyStorageKey]);
+
+  // Persist the selected view (Groups / Recent) across visits.
+  useEffect(() => {
+    saveViewModeToStorage(viewMode);
+  }, [viewMode]);
+
   useScrollRestoration(
     scrollKey,
     !isLoading && !!payroll,
@@ -588,8 +671,6 @@ const PayrollPage: React.FC = () => {
         event.altKey ||
         event.key.length !== 1 ||
         !searchInputRef.current ||
-        isStatusDialogOpen ||
-        showFinalizeDialog ||
         showMissingTaxDialog ||
         isEditableTarget(event.target)
       ) {
@@ -605,7 +686,7 @@ const PayrollPage: React.FC = () => {
     return () => {
       document.removeEventListener("keydown", handleSearchTypingShortcut);
     };
-  }, [isStatusDialogOpen, showFinalizeDialog, showMissingTaxDialog]);
+  }, [showMissingTaxDialog]);
 
   const handleToggleAllJobs = (expanded: boolean): void => {
     if (!payroll?.employeePayrolls) return;
@@ -619,23 +700,6 @@ const PayrollPage: React.FC = () => {
 
     saveExpandedJobsToStorage(expandedJobsStorageKey, newExpanded);
     setExpandedJobs(newExpanded);
-  };
-
-  const handleStatusChange = async () => {
-    if (!payroll?.id) return;
-
-    setIsUpdatingStatus(true);
-    try {
-      await updateMonthlyPayrollStatus(payroll.id, newStatus);
-      toast.success(`Payroll status updated to ${newStatus}`);
-      setIsStatusDialogOpen(false);
-      await fetchPayrollDetails();
-    } catch (error) {
-      console.error("Error updating payroll status:", error);
-      toast.error("Failed to update payroll status");
-    } finally {
-      setIsUpdatingStatus(false);
-    }
   };
 
   const calculateTotals = (employeePayrolls: EmployeePayroll[]) => {
@@ -671,8 +735,31 @@ const PayrollPage: React.FC = () => {
   };
 
   const handleViewEmployeePayroll = (employeePayrollId: number | undefined) => {
+    // Record the open so this employee (and its group) floats to the top of the
+    // recency-ordered views on return.
+    if (employeePayrollId != null) {
+      const updatedRecency: Record<string, number> = {
+        ...openRecency,
+        [`${employeePayrollId}`]: Date.now(),
+      };
+      setOpenRecency(updatedRecency);
+      saveOpenRecencyToStorage(openRecencyStorageKey, updatedRecency);
+    }
     navigate(`/payroll/employee-payroll/${employeePayrollId}`);
   };
+
+  // Recency used to order both views: last-opened time if available, otherwise
+  // the processed/created time. Newer (larger) sorts first.
+  const getEmployeeRecency = useCallback(
+    (employeePayroll: EmployeePayroll): number => {
+      const opened: number | undefined =
+        employeePayroll.id != null
+          ? openRecency[`${employeePayroll.id}`]
+          : undefined;
+      return opened ?? getProcessedTime(employeePayroll);
+    },
+    [openRecency]
+  );
 
   const splitPayrollJobTypes = (jobType: string): string[] => {
     return jobType
@@ -878,17 +965,6 @@ const PayrollPage: React.FC = () => {
     }).format(amount);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Processing":
-        return "bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300";
-      case "Finalized":
-        return "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300";
-      default:
-        return "bg-default-100 dark:bg-gray-700 text-default-700 dark:text-gray-200";
-    }
-  };
-
   // Check if all employees in a job group are selected
   const isJobGroupSelected = useCallback(
     (jobType: string) => {
@@ -985,6 +1061,42 @@ const PayrollPage: React.FC = () => {
     Object.keys(groupedEmployees).length > 0 &&
     Object.keys(groupedEmployees).every((jobType) => expandedJobs[jobType]);
 
+  // Groups view: order groups by their most recently opened/processed member,
+  // then by total net pay as a tiebreak.
+  const sortedJobGroups = Object.entries(groupedEmployees)
+    .map(([jobType, employees]) => ({
+      jobType,
+      employees: getFilteredEmployees(jobType, employees),
+    }))
+    .filter((group) => group.employees.length > 0)
+    .sort((groupA, groupB) => {
+      const recencyA = Math.max(0, ...groupA.employees.map(getEmployeeRecency));
+      const recencyB = Math.max(0, ...groupB.employees.map(getEmployeeRecency));
+      if (recencyB !== recencyA) return recencyB - recencyA;
+      const netA = groupA.employees.reduce(
+        (sum, emp) => sum + parseFloat(emp.net_pay.toString()),
+        0
+      );
+      const netB = groupB.employees.reduce(
+        (sum, emp) => sum + parseFloat(emp.net_pay.toString()),
+        0
+      );
+      return netB - netA;
+    });
+
+  // Recent view: flat list ordered by recency, then net pay.
+  const sortedFlatEmployees = [...visibleEmployeePayrolls].sort(
+    (employeeA, employeeB) => {
+      const recencyA = getEmployeeRecency(employeeA);
+      const recencyB = getEmployeeRecency(employeeB);
+      if (recencyB !== recencyA) return recencyB - recencyA;
+      return (
+        parseFloat(employeeB.net_pay.toString()) -
+        parseFloat(employeeA.net_pay.toString())
+      );
+    }
+  );
+
   return (
     <div className="space-y-3">
       {/* Processing Progress Display */}
@@ -1055,77 +1167,42 @@ const PayrollPage: React.FC = () => {
                 )}
               </div>
               <span className="text-default-300 dark:text-gray-600">|</span>
-              <span
-                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                  payroll.status
-                )}`}
+              <button
+                onClick={() =>
+                  setViewMode((mode) =>
+                    mode === "groups" ? "recent" : "groups"
+                  )
+                }
+                className="inline-flex items-center gap-1.5 text-default-500 dark:text-gray-300 hover:text-sky-600 dark:hover:text-sky-400 transition-colors"
+                title={
+                  viewMode === "groups"
+                    ? "Showing Groups (employees grouped by job, most recently opened group first). Click to switch to Recent."
+                    : "Showing Recent (flat list, most recently opened employee first). Click to switch to Groups."
+                }
               >
-                {payroll.status === "Processing" ? (
-                  <IconClockPlay size={12} className="mr-1" />
-                ) : (
-                  <IconLock size={12} className="mr-1" />
-                )}
-                {payroll.status}
-              </span>
-              {payroll.status === "Processing" && (
-                <>
-                  <span className="text-default-300 dark:text-gray-600">•</span>
-                  <button
-                    onClick={handleProcessAll}
-                    disabled={
-                      isProcessing ||
-                      (hasActiveSearch && visibleEmployeePayrolls.length === 0)
-                    }
-                    className="inline-flex items-center gap-1.5 text-default-400 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors disabled:opacity-50"
-                    title={
-                      hasActiveSearch
-                        ? "Process employees shown by the search"
-                        : "Re-process payroll"
-                    }
-                  >
-                    <IconRefresh
-                      size={14}
-                      className={isProcessing ? "animate-spin" : ""}
-                    />
-                    <span>{processButtonText}</span>
-                  </button>
-                  <span className="text-default-300 dark:text-gray-600">•</span>
-                  <button
-                    onClick={() => setShowFinalizeDialog(true)}
-                    disabled={isProcessing}
-                    className="inline-flex items-center gap-1.5 text-default-400 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors disabled:opacity-50"
-                    title="Finalize payroll"
-                  >
-                    <IconLock size={14} />
-                    <span>Finalize</span>
-                  </button>
-                </>
-              )}
-              {payroll.status === "Finalized" && (
-                <>
-                  <span className="text-default-300 dark:text-gray-600">•</span>
-                  <span className="text-default-500 dark:text-gray-400">
-                    Finalized{" "}
-                    {payroll.updated_at
-                      ? formatDistanceToNow(new Date(payroll.updated_at), {
-                          addSuffix: true,
-                        })
-                      : ""}
-                  </span>
-                  <span className="text-default-300 dark:text-gray-600">•</span>
-                  <button
-                    onClick={() => {
-                      setNewStatus("Processing");
-                      setIsStatusDialogOpen(true);
-                    }}
-                    className="inline-flex items-center gap-1.5 text-default-400 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
-                    title="Revert to Processing"
-                  >
-                    <IconRefresh size={14} />
-                    <span>Revert</span>
-                  </button>
-                </>
-              )}
+                <IconArrowsSort size={14} />
+                <span>{viewMode === "groups" ? "Groups" : "Recent"}</span>
+              </button>
+              <span className="text-default-300 dark:text-gray-600">•</span>
+              <button
+                onClick={handleProcessAll}
+                disabled={
+                  isProcessing ||
+                  (hasActiveSearch && visibleEmployeePayrolls.length === 0)
+                }
+                className="inline-flex items-center gap-1.5 text-default-400 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors disabled:opacity-50"
+                title={
+                  hasActiveSearch
+                    ? "Process employees shown by the search"
+                    : "Re-process payroll"
+                }
+              >
+                <IconRefresh
+                  size={14}
+                  className={isProcessing ? "animate-spin" : ""}
+                />
+                <span>{processButtonText}</span>
+              </button>
             </div>
           </div>
 
@@ -1133,18 +1210,16 @@ const PayrollPage: React.FC = () => {
           <div className="flex space-x-2">
             {selectedCount > 0 && (
               <>
-                {payroll.status === "Processing" && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    color="sky"
-                    icon={IconRefresh}
-                    onClick={handleProcessSelected}
-                    disabled={isProcessing || selectedCount === 0}
-                  >
-                    Process {selectedCount}
-                  </Button>
-                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  color="sky"
+                  icon={IconRefresh}
+                  onClick={handleProcessSelected}
+                  disabled={isProcessing || selectedCount === 0}
+                >
+                  Process {selectedCount}
+                </Button>
                 {!isAllSelected && (
                   <PrintBatchPayslipsButton
                     payrolls={getSelectedPayrolls()}
@@ -1193,50 +1268,35 @@ const PayrollPage: React.FC = () => {
                 </button>
               )}
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              icon={areAllJobsExpanded ? IconChevronsUp : IconChevronsDown}
-              onClick={() => handleToggleAllJobs(!areAllJobsExpanded)}
-            ></Button>
+            {/* Expand/collapse all only makes sense in the grouped view */}
+            {viewMode === "groups" && (
+              <Button
+                size="sm"
+                variant="outline"
+                icon={areAllJobsExpanded ? IconChevronsUp : IconChevronsDown}
+                onClick={() => handleToggleAllJobs(!areAllJobsExpanded)}
+              ></Button>
+            )}
           </div>
         </div>
 
         {Object.keys(groupedEmployees).length === 0 ? (
           <div className="text-center py-8 border border-default-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
             <p className="text-default-500 dark:text-gray-400">No employee payrolls found.</p>
-            {payroll.status === "Processing" && (
-              <Button
-                onClick={handleProcessAll}
-                color="sky"
-                variant="outline"
-                className="mt-4"
-                disabled={isProcessing}
-              >
-                {isProcessing ? "Processing..." : "Process Payroll"}
-              </Button>
-            )}
+            <Button
+              onClick={handleProcessAll}
+              color="sky"
+              variant="outline"
+              className="mt-4"
+              disabled={isProcessing}
+            >
+              {isProcessing ? "Processing..." : "Process Payroll"}
+            </Button>
           </div>
-        ) : (
+        ) : viewMode === "recent" ? (
           <PayrollUnifiedTable
-            jobGroups={Object.entries(groupedEmployees)
-              .sort(([, employeesA], [, employeesB]) => {
-                // Sort by total net pay (highest to lowest)
-                const netPayA = employeesA.reduce(
-                  (sum, emp) => sum + parseFloat(emp.net_pay.toString()),
-                  0
-                );
-                const netPayB = employeesB.reduce(
-                  (sum, emp) => sum + parseFloat(emp.net_pay.toString()),
-                  0
-                );
-                return netPayB - netPayA;
-              })
-              .map(([jobType, employees]) => ({
-                jobType,
-                employees: getFilteredEmployees(jobType, employees),
-              }))
-              .filter((group) => group.employees.length > 0)}
+            variant="flat"
+            flatEmployees={sortedFlatEmployees}
             expandedJobs={expandedJobs}
             onToggleExpand={handleToggleJobExpansion}
             isJobGroupSelected={isJobGroupSelected}
@@ -1244,49 +1304,25 @@ const PayrollPage: React.FC = () => {
             selectedEmployeePayrolls={selectedEmployeePayrolls}
             onSelectEmployee={handleSelectEmployee}
             onViewDetails={handleViewEmployeePayroll}
-            payrollStatus={payroll.status}
+            midMonthPayrollsMap={midMonthPayrollsMap}
+            formatCurrency={formatCurrency}
+          />
+        ) : (
+          <PayrollUnifiedTable
+            variant="groups"
+            jobGroups={sortedJobGroups}
+            expandedJobs={expandedJobs}
+            onToggleExpand={handleToggleJobExpansion}
+            isJobGroupSelected={isJobGroupSelected}
+            onSelectGroup={handleSelectJobGroup}
+            selectedEmployeePayrolls={selectedEmployeePayrolls}
+            onSelectEmployee={handleSelectEmployee}
+            onViewDetails={handleViewEmployeePayroll}
             midMonthPayrollsMap={midMonthPayrollsMap}
             formatCurrency={formatCurrency}
           />
         )}
       </div>
-      {/* Status Change Dialog */}
-      <ConfirmationDialog
-        isOpen={isStatusDialogOpen}
-        onClose={() => setIsStatusDialogOpen(false)}
-        onConfirm={handleStatusChange}
-        title={`${
-          payroll.status === "Finalized" ? "Revert" : "Update"
-        } Payroll Status`}
-        message={
-          payroll.status === "Finalized"
-            ? "Are you sure you want to revert this payroll back to Processing? This will allow making changes to the payroll."
-            : `Are you sure you want to change the status from ${payroll.status} to ${newStatus}?`
-        }
-        confirmButtonText={isUpdatingStatus ? "Processing..." : "Confirm"}
-        variant={payroll.status === "Finalized" ? "danger" : "default"}
-      />
-      {/* Finalize Payroll Dialog */}
-      <FinalizePayrollDialog
-        isOpen={showFinalizeDialog}
-        onClose={() => setShowFinalizeDialog(false)}
-        onConfirm={async () => {
-          if (!payroll?.id) return;
-          try {
-            await updateMonthlyPayrollStatus(payroll.id, "Finalized");
-            setShowFinalizeDialog(false);
-            toast.success("Payroll has been finalized successfully");
-            await fetchPayrollDetails();
-          } catch (error) {
-            console.error("Error finalizing payroll:", error);
-            toast.error("Failed to finalize payroll");
-          }
-        }}
-        payrollMonth={getMonthName(payroll.month)}
-        payrollYear={payroll.year}
-        employeeCount={payroll.employeePayrolls.length}
-        totalGrossPay={totals.grossPay}
-      />
       {/* Missing Income Tax Rates Dialog */}
       <MissingIncomeTaxRatesDialog
         isOpen={showMissingTaxDialog}
