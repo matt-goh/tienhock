@@ -803,7 +803,10 @@ export interface EmployeePayroll {
   job_sections?: Record<string, string>;
   // Rounding adjustment values
   digenapkan?: number;          // Rounding adjustment amount
-  setelah_digenapkan?: number;  // Final rounded amount
+  setelah_digenapkan?: number;  // Final rounded amount (take-home, advances deducted)
+  // Commission/bonus advances (is_advance) for the month, aggregated by name.
+  // Added back to derive the Salary Report "Setelah Digenapkan" grand total.
+  commission_advance?: number;
 }
 
 export interface CommissionRecord {
@@ -1075,6 +1078,7 @@ export interface JournalEntry {
   total_debit: number;
   total_credit: number;
   status: "draft" | "posted" | "cancelled";
+  cheque_no?: string; // Sequential cheque number, Cash Payment (C) entries only
   created_at?: string;
   updated_at?: string;
   created_by?: string;
@@ -1104,6 +1108,7 @@ export interface JournalEntryInput {
   entry_type: JournalEntryType;
   entry_date: string;
   description?: string;
+  cheque_no?: string;
   lines: JournalEntryLineInput[];
 }
 
