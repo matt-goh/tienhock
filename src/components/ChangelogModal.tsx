@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-28",
+    ms: "Mengklik kad kakitangan kini membuka halaman butiran ringkas (baca sahaja) yang memaparkan semua maklumat kakitangan tersebut dengan pantas, dengan hanya bahagian Pay Codes yang masih boleh diedit di situ. Untuk menyunting maklumat lain, klik butang \"Edit\" untuk membuka borang penuh seperti biasa. Kad kakitangan juga kini mempunyai butang Edit (sebelah butang padam) yang terus membuka borang suntingan. Kotak carian di halaman Staff dan Customer kini difokuskan secara automatik apabila halaman dibuka. Kad pelanggan pula kini mempunyai dua butang pintasan baharu: terus ke tab \"Credit & Pricing\" dan ke tab \"Transaction History\".",
+    en: "Clicking a staff card now opens a quick read-only details page showing all of that staff member's information at a glance, with only the Pay Codes section still editable there. To edit other information, click the \"Edit\" button to open the full form as before. Staff cards also now have an Edit button (next to the delete button) that goes straight to the edit form. The search box on the Staff and Customer pages is now auto-focused when the page opens. Customer cards now have two new shortcut buttons: jump straight to the \"Credit & Pricing\" tab and to the \"Transaction History\" tab.",
+  },
+  {
+    date: "2026-06-28",
     ms: "Halaman pelanggan kini mempunyai tab baharu \"Transaction History\" yang memaparkan semua aktiviti pelanggan tersebut di satu tempat — invois, pembayaran, serta Nota Kredit/Debit/Bayaran Balik — disusun mengikut tarikh (terkini di atas). Terdapat penapis tarikh (Bulan/Julat/Tahun) yang lalai kepada 30 hari lepas, kad ringkasan Jumlah Diinvois / Jumlah Dibayar / bilangan pelarasan, dan setiap baris boleh diklik untuk terus membuka invois atau dokumen berkenaan.",
     en: "The customer page now has a new \"Transaction History\" tab that shows everything for that customer in one place — invoices, payments, and Credit/Debit/Refund Notes — sorted by date (newest first). It has a date filter (Month/Range/Year) defaulting to the last 30 days, summary cards for Total Invoiced / Total Paid / number of adjustments, and every row is clickable to jump straight to the related invoice or document.",
   },
