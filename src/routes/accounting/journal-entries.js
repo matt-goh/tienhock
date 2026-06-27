@@ -45,7 +45,7 @@ export default function (pool) {
         SELECT
           je.id, je.reference_no, je.entry_type, je.entry_date,
           je.description, je.total_debit, je.total_credit, je.status,
-          je.created_at, je.updated_at, je.posted_at,
+          je.cheque_no, je.created_at, je.updated_at, je.posted_at,
           jet.name as entry_type_name
         FROM journal_entries je
         LEFT JOIN journal_entry_types jet ON je.entry_type = jet.code
@@ -169,6 +169,46 @@ export default function (pool) {
     }
   });
 
+  // GET /next-cheque-no - Get next sequential cheque number (for Cash Payment / C entries)
+  // Cheque numbers are a continuous physical cheque-book sequence (e.g. PBB350779 -> PBB350780),
+  // independent of month/reference. Returns the seed PBB350779 when none exist yet.
+  router.get("/next-cheque-no", async (req, res) => {
+    const SEED_CHEQUE_NO = "PBB350779";
+    try {
+      const result = await pool.query(
+        "SELECT cheque_no FROM journal_entries WHERE cheque_no IS NOT NULL AND cheque_no <> ''"
+      );
+
+      let best = null; // { prefix, num, width }
+      for (const row of result.rows) {
+        const match = String(row.cheque_no).match(/^(.*?)(\d+)$/);
+        if (!match) continue;
+        const prefix = match[1];
+        const num = parseInt(match[2], 10);
+        const width = match[2].length;
+        if (!best || num > best.num) {
+          best = { prefix, num, width };
+        }
+      }
+
+      let nextChequeNo;
+      if (!best) {
+        nextChequeNo = SEED_CHEQUE_NO;
+      } else {
+        const nextNum = best.num + 1;
+        nextChequeNo = `${best.prefix}${String(nextNum).padStart(best.width, "0")}`;
+      }
+
+      res.json({ cheque_no: nextChequeNo });
+    } catch (error) {
+      console.error("Error generating next cheque number:", error);
+      res.status(500).json({
+        message: "Error generating next cheque number",
+        error: error.message,
+      });
+    }
+  });
+
   // GET /:id - Get single journal entry with lines
   router.get("/:id", async (req, res) => {
     try {
@@ -179,7 +219,7 @@ export default function (pool) {
         SELECT
           je.id, je.reference_no, je.entry_type, je.entry_date,
           je.description, je.total_debit, je.total_credit, je.status,
-          je.created_at, je.updated_at, je.posted_at,
+          je.cheque_no, je.created_at, je.updated_at, je.posted_at,
           je.created_by, je.updated_by, je.posted_by,
           jet.name as entry_type_name
         FROM journal_entries je
@@ -327,8 +367,14 @@ export default function (pool) {
 
   // POST / - Create new journal entry
   router.post("/", async (req, res) => {
-    const { reference_no, entry_type, entry_date, description, lines } =
+    const { reference_no, entry_type, entry_date, description, cheque_no, lines } =
       req.body;
+
+    // Cheque number only applies to Cash Payment (C) entries
+    const normalizedChequeNo =
+      entry_type === "C" && cheque_no && String(cheque_no).trim()
+        ? String(cheque_no).trim()
+        : null;
 
     // Validation
     if (!reference_no || !entry_type || !entry_date) {
@@ -389,8 +435,8 @@ export default function (pool) {
       const insertEntryQuery = `
         INSERT INTO journal_entries (
           reference_no, entry_type, entry_date, description,
-          total_debit, total_credit, status, created_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, 'draft', $7)
+          total_debit, total_credit, status, cheque_no, created_by
+        ) VALUES ($1, $2, $3, $4, $5, $6, 'draft', $7, $8)
         RETURNING id
       `;
 
@@ -401,6 +447,7 @@ export default function (pool) {
         description || null,
         totalDebit,
         totalCredit,
+        normalizedChequeNo,
         req.staffId || null,
       ]);
 
@@ -447,8 +494,14 @@ export default function (pool) {
   // PUT /:id - Update journal entry
   router.put("/:id", async (req, res) => {
     const { id } = req.params;
-    const { reference_no, entry_type, entry_date, description, lines } =
+    const { reference_no, entry_type, entry_date, description, cheque_no, lines } =
       req.body;
+
+    // Cheque number only applies to Cash Payment (C) entries
+    const normalizedChequeNo =
+      entry_type === "C" && cheque_no && String(cheque_no).trim()
+        ? String(cheque_no).trim()
+        : null;
 
     if (!reference_no || !entry_type || !entry_date) {
       return res.status(400).json({
@@ -529,8 +582,8 @@ export default function (pool) {
         UPDATE journal_entries
         SET reference_no = $1, entry_type = $2, entry_date = $3,
             description = $4, total_debit = $5, total_credit = $6,
-            updated_by = $7, updated_at = CURRENT_TIMESTAMP
-        WHERE id = $8
+            cheque_no = $7, updated_by = $8, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $9
       `;
 
       await client.query(updateEntryQuery, [
@@ -540,6 +593,7 @@ export default function (pool) {
         description || null,
         totalDebit,
         totalCredit,
+        normalizedChequeNo,
         req.staffId || null,
         id,
       ]);

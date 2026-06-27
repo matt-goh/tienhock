@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-27",
+    ms: "Catatan Jurnal jenis \"C - Cash Payment\" kini mempunyai medan \"Cheque No\" baharu untuk nombor cek. Nombor cek diisi secara automatik mengikut turutan (bermula dari PBB350779, kemudian PBB350780 dan seterusnya) tetapi masih boleh diubah secara manual. Nombor cek turut dipaparkan pada halaman butiran catatan jurnal.",
+    en: "Journal Entries of type \"C - Cash Payment\" now have a new \"Cheque No\" field for the cheque number. The cheque number is auto-filled in sequence (starting from PBB350779, then PBB350780 and so on) but can still be edited manually. The cheque number is also shown on the journal entry details page.",
+  },
+  {
+    date: "2026-06-27",
     ms: "Pemilih tarikh baharu yang lebih ringkas kini digunakan di banyak halaman bersenarai data dan laporan — antaranya Senarai Invois (Tien Hock, Jelly Polly, Green Target), Pembayaran, Jurnal, Nota Pelarasan, Log Harian, laporan Jualan, Pembelian Material & General, Bayaran Pembekal, Senarai Pengeluaran, Log Bulanan, Laporan Gaji, serta halaman tambahan Payroll (Bonus, Bayaran Pertengahan Bulan, Pinjam, Others). Ia menggantikan kotak tarikh serta penanda hari/bulan/tahun yang berasingan. Klik butang tarikh untuk menukar antara mod Hari, Bulan, Julat dan Tahun (mengikut halaman), memilih pintasan pantas (Hari Ini, Bulan Ini, 7/30 Hari Lepas dan lain-lain), atau pilih dari kalendar. Anak panah kiri/kanan di sebelahnya melangkah mengikut pilihan semasa, dan tidak akan melepasi tarikh hari ini.",
     en: "A new, more compact date picker is now used across many data-list and report pages — including Invoice lists (Tien Hock, Jelly Polly, Green Target), Payments, Journal Entries, Adjustment Documents, Daily Logs, the Sales reports, Material & General Purchases, Supplier Payments, the Production list, Monthly Logs, the Salary Report, and the Payroll add-on pages (Bonus, Mid-Month, Pinjam, Others). It replaces the separate date boxes and day/month/year steppers. Click the date button to switch between Day, Month, Range and Year modes (depending on the page), pick a quick preset (Today, This Month, Last 7/30 Days and more), or choose from the calendar. The left/right arrows beside it step through your current selection and won't move past today.",
   },
