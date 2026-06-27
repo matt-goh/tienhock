@@ -641,12 +641,32 @@ const PayrollPage: React.FC = () => {
   const calculateTotals = (employeePayrolls: EmployeePayroll[]) => {
     return employeePayrolls.reduce(
       (acc, curr) => {
+        const netPay = parseFloat(curr.net_pay.toString());
+        // Stored "Setelah Digenapkan" = take-home, with commission/bonus advances
+        // already deducted (same as the Net column below).
+        const takeHome =
+          curr.setelah_digenapkan != null
+            ? parseFloat(curr.setelah_digenapkan.toString())
+            : Math.ceil(netPay);
+        const digenapkan =
+          curr.digenapkan != null ? parseFloat(curr.digenapkan.toString()) : 0;
+        const advance =
+          curr.commission_advance != null
+            ? parseFloat(curr.commission_advance.toString())
+            : 0;
+        // Salary Report "Setelah Digenapkan": add the advances back so the figure
+        // reflects total earned salary. (takeHome - digenapkan) recovers the
+        // pre-rounding jumlah (net - mid-month); re-round after adding advances.
+        const setelahDigenapkan = Math.ceil(takeHome - digenapkan + advance);
         return {
           grossPay: acc.grossPay + parseFloat(curr.gross_pay.toString()),
-          netPay: acc.netPay + parseFloat(curr.net_pay.toString()),
+          netPay: acc.netPay + netPay,
+          takeHome: acc.takeHome + takeHome,
+          advances: acc.advances + advance,
+          setelahDigenapkan: acc.setelahDigenapkan + setelahDigenapkan,
         };
       },
-      { grossPay: 0, netPay: 0 }
+      { grossPay: 0, netPay: 0, takeHome: 0, advances: 0, setelahDigenapkan: 0 }
     );
   };
 
@@ -850,6 +870,14 @@ const PayrollPage: React.FC = () => {
     }).format(amount);
   };
 
+  // Currency without the "RM" prefix, for compact header stats.
+  const formatAmount = (amount: number) => {
+    return new Intl.NumberFormat("en-MY", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "Processing":
@@ -1003,15 +1031,28 @@ const PayrollPage: React.FC = () => {
                 <span className="font-medium text-default-700 dark:text-gray-200">
                   {payroll.employeePayrolls.length}
                 </span>
-                <span className="text-default-400 dark:text-gray-400">employees</span>
               </div>
               <span className="text-default-300 dark:text-gray-600">•</span>
               <div className="flex items-center gap-1.5">
                 <IconCash size={16} className="text-emerald-600 dark:text-emerald-400" />
-                <span className="font-semibold text-emerald-700 dark:text-emerald-300">
-                  {formatCurrency(totals.grossPay)}
+                <span
+                  className="font-semibold text-emerald-700 dark:text-emerald-300"
+                  title={`Setelah Digenapkan (${formatCurrency(
+                    totals.setelahDigenapkan
+                  )}) = total earned salary. The Net column below shows take-home (${formatCurrency(
+                    totals.takeHome
+                  )}), which has ${formatCurrency(
+                    totals.advances
+                  )} of commission/bonus advances already paid out deducted.`}
+                >
+                  {formatAmount(totals.setelahDigenapkan)}
                 </span>
-                <span className="text-default-400 dark:text-gray-400">total</span>
+                {totals.advances > 0 && (
+                  <span className="text-xs text-default-400 dark:text-gray-500">
+                    ({formatAmount(totals.takeHome)} +{" "}
+                    {formatAmount(totals.advances)})
+                  </span>
+                )}
               </div>
               <span className="text-default-300 dark:text-gray-600">|</span>
               <span
@@ -1101,7 +1142,7 @@ const PayrollPage: React.FC = () => {
                     onClick={handleProcessSelected}
                     disabled={isProcessing || selectedCount === 0}
                   >
-                    Process Selected
+                    Process {selectedCount}
                   </Button>
                 )}
                 {!isAllSelected && (
@@ -1112,8 +1153,8 @@ const PayrollPage: React.FC = () => {
                     color="sky"
                     buttonText={
                       isFetchingMidMonth
-                        ? "Loading mid-month data..."
-                        : `Print ${selectedCount} Payslips`
+                        ? "Loading..."
+                        : `${selectedCount} Payslips`
                     }
                     disabled={isFetchingMidMonth || selectedCount === 0}
                     midMonthPayrollsMap={midMonthPayrollsMap}
@@ -1128,8 +1169,8 @@ const PayrollPage: React.FC = () => {
               disabled={isFetchingMidMonth}
               buttonLabel={
                 isFetchingMidMonth
-                  ? "Loading mid-month data..."
-                  : "Print Payslips"
+                  ? "Loading..."
+                  : "Payslips"
               }
             />
             <div className="relative">

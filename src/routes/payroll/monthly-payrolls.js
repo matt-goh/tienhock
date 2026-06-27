@@ -74,15 +74,26 @@ export default function (pool) {
       if (include_employee_payrolls === "true") {
         const payrollsWithEmployees = await Promise.all(
           result.rows.map(async (payroll) => {
+            // commission_advance: commission/bonus records flagged is_advance for
+            // this employee (aggregated by name across siblings, same as net_pay
+            // processing). Added back on the page to derive the Salary Report
+            // "Setelah Digenapkan" (total earned incl. advances already paid).
             const employeePayrollsQuery = `
-              SELECT ep.*, s.name as employee_name
+              SELECT ep.*, s.name as employee_name,
+                COALESCE((
+                  SELECT SUM(CASE WHEN COALESCE(cr.is_advance, true) THEN cr.amount ELSE 0 END)
+                  FROM commission_records cr
+                  WHERE cr.employee_id IN (SELECT id FROM staffs WHERE name = s.name)
+                    AND EXTRACT(YEAR FROM cr.commission_date) = $2
+                    AND EXTRACT(MONTH FROM cr.commission_date) = $3
+                ), 0) AS commission_advance
               FROM employee_payrolls ep
               LEFT JOIN staffs s ON ep.employee_id = s.id
               WHERE ep.monthly_payroll_id = $1
             `;
             const employeePayrollsResult = await pool.query(
               employeePayrollsQuery,
-              [payroll.id],
+              [payroll.id, payroll.year, payroll.month],
             );
             return {
               ...payroll,
