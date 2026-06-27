@@ -302,6 +302,10 @@ const PayrollPage: React.FC = () => {
   const [missingIncomeTaxEmployees, setMissingIncomeTaxEmployees] = useState<
     MissingIncomeTaxEmployee[]
   >([]);
+  // The employee payroll row currently being processed via its per-row button
+  // (drives the inline spinner on that row).
+  const [processingEmployeePayrollId, setProcessingEmployeePayrollId] =
+    useState<number | null>(null);
 
   // Preserve scroll position when returning to this page (e.g. from an
   // employee payroll details page). Keyed by year-month so switching months
@@ -950,6 +954,39 @@ const PayrollPage: React.FC = () => {
     }
   };
 
+  // Re-process a single employee straight from its row.
+  const handleProcessEmployee = async (
+    employeePayroll: EmployeePayroll
+  ): Promise<void> => {
+    if (!payroll?.id || isProcessing) return;
+
+    setProcessingEmployeePayrollId(employeePayroll.id ?? null);
+    setIsProcessing(true);
+    setProcessingProgress({
+      current: 10,
+      total: 100,
+      stage: `Processing ${employeePayroll.employee_name ?? "employee"}...`,
+    });
+
+    try {
+      const combinations: PayrollProcessEmployeeSelection[] =
+        buildProcessCombinationsFromPayrolls([employeePayroll]);
+
+      await processPayrollCombinations(
+        combinations,
+        false,
+        "No employee found for processing"
+      );
+    } catch (error) {
+      console.error("Error processing employee payroll:", error);
+      toast.error("Failed to process employee");
+    } finally {
+      setIsProcessing(false);
+      setProcessingEmployeePayrollId(null);
+      setProcessingProgress({ current: 0, total: 0, stage: "" });
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-MY", {
       style: "currency",
@@ -1304,6 +1341,9 @@ const PayrollPage: React.FC = () => {
             selectedEmployeePayrolls={selectedEmployeePayrolls}
             onSelectEmployee={handleSelectEmployee}
             onViewDetails={handleViewEmployeePayroll}
+            onProcessEmployee={handleProcessEmployee}
+            isProcessing={isProcessing}
+            processingEmployeePayrollId={processingEmployeePayrollId}
             midMonthPayrollsMap={midMonthPayrollsMap}
             formatCurrency={formatCurrency}
           />
@@ -1318,6 +1358,9 @@ const PayrollPage: React.FC = () => {
             selectedEmployeePayrolls={selectedEmployeePayrolls}
             onSelectEmployee={handleSelectEmployee}
             onViewDetails={handleViewEmployeePayroll}
+            onProcessEmployee={handleProcessEmployee}
+            isProcessing={isProcessing}
+            processingEmployeePayrollId={processingEmployeePayrollId}
             midMonthPayrollsMap={midMonthPayrollsMap}
             formatCurrency={formatCurrency}
           />
