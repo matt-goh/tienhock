@@ -710,8 +710,19 @@ export default function (pool) {
             );
 
             const jumlah = commAmount - midMonthAmount;
-            const setelahDigenapkan = Math.ceil(jumlah);
-            const digenapkan = setelahDigenapkan - jumlah;
+            // SETELAH DIGENAPKAN is a per-EMPLOYEE rounding. When a commission-only
+            // worker spans several commission locations (e.g. Insentif 18 + Cuti
+            // Tahunan 23), round ONCE on their combined jumlah and keep the whole
+            // rounded figure on their FIRST commission location; later locations add 0.
+            // This keeps the location subtotals reconciled with the (employee-deduped)
+            // grand total instead of ceil-ing each location's piece separately.
+            const priorCommOnly = hasRegularPayroll
+              ? null
+              : commissionOnlyEmployees.find(
+                  (e) => e.staff_id === row.employee_id,
+                );
+            const setelahDigenapkan = priorCommOnly ? 0 : Math.ceil(jumlah);
+            const digenapkan = priorCommOnly ? 0 : setelahDigenapkan - jumlah;
             const bankIncome = locCode === "23" ? 0 : commAmount;
             const bankMidMonthAmount =
               bankIncome > 0 ? midMonthMap.get(row.employee_id) || 0 : 0;
@@ -767,10 +778,8 @@ export default function (pool) {
 
             // Track commission-only employees for main data response
             if (!hasRegularPayroll) {
-              // Check if already tracked (multiple commission entries for same employee)
-              const existingCommOnly = commissionOnlyEmployees.find(
-                (e) => e.staff_id === row.employee_id,
-              );
+              // Already resolved above (null on the employee's first commission location).
+              const existingCommOnly = priorCommOnly;
               if (!existingCommOnly) {
                 commissionOnlyEmployees.push(commissionEmployeeData);
                 commissionOnlyBankIncome.set(row.employee_id, bankIncome);
@@ -812,16 +821,27 @@ export default function (pool) {
                 existingCommOnly.final_total = existingCommOnly.gaji_genap;
                 existingCommOnly.mid_month_amount = bankMidMonthAmount;
                 existingCommOnly.net_pay = existingCommOnly.gaji_bersih;
+                // The rounding now lives on the employee's combined figure (this row is
+                // their first commission location). Apply the rounding delta to that
+                // first location's totals (this later location already added 0 above) so
+                // the location subtotals still tie out to the grand total.
+                const setelahDelta =
+                  existingCommOnly.setelah_digenapkan - previousSetelahDigenapkan;
+                const digenapkanDelta =
+                  existingCommOnly.digenapkan - previousDigenapkan;
+                const firstLocation =
+                  locationData[existingCommOnly.location_code];
+                if (firstLocation) {
+                  firstLocation.totals.setelah_digenapkan += setelahDelta;
+                  firstLocation.totals.digenapkan += digenapkanDelta;
+                }
                 // Update grand totals
                 grandTotals[commField] += commAmount;
                 grandTotals.gaji_kasar += commAmount;
                 grandTotals.gaji_bersih += commAmount;
                 grandTotals.jumlah += commAmount;
-                grandTotals.digenapkan +=
-                  existingCommOnly.digenapkan - previousDigenapkan;
-                grandTotals.setelah_digenapkan +=
-                  existingCommOnly.setelah_digenapkan -
-                  previousSetelahDigenapkan;
+                grandTotals.digenapkan += digenapkanDelta;
+                grandTotals.setelah_digenapkan += setelahDelta;
               }
             }
           } else {
