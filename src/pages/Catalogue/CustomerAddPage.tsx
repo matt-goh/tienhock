@@ -385,7 +385,7 @@ const CustomerAddPage: React.FC = () => {
         {/* Wrap form in a div to handle potential saving overlay */}
         <div className="relative">
           {isSaving && (
-            <div className="absolute inset-0 bg-white dark:bg-gray-800/80 dark:bg-gray-800/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-b-lg">
+            <div className="absolute inset-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-b-lg">
               <div className="flex items-center space-x-3 bg-white dark:bg-gray-800 px-6 py-4 rounded-lg shadow-lg border border-default-200 dark:border-gray-700">
                 <LoadingSpinner hideText />
                 <span className="text-sm font-medium text-default-700 dark:text-gray-200">
@@ -466,7 +466,7 @@ const CustomerAddPage: React.FC = () => {
                 <div className="space-y-8 mt-5">
                   {/* Increased spacing */}
                   {/* --- Credit Management Section --- */}
-                  <div className="p-4 border border-default-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50/50 dark:bg-gray-900/50">
+                  <div className="p-4 border border-default-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                     <h3 className="text-lg font-medium text-default-900 dark:text-gray-100 mb-4">
                       Credit Management
                     </h3>
@@ -506,7 +506,7 @@ const CustomerAddPage: React.FC = () => {
                             }
                           }}
                           placeholder="0.00"
-                          className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-md shadow-sm text-sm bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 dark:bg-gray-800 dark:disabled:bg-gray-800"
+                          className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-md shadow-sm text-sm bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 dark:disabled:bg-gray-800"
                           disabled={isSaving}
                         />
                         {formData.credit_limit === 0 && (
@@ -521,7 +521,7 @@ const CustomerAddPage: React.FC = () => {
                         <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
                           Credit Used
                         </label>
-                        <div className="px-3 py-2 border border-default-200 dark:border-gray-700 rounded-md bg-default-100 dark:bg-gray-800 dark:bg-gray-900 h-[42px] flex items-center">
+                        <div className="px-3 py-2 border border-default-200 dark:border-gray-700 rounded-md bg-default-100 dark:bg-gray-900 h-[42px] flex items-center">
                           <span className="font-medium text-default-700 dark:text-gray-200">
                             RM 0.00
                           </span>
@@ -533,7 +533,7 @@ const CustomerAddPage: React.FC = () => {
                         <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
                           Available Credit
                         </label>
-                        <div className="px-3 py-2 border border-default-200 dark:border-gray-700 rounded-md bg-default-100 dark:bg-gray-800 dark:bg-gray-900 h-[42px] flex items-center">
+                        <div className="px-3 py-2 border border-default-200 dark:border-gray-700 rounded-md bg-default-100 dark:bg-gray-900 h-[42px] flex items-center">
                           <span className="font-medium text-default-700 dark:text-gray-200">
                             {formData.credit_limit === 0
                               ? "Unlimited"
@@ -547,7 +547,7 @@ const CustomerAddPage: React.FC = () => {
                     {/* Credit Usage Bar (Always 0% for new) */}
                     {(formData.credit_limit ?? 0) > 0 && (
                       <div className="mt-4">
-                        <div className="flex justify-between text-xs text-default-600 dark:text-gray-300 dark:text-gray-400 mb-1">
+                        <div className="flex justify-between text-xs text-default-600 dark:text-gray-400 mb-1">
                           <span>Usage</span>
                           <span>
                             0.00 /{" "}

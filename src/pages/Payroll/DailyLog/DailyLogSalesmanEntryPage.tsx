@@ -2909,8 +2909,8 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
               } else {
                 // Apply auto-selection rules for new entries
                 if (payCode.pay_type === "Tambahan") {
-                  // NEVER auto-select Tambahan pay codes
-                  isSelected = false;
+                  // Tambahan pay codes follow their default setting
+                  isSelected = payCode.is_default_setting;
                 } else if (payCode.pay_type === "Overtime") {
                   // Salesmen don't have hour-based overtime, never auto-select
                   isSelected = false;
