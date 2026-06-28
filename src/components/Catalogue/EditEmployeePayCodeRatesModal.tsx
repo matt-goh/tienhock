@@ -294,8 +294,8 @@ const EditEmployeePayCodeRatesModal: React.FC<
                       />
                     </>
                   )}
-                  {/* Default checkbox and unlink button only for non-Tambahan pay codes */}
-                  {payCodeDetail && payCodeDetail.pay_type !== "Tambahan" && (
+                  {/* Default checkbox + unlink button (all pay types) */}
+                  {payCodeDetail && (
                     <div className="mt-4 border-t pt-4 border-gray-100 dark:border-gray-700">
                       <Checkbox
                         checked={editRates.is_default}
@@ -355,7 +355,7 @@ const EditEmployeePayCodeRatesModal: React.FC<
                   )}
                 </div>
 
-                <div className={`flex justify-end space-x-3 mt-${payCodeDetail && payCodeDetail.pay_type == "Tambahan" ? '6' : '1'}`}>
+                <div className="flex justify-end space-x-3 mt-1">
                   <Button
                     type="button"
                     variant="outline"
