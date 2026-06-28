@@ -525,7 +525,8 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
         ): boolean => {
           let isSelected: boolean;
           if (payCode.pay_type === "Tambahan") {
-            isSelected = false;
+            // Tambahan pay codes follow their default setting
+            isSelected = payCode.is_default_setting;
           } else if (payCode.pay_type === "Overtime") {
             isSelected = hasOvertimeHours && payCode.is_default_setting;
           } else if (payCode.pay_type === "Base") {

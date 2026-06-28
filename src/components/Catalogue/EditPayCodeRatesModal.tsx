@@ -308,9 +308,8 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
                       />
                     </>
                   )}
-                  {/* Checkbox for default setting */
-                  /* Only show if payCodeDetail is not "Tambahan" */}
-                  {payCodeDetail && payCodeDetail.pay_type !== "Tambahan" && (
+                  {/* Default checkbox + unlink button (all pay types) */}
+                  {payCodeDetail && (
                     <div className="mt-4 border-t pt-4 border-gray-100 dark:border-gray-700">
                       <Checkbox
                         checked={editRates.is_default}
@@ -371,13 +370,7 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
                   )}
                 </div>
 
-                <div
-                  className={`flex justify-end space-x-3 mt-${
-                    payCodeDetail && payCodeDetail.pay_type == "Tambahan"
-                      ? "6"
-                      : "1"
-                  }`}
-                >
+                <div className="flex justify-end space-x-3 mt-1">
                   <Button
                     type="button"
                     variant="outline"
