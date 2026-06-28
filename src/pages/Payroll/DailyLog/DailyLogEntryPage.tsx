@@ -2469,8 +2469,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               // CREATE mode OR employee wasn't in original work log:
               // Apply auto-selection rules for new entries
               if (payCode.pay_type === "Tambahan") {
-                // NEVER auto-select Tambahan pay codes
-                isSelected = false;
+                // Tambahan pay codes follow their default setting
+                isSelected = payCode.is_default_setting;
               } else if (payCode.pay_type === "Overtime") {
                 // Auto-select OT codes based on natural OT (hours > threshold)
                 // BH_OT_STIM uses ONLY forced OT from JAGA STIM column
