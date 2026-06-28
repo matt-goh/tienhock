@@ -2275,6 +2275,19 @@ export default function (pool) {
         });
       };
 
+      // Multi-ID employees (e.g. JIRIM / JIRIM_PB / JIRIM_PM) are one person and must
+      // appear as a single breakdown row, like the payroll system. Siblings share a
+      // head_staff_id and all report under the head's location, so collapsing on the
+      // canonical head id (COALESCE(head_staff_id, id)) both merges them and yields the
+      // head's id for display.
+      const canonicalRows = await pool.query(
+        `SELECT id, COALESCE(NULLIF(head_staff_id, ''), id) AS canonical_id FROM staffs`,
+      );
+      const idToCanonical = new Map(
+        canonicalRows.rows.map((r) => [r.id, r.canonical_id]),
+      );
+      const canonicalOf = (id) => idToCanonical.get(id) || id;
+
       // Pass 1 (cheap): staff per location + display order, to determine page boundaries.
       const staffByLocation = new Map();
       const locationOrder = [];
@@ -2285,7 +2298,9 @@ export default function (pool) {
             locationOrder.push(loc.location);
           }
           const set = staffByLocation.get(loc.location);
-          (loc.employees || []).forEach((emp) => set.add(emp.staff_id));
+          (loc.employees || []).forEach((emp) =>
+            set.add(canonicalOf(emp.staff_id)),
+          );
         });
       });
       const orderedLocs = locationOrder.filter(
@@ -2345,18 +2360,24 @@ export default function (pool) {
           const bucket = detailMap.get(loc.location);
           addInto(bucket.totals, loc.totals);
           (loc.employees || []).forEach((emp) => {
-            if (!bucket.employees.has(emp.staff_id)) {
-              bucket.employees.set(emp.staff_id, {
-                staff_id: emp.staff_id,
+            const cid = canonicalOf(emp.staff_id);
+            if (!bucket.employees.has(cid)) {
+              bucket.employees.set(cid, {
+                staff_id: cid,
                 staff_name: emp.staff_name,
                 monthsMap: new Map(),
                 total: emptyTotals(),
               });
             }
-            const e = bucket.employees.get(emp.staff_id);
-            const monthTotals = emptyTotals();
+            const e = bucket.employees.get(cid);
+            // Accumulate so sibling IDs landing in the same month merge instead of
+            // overwriting each other.
+            let monthTotals = e.monthsMap.get(month);
+            if (!monthTotals) {
+              monthTotals = emptyTotals();
+              e.monthsMap.set(month, monthTotals);
+            }
             addInto(monthTotals, emp);
-            e.monthsMap.set(month, monthTotals);
             addInto(e.total, emp);
           });
         });
