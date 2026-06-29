@@ -162,6 +162,17 @@ GT Salary Report — monthly + annual (summary + breakdown), grouped by job (OFF
 
 **Known limitation:** `payroll_items` don't persist `report_column`, so the per-entry `others_records.report_column` override is lost once processed (only `pay_codes.report_column` applies in the report). Acceptable v1.
 
+## Phase 6 — DONE (2026-06-30)
+
+GT E-Caruman — EPF (CSV) + combined SOCSO/EIS/SIP (PERKESO) + PCB (LHDN CP39) exports.
+
+- **Backend (no schema change):** `src/routes/greentarget/e-caruman.js` (mounted `/greentarget/api/e-caruman`). The fixed-width/CSV format generators + helpers are **copied verbatim** from `src/routes/payroll/e-caruman.js` (TH route untouched — statutory formats must stay byte-identical); queries mirror TH but on `greentarget.employee_payrolls`/`monthly_payrolls`/`payroll_deductions` joined to `public.staffs`. Endpoints: `GET /preview`, `GET /epf/export`, `GET /socso-sip/export` (needs employerCode+myCoId), `GET /income-tax/export` (needs eNumber). GT SOCSO deductions already carry `rate_info.keilatan_amount`/`skbbk_amount`.
+- **Codes in DB:** `GET /settings` + `PUT /settings` upsert 3 keys into `greentarget.payroll_settings` (`ecaruman_perkeso_employer_code`, `ecaruman_mycoid_ssm`, `ecaruman_lhdn_e_number`) — `ON CONFLICT (setting_key)`. Self-contained; no migration; existing payroll-rules settings endpoint untouched.
+- **Frontend:** `src/pages/GreenTarget/Payroll/GTECarumanPage.tsx` — month nav, editable+DB-persisted code fields (Save), preview cards (EPF / SOCSO+EIS / PCB) with counts+totals, simple Blob downloads (all browsers, vs TH's File-System-Access folder picker), missing-EPF inline warning. Nav item "E-Caruman" added under GT Payroll.
+- **Changelog** entry added (2026-06-30).
+
+**Tech debt:** the statutory format generators are duplicated between `payroll/e-caruman.js` and `greentarget/e-caruman.js` (deliberate — TH isolation over DRY for compliance code). A future refactor can extract a shared `eCarumanFormats.js` used by both.
+
 ## Phase status
 
 - [x] Phase 0 — Pay codes & DRIVER mapping (done)
@@ -170,7 +181,9 @@ GT Salary Report — monthly + annual (summary + breakdown), grouped by job (OFF
 - [x] Phase 3 — Daily Lori Habuk driver entry + rewire DRIVER processing (done)
 - [x] Phase 4 — Payrolls + Details parity (done)
 - [x] Phase 5 — GT Salary Report (done)
-- [ ] Phase 6 — GT E-Caruman
+- [x] Phase 6 — GT E-Caruman (done)
+
+**🎉 GT payroll parity build complete (Phases 0–6).** Next session: process a real GT month and verify Phases 3–6 end-to-end (nothing has been processed in dev yet).
 
 ## Reminders / repo rules in effect
 
