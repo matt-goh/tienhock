@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-29",
+    ms: "Muat turun SQL backup kini lebih cepat dan lebih stabil. Sistem tidak lagi membuat salinan database sementara semasa menukar backup kepada SQL, jadi muat turun yang dibatalkan akan berhenti dengan kemas dan tidak memperlahankan laman web.",
+    en: "Backup SQL downloads are now faster and more stable. The system no longer creates a temporary database copy when converting a backup to SQL, so cancelled downloads stop cleanly and do not slow down the website.",
+  },
+  {
+    date: "2026-06-29",
     ms: "Green Target kini mempunyai tiga halaman baharu di bawah menu Payroll: \"Bonus\", \"Others (Advance)\" dan \"Others (Kerja Luar OT)\" — sama seperti Tien Hock. Bonus menambah jumlah kepada gaji kasar dan gaji bersih pekerja. Others (Advance) menambah kepada gaji kasar tetapi ditolak semula sebagai pendahuluan (advance), jadi tiada kesan bersih. Others (Kerja Luar OT) merekod kerja ikut kod gaji, kadar dan kuantiti, dan menambah kepada gaji kasar. Semua tiga jenis ini kini diambil kira secara automatik semasa memproses gaji bulanan Green Target. Setiap halaman hanya memaparkan pekerja payroll Green Target sahaja.",
     en: "Green Target now has three new pages under the Payroll menu: \"Bonus\", \"Others (Advance)\", and \"Others (Kerja Luar OT)\" — matching Tien Hock. Bonus adds an amount to the employee's gross and net pay. Others (Advance) adds to gross pay but is deducted back as an advance, so it has no net effect. Others (Kerja Luar OT) records work by pay code, rate, and quantity, and adds to gross pay. All three now feed into Green Target's monthly payroll processing automatically. Each page only lists Green Target payroll employees.",
   },
