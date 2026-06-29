@@ -267,8 +267,8 @@ export default function (pool) {
               const activityQuery = `
                 INSERT INTO greentarget.monthly_work_log_activities (
                   monthly_entry_id, pay_code_id, hours_applied,
-                  rate_used, calculated_amount, is_manually_added
-                ) VALUES ($1, $2, $3, $4, $5, $6)
+                  rate_used, calculated_amount, is_manually_added, units_produced
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
               `;
 
               await client.query(activityQuery, [
@@ -278,6 +278,7 @@ export default function (pool) {
                 parseFloat(activity.rate),
                 parseFloat(activity.calculatedAmount),
                 activity.isManuallyAdded || false,
+                activity.unitsProduced ?? null,
               ]);
             }
           }
@@ -393,8 +394,8 @@ export default function (pool) {
               const activityQuery = `
                 INSERT INTO greentarget.monthly_work_log_activities (
                   monthly_entry_id, pay_code_id, hours_applied,
-                  rate_used, calculated_amount, is_manually_added
-                ) VALUES ($1, $2, $3, $4, $5, $6)
+                  rate_used, calculated_amount, is_manually_added, units_produced
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
               `;
 
               await client.query(activityQuery, [
@@ -404,6 +405,7 @@ export default function (pool) {
                 parseFloat(activity.rate),
                 parseFloat(activity.calculatedAmount),
                 activity.isManuallyAdded || false,
+                activity.unitsProduced ?? null,
               ]);
             }
           }

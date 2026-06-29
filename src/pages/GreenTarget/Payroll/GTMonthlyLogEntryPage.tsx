@@ -1,5 +1,5 @@
 // src/pages/GreenTarget/Payroll/GTMonthlyLogEntryPage.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Button from "../../../components/Button";
 import BackButton from "../../../components/BackButton";
@@ -8,10 +8,17 @@ import MonthNavigator from "../../../components/MonthNavigator";
 import Checkbox from "../../../components/Checkbox";
 import toast from "react-hot-toast";
 import { api } from "../../../routes/utils/api";
+import { Employee } from "../../../types/types";
 import { useJobPayCodeMappings } from "../../../utils/catalogue/useJobPayCodeMappings";
 import { useJobsCache } from "../../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
-import { IconClock, IconRefresh } from "@tabler/icons-react";
+import ManageActivitiesModal, {
+  ActivityItem,
+} from "../../../components/Payroll/ManageActivitiesModal";
+import { calculateActivityAmount } from "../../../utils/payroll/calculateActivityAmount";
+import { IconClock, IconRefresh, IconListCheck } from "@tabler/icons-react";
+
+const GT_OFFICE_JOB = "OFFICE";
 
 interface GTPayrollEmployee {
   id: number;
@@ -26,18 +33,6 @@ interface EmployeeEntry {
   totalHours: number;
   overtimeHours: number;
   selected: boolean;
-  activities: ActivityItem[];
-}
-
-interface ActivityItem {
-  payCodeId: string;
-  description: string;
-  payType: string;
-  rateUnit: string;
-  rate: number;
-  hoursApplied: number;
-  calculatedAmount: number;
-  isSelected: boolean;
 }
 
 interface ExistingWorkLog {
@@ -58,22 +53,42 @@ interface ExistingWorkLog {
       pay_type: string;
       rate_unit: string;
       rate_used: number;
-      hours_applied: number;
+      hours_applied: number | null;
+      units_produced?: number | null;
       calculated_amount: number;
     }[];
   }[];
 }
 
+const DEFAULT_HOURS = 176; // 22 days × 8 hours (informational; office base pay is usually Fixed)
+const DEFAULT_OVERTIME = 0;
+
+// Identity used to match generated activities against saved/edited ones.
+const getActivityIdentity = (a: {
+  payCodeId: string;
+  description: string;
+  payType: string;
+  rateUnit: string;
+  rate: number;
+  hoursApplied?: number;
+}): string =>
+  [a.payCodeId, a.description, a.payType, a.rateUnit, a.rate, a.hoursApplied ?? ""].join(
+    "|"
+  );
+
 const GTMonthlyLogEntryPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const { detailedMappings: jobPayCodeDetails, loading: loadingPayCodes, refreshData: refreshPayCodeMappings } =
-    useJobPayCodeMappings();
+  const {
+    detailedMappings: jobPayCodeDetails,
+    employeeMappings,
+    loading: loadingPayCodes,
+    refreshData: refreshPayCodeMappings,
+  } = useJobPayCodeMappings();
   const { refreshJobs } = useJobsCache();
   const { refreshStaffs } = useStaffsCache();
 
-  // Form state
   const currentDate = new Date();
   const [formData, setFormData] = useState({
     logMonth: parseInt(searchParams.get("month") || "") || currentDate.getMonth() + 1,
@@ -81,141 +96,182 @@ const GTMonthlyLogEntryPage: React.FC = () => {
   });
 
   const [gtEmployees, setGtEmployees] = useState<GTPayrollEmployee[]>([]);
-  const [employeeEntries, setEmployeeEntries] = useState<Record<string, EmployeeEntry>>({});
+  const [employeeEntries, setEmployeeEntries] = useState<Record<string, EmployeeEntry>>(
+    {}
+  );
+  const [employeeActivities, setEmployeeActivities] = useState<
+    Record<string, ActivityItem[]>
+  >({});
   const [existingWorkLog, setExistingWorkLog] = useState<ExistingWorkLog | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isRefreshingCache, setIsRefreshingCache] = useState(false);
 
-  const DEFAULT_HOURS = 176; // 22 days × 8 hours
-  const DEFAULT_OVERTIME = 0;
+  // Activities modal
+  const [showActivitiesModal, setShowActivitiesModal] = useState(false);
+  const [activeEmployeeId, setActiveEmployeeId] = useState<string | null>(null);
 
-  // Computed date for MonthNavigator
-  const selectedMonthDate = useMemo(() => {
-    return new Date(formData.logYear, formData.logMonth - 1, 1);
-  }, [formData.logMonth, formData.logYear]);
+  const selectedMonthDate = useMemo(
+    () => new Date(formData.logYear, formData.logMonth - 1, 1),
+    [formData.logMonth, formData.logYear]
+  );
 
-  // Fetch data
-  useEffect(() => {
-    fetchData();
-  }, [formData.logMonth, formData.logYear]);
+  // Build the default activity list for an employee, merging OFFICE job pay
+  // codes with the employee's own pay codes (employee overrides win — this is
+  // where the office monthly salary, e.g. BULAN_BM, lives). Optionally restores
+  // selection/units from previously saved activities.
+  const buildActivitiesForEmployee = useCallback(
+    (
+      entry: EmployeeEntry,
+      existing?: ActivityItem[]
+    ): ActivityItem[] => {
+      const jobCodes = jobPayCodeDetails[GT_OFFICE_JOB] || [];
+      const empCodes = employeeMappings[entry.employeeId] || [];
 
-  const fetchData = async () => {
+      const merged = new Map<string, any>();
+      jobCodes.forEach((pc: any) => merged.set(pc.pay_code_id, { ...pc, source: "job" }));
+      empCodes.forEach((pc: any) =>
+        merged.set(pc.pay_code_id, { ...pc, source: "employee" })
+      );
+
+      const hasOvertime = (entry.overtimeHours || 0) > 0;
+
+      return Array.from(merged.values()).map((pc: any) => {
+        const rate = Number(pc.override_rate_biasa ?? pc.rate_biasa ?? 0);
+        const isOvertime = pc.pay_type === "Overtime";
+        const isHour = pc.rate_unit === "Hour";
+
+        const hoursApplied = isHour
+          ? isOvertime
+            ? entry.overtimeHours || 0
+            : entry.totalHours || 0
+          : undefined;
+
+        // Quantity-based units (Trip/Day/Bag/Ctn) start unselected & at 0; Fixed
+        // uses the rate directly (no units) unless the user enters an amount.
+        const requiresUnits = !!pc.requires_units_input;
+        const unitsProduced =
+          requiresUnits && pc.rate_unit !== "Fixed" ? 0 : undefined;
+
+        let isSelected: boolean;
+        if (isOvertime) {
+          isSelected = hasOvertime && !!pc.is_default_setting;
+        } else {
+          isSelected = !!pc.is_default_setting;
+        }
+        if (
+          pc.rate_unit === "Bag" ||
+          pc.rate_unit === "Ctn" ||
+          pc.rate_unit === "Trip" ||
+          pc.rate_unit === "Day"
+        ) {
+          isSelected = false;
+        }
+
+        const base: ActivityItem = {
+          payCodeId: pc.pay_code_id,
+          description: pc.description,
+          payType: pc.pay_type,
+          rateUnit: pc.rate_unit,
+          rate,
+          isDefault: !!pc.is_default_setting,
+          isSelected,
+          unitsProduced,
+          hoursApplied,
+          source: pc.source,
+          calculatedAmount: 0,
+        };
+
+        // Restore prior selection/units from saved/edited activities.
+        const prior = existing?.find(
+          (e) => getActivityIdentity(e) === getActivityIdentity(base)
+        );
+        if (prior) {
+          base.isSelected = prior.isSelected;
+          base.unitsProduced = prior.unitsProduced ?? base.unitsProduced;
+        }
+
+        base.calculatedAmount = calculateActivityAmount(
+          base,
+          base.hoursApplied ?? entry.totalHours,
+          {}
+        );
+        return base;
+      });
+    },
+    [jobPayCodeDetails, employeeMappings]
+  );
+
+  const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Fetch GT OFFICE employees
       const employeesResponse = await api.get("/greentarget/api/payroll-employees");
-      const officeEmployees = employeesResponse.filter(
+      const officeEmployees = (employeesResponse || []).filter(
         (e: GTPayrollEmployee) => e.job_type === "OFFICE"
       );
       setGtEmployees(officeEmployees);
 
-      // Check for existing work log
       const workLogsResponse = await api.get(
         `/greentarget/api/monthly-work-logs?month=${formData.logMonth}&year=${formData.logYear}&section=OFFICE`
       );
 
+      let fullWorkLog: ExistingWorkLog | null = null;
       if (workLogsResponse.logs?.length > 0) {
-        // Load existing work log
-        const workLogId = workLogsResponse.logs[0].id;
-        const fullWorkLog = await api.get(`/greentarget/api/monthly-work-logs/${workLogId}`);
-        setExistingWorkLog(fullWorkLog);
-        initializeFromExistingLog(fullWorkLog, officeEmployees);
-      } else {
-        setExistingWorkLog(null);
-        initializeNewEntries(officeEmployees);
+        fullWorkLog = await api.get(
+          `/greentarget/api/monthly-work-logs/${workLogsResponse.logs[0].id}`
+        );
       }
+      setExistingWorkLog(fullWorkLog);
+
+      const entries: Record<string, EmployeeEntry> = {};
+      const activities: Record<string, ActivityItem[]> = {};
+
+      officeEmployees.forEach((emp: GTPayrollEmployee) => {
+        const saved = fullWorkLog?.employeeEntries?.find(
+          (e) => e.employee_id === emp.employee_id
+        );
+        const entry: EmployeeEntry = {
+          employeeId: emp.employee_id,
+          employeeName: emp.employee_name,
+          totalHours: saved ? Number(saved.total_hours) : DEFAULT_HOURS,
+          overtimeHours: saved ? Number(saved.overtime_hours) || 0 : DEFAULT_OVERTIME,
+          selected: true,
+        };
+        entries[emp.employee_id] = entry;
+
+        const savedActivities: ActivityItem[] | undefined = saved?.activities?.map(
+          (a) => ({
+            payCodeId: a.pay_code_id,
+            description: a.description,
+            payType: a.pay_type,
+            rateUnit: a.rate_unit,
+            rate: Number(a.rate_used),
+            isDefault: false,
+            isSelected: true,
+            unitsProduced:
+              a.units_produced != null ? Number(a.units_produced) : undefined,
+            hoursApplied: a.hours_applied != null ? Number(a.hours_applied) : undefined,
+            calculatedAmount: Number(a.calculated_amount),
+          })
+        );
+
+        activities[emp.employee_id] = buildActivitiesForEmployee(entry, savedActivities);
+      });
+
+      setEmployeeEntries(entries);
+      setEmployeeActivities(activities);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Failed to load data");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [formData.logMonth, formData.logYear, buildActivitiesForEmployee]);
 
-  const initializeFromExistingLog = (
-    workLog: ExistingWorkLog,
-    employees: GTPayrollEmployee[]
-  ) => {
-    const entries: Record<string, EmployeeEntry> = {};
-
-    // First, add all employees with their existing data
-    employees.forEach((emp) => {
-      const existingEntry = workLog.employeeEntries?.find(
-        (e) => e.employee_id === emp.employee_id
-      );
-
-      if (existingEntry) {
-        entries[emp.employee_id] = {
-          employeeId: emp.employee_id,
-          employeeName: emp.employee_name,
-          totalHours: existingEntry.total_hours,
-          overtimeHours: existingEntry.overtime_hours || 0,
-          selected: true,
-          activities: existingEntry.activities?.map((a) => ({
-            payCodeId: a.pay_code_id,
-            description: a.description,
-            payType: a.pay_type,
-            rateUnit: a.rate_unit,
-            rate: a.rate_used,
-            hoursApplied: a.hours_applied,
-            calculatedAmount: a.calculated_amount,
-            isSelected: true,
-          })) || [],
-        };
-      } else {
-        // Employee not in existing log, initialize with defaults
-        entries[emp.employee_id] = createDefaultEntry(emp);
-      }
-    });
-
-    setEmployeeEntries(entries);
-  };
-
-  const initializeNewEntries = (employees: GTPayrollEmployee[]) => {
-    const entries: Record<string, EmployeeEntry> = {};
-
-    employees.forEach((emp) => {
-      entries[emp.employee_id] = createDefaultEntry(emp);
-    });
-
-    setEmployeeEntries(entries);
-  };
-
-  const createDefaultEntry = (emp: GTPayrollEmployee): EmployeeEntry => {
-    // Get OFFICE pay codes
-    const officePayCodes = jobPayCodeDetails["OFFICE"] || [];
-
-    // Create default activities from OFFICE pay codes
-    const activities: ActivityItem[] = officePayCodes.map((pc) => {
-      const rate = parseFloat(String(pc.override_rate_biasa || pc.rate_biasa || "0"));
-      const calculatedAmount = (pc.rate_unit === "Hour" || pc.rate_unit === "Bill")
-        ? rate * DEFAULT_HOURS
-        : pc.rate_unit === "Fixed"
-        ? rate
-        : 0;
-
-      return {
-        payCodeId: pc.pay_code_id,
-        description: pc.description,
-        payType: pc.pay_type,
-        rateUnit: pc.rate_unit,
-        rate,
-        hoursApplied: (pc.rate_unit === "Hour" || pc.rate_unit === "Bill") ? DEFAULT_HOURS : 0,
-        calculatedAmount,
-        isSelected: pc.pay_type === "Base",
-      };
-    });
-
-    return {
-      employeeId: emp.employee_id,
-      employeeName: emp.employee_name,
-      totalHours: DEFAULT_HOURS,
-      overtimeHours: DEFAULT_OVERTIME,
-      selected: true,
-      activities,
-    };
-  };
+  useEffect(() => {
+    if (!loadingPayCodes) fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.logMonth, formData.logYear, loadingPayCodes]);
 
   const handleMonthChange = (newMonth: Date) => {
     setFormData({
@@ -224,42 +280,43 @@ const GTMonthlyLogEntryPage: React.FC = () => {
     });
   };
 
-  const handleHoursChange = (employeeId: string, field: "totalHours" | "overtimeHours", value: number) => {
+  // Recompute Hour-based activity amounts when hours change (keeps selections/units).
+  const handleHoursChange = (
+    employeeId: string,
+    field: "totalHours" | "overtimeHours",
+    value: number
+  ) => {
     setEmployeeEntries((prev) => {
       const entry = prev[employeeId];
       if (!entry) return prev;
+      const next = { ...entry, [field]: value };
 
-      // Update activities calculations based on new hours
-      const updatedActivities = entry.activities.map((activity) => {
-        if (activity.rateUnit === "Hour" || activity.rateUnit === "Bill") {
-          const hours = field === "totalHours" ? value : entry.totalHours;
-          return {
-            ...activity,
-            hoursApplied: hours,
-            calculatedAmount: activity.rate * hours,
-          };
-        }
-        return activity;
+      setEmployeeActivities((prevActs) => {
+        const acts = prevActs[employeeId];
+        if (!acts) return prevActs;
+        const updated = acts.map((a) => {
+          if (a.rateUnit !== "Hour") return a;
+          const hoursApplied =
+            a.payType === "Overtime" ? next.overtimeHours || 0 : next.totalHours || 0;
+          const recalced = { ...a, hoursApplied };
+          recalced.calculatedAmount = calculateActivityAmount(
+            recalced,
+            hoursApplied,
+            {}
+          );
+          return recalced;
+        });
+        return { ...prevActs, [employeeId]: updated };
       });
 
-      return {
-        ...prev,
-        [employeeId]: {
-          ...entry,
-          [field]: value,
-          activities: updatedActivities,
-        },
-      };
+      return { ...prev, [employeeId]: next };
     });
   };
 
   const toggleEmployeeSelection = (employeeId: string) => {
     setEmployeeEntries((prev) => ({
       ...prev,
-      [employeeId]: {
-        ...prev[employeeId],
-        selected: !prev[employeeId].selected,
-      },
+      [employeeId]: { ...prev[employeeId], selected: !prev[employeeId].selected },
     }));
   };
 
@@ -286,10 +343,27 @@ const GTMonthlyLogEntryPage: React.FC = () => {
     }
   };
 
-  const handleSave = async () => {
-    // Filter selected employees
-    const selectedEntries = Object.values(employeeEntries).filter((e) => e.selected);
+  const openActivitiesModal = (employeeId: string) => {
+    setActiveEmployeeId(employeeId);
+    setShowActivitiesModal(true);
+  };
 
+  const handleActivitiesUpdated = (activities: ActivityItem[]) => {
+    if (!activeEmployeeId) return;
+    const entry = employeeEntries[activeEmployeeId];
+    const recalculated = activities.map((a) => ({
+      ...a,
+      calculatedAmount: calculateActivityAmount(
+        a,
+        a.hoursApplied ?? entry?.totalHours ?? 0,
+        {}
+      ),
+    }));
+    setEmployeeActivities((prev) => ({ ...prev, [activeEmployeeId]: recalculated }));
+  };
+
+  const handleSave = async () => {
+    const selectedEntries = Object.values(employeeEntries).filter((e) => e.selected);
     if (selectedEntries.length === 0) {
       toast.error("Select at least one employee");
       return;
@@ -305,15 +379,16 @@ const GTMonthlyLogEntryPage: React.FC = () => {
         contextData: {},
         employeeEntries: selectedEntries.map((entry) => ({
           employeeId: entry.employeeId,
-          jobType: "OFFICE",
+          jobType: GT_OFFICE_JOB,
           totalHours: entry.totalHours,
           overtimeHours: entry.overtimeHours,
-          activities: entry.activities
+          activities: (employeeActivities[entry.employeeId] || [])
             .filter((a) => a.isSelected)
             .map((a) => ({
               payCodeId: a.payCodeId,
               rate: a.rate,
-              hoursApplied: a.hoursApplied,
+              hoursApplied: a.hoursApplied ?? null,
+              unitsProduced: a.unitsProduced ?? null,
               calculatedAmount: a.calculatedAmount,
               isSelected: true,
               isManuallyAdded: false,
@@ -322,13 +397,15 @@ const GTMonthlyLogEntryPage: React.FC = () => {
       };
 
       if (existingWorkLog) {
-        await api.put(`/greentarget/api/monthly-work-logs/${existingWorkLog.id}`, payload);
+        await api.put(
+          `/greentarget/api/monthly-work-logs/${existingWorkLog.id}`,
+          payload
+        );
         toast.success("Work log updated successfully");
       } else {
         await api.post("/greentarget/api/monthly-work-logs", payload);
         toast.success("Work log created successfully");
       }
-
       navigate("/greentarget/payroll");
     } catch (error) {
       console.error("Error saving work log:", error);
@@ -338,24 +415,28 @@ const GTMonthlyLogEntryPage: React.FC = () => {
     }
   };
 
-  // Calculate totals
+  const getEntryTotal = (employeeId: string): number =>
+    (employeeActivities[employeeId] || [])
+      .filter((a) => a.isSelected)
+      .reduce((s, a) => s + a.calculatedAmount, 0);
+
   const totals = useMemo(() => {
     const selectedEntries = Object.values(employeeEntries).filter((e) => e.selected);
-    const totalHours = selectedEntries.reduce((sum, e) => sum + e.totalHours, 0);
-    const totalOvertime = selectedEntries.reduce((sum, e) => sum + e.overtimeHours, 0);
-    const totalAmount = selectedEntries.reduce((sum, e) => {
-      const entryTotal = e.activities
-        .filter((a) => a.isSelected)
-        .reduce((s, a) => s + a.calculatedAmount, 0);
-      return sum + entryTotal;
-    }, 0);
-
+    const totalHours = selectedEntries.reduce((s, e) => s + e.totalHours, 0);
+    const totalOvertime = selectedEntries.reduce((s, e) => s + e.overtimeHours, 0);
+    const totalAmount = selectedEntries.reduce(
+      (s, e) => s + getEntryTotal(e.employeeId),
+      0
+    );
     return { totalHours, totalOvertime, totalAmount, count: selectedEntries.length };
-  }, [employeeEntries]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employeeEntries, employeeActivities]);
 
   const allSelected =
     Object.values(employeeEntries).length > 0 &&
     Object.values(employeeEntries).every((e) => e.selected);
+
+  const activeEntry = activeEmployeeId ? employeeEntries[activeEmployeeId] : null;
 
   const renderHourInput = (
     entry: EmployeeEntry,
@@ -391,7 +472,7 @@ const GTMonthlyLogEntryPage: React.FC = () => {
           <div className="mb-0.5 text-center text-[10px] uppercase text-default-400 dark:text-gray-500">
             OT
           </div>
-          {renderHourInput(entry, "overtimeHours", "Biasa overtime hours")}
+          {renderHourInput(entry, "overtimeHours", "Overtime hours")}
         </div>
       </div>
     </div>
@@ -441,10 +522,7 @@ const GTMonthlyLogEntryPage: React.FC = () => {
               className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-default-300 dark:border-gray-600 hover:bg-default-100 dark:hover:bg-gray-700 text-default-600 dark:text-gray-300 text-sm font-medium transition-colors disabled:opacity-50"
               title="Refresh staff, jobs, and pay codes"
             >
-              <IconRefresh
-                size={16}
-                className={isRefreshingCache ? "animate-spin" : ""}
-              />
+              <IconRefresh size={16} className={isRefreshingCache ? "animate-spin" : ""} />
               Refresh
             </button>
             <Button
@@ -477,10 +555,7 @@ const GTMonthlyLogEntryPage: React.FC = () => {
           <p className="text-default-500 dark:text-gray-400 mb-4">
             Add OFFICE employees to GT Payroll first.
           </p>
-          <Button
-            variant="outline"
-            onClick={() => navigate("/greentarget/payroll")}
-          >
+          <Button variant="outline" onClick={() => navigate("/greentarget/payroll")}>
             Go to Payroll
           </Button>
         </div>
@@ -511,6 +586,9 @@ const GTMonthlyLogEntryPage: React.FC = () => {
                     <th className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap w-44">
                       Biasa
                     </th>
+                    <th className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap">
+                      Activities
+                    </th>
                     <th className="px-6 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap">
                       Amount
                     </th>
@@ -518,9 +596,9 @@ const GTMonthlyLogEntryPage: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-default-200 dark:divide-gray-700">
                   {Object.values(employeeEntries).map((entry) => {
-                    const entryTotal = entry.activities
-                      .filter((a) => a.isSelected)
-                      .reduce((s, a) => s + a.calculatedAmount, 0);
+                    const acts = employeeActivities[entry.employeeId] || [];
+                    const selectedCount = acts.filter((a) => a.isSelected).length;
+                    const entryTotal = getEntryTotal(entry.employeeId);
 
                     return (
                       <tr
@@ -536,9 +614,7 @@ const GTMonthlyLogEntryPage: React.FC = () => {
                           className="px-6 py-2 whitespace-nowrap cursor-pointer"
                           onClickCapture={(e) => {
                             e.stopPropagation();
-                            if (!isSaving) {
-                              toggleEmployeeSelection(entry.employeeId);
-                            }
+                            if (!isSaving) toggleEmployeeSelection(entry.employeeId);
                           }}
                         >
                           <Checkbox
@@ -558,6 +634,21 @@ const GTMonthlyLogEntryPage: React.FC = () => {
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap">
                           {renderHourGroup(entry)}
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap text-center">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (entry.selected) openActivitiesModal(entry.employeeId);
+                            }}
+                            disabled={!entry.selected || isSaving}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-default-300 dark:border-gray-600 px-3 py-1 text-xs font-medium text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                            title="Manage pay code activities"
+                          >
+                            <IconListCheck size={14} />
+                            {selectedCount} selected
+                          </button>
                         </td>
                         <td className="px-6 py-2 whitespace-nowrap text-right text-sm font-medium text-emerald-600 dark:text-emerald-400">
                           RM {entryTotal.toFixed(2)}
@@ -606,6 +697,21 @@ const GTMonthlyLogEntryPage: React.FC = () => {
             </div>
           </div>
         </>
+      )}
+
+      {/* Activities Modal */}
+      {activeEntry && (
+        <ManageActivitiesModal
+          isOpen={showActivitiesModal}
+          onClose={() => setShowActivitiesModal(false)}
+          employee={{ id: activeEntry.employeeId, name: activeEntry.employeeName } as Employee}
+          jobType={GT_OFFICE_JOB}
+          jobName="Office"
+          employeeHours={activeEntry.totalHours}
+          dayType="Biasa"
+          existingActivities={employeeActivities[activeEntry.employeeId] || []}
+          onActivitiesUpdated={handleActivitiesUpdated}
+        />
       )}
     </div>
   );

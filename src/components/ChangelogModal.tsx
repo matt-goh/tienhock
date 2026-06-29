@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-06-29",
+    ms: "Entri bulanan Office bagi Green Target kini menyokong kod gaji (pay codes), sama seperti Tien Hock. Setiap pekerja office kini mempunyai butang \"Activities\" untuk memilih kod gaji yang berkenaan (gaji pokok, kerja lebih masa, elaun dan sebagainya) serta menetapkan jumlahnya. Yang penting, kod gaji peribadi pekerja itu (contohnya gaji bulanan) kini diambil secara automatik — sebelum ini entri Office hanya merekod jam kerja sahaja.",
+    en: "Green Target's Office monthly entry now supports pay codes, just like Tien Hock. Each office employee now has an \"Activities\" button to choose which pay codes apply (basic salary, overtime, allowances, etc.) and set their amounts. Importantly, the employee's own pay codes (such as their monthly salary) are now picked up automatically — previously the Office entry only recorded hours.",
+  },
+  {
     date: "2026-06-28",
     ms: "Kod gaji jenis Tambahan kini boleh ditetapkan sebagai \"Default\" (ditanda secara automatik semasa membuat entri kerja baharu) melalui tetingkap edit kadar, sama seperti kod gaji Base. Sebagai permulaan, semua kod Tambahan ditetapkan TIDAK default kecuali \"SAPU1\" (SAPU SELURUH KAWASAN KILANG) — jadi SAPU1 kini ditanda secara automatik apabila membuat entri kerja harian dan bulanan baharu (boleh dibuang secara manual jika tidak berkenaan), manakala semua kod Tambahan lain kekal tidak ditanda. Tetingkap edit kadar untuk kod Tambahan kini juga mempunyai butang \"Unlink Pay Code\" untuk menanggalkan kaitan kod itu, sama seperti kod gaji lain.",
     en: "Tambahan pay codes can now be set as \"Default\" (auto-ticked when creating new work entries) from the rate edit window, just like Base pay codes. To start, all Tambahan codes were set to NOT default except \"SAPU1\" (SAPU SELURUH KAWASAN KILANG) — so SAPU1 is now auto-ticked when creating new daily and monthly work entries (you can untick it manually if it doesn't apply), while all other Tambahan codes stay unticked. The rate edit window for Tambahan codes now also has an \"Unlink Pay Code\" button to remove the association, just like other pay codes.",
