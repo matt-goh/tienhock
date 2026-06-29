@@ -20,8 +20,18 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-29",
-    ms: "Muat turun SQL backup kini lebih cepat dan lebih stabil. Sistem tidak lagi membuat salinan database sementara semasa menukar backup kepada SQL, jadi muat turun yang dibatalkan akan berhenti dengan kemas dan tidak memperlahankan laman web.",
-    en: "Backup SQL downloads are now faster and more stable. The system no longer creates a temporary database copy when converting a backup to SQL, so cancelled downloads stop cleanly and do not slow down the website.",
+    ms: "Halaman General Stock kini mempunyai butang pintasan ke senarai General Purchases, pembelian local baharu dan pembelian foreign baharu. Senarai General Purchases juga kini mempunyai pintasan kembali ke General Stock.",
+    en: "The General Stock page now has shortcut buttons to the General Purchases list, a new local purchase, and a new foreign purchase. The General Purchases list also has a shortcut back to General Stock.",
+  },
+  {
+    date: "2026-06-29",
+    ms: "Muat turun SQL backup kini lebih cepat dan lebih stabil. Sistem tidak lagi membuat salinan database sementara semasa menukar backup kepada SQL, jadi muat turun yang dibatalkan akan berhenti dengan kemas dan tidak memperlahankan laman web. Semasa muat turun sedang berjalan, tetingkap backup akan kekal terbuka dan navigasi keluar akan disekat sehingga selesai.",
+    en: "Backup SQL downloads are now faster and more stable. The system no longer creates a temporary database copy when converting a backup to SQL, so cancelled downloads stop cleanly and do not slow down the website. While a download is running, the backup window stays open and navigation away is blocked until it finishes.",
+  },
+  {
+    date: "2026-06-29",
+    ms: "General Purchase kini memasukkan jumlah, cukai dan akaun GL di peringkat invois, bukan lagi di setiap item. Item pembelian kini fokus kepada stok sahaja, boleh menambah beberapa item untuk pembelian local dan foreign, serta boleh pilih item General Stock sedia ada untuk menambah baki ke item tersebut dengan pratonton baki baharu.",
+    en: "General Purchase now enters amount, tax, and GL account at invoice level instead of per item. Purchase items now focus on stock only, local and foreign purchases can both contain multiple items, and an item can append quantity to an existing General Stock item with a new-balance preview.",
   },
   {
     date: "2026-06-29",

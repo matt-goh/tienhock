@@ -37,6 +37,7 @@ import {
   SelfBilledInvoiceInput,
   SelfBilledInvoiceLine,
   GeneralStockCategory,
+  GeneralStockRow,
 } from "../../../types/types";
 
 interface SelfBilledFormData {
@@ -51,6 +52,11 @@ interface SelfBilledFormData {
   supporting_document_notes: string;
   currency_code: string;
   fx_rate: string;
+  account_code: string;
+  total_foreign_amount: string;
+  total_excluding_tax_myr: string;
+  tax_amount_myr: string;
+  tax_type: string;
   notes: string;
 }
 
@@ -98,6 +104,11 @@ const defaultFormData: SelfBilledFormData = {
   supporting_document_notes: "",
   currency_code: "CNY",
   fx_rate: "0.6000",
+  account_code: "OP",
+  total_foreign_amount: "",
+  total_excluding_tax_myr: "",
+  tax_amount_myr: "0",
+  tax_type: "06",
   notes: "",
 };
 
@@ -117,6 +128,7 @@ const createDefaultLine = (lineNumber: number): SelfBilledInvoiceLine => ({
   tax_exemption_reason: "",
   customs_form_reference: "",
   account_code: null,
+  stock_append_target_line_id: null,
   notes: "",
 });
 
@@ -181,6 +193,16 @@ const formatAmount = (amount: number, currency: string): string => {
   }).format(amount);
 };
 
+const formatQty = (amount: number): string => {
+  return amount.toLocaleString("en-MY", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 4,
+  });
+};
+
+const normalizeStockDescription = (value: string | null | undefined): string =>
+  (value || "").trim().replace(/\s+/g, " ").toLowerCase();
+
 const formatFileSize = (bytes?: number | null): string => {
   if (!bytes) return "-";
   if (bytes < 1024) return `${bytes} B`;
@@ -222,6 +244,9 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
   const [generalStockCategories, setGeneralStockCategories] = useState<
     GeneralStockCategory[]
   >([]);
+  const [generalStockRows, setGeneralStockRows] = useState<GeneralStockRow[]>(
+    []
+  );
   const [supplierSearchFocused, setSupplierSearchFocused] =
     useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(isEditMode);
@@ -292,6 +317,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
         ...defaultSupplier,
         ...invoice.supplier,
       });
+      const firstLine: SelfBilledInvoiceLine | undefined = invoice.lines[0];
       setFormData({
         purchase_date: toLocalDateInputValue(invoice.purchase_date) || today,
         transaction_type: invoice.transaction_type,
@@ -304,6 +330,11 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
         supporting_document_notes: invoice.supporting_document_notes || "",
         currency_code: invoice.currency_code,
         fx_rate: String(invoice.fx_rate || "1"),
+        account_code: invoice.account_code || firstLine?.account_code || "",
+        total_foreign_amount: String(toNumber(invoice.total_foreign_amount)),
+        total_excluding_tax_myr: String(toNumber(invoice.total_excluding_tax_myr)),
+        tax_amount_myr: String(toNumber(invoice.tax_amount_myr)),
+        tax_type: firstLine?.tax_type || "06",
         notes: invoice.notes || "",
       });
       setSupplierPayment((previous: SupplierPaymentDraft) => ({
@@ -323,6 +354,8 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               amount_myr: toNumber(line.amount_myr),
               tax_rate: toNumber(line.tax_rate),
               tax_amount_myr: toNumber(line.tax_amount_myr),
+              stock_append_target_line_id:
+                line.stock_append_target_line_id || null,
             }))
           : [createDefaultLine(1)]
       );
@@ -352,6 +385,18 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       });
   }, [isEditMode]);
 
+  useEffect(() => {
+    api
+      .get<{ rows: GeneralStockRow[] }>(
+        "/api/general-purchases/general-stock/search?limit=200"
+      )
+      .then(({ rows }) => setGeneralStockRows(rows || []))
+      .catch((error: unknown) => {
+        console.error("Error loading general stock rows:", error);
+        setGeneralStockRows([]);
+      });
+  }, []);
+
   const generalStockCategoryOptions = useMemo(
     () => [
       { id: "", name: "No General stock category" },
@@ -361,6 +406,19 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       })),
     ],
     [generalStockCategories]
+  );
+
+  const generalStockOptions = useMemo(
+    () => [
+      { id: "", name: "New General stock item" },
+      ...generalStockRows.map((row: GeneralStockRow) => ({
+        id: String(row.line_id),
+        name: `${row.description} (Qty ${formatQty(
+          toNumber(row.current_stock)
+        )}) - ${row.purchase_no}`,
+      })),
+    ],
+    [generalStockRows]
   );
 
   useEffect(() => {
@@ -387,16 +445,16 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
   }, [supplier.supplier_name]);
 
   const totals = useMemo(() => {
-    return lines.reduce(
-      (accumulator, line) => ({
-        foreign:
-          accumulator.foreign + toNumber(line.amount_foreign),
-        myr: accumulator.myr + toNumber(line.amount_myr),
-        tax: accumulator.tax + toNumber(line.tax_amount_myr),
-      }),
-      { foreign: 0, myr: 0, tax: 0 }
-    );
-  }, [lines]);
+    return {
+      foreign: toNumber(formData.total_foreign_amount),
+      myr: toNumber(formData.total_excluding_tax_myr),
+      tax: toNumber(formData.tax_amount_myr),
+    };
+  }, [
+    formData.tax_amount_myr,
+    formData.total_excluding_tax_myr,
+    formData.total_foreign_amount,
+  ]);
   const payableAmount = useMemo<number>(
     () => Math.round((totals.myr + totals.tax) * 100) / 100,
     [totals.myr, totals.tax]
@@ -434,17 +492,18 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       );
     }
 
-    if (field === "fx_rate") {
-      const newRate = toNumber(value as string);
-      if (newRate > 0) {
-        setLines((previousLines: SelfBilledInvoiceLine[]) =>
-          previousLines.map((line: SelfBilledInvoiceLine) => ({
-            ...line,
-            amount_myr: Number(
-              (toNumber(line.amount_foreign) * newRate).toFixed(2)
-            ),
-          }))
-        );
+    if (field === "fx_rate" || field === "total_foreign_amount") {
+      const nextFxRate =
+        field === "fx_rate" ? toNumber(value as string) : toNumber(formData.fx_rate);
+      const nextForeignAmount =
+        field === "total_foreign_amount"
+          ? toNumber(value as string)
+          : toNumber(formData.total_foreign_amount);
+      if (nextFxRate > 0 && nextForeignAmount > 0) {
+        setFormData((previous: SelfBilledFormData) => ({
+          ...previous,
+          total_excluding_tax_myr: (nextForeignAmount * nextFxRate).toFixed(2),
+        }));
       }
     }
   };
@@ -465,7 +524,6 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
     field: keyof SelfBilledInvoiceLine,
     value: string | number
   ): void => {
-    const fxRate = toNumber(formData.fx_rate) || 1;
     setLines((previousLines: SelfBilledInvoiceLine[]) =>
       previousLines.map((line: SelfBilledInvoiceLine, lineIndex: number) => {
         if (lineIndex !== index) return line;
@@ -473,32 +531,69 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
         const nextLine: SelfBilledInvoiceLine = { ...line };
         nextLine[field] = value as never;
 
-        if (field === "quantity" || field === "unit_price_foreign") {
-          const quantity = Math.max(0, toNumber(nextLine.quantity));
-          const unitPriceForeign = Math.max(
-            0,
-            toNumber(nextLine.unit_price_foreign)
-          );
-          const amountForeign = Number((quantity * unitPriceForeign).toFixed(2));
-          nextLine.quantity = quantity;
-          nextLine.unit_price_foreign = unitPriceForeign;
-          nextLine.amount_foreign = amountForeign;
-          nextLine.amount_myr = Number((amountForeign * fxRate).toFixed(2));
-        }
-
-        if (field === "amount_foreign") {
-          const amountForeign = Math.max(0, toNumber(value));
-          const quantity = toNumber(nextLine.quantity) || 1;
-          nextLine.quantity = quantity;
-          nextLine.unit_price_foreign = Number(
-            (amountForeign / quantity).toFixed(4)
-          );
-          nextLine.amount_foreign = amountForeign;
-          nextLine.amount_myr = Number((amountForeign * fxRate).toFixed(2));
-        }
-
         return nextLine;
       })
+    );
+  };
+
+  const updateLineAppendTarget = (index: number, value: string): void => {
+    const targetId = value ? Number.parseInt(value, 10) : null;
+    const targetRow = targetId
+      ? generalStockRows.find((row: GeneralStockRow) => row.line_id === targetId)
+      : null;
+
+    setLines((previousLines: SelfBilledInvoiceLine[]) =>
+      previousLines.map((line: SelfBilledInvoiceLine, lineIndex: number) => {
+        if (lineIndex !== index) return line;
+        return {
+          ...line,
+          stock_append_target_line_id: targetId,
+          description: targetRow ? targetRow.description : line.description,
+          general_stock_category_id: targetRow
+            ? targetRow.general_stock_category_id
+            : line.general_stock_category_id,
+        };
+      })
+    );
+  };
+
+  const getSelectedGeneralStockRow = (
+    line: SelfBilledInvoiceLine
+  ): GeneralStockRow | null => {
+    if (!line.stock_append_target_line_id) return null;
+    return (
+      generalStockRows.find(
+        (row: GeneralStockRow) => row.line_id === line.stock_append_target_line_id
+      ) || null
+    );
+  };
+
+  const findDuplicateNewStockRow = (
+    line: SelfBilledInvoiceLine
+  ): GeneralStockRow | null => {
+    if (line.stock_append_target_line_id) return null;
+
+    const normalizedDescription = normalizeStockDescription(line.description);
+    if (!normalizedDescription) return null;
+
+    const originalLine = line.id
+      ? existingInvoice?.lines.find(
+          (existingLine: SelfBilledInvoiceLine) => existingLine.id === line.id
+        )
+      : null;
+    if (
+      originalLine &&
+      normalizeStockDescription(originalLine.description) === normalizedDescription
+    ) {
+      return null;
+    }
+
+    return (
+      generalStockRows.find(
+        (row: GeneralStockRow) =>
+          row.line_id !== line.id &&
+          normalizeStockDescription(row.description) === normalizedDescription
+      ) || null
     );
   };
 
@@ -539,18 +634,39 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       (line: SelfBilledInvoiceLine) =>
         !line.description.trim() ||
         toNumber(line.quantity) <= 0 ||
-        toNumber(line.amount_foreign) <= 0 ||
-        toNumber(line.amount_myr) <= 0
+        (Boolean(line.stock_append_target_line_id) &&
+          toNumber(line.balance_quantity) <= 0)
     );
     if (invalidLineIndex >= 0) {
       toast.error(`Line ${invalidLineIndex + 1} is incomplete`);
       return false;
     }
-    const missingAccountIndex = lines.findIndex(
-      (line: SelfBilledInvoiceLine) => !(line.account_code && line.account_code.trim())
+    const duplicateLineIndex = lines.findIndex(
+      (line: SelfBilledInvoiceLine) => findDuplicateNewStockRow(line) !== null
     );
-    if (missingAccountIndex >= 0) {
-      toast.error(`Line ${missingAccountIndex + 1}: GL account is required`);
+    if (duplicateLineIndex >= 0) {
+      const duplicateRow = findDuplicateNewStockRow(lines[duplicateLineIndex]);
+      toast.error(
+        `Line ${duplicateLineIndex + 1} matches existing General Stock item "${
+          duplicateRow?.description || ""
+        }". Select it in Stock Item to append balance instead.`
+      );
+      return false;
+    }
+    if (!formData.account_code.trim()) {
+      toast.error("GL account is required");
+      return false;
+    }
+    if (toNumber(formData.total_foreign_amount) <= 0) {
+      toast.error(`${formData.currency_code} total must be greater than zero`);
+      return false;
+    }
+    if (toNumber(formData.total_excluding_tax_myr) <= 0) {
+      toast.error("MYR subtotal must be greater than zero");
+      return false;
+    }
+    if (toNumber(formData.tax_amount_myr) < 0) {
+      toast.error("Tax cannot be negative");
       return false;
     }
     const paymentError: string | null = validateSupplierPaymentDraft(
@@ -567,24 +683,32 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
   const buildLinePayload = (
     line: SelfBilledInvoiceLine,
     index: number
-  ): SelfBilledInvoiceLine => ({
-    ...line,
-    line_number: index + 1,
-    quantity: toNumber(line.quantity),
-    unit_price_foreign: toNumber(line.unit_price_foreign),
-    amount_foreign: toNumber(line.amount_foreign),
-    amount_myr: toNumber(line.amount_myr),
-    tax_rate: toNumber(line.tax_rate),
-    tax_amount_myr: toNumber(line.tax_amount_myr),
-    classification_code: line.classification_code || "034",
-    tax_type: line.tax_type || "06",
-    customs_form_reference: line.customs_form_reference || null,
-    tax_exemption_reason: line.tax_exemption_reason || null,
-    balance_quantity: toNullableNumber(line.balance_quantity),
-    general_stock_category_id: line.general_stock_category_id || null,
-    account_code: line.account_code ? line.account_code.trim() : null,
-    notes: line.notes || null,
-  });
+  ): SelfBilledInvoiceLine => {
+    const selectedStockRow = getSelectedGeneralStockRow(line);
+
+    return {
+      ...line,
+      line_number: index + 1,
+      description: selectedStockRow
+        ? selectedStockRow.description
+        : line.description,
+      quantity: toNumber(line.quantity),
+      unit_price_foreign: toNumber(line.unit_price_foreign),
+      amount_foreign: 0,
+      amount_myr: 0,
+      tax_rate: 0,
+      tax_amount_myr: 0,
+      classification_code: line.classification_code || "034",
+      tax_type: formData.tax_type || "06",
+      customs_form_reference: line.customs_form_reference || null,
+      tax_exemption_reason: line.tax_exemption_reason || null,
+      balance_quantity: toNullableNumber(line.balance_quantity),
+      general_stock_category_id: line.general_stock_category_id || null,
+      account_code: null,
+      stock_append_target_line_id: line.stock_append_target_line_id || null,
+      notes: line.notes || null,
+    };
+  };
 
   const buildPayload = (): SelfBilledInvoiceInput => {
     return {
@@ -619,6 +743,10 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
         formData.supporting_document_notes.trim() || null,
       currency_code: formData.currency_code,
       fx_rate: toNumber(formData.fx_rate),
+      account_code: formData.account_code.trim() || null,
+      total_foreign_amount: toNumber(formData.total_foreign_amount),
+      total_excluding_tax_myr: toNumber(formData.total_excluding_tax_myr),
+      tax_amount_myr: toNumber(formData.tax_amount_myr),
       notes: formData.notes.trim() || null,
       lines: lines.map(buildLinePayload),
     };
@@ -771,6 +899,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
           line_number: line.line_number || index + 1,
           balance_quantity: toNullableNumber(line.balance_quantity),
           general_stock_category_id: line.general_stock_category_id || null,
+          stock_append_target_line_id: line.stock_append_target_line_id || null,
         })),
       });
 
@@ -1326,27 +1455,30 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
             )}
 
             <div className="space-y-3 p-3">
-              {lines.map((line: SelfBilledInvoiceLine, index: number) => (
-                <div
-                  key={`${line.id || "new"}-${index}`}
-                  className="rounded-lg border border-default-200 bg-default-50/60 p-3 dark:border-gray-700 dark:bg-gray-900/30"
-                >
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-sky-100 px-2 text-xs font-semibold text-sky-800 dark:bg-sky-900/40 dark:text-sky-200">
-                        {index + 1}
-                      </span>
-                      <span className="text-sm font-medium text-default-800 dark:text-gray-100">
-                        Item {index + 1}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono text-sm font-semibold text-default-900 dark:text-gray-100">
-                        {formatAmount(
-                          toNumber(line.amount_myr) + toNumber(line.tax_amount_myr),
-                          "MYR"
-                        )}
-                      </span>
+              {lines.map((line: SelfBilledInvoiceLine, index: number) => {
+                const selectedStockRow = getSelectedGeneralStockRow(line);
+                const isAppend = Boolean(line.stock_append_target_line_id);
+                const newBalance =
+                  toNumber(selectedStockRow?.current_stock) +
+                  toNumber(line.balance_quantity);
+
+                return (
+                  <div
+                    key={`${line.id || "new"}-${index}`}
+                    className="rounded-lg border border-default-200 bg-default-50/60 p-3 dark:border-gray-700 dark:bg-gray-900/30"
+                  >
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-sky-100 px-2 text-xs font-semibold text-sky-800 dark:bg-sky-900/40 dark:text-sky-200">
+                          {index + 1}
+                        </span>
+                        <span className="text-sm font-medium text-default-800 dark:text-gray-100">
+                          Item {index + 1}
+                        </span>
+                        <span className="rounded-full bg-white px-2 py-0.5 text-xs text-default-500 ring-1 ring-default-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700">
+                          {isAppend ? "Existing item" : "New item"}
+                        </span>
+                      </div>
                       {canEditLineItems && lines.length > 1 && (
                         <button
                           type="button"
@@ -1358,172 +1490,140 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                         </button>
                       )}
                     </div>
-                  </div>
 
-                  <div className="grid items-stretch gap-3 xl:grid-cols-[minmax(260px,1.4fr)_minmax(360px,1fr)]">
-                    <div className="flex h-full flex-col gap-1.5">
-                      <label className="block text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">
-                        Item Description
-                      </label>
-                      {canEditLineItems ? (
-                        <textarea
-                          value={line.description}
-                          onChange={(
-                            event: React.ChangeEvent<HTMLTextAreaElement>
-                          ) =>
-                            updateLineField(
-                              index,
-                              "description",
-                              event.target.value
-                            )
-                          }
-                          rows={4}
-                          className="min-h-[110px] flex-1 resize-y rounded-md border border-default-300 bg-white px-3 py-2 text-sm text-default-900 placeholder:text-default-400 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500"
-                          placeholder="e.g. PVC tarpaulin 0.5mm, 2m x 100m"
-                        />
-                      ) : (
-                        <div className="min-h-[110px] flex-1 whitespace-pre-wrap rounded-md border border-default-200 bg-white px-3 py-2 text-sm text-default-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
-                          {line.description || "-"}
+                    <div className="mb-3 grid gap-3 lg:grid-cols-[minmax(220px,0.8fr)_minmax(260px,1fr)]">
+                      <FormListbox
+                        name={`stock_append_target_${index}`}
+                        label="Stock Item"
+                        value={
+                          line.stock_append_target_line_id
+                            ? String(line.stock_append_target_line_id)
+                            : ""
+                        }
+                        onChange={(value: string) =>
+                          updateLineAppendTarget(index, value)
+                        }
+                        options={generalStockOptions}
+                        disabled={!canEditRecords}
+                        className="[&_button]:py-2"
+                      />
+                      {selectedStockRow && (
+                        <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm text-indigo-800 dark:border-indigo-900/60 dark:bg-indigo-900/20 dark:text-indigo-200">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <span className="truncate">
+                              Current: {formatQty(toNumber(selectedStockRow.current_stock))}
+                            </span>
+                            <span className="font-semibold">
+                              After purchase: {formatQty(newBalance)}
+                            </span>
+                          </div>
                         </div>
                       )}
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <FormInput
-                        name={`quantity_${index}`}
-                        label="Qty"
-                        value={line.quantity}
-                        type="number"
-                        min={0}
-                        step="0.0001"
-                        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                          updateLineField(index, "quantity", event.target.value)
-                        }
-                        disabled={!canEditLineItems}
-                      />
-                      <FormInput
-                        name={`unit_price_foreign_${index}`}
-                        label={`Unit (${formData.currency_code})`}
-                        value={line.unit_price_foreign}
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                          updateLineField(
-                            index,
-                            "unit_price_foreign",
-                            event.target.value
-                          )
-                        }
-                        disabled={!canEditLineItems}
-                      />
-                      <FormInput
-                        name={`amount_foreign_${index}`}
-                        label={`Amount (${formData.currency_code})`}
-                        value={line.amount_foreign}
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                          updateLineField(
-                            index,
-                            "amount_foreign",
-                            event.target.value
-                          )
-                        }
-                        disabled={!canEditLineItems}
-                      />
-                      <FormInput
-                        name={`amount_myr_${index}`}
-                        label="Amount (MYR)"
-                        value={line.amount_myr}
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                          updateLineField(index, "amount_myr", event.target.value)
-                        }
-                        disabled={!canEditLineItems}
-                      />
+                    <div className="grid items-stretch gap-3 xl:grid-cols-[minmax(260px,1.2fr)_minmax(420px,1fr)]">
+                      <div className="flex h-full flex-col gap-1.5">
+                        <label className="block text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">
+                          Item Description
+                        </label>
+                        {canEditLineItems ? (
+                          <textarea
+                            value={
+                              selectedStockRow
+                                ? selectedStockRow.description
+                                : line.description
+                            }
+                            onChange={(
+                              event: React.ChangeEvent<HTMLTextAreaElement>
+                            ) =>
+                              updateLineField(
+                                index,
+                                "description",
+                                event.target.value
+                              )
+                            }
+                            rows={4}
+                            disabled={isAppend}
+                            className="min-h-[110px] flex-1 resize-y rounded-md border border-default-300 bg-white px-3 py-2 text-sm text-default-900 placeholder:text-default-400 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500"
+                            placeholder="e.g. PVC tarpaulin 0.5mm, 2m x 100m"
+                          />
+                        ) : (
+                          <div className="min-h-[110px] flex-1 whitespace-pre-wrap rounded-md border border-default-200 bg-white px-3 py-2 text-sm text-default-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
+                            {line.description || "-"}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <FormInput
+                          name={`quantity_${index}`}
+                          label="Qty"
+                          value={line.quantity}
+                          type="number"
+                          min={0}
+                          step="0.0001"
+                          onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                            updateLineField(index, "quantity", event.target.value)
+                          }
+                          disabled={!canEditLineItems}
+                        />
+                        <FormInput
+                          name={`unit_price_foreign_${index}`}
+                          label={`Unit (${formData.currency_code})`}
+                          value={line.unit_price_foreign}
+                          type="number"
+                          min={0}
+                          step="1"
+                          onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                            updateLineField(
+                              index,
+                              "unit_price_foreign",
+                              event.target.value
+                            )
+                          }
+                          disabled={!canEditLineItems}
+                        />
+                        <FormInput
+                          name={`balance_quantity_${index}`}
+                          label="Balance Qty"
+                          value={line.balance_quantity ?? ""}
+                          type="number"
+                          min={0}
+                          step="1"
+                          onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                            updateLineField(
+                              index,
+                              "balance_quantity",
+                              event.target.value
+                            )
+                          }
+                          disabled={!canEditRecords}
+                        />
+                        <FormListbox
+                          name={`general_stock_category_${index}`}
+                          label="General Category"
+                          value={
+                            line.general_stock_category_id
+                              ? String(line.general_stock_category_id)
+                              : ""
+                          }
+                          onChange={(value: string) =>
+                            updateLineField(
+                              index,
+                              "general_stock_category_id",
+                              value ? Number.parseInt(value, 10) : ""
+                            )
+                          }
+                          options={generalStockCategoryOptions}
+                          optionsPosition="top"
+                          disabled={!canEditRecords}
+                          className="[&_button]:py-2"
+                        />
+                      </div>
                     </div>
                   </div>
-
-                  <div className="mt-3 grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(240px,1fr)_repeat(4,minmax(150px,0.7fr))]">
-                    <AccountCodeCombobox
-                      label="GL Account"
-                      value={line.account_code || ""}
-                      onChange={(value: string) =>
-                        updateLineField(index, "account_code", value)
-                      }
-                      disabled={!canEditLineItems}
-                      placeholder="Account"
-                    />
-                    <FormInput
-                      name={`balance_quantity_${index}`}
-                      label="Balance Qty"
-                      value={line.balance_quantity ?? ""}
-                      type="number"
-                      min={0}
-                      step="0.0001"
-                      onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                        updateLineField(
-                          index,
-                          "balance_quantity",
-                          event.target.value
-                        )
-                      }
-                      disabled={!canEditRecords}
-                    />
-                    <FormListbox
-                      name={`general_stock_category_${index}`}
-                      label="General Category"
-                      value={
-                        line.general_stock_category_id
-                          ? String(line.general_stock_category_id)
-                          : ""
-                      }
-                      onChange={(value: string) =>
-                        updateLineField(
-                          index,
-                          "general_stock_category_id",
-                          value ? Number.parseInt(value, 10) : ""
-                        )
-                      }
-                      options={generalStockCategoryOptions}
-                      optionsPosition="top"
-                      disabled={!canEditRecords}
-                      className="[&_button]:py-2"
-                    />
-                    <FormListbox
-                      name={`tax_type_${index}`}
-                      label="Tax Type"
-                      value={line.tax_type}
-                      onChange={(value: string) =>
-                        updateLineField(index, "tax_type", value)
-                      }
-                      options={taxTypeOptions}
-                      disabled={!canEditLineItems}
-                      className="[&_button]:py-2"
-                    />
-                    <FormInput
-                      name={`tax_amount_myr_${index}`}
-                      label="Tax (MYR)"
-                      value={line.tax_amount_myr}
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                        updateLineField(
-                          index,
-                          "tax_amount_myr",
-                          event.target.value
-                        )
-                      }
-                      disabled={!canEditLineItems}
-                    />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
 
@@ -1661,6 +1761,9 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
         {/* ── Sidebar ── */}
         <aside className="space-y-2 xl:sticky xl:top-14 xl:self-start">
           <section className="rounded-lg border border-default-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
+              Currency & Totals
+            </h2>
             <div className="grid gap-3">
               <FormListbox
                 name="currency_code"
@@ -1684,14 +1787,65 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                 disabled={!canEdit}
                 required
               />
+              <FormInput
+                name="total_foreign_amount"
+                label={`${formData.currency_code} Total`}
+                value={formData.total_foreign_amount}
+                type="number"
+                step="0.01"
+                min={0}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  updateFormField("total_foreign_amount", event.target.value)
+                }
+                disabled={!canEdit}
+                required
+              />
+              <FormInput
+                name="total_excluding_tax_myr"
+                label="MYR Subtotal"
+                value={formData.total_excluding_tax_myr}
+                type="number"
+                step="0.01"
+                min={0}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  updateFormField("total_excluding_tax_myr", event.target.value)
+                }
+                disabled={!canEdit}
+                required
+              />
+              <FormListbox
+                name="tax_type"
+                label="Tax Type"
+                value={formData.tax_type}
+                onChange={(value: string) => updateFormField("tax_type", value)}
+                options={taxTypeOptions}
+                disabled={!canEdit}
+                className="[&_button]:py-1.5"
+              />
+              <FormInput
+                name="tax_amount_myr"
+                label="Tax (MYR)"
+                value={formData.tax_amount_myr}
+                type="number"
+                step="0.01"
+                min={0}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  updateFormField("tax_amount_myr", event.target.value)
+                }
+                disabled={!canEdit}
+              />
+              <AccountCodeCombobox
+                label="GL Account"
+                required
+                value={formData.account_code}
+                onChange={(value: string) =>
+                  updateFormField("account_code", value)
+                }
+                disabled={!canEdit}
+                placeholder="Expense account"
+              />
             </div>
-          </section>
-
-          <section className="rounded-lg border border-default-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
-              Totals
-            </h2>
-            <div className="space-y-2 text-sm">
+            <div className="mt-3 space-y-2 border-t border-default-200 pt-3 text-sm dark:border-gray-700">
               <div className="flex justify-between gap-4">
                 <span className="text-default-500 dark:text-gray-400">
                   {formData.currency_code} subtotal

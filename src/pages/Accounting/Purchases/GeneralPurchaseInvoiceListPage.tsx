@@ -6,6 +6,7 @@ import {
   IconPaperclip,
   IconPencil,
   IconPlus,
+  IconPackage,
   IconRefresh,
   IconSearch,
   IconSelectAll,
@@ -564,6 +565,16 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
             className="h-8 w-8 rounded-lg !px-0"
             onClick={fetchInvoices}
           />
+          <Button
+            type="button"
+            icon={IconPackage}
+            variant="outline"
+            size="sm"
+            className="h-8 rounded-lg !px-3"
+            onClick={() => navigate("/stock/entry")}
+          >
+            General Stock
+          </Button>
           <Button
             type="button"
             icon={IconPlus}
