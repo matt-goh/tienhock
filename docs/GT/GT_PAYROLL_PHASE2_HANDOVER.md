@@ -3,7 +3,7 @@
 **Started:** 2026-06-29
 **Status:** IN PROGRESS — Phase 0 (pay-code groundwork)
 **Plan file (working):** `C:\Users\matia\.claude\plans\stop-and-let-me-prancy-nest.md`
-**Prior context:** `GT_PAYROLL_AUDIT.md` (the first GT payroll upgrade), `GT_PAYROLL_USER_GUIDE_EN.md`.
+**Prior context:** the earlier GT docs (`GT_PAYROLL_AUDIT.md`, `GT_PAYROLL_IMPLEMENTATION_STATUS.md`, and the EN/BM HR guides) were **consolidated into this file (2026-06-30) and deleted** — see the "Background — pre-parity GT payroll" section below.
 
 This document is the living progress/context record for completing the Green Target (GT) payroll system to parity with Tien Hock (TH), plus the net-new **Daily Lori Habuk** driver entry. Update it as each phase lands.
 
@@ -26,6 +26,23 @@ Bring GT payroll to TH parity and build the missing Daily Lori Habuk piece. Modu
 - The TRIP/habuk pay codes are referenced **only** by DRIVER/DRIVER_IKUT job mappings and **no** `employee_pay_codes` — so editing them is low-risk for TH.
 - GT `monthly-work-logs` backend already stores pay-code activities (`greentarget.monthly_work_log_activities`); `process-all` already consumes them. Adding Office pay-code support is mostly **frontend**.
 - DRIVER pay is currently derived from rentals at process time (`monthly-payrolls.js` lines ~328-431, 512-641). Phase 3 changes this to read saved daily logs.
+
+## Background — pre-parity GT payroll (consolidated 2026-06-30 from retired docs)
+
+*Folds in the now-deleted `GT_PAYROLL_AUDIT.md` (2026-06-10 audit/fix log), `GT_PAYROLL_IMPLEMENTATION_STATUS.md` (original rules/rentals build), and the HR guides `GT_PAYROLL_USER_GUIDE_EN.md` / `GT_PAYROLL_PANDUAN_PENGGUNA.md` (EN + BM). Kept here for context completeness.*
+
+### Foundations — configurable DRIVER engine (migration `003_greentarget_payroll_enhancement.sql`)
+- `greentarget.payroll_rules` (PLACEMENT by invoice amount, PICKUP by destination + amount), `greentarget.pickup_destinations` (KILANG/MD/MENGGATAL), `greentarget.rental_addons` + `greentarget.addon_paycodes` (manual per-rental extras: Hantar Barang, 1/2 Beras, TH/Menggatal Minyak, Muatan Lain), `greentarget.payroll_settings` (e.g. default invoice amount RM200; rule eval by `priority`, lower = higher). Managed on the **Payroll Settings / Rules** page (`PayrollRulesPage.tsx`). Original rules: PLACEMENT TRIP5 (≤RM180) / TRIP10 (>RM180); pay-code rates live in the main Pay Codes catalogue. **Note:** Phase 3 moved this rule engine to *prefill-only* (the Daily Lori Habuk entry); process-all no longer uses it.
+
+### Audit upgrade (migration `004_gt_payroll_pinjam_midmonth.sql`, 2026-06-10) — verified + fixed
+- **Statutory core confirmed identical to TH** (EPF ceiling steps + `Math.ceil`; SOCSO Keilatan + SKBBK-from-June-2026, Keilatan skipped for 60+; SIP Malaysian under-60; PCB marital/spouse/children K0–K10; per-staff overrides via `resolveContributionContext`). Extracted to `src/routes/greentarget/gtStatutoryCalc.js` as the single source for process-all + recalc (intentionally NOT TH's `recalculateAndUpdatePayroll`, which carries TH-only leave/commission/grouping concepts).
+- **Fixed:** parameterized item inserts (was string-concat), **statutory recalc on manual item add/delete** (`recalculateGTPayroll`), integer-cent gross/EPF math, orphan-payroll pruning on re-process, `/batch` route registered before `/:id`. (A Finalized-guard was added then — but the Finalize/lock system was later removed; GT payrolls are always editable, `isFinalized=false`.)
+- **Added:** `greentarget.pinjam_records` + `greentarget.mid_month_payrolls` (separate from TH so GT records never appear in TH lists/reports/bank files); `digenapkan`/`setelah_digenapkan` rounding (`setelah_digenapkan = CEIL(net − mid-month)`); GT Pinjam + Mid-month pages.
+- **Design:** pinjam is NOT part of net pay and NOT on the payslip (monthly pinjam deducted off *Jumlah Digenapkan*; mid-month pinjam off the advance); shared `PinjamFormModal`/`AddManualItemModal` made `apiBasePath`-configurable (TH defaults unchanged). GT invoices use `amount_before_tax` / `status != 'cancelled'` (not TH's `total_excluding_tax`/`invoice_status`). GT-payroll staff are excluded from TH's monthly entry list (prevents double pay). GT processes per `employee_id` — no same-name sibling grouping (GT staff are single-ID).
+
+### HR operational workflow (from the retired EN/BM user guides)
+Monthly flow: keep the GT employee list current (OFFICE/DRIVER) → enter OFFICE hours (Office page) + DRIVER trips (now the **Daily Lori Habuk** page, Phase 3) → enter Mid-month advances + Pinjam → **Create** then **Process** the month → review each employee's Details, add manual items if needed → print payslips → Salary Report / E-Caruman as needed. Re-Process anytime after edits (manual items survive); contributions derive from the staff record (DOB/nationality/marital/children). "Jumlah Digenapkan" is the take-home; monthly pinjam shows as "Final Pay" on the Pinjam card.
+- **⚠️ The retired guides predate Phases 1–6 and are partly outdated** — they describe a Finalize/Unlock lock that no longer exists, and don't cover Daily Lori Habuk, Bonus/Advance/Others (Kerja Luar OT), batch payslips, Salary Report, or E-Caruman. The Phase 0–6 sections below are authoritative for the current feature set. (If HR still needs a standalone guide, regenerate one from the current features.)
 
 ## Pay-code inventory (Phase 0) — NEEDS USER CONFIRMATION
 
