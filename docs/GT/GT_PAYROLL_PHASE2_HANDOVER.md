@@ -112,12 +112,36 @@ GT now has Bonus, Others (Advance), and Others (Kerja Luar OT) entry pages with 
 
 **Follow-up for Phase 4 (Details/payslip parity):** advances are stored as gross payroll_items and netted out via net_pay, but the GT payslip does not yet show an explicit "advance deduction" line (TH does). Numbers (gross/net) are correct; the itemised deduction display is deferred to the Details parity phase.
 
+## Phase 3 — DONE (2026-06-29)
+
+Daily Lori Habuk driver entry + DRIVER processing rewired to read saved daily logs.
+
+- **DB:** `migrations/007_gt_daily_lori_habuk.sql` (applied to dev) — `greentarget.daily_lori_habuk_logs` (header per driver/day, unique (log_date, employee_id)) + `greentarget.daily_lori_habuk_lines` (trip lines; source_type PLACEMENT/PICKUP/ADDON/MANUAL/DERIVED). Schema added to CLAUDE.md + AGENTS.md; `driver_trips` note updated (superseded).
+- **Shared helper:** `src/routes/greentarget/driverTripRules.js` — date-aware rental→trip-line derivation (`buildPrefillLinesForDriverDate`, `evaluateCondition`, `deriveTripLb6Line`) extracted from the old process-all DRIVER calc; used by the prefill GET.
+- **Route:** `src/routes/greentarget/daily-lori-habuk.js` (mounted `/greentarget/api/daily-lori-habuk`): GET `?date=` returns each active DRIVER's saved log or rentals-prefill; POST upserts one driver-day (ON CONFLICT, full-replace lines); DELETE clears a driver-day.
+- **Processing rewire:** `monthly-payrolls.js` DRIVER branch now reads `habukLinesByDriver` (from `daily_lori_habuk_lines` where `log_date` in month AND status='Submitted'), pushing each line as a payroll_item (`work_log_type='daily_habuk'`). Base-salary (Month) logic kept. The old rentals query / `rentalsByDriver` / `addonsByRental` / `evaluateCondition` / `placementRules`/`pickupRules`/`defaultInvoiceAmount` are now **unused in this file** but left in place (surgical) — a Phase 4 cleanup can remove them.
+- **Frontend:** `src/pages/GreenTarget/Payroll/GTDailyLoriHabukEntryPage.tsx` — date-centric (`TimeNavigator` day mode) driver cards; each card lists trip lines (DRIVER pay-code `<select>` from `useJobPayCodeMappings` `detailedMappings["DRIVER"]`, editable rate/qty, computed amount, source badges); add manual trip; auto TRIP_LB6 DERIVED line (live re-derive on edit, >6 Trip-unit qty); per-driver Save (POST). Nav item "Daily Lori Habuk" added under GT Payroll.
+- **Changelog:** entry added (2026-06-29) flagging the saved-log-only behaviour.
+
+**⚠️ Behaviour change (decision #2):** DRIVER trip pay is now strictly from the saved daily log. Months not entered = base salary only (no rental-derived trip pay). The `amount = rate × quantity` convention is used uniformly (matches the old placement/pickup/addon math; differs from `calculateAmount`'s Fixed branch, deliberately).
+
+**Post-Phase-3 fixes (2026-06-29):**
+- **Prefill was empty** because `greentarget.rentals.driver` stores the staff **name** (e.g. "YONUS CHAN CHOON FAH"), not the staff id. The daily-habuk prefill GET now matches rentals by `employee_name`, not `employee_id` (`daily-lori-habuk.js`). (The old process-all DRIVER calc had the same latent mismatch — now moot since processing reads the saved daily log keyed by id.)
+- **Empty-pay-code rules** (the PICKUP rules currently have no `pay_code_id`) no longer create junk prefill lines — `driverTripRules.js` skips placement/pickup rules whose `pay_code_id` is blank.
+- **Daily entry pay-code picker** switched from a native `<select>` to the shared `FormCombobox` (searchable, single mode, per-line query); empty saves are blocked (use Clear instead); a per-driver **Clear** button (with confirm) deletes a saved driver-day via the DELETE endpoint.
+- **Payroll Settings pay-code dropdown** (`payroll-rules.js` GET `/pay-codes`) was hardcoded to `id LIKE 'TRIP%'`, hiding the new COMM_TARIK/COMM_TAMBAHAN/TBH5/etc. It now returns every pay code mapped to DRIVER/DRIVER_IKUT plus any configured as an addon paycode, so all habuk codes are selectable when configuring rules & addons.
+
+**Open items for confirmation/Phase 4:**
+- TRIP_LB6 trigger = sum of Trip-unit line quantities > 6 (assumption — confirm with user).
+- ADDON lines prefill on the rental's `date_placed` (assumption).
+- Payslip display of advances (Phase 2 carry-over) + remove now-dead rentals calc from `monthly-payrolls.js`.
+
 ## Phase status
 
 - [x] Phase 0 — Pay codes & DRIVER mapping (done)
 - [x] Phase 1 — GT Office monthly entry with pay codes (done)
 - [x] Phase 2 — GT Others / Advance / Bonus (done)
-- [ ] Phase 3 — Daily Lori Habuk driver entry + rewire DRIVER processing
+- [x] Phase 3 — Daily Lori Habuk driver entry + rewire DRIVER processing (done)
 - [ ] Phase 4 — Payrolls + Details parity
 - [ ] Phase 5 — GT Salary Report
 - [ ] Phase 6 — GT E-Caruman

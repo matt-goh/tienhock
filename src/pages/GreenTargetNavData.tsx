@@ -33,6 +33,7 @@ import GTPinjamListPage from "./GreenTarget/Payroll/GTPinjamListPage";
 import GTBonusPage from "./GreenTarget/Payroll/GTBonusPage";
 import GTOthersAdvancePage from "./GreenTarget/Payroll/GTOthersAdvancePage";
 import GTOthersKerjaLuarOtPage from "./GreenTarget/Payroll/GTOthersKerjaLuarOtPage";
+import GTDailyLoriHabukEntryPage from "./GreenTarget/Payroll/GTDailyLoriHabukEntryPage";
 import GTAdjustmentDocsListPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsListPage";
 import GTAdjustmentDocsFormPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsFormPage";
 import GTAdjustmentDocsDetailsPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsDetailsPage";
@@ -137,6 +138,11 @@ export const GreenTargetNavData: SidebarItem[] = [
         name: "Office",
         path: "/payroll/office-log",
         component: GTMonthlyLogEntryPage,
+      },
+      {
+        name: "Daily Lori Habuk",
+        path: "/payroll/daily-lori-habuk",
+        component: GTDailyLoriHabukEntryPage,
       },
       {
         name: "Bonus",

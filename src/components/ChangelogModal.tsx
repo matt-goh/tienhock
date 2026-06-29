@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-29",
+    ms: "Green Target kini mempunyai halaman baharu \"Daily Lori Habuk\" di bawah menu Payroll untuk merekod trip pemandu lori habuk setiap hari. Pilih satu tarikh dan setiap pemandu dipaparkan sebagai kad dengan senarai trip pada hari itu. Trip daripada sewaan (rental) yang telah lengkap diisi secara automatik (placement & pickup), trip habuk manual boleh ditambah di atasnya, dan bonus \"> 6 trip sehari\" (TRIP_LB6) dikira secara automatik. PENTING: gaji trip pemandu kini diambil daripada log harian yang DISIMPAN semasa memproses gaji bulanan — bukan lagi dikira terus daripada rekod sewaan. Jadi log harian setiap pemandu mesti disimpan untuk hari-hari berkenaan; jika tiada log disimpan untuk sesuatu bulan, pemandu hanya menerima gaji pokok sahaja (rekod sewaan hanya mengisi cadangan, tidak lagi membayar secara automatik).",
+    en: "Green Target now has a new \"Daily Lori Habuk\" page under the Payroll menu to record each driver's daily habuk-lorry trips. Pick a date and every driver shows as a card listing that day's trips. Completed rentals prefill automatically (placement & pickup), manual habuk trips can be added on top, and the \"more than 6 trips a day\" bonus (TRIP_LB6) is worked out automatically. IMPORTANT: driver trip pay is now taken from the SAVED daily log when monthly payroll is processed — it is no longer calculated directly from rental records. So each driver's daily log must be saved for the relevant days; if no log is saved for a month, the driver receives base salary only (rentals only prefill the suggestion, they no longer pay automatically).",
+  },
+  {
+    date: "2026-06-29",
     ms: "Halaman General Stock kini mempunyai butang pintasan ke senarai General Purchases, pembelian local baharu dan pembelian foreign baharu. Senarai General Purchases juga kini mempunyai pintasan kembali ke General Stock.",
     en: "The General Stock page now has shortcut buttons to the General Purchases list, a new local purchase, and a new foreign purchase. The General Purchases list also has a shortcut back to General Stock.",
   },
