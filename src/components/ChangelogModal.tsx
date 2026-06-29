@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-30",
+    ms: "Green Target kini mempunyai halaman \"E-Caruman\" baharu di bawah menu Payroll untuk menjana fail caruman berkanun: KWSP (CSV), gabungan SOCSO + EIS/SIP (fail teks PERKESO), dan PCB (fail teks LHDN CP39) — sama format seperti Tien Hock tetapi menggunakan data Green Target. Kod pendaftaran majikan (kod majikan PERKESO, MyCoID/SSM, nombor E LHDN) kini boleh dimasukkan terus pada halaman ini dan disimpan dalam pangkalan data untuk kegunaan akan datang. Halaman ini juga menunjukkan pratonton bilangan pekerja dan jumlah caruman, serta memberi amaran jika ada pekerja yang mencarum KWSP tetapi tiada nombor KWSP.",
+    en: "Green Target now has a new \"E-Caruman\" page under the Payroll menu to generate statutory contribution files: EPF (CSV), combined SOCSO + EIS/SIP (PERKESO text file), and PCB (LHDN CP39 text file) — same formats as Tien Hock but using Green Target data. The employer registration codes (PERKESO employer code, MyCoID/SSM, LHDN E-number) can now be entered on the page and are saved in the database for reuse. The page also previews the employee counts and contribution totals, and warns if any employee has an EPF contribution but no EPF number.",
+  },
+  {
+    date: "2026-06-30",
     ms: "Green Target kini mempunyai halaman \"Salary Report\" baharu di bawah menu Payroll. Laporan ini dikumpulkan mengikut jenis kerja (Office / Driver) — Green Target tiada lokasi — dan memaparkan setiap pekerja dengan lajur GAJI, OT, BONUS, C/I/O, CUTI, gaji kasar, KWSP/SOCSO/SIP (majikan & pekerja), PCB, gaji bersih, pendahuluan separuh bulan dan jumlah digenapkan. Terdapat paparan Bulanan dan Tahunan (ringkasan + pecahan setiap pekerja mengikut bulan), serta cetak/muat turun PDF.",
     en: "Green Target now has a new \"Salary Report\" page under the Payroll menu. The report is grouped by job type (Office / Driver) — Green Target has no locations — and lists each employee with GAJI, OT, BONUS, C/I/O, CUTI, gross, EPF/SOCSO/SIP (employer & employee), PCB, net pay, mid-month advance and rounded totals. It has Monthly and Annual views (summary + per-employee monthly breakdown), with print/download to PDF.",
   },
