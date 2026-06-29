@@ -98,11 +98,25 @@ GT must reach TH parity on all printed/exported documents. Reuse the TH generato
 
 When building each, mirror the TH PDF layout/typography and the print-vs-download + bank-export UX exactly (compact, responsive, dark-mode N/A for PDFs but the trigger buttons follow TH styling).
 
+## Phase 2 — DONE (2026-06-29)
+
+GT now has Bonus, Others (Advance), and Others (Kerja Luar OT) entry pages with full payroll integration.
+
+- **DB:** `migrations/006_gt_addon_tables.sql` (applied to dev) — new `greentarget.commission_records` (Bonus/Advance; no location_code, Bonus vs Advance split by `is_advance`) and `greentarget.others_records` (mirror of public, keeps link_id/report_column). Schema added to CLAUDE.md + AGENTS.md.
+- **Routes:** `src/routes/greentarget/incentives.js` (filters by `is_advance` instead of TH's location/type) and `src/routes/greentarget/others-records.js` (clone of TH others-records on the GT table). Mounted at `/greentarget/api/incentives` and `/greentarget/api/others-records` in `src/routes/index.js`.
+- **Processing:** `monthly-payrolls.js` (process-all) fetches the month's commission/others, pushes them into `combinedItems` as payroll_items (Bonus/Advance→Tambahan tagged work_log_type 'bonus'/'advance'; Kerja Luar OT→pay_code pay_type, work_log_type 'others'), raising gross + EPF base. Net subtracts only the `is_advance` commission total. `employee-payrolls.js` recalc mirrors this by summing stored items where work_log_type='advance'. Math matches TH `employee-payrolls.js` (commission all-to-gross, advances-from-net; Kerja Luar OT gross-only, NOT net-deducted — authoritative per TH code lines 616–620, which the older CLAUDE schema note contradicted).
+- **Frontend:** `GTBonusPage` (is_advance=false), `GTOthersAdvancePage` (is_advance=true, no location column), `GTOthersKerjaLuarOtPage` — thin clones of the TH pages under `src/pages/GreenTarget/Payroll/`, scoped to GT payroll employees via `useGTPayrollEmployees`.
+- **Shared modals (additive, TH unchanged via defaults):** `AddIncentiveModal`/`EditIncentiveModal` gained `apiBasePath`, `forceIsAdvance` (hides Advance toggle + forces value), `allowedEmployeeIds`. `AddOthersModal` gained `apiBasePath` + `allowedEmployeeIds`; `EditOthersModal` gained `apiBasePath`. (Others pay-code list is NOT GT-job-scoped — same as TH, which lists all active pay codes.)
+- **Nav:** three items added under the GT Payroll group in `GreenTargetNavData.tsx`.
+- **Changelog:** entry added (2026-06-29).
+
+**Follow-up for Phase 4 (Details/payslip parity):** advances are stored as gross payroll_items and netted out via net_pay, but the GT payslip does not yet show an explicit "advance deduction" line (TH does). Numbers (gross/net) are correct; the itemised deduction display is deferred to the Details parity phase.
+
 ## Phase status
 
 - [x] Phase 0 — Pay codes & DRIVER mapping (done)
 - [x] Phase 1 — GT Office monthly entry with pay codes (done)
-- [ ] Phase 2 — GT Others / Advance / Bonus
+- [x] Phase 2 — GT Others / Advance / Bonus (done)
 - [ ] Phase 3 — Daily Lori Habuk driver entry + rewire DRIVER processing
 - [ ] Phase 4 — Payrolls + Details parity
 - [ ] Phase 5 — GT Salary Report

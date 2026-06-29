@@ -41,6 +41,14 @@ interface AddIncentiveModalProps {
   incentiveType: IncentiveType;
   displayLabel?: string;
   displayLabelPlural?: string;
+  // API base path for the records endpoint (default Tien Hock /api/incentives).
+  // Green Target pages pass /greentarget/api/incentives.
+  apiBasePath?: string;
+  // When defined, hide the Advance checkbox and force this is_advance value
+  // (Green Target Bonus = false, Others (Advance) = true).
+  forceIsAdvance?: boolean;
+  // When provided, restrict the staff picker to these employee ids.
+  allowedEmployeeIds?: string[];
 }
 
 const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
@@ -52,7 +60,12 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
   incentiveType,
   displayLabel = incentiveType,
   displayLabelPlural,
+  apiBasePath = "/api/incentives",
+  forceIsAdvance,
+  allowedEmployeeIds,
 }) => {
+  const showAdvanceColumn =
+    incentiveType === "Bonus" && forceIsAdvance === undefined;
   const { staffs } = useStaffsCache();
   const { locations } = useLocationMappingsCache();
   const { user } = useAuth();
@@ -94,11 +107,16 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
 
   const allStaffOptions = useMemo(
     () =>
-      staffs.map((staff) => ({
-        id: staff.id,
-        name: `${staff.name} (${staff.id})`,
-      })),
-    [staffs]
+      staffs
+        .filter(
+          (staff) =>
+            !allowedEmployeeIds || allowedEmployeeIds.includes(staff.id)
+        )
+        .map((staff) => ({
+          id: staff.id,
+          name: `${staff.name} (${staff.id})`,
+        })),
+    [staffs, allowedEmployeeIds]
   );
 
   const handleEntryChange = <K extends keyof IncentiveEntry>(
@@ -181,9 +199,14 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
         description: entry.description,
         created_by: user?.id,
         location_code: incentiveType === "Commission" ? entry.locationCode : null,
-        is_advance: incentiveType === "Commission" ? true : entry.isAdvance,
+        is_advance:
+          incentiveType === "Commission"
+            ? true
+            : forceIsAdvance !== undefined
+            ? forceIsAdvance
+            : entry.isAdvance,
       };
-      return api.post("/api/incentives", payload);
+      return api.post(apiBasePath, payload);
     });
 
     try {
@@ -277,7 +300,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                         <th className={`py-2 px-3 text-left font-medium text-default-600 dark:text-default-400 ${incentiveType === "Commission" ? "w-1/4" : "w-1/3"}`}>
                           Description
                         </th>
-                        {incentiveType === "Bonus" && (
+                        {showAdvanceColumn && (
                           <th className="py-2 px-3 text-left font-medium text-default-600 dark:text-default-400 w-1/6">
                             Advance
                           </th>
@@ -358,7 +381,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                               placeholder={`e.g., ${displayLabel}, bonus work`}
                             />
                           </td>
-                          {incentiveType === "Bonus" && (
+                          {showAdvanceColumn && (
                             <td className="py-2 px-3 align-top">
                               <Checkbox
                                 checked={entry.isAdvance}

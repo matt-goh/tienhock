@@ -263,6 +263,8 @@ export default function (pool) {
         rentalAddonsResult,
         allPayCodesResult,
         midMonthResult,
+        commissionRecordsResult,
+        othersRecordsResult,
       ] = await Promise.all([
         // Monthly work logs for OFFICE workers (from GT schema)
         client.query(`
@@ -376,6 +378,23 @@ export default function (pool) {
           FROM greentarget.mid_month_payrolls
           WHERE year = $1 AND month = $2
         `, [year, month]),
+
+        // GT Bonus / Others (Advance) records for the month (commission_records)
+        client.query(`
+          SELECT employee_id, amount, description, is_advance
+          FROM greentarget.commission_records
+          WHERE DATE(commission_date) >= $1 AND DATE(commission_date) <= $2
+        `, [startDate, endDate]),
+
+        // GT Others (Kerja Luar OT) records for the month
+        client.query(`
+          SELECT orec.employee_id, orec.pay_code_id, orec.description,
+                 orec.rate, orec.rate_unit, orec.quantity, orec.amount,
+                 pc.pay_type
+          FROM greentarget.others_records orec
+          LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
+          WHERE DATE(orec.record_date) >= $1 AND DATE(orec.record_date) <= $2
+        `, [startDate, endDate]),
       ]);
 
       // Build lookup maps
@@ -384,6 +403,22 @@ export default function (pool) {
       const midMonthMap = new Map(
         midMonthResult.rows.map((r) => [r.employee_id, parseFloat(r.amount)])
       );
+
+      // GT earning add-ons grouped by employee (Bonus/Advance + Kerja Luar OT)
+      const commissionsByEmployee = {};
+      commissionRecordsResult.rows.forEach((r) => {
+        if (!commissionsByEmployee[r.employee_id]) {
+          commissionsByEmployee[r.employee_id] = [];
+        }
+        commissionsByEmployee[r.employee_id].push(r);
+      });
+      const othersByEmployee = {};
+      othersRecordsResult.rows.forEach((r) => {
+        if (!othersByEmployee[r.employee_id]) {
+          othersByEmployee[r.employee_id] = [];
+        }
+        othersByEmployee[r.employee_id].push(r);
+      });
 
       // Build job pay codes map
       const jobPayCodesMap = {};
@@ -641,6 +676,45 @@ export default function (pool) {
             }
           }
 
+          // Earning add-ons: Bonus / Others (Advance) (commission_records) and
+          // Others (Kerja Luar OT) (others_records). All raise gross (and the
+          // EPF base via Tambahan/Base typing, mirroring Tien Hock). Only
+          // commission records flagged is_advance are deducted from net.
+          let commissionAdvanceTotal = 0;
+          for (const cr of commissionsByEmployee[employeeId] || []) {
+            const amt = Math.round(parseFloat(cr.amount) * 100) / 100;
+            combinedItems.push({
+              pay_code_id: null,
+              description: cr.description || (cr.is_advance ? "Advance" : "Bonus"),
+              pay_type: "Tambahan",
+              rate: amt,
+              rate_unit: "Fixed",
+              quantity: 1,
+              amount: amt,
+              job_type: jobType,
+              source_employee_id: employeeId,
+              is_manual: false,
+              work_log_type: cr.is_advance ? "advance" : "bonus",
+            });
+            if (cr.is_advance) commissionAdvanceTotal += amt;
+          }
+          for (const orec of othersByEmployee[employeeId] || []) {
+            const amt = Math.round(parseFloat(orec.amount) * 100) / 100;
+            combinedItems.push({
+              pay_code_id: orec.pay_code_id || null,
+              description: orec.description || "Others",
+              pay_type: orec.pay_type || "Tambahan",
+              rate: parseFloat(orec.rate),
+              rate_unit: orec.rate_unit,
+              quantity: parseFloat(orec.quantity),
+              amount: amt,
+              job_type: jobType,
+              source_employee_id: employeeId,
+              is_manual: false,
+              work_log_type: "others",
+            });
+          }
+
           // Calculate gross pay in integer cents to avoid float drift
           const grossPayCents = combinedItems.reduce(
             (sum, item) => sum + Math.round(item.amount * 100),
@@ -678,7 +752,12 @@ export default function (pool) {
             (sum, d) => sum + d.employee_amount,
             0
           );
-          const netPay = Math.round((grossPay - totalEmployeeDeductions) * 100) / 100;
+          // Commission/Bonus advances are deducted from net (Bonus and Kerja
+          // Luar OT raise net; only is_advance commission records reduce it).
+          const netPay =
+            Math.round(
+              (grossPay - totalEmployeeDeductions - commissionAdvanceTotal) * 100
+            ) / 100;
 
           // Mid-month advance + rounding (digenapkan), mirroring Tien Hock payroll
           const midMonthAmount = midMonthMap.get(employeeId) || 0;

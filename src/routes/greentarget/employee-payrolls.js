@@ -33,7 +33,7 @@ export default function (pool) {
         [employee_id]
       ),
       pool.query(
-        `SELECT pi.amount, pc.pay_type
+        `SELECT pi.amount, pi.work_log_type, pc.pay_type
          FROM greentarget.payroll_items pi
          LEFT JOIN public.pay_codes pc ON pi.pay_code_id = pc.id
          WHERE pi.employee_payroll_id = $1`,
@@ -55,15 +55,22 @@ export default function (pool) {
     // Integer cents to avoid float drift; EPF base excludes Overtime items
     let grossPayCents = 0;
     let epfGrossPayCents = 0;
+    let commissionAdvanceCents = 0;
     itemsResult.rows.forEach((item) => {
       const cents = Math.round(parseFloat(item.amount) * 100);
       grossPayCents += cents;
       if ((item.pay_type || "Tambahan") !== "Overtime") {
         epfGrossPayCents += cents;
       }
+      // Bonus/Advance/Kerja Luar OT add-ons were stored as items; only the
+      // is_advance commission rows (work_log_type='advance') reduce net pay.
+      if (item.work_log_type === "advance") {
+        commissionAdvanceCents += cents;
+      }
     });
     const grossPay = grossPayCents / 100;
     const epfGrossPay = epfGrossPayCents / 100;
+    const commissionAdvanceTotal = commissionAdvanceCents / 100;
 
     const deductions = calculateGTStatutoryDeductions({
       staff,
@@ -78,7 +85,10 @@ export default function (pool) {
       (sum, d) => sum + d.employee_amount,
       0
     );
-    const netPay = Math.round((grossPay - totalEmployeeDeductions) * 100) / 100;
+    const netPay =
+      Math.round(
+        (grossPay - totalEmployeeDeductions - commissionAdvanceTotal) * 100
+      ) / 100;
 
     // Mid-month advance + rounding (digenapkan), mirroring process-all
     const midMonthAmount = parseFloat(midMonthResult.rows[0]?.amount || 0);

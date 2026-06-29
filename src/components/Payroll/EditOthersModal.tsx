@@ -34,6 +34,8 @@ interface EditOthersModalProps {
   onSuccess: () => void;
   record: OthersRecord | null;
   displayLabel: string;
+  // API base path for the records endpoint (default Tien Hock /api/others-records).
+  apiBasePath?: string;
 }
 
 const formatCurrency = (amount: number): string =>
@@ -68,6 +70,7 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
   onSuccess,
   record,
   displayLabel,
+  apiBasePath = "/api/others-records",
 }) => {
   const { payCodes } = useJobPayCodeMappings();
 
@@ -142,7 +145,7 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
       setLinkedDates([dateStr]);
       setIsLoadingSiblings(true);
       api
-        .get(`/api/others-records?link_id=${record.link_id}`)
+        .get(`${apiBasePath}?link_id=${record.link_id}`)
         .then((rows: OthersRecord[]) => {
           const dates = rows
             .map((r) => toLocalYmd(r.record_date))
@@ -229,7 +232,7 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
       } else {
         payload.record_date = recordDate;
       }
-      await api.put(`/api/others-records/${record.id}`, payload);
+      await api.put(`${apiBasePath}/${record.id}`, payload);
       toast.success(
         isLinked
           ? `Linked ${displayLabel} entry updated (${linkedDates.length} date${

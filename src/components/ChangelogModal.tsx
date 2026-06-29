@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-29",
+    ms: "Green Target kini mempunyai tiga halaman baharu di bawah menu Payroll: \"Bonus\", \"Others (Advance)\" dan \"Others (Kerja Luar OT)\" — sama seperti Tien Hock. Bonus menambah jumlah kepada gaji kasar dan gaji bersih pekerja. Others (Advance) menambah kepada gaji kasar tetapi ditolak semula sebagai pendahuluan (advance), jadi tiada kesan bersih. Others (Kerja Luar OT) merekod kerja ikut kod gaji, kadar dan kuantiti, dan menambah kepada gaji kasar. Semua tiga jenis ini kini diambil kira secara automatik semasa memproses gaji bulanan Green Target. Setiap halaman hanya memaparkan pekerja payroll Green Target sahaja.",
+    en: "Green Target now has three new pages under the Payroll menu: \"Bonus\", \"Others (Advance)\", and \"Others (Kerja Luar OT)\" — matching Tien Hock. Bonus adds an amount to the employee's gross and net pay. Others (Advance) adds to gross pay but is deducted back as an advance, so it has no net effect. Others (Kerja Luar OT) records work by pay code, rate, and quantity, and adds to gross pay. All three now feed into Green Target's monthly payroll processing automatically. Each page only lists Green Target payroll employees.",
+  },
+  {
+    date: "2026-06-29",
     ms: "Entri bulanan Office bagi Green Target kini menyokong kod gaji (pay codes), sama seperti Tien Hock. Setiap pekerja office kini mempunyai butang \"Activities\" untuk memilih kod gaji yang berkenaan (gaji pokok, kerja lebih masa, elaun dan sebagainya) serta menetapkan jumlahnya. Yang penting, kod gaji peribadi pekerja itu (contohnya gaji bulanan) kini diambil secara automatik — sebelum ini entri Office hanya merekod jam kerja sahaja.",
     en: "Green Target's Office monthly entry now supports pay codes, just like Tien Hock. Each office employee now has an \"Activities\" button to choose which pay codes apply (basic salary, overtime, allowances, etc.) and set their amounts. Importantly, the employee's own pay codes (such as their monthly salary) are now picked up automatically — previously the Office entry only recorded hours.",
   },

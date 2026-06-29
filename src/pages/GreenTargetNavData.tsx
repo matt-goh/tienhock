@@ -30,6 +30,9 @@ import GTPayrollDetailsPage from "./GreenTarget/Payroll/GTPayrollDetailsPage";
 import PayrollRulesPage from "./GreenTarget/Payroll/PayrollRulesPage";
 import GTMidMonthPayrollPage from "./GreenTarget/Payroll/GTMidMonthPayrollPage";
 import GTPinjamListPage from "./GreenTarget/Payroll/GTPinjamListPage";
+import GTBonusPage from "./GreenTarget/Payroll/GTBonusPage";
+import GTOthersAdvancePage from "./GreenTarget/Payroll/GTOthersAdvancePage";
+import GTOthersKerjaLuarOtPage from "./GreenTarget/Payroll/GTOthersKerjaLuarOtPage";
 import GTAdjustmentDocsListPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsListPage";
 import GTAdjustmentDocsFormPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsFormPage";
 import GTAdjustmentDocsDetailsPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsDetailsPage";
@@ -134,6 +137,21 @@ export const GreenTargetNavData: SidebarItem[] = [
         name: "Office",
         path: "/payroll/office-log",
         component: GTMonthlyLogEntryPage,
+      },
+      {
+        name: "Bonus",
+        path: "/payroll/bonus",
+        component: GTBonusPage,
+      },
+      {
+        name: "Others (Advance)",
+        path: "/payroll/others-advance",
+        component: GTOthersAdvancePage,
+      },
+      {
+        name: "Others (Kerja Luar OT)",
+        path: "/payroll/others",
+        component: GTOthersKerjaLuarOtPage,
       },
       {
         name: "Mid-month Payroll",
