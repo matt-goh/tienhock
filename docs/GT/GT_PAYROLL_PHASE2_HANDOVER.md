@@ -173,6 +173,14 @@ GT E-Caruman — EPF (CSV) + combined SOCSO/EIS/SIP (PERKESO) + PCB (LHDN CP39) 
 
 **Tech debt:** the statutory format generators are duplicated between `payroll/e-caruman.js` and `greentarget/e-caruman.js` (deliberate — TH isolation over DRY for compliance code). A future refactor can extract a shared `eCarumanFormats.js` used by both.
 
+## Post-build review (2026-06-30)
+
+Comprehensive scan of Phases 0–6 financial logic. One real bug found + fixed; rest verified sound.
+
+- **BUG FIXED — payslip subtracted the Advance twice.** `PaySlipPDFMake` expects `net_pay = gross − statutory only` and computes `finalPayment = net_pay − midMonth − commissionAdvance`. GT's stored `net_pay` already had the advance removed, so passing it straight through double-deducted the advance on every GT payslip (single + batch) that had an Advance. Fix: `buildGTPayslipPayroll` now re-adds `commissionAdvanceTotal` to `net_pay` so it matches the generator's convention (`net_pay = stored_net + advance = gross − statutory`). Verified correct for no-advance, bonus-only, and advance cases; single slip keeps the mid-month line, batch omits it (already-flagged gap).
+- **Verified consistent:** process-all vs `employee-payrolls.js` recalc compute gross/EPF-base/advance/net identically (advance items tagged `work_log_type='advance'`, EPF base excludes Overtime, bonus/advance/non-OT-others in EPF base — matches TH). Add-on items re-inserted with `work_log_type` and are `is_manual=false` (cleared/re-derived on reprocess). Salary-report buckets sum to gross; gaji_bersih/setelah from stored values. E-Caruman GT preview correctly sources EIS from `deduction_type='sip'`; SOCSO Keilatan/SKBBK from `rate_info`. Daily-habuk TRIP_LB6 derivation uses the same >6 Trip-unit rule on backend prefill and frontend live-edit.
+- **Pre-existing (not introduced here, out of scope):** GT process-all computes gross from non-manual `combinedItems` and keeps existing manual items on reprocess, so a fresh process-all undercounts gross by any manual items until a recalc runs (adding/editing a manual item triggers the correct recalc). Unchanged by this build.
+
 ## Phase status
 
 - [x] Phase 0 — Pay codes & DRIVER mapping (done)

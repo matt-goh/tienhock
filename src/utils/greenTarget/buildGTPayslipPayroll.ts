@@ -125,7 +125,12 @@ export const buildGTPayslipPayroll = (
     job_type: payroll.job_type,
     section: payroll.section || "GREEN TARGET",
     gross_pay: payroll.gross_pay,
-    net_pay: payroll.net_pay,
+    // PaySlipPDFMake expects net_pay = gross - statutory ONLY (it subtracts the
+    // advance separately as a deduction line: finalPayment = net_pay - midMonth
+    // - commissionAdvance). GT's stored net_pay already has the advance removed,
+    // so re-add it here to avoid double-counting the advance on the payslip.
+    net_pay:
+      Math.round((Number(payroll.net_pay) + commissionAdvanceTotal) * 100) / 100,
     digenapkan: payroll.digenapkan,
     setelah_digenapkan: payroll.setelah_digenapkan ?? undefined,
     year: payroll.year,
