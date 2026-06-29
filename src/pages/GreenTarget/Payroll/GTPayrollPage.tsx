@@ -21,6 +21,11 @@ import PayrollEmployeeManagementModal from "../../../components/GreenTarget/Payr
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
+import {
+  PrintBatchPayslipsButton,
+  DownloadBatchPayslipsButton,
+} from "../../../utils/payroll/PayslipButtons";
+import { buildGTPayslipPayroll } from "../../../utils/greenTarget/buildGTPayslipPayroll";
 
 interface GTMonthlyPayroll {
   id: number;
@@ -40,6 +45,10 @@ interface GTEmployeePayroll {
   gross_pay: string;
   net_pay: string;
   employee_name: string;
+  digenapkan?: number;
+  setelah_digenapkan?: number | null;
+  items?: any[];
+  deductions?: any[];
 }
 
 interface GTPayrollEmployee {
@@ -194,6 +203,19 @@ const GTPayrollPage: React.FC = () => {
   const officePayrolls = payroll?.employeePayrolls?.filter((ep) => ep.job_type === "OFFICE") || [];
   const driverPayrolls = payroll?.employeePayrolls?.filter((ep) => ep.job_type === "DRIVER") || [];
 
+  // Build payslip-ready payrolls for batch print/download (advances/bonus/OT
+  // moved into commission/others so the shared TH generator renders them).
+  const batchPayrolls = (payroll?.employeePayrolls || []).map(
+    (ep) =>
+      buildGTPayslipPayroll({
+        ...ep,
+        gross_pay: Number(ep.gross_pay),
+        net_pay: Number(ep.net_pay),
+        year: payroll?.year,
+        month: payroll?.month,
+      }).pdfPayroll
+  );
+
   // Calculate totals
   const totalGross = payroll?.employeePayrolls?.reduce(
     (sum, ep) => sum + parseFloat(ep.gross_pay || "0"), 0
@@ -261,6 +283,24 @@ const GTPayrollPage: React.FC = () => {
 
         {/* Right side: Action Buttons */}
         <div className="flex items-center gap-2">
+          {batchPayrolls.length > 0 && (
+            <>
+              <PrintBatchPayslipsButton
+                payrolls={batchPayrolls}
+                companyName="GREEN TARGET SDN. BHD."
+                size="sm"
+                variant="outline"
+                color="sky"
+              />
+              <DownloadBatchPayslipsButton
+                payrolls={batchPayrolls}
+                companyName="GREEN TARGET SDN. BHD."
+                size="sm"
+                variant="outline"
+                color="sky"
+              />
+            </>
+          )}
           <button
             onClick={() =>
               navigate(

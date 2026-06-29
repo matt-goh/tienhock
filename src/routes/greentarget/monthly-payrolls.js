@@ -154,9 +154,68 @@ export default function (pool) {
       `;
       const employeePayrollsResult = await pool.query(employeePayrollsQuery, [id]);
 
+      // Attach per-employee items + deductions so batch payslip printing has the
+      // full data (mirrors Tien Hock's monthly GET).
+      const epIds = employeePayrollsResult.rows.map((ep) => ep.id);
+      let itemsByEp = {};
+      let deductionsByEp = {};
+      if (epIds.length > 0) {
+        const [itemsResult, deductionsResult] = await Promise.all([
+          pool.query(
+            `SELECT pi.id, pi.employee_payroll_id, pi.pay_code_id, pi.description,
+                    pi.rate, pi.rate_unit, pi.quantity, pi.amount, pi.is_manual,
+                    pi.job_type, pi.work_log_type, pc.pay_type
+             FROM greentarget.payroll_items pi
+             LEFT JOIN public.pay_codes pc ON pi.pay_code_id = pc.id
+             WHERE pi.employee_payroll_id = ANY($1)
+             ORDER BY pi.id`,
+            [epIds]
+          ),
+          pool.query(
+            `SELECT pd.id, pd.employee_payroll_id, pd.deduction_type,
+                    CAST(pd.employee_amount AS NUMERIC(10,2)) as employee_amount,
+                    CAST(pd.employer_amount AS NUMERIC(10,2)) as employer_amount,
+                    CAST(pd.wage_amount AS NUMERIC(10,2)) as wage_amount,
+                    pd.rate_info
+             FROM greentarget.payroll_deductions pd
+             WHERE pd.employee_payroll_id = ANY($1)
+             ORDER BY pd.deduction_type`,
+            [epIds]
+          ),
+        ]);
+        for (const item of itemsResult.rows) {
+          (itemsByEp[item.employee_payroll_id] ||= []).push({
+            ...item,
+            rate: parseFloat(item.rate),
+            quantity: parseFloat(item.quantity),
+            amount: parseFloat(item.amount),
+            is_manual: !!item.is_manual,
+          });
+        }
+        for (const d of deductionsResult.rows) {
+          (deductionsByEp[d.employee_payroll_id] ||= []).push({
+            ...d,
+            employee_amount: parseFloat(d.employee_amount),
+            employer_amount: parseFloat(d.employer_amount),
+            wage_amount: parseFloat(d.wage_amount),
+          });
+        }
+      }
+
+      const employeePayrolls = employeePayrollsResult.rows.map((ep) => ({
+        ...ep,
+        gross_pay: parseFloat(ep.gross_pay),
+        net_pay: parseFloat(ep.net_pay),
+        digenapkan: ep.digenapkan != null ? parseFloat(ep.digenapkan) : 0,
+        setelah_digenapkan:
+          ep.setelah_digenapkan != null ? parseFloat(ep.setelah_digenapkan) : null,
+        items: itemsByEp[ep.id] || [],
+        deductions: deductionsByEp[ep.id] || [],
+      }));
+
       res.json({
         ...payrollResult.rows[0],
-        employeePayrolls: employeePayrollsResult.rows,
+        employeePayrolls,
       });
     } catch (error) {
       console.error("Error fetching GT monthly payroll details:", error);
