@@ -53,6 +53,7 @@ type StockEntryMode = "general" | "material";
 
 interface StockAdjustmentEntryPageProps {
   mode: StockEntryMode;
+  generalHeaderActions?: React.ReactNode;
 }
 
 const categoryLabels: Record<MaterialCategory, string> = {
@@ -184,7 +185,10 @@ const makeNewVariantRow = (defaultUnitCost: number): StockEntryRow => ({
   notes: null,
 });
 
-const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({ mode }) => {
+const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
+  mode,
+  generalHeaderActions,
+}) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => new Date());
@@ -1091,26 +1095,36 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({ mod
               <h2 className="text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
                 General Categories
               </h2>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newGeneralCategoryName}
-                  onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                    setNewGeneralCategoryName(event.target.value)
-                  }
-                  placeholder="New category"
-                  className="h-8 rounded-lg border border-default-300 bg-white px-3 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-                />
-                <Button
-                  type="button"
-                  color="sky"
-                  size="sm"
-                  icon={IconPlus}
-                  onClick={handleAddGeneralCategory}
-                  disabled={!newGeneralCategoryName.trim()}
-                >
-                  Add
-                </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                {generalHeaderActions && (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {generalHeaderActions}
+                    </div>
+                    <span className="text-default-300 dark:text-gray-600">|</span>
+                  </>
+                )}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newGeneralCategoryName}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                      setNewGeneralCategoryName(event.target.value)
+                    }
+                    placeholder="New category"
+                    className="h-8 rounded-lg border border-default-300 bg-white px-3 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                  />
+                  <Button
+                    type="button"
+                    color="sky"
+                    size="sm"
+                    icon={IconPlus}
+                    onClick={handleAddGeneralCategory}
+                    disabled={!newGeneralCategoryName.trim()}
+                  >
+                    Add
+                  </Button>
+                </div>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -1211,6 +1225,9 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({ mod
                     Source Qty
                   </th>
                   <th className="w-28 px-2 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
+                    Added
+                  </th>
+                  <th className="w-28 px-2 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
                     Used
                   </th>
                   <th className="w-28 px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
@@ -1231,7 +1248,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({ mod
                   return (
                     <React.Fragment key={categoryName}>
                       <tr className="bg-default-100 dark:bg-gray-700/50">
-                        <td colSpan={5} className="px-3 py-1.5 text-xs font-semibold text-default-700 dark:text-gray-300">
+                        <td colSpan={6} className="px-3 py-1.5 text-xs font-semibold text-default-700 dark:text-gray-300">
                           <div className="flex items-center gap-2">
                             <IconPackage size={14} className="text-default-500" />
                             {categoryName}
@@ -1271,6 +1288,9 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({ mod
                             </td>
                             <td className="px-2 py-2 text-right font-mono text-sm text-default-700 dark:text-gray-300">
                               {formatQty(makeNumber(row.balance_quantity))}
+                            </td>
+                            <td className="px-2 py-2 text-right font-mono text-sm text-emerald-600 dark:text-emerald-400">
+                              {formatQty(makeNumber(row.appended_quantity))}
                             </td>
                             <td
                               className="px-2 py-2 text-right font-mono text-sm text-red-600 dark:text-red-400"
@@ -1314,7 +1334,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({ mod
 
                 {filteredGeneralStockRows.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-12 text-center text-default-500 dark:text-gray-400">
+                    <td colSpan={7} className="px-4 py-12 text-center text-default-500 dark:text-gray-400">
                       <IconPackage size={32} className="mx-auto mb-2 text-default-300 dark:text-gray-600" />
                       <p>
                         {generalSearchQuery.trim()
