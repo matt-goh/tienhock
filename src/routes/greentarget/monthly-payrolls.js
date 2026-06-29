@@ -265,6 +265,7 @@ export default function (pool) {
         midMonthResult,
         commissionRecordsResult,
         othersRecordsResult,
+        habukLinesResult,
       ] = await Promise.all([
         // Monthly work logs for OFFICE workers (from GT schema)
         client.query(`
@@ -395,6 +396,17 @@ export default function (pool) {
           LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
           WHERE DATE(orec.record_date) >= $1 AND DATE(orec.record_date) <= $2
         `, [startDate, endDate]),
+
+        // GT Daily Lori Habuk saved trip lines for the month (DRIVER pay source)
+        client.query(`
+          SELECT l.employee_id, ln.pay_code_id, ln.quantity, ln.rate_used,
+                 ln.amount, ln.source_type, ln.rental_id, ln.description,
+                 pc.pay_type, pc.rate_unit
+          FROM greentarget.daily_lori_habuk_logs l
+          JOIN greentarget.daily_lori_habuk_lines ln ON ln.log_id = l.id
+          LEFT JOIN pay_codes pc ON ln.pay_code_id = pc.id
+          WHERE l.log_date >= $1 AND l.log_date <= $2 AND l.status = 'Submitted'
+        `, [startDate, endDate]),
       ]);
 
       // Build lookup maps
@@ -418,6 +430,15 @@ export default function (pool) {
           othersByEmployee[r.employee_id] = [];
         }
         othersByEmployee[r.employee_id].push(r);
+      });
+
+      // GT Daily Lori Habuk saved trip lines grouped by driver (DRIVER pay source)
+      const habukLinesByDriver = {};
+      habukLinesResult.rows.forEach((r) => {
+        if (!habukLinesByDriver[r.employee_id]) {
+          habukLinesByDriver[r.employee_id] = [];
+        }
+        habukLinesByDriver[r.employee_id].push(r);
       });
 
       // Build job pay codes map
@@ -545,111 +566,26 @@ export default function (pool) {
               });
             }
           } else if (jobType === "DRIVER") {
-            // Process DRIVER using rule-based calculation from rentals
-            const driverRentals = rentalsByDriver[employeeId] || [];
-
-            // Process each completed rental
-            for (const rental of driverRentals) {
-              const invoiceAmount = rental.invoice_amount !== null
-                ? parseFloat(rental.invoice_amount)
-                : defaultInvoiceAmount;
-
-              // Find matching PLACEMENT rule
-              let placementRule = null;
-              for (const rule of placementRules) {
-                if (evaluateCondition(invoiceAmount, rule.condition_operator, parseFloat(rule.condition_value))) {
-                  placementRule = rule;
-                  break;
-                }
-              }
-
-              // Add PLACEMENT payroll item
-              if (placementRule) {
-                const payCode = allPayCodesMap[placementRule.pay_code_id];
-                const rate = payCode ? parseFloat(payCode.rate_biasa) || 0 : 0;
-                combinedItems.push({
-                  pay_code_id: placementRule.pay_code_id,
-                  description: payCode?.description || placementRule.description || placementRule.pay_code_id,
-                  pay_type: "Tambahan",
-                  rate: rate,
-                  rate_unit: "Trip",
-                  quantity: 1,
-                  amount: rate,
-                  job_type: "DRIVER",
-                  source_employee_id: employeeId,
-                  is_manual: false,
-                  rental_id: rental.rental_id,
-                  source_type: "PLACEMENT",
-                });
-              }
-
-              // Find matching PICKUP rule (only if pickup_destination is set)
-              if (rental.pickup_destination) {
-                let pickupRule = null;
-                for (const rule of pickupRules) {
-                  const primaryMatch = evaluateCondition(
-                    rental.pickup_destination,
-                    rule.condition_operator,
-                    rule.condition_value
-                  );
-
-                  let secondaryMatch = true;
-                  if (rule.secondary_condition_field && rule.secondary_condition_operator) {
-                    if (rule.secondary_condition_field === "invoice_amount") {
-                      secondaryMatch = evaluateCondition(
-                        invoiceAmount,
-                        rule.secondary_condition_operator,
-                        parseFloat(rule.secondary_condition_value)
-                      );
-                    }
-                  }
-
-                  if (primaryMatch && secondaryMatch) {
-                    pickupRule = rule;
-                    break;
-                  }
-                }
-
-                // Add PICKUP payroll item
-                if (pickupRule) {
-                  const payCode = allPayCodesMap[pickupRule.pay_code_id];
-                  const rate = payCode ? parseFloat(payCode.rate_biasa) || 0 : 0;
-                  combinedItems.push({
-                    pay_code_id: pickupRule.pay_code_id,
-                    description: payCode?.description || pickupRule.description || pickupRule.pay_code_id,
-                    pay_type: "Tambahan",
-                    rate: rate,
-                    rate_unit: "Trip",
-                    quantity: 1,
-                    amount: rate,
-                    job_type: "DRIVER",
-                    source_employee_id: employeeId,
-                    is_manual: false,
-                    rental_id: rental.rental_id,
-                    source_type: "PICKUP",
-                  });
-                }
-              }
-
-              // Add rental addons
-              const addons = addonsByRental[rental.rental_id] || [];
-              for (const addon of addons) {
-                const addonAmount = parseFloat(addon.amount) * parseFloat(addon.quantity);
-                combinedItems.push({
-                  pay_code_id: addon.pay_code_id,
-                  description: addon.display_name || addon.pay_code_description || addon.pay_code_id,
-                  pay_type: "Tambahan",
-                  rate: parseFloat(addon.amount),
-                  rate_unit: "Fixed",
-                  quantity: parseFloat(addon.quantity),
-                  amount: Math.round(addonAmount * 100) / 100,
-                  job_type: "DRIVER",
-                  source_employee_id: employeeId,
-                  is_manual: false,
-                  rental_id: rental.rental_id,
-                  source_type: "ADDON",
-                });
-              }
+            // DRIVER trip pay now comes from the saved Daily Lori Habuk log for
+            // the month (Phase 3). Rentals only prefill that daily entry; they no
+            // longer feed processing directly. A driver with no submitted daily
+            // log earns base salary only (see the base-salary block below).
+            const habukLines = habukLinesByDriver[employeeId] || [];
+            for (const line of habukLines) {
+              combinedItems.push({
+                pay_code_id: line.pay_code_id,
+                description: line.description || line.pay_code_id,
+                pay_type: line.pay_type || "Tambahan",
+                rate: parseFloat(line.rate_used) || 0,
+                rate_unit: line.rate_unit || "Trip",
+                quantity: parseFloat(line.quantity) || 0,
+                amount: Math.round(parseFloat(line.amount) * 100) / 100,
+                job_type: "DRIVER",
+                source_employee_id: employeeId,
+                is_manual: false,
+                rental_id: line.rental_id || null,
+                work_log_type: "daily_habuk",
+              });
             }
 
             // Also check for base salary pay code for drivers

@@ -100,6 +100,7 @@ import greenTargetMidMonthPayrollsRouter from "./greentarget/mid-month-payrolls.
 import greenTargetAdjustmentDocsRouter from "./greentarget/adjustment-docs.js";
 import greenTargetIncentivesRouter from "./greentarget/incentives.js";
 import greenTargetOthersRecordsRouter from "./greentarget/others-records.js";
+import greenTargetDailyLoriHabukRouter from "./greentarget/daily-lori-habuk.js";
 
 // Jellypolly routes
 import jellypollyInvoiceRouter from "./jellypolly/invoices.js";
@@ -281,6 +282,10 @@ export default function setupRoutes(app, pool) {
   app.use(
     "/greentarget/api/others-records",
     greenTargetOthersRecordsRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/daily-lori-habuk",
+    greenTargetDailyLoriHabukRouter(pool)
   );
 
   // Jellypolly routes
