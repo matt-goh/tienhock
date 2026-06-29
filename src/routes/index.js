@@ -101,6 +101,7 @@ import greenTargetAdjustmentDocsRouter from "./greentarget/adjustment-docs.js";
 import greenTargetIncentivesRouter from "./greentarget/incentives.js";
 import greenTargetOthersRecordsRouter from "./greentarget/others-records.js";
 import greenTargetDailyLoriHabukRouter from "./greentarget/daily-lori-habuk.js";
+import greenTargetSalaryReportRouter from "./greentarget/salary-report.js";
 
 // Jellypolly routes
 import jellypollyInvoiceRouter from "./jellypolly/invoices.js";
@@ -286,6 +287,10 @@ export default function setupRoutes(app, pool) {
   app.use(
     "/greentarget/api/daily-lori-habuk",
     greenTargetDailyLoriHabukRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/salary-report",
+    greenTargetSalaryReportRouter(pool)
   );
 
   // Jellypolly routes
