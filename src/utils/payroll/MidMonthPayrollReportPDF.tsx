@@ -307,6 +307,7 @@ export interface MidMonthPayrollReportPDFData {
   summary: {
     total_final: number;
   };
+  companyName?: string;
 }
 
 const MidMonthRow: React.FC<{
@@ -483,7 +484,9 @@ export const generateMidMonthPayrollReportPDF = async (
   action: "download" | "print"
 ) => {
   try {
-    const doc = <MidMonthPayrollReportPDF data={data} />;
+    const doc = (
+      <MidMonthPayrollReportPDF data={data} companyName={data.companyName} />
+    );
     const pdfBlob = await pdf(doc).toBlob();
 
     const fileName = `Mid_Month_Payroll_Report_${getMonthName(data.month)}_${data.year}.pdf`;

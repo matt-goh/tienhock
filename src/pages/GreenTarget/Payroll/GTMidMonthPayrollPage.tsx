@@ -17,6 +17,9 @@ import {
   IconTrash,
   IconCash,
   IconRefresh,
+  IconPrinter,
+  IconDownload,
+  IconFileText,
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -29,7 +32,14 @@ import {
 import TimeNavigator from "../../../components/TimeNavigator";
 import { api } from "../../../routes/utils/api";
 import { getMonthName } from "../../../utils/payroll/payrollUtils";
+import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
+import {
+  generateMidMonthPayrollReportPDF,
+  MidMonthPayrollReportPDFData,
+} from "../../../utils/payroll/MidMonthPayrollReportPDF";
 import toast from "react-hot-toast";
+
+const GT_COMPANY_NAME = "GREEN TARGET SDN. BHD.";
 
 interface GTMidMonthPayroll {
   id: number;
@@ -281,6 +291,9 @@ const GTMidMonthPayrollPage: React.FC = () => {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [pinjamByEmp, setPinjamByEmp] = useState<Record<string, number>>({});
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [isGeneratingExport, setIsGeneratingExport] = useState(false);
+  const { staffs } = useStaffsCache();
 
   // Filters
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
@@ -376,6 +389,207 @@ const GTMidMonthPayrollPage: React.FC = () => {
     0
   );
 
+  // Mid-month report PDF (mirrors Tien Hock; net = advance - mid-month pinjam)
+  const generatePDF = async (action: "download" | "print") => {
+    if (payrolls.length === 0) {
+      toast.error("No mid-month payrolls to report");
+      return;
+    }
+    setIsGeneratingPDF(true);
+    try {
+      const staffById = new Map(staffs.map((s) => [s.id, s]));
+      const rows = payrolls.map((payroll, idx) => {
+        const staff = staffById.get(payroll.employee_id);
+        const midMonthAmount = Number(payroll.amount) || 0;
+        const pinjamAmount = pinjamByEmp[payroll.employee_id] ?? 0;
+        const netAmount = midMonthAmount - pinjamAmount;
+        return {
+          no: idx + 1,
+          staff_name: payroll.employee_name,
+          icNo: staff?.icNo ?? "",
+          midMonthAmount,
+          pinjamAmount,
+          netAmount,
+          total: netAmount,
+          payment_preference: payroll.payment_method,
+        };
+      });
+      const totalFinal = rows.reduce((sum, r) => sum + r.netAmount, 0);
+      const pdfData: MidMonthPayrollReportPDFData = {
+        year: currentYear,
+        month: currentMonth,
+        data: rows,
+        total_records: rows.length,
+        summary: { total_final: totalFinal },
+        companyName: GT_COMPANY_NAME,
+      };
+      await generateMidMonthPayrollReportPDF(pdfData, action);
+      toast.success(
+        `Mid-month payroll report ${
+          action === "download" ? "downloaded" : "generated for printing"
+        }`
+      );
+    } catch (error) {
+      console.error("Error generating GT mid-month PDF:", error);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
+  // Public Bank (PBB/IBG) .txt bank file — only Bank-payment employees.
+  const generateTextExport = async () => {
+    const bankPayrolls = payrolls.filter((p) => p.payment_method === "Bank");
+    if (bankPayrolls.length === 0) {
+      toast.error("No Bank-payment employees available to export");
+      return;
+    }
+    setIsGeneratingExport(true);
+    try {
+      const staffById = new Map(staffs.map((s) => [s.id, s]));
+      const lastDayOfMonth = new Date(currentYear, currentMonth, 0).getDate();
+      const paymentDate = `${lastDayOfMonth
+        .toString()
+        .padStart(2, "0")}/${currentMonth
+        .toString()
+        .padStart(2, "0")}/${currentYear}`;
+
+      const paymentDateRow = [
+        "PAYMENT DATE : (DD/MM/YYYY)",
+        paymentDate,
+        ...Array(19).fill(""),
+      ];
+      const headerRow1 = [
+        "Payment Type/ Mode : PBB/IBG/REN",
+        "Bene Acct No.",
+        "BIC",
+        "Bene Full Name",
+        "ID Type: For Intrabank & IBG NI, OI, BR, PL, ML, PP For Rentas NI, OI, BR, OT",
+        "Bene Identification No / Passport",
+        "Payment Amount (with 2 decimal points)",
+        "Recipient Reference (shown in sender and bene statement)",
+        "Other Payment Details (shown in sender and bene statement)",
+        "Bene Email 1",
+        "Bene Email 2",
+        "Bene Mobile No. 1 (charge RM0.20 per number)",
+        "Bene Mobile No. 2 (charge RM0.20 per number)",
+        "Joint Bene Name",
+        "Joint Bene Identification No.",
+        "Joint ID Type: For Intrabank & IBG NI, OI, BR, PL, ML, PP For Rentas NI, OI, BR, OT",
+        "E-mail Content Line 1 (will be shown in bene email)",
+        "E-mail Content Line 2 (will be shown in bene email)",
+        "E-mail Content Line 3 (will be shown in bene email)",
+        "E-mail Content Line 4 (will be shown in bene email)",
+        "E-mail Content Line 5 (will be shown in bene email)",
+      ];
+      const headerRow2 = [
+        "(M) - Char: 3 - A",
+        "(M) - Char: 20 - N",
+        "(M) - Char: 11 - A",
+        "(M) - Char: 120 - A",
+        "(M) - Char: 2 - A",
+        "(O) - Char: 29 - AN",
+        "(M) - Char: 18 - N",
+        "(M) - Char: 20 - AN",
+        "(O) - Char: 20 - AN",
+        "(O) - Char: 70 - AN",
+        "(O) - Char: 70 - AN",
+        "(O) - Char: 15 - N",
+        "(O) - Char: 15 - N",
+        "(O) - Char: 120 - A",
+        "(O) - Char: 29 - AN",
+        "(O) - Char: 2 - A",
+        "(O) - Char: 40 - AN",
+        "(O) - Char: 40 - AN",
+        "(O) - Char: 40 - AN",
+        "(O) - Char: 40 - AN",
+        "(O) - Char: 40 - AN",
+      ];
+
+      // GT employees are single-ID — one bank line per payroll, net of pinjam.
+      const dataRows = bankPayrolls
+        .map((payroll) => {
+          const staff = staffById.get(payroll.employee_id);
+          const gross = Number(payroll.amount) || 0;
+          const pinjam = pinjamByEmp[payroll.employee_id] ?? 0;
+          const net = gross - pinjam;
+          return { staff, fallbackName: payroll.employee_name, net };
+        })
+        .filter((row) => row.net > 0)
+        .map((row) => [
+          "PBB",
+          (row.staff?.bankAccountNumber || "").replace(/-/g, ""),
+          "PBBEMYKL",
+          (row.staff?.name || row.fallbackName || "").replace(/,/g, " "),
+          row.staff?.document || "",
+          (row.staff?.icNo || "").replace(/-/g, ""),
+          row.net.toFixed(2),
+          "Mid-Month",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "Content Line 1",
+          "Content Line 2",
+          "Content Line 3",
+          "Content Line 4",
+          "Content Line 5",
+        ]);
+
+      if (dataRows.length === 0) {
+        toast.error("No payable rows after deducting pinjam");
+        return;
+      }
+
+      const totalExport = dataRows.reduce(
+        (sum, row) => sum + parseFloat(row[6]),
+        0
+      );
+      const totalRow = [
+        "TOTAL:",
+        "",
+        "",
+        "",
+        "",
+        "",
+        totalExport.toFixed(2),
+        ...Array(14).fill(""),
+      ];
+
+      const allRows = [
+        paymentDateRow,
+        headerRow1,
+        headerRow2,
+        ...dataRows,
+        totalRow,
+      ];
+      const textContent = allRows.map((row) => row.join(";")).join("\r\n");
+      const blob = new Blob([textContent], {
+        type: "text/plain;charset=utf-8",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `gt-mid-month-payment-export-${currentMonth
+        .toString()
+        .padStart(2, "0")}-${currentYear}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success("Bank file exported");
+    } catch (error) {
+      console.error("Error generating GT bank export:", error);
+      toast.error("Failed to generate bank file");
+    } finally {
+      setIsGeneratingExport(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row justify-between items-center">
@@ -383,6 +597,33 @@ const GTMidMonthPayrollPage: React.FC = () => {
           Mid-month Payrolls (Green Target)
         </h1>
         <div className="flex space-x-3 mt-4 md:mt-0">
+          <Button
+            onClick={() => generatePDF("print")}
+            icon={IconPrinter}
+            variant="outline"
+            disabled={isGeneratingPDF || payrolls.length === 0}
+            title="Print mid-month report"
+          >
+            Print
+          </Button>
+          <Button
+            onClick={() => generatePDF("download")}
+            icon={IconDownload}
+            variant="outline"
+            disabled={isGeneratingPDF || payrolls.length === 0}
+            title="Download mid-month report PDF"
+          >
+            Download
+          </Button>
+          <Button
+            onClick={generateTextExport}
+            icon={IconFileText}
+            variant="outline"
+            disabled={isGeneratingExport || payrolls.length === 0}
+            title="Export Public Bank IBG file (Bank-payment employees)"
+          >
+            Bank File
+          </Button>
           <Button
             onClick={fetchPayrolls}
             icon={IconRefresh}

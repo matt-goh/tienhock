@@ -136,13 +136,27 @@ Daily Lori Habuk driver entry + DRIVER processing rewired to read saved daily lo
 - ADDON lines prefill on the rental's `date_placed` (assumption).
 - Payslip display of advances (Phase 2 carry-over) + remove now-dead rentals calc from `monthly-payrolls.js`.
 
+## Phase 4 — DONE (2026-06-30)
+
+Payrolls + Details parity: payslip advance display, batch payslip printing, Pinjam PDF, Mid-month PDF + PBB bank export.
+
+- **Backend (no schema change):** `employee-payrolls.js` GET `/:id` items now expose `pi.work_log_type`; `monthly-payrolls.js` GET `/:id` now attaches per-employee `items` (incl. work_log_type/pay_type) + `deductions` (parsed) so batch printing has full data.
+- **Shared helper** `src/utils/greenTarget/buildGTPayslipPayroll.ts`: moves add-on items (work_log_type 'advance'/'bonus'→`commission_records` with is_advance; 'others'→`others_records`) out of `items`, leaving only work items — so `PaySlipPDFMake` renders them in dedicated sections + the advance deduction (no double count). Returns `commissionAdvanceTotal`.
+- **Details** (`GTPayrollDetailsPage.tsx`): `buildPayslipData` uses the helper; Net Pay summary shows a Gross → Statutory → Advance breakdown when an advance exists (reconciles to stored net_pay).
+- **Batch payslips** (`GTPayrollPage.tsx`): `PrintBatchPayslipsButton` + `DownloadBatchPayslipsButton`, payrolls mapped via the helper, `companyName="GREEN TARGET SDN. BHD."`.
+- **Pinjam PDF** (`GTPinjamListPage.tsx`): Print/Download via `generatePinjamPDF` from the existing `employeeData` + totals. `PinjamPDF.tsx` gained an optional `companyName` (TH default unchanged).
+- **Mid-month** (`GTMidMonthPayrollPage.tsx`): Print/Download report via `generateMidMonthPayrollReportPDF` (net = advance − mid-month pinjam, using `pinjamByEmp` already on the page) + a "Bank File" export porting TH's PBB/IBG `.txt` (Bank-payment only, GT single-ID so one row per employee, sender "GREEN TARGET SDN. BHD."). `MidMonthPayrollReportPDF.tsx` gained an optional `companyName` (threaded via the data object).
+- **Changelog** entry added (2026-06-30).
+
+**Known minor gaps (acceptable):** batch payslips don't itemise the mid-month advance line (the enriched monthly GET doesn't return per-employee mid-month; `setelah_digenapkan` is still correct) — the single payslip on the Details page does show it. Batch payslip `jobName` falls back to the GT job_type (TH jobs cache has no OFFICE/DRIVER) — cosmetic.
+
 ## Phase status
 
 - [x] Phase 0 — Pay codes & DRIVER mapping (done)
 - [x] Phase 1 — GT Office monthly entry with pay codes (done)
 - [x] Phase 2 — GT Others / Advance / Bonus (done)
 - [x] Phase 3 — Daily Lori Habuk driver entry + rewire DRIVER processing (done)
-- [ ] Phase 4 — Payrolls + Details parity
+- [x] Phase 4 — Payrolls + Details parity (done)
 - [ ] Phase 5 — GT Salary Report
 - [ ] Phase 6 — GT E-Caruman
 

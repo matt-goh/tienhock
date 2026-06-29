@@ -260,7 +260,7 @@ export default function (pool) {
           pool.query(`
             SELECT pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit,
                   pi.quantity, pi.amount, pi.is_manual, pi.job_type,
-                  pc.pay_type
+                  pi.work_log_type, pc.pay_type
             FROM greentarget.payroll_items pi
             LEFT JOIN public.pay_codes pc ON pi.pay_code_id = pc.id
             WHERE pi.employee_payroll_id = $1
