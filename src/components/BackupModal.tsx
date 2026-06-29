@@ -20,6 +20,7 @@ import { API_BASE_URL, DB_NAME } from "../configs/config";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "./ConfirmationDialog";
 import { sessionService } from "../services/SessionService";
+import { useLocation, useNavigate } from "react-router-dom";
 
 // Use Vite's built-in MODE for frontend environment detection
 const NODE_ENV = import.meta.env.MODE;
@@ -36,6 +37,8 @@ interface Backup {
 }
 
 const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const defaultBackUpName = `backup_${DB_NAME}`;
   const [backups, setBackups] = useState<Backup[]>([]);
   const [loading, setLoading] = useState(false);
@@ -51,9 +54,18 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
   const [restorePhase, setRestorePhase] = useState<string | null>(null);
   const [hasScrollbar, setHasScrollbar] = useState(false);
   const tableBodyRef = useRef<HTMLDivElement>(null);
+  const lockedLocationRef = useRef<string | null>(null);
+  const navigationToastShownRef = useRef(false);
   const [backupToDelete, setBackupToDelete] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadingBackup, setDownloadingBackup] = useState<string | null>(
+    null
+  );
+  const isBlockingOperation = restoring || uploading || downloading;
+  const isBusy = loading || isBlockingOperation;
+  const currentLocationPath = `${location.pathname}${location.search}${location.hash}`;
 
   // Reset backup name when modal closes
   useEffect(() => {
@@ -217,7 +229,9 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
 
   const handleDownload = async (filename: string) => {
     try {
-      setLoading(true);
+      setDownloading(true);
+      setDownloadingBackup(filename);
+      setError(null);
 
       // Use the same pattern as the api utility but handle blob response
       const sessionId = sessionService.getSessionId();
@@ -271,7 +285,8 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
       console.error("Download failed:", error);
       toast.error(`Failed to download backup: ${error.message}`);
     } finally {
-      setLoading(false);
+      setDownloading(false);
+      setDownloadingBackup(null);
     }
   };
 
@@ -332,6 +347,43 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
   }, [statusCheckInterval]);
 
   useEffect(() => {
+    if (!isBlockingOperation) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [isBlockingOperation]);
+
+  useEffect(() => {
+    if (!isBlockingOperation) {
+      lockedLocationRef.current = null;
+      navigationToastShownRef.current = false;
+      return;
+    }
+
+    if (!lockedLocationRef.current) {
+      lockedLocationRef.current = currentLocationPath;
+      return;
+    }
+
+    if (lockedLocationRef.current !== currentLocationPath) {
+      if (!navigationToastShownRef.current) {
+        toast.error("Please wait until the backup operation finishes.");
+        navigationToastShownRef.current = true;
+      }
+
+      navigate(lockedLocationRef.current, { replace: true });
+    }
+  }, [currentLocationPath, isBlockingOperation, navigate]);
+
+  useEffect(() => {
     if (!isOpen && statusCheckInterval) {
       clearInterval(statusCheckInterval);
       setStatusCheckInterval(null);
@@ -359,7 +411,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
         <Dialog
           className="fixed inset-0 z-50 overflow-y-auto"
           open={isOpen}
-          onClose={restoring || uploading ? () => {} : onClose}
+          onClose={isBlockingOperation ? () => {} : onClose}
         >
           <div className="min-h-screen px-4 text-center">
             <TransitionChild
@@ -432,14 +484,14 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                         <>
                           <Button
                             onClick={() => setShowBackupNameInput(true)}
-                            disabled={loading || restoring || uploading}
+                            disabled={isBusy}
                             icon={IconDatabasePlus}
                           >
                             Create New Backup
                           </Button>
                           <Button
                             onClick={() => fileInputRef.current?.click()}
-                            disabled={loading || restoring || uploading}
+                            disabled={isBusy}
                             variant="outline"
                             icon={IconUpload}
                           >
@@ -453,11 +505,12 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                             placeholder={defaultBackUpName}
                             value={backupName}
                             onChange={(e) => setBackupName(e.target.value)}
+                            disabled={isBusy}
                             className="px-3 py-2 w-44 border border-default-300 dark:border-gray-600 rounded-lg focus:outline-none focus:border-default-500 dark:focus:border-sky-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                           />
                           <Button
                             onClick={handleCreateBackup}
-                            disabled={loading || restoring}
+                            disabled={isBusy}
                           >
                             Create
                           </Button>
@@ -467,6 +520,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                               setBackupName(defaultBackUpName);
                             }}
                             variant="outline"
+                            disabled={isBusy}
                           >
                             Cancel
                           </Button>
@@ -475,7 +529,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                     </div>
                     <Button
                       onClick={fetchBackups}
-                      disabled={loading || restoring}
+                      disabled={isBusy}
                       variant="outline"
                       icon={IconRefresh}
                     >
@@ -580,6 +634,13 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                                               : "Restoring..."}
                                           </span>
                                         </div>
+                                      ) : downloadingBackup === backup.filename ? (
+                                        <div className="flex items-center space-x-2">
+                                          <LoadingSpinner size="sm" hideText />
+                                          <span className="text-sm text-default-500 dark:text-gray-400">
+                                            Downloading...
+                                          </span>
+                                        </div>
                                       ) : (
                                         <>
                                           <Button
@@ -589,7 +650,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                                               );
                                               setShowConfirmDialog(true);
                                             }}
-                                            disabled={restoring || loading}
+                                            disabled={isBusy}
                                             variant="outline"
                                             size="sm"
                                           >
@@ -599,7 +660,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                                             onClick={() =>
                                               handleDownload(backup.filename)
                                             }
-                                            disabled={restoring || loading}
+                                            disabled={isBusy}
                                             variant="outline"
                                             size="sm"
                                             color="sky"
@@ -613,7 +674,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                                               );
                                               setShowDeleteConfirmDialog(true);
                                             }}
-                                            disabled={restoring || loading}
+                                            disabled={isBusy}
                                             variant="outline"
                                             size="sm"
                                             color="rose"
@@ -633,16 +694,22 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                   </div>
                 </div>
                 {/* Full Modal Loading Overlay */}
-                {(restoring || uploading) && (
+                {isBlockingOperation && (
                   <div className="absolute inset-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm flex items-center justify-center z-50">
                     <div className="flex flex-col items-center space-y-3 p-6 rounded-lg text-center">
                       <LoadingSpinner size="lg" hideText />
                       <div className="space-y-2">
                         <h3 className="text-lg font-medium text-default-900 dark:text-gray-100">
-                          {uploading ? "Importing SQL" : "Restoring Database"}
+                          {downloading
+                            ? "Downloading Backup"
+                            : uploading
+                            ? "Importing SQL"
+                            : "Restoring Database"}
                         </h3>
                         <p className="text-default-600 dark:text-gray-300">
-                          {restorePhase === "INITIALIZATION"
+                          {downloading
+                            ? "Preparing the SQL backup download..."
+                            : restorePhase === "INITIALIZATION"
                             ? "Preparing for restore..."
                             : restorePhase === "CLEANUP"
                             ? "Cleaning up existing data..."
@@ -659,7 +726,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                             : "Please wait while the database is being restored"}
                         </p>
                         <p className="text-sm text-default-500 dark:text-gray-400">
-                          Please do not close this window or refresh the page
+                          Please keep this window open until it finishes.
                         </p>
                       </div>
                     </div>
