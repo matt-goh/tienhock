@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-30",
+    ms: "Green Target kini mempunyai halaman \"Salary Report\" baharu di bawah menu Payroll. Laporan ini dikumpulkan mengikut jenis kerja (Office / Driver) — Green Target tiada lokasi — dan memaparkan setiap pekerja dengan lajur GAJI, OT, BONUS, C/I/O, CUTI, gaji kasar, KWSP/SOCSO/SIP (majikan & pekerja), PCB, gaji bersih, pendahuluan separuh bulan dan jumlah digenapkan. Terdapat paparan Bulanan dan Tahunan (ringkasan + pecahan setiap pekerja mengikut bulan), serta cetak/muat turun PDF.",
+    en: "Green Target now has a new \"Salary Report\" page under the Payroll menu. The report is grouped by job type (Office / Driver) — Green Target has no locations — and lists each employee with GAJI, OT, BONUS, C/I/O, CUTI, gross, EPF/SOCSO/SIP (employer & employee), PCB, net pay, mid-month advance and rounded totals. It has Monthly and Annual views (summary + per-employee monthly breakdown), with print/download to PDF.",
+  },
+  {
+    date: "2026-06-30",
     ms: "Penambahbaikan cetakan & laporan gaji Green Target: (1) Slip gaji kini memaparkan Bonus, Advance dan Kerja Luar OT sebagai baris berasingan, serta potongan Advance — jadi gaji kasar tolak potongan berkanun tolak advance = gaji bersih boleh disemak dengan jelas (halaman Butiran Gaji juga menunjukkan pecahan ini). (2) Halaman Gaji Bulanan kini ada butang cetak/muat turun slip gaji secara pukal untuk semua pekerja sekali gus. (3) Halaman Pinjam kini ada cetak/muat turun ringkasan Pinjam (PDF). (4) Halaman Mid-month kini ada laporan PDF dan eksport fail bank Public Bank (IBG .txt) untuk pekerja yang dibayar melalui Bank.",
     en: "Green Target payroll printing & reports improvements: (1) Payslips now show Bonus, Advance and Kerja Luar OT as their own lines, plus the Advance deduction — so gross minus statutory deductions minus advance = net pay is clearly visible (the Payroll Details page also shows this breakdown). (2) The Monthly Payroll page now has buttons to print/download all employees' payslips in one batch. (3) The Pinjam page now has print/download of the Pinjam summary (PDF). (4) The Mid-month page now has a report PDF and a Public Bank (IBG .txt) bank-file export for Bank-payment employees.",
   },

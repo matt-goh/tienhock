@@ -34,6 +34,7 @@ import GTBonusPage from "./GreenTarget/Payroll/GTBonusPage";
 import GTOthersAdvancePage from "./GreenTarget/Payroll/GTOthersAdvancePage";
 import GTOthersKerjaLuarOtPage from "./GreenTarget/Payroll/GTOthersKerjaLuarOtPage";
 import GTDailyLoriHabukEntryPage from "./GreenTarget/Payroll/GTDailyLoriHabukEntryPage";
+import GTSalaryReportPage from "./GreenTarget/Payroll/GTSalaryReportPage";
 import GTAdjustmentDocsListPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsListPage";
 import GTAdjustmentDocsFormPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsFormPage";
 import GTAdjustmentDocsDetailsPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsDetailsPage";
@@ -168,6 +169,11 @@ export const GreenTargetNavData: SidebarItem[] = [
         name: "Pinjam",
         path: "/payroll/pinjam",
         component: GTPinjamListPage,
+      },
+      {
+        name: "Salary Report",
+        path: "/payroll/salary-report",
+        component: GTSalaryReportPage,
       },
       {
         name: "Payroll Settings",

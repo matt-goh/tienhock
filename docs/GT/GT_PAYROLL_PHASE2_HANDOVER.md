@@ -119,7 +119,7 @@ Daily Lori Habuk driver entry + DRIVER processing rewired to read saved daily lo
 - **DB:** `migrations/007_gt_daily_lori_habuk.sql` (applied to dev) — `greentarget.daily_lori_habuk_logs` (header per driver/day, unique (log_date, employee_id)) + `greentarget.daily_lori_habuk_lines` (trip lines; source_type PLACEMENT/PICKUP/ADDON/MANUAL/DERIVED). Schema added to CLAUDE.md + AGENTS.md; `driver_trips` note updated (superseded).
 - **Shared helper:** `src/routes/greentarget/driverTripRules.js` — date-aware rental→trip-line derivation (`buildPrefillLinesForDriverDate`, `evaluateCondition`, `deriveTripLb6Line`) extracted from the old process-all DRIVER calc; used by the prefill GET.
 - **Route:** `src/routes/greentarget/daily-lori-habuk.js` (mounted `/greentarget/api/daily-lori-habuk`): GET `?date=` returns each active DRIVER's saved log or rentals-prefill; POST upserts one driver-day (ON CONFLICT, full-replace lines); DELETE clears a driver-day.
-- **Processing rewire:** `monthly-payrolls.js` DRIVER branch now reads `habukLinesByDriver` (from `daily_lori_habuk_lines` where `log_date` in month AND status='Submitted'), pushing each line as a payroll_item (`work_log_type='daily_habuk'`). Base-salary (Month) logic kept. The old rentals query / `rentalsByDriver` / `addonsByRental` / `evaluateCondition` / `placementRules`/`pickupRules`/`defaultInvoiceAmount` are now **unused in this file** but left in place (surgical) — a Phase 4 cleanup can remove them.
+- **Processing rewire:** `monthly-payrolls.js` DRIVER branch now reads `habukLinesByDriver` (from `daily_lori_habuk_lines` where `log_date` in month AND status='Submitted'), pushing each line as a payroll_item (`work_log_type='daily_habuk'`). Base-salary (Month) logic kept. The old rentals query / `rentalsByDriver` / `addonsByRental` / `evaluateCondition` / `placementRules`/`pickupRules`/`defaultInvoiceAmount` were **removed in the Phase 4 cleanup (2026-06-30)** — the rental→trip rule engine now lives only in `driverTripRules.js` (used by the daily prefill). `greentarget.payroll_rules`/`payroll_settings`/`rental_addons` are still configured via the Settings page and consumed by the prefill, just not by process-all.
 - **Frontend:** `src/pages/GreenTarget/Payroll/GTDailyLoriHabukEntryPage.tsx` — date-centric (`TimeNavigator` day mode) driver cards; each card lists trip lines (DRIVER pay-code `<select>` from `useJobPayCodeMappings` `detailedMappings["DRIVER"]`, editable rate/qty, computed amount, source badges); add manual trip; auto TRIP_LB6 DERIVED line (live re-derive on edit, >6 Trip-unit qty); per-driver Save (POST). Nav item "Daily Lori Habuk" added under GT Payroll.
 - **Changelog:** entry added (2026-06-29) flagging the saved-log-only behaviour.
 
@@ -150,6 +150,18 @@ Payrolls + Details parity: payslip advance display, batch payslip printing, Pinj
 
 **Known minor gaps (acceptable):** batch payslips don't itemise the mid-month advance line (the enriched monthly GET doesn't return per-employee mid-month; `setelah_digenapkan` is still correct) — the single payslip on the Details page does show it. Batch payslip `jobName` falls back to the GT job_type (TH jobs cache has no OFFICE/DRIVER) — cosmetic.
 
+## Phase 5 — DONE (2026-06-30)
+
+GT Salary Report — monthly + annual (summary + breakdown), grouped by job (OFFICE/DRIVER), auto column bucketing.
+
+- **Backend (no schema change):** `src/routes/greentarget/salary-report.js` (mounted `/greentarget/api/salary-report`). GT has no locations/leave, so the 2444-line TH location SQL is NOT reused; buckets are computed in JS from `employee_payrolls` + `payroll_items` (join `pay_codes` for pay_type/report_column) + `payroll_deductions` + `mid_month_payrolls`. Endpoints: `GET /?year&month` (comprehensive, `location`=job group), `GET /annual?year` (summary), `GET /annual-breakdown?year`. Shared `buildRow` + `loadYearRows` helpers.
+- **Auto bucketing:** `pay_codes.report_column` override wins (GAJI/OT/BONUS/CIO→comm/CUTI), else `work_log_type='bonus'`→bonus, `'advance'`→comm (C/I/O), `pay_type='Overtime'`→ot, else gaji. cuti=0. Statutory split majikan/pekerja from deductions; gross/net/mid-month/rounding from stored values.
+- **PDF:** `SalaryReportPDF.tsx` gained optional `companyName` (additive, TH default). GT passes "GREEN TARGET SDN. BHD." and `locationMap={OFFICE:"Office",DRIVER:"Driver Lori Habuk"}`. Monthly uses `reportType:"employee-grouped"`; annual `"annual"` / `"annual-breakdown"`.
+- **Frontend:** `src/pages/GreenTarget/Payroll/GTSalaryReportPage.tsx` — Monthly/Annual tabs (annual: Summary/Breakdown sub-views), on-screen 18-column table grouped by OFFICE/DRIVER with subtotals + grand total, Print/Download via `generateSalaryReportPDF`. Nav item "Salary Report" added under GT Payroll.
+- **Changelog** entry added (2026-06-30).
+
+**Known limitation:** `payroll_items` don't persist `report_column`, so the per-entry `others_records.report_column` override is lost once processed (only `pay_codes.report_column` applies in the report). Acceptable v1.
+
 ## Phase status
 
 - [x] Phase 0 — Pay codes & DRIVER mapping (done)
@@ -157,7 +169,7 @@ Payrolls + Details parity: payslip advance display, batch payslip printing, Pinj
 - [x] Phase 2 — GT Others / Advance / Bonus (done)
 - [x] Phase 3 — Daily Lori Habuk driver entry + rewire DRIVER processing (done)
 - [x] Phase 4 — Payrolls + Details parity (done)
-- [ ] Phase 5 — GT Salary Report
+- [x] Phase 5 — GT Salary Report (done)
 - [ ] Phase 6 — GT E-Caruman
 
 ## Reminders / repo rules in effect

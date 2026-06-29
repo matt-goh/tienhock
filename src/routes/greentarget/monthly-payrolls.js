@@ -316,11 +316,6 @@ export default function (pool) {
         staffsResult,
         jobPayCodesResult,
         contributionRates,
-        payrollRulesResult,
-        payrollSettingsResult,
-        driverRentalsResult,
-        rentalAddonsResult,
-        allPayCodesResult,
         midMonthResult,
         commissionRecordsResult,
         othersRecordsResult,
@@ -372,65 +367,6 @@ export default function (pool) {
 
         // Contribution rates
         fetchActiveContributionRates(client),
-
-        // Payroll rules for DRIVER processing
-        client.query(`
-          SELECT * FROM greentarget.payroll_rules
-          WHERE is_active = true
-          ORDER BY rule_type, priority DESC
-        `),
-
-        // Payroll settings (default invoice amount)
-        client.query(`
-          SELECT setting_key, setting_value
-          FROM greentarget.payroll_settings
-        `),
-
-        // Completed rentals with invoice amounts for the month
-        client.query(`
-          SELECT
-            r.rental_id,
-            r.driver,
-            r.pickup_destination,
-            COALESCE(
-              (SELECT SUM(i.amount_before_tax)
-               FROM greentarget.invoice_rentals ir
-               JOIN greentarget.invoices i ON ir.invoice_id = i.invoice_id
-               WHERE ir.rental_id = r.rental_id AND i.status != 'cancelled'),
-              NULL
-            ) as invoice_amount,
-            EXISTS(
-              SELECT 1 FROM greentarget.invoice_rentals ir
-              JOIN greentarget.invoices i ON ir.invoice_id = i.invoice_id
-              WHERE ir.rental_id = r.rental_id AND i.status != 'cancelled'
-            ) as has_invoice
-          FROM greentarget.rentals r
-          WHERE r.date_picked IS NOT NULL
-            AND r.date_placed >= $1
-            AND r.date_placed <= $2
-        `, [startDate, endDate]),
-
-        // All rental addons for completed rentals this month
-        client.query(`
-          SELECT ra.*, pc.description as pay_code_description, ap.display_name
-          FROM greentarget.rental_addons ra
-          JOIN pay_codes pc ON ra.pay_code_id = pc.id
-          LEFT JOIN greentarget.addon_paycodes ap ON ra.pay_code_id = ap.pay_code_id
-          WHERE ra.rental_id IN (
-            SELECT r.rental_id
-            FROM greentarget.rentals r
-            WHERE r.date_picked IS NOT NULL
-              AND r.date_placed >= $1
-              AND r.date_placed <= $2
-          )
-        `, [startDate, endDate]),
-
-        // All pay codes for rate lookups
-        client.query(`
-          SELECT id, description, rate_biasa, pay_type, rate_unit
-          FROM pay_codes
-          WHERE is_active = true
-        `),
 
         // Mid-month advances for this month (deducted before rounding)
         client.query(`
@@ -508,67 +444,6 @@ export default function (pool) {
         }
         jobPayCodesMap[row.job_id].push(row);
       });
-
-      // Build payroll rules map
-      const payrollRules = payrollRulesResult.rows;
-      const placementRules = payrollRules.filter((r) => r.rule_type === "PLACEMENT");
-      const pickupRules = payrollRules.filter((r) => r.rule_type === "PICKUP");
-
-      // Build settings map
-      const settingsMap = {};
-      payrollSettingsResult.rows.forEach((s) => {
-        settingsMap[s.setting_key] = s.setting_value;
-      });
-      const defaultInvoiceAmount = parseFloat(settingsMap.default_invoice_amount) || 200;
-
-      // Build all pay codes map for rate lookups
-      const allPayCodesMap = {};
-      allPayCodesResult.rows.forEach((pc) => {
-        allPayCodesMap[pc.id] = pc;
-      });
-
-      // Build rentals by driver map
-      const rentalsByDriver = {};
-      driverRentalsResult.rows.forEach((rental) => {
-        if (!rentalsByDriver[rental.driver]) {
-          rentalsByDriver[rental.driver] = [];
-        }
-        rentalsByDriver[rental.driver].push(rental);
-      });
-
-      // Build addons by rental map
-      const addonsByRental = {};
-      rentalAddonsResult.rows.forEach((addon) => {
-        if (!addonsByRental[addon.rental_id]) {
-          addonsByRental[addon.rental_id] = [];
-        }
-        addonsByRental[addon.rental_id].push(addon);
-      });
-
-      // Helper function to evaluate payroll rule conditions
-      const evaluateCondition = (value, operator, targetValue) => {
-        switch (operator) {
-          case "=":
-            return (
-              value === targetValue ||
-              (typeof value === "string" &&
-                typeof targetValue === "string" &&
-                value.toUpperCase() === targetValue.toUpperCase())
-            );
-          case ">":
-            return value > targetValue;
-          case "<":
-            return value < targetValue;
-          case ">=":
-            return value >= targetValue;
-          case "<=":
-            return value <= targetValue;
-          case "ANY":
-            return true;
-          default:
-            return false;
-        }
-      };
 
       // Process work logs into items per employee
       const workLogsByEmployee = {};
