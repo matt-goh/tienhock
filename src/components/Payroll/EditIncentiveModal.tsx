@@ -38,6 +38,11 @@ interface EditIncentiveModalProps {
   onSuccess: () => void;
   incentive: Incentive | null;
   displayLabel?: string;
+  // API base path for the records endpoint (default Tien Hock /api/incentives).
+  apiBasePath?: string;
+  // When defined, hide the Advance checkbox and force this is_advance value
+  // (Green Target Bonus = false, Others (Advance) = true).
+  forceIsAdvance?: boolean;
 }
 
 const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
@@ -46,6 +51,8 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
   onSuccess,
   incentive,
   displayLabel = "Incentive",
+  apiBasePath = "/api/incentives",
+  forceIsAdvance,
 }) => {
   const { locations } = useLocationMappingsCache();
   const [amount, setAmount] = useState("");
@@ -66,14 +73,15 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
       }));
   }, [locations]);
 
-  // Check if this is a commission entry (has location_code or description contains "Commission")
+  // Check if this is a commission entry (has location_code or description contains "Commission").
+  // In GT mode (forceIsAdvance defined) there are no locations, so never treat as commission.
   const isCommissionEntry = useMemo((): boolean => {
-    if (!incentive) return false;
+    if (!incentive || forceIsAdvance !== undefined) return false;
     return Boolean(
       incentive.location_code ||
         incentive.description?.toUpperCase().includes("COMMISSION")
     );
-  }, [incentive]);
+  }, [incentive, forceIsAdvance]);
 
   useEffect(() => {
     if (incentive) {
@@ -107,12 +115,16 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
     setIsSaving(true);
 
     try {
-      await api.put(`/api/incentives/${incentive.id}`, {
+      await api.put(`${apiBasePath}/${incentive.id}`, {
         amount: parseFloat(amount),
         description: description.trim(),
         commission_date: incentiveDate,
         location_code: isCommissionEntry ? locationCode : null,
-        is_advance: isCommissionEntry ? true : isAdvance,
+        is_advance: isCommissionEntry
+          ? true
+          : forceIsAdvance !== undefined
+          ? forceIsAdvance
+          : isAdvance,
       });
 
       toast.success(`${displayLabel} updated successfully!`);
@@ -219,7 +231,7 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
                       required
                     />
 
-                    {!isCommissionEntry && (
+                    {!isCommissionEntry && forceIsAdvance === undefined && (
                       <Checkbox
                         checked={isAdvance}
                         onChange={setIsAdvance}

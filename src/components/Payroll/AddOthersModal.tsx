@@ -66,6 +66,11 @@ interface AddOthersModalProps {
   currentYear: number;
   currentMonth: number;
   displayLabel: string;
+  // API base path for the records endpoint (default Tien Hock /api/others-records).
+  // Green Target pages pass /greentarget/api/others-records.
+  apiBasePath?: string;
+  // When provided, restrict the staff pickers to these employee ids.
+  allowedEmployeeIds?: string[];
 }
 
 const PAY_CODE_PAGE_SIZE = 50;
@@ -108,6 +113,8 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
   currentYear,
   currentMonth,
   displayLabel,
+  apiBasePath = "/api/others-records",
+  allowedEmployeeIds,
 }) => {
   const { staffs } = useStaffsCache();
   const { payCodes } = useJobPayCodeMappings();
@@ -139,11 +146,16 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
 
   const allStaffOptions = useMemo(
     () =>
-      staffs.map((staff) => ({
-        id: staff.id,
-        name: `${staff.name} (${staff.id})`,
-      })),
-    [staffs]
+      staffs
+        .filter(
+          (staff) =>
+            !allowedEmployeeIds || allowedEmployeeIds.includes(staff.id)
+        )
+        .map((staff) => ({
+          id: staff.id,
+          name: `${staff.name} (${staff.id})`,
+        })),
+    [staffs, allowedEmployeeIds]
   );
 
   useEffect(() => {
@@ -357,7 +369,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
         } else {
           payload.record_dates = [...e.dates].sort();
         }
-        await api.post("/api/others-records", payload);
+        await api.post(apiBasePath, payload);
         totalInserted += e.dates.length;
       }
       toast.success(

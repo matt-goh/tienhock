@@ -1,0 +1,154 @@
+// src/routes/greentarget/incentives.js
+// Green Target Bonus / Others (Advance) records on greentarget.commission_records.
+// GT has no locations: the Bonus vs Advance split is carried by is_advance
+//   Bonus            -> is_advance = false
+//   Others (Advance) -> is_advance = true
+import { Router } from "express";
+
+export default function (pool) {
+  const router = Router();
+
+  /**
+   * GET /greentarget/api/incentives
+   * List GT commission/bonus records with date filtering.
+   * Optional ?is_advance=true|false narrows to Advance vs Bonus.
+   */
+  router.get("/", async (req, res) => {
+    const { start_date, end_date, employee_id, is_advance } = req.query;
+
+    try {
+      let query = `
+        SELECT cr.*, s.name as employee_name
+        FROM greentarget.commission_records cr
+        JOIN staffs s ON cr.employee_id = s.id
+        WHERE 1=1
+      `;
+      const values = [];
+      let paramCount = 1;
+
+      if (is_advance === "true" || is_advance === "false") {
+        query += ` AND cr.is_advance = $${paramCount}`;
+        values.push(is_advance === "true");
+        paramCount++;
+      }
+      if (start_date) {
+        query += ` AND DATE(cr.commission_date) >= $${paramCount}`;
+        values.push(start_date);
+        paramCount++;
+      }
+      if (end_date) {
+        query += ` AND DATE(cr.commission_date) <= $${paramCount}`;
+        values.push(end_date);
+        paramCount++;
+      }
+      if (employee_id) {
+        query += ` AND cr.employee_id = $${paramCount}`;
+        values.push(employee_id);
+        paramCount++;
+      }
+
+      query += " ORDER BY cr.commission_date DESC, cr.id DESC";
+
+      const result = await pool.query(query, values);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching GT incentive records:", error);
+      res.status(500).json({
+        message: "Error fetching incentive records",
+        error: error.message,
+      });
+    }
+  });
+
+  /**
+   * POST /greentarget/api/incentives
+   * Create a new GT commission/bonus record.
+   */
+  router.post("/", async (req, res) => {
+    const { employee_id, commission_date, amount, description, created_by, is_advance } =
+      req.body;
+    try {
+      const query = `
+        INSERT INTO greentarget.commission_records (
+          employee_id, commission_date, amount, description, created_by, is_advance
+        ) VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING *;
+      `;
+      const result = await pool.query(query, [
+        employee_id,
+        commission_date,
+        amount,
+        description,
+        created_by,
+        is_advance === true,
+      ]);
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error("Error creating GT incentive record:", error);
+      res.status(500).json({
+        message: "Error creating incentive record",
+        error: error.message,
+      });
+    }
+  });
+
+  /**
+   * PUT /greentarget/api/incentives/:id
+   * Update an existing GT commission/bonus record.
+   */
+  router.put("/:id", async (req, res) => {
+    const { id } = req.params;
+    const { amount, description, commission_date, is_advance } = req.body;
+    try {
+      const query = `
+        UPDATE greentarget.commission_records
+        SET amount = $1, description = $2, commission_date = $3, is_advance = $4,
+            updated_at = now()
+        WHERE id = $5
+        RETURNING *;
+      `;
+      const result = await pool.query(query, [
+        amount,
+        description,
+        commission_date,
+        is_advance === true,
+        id,
+      ]);
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Incentive record not found." });
+      }
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("Error updating GT incentive record:", error);
+      res.status(500).json({
+        message: "Error updating incentive record",
+        error: error.message,
+      });
+    }
+  });
+
+  /**
+   * DELETE /greentarget/api/incentives/:id
+   */
+  router.delete("/:id", async (req, res) => {
+    const { id } = req.params;
+    try {
+      const result = await pool.query(
+        "DELETE FROM greentarget.commission_records WHERE id = $1 RETURNING *",
+        [id]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Incentive record not found." });
+      }
+      res.status(200).json({ message: "Incentive record deleted." });
+    } catch (error) {
+      console.error("Error deleting GT incentive record:", error);
+      res.status(500).json({
+        message: "Error deleting incentive record",
+        error: error.message,
+      });
+    }
+  });
+
+  return router;
+}
