@@ -24,11 +24,14 @@ import {
   IconPlus,
   IconX,
   IconSearch,
+  IconCategory2,
+  IconSettings,
 } from "@tabler/icons-react";
 import clsx from "clsx";
 import Button from "../../../components/Button";
 import MonthNavigator from "../../../components/MonthNavigator";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import GeneralStockCategoryModal from "../../../components/Stock/GeneralStockCategoryModal";
 import { useProductsCache } from "../../../utils/invoice/useProductsCache";
 
 interface StockKilangItem {
@@ -217,8 +220,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
   const [generalAdjustmentInputs, setGeneralAdjustmentInputs] = useState<Record<number, string>>({});
   const [generalSearchQuery, setGeneralSearchQuery] = useState<string>("");
   const [newGeneralCategoryName, setNewGeneralCategoryName] = useState<string>("");
-  const [editingGeneralCategoryId, setEditingGeneralCategoryId] = useState<number | null>(null);
-  const [editingGeneralCategoryName, setEditingGeneralCategoryName] = useState<string>("");
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState<boolean>(false);
   const [revertingAdjustmentId, setRevertingAdjustmentId] = useState<number | null>(null);
   const [tooltipState, setTooltipState] = useState<{ lineId: number; x: number; y: number } | null>(null);
   const tooltipTimeoutRef = useRef<number | null>(null);
@@ -594,39 +596,6 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     } catch (error: unknown) {
       console.error("Error adding general stock category:", error);
       toast.error(error instanceof Error ? error.message : "Failed to add category");
-    }
-  };
-
-  const handleUpdateGeneralCategory = async (category: GeneralStockCategory): Promise<void> => {
-    const name = editingGeneralCategoryName.trim();
-    if (!name) return;
-
-    try {
-      await api.put(`/api/general-purchases/general-stock/categories/${category.id}`, {
-        name,
-        sort_order: category.sort_order,
-        is_active: category.is_active,
-      });
-      setEditingGeneralCategoryId(null);
-      setEditingGeneralCategoryName("");
-      await fetchData();
-      toast.success("General stock category updated");
-    } catch (error: unknown) {
-      console.error("Error updating general stock category:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to update category");
-    }
-  };
-
-  const handleDeleteGeneralCategory = async (category: GeneralStockCategory): Promise<void> => {
-    if (!window.confirm(`Remove category "${category.name}"?`)) return;
-
-    try {
-      await api.delete(`/api/general-purchases/general-stock/categories/${category.id}`);
-      await fetchData();
-      toast.success("General stock category removed");
-    } catch (error: unknown) {
-      console.error("Error removing general stock category:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to remove category");
     }
   };
 
@@ -1092,9 +1061,14 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
         <div className="space-y-3">
           <div className="rounded-lg border border-default-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
             <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
-                General Categories
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
+                  General Categories
+                </h2>
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-default-100 px-1.5 text-xs font-medium text-default-500 dark:bg-gray-700 dark:text-gray-400">
+                  {generalStockCategories.length}
+                </span>
+              </div>
               <div className="flex flex-wrap items-center gap-2">
                 {generalHeaderActions && (
                   <>
@@ -1111,6 +1085,12 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                     onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                       setNewGeneralCategoryName(event.target.value)
                     }
+                    onKeyDown={(event: React.KeyboardEvent<HTMLInputElement>) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        handleAddGeneralCategory();
+                      }
+                    }}
                     placeholder="New category"
                     className="h-8 rounded-lg border border-default-300 bg-white px-3 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                   />
@@ -1124,64 +1104,46 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                   >
                     Add
                   </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    icon={IconSettings}
+                    onClick={() => setIsCategoryModalOpen(true)}
+                  >
+                    Manage
+                  </Button>
                 </div>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {generalStockCategories.map((category: GeneralStockCategory) => (
-                <div
-                  key={category.id}
-                  className="flex h-8 items-center gap-1 rounded-lg border border-default-200 bg-default-50 px-2 text-sm dark:border-gray-700 dark:bg-gray-900/40"
-                >
-                  {editingGeneralCategoryId === category.id ? (
-                    <input
-                      type="text"
-                      value={editingGeneralCategoryName}
-                      onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                        setEditingGeneralCategoryName(event.target.value)
-                      }
-                      className="h-6 w-32 rounded border border-default-300 bg-white px-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-                      autoFocus
-                    />
-                  ) : (
-                    <span className="text-default-700 dark:text-gray-200">{category.name}</span>
-                  )}
-                  {editingGeneralCategoryId === category.id ? (
-                    <button
-                      type="button"
-                      className="rounded px-1 text-xs text-sky-600 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-sky-900/30"
-                      onClick={() => handleUpdateGeneralCategory(category)}
-                    >
-                      Save
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="rounded px-1 text-xs text-default-500 hover:bg-default-100 hover:text-default-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-100"
-                      onClick={() => {
-                        setEditingGeneralCategoryId(category.id);
-                        setEditingGeneralCategoryName(category.name);
-                      }}
-                    >
-                      Edit
-                    </button>
-                  )}
+            {generalStockCategories.length === 0 ? (
+              <button
+                type="button"
+                onClick={() => setIsCategoryModalOpen(true)}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-default-300 px-3 py-3 text-sm text-default-500 transition-colors hover:border-sky-400 hover:text-sky-600 dark:border-gray-600 dark:text-gray-400 dark:hover:border-sky-500 dark:hover:text-sky-300"
+              >
+                <IconPlus size={16} />
+                No categories yet — add your first one
+              </button>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {generalStockCategories.map((category: GeneralStockCategory) => (
                   <button
+                    key={category.id}
                     type="button"
-                    className="rounded p-0.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-                    onClick={() => handleDeleteGeneralCategory(category)}
-                    title="Remove category"
+                    onClick={() => setIsCategoryModalOpen(true)}
+                    title="Manage categories"
+                    className="group flex h-8 items-center gap-1.5 rounded-full border border-default-200 bg-default-50 pl-3 pr-2.5 text-sm text-default-700 transition-colors hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-200 dark:hover:border-sky-700 dark:hover:bg-sky-900/20 dark:hover:text-sky-300"
                   >
-                    <IconX size={14} />
+                    <IconCategory2
+                      size={14}
+                      className="text-default-400 transition-colors group-hover:text-sky-500 dark:text-gray-500"
+                    />
+                    <span className="truncate">{category.name}</span>
                   </button>
-                </div>
-              ))}
-              {generalStockCategories.length === 0 && (
-                <span className="text-sm text-default-500 dark:text-gray-400">
-                  No categories yet.
-                </span>
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="relative max-w-sm">
@@ -1916,6 +1878,13 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
           ))}
         </div>
       )}
+
+      <GeneralStockCategoryModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        categories={generalStockCategories}
+        onChanged={fetchData}
+      />
     </div>
   );
 };
