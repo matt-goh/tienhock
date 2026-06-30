@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-30",
+    ms: "Halaman General Stock kini mengurus kategori melalui tetingkap khas. Tekan butang \"Manage\" atau klik mana-mana kategori untuk membuka tetingkap di mana anda boleh menambah, menamakan semula, dan memadam kategori di satu tempat. Kotak pintasan \"New category\" masih ada untuk menambah kategori dengan cepat. Paparan kategori di halaman juga diperkemas dan lebih jelas.",
+    en: "The General Stock page now manages categories through a dedicated pop-up. Press the \"Manage\" button or click any category to open a window where you can add, rename, and delete categories in one place. The quick \"New category\" box is still there for fast adding. The category list shown on the page has also been tidied up and made clearer.",
+  },
+  {
+    date: "2026-06-30",
     ms: "Green Target kini mempunyai halaman \"E-Caruman\" baharu di bawah menu Payroll untuk menjana fail caruman berkanun: KWSP (CSV), gabungan SOCSO + EIS/SIP (fail teks PERKESO), dan PCB (fail teks LHDN CP39) — sama format seperti Tien Hock tetapi menggunakan data Green Target. Kod pendaftaran majikan (kod majikan PERKESO, MyCoID/SSM, nombor E LHDN) kini boleh dimasukkan terus pada halaman ini dan disimpan dalam pangkalan data untuk kegunaan akan datang. Halaman ini juga menunjukkan pratonton bilangan pekerja dan jumlah caruman, serta memberi amaran jika ada pekerja yang mencarum KWSP tetapi tiada nombor KWSP.",
     en: "Green Target now has a new \"E-Caruman\" page under the Payroll menu to generate statutory contribution files: EPF (CSV), combined SOCSO + EIS/SIP (PERKESO text file), and PCB (LHDN CP39 text file) — same formats as Tien Hock but using Green Target data. The employer registration codes (PERKESO employer code, MyCoID/SSM, LHDN E-number) can now be entered on the page and are saved in the database for reuse. The page also previews the employee counts and contribution totals, and warns if any employee has an EPF contribution but no EPF number.",
   },

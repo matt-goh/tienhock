@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import {
+  IconArrowNarrowRight,
   IconDownload,
   IconEye,
   IconFile,
@@ -934,15 +935,30 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
                       disabled={!canEdit}
                     />
                     {selectedStockRow && (
-                      <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm text-indigo-800 dark:border-indigo-900/60 dark:bg-indigo-900/20 dark:text-indigo-200">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <span className="truncate">
-                            Current: {formatQty(toNumber(selectedStockRow.current_stock))}
+                      <div className="flex items-center gap-2.5 rounded-lg border border-indigo-200/70 bg-gradient-to-br from-indigo-50 to-white px-3 py-2 dark:border-indigo-900/60 dark:from-indigo-900/20 dark:to-gray-800/40">
+                        <div className="flex min-w-0 flex-col">
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-indigo-400 dark:text-indigo-300/70">
+                            Current
                           </span>
-                          <span className="font-semibold">
-                            After purchase: {formatQty(newBalance)}
+                          <span className="font-mono text-sm font-medium tabular-nums text-default-700 dark:text-gray-200">
+                            {formatQty(toNumber(selectedStockRow.current_stock))}
                           </span>
                         </div>
+                        <IconArrowNarrowRight
+                          size={18}
+                          className="shrink-0 text-indigo-400 dark:text-indigo-500"
+                        />
+                        <div className="flex min-w-0 flex-col">
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-indigo-500 dark:text-indigo-300">
+                            After purchase
+                          </span>
+                          <span className="font-mono text-sm font-bold tabular-nums text-indigo-700 dark:text-indigo-200">
+                            {formatQty(newBalance)}
+                          </span>
+                        </div>
+                        <span className="ml-auto inline-flex shrink-0 items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold tabular-nums text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                          +{formatQty(toNumber(line.balance_quantity))}
+                        </span>
                       </div>
                     )}
                   </div>
