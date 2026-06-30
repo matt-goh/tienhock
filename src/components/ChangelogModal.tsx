@@ -20,6 +20,16 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-30",
+    ms: "Senarai General Purchases kini memaparkan nombor penghantaran dalam lajur Reference, dan menggunakan nombor order jika nombor penghantaran tiada. Butang refresh e-invois juga disembunyikan apabila status e-invois sudah Valid.",
+    en: "The General Purchases list now shows the shipping number in the Reference column, and uses the order number when the shipping number is missing. The e-invoice refresh button is also hidden when the e-invoice status is already Valid.",
+  },
+  {
+    date: "2026-06-30",
+    ms: "Pemilih \"Stock Item\" dalam pembelian General kini boleh dicari terus, ditapis mengikut tarikh pembelian stok, dan memuatkan lebih banyak item melalui butang \"Load more...\". Ini memudahkan memilih item General Stock sedia ada apabila senarai item semakin panjang.",
+    en: "The \"Stock Item\" picker in General Purchases is now searchable, can be filtered by stock purchase date, and can load more items with a \"Load more...\" button. This makes it easier to pick an existing General Stock item as the item list grows.",
+  },
+  {
+    date: "2026-06-30",
     ms: "Halaman General Stock kini mengurus kategori melalui tetingkap khas. Tekan butang \"Manage\" atau klik mana-mana kategori untuk membuka tetingkap di mana anda boleh menambah, menamakan semula, dan memadam kategori di satu tempat. Kotak pintasan \"New category\" masih ada untuk menambah kategori dengan cepat. Paparan kategori di halaman juga diperkemas dan lebih jelas.",
     en: "The General Stock page now manages categories through a dedicated pop-up. Press the \"Manage\" button or click any category to open a window where you can add, rename, and delete categories in one place. The quick \"New category\" box is still there for fast adding. The category list shown on the page has also been tidied up and made clearer.",
   },

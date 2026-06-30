@@ -16,6 +16,7 @@ import Button from "../../../components/Button";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import { FormInput, FormListbox } from "../../../components/FormComponents";
 import AccountCodeCombobox from "../../../components/Accounting/AccountCodeCombobox";
+import GeneralStockItemCombobox from "../../../components/Accounting/GeneralStockItemCombobox";
 import SupplierPaymentInlineSection, {
   buildSupplierPaymentPayload,
   createDefaultSupplierPaymentDraft,
@@ -24,6 +25,7 @@ import SupplierPaymentInlineSection, {
   validateSupplierPaymentDraft,
 } from "../../../components/Accounting/SupplierPaymentInlineSection";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import { useGeneralStockSearch } from "../../../hooks/useGeneralStockSearch";
 import { api } from "../../../routes/utils/api";
 import {
   GeneralStockCategory,
@@ -183,7 +185,6 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
   ]);
   const [existingInvoice, setExistingInvoice] = useState<SelfBilledInvoice | null>(null);
   const [categories, setCategories] = useState<GeneralStockCategory[]>([]);
-  const [generalStockRows, setGeneralStockRows] = useState<GeneralStockRow[]>([]);
   const [loading, setLoading] = useState<boolean>(isEditMode);
   const [saving, setSaving] = useState<boolean>(false);
   const [s3Enabled, setS3Enabled] = useState<boolean>(true);
@@ -197,6 +198,9 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
     () => createDefaultSupplierPaymentDraft(today, 0, !isEditMode)
   );
   const previousPayableAmountRef = useRef<number>(0);
+  const stockSearch = useGeneralStockSearch({
+    initialDateTo: formData.purchase_date,
+  });
 
   const categoryOptions = useMemo(
     () => [
@@ -208,21 +212,19 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
     ],
     [categories]
   );
-  const generalStockOptions = useMemo(
-    () => [
-      { id: "", name: "New General stock item" },
-      ...generalStockRows.map((row: GeneralStockRow) => ({
-        id: String(row.line_id),
-        name: `${row.description} (Qty ${formatQty(
-          toNumber(row.current_stock)
-        )}) - ${row.purchase_no}`,
-      })),
-    ],
-    [generalStockRows]
-  );
   const payableAmount = useMemo<number>(
     () => Math.round(toNumber(formData.amount_myr) * 100) / 100,
     [formData.amount_myr]
+  );
+  const selectedStockTargetIds = useMemo<number[]>(
+    () =>
+      lines.reduce<number[]>((targetIds: number[], line: SelfBilledInvoiceLine) => {
+        if (typeof line.stock_append_target_line_id === "number") {
+          targetIds.push(line.stock_append_target_line_id);
+        }
+        return targetIds;
+      }, []),
+    [lines]
   );
   const outstandingPaymentAmount = useMemo<number>(() => {
     const alreadyPaid: number = toNumber(existingInvoice?.amount_paid || 0);
@@ -327,6 +329,10 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
   }, [loadInvoice]);
 
   useEffect(() => {
+    void stockSearch.ensureRows(selectedStockTargetIds);
+  }, [selectedStockTargetIds, stockSearch.ensureRows]);
+
+  useEffect(() => {
     if (isEditMode) return;
     api
       .get<{ s3Enabled: boolean; categories: GeneralStockCategory[] }>("/api/general-purchases/init")
@@ -339,18 +345,6 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
         setS3Enabled(false);
       });
   }, [isEditMode]);
-
-  useEffect(() => {
-    api
-      .get<{ rows: GeneralStockRow[] }>(
-        "/api/general-purchases/general-stock/search?limit=200"
-      )
-      .then(({ rows }) => setGeneralStockRows(rows || []))
-      .catch((error: unknown) => {
-        console.error("Error loading general stock rows:", error);
-        setGeneralStockRows([]);
-      });
-  }, []);
 
   const updateFormField = (
     field: keyof LocalGeneralPurchaseFormData,
@@ -382,10 +376,14 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
     );
   };
 
-  const updateLineAppendTarget = (index: number, value: string): void => {
+  const updateLineAppendTarget = (
+    index: number,
+    value: string,
+    selectedRow?: GeneralStockRow | null
+  ): void => {
     const targetId = value ? Number.parseInt(value, 10) : null;
     const targetRow = targetId
-      ? generalStockRows.find((row: GeneralStockRow) => row.line_id === targetId)
+      ? selectedRow || stockSearch.getRowById(targetId)
       : null;
 
     setLines((previousLines: SelfBilledInvoiceLine[]) =>
@@ -427,11 +425,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
     line: SelfBilledInvoiceLine
   ): GeneralStockRow | null => {
     if (!line.stock_append_target_line_id) return null;
-    return (
-      generalStockRows.find(
-        (row: GeneralStockRow) => row.line_id === line.stock_append_target_line_id
-      ) || null
-    );
+    return stockSearch.getRowById(line.stock_append_target_line_id);
   };
 
   const findDuplicateNewStockRow = (
@@ -455,7 +449,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
     }
 
     return (
-      generalStockRows.find(
+      stockSearch.rows.find(
         (row: GeneralStockRow) =>
           row.line_id !== line.id &&
           normalizeStockDescription(row.description) === normalizedDescription
@@ -859,7 +853,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
           )}
         </div>
         <div className="space-y-3">
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <FormInput
               name="amount_myr"
               label="Amount (MYR)"
@@ -880,6 +874,26 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
               onChange={(value: string) => updateFormField("account_code", value)}
               disabled={!canEdit}
               placeholder="Pick the expense account to debit"
+            />
+            <FormInput
+              name="stock_search_from"
+              label="Stock Date From"
+              value={stockSearch.dateFrom}
+              type="date"
+              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                stockSearch.setDateFrom(event.target.value)
+              }
+              disabled={!canEdit}
+            />
+            <FormInput
+              name="stock_search_to"
+              label="Stock Date To"
+              value={stockSearch.dateTo}
+              type="date"
+              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                stockSearch.setDateTo(event.target.value)
+              }
+              disabled={!canEdit}
             />
           </div>
           <div className="space-y-3">
@@ -920,18 +934,20 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
                   </div>
 
                   <div className="mb-3 grid gap-3 lg:grid-cols-[minmax(220px,0.8fr)_minmax(260px,1fr)]">
-                    <FormListbox
+                    <GeneralStockItemCombobox
                       name={`stock_append_target_${index}`}
                       label="Stock Item"
-                      value={
-                        line.stock_append_target_line_id
-                          ? String(line.stock_append_target_line_id)
-                          : ""
+                      selectedRow={selectedStockRow}
+                      rows={stockSearch.searchRows}
+                      query={stockSearch.query}
+                      onQueryChange={stockSearch.setQuery}
+                      onChange={(value: string, row: GeneralStockRow | null) =>
+                        updateLineAppendTarget(index, value, row)
                       }
-                      onChange={(value: string) =>
-                        updateLineAppendTarget(index, value)
-                      }
-                      options={generalStockOptions}
+                      onLoadMore={stockSearch.loadMore}
+                      hasMore={stockSearch.hasMore}
+                      loading={stockSearch.loading}
+                      loadingMore={stockSearch.loadingMore}
                       disabled={!canEdit}
                     />
                     {selectedStockRow && (
