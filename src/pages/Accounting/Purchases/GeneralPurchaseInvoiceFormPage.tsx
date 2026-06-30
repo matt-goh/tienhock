@@ -20,6 +20,7 @@ import Button from "../../../components/Button";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import { FormInput, FormListbox } from "../../../components/FormComponents";
 import AccountCodeCombobox from "../../../components/Accounting/AccountCodeCombobox";
+import GeneralStockItemCombobox from "../../../components/Accounting/GeneralStockItemCombobox";
 import SupplierPaymentInlineSection, {
   buildSupplierPaymentPayload,
   createDefaultSupplierPaymentDraft,
@@ -29,6 +30,7 @@ import SupplierPaymentInlineSection, {
 } from "../../../components/Accounting/SupplierPaymentInlineSection";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { COUNTRY_OPTIONS, CURRENCY_OPTIONS } from "../../../constants/einvoiceCodes";
+import { useGeneralStockSearch } from "../../../hooks/useGeneralStockSearch";
 import { api } from "../../../routes/utils/api";
 import {
   SelfBilledEInvoiceStatus,
@@ -245,9 +247,6 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
   const [generalStockCategories, setGeneralStockCategories] = useState<
     GeneralStockCategory[]
   >([]);
-  const [generalStockRows, setGeneralStockRows] = useState<GeneralStockRow[]>(
-    []
-  );
   const [supplierSearchFocused, setSupplierSearchFocused] =
     useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(isEditMode);
@@ -272,6 +271,9 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       )
   );
   const previousPayableAmountRef = useRef<number>(0);
+  const stockSearch = useGeneralStockSearch({
+    initialDateTo: formData.purchase_date,
+  });
 
   const canEdit: boolean =
     existingInvoice?.invoice_status !== "cancelled" &&
@@ -386,18 +388,6 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       });
   }, [isEditMode]);
 
-  useEffect(() => {
-    api
-      .get<{ rows: GeneralStockRow[] }>(
-        "/api/general-purchases/general-stock/search?limit=200"
-      )
-      .then(({ rows }) => setGeneralStockRows(rows || []))
-      .catch((error: unknown) => {
-        console.error("Error loading general stock rows:", error);
-        setGeneralStockRows([]);
-      });
-  }, []);
-
   const generalStockCategoryOptions = useMemo(
     () => [
       { id: "", name: "No General stock category" },
@@ -409,18 +399,20 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
     [generalStockCategories]
   );
 
-  const generalStockOptions = useMemo(
-    () => [
-      { id: "", name: "New General stock item" },
-      ...generalStockRows.map((row: GeneralStockRow) => ({
-        id: String(row.line_id),
-        name: `${row.description} (Qty ${formatQty(
-          toNumber(row.current_stock)
-        )}) - ${row.purchase_no}`,
-      })),
-    ],
-    [generalStockRows]
+  const selectedStockTargetIds = useMemo<number[]>(
+    () =>
+      lines.reduce<number[]>((targetIds: number[], line: SelfBilledInvoiceLine) => {
+        if (typeof line.stock_append_target_line_id === "number") {
+          targetIds.push(line.stock_append_target_line_id);
+        }
+        return targetIds;
+      }, []),
+    [lines]
   );
+
+  useEffect(() => {
+    void stockSearch.ensureRows(selectedStockTargetIds);
+  }, [selectedStockTargetIds, stockSearch.ensureRows]);
 
   useEffect(() => {
     const search = supplier.supplier_name.trim();
@@ -537,10 +529,14 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
     );
   };
 
-  const updateLineAppendTarget = (index: number, value: string): void => {
+  const updateLineAppendTarget = (
+    index: number,
+    value: string,
+    selectedRow?: GeneralStockRow | null
+  ): void => {
     const targetId = value ? Number.parseInt(value, 10) : null;
     const targetRow = targetId
-      ? generalStockRows.find((row: GeneralStockRow) => row.line_id === targetId)
+      ? selectedRow || stockSearch.getRowById(targetId)
       : null;
 
     setLines((previousLines: SelfBilledInvoiceLine[]) =>
@@ -562,11 +558,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
     line: SelfBilledInvoiceLine
   ): GeneralStockRow | null => {
     if (!line.stock_append_target_line_id) return null;
-    return (
-      generalStockRows.find(
-        (row: GeneralStockRow) => row.line_id === line.stock_append_target_line_id
-      ) || null
-    );
+    return stockSearch.getRowById(line.stock_append_target_line_id);
   };
 
   const findDuplicateNewStockRow = (
@@ -590,7 +582,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
     }
 
     return (
-      generalStockRows.find(
+      stockSearch.rows.find(
         (row: GeneralStockRow) =>
           row.line_id !== line.id &&
           normalizeStockDescription(row.description) === normalizedDescription
@@ -1456,6 +1448,28 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
             )}
 
             <div className="space-y-3 p-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <FormInput
+                  name="stock_search_from"
+                  label="Stock Date From"
+                  value={stockSearch.dateFrom}
+                  type="date"
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                    stockSearch.setDateFrom(event.target.value)
+                  }
+                  disabled={!canEditRecords}
+                />
+                <FormInput
+                  name="stock_search_to"
+                  label="Stock Date To"
+                  value={stockSearch.dateTo}
+                  type="date"
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                    stockSearch.setDateTo(event.target.value)
+                  }
+                  disabled={!canEditRecords}
+                />
+              </div>
               {lines.map((line: SelfBilledInvoiceLine, index: number) => {
                 const selectedStockRow = getSelectedGeneralStockRow(line);
                 const isAppend = Boolean(line.stock_append_target_line_id);
@@ -1493,19 +1507,22 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                     </div>
 
                     <div className="mb-3 grid gap-3 lg:grid-cols-[minmax(220px,0.8fr)_minmax(260px,1fr)]">
-                      <FormListbox
+                      <GeneralStockItemCombobox
                         name={`stock_append_target_${index}`}
                         label="Stock Item"
-                        value={
-                          line.stock_append_target_line_id
-                            ? String(line.stock_append_target_line_id)
-                            : ""
+                        selectedRow={selectedStockRow}
+                        rows={stockSearch.searchRows}
+                        query={stockSearch.query}
+                        onQueryChange={stockSearch.setQuery}
+                        onChange={(value: string, row: GeneralStockRow | null) =>
+                          updateLineAppendTarget(index, value, row)
                         }
-                        onChange={(value: string) =>
-                          updateLineAppendTarget(index, value)
-                        }
-                        options={generalStockOptions}
+                        onLoadMore={stockSearch.loadMore}
+                        hasMore={stockSearch.hasMore}
+                        loading={stockSearch.loading}
+                        loadingMore={stockSearch.loadingMore}
                         disabled={!canEditRecords}
+                        optionsPosition="top"
                         className="[&_button]:py-2"
                       />
                       {selectedStockRow && (

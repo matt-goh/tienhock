@@ -1179,7 +1179,8 @@ export default function (pool, config) {
           COALESCE(sbi.purchase_kind, '${PURCHASE_KIND_FOREIGN}') AS purchase_kind,
           sbi.local_supplier_name,
           sbi.purchase_date::text AS purchase_date,
-          sbi.transaction_type, sbi.platform, sbi.order_no, sbi.currency_code,
+          sbi.transaction_type, sbi.platform, sbi.order_no, sbi.shipping_number,
+          sbi.currency_code,
           sbi.total_foreign_amount, sbi.payable_amount_myr, sbi.uuid,
           sbi.long_id,
           COALESCE(sbi.invoice_status, '${LOCAL_STATUS_ACTIVE}') AS invoice_status,
@@ -1200,6 +1201,7 @@ export default function (pool, config) {
           OR fs.supplier_name ILIKE $${params.length}
           OR sbi.local_supplier_name ILIKE $${params.length}
           OR sbi.order_no ILIKE $${params.length}
+          OR sbi.shipping_number ILIKE $${params.length}
           OR sbi.platform ILIKE $${params.length}
         )`;
       }
@@ -1806,9 +1808,30 @@ export default function (pool, config) {
   router.get("/general-stock/search", async (req, res) => {
     try {
       const search = normalizeText(req.query.search, "");
-      const limit = Math.min(Number.parseInt(req.query.limit, 10) || 100, 200);
+      const requestedLimit = Math.min(
+        Math.max(Number.parseInt(req.query.limit, 10) || 100, 1),
+        200
+      );
+      const offset = Math.max(Number.parseInt(req.query.offset, 10) || 0, 0);
+      const dateFrom = /^\d{4}-\d{2}-\d{2}$/.test(req.query.date_from || "")
+        ? req.query.date_from
+        : null;
+      const dateTo = /^\d{4}-\d{2}-\d{2}$/.test(req.query.date_to || "")
+        ? req.query.date_to
+        : null;
+      const rawLineIds = Array.isArray(req.query.line_ids)
+        ? req.query.line_ids.join(",")
+        : req.query.line_ids || "";
+      const lineIds = rawLineIds
+        .toString()
+        .split(",")
+        .map((value) => Number.parseInt(value, 10))
+        .filter((value) => Number.isInteger(value));
       const params = [];
       let searchClause = "";
+      let dateFromClause = "";
+      let dateToClause = "";
+      let lineIdsClause = "";
 
       if (search) {
         params.push(`%${search}%`);
@@ -1820,7 +1843,25 @@ export default function (pool, config) {
         )`;
       }
 
-      params.push(limit);
+      if (dateFrom) {
+        params.push(dateFrom);
+        dateFromClause = `AND sbi.purchase_date >= $${params.length}::date`;
+      }
+
+      if (dateTo) {
+        params.push(dateTo);
+        dateToClause = `AND sbi.purchase_date <= $${params.length}::date`;
+      }
+
+      if (lineIds.length > 0) {
+        params.push(lineIds);
+        lineIdsClause = `AND sbil.id = ANY($${params.length}::int[])`;
+      }
+
+      params.push(requestedLimit + 1);
+      const limitParamIndex = params.length;
+      params.push(offset);
+      const offsetParamIndex = params.length;
       const result = await pool.query(
         `WITH stock_adjustment_totals AS (
            SELECT
@@ -1867,12 +1908,23 @@ export default function (pool, config) {
             OR sbil.general_stock_category_id IS NOT NULL)
            AND aps.source_self_billed_invoice_line_id IS NULL
            ${searchClause}
+           ${dateFromClause}
+           ${dateToClause}
+           ${lineIdsClause}
          ORDER BY sbi.purchase_date DESC, sbi.id DESC, sbil.line_number ASC
-         LIMIT $${params.length}`,
+         LIMIT $${limitParamIndex}
+         OFFSET $${offsetParamIndex}`,
         params
       );
+      const rows = result.rows.slice(0, requestedLimit);
 
-      res.json({ rows: result.rows });
+      res.json({
+        rows,
+        has_more: result.rows.length > requestedLimit,
+        next_offset: offset + rows.length,
+        limit: requestedLimit,
+        offset,
+      });
     } catch (error) {
       console.error("Error searching general stock:", error);
       res.status(500).json({
