@@ -1726,6 +1726,14 @@ export interface GeneralStockRow {
   used_adjustments?: GeneralStockAdjustment[];
 }
 
+export interface GeneralStockSearchResponse {
+  rows: GeneralStockRow[];
+  has_more: boolean;
+  next_offset: number;
+  limit: number;
+  offset: number;
+}
+
 export interface SelfBilledForeignSupplier {
   id?: number;
   supplier_name: string;
@@ -1783,6 +1791,7 @@ export interface SelfBilledInvoiceListItem {
   transaction_type: string;
   platform: string | null;
   order_no: string | null;
+  shipping_number: string | null;
   currency_code: string;
   total_foreign_amount: number;
   payable_amount_myr: number;
