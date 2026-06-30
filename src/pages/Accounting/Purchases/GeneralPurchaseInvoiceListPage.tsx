@@ -481,7 +481,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
       <div className="flex flex-col gap-2 rounded-lg border border-default-200 bg-white px-3 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-800 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-lg font-semibold text-default-900 dark:text-gray-100">
-            {total > 0 && !loading ? `${total} ` : ""}General Purchases
+            {total > 0 && !loading ? `${total} ` : ""} Purchases
           </h1>
           <span className="hidden text-default-300 dark:text-gray-600 sm:inline">
             |
@@ -509,8 +509,8 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
 
         <div className="flex flex-wrap items-center gap-2">
           <div
-            className="relative h-8 w-full sm:w-48"
-            title="Search by purchase number, supplier, order, or platform"
+            className="relative h-8 w-full sm:w-36"
+            title="Search by purchase number, supplier, shipping/order number, or platform"
           >
             <IconSearch
               size={16}
@@ -537,7 +537,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
             )}
           </div>
 
-          <div className="h-8 w-full sm:w-32">
+          <div className="h-8 w-full sm:w-28">
             <FormListbox
               name="invoice_status"
               value={selectedInvoiceStatus}
@@ -547,7 +547,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
             />
           </div>
 
-          <div className="h-8 w-full sm:w-40">
+          <div className="h-8 w-full sm:w-32">
             <FormListbox
               name="einvoice_status"
               value={selectedEInvoiceStatus}
@@ -573,7 +573,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
             className="h-8 rounded-lg !px-3"
             onClick={() => navigate("/stock/entry")}
           >
-            General Stock
+            Stock
           </Button>
           <Button
             type="button"
@@ -584,7 +584,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
             className="h-8 rounded-lg !px-3"
             onClick={() => navigate(`/stock/general-purchases/new/local?month=${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, "0")}`)}
           >
-            New Local
+            Local
           </Button>
           <Button
             type="button"
@@ -595,7 +595,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
             className="h-8 rounded-lg !px-3"
             onClick={() => navigate(`/stock/general-purchases/new/foreign?month=${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, "0")}`)}
           >
-            New Foreign
+            Foreign
           </Button>
         </div>
       </div>
@@ -789,7 +789,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
                     </td>
                     <td className="px-3 py-2 text-sm text-default-600 dark:text-gray-400">
                       <div className="max-w-xs truncate">
-                        {[invoice.platform, invoice.order_no]
+                        {[invoice.platform, invoice.shipping_number || invoice.order_no]
                           .filter(Boolean)
                           .join(" / ") || "-"}
                       </div>
@@ -861,26 +861,28 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
                             <IconExternalLink size={15} />
                           </a>
                         )}
-                        {invoice.purchase_kind !== "local" && invoice.uuid && (
-                          <button
-                            type="button"
-                            onClick={(
-                              event: React.MouseEvent<HTMLButtonElement>
-                            ) => refreshEInvoiceStatus(event, invoice)}
-                            disabled={refreshingInvoiceId !== null}
-                            className="rounded p-1 text-default-500 hover:bg-default-100 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-sky-300"
-                            title="Refresh E-Invoice status"
-                          >
-                            <IconRefresh
-                              size={15}
-                              className={
-                                refreshingInvoiceId === invoice.id
-                                  ? "animate-spin"
-                                  : undefined
-                              }
-                            />
-                          </button>
-                        )}
+                        {invoice.purchase_kind !== "local" &&
+                          invoice.uuid &&
+                          invoice.einvoice_status !== "valid" && (
+                            <button
+                              type="button"
+                              onClick={(
+                                event: React.MouseEvent<HTMLButtonElement>
+                              ) => refreshEInvoiceStatus(event, invoice)}
+                              disabled={refreshingInvoiceId !== null}
+                              className="rounded p-1 text-default-500 hover:bg-default-100 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-sky-300"
+                              title="Refresh E-Invoice status"
+                            >
+                              <IconRefresh
+                                size={15}
+                                className={
+                                  refreshingInvoiceId === invoice.id
+                                    ? "animate-spin"
+                                    : undefined
+                                }
+                              />
+                            </button>
+                          )}
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-right">
