@@ -6,10 +6,13 @@
 // page visit does not refetch.
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import {
   IconFileInvoice,
   IconCash,
   IconExternalLink,
+  IconPrinter,
+  IconDownload,
 } from "@tabler/icons-react";
 import { api } from "../../routes/utils/api";
 import TimeNavigator, { TimeRange } from "../TimeNavigator";
@@ -20,8 +23,18 @@ import {
 import { getAdjustmentDocsPaths } from "../AdjustmentDocs/useAdjustmentDocsPaths";
 import { formatAdjustmentDocId } from "../../utils/adjustments/formatDocId";
 import { parseDatabaseTimestamp, formatDisplayDate } from "../../utils/invoice/dateUtils";
+import { generateTransactionHistoryPDF } from "../../utils/catalogue/TransactionHistoryPDF";
 import LoadingSpinner from "../LoadingSpinner";
 import { AdjustmentDocType, EInvoiceStatus } from "../../types/types";
+
+// Human-readable labels for the PDF / exports.
+const KIND_LABELS: Record<TxnKind, string> = {
+  invoice: "Invoice",
+  payment: "Payment",
+  credit_note: "Credit Note",
+  debit_note: "Debit Note",
+  refund_note: "Refund Note",
+};
 
 // --- Public types (shared with the parent cache) ---
 export type TxnKind = "invoice" | "payment" | AdjustmentDocType;
@@ -46,6 +59,7 @@ export interface TxnCache {
 
 interface CustomerTransactionsTabProps {
   customerId: string;
+  customerName?: string;
   range: TimeRange;
   onRangeChange: (range: TimeRange) => void;
   cache: TxnCache | null;
@@ -207,6 +221,7 @@ const SummaryCard: React.FC<{
 
 const CustomerTransactionsTab: React.FC<CustomerTransactionsTabProps> = ({
   customerId,
+  customerName,
   range,
   onRangeChange,
   cache,
@@ -215,6 +230,7 @@ const CustomerTransactionsTab: React.FC<CustomerTransactionsTabProps> = ({
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const currentKey = rangeKey(range);
 
@@ -274,19 +290,74 @@ const CustomerTransactionsTab: React.FC<CustomerTransactionsTabProps> = ({
     return { invoiced, paid, adjustments };
   }, [rows]);
 
+  const handleExport = async (action: "print" | "download") => {
+    if (rows.length === 0 || isExporting) return;
+    setIsExporting(true);
+    try {
+      await generateTransactionHistoryPDF(
+        {
+          customer: { id: customerId, name: customerName ?? "" },
+          periodLabel: `${formatDisplayDate(range.start)} – ${formatDisplayDate(
+            range.end
+          )}`,
+          rows: rows.map((r) => ({
+            date: formatDisplayDate(r.date),
+            typeLabel: KIND_LABELS[r.kind],
+            reference: r.reference,
+            relatedInvoice: r.relatedInvoice,
+            amount: r.amount,
+            direction: r.direction,
+            status: r.status,
+          })),
+          summary,
+        },
+        action
+      );
+    } catch (err) {
+      console.error("Error generating transaction history PDF:", err);
+      toast.error("Failed to generate PDF. Please try again.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const canExport = showingCurrent && rows.length > 0;
+
   return (
     <div className="space-y-5 mt-5">
-      {/* Header: filter */}
+      {/* Header: filter + export */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-base font-medium text-default-700 dark:text-gray-200">
           Transaction History
         </h3>
-        <TimeNavigator
-          range={range}
-          onChange={(r) => onRangeChange(r)}
-          modes={["month", "range", "year"]}
-          size="sm"
-        />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleExport("print")}
+            disabled={!canExport || isExporting}
+            className="inline-flex items-center gap-1.5 h-[34px] px-3 rounded-lg border border-default-300 dark:border-gray-600 text-sm font-medium text-default-700 dark:text-gray-200 bg-default-50 dark:bg-gray-900/50 hover:bg-default-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Print transaction history"
+          >
+            <IconPrinter size={16} />
+            Print
+          </button>
+          <button
+            type="button"
+            onClick={() => handleExport("download")}
+            disabled={!canExport || isExporting}
+            className="inline-flex items-center gap-1.5 h-[34px] px-3 rounded-lg border border-default-300 dark:border-gray-600 text-sm font-medium text-default-700 dark:text-gray-200 bg-default-50 dark:bg-gray-900/50 hover:bg-default-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Download transaction history as PDF"
+          >
+            <IconDownload size={16} />
+            PDF
+          </button>
+          <TimeNavigator
+            range={range}
+            onChange={(r) => onRangeChange(r)}
+            modes={["month", "range", "year"]}
+            size="sm"
+          />
+        </div>
       </div>
 
       {/* Summary cards */}

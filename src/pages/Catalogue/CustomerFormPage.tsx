@@ -1046,6 +1046,7 @@ const CustomerFormPage: React.FC = () => {
                 {isEditMode && id ? (
                   <CustomerTransactionsTab
                     customerId={id}
+                    customerName={formData.name}
                     range={txnRange}
                     onRangeChange={setTxnRange}
                     cache={txnCache}
