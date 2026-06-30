@@ -125,7 +125,7 @@ export const GreenTargetNavData: SidebarItem[] = [
     icon: IconReceipt,
     subItems: [
       {
-        name: "Monthly Payroll",
+        name: "Payrolls",
         path: "/payroll",
         component: GTPayrollPage,
         subItems: [
