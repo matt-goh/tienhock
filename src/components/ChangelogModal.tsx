@@ -80,8 +80,8 @@ const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   },
   {
     date: "2026-06-28",
-    ms: "Halaman pelanggan kini mempunyai tab baharu \"Transaction History\" yang memaparkan semua aktiviti pelanggan tersebut di satu tempat — invois, pembayaran, serta Nota Kredit/Debit/Bayaran Balik — disusun mengikut tarikh (terkini di atas). Terdapat penapis tarikh (Bulan/Julat/Tahun) yang lalai kepada 30 hari lepas, kad ringkasan Jumlah Diinvois / Jumlah Dibayar / bilangan pelarasan, dan setiap baris boleh diklik untuk terus membuka invois atau dokumen berkenaan.",
-    en: "The customer page now has a new \"Transaction History\" tab that shows everything for that customer in one place — invoices, payments, and Credit/Debit/Refund Notes — sorted by date (newest first). It has a date filter (Month/Range/Year) defaulting to the last 30 days, summary cards for Total Invoiced / Total Paid / number of adjustments, and every row is clickable to jump straight to the related invoice or document.",
+    ms: "Halaman pelanggan kini mempunyai tab baharu \"Transaction History\" yang memaparkan semua aktiviti pelanggan tersebut di satu tempat — invois, pembayaran, serta Nota Kredit/Debit/Bayaran Balik — disusun mengikut tarikh (terkini di atas). Terdapat penapis tarikh (Bulan/Julat/Tahun) yang lalai kepada 30 hari lepas, kad ringkasan Jumlah Diinvois / Jumlah Dibayar / bilangan pelarasan, dan setiap baris boleh diklik untuk terus membuka invois atau dokumen berkenaan. Sejarah ini juga boleh dicetak atau dimuat turun sebagai PDF.",
+    en: "The customer page now has a new \"Transaction History\" tab that shows everything for that customer in one place — invoices, payments, and Credit/Debit/Refund Notes — sorted by date (newest first). It has a date filter (Month/Range/Year) defaulting to the last 30 days, summary cards for Total Invoiced / Total Paid / number of adjustments, and every row is clickable to jump straight to the related invoice or document. The history can also be printed or downloaded as a PDF.",
   },
   {
     date: "2026-06-27",
