@@ -87,6 +87,29 @@ interface PayrollSettings {
 }
 
 type TabType = "rules" | "settings";
+type RuleType = "PLACEMENT" | "PICKUP";
+
+interface OperatorOption {
+  value: string;
+  label: string;
+}
+
+const CONDITION_OPERATOR_OPTIONS: OperatorOption[] = [
+  { value: "=", label: "=" },
+  { value: "<=", label: "<=" },
+  { value: ">", label: ">" },
+  { value: "<", label: "<" },
+  { value: ">=", label: ">=" },
+];
+
+const DESTINATION_OPERATOR_OPTIONS: OperatorOption[] = [
+  { value: "=", label: "=" },
+];
+
+const getPrimaryOperatorOptions = (conditionField: string): OperatorOption[] =>
+  conditionField === "destination"
+    ? DESTINATION_OPERATOR_OPTIONS
+    : CONDITION_OPERATOR_OPTIONS;
 
 const PayrollRulesPage: React.FC = () => {
   const navigate = useNavigate();
@@ -127,7 +150,7 @@ const PayrollRulesPage: React.FC = () => {
   });
 
   const [ruleForm, setRuleForm] = useState({
-    rule_type: "PLACEMENT" as "PLACEMENT" | "PICKUP",
+    rule_type: "PLACEMENT" as RuleType,
     condition_field: "invoice_amount",
     condition_operator: "<=",
     condition_value: "",
@@ -294,13 +317,17 @@ const PayrollRulesPage: React.FC = () => {
   };
 
   // Rule handlers
-  const openRuleModal = (rule?: PayrollRule) => {
+  const openRuleModal = (
+    rule?: PayrollRule,
+    defaultRuleType: RuleType = "PLACEMENT"
+  ): void => {
     if (rule) {
       setEditingRule(rule);
       setRuleForm({
         rule_type: rule.rule_type,
         condition_field: rule.condition_field,
-        condition_operator: rule.condition_operator,
+        condition_operator:
+          rule.condition_field === "destination" ? "=" : rule.condition_operator,
         condition_value: rule.condition_value,
         secondary_condition_field: rule.secondary_condition_field || "",
         secondary_condition_operator: rule.secondary_condition_operator || "",
@@ -312,9 +339,10 @@ const PayrollRulesPage: React.FC = () => {
     } else {
       setEditingRule(null);
       setRuleForm({
-        rule_type: "PLACEMENT",
-        condition_field: "invoice_amount",
-        condition_operator: "<=",
+        rule_type: defaultRuleType,
+        condition_field:
+          defaultRuleType === "PLACEMENT" ? "invoice_amount" : "destination",
+        condition_operator: defaultRuleType === "PLACEMENT" ? "<=" : "=",
         condition_value: "",
         secondary_condition_field: "",
         secondary_condition_operator: "",
@@ -354,8 +382,13 @@ const PayrollRulesPage: React.FC = () => {
 
     setIsSaving(true);
     try {
+      const conditionOperator: string =
+        ruleForm.condition_field === "destination"
+          ? "="
+          : ruleForm.condition_operator;
       const payload = {
         ...ruleForm,
+        condition_operator: conditionOperator,
         secondary_condition_field:
           ruleForm.secondary_condition_field || undefined,
         secondary_condition_operator:
@@ -641,10 +674,7 @@ const PayrollRulesPage: React.FC = () => {
                 </span>
               </div>
               <button
-                onClick={() => {
-                  setRuleForm((prev) => ({ ...prev, rule_type: "PLACEMENT", condition_field: "invoice_amount" }));
-                  openRuleModal();
-                }}
+                onClick={() => openRuleModal(undefined, "PLACEMENT")}
                 className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition-colors"
               >
                 <IconPlus size={14} />
@@ -754,10 +784,7 @@ const PayrollRulesPage: React.FC = () => {
                 </span>
               </div>
               <button
-                onClick={() => {
-                  setRuleForm((prev) => ({ ...prev, rule_type: "PICKUP", condition_field: "destination" }));
-                  openRuleModal();
-                }}
+                onClick={() => openRuleModal(undefined, "PICKUP")}
                 className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition-colors"
               >
                 <IconPlus size={14} />
@@ -1461,6 +1488,7 @@ const PayrollRulesPage: React.FC = () => {
                               value === "PLACEMENT"
                                 ? "invoice_amount"
                                 : "destination",
+                            condition_operator: value === "PICKUP" ? "=" : "<=",
                           }));
                         }}
                       >
@@ -1564,6 +1592,10 @@ const PayrollRulesPage: React.FC = () => {
                               setRuleForm((prev) => ({
                                 ...prev,
                                 condition_field: value,
+                                condition_operator:
+                                  value === "destination"
+                                    ? "="
+                                    : prev.condition_operator,
                               }))
                             }
                           >
@@ -1636,13 +1668,9 @@ const PayrollRulesPage: React.FC = () => {
                                 </span>
                               </ListboxButton>
                               <ListboxOptions className="absolute z-10 mt-1 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                                {[
-                                  { value: "=", label: "=" },
-                                  { value: "<=", label: "<=" },
-                                  { value: ">", label: ">" },
-                                  { value: "<", label: "<" },
-                                  { value: ">=", label: ">=" },
-                                ].map((op) => (
+                                {getPrimaryOperatorOptions(
+                                  ruleForm.condition_field
+                                ).map((op) => (
                                   <ListboxOption
                                     key={op.value}
                                     value={op.value}
