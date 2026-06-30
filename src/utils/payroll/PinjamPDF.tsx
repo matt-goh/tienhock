@@ -32,6 +32,7 @@ interface PinjamPDFData {
   month: number;
   totalMidMonthPinjam: number;
   totalMonthlyPinjam: number;
+  companyName?: string;
 }
 
 const styles = StyleSheet.create({
@@ -213,6 +214,7 @@ const formatCurrency = (amount: number): string => {
 
 const PinjamPDFDocument: React.FC<{ data: PinjamPDFData }> = ({ data }) => {
   const { employees, year, month } = data;
+  const companyName = data.companyName || "TIEN HOCK FOOD INDUSTRIES S/B";
   const monthName = getMonthName(month);
 
   const renderEmployeeCard = (employee: PinjamEmployee) => (
@@ -342,9 +344,7 @@ const PinjamPDFDocument: React.FC<{ data: PinjamPDFData }> = ({ data }) => {
       <Page size="A4" style={styles.page} wrap>
         {/* Header - flows once at the top, so it appears only on the first page */}
         <View style={styles.headerSection}>
-          <Text style={styles.companyHeader}>
-            TIEN HOCK FOOD INDUSTRIES S/B
-          </Text>
+          <Text style={styles.companyHeader}>{companyName}</Text>
         </View>
 
         {/* Employee Cards - react-pdf flows these across pages automatically */}

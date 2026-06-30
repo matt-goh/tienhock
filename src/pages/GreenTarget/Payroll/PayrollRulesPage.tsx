@@ -29,6 +29,7 @@ import {
   IconRuler,
   IconPackage,
   IconSearch,
+  IconExternalLink,
 } from "@tabler/icons-react";
 import clsx from "clsx";
 
@@ -71,6 +72,11 @@ interface PayCode {
   id: string;
   description: string;
   rate_biasa: number;
+  rate_ahad?: number;
+  rate_umum?: number;
+  pay_type?: string;
+  rate_unit?: string;
+  is_active?: boolean;
 }
 
 interface PayrollSettings {
@@ -493,6 +499,17 @@ const PayrollRulesPage: React.FC = () => {
       (a.pay_code_id || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.display_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+  const filteredDriverPayCodes = payCodes.filter(
+    (p) =>
+      (p.id || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.description || "").toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Open a pay code in the global Pay Codes catalogue with its id prefilled in
+  // the search box (PayCodePage reads the ?desc= query param).
+  const openInPayCodePage = (payCodeId: string) => {
+    navigate(`/catalogue/pay-codes?desc=${encodeURIComponent(payCodeId)}`);
+  };
 
   if (isLoading) {
     return (
@@ -958,6 +975,97 @@ const PayrollRulesPage: React.FC = () => {
               )}
             </tbody>
           </table>
+          </div>
+
+          {/* Driver Pay Codes (read-only reference) */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+            <div className="px-4 py-2 border-b border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/50 flex items-center justify-between">
+              <div>
+                <span className="text-sm font-medium text-default-700 dark:text-gray-300">
+                  Driver Pay Codes
+                </span>
+                <span className="text-xs text-default-400 dark:text-gray-500 ml-2">
+                  Mapped to the driver job — read-only, click to view in Pay Codes
+                </span>
+              </div>
+            </div>
+            <table className="w-full text-sm">
+              <thead className="bg-default-50 dark:bg-gray-700">
+                <tr>
+                  <th className="px-4 py-2 text-left text-default-600 dark:text-gray-300 font-medium text-xs">
+                    Pay Code
+                  </th>
+                  <th className="px-4 py-2 text-left text-default-600 dark:text-gray-300 font-medium text-xs">
+                    Description
+                  </th>
+                  <th className="px-4 py-2 text-left text-default-600 dark:text-gray-300 font-medium text-xs w-24">
+                    Type
+                  </th>
+                  <th className="px-4 py-2 text-left text-default-600 dark:text-gray-300 font-medium text-xs w-20">
+                    Unit
+                  </th>
+                  <th className="px-4 py-2 text-right text-default-600 dark:text-gray-300 font-medium text-xs w-24">
+                    Biasa
+                  </th>
+                  <th className="px-4 py-2 text-right text-default-600 dark:text-gray-300 font-medium text-xs w-24">
+                    Ahad
+                  </th>
+                  <th className="px-4 py-2 text-right text-default-600 dark:text-gray-300 font-medium text-xs w-24">
+                    Umum
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredDriverPayCodes.map((pc) => (
+                  <tr
+                    key={pc.id}
+                    onClick={() => openInPayCodePage(pc.id)}
+                    className="border-b border-default-100 dark:border-gray-700 cursor-pointer hover:bg-sky-50/60 dark:hover:bg-sky-900/20 group"
+                    title="Open in Pay Codes"
+                  >
+                    <td className="px-4 py-2">
+                      <span className="inline-flex items-center gap-1 font-mono font-medium text-sky-600 dark:text-sky-400 text-xs">
+                        {pc.id}
+                        <IconExternalLink
+                          size={12}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        />
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-default-800 dark:text-gray-200">
+                      {pc.description}
+                    </td>
+                    <td className="px-4 py-2 text-default-600 dark:text-gray-400 text-xs">
+                      {pc.pay_type || "-"}
+                    </td>
+                    <td className="px-4 py-2 text-default-600 dark:text-gray-400 text-xs">
+                      {pc.rate_unit || "-"}
+                    </td>
+                    <td className="px-4 py-2 text-right font-mono text-default-800 dark:text-gray-200 text-xs">
+                      {(Number(pc.rate_biasa) || 0).toFixed(2)}
+                    </td>
+                    <td className="px-4 py-2 text-right font-mono text-default-600 dark:text-gray-400 text-xs">
+                      {(Number(pc.rate_ahad) || 0).toFixed(2)}
+                    </td>
+                    <td className="px-4 py-2 text-right font-mono text-default-600 dark:text-gray-400 text-xs">
+                      {(Number(pc.rate_umum) || 0).toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+                {filteredDriverPayCodes.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="px-4 py-6 text-center text-default-500 dark:text-gray-400 text-sm"
+                    >
+                      {searchTerm
+                        ? "No driver pay codes matching search"
+                        : "No driver pay codes found"}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

@@ -19,6 +19,56 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-06-30",
+    ms: "Halaman General Stock kini mengurus kategori melalui tetingkap khas. Tekan butang \"Manage\" atau klik mana-mana kategori untuk membuka tetingkap di mana anda boleh menambah, menamakan semula, dan memadam kategori di satu tempat. Kotak pintasan \"New category\" masih ada untuk menambah kategori dengan cepat. Paparan kategori di halaman juga diperkemas dan lebih jelas.",
+    en: "The General Stock page now manages categories through a dedicated pop-up. Press the \"Manage\" button or click any category to open a window where you can add, rename, and delete categories in one place. The quick \"New category\" box is still there for fast adding. The category list shown on the page has also been tidied up and made clearer.",
+  },
+  {
+    date: "2026-06-30",
+    ms: "Green Target kini mempunyai halaman \"E-Caruman\" baharu di bawah menu Payroll untuk menjana fail caruman berkanun: KWSP (CSV), gabungan SOCSO + EIS/SIP (fail teks PERKESO), dan PCB (fail teks LHDN CP39) — sama format seperti Tien Hock tetapi menggunakan data Green Target. Kod pendaftaran majikan (kod majikan PERKESO, MyCoID/SSM, nombor E LHDN) kini boleh dimasukkan terus pada halaman ini dan disimpan dalam pangkalan data untuk kegunaan akan datang. Halaman ini juga menunjukkan pratonton bilangan pekerja dan jumlah caruman, serta memberi amaran jika ada pekerja yang mencarum KWSP tetapi tiada nombor KWSP.",
+    en: "Green Target now has a new \"E-Caruman\" page under the Payroll menu to generate statutory contribution files: EPF (CSV), combined SOCSO + EIS/SIP (PERKESO text file), and PCB (LHDN CP39 text file) — same formats as Tien Hock but using Green Target data. The employer registration codes (PERKESO employer code, MyCoID/SSM, LHDN E-number) can now be entered on the page and are saved in the database for reuse. The page also previews the employee counts and contribution totals, and warns if any employee has an EPF contribution but no EPF number.",
+  },
+  {
+    date: "2026-06-30",
+    ms: "Green Target kini mempunyai halaman \"Salary Report\" baharu di bawah menu Payroll. Laporan ini dikumpulkan mengikut jenis kerja (Office / Driver) — Green Target tiada lokasi — dan memaparkan setiap pekerja dengan lajur GAJI, OT, BONUS, C/I/O, CUTI, gaji kasar, KWSP/SOCSO/SIP (majikan & pekerja), PCB, gaji bersih, pendahuluan separuh bulan dan jumlah digenapkan. Terdapat paparan Bulanan dan Tahunan (ringkasan + pecahan setiap pekerja mengikut bulan), serta cetak/muat turun PDF.",
+    en: "Green Target now has a new \"Salary Report\" page under the Payroll menu. The report is grouped by job type (Office / Driver) — Green Target has no locations — and lists each employee with GAJI, OT, BONUS, C/I/O, CUTI, gross, EPF/SOCSO/SIP (employer & employee), PCB, net pay, mid-month advance and rounded totals. It has Monthly and Annual views (summary + per-employee monthly breakdown), with print/download to PDF.",
+  },
+  {
+    date: "2026-06-30",
+    ms: "Penambahbaikan cetakan & laporan gaji Green Target: (1) Slip gaji kini memaparkan Bonus, Advance dan Kerja Luar OT sebagai baris berasingan, serta potongan Advance — jadi gaji kasar tolak potongan berkanun tolak advance = gaji bersih boleh disemak dengan jelas (halaman Butiran Gaji juga menunjukkan pecahan ini). (2) Halaman Gaji Bulanan kini ada butang cetak/muat turun slip gaji secara pukal untuk semua pekerja sekali gus. (3) Halaman Pinjam kini ada cetak/muat turun ringkasan Pinjam (PDF). (4) Halaman Mid-month kini ada laporan PDF dan eksport fail bank Public Bank (IBG .txt) untuk pekerja yang dibayar melalui Bank.",
+    en: "Green Target payroll printing & reports improvements: (1) Payslips now show Bonus, Advance and Kerja Luar OT as their own lines, plus the Advance deduction — so gross minus statutory deductions minus advance = net pay is clearly visible (the Payroll Details page also shows this breakdown). (2) The Monthly Payroll page now has buttons to print/download all employees' payslips in one batch. (3) The Pinjam page now has print/download of the Pinjam summary (PDF). (4) The Mid-month page now has a report PDF and a Public Bank (IBG .txt) bank-file export for Bank-payment employees.",
+  },
+  {
+    date: "2026-06-29",
+    ms: "Green Target kini mempunyai halaman baharu \"Daily Lori Habuk\" di bawah menu Payroll untuk merekod trip pemandu lori habuk setiap hari. Pilih satu tarikh dan setiap pemandu dipaparkan sebagai kad dengan senarai trip pada hari itu. Trip daripada sewaan (rental) yang telah lengkap diisi secara automatik (placement & pickup), trip habuk manual boleh ditambah di atasnya, dan bonus \"> 6 trip sehari\" (TRIP_LB6) dikira secara automatik. PENTING: gaji trip pemandu kini diambil daripada log harian yang DISIMPAN semasa memproses gaji bulanan — bukan lagi dikira terus daripada rekod sewaan. Jadi log harian setiap pemandu mesti disimpan untuk hari-hari berkenaan; jika tiada log disimpan untuk sesuatu bulan, pemandu hanya menerima gaji pokok sahaja (rekod sewaan hanya mengisi cadangan, tidak lagi membayar secara automatik).",
+    en: "Green Target now has a new \"Daily Lori Habuk\" page under the Payroll menu to record each driver's daily habuk-lorry trips. Pick a date and every driver shows as a card listing that day's trips. Completed rentals prefill automatically (placement & pickup), manual habuk trips can be added on top, and the \"more than 6 trips a day\" bonus (TRIP_LB6) is worked out automatically. IMPORTANT: driver trip pay is now taken from the SAVED daily log when monthly payroll is processed — it is no longer calculated directly from rental records. So each driver's daily log must be saved for the relevant days; if no log is saved for a month, the driver receives base salary only (rentals only prefill the suggestion, they no longer pay automatically).",
+  },
+  {
+    date: "2026-06-29",
+    ms: "Halaman General Stock kini mempunyai butang pintasan ke senarai General Purchases, pembelian local baharu dan pembelian foreign baharu. Senarai General Purchases juga kini mempunyai pintasan kembali ke General Stock.",
+    en: "The General Stock page now has shortcut buttons to the General Purchases list, a new local purchase, and a new foreign purchase. The General Purchases list also has a shortcut back to General Stock.",
+  },
+  {
+    date: "2026-06-29",
+    ms: "Muat turun SQL backup kini lebih cepat dan lebih stabil. Sistem tidak lagi membuat salinan database sementara semasa menukar backup kepada SQL, jadi muat turun yang dibatalkan akan berhenti dengan kemas dan tidak memperlahankan laman web. Semasa muat turun sedang berjalan, tetingkap backup akan kekal terbuka dan navigasi keluar akan disekat sehingga selesai.",
+    en: "Backup SQL downloads are now faster and more stable. The system no longer creates a temporary database copy when converting a backup to SQL, so cancelled downloads stop cleanly and do not slow down the website. While a download is running, the backup window stays open and navigation away is blocked until it finishes.",
+  },
+  {
+    date: "2026-06-29",
+    ms: "General Purchase kini memasukkan jumlah, cukai dan akaun GL di peringkat invois, bukan lagi di setiap item. Item pembelian kini fokus kepada stok sahaja, boleh menambah beberapa item untuk pembelian local dan foreign, serta boleh pilih item General Stock sedia ada untuk menambah baki ke item tersebut dengan pratonton baki baharu.",
+    en: "General Purchase now enters amount, tax, and GL account at invoice level instead of per item. Purchase items now focus on stock only, local and foreign purchases can both contain multiple items, and an item can append quantity to an existing General Stock item with a new-balance preview.",
+  },
+  {
+    date: "2026-06-29",
+    ms: "Green Target kini mempunyai tiga halaman baharu di bawah menu Payroll: \"Bonus\", \"Others (Advance)\" dan \"Others (Kerja Luar OT)\" — sama seperti Tien Hock. Bonus menambah jumlah kepada gaji kasar dan gaji bersih pekerja. Others (Advance) menambah kepada gaji kasar tetapi ditolak semula sebagai pendahuluan (advance), jadi tiada kesan bersih. Others (Kerja Luar OT) merekod kerja ikut kod gaji, kadar dan kuantiti, dan menambah kepada gaji kasar. Semua tiga jenis ini kini diambil kira secara automatik semasa memproses gaji bulanan Green Target. Setiap halaman hanya memaparkan pekerja payroll Green Target sahaja.",
+    en: "Green Target now has three new pages under the Payroll menu: \"Bonus\", \"Others (Advance)\", and \"Others (Kerja Luar OT)\" — matching Tien Hock. Bonus adds an amount to the employee's gross and net pay. Others (Advance) adds to gross pay but is deducted back as an advance, so it has no net effect. Others (Kerja Luar OT) records work by pay code, rate, and quantity, and adds to gross pay. All three now feed into Green Target's monthly payroll processing automatically. Each page only lists Green Target payroll employees.",
+  },
+  {
+    date: "2026-06-29",
+    ms: "Entri bulanan Office bagi Green Target kini menyokong kod gaji (pay codes), sama seperti Tien Hock. Setiap pekerja office kini mempunyai butang \"Activities\" untuk memilih kod gaji yang berkenaan (gaji pokok, kerja lebih masa, elaun dan sebagainya) serta menetapkan jumlahnya. Yang penting, kod gaji peribadi pekerja itu (contohnya gaji bulanan) kini diambil secara automatik — sebelum ini entri Office hanya merekod jam kerja sahaja.",
+    en: "Green Target's Office monthly entry now supports pay codes, just like Tien Hock. Each office employee now has an \"Activities\" button to choose which pay codes apply (basic salary, overtime, allowances, etc.) and set their amounts. Importantly, the employee's own pay codes (such as their monthly salary) are now picked up automatically — previously the Office entry only recorded hours.",
+  },
+  {
     date: "2026-06-28",
     ms: "Kod gaji jenis Tambahan kini boleh ditetapkan sebagai \"Default\" (ditanda secara automatik semasa membuat entri kerja baharu) melalui tetingkap edit kadar, sama seperti kod gaji Base. Sebagai permulaan, semua kod Tambahan ditetapkan TIDAK default kecuali \"SAPU1\" (SAPU SELURUH KAWASAN KILANG) — jadi SAPU1 kini ditanda secara automatik apabila membuat entri kerja harian dan bulanan baharu (boleh dibuang secara manual jika tidak berkenaan), manakala semua kod Tambahan lain kekal tidak ditanda. Tetingkap edit kadar untuk kod Tambahan kini juga mempunyai butang \"Unlink Pay Code\" untuk menanggalkan kaitan kod itu, sama seperti kod gaji lain.",
     en: "Tambahan pay codes can now be set as \"Default\" (auto-ticked when creating new work entries) from the rate edit window, just like Base pay codes. To start, all Tambahan codes were set to NOT default except \"SAPU1\" (SAPU SELURUH KAWASAN KILANG) — so SAPU1 is now auto-ticked when creating new daily and monthly work entries (you can untick it manually if it doesn't apply), while all other Tambahan codes stay unticked. The rate edit window for Tambahan codes now also has an \"Unlink Pay Code\" button to remove the association, just like other pay codes.",

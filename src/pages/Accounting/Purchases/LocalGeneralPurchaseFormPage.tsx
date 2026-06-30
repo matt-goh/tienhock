@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import {
+  IconArrowNarrowRight,
   IconDownload,
   IconEye,
   IconFile,
@@ -26,6 +27,7 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import { api } from "../../../routes/utils/api";
 import {
   GeneralStockCategory,
+  GeneralStockRow,
   SelfBilledForeignSupplier,
   SelfBilledInvoice,
   SelfBilledInvoiceInput,
@@ -37,10 +39,7 @@ interface LocalGeneralPurchaseFormData {
   supplier_name: string;
   order_no: string;
   payment_reference: string;
-  description: string;
   amount_myr: string;
-  balance_quantity: string;
-  general_stock_category_id: string;
   account_code: string;
   notes: string;
 }
@@ -127,6 +126,36 @@ const formatCurrency = (amount: number): string =>
     minimumFractionDigits: 2,
   }).format(amount);
 
+const formatQty = (amount: number): string => {
+  return amount.toLocaleString("en-MY", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 4,
+  });
+};
+
+const normalizeStockDescription = (value: string | null | undefined): string =>
+  (value || "").trim().replace(/\s+/g, " ").toLowerCase();
+
+const createDefaultLine = (lineNumber: number): SelfBilledInvoiceLine => ({
+  line_number: lineNumber,
+  description: "",
+  quantity: 1,
+  balance_quantity: null,
+  general_stock_category_id: null,
+  unit_price_foreign: 0,
+  amount_foreign: 0,
+  amount_myr: 0,
+  classification_code: "034",
+  tax_type: "06",
+  tax_rate: 0,
+  tax_amount_myr: 0,
+  tax_exemption_reason: null,
+  customs_form_reference: null,
+  account_code: null,
+  stock_append_target_line_id: null,
+  notes: null,
+});
+
 const isViewable = (filename?: string | null, contentType?: string | null): boolean => {
   if (contentType) return contentType.startsWith("image/") || contentType === "application/pdf";
   if (!filename) return false;
@@ -145,15 +174,16 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
     supplier_name: "",
     order_no: "",
     payment_reference: "",
-    description: "",
     amount_myr: "",
-    balance_quantity: "",
-    general_stock_category_id: "",
     account_code: "",
     notes: "",
   });
+  const [lines, setLines] = useState<SelfBilledInvoiceLine[]>([
+    createDefaultLine(1),
+  ]);
   const [existingInvoice, setExistingInvoice] = useState<SelfBilledInvoice | null>(null);
   const [categories, setCategories] = useState<GeneralStockCategory[]>([]);
+  const [generalStockRows, setGeneralStockRows] = useState<GeneralStockRow[]>([]);
   const [loading, setLoading] = useState<boolean>(isEditMode);
   const [saving, setSaving] = useState<boolean>(false);
   const [s3Enabled, setS3Enabled] = useState<boolean>(true);
@@ -177,6 +207,18 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
       })),
     ],
     [categories]
+  );
+  const generalStockOptions = useMemo(
+    () => [
+      { id: "", name: "New General stock item" },
+      ...generalStockRows.map((row: GeneralStockRow) => ({
+        id: String(row.line_id),
+        name: `${row.description} (Qty ${formatQty(
+          toNumber(row.current_stock)
+        )}) - ${row.purchase_no}`,
+      })),
+    ],
+    [generalStockRows]
   );
   const payableAmount = useMemo<number>(
     () => Math.round(toNumber(formData.amount_myr) * 100) / 100,
@@ -236,15 +278,28 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
         supplier_name: invoice.local_supplier_name || "",
         order_no: invoice.order_no || "",
         payment_reference: invoice.payment_reference || "",
-        description: line?.description || "",
-        amount_myr: String(toNumber(line?.amount_myr || invoice.payable_amount_myr)),
-        balance_quantity: line?.balance_quantity === null || line?.balance_quantity === undefined
-          ? ""
-          : String(line.balance_quantity),
-        general_stock_category_id: line?.general_stock_category_id ? String(line.general_stock_category_id) : "",
-        account_code: line?.account_code || "",
+        amount_myr: String(toNumber(invoice.total_excluding_tax_myr || invoice.payable_amount_myr || line?.amount_myr)),
+        account_code: invoice.account_code || line?.account_code || "",
         notes: invoice.notes || "",
       });
+      setLines(
+        invoice.lines.length > 0
+          ? invoice.lines.map((invoiceLine: SelfBilledInvoiceLine) => ({
+              ...invoiceLine,
+              quantity: toNumber(invoiceLine.quantity),
+              balance_quantity: toNullableNumber(invoiceLine.balance_quantity),
+              general_stock_category_id:
+                invoiceLine.general_stock_category_id || null,
+              unit_price_foreign: toNumber(invoiceLine.unit_price_foreign),
+              amount_foreign: toNumber(invoiceLine.amount_foreign),
+              amount_myr: toNumber(invoiceLine.amount_myr),
+              tax_rate: toNumber(invoiceLine.tax_rate),
+              tax_amount_myr: toNumber(invoiceLine.tax_amount_myr),
+              stock_append_target_line_id:
+                invoiceLine.stock_append_target_line_id || null,
+            }))
+          : [createDefaultLine(1)]
+      );
       setSupplierPayment((previous: SupplierPaymentDraft) => ({
         ...previous,
         payment_date: toLocalDateInputValue(invoice.purchase_date) || today,
@@ -285,6 +340,18 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
       });
   }, [isEditMode]);
 
+  useEffect(() => {
+    api
+      .get<{ rows: GeneralStockRow[] }>(
+        "/api/general-purchases/general-stock/search?limit=200"
+      )
+      .then(({ rows }) => setGeneralStockRows(rows || []))
+      .catch((error: unknown) => {
+        console.error("Error loading general stock rows:", error);
+        setGeneralStockRows([]);
+      });
+  }, []);
+
   const updateFormField = (
     field: keyof LocalGeneralPurchaseFormData,
     value: string
@@ -303,6 +370,99 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
     }
   };
 
+  const updateLineField = (
+    index: number,
+    field: keyof SelfBilledInvoiceLine,
+    value: string | number
+  ): void => {
+    setLines((previousLines: SelfBilledInvoiceLine[]) =>
+      previousLines.map((line: SelfBilledInvoiceLine, lineIndex: number) =>
+        lineIndex === index ? { ...line, [field]: value as never } : line
+      )
+    );
+  };
+
+  const updateLineAppendTarget = (index: number, value: string): void => {
+    const targetId = value ? Number.parseInt(value, 10) : null;
+    const targetRow = targetId
+      ? generalStockRows.find((row: GeneralStockRow) => row.line_id === targetId)
+      : null;
+
+    setLines((previousLines: SelfBilledInvoiceLine[]) =>
+      previousLines.map((line: SelfBilledInvoiceLine, lineIndex: number) => {
+        if (lineIndex !== index) return line;
+        return {
+          ...line,
+          stock_append_target_line_id: targetId,
+          description: targetRow ? targetRow.description : line.description,
+          general_stock_category_id: targetRow
+            ? targetRow.general_stock_category_id
+            : line.general_stock_category_id,
+        };
+      })
+    );
+  };
+
+  const addLineItem = (): void => {
+    setLines((previousLines: SelfBilledInvoiceLine[]) => [
+      ...previousLines,
+      createDefaultLine(previousLines.length + 1),
+    ]);
+  };
+
+  const removeLineItem = (index: number): void => {
+    setLines((previousLines: SelfBilledInvoiceLine[]) =>
+      previousLines.length <= 1
+        ? previousLines
+        : previousLines
+            .filter((_, lineIndex: number) => lineIndex !== index)
+            .map((line: SelfBilledInvoiceLine, lineIndex: number) => ({
+              ...line,
+              line_number: lineIndex + 1,
+            }))
+    );
+  };
+
+  const getSelectedGeneralStockRow = (
+    line: SelfBilledInvoiceLine
+  ): GeneralStockRow | null => {
+    if (!line.stock_append_target_line_id) return null;
+    return (
+      generalStockRows.find(
+        (row: GeneralStockRow) => row.line_id === line.stock_append_target_line_id
+      ) || null
+    );
+  };
+
+  const findDuplicateNewStockRow = (
+    line: SelfBilledInvoiceLine
+  ): GeneralStockRow | null => {
+    if (line.stock_append_target_line_id) return null;
+
+    const normalizedDescription = normalizeStockDescription(line.description);
+    if (!normalizedDescription) return null;
+
+    const originalLine = line.id
+      ? existingInvoice?.lines.find(
+          (existingLine: SelfBilledInvoiceLine) => existingLine.id === line.id
+        )
+      : null;
+    if (
+      originalLine &&
+      normalizeStockDescription(originalLine.description) === normalizedDescription
+    ) {
+      return null;
+    }
+
+    return (
+      generalStockRows.find(
+        (row: GeneralStockRow) =>
+          row.line_id !== line.id &&
+          normalizeStockDescription(row.description) === normalizedDescription
+      ) || null
+    );
+  };
+
   const validateBeforeSave = (): boolean => {
     if (!formData.supplier_name.trim()) {
       toast.error("Supplier name is required");
@@ -312,8 +472,8 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
       toast.error("Purchase date is required");
       return false;
     }
-    if (!formData.description.trim()) {
-      toast.error("Description is required");
+    if (lines.length === 0) {
+      toast.error("At least one item is required");
       return false;
     }
     if (toNumber(formData.amount_myr) <= 0) {
@@ -322,6 +482,29 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
     }
     if (!formData.account_code.trim()) {
       toast.error("GL account is required");
+      return false;
+    }
+    const invalidLineIndex = lines.findIndex(
+      (line: SelfBilledInvoiceLine) =>
+        !line.description.trim() ||
+        toNumber(line.quantity) <= 0 ||
+        (Boolean(line.stock_append_target_line_id) &&
+          toNumber(line.balance_quantity) <= 0)
+    );
+    if (invalidLineIndex >= 0) {
+      toast.error(`Line ${invalidLineIndex + 1} is incomplete`);
+      return false;
+    }
+    const duplicateLineIndex = lines.findIndex(
+      (line: SelfBilledInvoiceLine) => findDuplicateNewStockRow(line) !== null
+    );
+    if (duplicateLineIndex >= 0) {
+      const duplicateRow = findDuplicateNewStockRow(lines[duplicateLineIndex]);
+      toast.error(
+        `Line ${duplicateLineIndex + 1} matches existing General Stock item "${
+          duplicateRow?.description || ""
+        }". Select it in Stock Item to append balance instead.`
+      );
       return false;
     }
     const paymentError: string | null = validateSupplierPaymentDraft(
@@ -337,27 +520,34 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
 
   const buildPayload = (): SelfBilledInvoiceInput => {
     const amountMyr = toNumber(formData.amount_myr);
-    const line: SelfBilledInvoiceLine = {
-      id: existingInvoice?.lines[0]?.id,
-      line_number: 1,
-      description: formData.description.trim(),
-      quantity: 1,
-      balance_quantity: toNullableNumber(formData.balance_quantity),
-      general_stock_category_id: formData.general_stock_category_id
-        ? Number.parseInt(formData.general_stock_category_id, 10)
-        : null,
-      unit_price_foreign: amountMyr,
-      amount_foreign: amountMyr,
-      amount_myr: amountMyr,
-      classification_code: "034",
-      tax_type: "06",
-      tax_rate: 0,
-      tax_amount_myr: 0,
-      tax_exemption_reason: null,
-      customs_form_reference: null,
-      account_code: formData.account_code.trim() || null,
-      notes: null,
-    };
+    const linePayloads: SelfBilledInvoiceLine[] = lines.map(
+      (line: SelfBilledInvoiceLine, index: number) => {
+        const selectedStockRow = getSelectedGeneralStockRow(line);
+
+        return {
+          ...line,
+          line_number: index + 1,
+          description: selectedStockRow
+            ? selectedStockRow.description
+            : line.description.trim(),
+          quantity: toNumber(line.quantity),
+          balance_quantity: toNullableNumber(line.balance_quantity),
+          general_stock_category_id: line.general_stock_category_id || null,
+          unit_price_foreign: toNumber(line.unit_price_foreign),
+          amount_foreign: 0,
+          amount_myr: 0,
+          classification_code: "034",
+          tax_type: "06",
+          tax_rate: 0,
+          tax_amount_myr: 0,
+          tax_exemption_reason: null,
+          customs_form_reference: null,
+          account_code: null,
+          stock_append_target_line_id: line.stock_append_target_line_id || null,
+          notes: null,
+        };
+      }
+    );
 
     return {
       purchase_kind: "local",
@@ -378,8 +568,12 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
       supporting_document_notes: null,
       currency_code: "MYR",
       fx_rate: 1,
+      account_code: formData.account_code.trim() || null,
+      total_foreign_amount: amountMyr,
+      total_excluding_tax_myr: amountMyr,
+      tax_amount_myr: 0,
       notes: formData.notes.trim() || null,
-      lines: [line],
+      lines: linePayloads,
     };
   };
 
@@ -648,25 +842,23 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
       </section>
 
       <section className="rounded-lg border border-default-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
-          Purchase Summary
-        </h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
+            Purchase Items
+          </h2>
+          {canEdit && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-lg"
+              onClick={addLineItem}
+            >
+              Add Item
+            </Button>
+          )}
+        </div>
         <div className="space-y-3">
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
-              Description <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              value={formData.description}
-              onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) =>
-                updateFormField("description", event.target.value)
-              }
-              disabled={!canEdit}
-              rows={4}
-              className="w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 placeholder:text-default-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
-              placeholder="Purchase details"
-            />
-          </div>
           <div className="grid gap-3 md:grid-cols-2">
             <FormInput
               name="amount_myr"
@@ -689,28 +881,176 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
               disabled={!canEdit}
               placeholder="Pick the expense account to debit"
             />
-            <FormInput
-              name="balance_quantity"
-              label="Balance Quantity"
-              value={formData.balance_quantity}
-              type="number"
-              min={0}
-              step="1"
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                updateFormField("balance_quantity", event.target.value)
-              }
-              disabled={!canEdit}
-            />
-            <FormListbox
-              name="general_stock_category_id"
-              label="General Category"
-              value={formData.general_stock_category_id}
-              onChange={(value: string) =>
-                updateFormField("general_stock_category_id", value)
-              }
-              options={categoryOptions}
-              disabled={!canEdit}
-            />
+          </div>
+          <div className="space-y-3">
+            {lines.map((line: SelfBilledInvoiceLine, index: number) => {
+              const selectedStockRow = getSelectedGeneralStockRow(line);
+              const isAppend = Boolean(line.stock_append_target_line_id);
+              const newBalance =
+                toNumber(selectedStockRow?.current_stock) +
+                toNumber(line.balance_quantity);
+
+              return (
+                <div
+                  key={`${line.id || "new"}-${index}`}
+                  className="rounded-lg border border-default-200 bg-default-50/60 p-3 dark:border-gray-700 dark:bg-gray-900/30"
+                >
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-sky-100 px-2 text-xs font-semibold text-sky-800 dark:bg-sky-900/40 dark:text-sky-200">
+                        {index + 1}
+                      </span>
+                      <span className="text-sm font-medium text-default-800 dark:text-gray-100">
+                        Item {index + 1}
+                      </span>
+                      <span className="rounded-full bg-white px-2 py-0.5 text-xs text-default-500 ring-1 ring-default-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700">
+                        {isAppend ? "Existing item" : "New item"}
+                      </span>
+                    </div>
+                    {canEdit && lines.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeLineItem(index)}
+                        className="rounded p-1 text-rose-600 hover:bg-rose-50 hover:text-rose-800 focus:outline-none focus:ring-2 focus:ring-rose-500 dark:text-rose-300 dark:hover:bg-rose-900/30 dark:hover:text-rose-100"
+                        title="Remove item"
+                      >
+                        <IconTrash size={16} />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="mb-3 grid gap-3 lg:grid-cols-[minmax(220px,0.8fr)_minmax(260px,1fr)]">
+                    <FormListbox
+                      name={`stock_append_target_${index}`}
+                      label="Stock Item"
+                      value={
+                        line.stock_append_target_line_id
+                          ? String(line.stock_append_target_line_id)
+                          : ""
+                      }
+                      onChange={(value: string) =>
+                        updateLineAppendTarget(index, value)
+                      }
+                      options={generalStockOptions}
+                      disabled={!canEdit}
+                    />
+                    {selectedStockRow && (
+                      <div className="flex items-center gap-2.5 rounded-lg border border-indigo-200/70 bg-gradient-to-br from-indigo-50 to-white px-3 py-2 dark:border-indigo-900/60 dark:from-indigo-900/20 dark:to-gray-800/40">
+                        <div className="flex min-w-0 flex-col">
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-indigo-400 dark:text-indigo-300/70">
+                            Current
+                          </span>
+                          <span className="font-mono text-sm font-medium tabular-nums text-default-700 dark:text-gray-200">
+                            {formatQty(toNumber(selectedStockRow.current_stock))}
+                          </span>
+                        </div>
+                        <IconArrowNarrowRight
+                          size={18}
+                          className="shrink-0 text-indigo-400 dark:text-indigo-500"
+                        />
+                        <div className="flex min-w-0 flex-col">
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-indigo-500 dark:text-indigo-300">
+                            After purchase
+                          </span>
+                          <span className="font-mono text-sm font-bold tabular-nums text-indigo-700 dark:text-indigo-200">
+                            {formatQty(newBalance)}
+                          </span>
+                        </div>
+                        <span className="ml-auto inline-flex shrink-0 items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold tabular-nums text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                          +{formatQty(toNumber(line.balance_quantity))}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid items-stretch gap-3 xl:grid-cols-[minmax(260px,1.2fr)_minmax(420px,1fr)]">
+                    <div className="flex h-full flex-col gap-1.5">
+                      <label className="block text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">
+                        Item Description
+                      </label>
+                      <textarea
+                        value={
+                          selectedStockRow
+                            ? selectedStockRow.description
+                            : line.description
+                        }
+                        onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) =>
+                          updateLineField(index, "description", event.target.value)
+                        }
+                        disabled={!canEdit || isAppend}
+                        rows={4}
+                        className="min-h-[110px] flex-1 resize-y rounded-md border border-default-300 bg-white px-3 py-2 text-sm text-default-900 placeholder:text-default-400 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
+                        placeholder="Purchase details"
+                      />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <FormInput
+                        name={`quantity_${index}`}
+                        label="Qty"
+                        value={line.quantity}
+                        type="number"
+                        min={0}
+                        step="0.0001"
+                        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                          updateLineField(index, "quantity", event.target.value)
+                        }
+                        disabled={!canEdit}
+                      />
+                      <FormInput
+                        name={`unit_price_${index}`}
+                        label="Unit (MYR)"
+                        value={line.unit_price_foreign}
+                        type="number"
+                        min={0}
+                        step="1"
+                        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                          updateLineField(
+                            index,
+                            "unit_price_foreign",
+                            event.target.value
+                          )
+                        }
+                        disabled={!canEdit}
+                      />
+                      <FormInput
+                        name={`balance_quantity_${index}`}
+                        label="Balance Qty"
+                        value={line.balance_quantity ?? ""}
+                        type="number"
+                        min={0}
+                        step="1"
+                        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                          updateLineField(
+                            index,
+                            "balance_quantity",
+                            event.target.value
+                          )
+                        }
+                        disabled={!canEdit}
+                      />
+                      <FormListbox
+                        name={`general_stock_category_${index}`}
+                        label="General Category"
+                        value={
+                          line.general_stock_category_id
+                            ? String(line.general_stock_category_id)
+                            : ""
+                        }
+                        onChange={(value: string) =>
+                          updateLineField(
+                            index,
+                            "general_stock_category_id",
+                            value ? Number.parseInt(value, 10) : ""
+                          )
+                        }
+                        options={categoryOptions}
+                        disabled={!canEdit}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
