@@ -336,6 +336,8 @@ export interface SalaryReportPDFProps {
   locationOrder: LocationOrderItem[];
   // Optional filename suffix (e.g. "Batch_1") for batched downloads.
   fileNameSuffix?: string;
+  // Optional company header (default Tien Hock); Green Target passes its own.
+  companyName?: string;
 }
 
 // Helper functions
@@ -1113,6 +1115,7 @@ const SalaryReportPDF: React.FC<SalaryReportPDFProps> = ({
   grandTotals,
   locationMap,
   locationOrder,
+  companyName = "TIEN HOCK FOOD INDUSTRIES S/B (953309-T)",
 }) => {
   const reportTitle = buildReportTitle(periodType, year, month);
   const viewSubtitle = buildViewSubtitle(reportType);
@@ -1168,7 +1171,7 @@ const SalaryReportPDF: React.FC<SalaryReportPDFProps> = ({
       <Page size="A4" orientation="landscape" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.companyName}>TIEN HOCK FOOD INDUSTRIES S/B (953309-T)</Text>
+          <Text style={styles.companyName}>{companyName}</Text>
           <Text style={styles.reportTitle}>{reportTitle}</Text>
           <Text style={styles.viewSubtitle}>{viewSubtitle}</Text>
         </View>

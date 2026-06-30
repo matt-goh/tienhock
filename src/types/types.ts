@@ -1710,6 +1710,9 @@ export interface GeneralStockRow {
   line_number: number;
   description: string;
   balance_quantity: number | null;
+  base_balance_quantity?: number;
+  appended_quantity?: number;
+  used_quantity?: number;
   amount_myr: number;
   general_stock_category_id: number | null;
   category_name: string;
@@ -1766,6 +1769,7 @@ export interface SelfBilledInvoiceLine {
   tax_exemption_reason?: string | null;
   customs_form_reference?: string | null;
   account_code?: string | null;
+  stock_append_target_line_id?: number | null;
   notes?: string | null;
 }
 
@@ -1818,6 +1822,10 @@ export interface SelfBilledInvoiceInput {
   supporting_document_uploaded_by?: string | null;
   currency_code: string;
   fx_rate: number;
+  account_code?: string | null;
+  total_foreign_amount?: number;
+  total_excluding_tax_myr?: number;
+  tax_amount_myr?: number;
   notes?: string | null;
   lines: SelfBilledInvoiceLine[];
 }

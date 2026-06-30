@@ -154,9 +154,68 @@ export default function (pool) {
       `;
       const employeePayrollsResult = await pool.query(employeePayrollsQuery, [id]);
 
+      // Attach per-employee items + deductions so batch payslip printing has the
+      // full data (mirrors Tien Hock's monthly GET).
+      const epIds = employeePayrollsResult.rows.map((ep) => ep.id);
+      let itemsByEp = {};
+      let deductionsByEp = {};
+      if (epIds.length > 0) {
+        const [itemsResult, deductionsResult] = await Promise.all([
+          pool.query(
+            `SELECT pi.id, pi.employee_payroll_id, pi.pay_code_id, pi.description,
+                    pi.rate, pi.rate_unit, pi.quantity, pi.amount, pi.is_manual,
+                    pi.job_type, pi.work_log_type, pc.pay_type
+             FROM greentarget.payroll_items pi
+             LEFT JOIN public.pay_codes pc ON pi.pay_code_id = pc.id
+             WHERE pi.employee_payroll_id = ANY($1)
+             ORDER BY pi.id`,
+            [epIds]
+          ),
+          pool.query(
+            `SELECT pd.id, pd.employee_payroll_id, pd.deduction_type,
+                    CAST(pd.employee_amount AS NUMERIC(10,2)) as employee_amount,
+                    CAST(pd.employer_amount AS NUMERIC(10,2)) as employer_amount,
+                    CAST(pd.wage_amount AS NUMERIC(10,2)) as wage_amount,
+                    pd.rate_info
+             FROM greentarget.payroll_deductions pd
+             WHERE pd.employee_payroll_id = ANY($1)
+             ORDER BY pd.deduction_type`,
+            [epIds]
+          ),
+        ]);
+        for (const item of itemsResult.rows) {
+          (itemsByEp[item.employee_payroll_id] ||= []).push({
+            ...item,
+            rate: parseFloat(item.rate),
+            quantity: parseFloat(item.quantity),
+            amount: parseFloat(item.amount),
+            is_manual: !!item.is_manual,
+          });
+        }
+        for (const d of deductionsResult.rows) {
+          (deductionsByEp[d.employee_payroll_id] ||= []).push({
+            ...d,
+            employee_amount: parseFloat(d.employee_amount),
+            employer_amount: parseFloat(d.employer_amount),
+            wage_amount: parseFloat(d.wage_amount),
+          });
+        }
+      }
+
+      const employeePayrolls = employeePayrollsResult.rows.map((ep) => ({
+        ...ep,
+        gross_pay: parseFloat(ep.gross_pay),
+        net_pay: parseFloat(ep.net_pay),
+        digenapkan: ep.digenapkan != null ? parseFloat(ep.digenapkan) : 0,
+        setelah_digenapkan:
+          ep.setelah_digenapkan != null ? parseFloat(ep.setelah_digenapkan) : null,
+        items: itemsByEp[ep.id] || [],
+        deductions: deductionsByEp[ep.id] || [],
+      }));
+
       res.json({
         ...payrollResult.rows[0],
-        employeePayrolls: employeePayrollsResult.rows,
+        employeePayrolls,
       });
     } catch (error) {
       console.error("Error fetching GT monthly payroll details:", error);
@@ -257,12 +316,10 @@ export default function (pool) {
         staffsResult,
         jobPayCodesResult,
         contributionRates,
-        payrollRulesResult,
-        payrollSettingsResult,
-        driverRentalsResult,
-        rentalAddonsResult,
-        allPayCodesResult,
         midMonthResult,
+        commissionRecordsResult,
+        othersRecordsResult,
+        habukLinesResult,
       ] = await Promise.all([
         // Monthly work logs for OFFICE workers (from GT schema)
         client.query(`
@@ -311,71 +368,40 @@ export default function (pool) {
         // Contribution rates
         fetchActiveContributionRates(client),
 
-        // Payroll rules for DRIVER processing
-        client.query(`
-          SELECT * FROM greentarget.payroll_rules
-          WHERE is_active = true
-          ORDER BY rule_type, priority DESC
-        `),
-
-        // Payroll settings (default invoice amount)
-        client.query(`
-          SELECT setting_key, setting_value
-          FROM greentarget.payroll_settings
-        `),
-
-        // Completed rentals with invoice amounts for the month
-        client.query(`
-          SELECT
-            r.rental_id,
-            r.driver,
-            r.pickup_destination,
-            COALESCE(
-              (SELECT SUM(i.amount_before_tax)
-               FROM greentarget.invoice_rentals ir
-               JOIN greentarget.invoices i ON ir.invoice_id = i.invoice_id
-               WHERE ir.rental_id = r.rental_id AND i.status != 'cancelled'),
-              NULL
-            ) as invoice_amount,
-            EXISTS(
-              SELECT 1 FROM greentarget.invoice_rentals ir
-              JOIN greentarget.invoices i ON ir.invoice_id = i.invoice_id
-              WHERE ir.rental_id = r.rental_id AND i.status != 'cancelled'
-            ) as has_invoice
-          FROM greentarget.rentals r
-          WHERE r.date_picked IS NOT NULL
-            AND r.date_placed >= $1
-            AND r.date_placed <= $2
-        `, [startDate, endDate]),
-
-        // All rental addons for completed rentals this month
-        client.query(`
-          SELECT ra.*, pc.description as pay_code_description, ap.display_name
-          FROM greentarget.rental_addons ra
-          JOIN pay_codes pc ON ra.pay_code_id = pc.id
-          LEFT JOIN greentarget.addon_paycodes ap ON ra.pay_code_id = ap.pay_code_id
-          WHERE ra.rental_id IN (
-            SELECT r.rental_id
-            FROM greentarget.rentals r
-            WHERE r.date_picked IS NOT NULL
-              AND r.date_placed >= $1
-              AND r.date_placed <= $2
-          )
-        `, [startDate, endDate]),
-
-        // All pay codes for rate lookups
-        client.query(`
-          SELECT id, description, rate_biasa, pay_type, rate_unit
-          FROM pay_codes
-          WHERE is_active = true
-        `),
-
         // Mid-month advances for this month (deducted before rounding)
         client.query(`
           SELECT employee_id, amount
           FROM greentarget.mid_month_payrolls
           WHERE year = $1 AND month = $2
         `, [year, month]),
+
+        // GT Bonus / Others (Advance) records for the month (commission_records)
+        client.query(`
+          SELECT employee_id, amount, description, is_advance
+          FROM greentarget.commission_records
+          WHERE DATE(commission_date) >= $1 AND DATE(commission_date) <= $2
+        `, [startDate, endDate]),
+
+        // GT Others (Kerja Luar OT) records for the month
+        client.query(`
+          SELECT orec.employee_id, orec.pay_code_id, orec.description,
+                 orec.rate, orec.rate_unit, orec.quantity, orec.amount,
+                 pc.pay_type
+          FROM greentarget.others_records orec
+          LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
+          WHERE DATE(orec.record_date) >= $1 AND DATE(orec.record_date) <= $2
+        `, [startDate, endDate]),
+
+        // GT Daily Lori Habuk saved trip lines for the month (DRIVER pay source)
+        client.query(`
+          SELECT l.employee_id, ln.pay_code_id, ln.quantity, ln.rate_used,
+                 ln.amount, ln.source_type, ln.rental_id, ln.description,
+                 pc.pay_type, pc.rate_unit
+          FROM greentarget.daily_lori_habuk_logs l
+          JOIN greentarget.daily_lori_habuk_lines ln ON ln.log_id = l.id
+          LEFT JOIN pay_codes pc ON ln.pay_code_id = pc.id
+          WHERE l.log_date >= $1 AND l.log_date <= $2 AND l.status = 'Submitted'
+        `, [startDate, endDate]),
       ]);
 
       // Build lookup maps
@@ -385,6 +411,31 @@ export default function (pool) {
         midMonthResult.rows.map((r) => [r.employee_id, parseFloat(r.amount)])
       );
 
+      // GT earning add-ons grouped by employee (Bonus/Advance + Kerja Luar OT)
+      const commissionsByEmployee = {};
+      commissionRecordsResult.rows.forEach((r) => {
+        if (!commissionsByEmployee[r.employee_id]) {
+          commissionsByEmployee[r.employee_id] = [];
+        }
+        commissionsByEmployee[r.employee_id].push(r);
+      });
+      const othersByEmployee = {};
+      othersRecordsResult.rows.forEach((r) => {
+        if (!othersByEmployee[r.employee_id]) {
+          othersByEmployee[r.employee_id] = [];
+        }
+        othersByEmployee[r.employee_id].push(r);
+      });
+
+      // GT Daily Lori Habuk saved trip lines grouped by driver (DRIVER pay source)
+      const habukLinesByDriver = {};
+      habukLinesResult.rows.forEach((r) => {
+        if (!habukLinesByDriver[r.employee_id]) {
+          habukLinesByDriver[r.employee_id] = [];
+        }
+        habukLinesByDriver[r.employee_id].push(r);
+      });
+
       // Build job pay codes map
       const jobPayCodesMap = {};
       jobPayCodesResult.rows.forEach((row) => {
@@ -393,67 +444,6 @@ export default function (pool) {
         }
         jobPayCodesMap[row.job_id].push(row);
       });
-
-      // Build payroll rules map
-      const payrollRules = payrollRulesResult.rows;
-      const placementRules = payrollRules.filter((r) => r.rule_type === "PLACEMENT");
-      const pickupRules = payrollRules.filter((r) => r.rule_type === "PICKUP");
-
-      // Build settings map
-      const settingsMap = {};
-      payrollSettingsResult.rows.forEach((s) => {
-        settingsMap[s.setting_key] = s.setting_value;
-      });
-      const defaultInvoiceAmount = parseFloat(settingsMap.default_invoice_amount) || 200;
-
-      // Build all pay codes map for rate lookups
-      const allPayCodesMap = {};
-      allPayCodesResult.rows.forEach((pc) => {
-        allPayCodesMap[pc.id] = pc;
-      });
-
-      // Build rentals by driver map
-      const rentalsByDriver = {};
-      driverRentalsResult.rows.forEach((rental) => {
-        if (!rentalsByDriver[rental.driver]) {
-          rentalsByDriver[rental.driver] = [];
-        }
-        rentalsByDriver[rental.driver].push(rental);
-      });
-
-      // Build addons by rental map
-      const addonsByRental = {};
-      rentalAddonsResult.rows.forEach((addon) => {
-        if (!addonsByRental[addon.rental_id]) {
-          addonsByRental[addon.rental_id] = [];
-        }
-        addonsByRental[addon.rental_id].push(addon);
-      });
-
-      // Helper function to evaluate payroll rule conditions
-      const evaluateCondition = (value, operator, targetValue) => {
-        switch (operator) {
-          case "=":
-            return (
-              value === targetValue ||
-              (typeof value === "string" &&
-                typeof targetValue === "string" &&
-                value.toUpperCase() === targetValue.toUpperCase())
-            );
-          case ">":
-            return value > targetValue;
-          case "<":
-            return value < targetValue;
-          case ">=":
-            return value >= targetValue;
-          case "<=":
-            return value <= targetValue;
-          case "ANY":
-            return true;
-          default:
-            return false;
-        }
-      };
 
       // Process work logs into items per employee
       const workLogsByEmployee = {};
@@ -510,111 +500,26 @@ export default function (pool) {
               });
             }
           } else if (jobType === "DRIVER") {
-            // Process DRIVER using rule-based calculation from rentals
-            const driverRentals = rentalsByDriver[employeeId] || [];
-
-            // Process each completed rental
-            for (const rental of driverRentals) {
-              const invoiceAmount = rental.invoice_amount !== null
-                ? parseFloat(rental.invoice_amount)
-                : defaultInvoiceAmount;
-
-              // Find matching PLACEMENT rule
-              let placementRule = null;
-              for (const rule of placementRules) {
-                if (evaluateCondition(invoiceAmount, rule.condition_operator, parseFloat(rule.condition_value))) {
-                  placementRule = rule;
-                  break;
-                }
-              }
-
-              // Add PLACEMENT payroll item
-              if (placementRule) {
-                const payCode = allPayCodesMap[placementRule.pay_code_id];
-                const rate = payCode ? parseFloat(payCode.rate_biasa) || 0 : 0;
-                combinedItems.push({
-                  pay_code_id: placementRule.pay_code_id,
-                  description: payCode?.description || placementRule.description || placementRule.pay_code_id,
-                  pay_type: "Tambahan",
-                  rate: rate,
-                  rate_unit: "Trip",
-                  quantity: 1,
-                  amount: rate,
-                  job_type: "DRIVER",
-                  source_employee_id: employeeId,
-                  is_manual: false,
-                  rental_id: rental.rental_id,
-                  source_type: "PLACEMENT",
-                });
-              }
-
-              // Find matching PICKUP rule (only if pickup_destination is set)
-              if (rental.pickup_destination) {
-                let pickupRule = null;
-                for (const rule of pickupRules) {
-                  const primaryMatch = evaluateCondition(
-                    rental.pickup_destination,
-                    rule.condition_operator,
-                    rule.condition_value
-                  );
-
-                  let secondaryMatch = true;
-                  if (rule.secondary_condition_field && rule.secondary_condition_operator) {
-                    if (rule.secondary_condition_field === "invoice_amount") {
-                      secondaryMatch = evaluateCondition(
-                        invoiceAmount,
-                        rule.secondary_condition_operator,
-                        parseFloat(rule.secondary_condition_value)
-                      );
-                    }
-                  }
-
-                  if (primaryMatch && secondaryMatch) {
-                    pickupRule = rule;
-                    break;
-                  }
-                }
-
-                // Add PICKUP payroll item
-                if (pickupRule) {
-                  const payCode = allPayCodesMap[pickupRule.pay_code_id];
-                  const rate = payCode ? parseFloat(payCode.rate_biasa) || 0 : 0;
-                  combinedItems.push({
-                    pay_code_id: pickupRule.pay_code_id,
-                    description: payCode?.description || pickupRule.description || pickupRule.pay_code_id,
-                    pay_type: "Tambahan",
-                    rate: rate,
-                    rate_unit: "Trip",
-                    quantity: 1,
-                    amount: rate,
-                    job_type: "DRIVER",
-                    source_employee_id: employeeId,
-                    is_manual: false,
-                    rental_id: rental.rental_id,
-                    source_type: "PICKUP",
-                  });
-                }
-              }
-
-              // Add rental addons
-              const addons = addonsByRental[rental.rental_id] || [];
-              for (const addon of addons) {
-                const addonAmount = parseFloat(addon.amount) * parseFloat(addon.quantity);
-                combinedItems.push({
-                  pay_code_id: addon.pay_code_id,
-                  description: addon.display_name || addon.pay_code_description || addon.pay_code_id,
-                  pay_type: "Tambahan",
-                  rate: parseFloat(addon.amount),
-                  rate_unit: "Fixed",
-                  quantity: parseFloat(addon.quantity),
-                  amount: Math.round(addonAmount * 100) / 100,
-                  job_type: "DRIVER",
-                  source_employee_id: employeeId,
-                  is_manual: false,
-                  rental_id: rental.rental_id,
-                  source_type: "ADDON",
-                });
-              }
+            // DRIVER trip pay now comes from the saved Daily Lori Habuk log for
+            // the month (Phase 3). Rentals only prefill that daily entry; they no
+            // longer feed processing directly. A driver with no submitted daily
+            // log earns base salary only (see the base-salary block below).
+            const habukLines = habukLinesByDriver[employeeId] || [];
+            for (const line of habukLines) {
+              combinedItems.push({
+                pay_code_id: line.pay_code_id,
+                description: line.description || line.pay_code_id,
+                pay_type: line.pay_type || "Tambahan",
+                rate: parseFloat(line.rate_used) || 0,
+                rate_unit: line.rate_unit || "Trip",
+                quantity: parseFloat(line.quantity) || 0,
+                amount: Math.round(parseFloat(line.amount) * 100) / 100,
+                job_type: "DRIVER",
+                source_employee_id: employeeId,
+                is_manual: false,
+                rental_id: line.rental_id || null,
+                work_log_type: "daily_habuk",
+              });
             }
 
             // Also check for base salary pay code for drivers
@@ -639,6 +544,45 @@ export default function (pool) {
                 });
               }
             }
+          }
+
+          // Earning add-ons: Bonus / Others (Advance) (commission_records) and
+          // Others (Kerja Luar OT) (others_records). All raise gross (and the
+          // EPF base via Tambahan/Base typing, mirroring Tien Hock). Only
+          // commission records flagged is_advance are deducted from net.
+          let commissionAdvanceTotal = 0;
+          for (const cr of commissionsByEmployee[employeeId] || []) {
+            const amt = Math.round(parseFloat(cr.amount) * 100) / 100;
+            combinedItems.push({
+              pay_code_id: null,
+              description: cr.description || (cr.is_advance ? "Advance" : "Bonus"),
+              pay_type: "Tambahan",
+              rate: amt,
+              rate_unit: "Fixed",
+              quantity: 1,
+              amount: amt,
+              job_type: jobType,
+              source_employee_id: employeeId,
+              is_manual: false,
+              work_log_type: cr.is_advance ? "advance" : "bonus",
+            });
+            if (cr.is_advance) commissionAdvanceTotal += amt;
+          }
+          for (const orec of othersByEmployee[employeeId] || []) {
+            const amt = Math.round(parseFloat(orec.amount) * 100) / 100;
+            combinedItems.push({
+              pay_code_id: orec.pay_code_id || null,
+              description: orec.description || "Others",
+              pay_type: orec.pay_type || "Tambahan",
+              rate: parseFloat(orec.rate),
+              rate_unit: orec.rate_unit,
+              quantity: parseFloat(orec.quantity),
+              amount: amt,
+              job_type: jobType,
+              source_employee_id: employeeId,
+              is_manual: false,
+              work_log_type: "others",
+            });
           }
 
           // Calculate gross pay in integer cents to avoid float drift
@@ -678,7 +622,12 @@ export default function (pool) {
             (sum, d) => sum + d.employee_amount,
             0
           );
-          const netPay = Math.round((grossPay - totalEmployeeDeductions) * 100) / 100;
+          // Commission/Bonus advances are deducted from net (Bonus and Kerja
+          // Luar OT raise net; only is_advance commission records reduce it).
+          const netPay =
+            Math.round(
+              (grossPay - totalEmployeeDeductions - commissionAdvanceTotal) * 100
+            ) / 100;
 
           // Mid-month advance + rounding (digenapkan), mirroring Tien Hock payroll
           const midMonthAmount = midMonthMap.get(employeeId) || 0;

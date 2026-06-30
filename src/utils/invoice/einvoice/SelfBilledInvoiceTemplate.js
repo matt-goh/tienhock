@@ -343,6 +343,30 @@ function generateInvoiceLines(lines, currencyCode, fxRate) {
     .join("");
 }
 
+function buildSummaryInvoiceLine(invoiceData) {
+  const firstLine = invoiceData.lines[0] || {};
+  const itemDescriptions = invoiceData.lines
+    .map((line) => cleanValue(line.description, ""))
+    .filter(Boolean)
+    .join("; ");
+  const description =
+    itemDescriptions.slice(0, 500) ||
+    cleanValue(invoiceData.transaction_type, "General purchase");
+
+  return {
+    line_number: 1,
+    description,
+    quantity: 1,
+    unit_price_foreign: Number(invoiceData.total_foreign_amount || 0),
+    amount_foreign: Number(invoiceData.total_foreign_amount || 0),
+    tax_amount_myr: Number(invoiceData.tax_amount_myr || 0),
+    classification_code: cleanValue(firstLine.classification_code, "034"),
+    tax_type: cleanValue(firstLine.tax_type, "06"),
+    tax_rate: Number(firstLine.tax_rate || 0),
+    tax_exemption_reason: cleanValue(firstLine.tax_exemption_reason, ""),
+  };
+}
+
 function generateAdditionalReferences(invoice) {
   const customsReference = cleanValue(invoice.customs_form_reference, "");
   const orderReference = cleanValue(invoice.order_no, "");
@@ -396,17 +420,12 @@ export async function SelfBilledInvoiceTemplate(invoiceData) {
     const currencyCode = cleanValue(invoiceData.currency_code, "CNY");
     const totalForeign = Number(invoiceData.total_foreign_amount || 0);
     const fxRate = Number(invoiceData.fx_rate || 1);
-    const taxAmount = invoiceData.lines.reduce((sum, line) => {
-      const amountForeign = Number(line.amount_foreign || 0);
-      return sum + getLineTaxAmount(line, amountForeign, fxRate);
-    }, 0);
-    const taxAmountMyr = invoiceData.lines.reduce((sum, line) => {
-      const amountForeign = Number(line.amount_foreign || 0);
-      const lineTaxAmount = getLineTaxAmount(line, amountForeign, fxRate);
-      return sum + getLineTaxAmountMyr(line, lineTaxAmount, fxRate);
-    }, 0);
+    const taxAmountMyr = Number(invoiceData.tax_amount_myr || 0);
+    const taxAmount =
+      taxAmountMyr > 0 ? convertMyrToDocumentAmount(taxAmountMyr, fxRate) : 0;
     const totalIncludingTax = totalForeign + taxAmount;
     const firstTaxType = cleanValue(invoiceData.lines[0]?.tax_type, "06");
+    const summaryLine = buildSummaryInvoiceLine(invoiceData);
 
     let xml = TEMPLATE_HEADER;
 
@@ -467,7 +486,7 @@ export async function SelfBilledInvoiceTemplate(invoiceData) {
     <cbc:PayableAmount currencyID="${escapeXml(currencyCode)}">${formatAmount(totalIncludingTax)}</cbc:PayableAmount>
   </cac:LegalMonetaryTotal>`;
 
-    xml += generateInvoiceLines(invoiceData.lines, escapeXml(currencyCode), fxRate);
+    xml += generateInvoiceLines([summaryLine], escapeXml(currencyCode), fxRate);
     xml += TEMPLATE_FOOTER;
 
     return xml;

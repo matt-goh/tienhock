@@ -56,11 +56,26 @@ export default function (pool) {
   // GET all trip-related pay codes (MUST be before /:id route)
   router.get("/pay-codes", async (req, res) => {
     try {
+      // Return every pay code mapped to the driver-side jobs (DRIVER /
+      // DRIVER_IKUT) plus any already configured as an addon paycode, so all the
+      // habuk trip codes (TRIP*, COMM_TARIK, COMM_TAMBAHAN, TBH5, TRIP_LB6, the
+      // _IKUT variants, etc.) are selectable when configuring rules & addons —
+      // not just the legacy TRIP* prefix set.
       const result = await pool.query(
-        `SELECT id, description, rate_biasa, rate_ahad, rate_umum, pay_type, rate_unit, is_active
-         FROM pay_codes
-         WHERE id LIKE 'TRIP%' AND is_active = true
-         ORDER BY id`
+        `SELECT DISTINCT pc.id, pc.description, pc.rate_biasa, pc.rate_ahad,
+                pc.rate_umum, pc.pay_type, pc.rate_unit, pc.is_active
+         FROM pay_codes pc
+         WHERE pc.is_active = true
+           AND (
+             pc.id IN (
+               SELECT pay_code_id FROM job_pay_codes
+               WHERE job_id IN ('DRIVER', 'DRIVER_IKUT')
+             )
+             OR pc.id IN (
+               SELECT pay_code_id FROM greentarget.addon_paycodes
+             )
+           )
+         ORDER BY pc.id`
       );
 
       res.json(result.rows);

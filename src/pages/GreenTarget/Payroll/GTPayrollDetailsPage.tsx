@@ -15,7 +15,7 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
-import { EmployeePayroll } from "../../../types/types";
+import { buildGTPayslipPayroll } from "../../../utils/greenTarget/buildGTPayslipPayroll";
 import AddManualItemModal from "../../../components/Payroll/AddManualItemModal";
 import { MidMonthPayroll } from "../../../utils/payroll/midMonthPayrollUtils";
 import {
@@ -34,6 +34,7 @@ interface PayrollItem {
   is_manual: boolean;
   pay_type?: string;
   job_type?: string;
+  work_log_type?: string | null;
 }
 
 interface Deduction {
@@ -139,47 +140,11 @@ const GTPayrollDetailsPage: React.FC = () => {
   };
 
   // Convert GT payroll format to EmployeePayroll format for the shared
-  // payslip download/print buttons (same PDF as Tien Hock payslips).
+  // payslip download/print buttons (same PDF as Tien Hock payslips). The helper
+  // moves Bonus/Advance/Kerja-Luar-OT items into commission_records/others_records
+  // so the payslip renders them (and the advance deduction) like Tien Hock.
   const buildPayslipData = (payroll: GTEmployeePayroll) => {
-    const pdfPayroll: EmployeePayroll = {
-      id: payroll.id,
-      monthly_payroll_id: payroll.monthly_payroll_id,
-      employee_id: payroll.employee_id,
-      employee_name: payroll.employee_name,
-      job_type: payroll.job_type,
-      section: payroll.section,
-      gross_pay: payroll.gross_pay,
-      net_pay: payroll.net_pay,
-      digenapkan: payroll.digenapkan,
-      setelah_digenapkan: payroll.setelah_digenapkan ?? undefined,
-      year: payroll.year,
-      month: payroll.month,
-      items: payroll.items.map(item => ({
-        id: item.id,
-        pay_code_id: item.pay_code_id,
-        description: item.description,
-        rate: item.rate,
-        rate_unit: item.rate_unit,
-        quantity: item.quantity,
-        amount: item.amount,
-        is_manual: item.is_manual,
-        pay_type: item.pay_type || "Base",
-        job_type: item.job_type,
-      })),
-      deductions: payroll.deductions.map(d => ({
-        deduction_type: d.deduction_type as "epf" | "socso" | "sip" | "income_tax",
-        employee_amount: d.employee_amount,
-        employer_amount: d.employer_amount,
-        wage_amount: d.wage_amount,
-        rate_info: {
-          rate_id: 0,
-          employee_rate: d.rate_info?.employee_rate || "0%",
-          employer_rate: d.rate_info?.employer_rate || "0%",
-        },
-      })),
-      leave_records: [],
-      commission_records: [],
-    };
+    const { pdfPayroll } = buildGTPayslipPayroll(payroll);
 
     const staffDetails = {
       name: payroll.employee_name,
@@ -271,6 +236,12 @@ const GTPayrollDetailsPage: React.FC = () => {
     (sum, d) => sum + d.employee_amount,
     0
   );
+
+  // Advance (is_advance Bonus/Commission) is stored as a gross item but deducted
+  // from net — surface it so gross - statutory - advance = net reconciles.
+  const commissionAdvanceTotal = payroll.items
+    .filter((it) => it.work_log_type === "advance")
+    .reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
 
   // Finalize/status system removed: payrolls are always editable.
   const isFinalized = false;
@@ -581,6 +552,26 @@ const GTPayrollDetailsPage: React.FC = () => {
 
       {/* Net Pay + Rounding Summary */}
       <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg shadow p-4 space-y-2">
+        {commissionAdvanceTotal > 0 && (
+          <div className="space-y-1 pb-2 mb-1 border-b border-emerald-200 dark:border-emerald-800 text-sm">
+            <div className="flex justify-between items-center text-emerald-700 dark:text-emerald-300">
+              <span>Gross Pay</span>
+              <span>{formatCurrency(payroll.gross_pay)}</span>
+            </div>
+            <div className="flex justify-between items-center text-emerald-700 dark:text-emerald-300">
+              <span>Statutory Deductions</span>
+              <span className="text-red-600 dark:text-red-400">
+                -{formatCurrency(totalDeductions)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center text-emerald-700 dark:text-emerald-300">
+              <span>Advance (Bonus/Commission)</span>
+              <span className="text-red-600 dark:text-red-400">
+                -{formatCurrency(commissionAdvanceTotal)}
+              </span>
+            </div>
+          </div>
+        )}
         <div className="flex justify-between items-center">
           <span className="text-lg font-medium text-emerald-800 dark:text-emerald-300">
             Net Pay

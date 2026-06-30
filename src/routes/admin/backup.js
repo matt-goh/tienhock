@@ -442,6 +442,21 @@ export default function backupRouter(pool) {
   });
 
   router.get('/download/:filename', async (req, res) => {
+    let downloadedBackupPath = null;
+    let cleanupStarted = false;
+
+    const cleanupDownloadedBackup = async () => {
+      if (!downloadedBackupPath || cleanupStarted) return;
+      cleanupStarted = true;
+
+      try {
+        await executeCommand(`rm -f "${downloadedBackupPath}"`);
+        console.log(`[Download] Cleaned up downloaded backup file: ${downloadedBackupPath}`);
+      } catch (fileCleanupError) {
+        console.warn(`[Download] Failed to cleanup backup file: ${fileCleanupError.message}`);
+      }
+    };
+
     try {
       if (pool.pool.maintenanceMode) {
         return res.status(503).json({
@@ -455,13 +470,16 @@ export default function backupRouter(pool) {
         return res.status(400).json({ error: 'Filename is required' });
       }
 
+      if (filename.includes('/') || filename.includes('\\')) {
+        return res.status(400).json({ error: 'Invalid filename' });
+      }
+
       const envBackupDir = `${backupDir}/${env}`;
       const filePath = `${envBackupDir}/${filename}`;
       const containerName = getContainerName();
 
       // Check if file exists locally, if not download from S3
       let fileExists = false;
-      let downloadedFromS3 = false;
       try {
         await executeCommand(`test -f "${filePath}"`);
         fileExists = true;
@@ -492,7 +510,7 @@ export default function backupRouter(pool) {
           }
 
           console.log(`[Download] Downloaded from S3 and copied to Docker: ${filePath}`);
-          downloadedFromS3 = true;
+          downloadedBackupPath = filePath;
         } else {
           // Production: Download directly to local filesystem
           const downloadedPath = await downloadS3Backup(filename, env, envBackupDir);
@@ -500,7 +518,7 @@ export default function backupRouter(pool) {
             return res.status(404).json({ error: 'Backup file not found in S3' });
           }
           console.log(`[Download] Downloaded from S3: ${downloadedPath}`);
-          downloadedFromS3 = true;
+          downloadedBackupPath = downloadedPath;
         }
       }
 
@@ -511,121 +529,81 @@ export default function backupRouter(pool) {
       res.setHeader('Content-Type', 'application/sql');
       res.setHeader('Content-Disposition', `attachment; filename="${sqlFilename}"`);
 
-      // Create a temporary database name
-      const tempDbName = `temp_restore_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-      const dbHost = shouldUseDockerExec() ? 'localhost' : DB_HOST;
-      const dbPort = shouldUseDockerExec() ? '5432' : DB_PORT;
+      console.log(`Streaming backup as SQL: ${filename}`);
 
-      try {
-        console.log(`Creating temporary database: ${tempDbName}`);
+      const pgRestoreArgs = [
+        '--clean',
+        '--if-exists',
+        '--no-owner',
+        '--no-privileges',
+        '--disable-triggers',
+        '-f',
+        '-',
+        filePath
+      ];
 
-        // Step 1: Create temporary database
-        await executeCommand(`PGPASSWORD=${DB_PASSWORD} createdb -h ${dbHost} -p ${dbPort} -U ${DB_USER} "${tempDbName}"`);
+      const restoreProcess = shouldUseDockerExec()
+        ? spawn('docker', [
+          'exec',
+          containerName,
+          'pg_restore',
+          ...pgRestoreArgs
+        ], {
+          stdio: ['ignore', 'pipe', 'pipe']
+        })
+        : spawn('pg_restore', pgRestoreArgs, {
+          stdio: ['ignore', 'pipe', 'pipe']
+        });
 
-        console.log(`Restoring backup to temporary database: ${tempDbName}`);
+      let processClosed = false;
 
-        // Step 2: Restore backup to temporary database
-        await executeCommand(`PGPASSWORD=${DB_PASSWORD} pg_restore -h ${dbHost} -p ${dbPort} -U ${DB_USER} -d "${tempDbName}" --no-owner --no-privileges --clean --if-exists -v "${filePath}"`);
+      restoreProcess.stdout.pipe(res);
 
-        console.log(`Dumping temporary database with INSERT statements`);
+      restoreProcess.stderr.on('data', (data) => {
+        console.error('pg_restore stderr:', data.toString());
+      });
 
-        // Step 3: Stream pg_dump output to response
-        if (shouldUseDockerExec()) {
-          // Running on Windows/Mac dev, use docker exec with streaming
-          const dockerArgs = [
-            'exec', containerName,
-            'bash', '-c',
-            `PGPASSWORD=${DB_PASSWORD} pg_dump -h localhost -p 5432 -U ${DB_USER} -d "${tempDbName}" --clean --if-exists --no-owner --no-privileges --inserts --disable-triggers`
-          ];
+      restoreProcess.on('error', async (error) => {
+        console.error('Failed to start pg_restore:', error);
+        await cleanupDownloadedBackup();
 
-          const dockerProcess = spawn('docker', dockerArgs, {
-            stdio: ['ignore', 'pipe', 'pipe']
-          });
-
-          dockerProcess.stdout.pipe(res);
-
-          dockerProcess.stderr.on('data', (data) => {
-            console.error('docker exec stderr:', data.toString());
-          });
-
-          dockerProcess.on('close', async (code) => {
-            console.log(`docker exec process exited with code ${code}`);
-            await cleanupTempDb(tempDbName, 'localhost', '5432', downloadedFromS3 ? filePath : null);
-          });
-
-          req.on('close', async () => {
-            if (!dockerProcess.killed) dockerProcess.kill();
-            await cleanupTempDb(tempDbName, 'localhost', '5432', downloadedFromS3 ? filePath : null);
-          });
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Download failed', details: error.message });
         } else {
-          // Running on Linux (Hetzner production), spawn pg_dump directly
-          const pgDumpArgs = [
-            '-h', dbHost,
-            '-p', dbPort,
-            '-U', DB_USER,
-            '-d', tempDbName,
-            '--clean',
-            '--if-exists',
-            '--no-owner',
-            '--no-privileges',
-            '--inserts',
-            '--disable-triggers',
-            '--verbose'
-          ];
-
-          const pgDump = spawn('pg_dump', pgDumpArgs, {
-            stdio: ['ignore', 'pipe', 'pipe'],
-            env: { ...process.env, PGPASSWORD: DB_PASSWORD }
-          });
-
-          pgDump.stdout.pipe(res);
-
-          pgDump.stderr.on('data', (data) => {
-            console.error('pg_dump stderr:', data.toString());
-          });
-
-          pgDump.on('close', async (code) => {
-            console.log(`pg_dump process exited with code ${code}`);
-            await cleanupTempDb(tempDbName, dbHost, dbPort, downloadedFromS3 ? filePath : null);
-          });
-
-          req.on('close', async () => {
-            if (!pgDump.killed) pgDump.kill();
-            await cleanupTempDb(tempDbName, dbHost, dbPort, downloadedFromS3 ? filePath : null);
-          });
+          res.destroy(error);
         }
+      });
 
-      } catch (error) {
-        console.error('Error during backup conversion:', error);
-        await cleanupTempDb(tempDbName, shouldUseDockerExec() ? 'localhost' : DB_HOST, shouldUseDockerExec() ? '5432' : DB_PORT, downloadedFromS3 ? filePath : null);
-        throw error;
-      }
+      restoreProcess.on('close', async (code, signal) => {
+        processClosed = true;
+        console.log(`pg_restore process exited with code ${code}${signal ? ` and signal ${signal}` : ''}`);
+        await cleanupDownloadedBackup();
+
+        if (code !== 0 && !res.writableEnded) {
+          const message = signal
+            ? `SQL download was interrupted (${signal})`
+            : `SQL download failed with exit code ${code}`;
+
+          if (!res.headersSent) {
+            res.status(500).json({ error: 'Download failed', details: message });
+          } else {
+            res.destroy(new Error(message));
+          }
+        }
+      });
+
+      res.on('close', () => {
+        if (!res.writableEnded && !processClosed && !restoreProcess.killed) {
+          console.warn(`[Download] Client disconnected; stopping SQL stream for ${filename}`);
+          restoreProcess.kill('SIGTERM');
+        }
+      });
 
     } catch (error) {
+      await cleanupDownloadedBackup();
       console.error('Download failed:', error);
       if (!res.headersSent) {
         res.status(500).json({ error: 'Download failed', details: error.message });
-      }
-    }
-
-    // Helper function to clean up temporary database and optionally the downloaded backup file
-    async function cleanupTempDb(dbName, dbHost, dbPort, backupFilePath = null) {
-      try {
-        console.log(`Cleaning up temporary database: ${dbName}`);
-        await executeCommand(`PGPASSWORD=${DB_PASSWORD} dropdb -h ${dbHost} -p ${dbPort} -U ${DB_USER} "${dbName}"`);
-        console.log(`Successfully dropped temporary database: ${dbName}`);
-      } catch (cleanupError) {
-        console.error(`Failed to cleanup temporary database ${dbName}:`, cleanupError);
-      }
-
-      // Clean up downloaded backup file if it was downloaded from S3
-      if (backupFilePath) {
-        try {
-          await executeCommand(`rm -f "${backupFilePath}"`);
-          console.log(`[Download] Cleaned up downloaded backup file: ${backupFilePath}`);
-        } catch (fileCleanupError) {
-          console.warn(`[Download] Failed to cleanup backup file: ${fileCleanupError.message}`);
-        }
       }
     }
   });

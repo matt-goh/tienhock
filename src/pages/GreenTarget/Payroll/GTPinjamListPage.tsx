@@ -9,6 +9,8 @@ import {
   IconTrash,
   IconCash,
   IconRefresh,
+  IconPrinter,
+  IconDownload,
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -16,6 +18,10 @@ import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import PinjamFormModal from "../../../components/Payroll/PinjamFormModal";
 import { api } from "../../../routes/utils/api";
 import TimeNavigator from "../../../components/TimeNavigator";
+import {
+  generatePinjamPDF,
+  PinjamPDFData,
+} from "../../../utils/payroll/PinjamPDF";
 import toast from "react-hot-toast";
 
 interface PinjamRecord {
@@ -247,6 +253,45 @@ const GTPinjamListPage: React.FC = () => {
     0
   );
 
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+
+  const generatePinjamPDFForAll = async (action: "download" | "print") => {
+    if (employeeData.length === 0) {
+      toast.error("No pinjam data to generate");
+      return;
+    }
+    setIsGeneratingPDF(true);
+    try {
+      const pdfData: PinjamPDFData = {
+        employees: employeeData.map((emp) => ({
+          employee_id: emp.employee_id,
+          employee_name: emp.employee_name,
+          midMonthPay: emp.midMonthPay,
+          netPay: emp.netPay,
+          midMonthPinjam: emp.midMonthPinjam,
+          midMonthPinjamDetails: emp.midMonthPinjamDetails,
+          monthlyPinjam: emp.monthlyPinjam,
+          monthlyPinjamDetails: emp.monthlyPinjamDetails,
+          gajiGenap: emp.gajiGenap,
+        })),
+        year: currentYear,
+        month: currentMonth,
+        totalMidMonthPinjam,
+        totalMonthlyPinjam,
+        companyName: "GREEN TARGET SDN. BHD.",
+      };
+      await generatePinjamPDF(pdfData, action);
+      toast.success(
+        `Pinjam summary ${action === "download" ? "downloaded" : "generated"}`
+      );
+    } catch (error) {
+      console.error("Error generating pinjam PDF:", error);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -281,6 +326,24 @@ const GTPinjamListPage: React.FC = () => {
                 {formatCurrency(totalMidMonthPinjam + totalMonthlyPinjam)}
               </span>
             </div>
+            <Button
+              onClick={() => generatePinjamPDFForAll("print")}
+              icon={IconPrinter}
+              variant="outline"
+              disabled={isGeneratingPDF || employeeData.length === 0}
+              title="Print Pinjam summary"
+            >
+              Print
+            </Button>
+            <Button
+              onClick={() => generatePinjamPDFForAll("download")}
+              icon={IconDownload}
+              variant="outline"
+              disabled={isGeneratingPDF || employeeData.length === 0}
+              title="Download Pinjam summary PDF"
+            >
+              Download
+            </Button>
             <Button
               onClick={fetchAllData}
               icon={IconRefresh}
