@@ -467,11 +467,23 @@ async function getFullInvoice(poolOrClient, id) {
   const linesResult = await poolOrClient.query(
     `SELECT
        sbil.*,
-       append_link.self_billed_invoice_line_id AS stock_append_target_line_id
+       CASE
+         WHEN COALESCE(source_sbi.invoice_status, '${LOCAL_STATUS_ACTIVE}') <> '${LOCAL_STATUS_CANCELLED}'
+          AND COALESCE(source_sbi.einvoice_status, '') <> 'cancelled'
+          AND COALESCE(target_sbi.invoice_status, '${LOCAL_STATUS_ACTIVE}') <> '${LOCAL_STATUS_CANCELLED}'
+          AND COALESCE(target_sbi.einvoice_status, '') <> 'cancelled'
+         THEN append_link.self_billed_invoice_line_id
+         ELSE NULL
+       END AS stock_append_target_line_id
      FROM self_billed_invoice_lines sbil
+     JOIN self_billed_invoices source_sbi ON source_sbi.id = sbil.self_billed_invoice_id
      LEFT JOIN general_stock_adjustments append_link
        ON append_link.source_self_billed_invoice_line_id = sbil.id
       AND append_link.adjustment_quantity > 0
+     LEFT JOIN self_billed_invoice_lines target_sbil
+       ON target_sbil.id = append_link.self_billed_invoice_line_id
+     LEFT JOIN self_billed_invoices target_sbi
+       ON target_sbi.id = target_sbil.self_billed_invoice_id
      WHERE sbil.self_billed_invoice_id = $1
      ORDER BY sbil.line_number ASC, sbil.id ASC`,
     [id]
@@ -577,13 +589,16 @@ async function upsertStockAppendAdjustment(client, line, staffId) {
   }
 
   const targetResult = await client.query(
-    `SELECT id, description, general_stock_category_id
-     FROM self_billed_invoice_lines
-     WHERE id = $1`,
+    `SELECT sbil.id, sbil.description, sbil.general_stock_category_id
+     FROM self_billed_invoice_lines sbil
+     JOIN self_billed_invoices sbi ON sbi.id = sbil.self_billed_invoice_id
+     WHERE sbil.id = $1
+       AND COALESCE(sbi.invoice_status, '${LOCAL_STATUS_ACTIVE}') <> '${LOCAL_STATUS_CANCELLED}'
+       AND COALESCE(sbi.einvoice_status, '') <> 'cancelled'`,
     [targetLineId]
   );
   if (targetResult.rows.length === 0) {
-    const error = new Error("Selected General stock item was not found");
+    const error = new Error("Selected General stock item was not found or has been cancelled");
     error.status = 400;
     throw error;
   }
@@ -641,16 +656,25 @@ async function validateNewStockLineDescriptions(client, invoiceId, lines) {
   );
   const existingResult = await client.query(
     `WITH append_sources AS (
-       SELECT DISTINCT source_self_billed_invoice_line_id
-       FROM general_stock_adjustments
-       WHERE source_self_billed_invoice_line_id IS NOT NULL
-         AND adjustment_quantity > 0
+       SELECT DISTINCT gsa.source_self_billed_invoice_line_id
+       FROM general_stock_adjustments gsa
+       JOIN self_billed_invoice_lines target_sbil
+         ON target_sbil.id = gsa.self_billed_invoice_line_id
+       JOIN self_billed_invoices target_sbi
+         ON target_sbi.id = target_sbil.self_billed_invoice_id
+       WHERE gsa.source_self_billed_invoice_line_id IS NOT NULL
+         AND gsa.adjustment_quantity > 0
+         AND COALESCE(target_sbi.invoice_status, '${LOCAL_STATUS_ACTIVE}') <> '${LOCAL_STATUS_CANCELLED}'
+         AND COALESCE(target_sbi.einvoice_status, '') <> 'cancelled'
      )
      SELECT sbil.id, sbil.self_billed_invoice_id, sbil.description
      FROM self_billed_invoice_lines sbil
+     JOIN self_billed_invoices sbi ON sbi.id = sbil.self_billed_invoice_id
      LEFT JOIN append_sources aps ON aps.source_self_billed_invoice_line_id = sbil.id
      WHERE (sbil.balance_quantity IS NOT NULL
-        OR sbil.general_stock_category_id IS NOT NULL)
+       OR sbil.general_stock_category_id IS NOT NULL)
+       AND COALESCE(sbi.invoice_status, '${LOCAL_STATUS_ACTIVE}') <> '${LOCAL_STATUS_CANCELLED}'
+       AND COALESCE(sbi.einvoice_status, '') <> 'cancelled'
        AND aps.source_self_billed_invoice_line_id IS NULL`
   );
   const existingRows = existingResult.rows.filter((row) => {
@@ -1865,17 +1889,36 @@ export default function (pool, config) {
       const result = await pool.query(
         `WITH stock_adjustment_totals AS (
            SELECT
-             self_billed_invoice_line_id,
-             SUM(adjustment_quantity) FILTER (WHERE adjustment_quantity > 0) AS appended_quantity,
-             SUM(adjustment_quantity) FILTER (WHERE adjustment_quantity < 0) AS used_quantity
-           FROM general_stock_adjustments
-           GROUP BY self_billed_invoice_line_id
+             gsa.self_billed_invoice_line_id,
+             SUM(gsa.adjustment_quantity) FILTER (
+               WHERE gsa.adjustment_quantity > 0
+                 AND (
+                   gsa.source_self_billed_invoice_line_id IS NULL
+                   OR (
+                     COALESCE(source_sbi.invoice_status, '${LOCAL_STATUS_ACTIVE}') <> '${LOCAL_STATUS_CANCELLED}'
+                     AND COALESCE(source_sbi.einvoice_status, '') <> 'cancelled'
+                   )
+                 )
+             ) AS appended_quantity,
+             SUM(gsa.adjustment_quantity) FILTER (WHERE gsa.adjustment_quantity < 0) AS used_quantity
+           FROM general_stock_adjustments gsa
+           LEFT JOIN self_billed_invoice_lines source_sbil
+             ON source_sbil.id = gsa.source_self_billed_invoice_line_id
+           LEFT JOIN self_billed_invoices source_sbi
+             ON source_sbi.id = source_sbil.self_billed_invoice_id
+           GROUP BY gsa.self_billed_invoice_line_id
          ),
          append_sources AS (
-           SELECT DISTINCT source_self_billed_invoice_line_id
-           FROM general_stock_adjustments
-           WHERE source_self_billed_invoice_line_id IS NOT NULL
-             AND adjustment_quantity > 0
+           SELECT DISTINCT gsa.source_self_billed_invoice_line_id
+           FROM general_stock_adjustments gsa
+           JOIN self_billed_invoice_lines target_sbil
+             ON target_sbil.id = gsa.self_billed_invoice_line_id
+           JOIN self_billed_invoices target_sbi
+             ON target_sbi.id = target_sbil.self_billed_invoice_id
+           WHERE gsa.source_self_billed_invoice_line_id IS NOT NULL
+             AND gsa.adjustment_quantity > 0
+             AND COALESCE(target_sbi.invoice_status, '${LOCAL_STATUS_ACTIVE}') <> '${LOCAL_STATUS_CANCELLED}'
+             AND COALESCE(target_sbi.einvoice_status, '') <> 'cancelled'
          )
          SELECT
            sbil.id AS line_id,
@@ -1906,6 +1949,8 @@ export default function (pool, config) {
          LEFT JOIN append_sources aps ON aps.source_self_billed_invoice_line_id = sbil.id
          WHERE (sbil.balance_quantity IS NOT NULL
             OR sbil.general_stock_category_id IS NOT NULL)
+           AND COALESCE(sbi.invoice_status, '${LOCAL_STATUS_ACTIVE}') <> '${LOCAL_STATUS_CANCELLED}'
+           AND COALESCE(sbi.einvoice_status, '') <> 'cancelled'
            AND aps.source_self_billed_invoice_line_id IS NULL
            ${searchClause}
            ${dateFromClause}
@@ -1951,11 +1996,24 @@ export default function (pool, config) {
         pool.query(
           `WITH stock_adjustment_totals AS (
              SELECT
-               self_billed_invoice_line_id,
-               SUM(adjustment_quantity) FILTER (WHERE adjustment_quantity > 0) AS appended_quantity,
-               SUM(adjustment_quantity) FILTER (WHERE adjustment_quantity < 0) AS used_quantity
-             FROM general_stock_adjustments
-             GROUP BY self_billed_invoice_line_id
+               gsa.self_billed_invoice_line_id,
+               SUM(gsa.adjustment_quantity) FILTER (
+                 WHERE gsa.adjustment_quantity > 0
+                   AND (
+                     gsa.source_self_billed_invoice_line_id IS NULL
+                     OR (
+                       COALESCE(source_sbi.invoice_status, '${LOCAL_STATUS_ACTIVE}') <> '${LOCAL_STATUS_CANCELLED}'
+                       AND COALESCE(source_sbi.einvoice_status, '') <> 'cancelled'
+                     )
+                   )
+               ) AS appended_quantity,
+               SUM(gsa.adjustment_quantity) FILTER (WHERE gsa.adjustment_quantity < 0) AS used_quantity
+             FROM general_stock_adjustments gsa
+             LEFT JOIN self_billed_invoice_lines source_sbil
+               ON source_sbil.id = gsa.source_self_billed_invoice_line_id
+             LEFT JOIN self_billed_invoices source_sbi
+               ON source_sbi.id = source_sbil.self_billed_invoice_id
+             GROUP BY gsa.self_billed_invoice_line_id
            ),
            used_adjustments AS (
              SELECT
@@ -1974,10 +2032,16 @@ export default function (pool, config) {
              GROUP BY self_billed_invoice_line_id
            ),
            append_sources AS (
-             SELECT DISTINCT source_self_billed_invoice_line_id
-             FROM general_stock_adjustments
-             WHERE source_self_billed_invoice_line_id IS NOT NULL
-               AND adjustment_quantity > 0
+             SELECT DISTINCT gsa.source_self_billed_invoice_line_id
+             FROM general_stock_adjustments gsa
+             JOIN self_billed_invoice_lines target_sbil
+               ON target_sbil.id = gsa.self_billed_invoice_line_id
+             JOIN self_billed_invoices target_sbi
+               ON target_sbi.id = target_sbil.self_billed_invoice_id
+             WHERE gsa.source_self_billed_invoice_line_id IS NOT NULL
+               AND gsa.adjustment_quantity > 0
+               AND COALESCE(target_sbi.invoice_status, '${LOCAL_STATUS_ACTIVE}') <> '${LOCAL_STATUS_CANCELLED}'
+               AND COALESCE(target_sbi.einvoice_status, '') <> 'cancelled'
            )
            SELECT
              sbil.id AS line_id,
@@ -2010,6 +2074,8 @@ export default function (pool, config) {
            LEFT JOIN append_sources aps ON aps.source_self_billed_invoice_line_id = sbil.id
            WHERE (sbil.balance_quantity IS NOT NULL
               OR sbil.general_stock_category_id IS NOT NULL)
+             AND COALESCE(sbi.invoice_status, '${LOCAL_STATUS_ACTIVE}') <> '${LOCAL_STATUS_CANCELLED}'
+             AND COALESCE(sbi.einvoice_status, '') <> 'cancelled'
              AND aps.source_self_billed_invoice_line_id IS NULL
              ${monthFilterClause}
            ORDER BY COALESCE(gsc.sort_order, 9999), COALESCE(gsc.name, 'Uncategorised'),
