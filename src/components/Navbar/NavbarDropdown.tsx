@@ -84,8 +84,26 @@ export default function NavbarDropdown({
     (item) => item.path && !item.showInPopover && !item.path.includes(":")
   );
 
-  const isMegaMenu = shouldUseMegaMenu(categoryName, navigableItems.length);
-  const columns = getMegaMenuColumns(navigableItems.length);
+  // Group items by their optional `group` label, preserving first-seen order.
+  // Ungrouped items fall into a headerless leading section.
+  const groupedItems: { label: string | null; items: SidebarItem[] }[] = [];
+  navigableItems.forEach((item) => {
+    const label = item.group || null;
+    const existing = groupedItems.find((g) => g.label === label);
+    if (existing) {
+      existing.items.push(item);
+    } else {
+      groupedItems.push({ label, items: [item] });
+    }
+  });
+  const hasGroups = groupedItems.some((g) => g.label !== null);
+
+  // Grouped categories always render as one column per group
+  const isMegaMenu =
+    hasGroups || shouldUseMegaMenu(categoryName, navigableItems.length);
+  const columns = hasGroups
+    ? Math.min(groupedItems.length, 4)
+    : getMegaMenuColumns(navigableItems.length);
 
   // Calculate position based on anchor element (centered using transform)
   useEffect(() => {
@@ -323,7 +341,23 @@ export default function NavbarDropdown({
         onMouseLeave={onMouseLeave}
       >
         {/* Items Grid/List */}
-        {isMegaMenu ? (
+        {hasGroups ? (
+          <div
+            className="grid gap-x-3 gap-y-1 items-start"
+            style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+          >
+            {groupedItems.map((group) => (
+              <div key={group.label ?? "__ungrouped"} className="space-y-0.5">
+                {group.label && (
+                  <div className="px-3 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-default-400 dark:text-gray-500 select-none">
+                    {group.label}
+                  </div>
+                )}
+                {group.items.map(renderDropdownItem)}
+              </div>
+            ))}
+          </div>
+        ) : isMegaMenu ? (
           <div
             className="grid gap-1"
             style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
