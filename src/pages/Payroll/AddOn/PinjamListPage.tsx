@@ -293,14 +293,21 @@ const PinjamListPage: React.FC = () => {
 
   const employeeData = useMemo<EmployeePinjamData[]>(() => {
     const latestPinjamTimesByEmployee = new Map<string, number>();
+    const latestPinjamTimesByName = new Map<string, number>();
 
     pinjamRecords.forEach((record: PinjamRecord) => {
       const latestTime = getPinjamActivityTime(record);
       const currentLatestTime =
         latestPinjamTimesByEmployee.get(record.employee_id) ?? 0;
+      const currentLatestNameTime =
+        latestPinjamTimesByName.get(record.employee_name) ?? 0;
 
       if (latestTime > currentLatestTime) {
         latestPinjamTimesByEmployee.set(record.employee_id, latestTime);
+      }
+
+      if (latestTime > currentLatestNameTime) {
+        latestPinjamTimesByName.set(record.employee_name, latestTime);
       }
     });
 
@@ -325,7 +332,10 @@ const PinjamListPage: React.FC = () => {
         employee_payroll_id: payrollRecord?.employee_payroll_id,
         employee_id: employeeId,
         employee_name: pinjamRecord.employee_name,
-        latestPinjamTime: latestPinjamTimesByEmployee.get(employeeId) ?? 0,
+        latestPinjamTime: Math.max(
+          latestPinjamTimesByEmployee.get(employeeId) ?? 0,
+          latestPinjamTimesByName.get(pinjamRecord.employee_name) ?? 0
+        ),
         midMonthPay: midMonthRecord?.amount || 0,
         netPay: payrollRecord?.net_pay || 0,
         setelahDigenapkan: payrollRecord?.setelah_digenapkan,
