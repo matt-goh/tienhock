@@ -7,6 +7,30 @@ const NEW_ID_RE = /^(TH|JP|GT)-(CN|DN|RN)-(\d{2})-(\d+)$/;
 
 export function formatAdjustmentDocId(id) {
   if (!id) return id ?? "";
-  const m = NEW_ID_RE.exec(id);
+  const m = NEW_ID_RE.exec(id.replace(/\//g, "-"));
   return m ? `${m[1]}/${m[2]}/${m[3]}/${m[4]}` : id;
+}
+
+export function parseAdjustmentDocId(id) {
+  if (!id) return null;
+  const m = NEW_ID_RE.exec(id.replace(/\//g, "-"));
+  if (!m) return null;
+  return {
+    company: m[1],
+    type: m[2],
+    year: m[3],
+    runningNumber: m[4],
+  };
+}
+
+export function buildAdjustmentDocId(company, type, year, runningNumber) {
+  return `${company}-${type}-${year}-${Number(runningNumber)}`;
+}
+
+export function getAdjustmentDocDisplayId(doc) {
+  return doc?.display_id || doc?.id || "";
+}
+
+export function formatAdjustmentDocDisplayId(doc) {
+  return formatAdjustmentDocId(getAdjustmentDocDisplayId(doc));
 }

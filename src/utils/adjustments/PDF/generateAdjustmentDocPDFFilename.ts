@@ -12,7 +12,7 @@ export const generateAdjustmentDocPDFFilename = (
   const prefix = companyContext === "jellypolly" ? "JP" : "TH";
 
   if (docs.length === 1) {
-    return `${prefix}_${docs[0].id}.pdf`;
+    return `${prefix}_${docs[0].display_id || docs[0].id}.pdf`;
   }
 
   const sorted = [...docs].sort((a, b) => {

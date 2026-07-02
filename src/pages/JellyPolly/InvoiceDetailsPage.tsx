@@ -57,6 +57,10 @@ import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import InvoiceSoloPDFHandler from "../../utils/invoice/PDF/InvoiceSoloPDFHandler";
 import InvoiceSoloPrintOverlay from "../../utils/invoice/PDF/InvoiceSoloPrintOverlay";
 import {
+  formatAdjustmentDocDisplayId,
+  formatAdjustmentDocId,
+} from "../../utils/adjustments/formatDocId";
+import {
   getInvoiceDisplayStatus,
   getInvoiceDisplayStatusLabel,
 } from "../../utils/invoice/invoiceDisplayStatus";
@@ -2336,7 +2340,7 @@ const InvoiceDetailsPage: React.FC = () => {
                           </span>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap font-mono text-sm text-gray-600 dark:text-gray-400">
-                          {doc.refund_reference || doc.id}
+                          {doc.refund_reference || formatAdjustmentDocDisplayId(doc)}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span
@@ -2352,7 +2356,9 @@ const InvoiceDetailsPage: React.FC = () => {
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-400 truncate max-w-xs">
                           {doc.reason ||
                             (doc.paired_with_id
-                              ? `Paired with ${doc.paired_with_id}`
+                              ? `Paired with ${formatAdjustmentDocId(
+                                  doc.paired_display_id || doc.paired_with_id
+                                )}`
                               : doc.linked_payment_id
                               ? `Linked to payment #${doc.linked_payment_id}`
                               : "Refund Note")}

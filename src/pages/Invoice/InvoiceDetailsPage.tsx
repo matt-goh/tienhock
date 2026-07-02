@@ -62,6 +62,10 @@ import { generateAdjustmentDocPDFBlob } from "../../utils/adjustments/PDF/Adjust
 import { generateAdjustmentDocPDFFilename } from "../../utils/adjustments/PDF/generateAdjustmentDocPDFFilename";
 import AdjustmentDocPrintOverlay from "../../utils/adjustments/PDF/AdjustmentDocPrintOverlay";
 import {
+  formatAdjustmentDocDisplayId,
+  formatAdjustmentDocId,
+} from "../../utils/adjustments/formatDocId";
+import {
   getInvoiceDisplayStatus,
   getInvoiceDisplayStatusLabel,
 } from "../../utils/invoice/invoiceDisplayStatus";
@@ -2376,7 +2380,7 @@ const InvoiceDetailsPage: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap font-mono text-sm text-gray-600 dark:text-gray-400">
-                        {doc.refund_reference || doc.id}
+                        {doc.refund_reference || formatAdjustmentDocDisplayId(doc)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span
@@ -2408,7 +2412,9 @@ const InvoiceDetailsPage: React.FC = () => {
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-400 truncate max-w-xs">
                         {doc.reason ||
                           (doc.paired_with_id
-                            ? `Paired with ${doc.paired_with_id}`
+                            ? `Paired with ${formatAdjustmentDocId(
+                                doc.paired_display_id || doc.paired_with_id
+                              )}`
                             : doc.linked_payment_id
                             ? `Linked to payment #${doc.linked_payment_id}`
                             : "Refund Note")}
@@ -2426,7 +2432,9 @@ const InvoiceDetailsPage: React.FC = () => {
                             }
                             className="inline-flex items-center justify-center p-1.5 rounded text-default-500 hover:text-sky-600 hover:bg-sky-50 dark:text-gray-400 dark:hover:text-sky-400 dark:hover:bg-sky-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Print PDF"
-                            aria-label={`Print PDF for ${doc.id}`}
+                            aria-label={`Print PDF for ${formatAdjustmentDocDisplayId(
+                              doc
+                            )}`}
                           >
                             <IconPrinter size={16} stroke={2} />
                           </button>
@@ -2438,7 +2446,9 @@ const InvoiceDetailsPage: React.FC = () => {
                             }
                             className="inline-flex items-center justify-center p-1.5 rounded text-default-500 hover:text-sky-600 hover:bg-sky-50 dark:text-gray-400 dark:hover:text-sky-400 dark:hover:bg-sky-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Download PDF"
-                            aria-label={`Download PDF for ${doc.id}`}
+                            aria-label={`Download PDF for ${formatAdjustmentDocDisplayId(
+                              doc
+                            )}`}
                           >
                             <IconDownload size={16} stroke={2} />
                           </button>
