@@ -2,14 +2,7 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useCompany } from "../contexts/CompanyContext";
-import {
-  IconFileInvoice,
-  IconListDetails,
-  IconUserDollar,
-  IconChevronRight,
-  IconReportMoney,
-  IconPackage,
-} from "@tabler/icons-react";
+import { IconChevronRight } from "@tabler/icons-react";
 import TienHockLogo from "../utils/TienHockLogo";
 import GreenTargetLogo from "../utils/GreenTargetLogo";
 import { TienHockNavData } from "./TienHockNavData";
@@ -28,6 +21,12 @@ interface NavigationItem {
 interface NavigationSubItem {
   name: string;
   path: string;
+  group?: string;
+}
+
+interface NavigationGroup {
+  name: string;
+  items: NavigationSubItem[];
 }
 
 interface CompanySection {
@@ -45,67 +44,71 @@ interface CompanySection {
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setActiveCompany, companies } = useCompany();
+  const { activeCompany, setActiveCompany, companies } = useCompany();
+
+  const excludedSubItemNameParts: string[] = [
+    "New",
+    "Edit",
+    "List",
+    "Details",
+  ];
+
+  const prefixPath = (path: string, routePrefix: string): string =>
+    `${routePrefix}${path}`;
 
   // Extract subitems from sidebar data, excluding specific patterns
-  const extractSubItems = (items: SidebarItem[]): NavigationSubItem[] => {
+  const extractSubItems = (
+    items: SidebarItem[],
+    routePrefix: string,
+    fallbackGroup: string
+  ): NavigationSubItem[] => {
     const subItems: NavigationSubItem[] = [];
-    items.forEach((item) => {
+    items.forEach((item: SidebarItem) => {
+      const path: string | undefined = item.path;
+      const group: string = item.group || fallbackGroup;
       if (
-        item.path &&
-        !item.path.includes(":") &&
-        !item.name.includes("New") &&
-        !item.name.includes("Edit") &&
-        !item.name.includes("List")
+        path &&
+        !path.includes(":") &&
+        !item.showInPopover &&
+        !excludedSubItemNameParts.some((part: string) =>
+          item.name.includes(part)
+        )
       ) {
-        subItems.push({ name: item.name, path: item.path });
+        subItems.push({
+          name: item.name,
+          path: prefixPath(path, routePrefix),
+          group,
+        });
       }
       if (item.subItems) {
-        subItems.push(...extractSubItems(item.subItems));
+        subItems.push(...extractSubItems(item.subItems, routePrefix, group));
       }
     });
     return subItems;
   };
 
-  // Build Tien Hock items with detailed sub-item lists
-  const buildTienHockItems = (): NavigationItem[] => {
+  const buildCategorizedItems = (
+    navData: SidebarItem[],
+    routePrefix: string,
+    getDescription: (name: string) => string
+  ): NavigationItem[] => {
     const items: NavigationItem[] = [];
 
-    TienHockNavData.forEach((category) => {
+    navData.forEach((category: SidebarItem) => {
       // Exclude "Bookmarks" category
       if (category.name !== "Bookmarks" && category.subItems) {
-        let icon: React.ElementType | undefined;
-        let description: string | undefined;
-
-        switch (category.name) {
-          case "Accounting":
-            icon = IconReportMoney;
-            description = "Manage financial records and transactions";
-            break;
-          case "Payroll":
-            icon = IconUserDollar;
-            description = "Manage employee payroll and payments";
-            break;
-          case "Sales":
-            icon = IconFileInvoice;
-            description = "Invoices and sales management";
-            break;
-          case "Catalogue":
-            icon = IconListDetails;
-            description = "Manage staff, customers, products, etc";
-            break;
-          case "Stock":
-            icon = IconPackage;
-            description = "Manage inventory and stock levels";
-            break;
-        }
+        const path: string = category.subItems[0]?.path || "/";
 
         items.push({
           name: category.name,
-          path: category.subItems[0]?.path || "/",
-          icon,
-          description,
-          subItems: extractSubItems(category.subItems),
+          path: prefixPath(path, routePrefix),
+          icon: category.icon,
+          description: getDescription(category.name),
+          subItems: extractSubItems(
+            category.subItems,
+            routePrefix,
+            category.name
+          ),
         });
       }
     });
@@ -113,11 +116,27 @@ const HomePage: React.FC = () => {
     return items;
   };
 
+  const getDescriptionForTienHock = (name: string): string => {
+    const descriptions: Record<string, string> = {
+      Accounting: "Manage financial records and transactions",
+      Payroll: "Manage employee payroll and payments",
+      Sales: "Invoices and sales management",
+      Catalogue: "Manage staff, customers, products, etc",
+      Stock: "Manage inventory and stock levels",
+    };
+    return descriptions[name] || "";
+  };
+
+  // Build Tien Hock items with detailed sub-item lists
+  const buildTienHockItems = (): NavigationItem[] =>
+    buildCategorizedItems(TienHockNavData, "", getDescriptionForTienHock);
+
   const getDescriptionForGreenTarget = (name: string): string => {
     const descriptions: Record<string, string> = {
       Dashboard: "Overview and analytics",
       Rentals: "Manage dumpster rentals",
       Invoices: "Billing and invoicing",
+      Documents: "Credit, debit and refund notes",
       Payments: "Track payments and transactions",
       Payroll: "Employee payroll management",
       Debtors: "Track outstanding payments",
@@ -129,7 +148,7 @@ const HomePage: React.FC = () => {
 
   // Build Green Target items as simple navigation cards
   const buildGreenTargetItems = (): NavigationItem[] => {
-    return GreenTargetNavData.map((item) => ({
+    return GreenTargetNavData.map((item: SidebarItem) => ({
       name: item.name,
       path: `/greentarget${item.path || ""}`,
       icon: item.icon,
@@ -141,39 +160,43 @@ const HomePage: React.FC = () => {
     const descriptions: Record<string, string> = {
       Accounting: "Financial reports and debtors management",
       Sales: "Sales and invoice management",
-      Invoice: "Create and manage invoices",
-      "Sales Summary": "Sales analytics and reporting",
-      Payments: "Track and manage payments",
-      Debtors: "Monitor outstanding receivables",
+      Payroll: "Manage Jelly Polly payroll and staff work",
+      Stock: "Production records and product stock",
     };
     return descriptions[name] || "";
   };
 
-  // Build Jelly Polly items as simple navigation cards
-  const buildJellyPollyItems = (): NavigationItem[] => {
-    const items: NavigationItem[] = [];
+  // Build Jelly Polly items with the same organized category layout as Tien Hock
+  const buildJellyPollyItems = (): NavigationItem[] =>
+    buildCategorizedItems(
+      JellyPollyNavData,
+      "/jellypolly",
+      getDescriptionForJellyPolly
+    );
 
-    JellyPollyNavData.forEach((category) => {
-      if (category.subItems) {
-        category.subItems.forEach((subItem) => {
-          if (
-            subItem.path &&
-            !subItem.path.includes(":") &&
-            !subItem.name.includes("New") &&
-            !subItem.name.includes("Details")
-          ) {
-            items.push({
-              name: subItem.name,
-              path: `/jellypolly${subItem.path}`,
-              icon: category.icon,
-              description: getDescriptionForJellyPolly(subItem.name),
-            });
-          }
-        });
+  const groupSubItems = (
+    subItems: NavigationSubItem[] | undefined
+  ): NavigationGroup[] => {
+    if (!subItems) {
+      return [];
+    }
+
+    const groups: NavigationGroup[] = [];
+    subItems.forEach((subItem: NavigationSubItem) => {
+      const groupName: string = subItem.group || "General";
+      const existingGroup: NavigationGroup | undefined = groups.find(
+        (group: NavigationGroup) => group.name === groupName
+      );
+
+      if (existingGroup) {
+        existingGroup.items.push(subItem);
+        return;
       }
+
+      groups.push({ name: groupName, items: [subItem] });
     });
 
-    return items;
+    return groups;
   };
 
   // Build company sections and reorder based on the current URL
@@ -214,7 +237,7 @@ const HomePage: React.FC = () => {
       },
     ];
 
-    let currentCompanyId = "tienhock";
+    let currentCompanyId: string = "tienhock";
     if (location.pathname.startsWith("/greentarget")) {
       currentCompanyId = "greentarget";
     } else if (location.pathname.startsWith("/jellypolly")) {
@@ -231,9 +254,9 @@ const HomePage: React.FC = () => {
     return currentSection ? [currentSection, ...otherSections] : sections;
   };
 
-  const companySections = buildCompanySections();
+  const companySections: CompanySection[] = buildCompanySections();
 
-  const handleNavigate = (companyId: string, path: string) => {
+  const handleNavigate = (companyId: string, path: string): void => {
     const company = companies.find((c) => c.id === companyId);
     if (company) {
       setActiveCompany(company);
@@ -241,145 +264,180 @@ const HomePage: React.FC = () => {
     }
   };
 
-  return (
-    <div className="space-y-3">
-      {companySections.map((section) => (
-        <section
-          key={section.company.id}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden"
-        >
-          {/* Company Header */}
-          <div
-            className={`${section.company.bgColor} px-5 py-3`}
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-1.5 bg-white/60 dark:bg-gray-800/60 rounded-lg shadow-sm backdrop-blur-sm">
-                {section.company.logo}
-              </div>
-              <div>
-                <h2
-                  className={`text-lg font-semibold ${section.company.color} tracking-tight`}
-                >
-                  {section.company.name}
-                </h2>
-              </div>
-            </div>
-          </div>
+  const renderSubItemButton = (
+    section: CompanySection,
+    subItem: NavigationSubItem
+  ): React.ReactElement => (
+    <button
+      key={subItem.path}
+      onClick={() => handleNavigate(section.company.id, subItem.path)}
+      className="group flex w-full min-w-0 items-center justify-between rounded-md px-2.5 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100 transition-colors duration-150"
+    >
+      <span className="min-w-0 truncate pr-1">{subItem.name}</span>
+      <IconChevronRight
+        size={14}
+        className="text-gray-400 dark:text-gray-500 opacity-0 transition-opacity group-hover:opacity-100 flex-shrink-0"
+      />
+    </button>
+  );
 
-          {/* Items Container */}
-          <div className="p-4">
-            {section.company.id === "tienhock" ? (
-              // Hierarchical Layout for Tien Hock
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-                {section.items.map((category) => {
-                  const Icon = category.icon;
-                  return (
-                    <div
-                      key={category.name}
-                      className="flex flex-col rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 hover:bg-white dark:hover:bg-gray-800 hover:shadow-sm hover:border-gray-200 dark:hover:border-gray-600 transition-all duration-200"
-                    >
-                      <div className="flex items-start gap-3 p-3 pb-2">
-                        {Icon && (
-                          <div
-                            className={`${section.company.bgColor} p-2 rounded-lg shadow-sm`}
-                          >
-                            <Icon
-                              size={20}
-                              className={section.company.color}
-                            />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm">
-                            {category.name}
-                          </h3>
-                          {category.description && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-tight">
-                              {category.description}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="mx-3 border-t border-gray-100 dark:border-gray-700" />
-                      <div className="p-2 flex-grow">
-                        <div className="space-y-0.5">
-                          {category.subItems && category.subItems.length > 0 ? (
-                            category.subItems.map((subItem) => (
-                              <button
-                                key={subItem.path}
-                                onClick={() =>
-                                  handleNavigate(
-                                    section.company.id,
-                                    subItem.path
-                                  )
-                                }
-                                className="group flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100 transition-colors duration-150"
-                              >
-                                <span>{subItem.name}</span>
-                                <IconChevronRight
-                                  size={14}
-                                  className="text-gray-400 dark:text-gray-500 opacity-0 transition-opacity group-hover:opacity-100"
-                                />
-                              </button>
-                            ))
-                          ) : (
-                            <p className="px-2.5 py-1.5 text-sm text-gray-400 dark:text-gray-500 italic">
-                              No items available.
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              // Card Layout for Green Target and Jelly Polly
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                {section.items.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <button
-                      key={item.path}
-                      onClick={() =>
-                        handleNavigate(section.company.id, item.path)
-                      }
-                      className="group p-3 rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 hover:bg-white dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 hover:shadow-sm transition-all duration-200 text-left"
-                    >
-                      <div className="flex items-start gap-2.5">
-                        {Icon && (
-                          <div
-                            className={`${section.company.bgColor} p-1.5 rounded-lg shadow-sm`}
-                          >
-                            <Icon
-                              size={18}
-                              className={section.company.color}
-                            />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm flex items-center">
-                            {item.name}
-                            <IconChevronRight
-                              size={14}
-                              className="ml-1 text-gray-400 dark:text-gray-500 opacity-0 transition-opacity group-hover:opacity-100 flex-shrink-0"
-                            />
-                          </h3>
-                          {item.description && (
-                            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 leading-tight">
-                              {item.description}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+  const renderGroupedSubItems = (
+    section: CompanySection,
+    category: NavigationItem
+  ): React.ReactElement => {
+    const groups: NavigationGroup[] = groupSubItems(category.subItems);
+    const shouldShowGroupHeaders: boolean = groups.length > 1;
+
+    if (groups.length === 0) {
+      return (
+        <p className="px-2.5 py-1.5 text-sm text-gray-400 dark:text-gray-500 italic">
+          No items available.
+        </p>
+      );
+    }
+
+    return (
+      <div className="space-y-2">
+        {groups.map((itemGroup: NavigationGroup) => (
+          <div key={itemGroup.name} className="space-y-0.5">
+            {shouldShowGroupHeaders && (
+              <p className="px-2.5 pt-1 text-[11px] font-semibold text-gray-400 dark:text-gray-500">
+                {itemGroup.name}
+              </p>
+            )}
+            {itemGroup.items.map((subItem: NavigationSubItem) =>
+              renderSubItemButton(section, subItem)
             )}
           </div>
-        </section>
-      ))}
+        ))}
+      </div>
+    );
+  };
+
+  const renderCategoryCard = (
+    section: CompanySection,
+    category: NavigationItem
+  ): React.ReactElement => {
+    const Icon: React.ElementType | undefined = category.icon;
+
+    return (
+      <div
+        key={category.name}
+        className="flex flex-col rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 hover:bg-white dark:hover:bg-gray-800 hover:shadow-sm hover:border-gray-200 dark:hover:border-gray-600 transition-all duration-200"
+      >
+        <div className="flex items-start gap-3 p-3 pb-2">
+          {Icon && (
+            <div className={`${section.company.bgColor} p-2 rounded-lg shadow-sm`}>
+              <Icon size={20} className={section.company.color} />
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm">
+              {category.name}
+            </h3>
+            {category.description && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-tight">
+                {category.description}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="mx-3 border-t border-gray-100 dark:border-gray-700" />
+        <div className="p-2 flex-grow">
+          {renderGroupedSubItems(section, category)}
+        </div>
+      </div>
+    );
+  };
+
+  const renderDirectItemButton = (
+    section: CompanySection,
+    item: NavigationItem
+  ): React.ReactElement => {
+    const Icon: React.ElementType | undefined = item.icon;
+
+    return (
+      <button
+        key={item.path}
+        onClick={() => handleNavigate(section.company.id, item.path)}
+        className="group p-3 rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 hover:bg-white dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 hover:shadow-sm transition-all duration-200 text-left"
+      >
+        <div className="flex items-start gap-2.5">
+          {Icon && (
+            <div
+              className={`${section.company.bgColor} p-1.5 rounded-lg shadow-sm`}
+            >
+              <Icon size={18} className={section.company.color} />
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm flex items-center">
+              <span className="min-w-0 truncate">{item.name}</span>
+              <IconChevronRight
+                size={14}
+                className="ml-1 text-gray-400 dark:text-gray-500 opacity-0 transition-opacity group-hover:opacity-100 flex-shrink-0"
+              />
+            </h3>
+            {item.description && (
+              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 leading-tight">
+                {item.description}
+              </p>
+            )}
+          </div>
+        </div>
+      </button>
+    );
+  };
+
+  return (
+    <div className="space-y-3">
+      {companySections.map((section: CompanySection) => {
+        const shouldShowCompanyHeader: boolean =
+          section.company.id !== activeCompany.id;
+        const shouldUseCategoryLayout: boolean =
+          section.company.id === "tienhock" ||
+          section.company.id === "jellypolly";
+
+        return (
+          <section
+            key={section.company.id}
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden"
+          >
+            {shouldShowCompanyHeader && (
+              <div className={`${section.company.bgColor} px-5 py-3`}>
+                <div className="flex items-center gap-3">
+                  <div className="p-1.5 bg-white/60 dark:bg-gray-800/60 rounded-lg shadow-sm backdrop-blur-sm">
+                    {section.company.logo}
+                  </div>
+                  <div>
+                    <h2
+                      className={`text-lg font-semibold ${section.company.color}`}
+                    >
+                      {section.company.name}
+                    </h2>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="p-4">
+              {shouldUseCategoryLayout ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                  {section.items.map((category: NavigationItem) =>
+                    renderCategoryCard(section, category)
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                  {section.items.map((item: NavigationItem) =>
+                    renderDirectItemButton(section, item)
+                  )}
+                </div>
+              )}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 };
