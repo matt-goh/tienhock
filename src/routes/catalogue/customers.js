@@ -318,7 +318,7 @@ export default function (pool) {
 
       // Adjustment documents (CN/DN/RN) — include cancelled.
       let adjSql = `
-        SELECT id, type, original_invoice_id, createddate, totalamountpayable,
+        SELECT id, display_id, type, original_invoice_id, createddate, totalamountpayable,
                status, einvoice_status
         FROM adjustment_documents
         WHERE customerid = $1`;

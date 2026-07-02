@@ -21,7 +21,7 @@ import {
   AdjustmentDocStatusBadge,
 } from "../AdjustmentDocs/AdjustmentDocBadge";
 import { getAdjustmentDocsPaths } from "../AdjustmentDocs/useAdjustmentDocsPaths";
-import { formatAdjustmentDocId } from "../../utils/adjustments/formatDocId";
+import { formatAdjustmentDocDisplayId } from "../../utils/adjustments/formatDocId";
 import { parseDatabaseTimestamp, formatDisplayDate } from "../../utils/invoice/dateUtils";
 import { generateTransactionHistoryPDF } from "../../utils/catalogue/TransactionHistoryPDF";
 import LoadingSpinner from "../LoadingSpinner";
@@ -146,7 +146,7 @@ const buildRows = (
       key: `adj-${adj.id}`,
       date: date ?? new Date(0),
       kind: type,
-      reference: formatAdjustmentDocId(adj.id),
+      reference: formatAdjustmentDocDisplayId(adj),
       navTo: `${paths.uiBase}/${adj.id}`,
       relatedInvoice: adj.original_invoice_id ?? null,
       amount: Number(adj.totalamountpayable) || 0,

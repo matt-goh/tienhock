@@ -20,6 +20,8 @@ export interface SidebarItem {
   defaultOpen?: boolean;
   companyId?: string;
   showInPopover?: boolean;
+  /** Section label used to group items inside the navbar dropdown */
+  group?: string;
 }
 
 export interface RouteItem {

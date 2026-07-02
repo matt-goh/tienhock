@@ -113,7 +113,7 @@ export const prepareAdjustmentDocPDFData = async (
   return {
     company: companyInfo,
     doc: {
-      id: doc.id,
+      id: doc.display_id || doc.id,
       type: doc.type,
       originalInvoiceId: doc.original_invoice_id,
       uuid: doc.uuid || "",

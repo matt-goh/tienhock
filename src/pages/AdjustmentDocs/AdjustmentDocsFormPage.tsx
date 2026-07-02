@@ -16,7 +16,12 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { FormInput, FormListbox } from "../../components/FormComponents";
 import { api } from "../../routes/utils/api";
-import { formatAdjustmentDocId } from "../../utils/adjustments/formatDocId";
+import {
+  buildAdjustmentDocId,
+  formatAdjustmentDocDisplayId,
+  formatAdjustmentDocId,
+  parseAdjustmentDocId,
+} from "../../utils/adjustments/formatDocId";
 import toast from "react-hot-toast";
 import {
   AdjustmentDocument,
@@ -178,6 +183,11 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
   // Predicted next document id for this type (preview only — the final id is
   // assigned on save and may differ if another doc is created in between).
   const [previewDocId, setPreviewDocId] = useState<string>("");
+  const [docRunningNumber, setDocRunningNumber] = useState<string>("");
+  const [hasCustomDocNumber, setHasCustomDocNumber] =
+    useState<boolean>(false);
+  const [docIdError, setDocIdError] = useState<string>("");
+  const [isCheckingDocId, setIsCheckingDocId] = useState<boolean>(false);
 
   const [invoice, setInvoice] = useState<ExtendedInvoiceData | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -224,10 +234,91 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
     };
   }, [paths.apiBase, type]);
 
+  useEffect(() => {
+    if (hasCustomDocNumber || !previewDocId) return;
+    const parsed = parseAdjustmentDocId(previewDocId);
+    setDocRunningNumber(parsed?.runningNumber || "");
+  }, [hasCustomDocNumber, previewDocId]);
+
   const isCN = type === "credit_note";
   const isDN = type === "debit_note";
   const isRN = type === "refund_note";
   const isReplacementPairedRefund: boolean = isRN && Boolean(pairedCreditNoteId);
+  const previewDocParts = useMemo(
+    () => parseAdjustmentDocId(previewDocId),
+    [previewDocId]
+  );
+  const requestedDocId: string = useMemo(() => {
+    if (!previewDocParts) return "";
+    const runningNumber = Number.parseInt(docRunningNumber, 10);
+    if (!Number.isInteger(runningNumber) || runningNumber <= 0) return "";
+    return buildAdjustmentDocId(
+      previewDocParts.company,
+      previewDocParts.type,
+      previewDocParts.year,
+      runningNumber
+    );
+  }, [docRunningNumber, previewDocParts]);
+  const docNumberPrefix: string = previewDocParts
+    ? `${previewDocParts.company}/${previewDocParts.type}/${previewDocParts.year}/`
+    : "";
+
+  useEffect(() => {
+    if (!type || !previewDocParts) {
+      setDocIdError("");
+      setIsCheckingDocId(false);
+      return;
+    }
+    if (!docRunningNumber.trim()) {
+      setDocIdError("Document No. running number is required");
+      setIsCheckingDocId(false);
+      return;
+    }
+    if (!requestedDocId) {
+      setDocIdError("Document No. running number must be greater than 0");
+      setIsCheckingDocId(false);
+      return;
+    }
+
+    const checkedType: AdjustmentDocType = type;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setIsCheckingDocId(true);
+      try {
+        const query = new URLSearchParams();
+        query.set("type", checkedType);
+        query.set("display_id", requestedDocId);
+        const response = (await api.get(
+          `${paths.apiBase}/id-availability?${query.toString()}`
+        )) as { available?: boolean };
+        if (cancelled) return;
+        setDocIdError(
+          response.available
+            ? ""
+            : `Document No. ${formatAdjustmentDocId(
+                requestedDocId
+              )} is already used by an active document`
+        );
+      } catch (error: any) {
+        if (!cancelled) {
+          setDocIdError(error?.message || "Could not check Document No.");
+        }
+      } finally {
+        if (!cancelled) setIsCheckingDocId(false);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [
+    docRunningNumber,
+    paths.apiBase,
+    previewDocParts,
+    requestedDocId,
+    type,
+  ]);
 
   const invoiceBalanceDue: number = invoice
     ? roundMoney(Number(invoice.balance_due || 0))
@@ -412,8 +503,8 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
             {
               uid: crypto.randomUUID(),
               code: "REFUND",
-              description: `Bayaran balik lebihan daripada Nota Kredit ${formatAdjustmentDocId(
-                loadedPairedCreditNote.id
+              description: `Bayaran balik lebihan daripada Nota Kredit ${formatAdjustmentDocDisplayId(
+                loadedPairedCreditNote
               )}`,
               quantity: 1,
               price: refundableExcess,
@@ -604,6 +695,11 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
     });
     if (totals.totalamountpayable <= 0)
       errors.push("Document total must be greater than 0");
+    if (!requestedDocId) errors.push("Document No. is required");
+    if (docIdError) errors.push(docIdError);
+    if (isCheckingDocId) {
+      errors.push("Document No. availability is still being checked");
+    }
 
     if (isCN && invoice) {
       const currentBalanceDue: number = roundMoney(
@@ -679,15 +775,15 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
       );
       if (maxReplacementRefundAmount <= MONEY_TOLERANCE) {
         errors.push(
-          `Refund Note cannot be paired because Credit Note ${formatAdjustmentDocId(
-            pairedCreditNote.id
+          `Refund Note cannot be paired because Credit Note ${formatAdjustmentDocDisplayId(
+            pairedCreditNote
           )} did not create a refundable excess. Issue the Credit Note alone to reduce the balance.`
         );
       } else if (totals.totalamountpayable > maxReplacementRefundAmount) {
         errors.push(
           `Refund amount cannot exceed the refundable excess RM ${maxReplacementRefundAmount.toFixed(
             2
-          )} from Credit Note ${formatAdjustmentDocId(pairedCreditNote.id)}.`
+          )} from Credit Note ${formatAdjustmentDocDisplayId(pairedCreditNote)}.`
         );
       }
     }
@@ -708,6 +804,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
     try {
       const payload: any = {
         type,
+        display_id: requestedDocId,
         original_invoice_id: invoice.id,
         reason: reason || null,
         lines: lines.map((l) => ({
@@ -771,7 +868,9 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
   };
 
   const isFormDirty =
-    reason.length > 0 || lines.some((l) => l.code || l.description);
+    hasCustomDocNumber ||
+    reason.length > 0 ||
+    lines.some((l) => l.code || l.description);
 
   const handleBackClick = () => {
     if (isFormDirty && !isSaving) {
@@ -941,7 +1040,12 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
               variant="filled"
               color="sky"
               size="md"
-              disabled={isSaving}
+              disabled={
+                isSaving ||
+                isCheckingDocId ||
+                Boolean(docIdError) ||
+                !requestedDocId
+              }
             >
               {isSaving ? "Saving..." : `Create ${TYPE_LABEL[type]}`}
             </Button>
@@ -955,11 +1059,38 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
                 Document No.
               </div>
-              <div
-                className="font-medium text-default-900 dark:text-gray-100 w-fit"
-                title="Predicted next number — the final number is assigned when you save"
-              >
-                {previewDocId ? formatAdjustmentDocId(previewDocId) : "—"}
+              <div title="Only the final running number can be changed">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-medium text-default-900 dark:text-gray-100 whitespace-nowrap">
+                    {docNumberPrefix || "—"}
+                  </span>
+                  {previewDocParts && (
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={docRunningNumber}
+                      onChange={(e) => {
+                        setHasCustomDocNumber(true);
+                        setDocRunningNumber(e.target.value);
+                      }}
+                      className="w-20 px-2 py-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 rounded text-sm font-medium"
+                      disabled={isSaving}
+                      aria-label="Document number running number"
+                    />
+                  )}
+                </div>
+                {(docIdError || isCheckingDocId) && (
+                  <div
+                    className={`mt-1 text-xs ${
+                      docIdError
+                        ? "text-rose-600 dark:text-rose-400"
+                        : "text-default-500 dark:text-gray-400"
+                    }`}
+                  >
+                    {docIdError || "Checking..."}
+                  </div>
+                )}
               </div>
             </div>
             <div>
@@ -1029,7 +1160,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
             <div className="mt-3 p-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 text-sm">
               <span className="font-medium text-indigo-800 dark:text-indigo-300">
                 Reissuing Refund Note for Credit Note{" "}
-                {formatAdjustmentDocId(pairedCreditNote.id)}
+                {formatAdjustmentDocDisplayId(pairedCreditNote)}
               </span>
               <span className="ml-2 text-indigo-700 dark:text-indigo-400">
                 (Tersedia: RM {Number(pairedCreditNote.totalamountpayable).toFixed(2)})
@@ -1069,9 +1200,11 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
                 : isDN
                 ? "cth. Caj bayaran lewat"
                 : isReplacementPairedRefund
-                ? `Bayaran balik gantian untuk Nota Kredit ${formatAdjustmentDocId(
-                    pairedCreditNoteId
-                  )}`
+                ? `Bayaran balik gantian untuk Nota Kredit ${
+                    pairedCreditNote
+                      ? formatAdjustmentDocDisplayId(pairedCreditNote)
+                      : formatAdjustmentDocId(pairedCreditNoteId)
+                  }`
                 : "cth. Bayaran balik untuk bayaran lebih"
             }
             rows={2}

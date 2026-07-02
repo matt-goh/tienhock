@@ -580,7 +580,7 @@ const CustomerFormPage: React.FC = () => {
           )}
         </div>
         <form onSubmit={handleSubmit} className="px-6">
-          <div className="space-y-6">
+          <div className="mt-4 space-y-6">
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               {renderInput("name", "Customer Name")}
               {renderInput("phone_number", "Phone Number", "tel")}

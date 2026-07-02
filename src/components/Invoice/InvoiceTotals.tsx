@@ -1,6 +1,7 @@
 // src/components/Invoice/InvoiceTotals.tsx
 import React, { ChangeEvent } from "react";
 import type { AdjustmentDocument } from "../../types/types";
+import { formatAdjustmentDocDisplayId } from "../../utils/adjustments/formatDocId";
 
 interface InvoiceTotalsProps {
   subtotal: number;
@@ -136,7 +137,8 @@ const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
               return (
                 <React.Fragment key={doc.id}>
                   <label className="text-gray-600 dark:text-gray-400 text-right self-center">
-                    {isDebit ? "Debit Note" : "Credit Note"} {doc.id}:
+                    {isDebit ? "Debit Note" : "Credit Note"}{" "}
+                    {formatAdjustmentDocDisplayId(doc)}:
                   </label>
                   <div className="flex items-center justify-end">
                     <span

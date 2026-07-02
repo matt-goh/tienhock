@@ -4,6 +4,7 @@
 // one InvoiceLine. BillingReference points at the consolidated parent's
 // UUID. Phase 5.
 import { TIENHOCK_INFO } from "./companyInfo.js";
+import { formatAdjustmentDocId } from "../../adjustments/formatDocId.js";
 
 const TYPE_CODE = {
   credit_note: "02",
@@ -46,6 +47,7 @@ function formatTime() {
 function createLineXml(child, index) {
   const subtotal = Number(child.total_excluding_tax || 0);
   const tax = Number(child.tax_amount || 0);
+  const childDisplayId = formatAdjustmentDocId(child.display_id || child.id);
   return `
   <cac:InvoiceLine>
     <cbc:ID>${index + 1}</cbc:ID>
@@ -67,7 +69,7 @@ function createLineXml(child, index) {
     </cac:TaxTotal>
     <cac:Item>
       <cbc:Description>${escapeXml(
-        `Adjustment ${child.id} for Invoice ${child.original_invoice_id}` +
+        `Adjustment ${childDisplayId} for Invoice ${child.original_invoice_id}` +
           (child.reason ? ` — ${child.reason}` : "")
       )}</cbc:Description>
       <cac:OriginCountry>

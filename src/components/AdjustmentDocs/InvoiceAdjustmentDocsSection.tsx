@@ -27,6 +27,10 @@ import {
 } from "../../utils/adjustments/PDF/AdjustmentDocPDFHandler";
 import { generateAdjustmentDocPDFFilename } from "../../utils/adjustments/PDF/generateAdjustmentDocPDFFilename";
 import AdjustmentDocPrintOverlay from "../../utils/adjustments/PDF/AdjustmentDocPrintOverlay";
+import {
+  formatAdjustmentDocDisplayId,
+  formatAdjustmentDocId,
+} from "../../utils/adjustments/formatDocId";
 
 interface Props {
   invoiceId: string;
@@ -209,7 +213,7 @@ const InvoiceAdjustmentDocsSection: React.FC<Props> = ({
                 onClick={() => navigate(`${paths.uiBase}/${d.id}`)}
               >
                 <td className="px-4 py-2 text-sm font-medium text-default-900 dark:text-gray-100">
-                  {d.id}
+                  {formatAdjustmentDocDisplayId(d)}
                 </td>
                 <td className="px-4 py-2">
                   <AdjustmentDocTypeBadge type={d.type} />
@@ -224,7 +228,11 @@ const InvoiceAdjustmentDocsSection: React.FC<Props> = ({
                   />
                 </td>
                 <td className="px-4 py-2 text-sm text-default-500 dark:text-gray-400">
-                  {d.paired_doc_id ? `↔ ${d.paired_doc_id}` : "—"}
+                  {d.paired_doc_id
+                    ? `↔ ${formatAdjustmentDocId(
+                        d.paired_display_id || d.paired_doc_id
+                      )}`
+                    : "—"}
                 </td>
                 <td
                   className="px-2 py-2 text-center"
@@ -240,7 +248,9 @@ const InvoiceAdjustmentDocsSection: React.FC<Props> = ({
                       disabled={!!printingDoc || downloadingId === d.id}
                       className="inline-flex items-center justify-center p-1.5 rounded text-default-500 hover:text-sky-600 hover:bg-sky-50 dark:text-gray-400 dark:hover:text-sky-400 dark:hover:bg-sky-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Print PDF"
-                      aria-label={`Print PDF for ${d.id}`}
+                      aria-label={`Print PDF for ${formatAdjustmentDocDisplayId(
+                        d
+                      )}`}
                     >
                       <IconPrinter size={16} stroke={2} />
                     </button>
@@ -253,7 +263,9 @@ const InvoiceAdjustmentDocsSection: React.FC<Props> = ({
                       disabled={downloadingId === d.id || !!printingDoc}
                       className="inline-flex items-center justify-center p-1.5 rounded text-default-500 hover:text-sky-600 hover:bg-sky-50 dark:text-gray-400 dark:hover:text-sky-400 dark:hover:bg-sky-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Download PDF"
-                      aria-label={`Download PDF for ${d.id}`}
+                      aria-label={`Download PDF for ${formatAdjustmentDocDisplayId(
+                        d
+                      )}`}
                     >
                       <IconDownload size={16} stroke={2} />
                     </button>
