@@ -804,6 +804,9 @@ export interface EmployeePayroll {
   // Section name per job_type (e.g., {"MEE_PACKING": "Mee", "BIHUN_SANGKUT": "Bihun"})
   // so each individual breakdown slip shows its own job's Bahagian.
   job_sections?: Record<string, string>;
+  // Print-only scope used by the payslip section menu when a grouped payroll
+  // should render only selected job breakdown slips.
+  print_job_types?: string[];
   // Rounding adjustment values
   digenapkan?: number;          // Rounding adjustment amount
   setelah_digenapkan?: number;  // Final rounded amount (take-home, advances deducted)

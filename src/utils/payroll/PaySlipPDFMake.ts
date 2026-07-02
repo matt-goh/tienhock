@@ -315,6 +315,14 @@ const itemBelongsToJobByName = (
   return descLower.includes(jobLower) || payCodeLower.includes(jobLower);
 };
 
+const getPrintJobTypeScope = (payroll: EmployeePayroll): Set<string> | null => {
+  const scopedJobTypes: string[] = (payroll.print_job_types || [])
+    .map((jobType: string) => jobType.trim())
+    .filter((jobType: string) => jobType.length > 0);
+
+  return scopedJobTypes.length > 0 ? new Set(scopedJobTypes) : null;
+};
+
 // Split grouped payroll into individual job payrolls
 const splitGroupedPayroll = (
   payroll: EmployeePayroll,
@@ -420,6 +428,13 @@ const splitGroupedPayroll = (
       const [headJob] = individualJobs.splice(headIndex, 1);
       individualJobs.unshift(headJob);
     }
+  }
+
+  const printJobTypeScope: Set<string> | null = getPrintJobTypeScope(payroll);
+  if (printJobTypeScope) {
+    return individualJobs.filter((job: IndividualJobPayroll) =>
+      printJobTypeScope.has(job.job_type),
+    );
   }
 
   return individualJobs;
@@ -2627,6 +2642,9 @@ const buildPayrollSlipContent = (
   const isGroupedPayroll =
     !!payroll.job_type && payroll.job_type.includes(", ");
   const individualJobs = isGroupedPayroll ? splitGroupedPayroll(payroll) : [];
+  const printJobTypeScope: Set<string> | null = isGroupedPayroll
+    ? getPrintJobTypeScope(payroll)
+    : null;
   const hasIndividual = isGroupedPayroll && individualJobs.length > 0;
 
   const includeIndividual = mode !== "combined" && hasIndividual;
@@ -2634,7 +2652,9 @@ const buildPayrollSlipContent = (
   // non-grouped employee (whose single slip is the combined slip) so something
   // always prints even in "individual" mode.
   const includeCombined =
-    mode === "combined" || mode === "both" || !hasIndividual;
+    mode === "combined" ||
+    mode === "both" ||
+    (!hasIndividual && !printJobTypeScope);
 
   let content: Content[] = [];
 
