@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-02",
+    ms: "Halaman General Stock kini menyembunyikan item yang baki semasanya kosong secara lalai. Gunakan pilihan \"Show zero balance\" untuk memaparkan semula item kosong apabila perlu.",
+    en: "The General Stock page now hides items with zero current balance by default. Use the \"Show zero balance\" option to show zero-balance items again when needed.",
+  },
+  {
+    date: "2026-07-02",
     ms: "Pembetulan Pinjam: pekerja yang mempunyai lebih daripada satu ID tetapi nama yang sama kini dipaparkan sebagai satu jumlah dalam halaman Pinjam. Untuk Butiran Gaji Tien Hock, kad Pinjam juga kini mengambil rekod pinjam daripada ID berkembar, supaya pinjam bulanan dan jumlah masuk bank sepadan dengan Salary Report.",
     en: "Pinjam fix: staff with more than one ID but the same name now show as one combined total on the Pinjam page. In Tien Hock Payroll Details, the Pinjam card now also picks up pinjam records from sibling IDs, so monthly pinjam and bank-in amount match the Salary Report.",
   },
