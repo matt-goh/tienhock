@@ -1,3 +1,9 @@
+# Legacy Trial Balance — Code-by-Code Analysis (by the user)
+
+> **Context (added 2 Jul 2026).** Formerly `TRIAL_BALANCE_ANALYZED_BY_USER.md`. This is the user's own, verbatim walk-through of every legacy trial-balance code prefix that carries an amount — still the best single explanation of what each legacy code *means* in this business. The question it ends with ("should we keep the journal voucher system?") was answered later: **keep journals as the engine, build transaction screens that auto-post** (see [ACCOUNTING_PROGRESS.md](ACCOUNTING_PROGRESS.md)). Prefix→FS-note mapping tables live in [LEGACY_SYSTEM_REFERENCE.md](LEGACY_SYSTEM_REFERENCE.md).
+
+---
+
 Ok we are now simultaneously working on the materials costing and integrating the payment system for the accounting system @materials_closing_stock.pdf. I'm now starting another session to work on another part of the accounting system: The many small components that can be categorized. And also some codes with amounts that I don't really know where they come from. I see many of them in the trial balance. Most of them are actually labeled in @Account code documents.pdf.
 
 1.	AC_* - ACCRUAL, the ones with amounts are AC_LEVY (LEVY_CURRENT), AC_SESB (SESB), and AC_TM (TELEKOM) . Not sure what they are, i assume they are electric bills and telekom bills.
