@@ -81,6 +81,7 @@ export default function (pool, config) {
               jsonb_agg(
                 jsonb_build_object(
                   'id', a.id,
+                  'display_id', a.display_id,
                   'type', a.type,
                   'original_invoice_id', a.original_invoice_id,
                   'customerid', a.customerid,
@@ -112,6 +113,7 @@ export default function (pool, config) {
                   'created_at', a.created_at,
                   'updated_at', a.updated_at,
                   'paired_doc_id', p.id,
+                  'paired_display_id', p.display_id,
                   'paired_type', p.type,
                   'paired_status', p.status,
                   'paired_einvoice_status', p.einvoice_status

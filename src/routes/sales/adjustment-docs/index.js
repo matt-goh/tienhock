@@ -9,7 +9,10 @@ import {
   cancelAdjustmentJournalEntry,
 } from "./accounting.js";
 import { determineBankAccount } from "../../../utils/payment-helpers.js";
-import { formatAdjustmentDocId } from "../../../utils/adjustments/formatDocId.js";
+import {
+  buildAdjustmentDocId,
+  formatAdjustmentDocId,
+} from "../../../utils/adjustments/formatDocId.js";
 import EInvoiceApiClientFactory from "../../../utils/invoice/einvoice/EInvoiceApiClientFactory.js";
 import EInvoiceSubmissionHandler from "../../../utils/invoice/einvoice/EInvoiceSubmissionHandler.js";
 import { EInvoiceAdjustmentNoteTemplate } from "../../../utils/invoice/einvoice/EInvoiceAdjustmentNoteTemplate.js";
@@ -61,21 +64,100 @@ async function generateNextDocId(client, type, year) {
   const yy = String(year).slice(-2);
   const pattern = `${prefix}-${yy}-%`;
   const result = await client.query(
-    `SELECT id FROM ${T.docs}
-      WHERE id LIKE $1
-      ORDER BY split_part(id, '-', 4)::int DESC
+    `SELECT COALESCE(display_id, id) AS display_id
+       FROM ${T.docs}
+      WHERE COALESCE(display_id, id) LIKE $1
+        AND status = 'active'
+      ORDER BY split_part(COALESCE(display_id, id), '-', 4)::int DESC
       LIMIT 1
       FOR UPDATE SKIP LOCKED`,
     [pattern]
   );
   let next = 1;
   if (result.rows.length > 0) {
-    const m = result.rows[0].id.match(
+    const m = result.rows[0].display_id.match(
       new RegExp(`^${prefix}-${yy}-(\\d+)$`)
     );
     if (m) next = parseInt(m[1], 10) + 1;
   }
   return `${prefix}-${yy}-${next}`;
+}
+
+function normalizeDisplayIdForType(displayId, type, year) {
+  if (!displayId) return null;
+  const normalized = String(displayId).trim().replace(/\//g, "-").toUpperCase();
+  const typePrefix = TYPE_PREFIX[type];
+  const yy = String(year).slice(-2);
+  const match = new RegExp(
+    `^${COMPANY_PREFIX}-${typePrefix}-${yy}-(\\d+)$`
+  ).exec(normalized);
+  if (!match) {
+    throw new Error(
+      `Document No. must stay in the ${formatAdjustmentDocId(
+        `${COMPANY_PREFIX}-${typePrefix}-${yy}-1`
+      )} format. Only the last number can be changed.`
+    );
+  }
+  const runningNumber = Number.parseInt(match[1], 10);
+  if (!Number.isInteger(runningNumber) || runningNumber <= 0) {
+    throw new Error("Document No. running number must be greater than 0");
+  }
+  return buildAdjustmentDocId(COMPANY_PREFIX, typePrefix, yy, runningNumber);
+}
+
+async function findActiveDisplayIdConflict(client, displayId, lockRows = false) {
+  const result = await client.query(
+    `SELECT id, COALESCE(display_id, id) AS display_id
+       FROM ${T.docs}
+      WHERE COALESCE(display_id, id) = $1
+        AND status = 'active'
+      LIMIT 1
+      ${lockRows ? "FOR UPDATE" : ""}`,
+    [displayId]
+  );
+  return result.rows[0] || null;
+}
+
+async function assertDisplayIdAvailable(client, displayId) {
+  const conflict = await findActiveDisplayIdConflict(client, displayId, true);
+  if (conflict) {
+    throw new Error(
+      `Document No. ${formatAdjustmentDocId(
+        displayId
+      )} is already used by active document ${formatAdjustmentDocId(
+        conflict.display_id
+      )}. Cancel it before reusing this number.`
+    );
+  }
+}
+
+async function resolveInternalDocId(client, displayId) {
+  const exactResult = await client.query(
+    `SELECT 1 FROM ${T.docs} WHERE id = $1 LIMIT 1`,
+    [displayId]
+  );
+  if (exactResult.rows.length === 0) return displayId;
+
+  for (let i = 0; i < 20; i++) {
+    const suffix = i === 0 ? Date.now() : `${Date.now()}-${i + 1}`;
+    const candidate = `${displayId}-R${suffix}`;
+    const candidateResult = await client.query(
+      `SELECT 1 FROM ${T.docs} WHERE id = $1 LIMIT 1`,
+      [candidate]
+    );
+    if (candidateResult.rows.length === 0) return candidate;
+  }
+  throw new Error("Could not allocate a unique internal adjustment document ID");
+}
+
+async function allocateDocIdentifiers(client, type, year, requestedDisplayId) {
+  const displayId =
+    requestedDisplayId || (await generateNextDocId(client, type, year));
+  await assertDisplayIdAvailable(client, displayId);
+  return {
+    id: await resolveInternalDocId(client, displayId),
+    display_id: displayId,
+  };
 }
 
 // ---------- consolidation lookup ----------
@@ -267,17 +349,18 @@ function validateLineItems(items, type) {
 async function insertDoc(client, doc) {
   await client.query(
     `INSERT INTO ${T.docs} (
-       id, type, original_invoice_id, customerid, salespersonid,
+       id, display_id, type, original_invoice_id, customerid, salespersonid,
        createddate, reason, paired_with_id, linked_payment_id,
        references_consolidated_id,
        total_excluding_tax, tax_amount, rounding, totalamountpayable,
        refund_method, refund_reference, bank_account,
        status, journal_entry_id, created_by
      ) VALUES (
-       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'active',$18,$19
+       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'active',$19,$20
      )`,
     [
       doc.id,
+      doc.display_id || doc.id,
       doc.type,
       doc.original_invoice_id,
       doc.customerid,
@@ -523,6 +606,39 @@ async function resolveReferencedDocument(client, doc) {
     }
   });
 
+  // --- GET /api/adjustment-docs/id-availability?type=&display_id= ---
+  router.get("/id-availability", async (req, res) => {
+    const { type, display_id } = req.query;
+    if (!VALID_TYPES.includes(type)) {
+      return res.status(400).json({ message: "Invalid type" });
+    }
+    const client = await pool.connect();
+    try {
+      const year = new Date().getFullYear();
+      const normalizedDisplayId = normalizeDisplayIdForType(
+        display_id,
+        type,
+        year
+      );
+      if (!normalizedDisplayId) {
+        return res.status(400).json({ message: "display_id is required" });
+      }
+      const conflict = await findActiveDisplayIdConflict(
+        client,
+        normalizedDisplayId
+      );
+      res.json({
+        available: !conflict,
+        display_id: normalizedDisplayId,
+        conflict,
+      });
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    } finally {
+      client.release();
+    }
+  });
+
   // --- GET /api/adjustment-docs ---
   router.get("/", async (req, res) => {
     const {
@@ -543,7 +659,8 @@ async function resolveReferencedDocument(client, doc) {
         SELECT a.*, i.customerid AS inv_customerid,
                i.einvoice_status AS original_invoice_einvoice_status,
                c.name AS customer_name,
-               p.id AS paired_doc_id, p.type AS paired_type, p.status AS paired_status,
+               p.id AS paired_doc_id, COALESCE(p.display_id, p.id) AS paired_display_id,
+               p.type AS paired_type, p.status AS paired_status,
                p.einvoice_status AS paired_einvoice_status
           FROM ${T.docs} a
           JOIN ${T.invoices} i ON a.original_invoice_id = i.id
@@ -594,7 +711,7 @@ async function resolveReferencedDocument(client, doc) {
         // form still matches the stored id.
         params.push(`%${search.replace(/\//g, "-")}%`);
         const spId = `$${p++}`;
-        sql += ` AND (a.id ILIKE ${spId} OR a.original_invoice_id ILIKE ${sp} OR c.name ILIKE ${sp})`;
+        sql += ` AND (COALESCE(a.display_id, a.id) ILIKE ${spId} OR a.id ILIKE ${spId} OR a.original_invoice_id ILIKE ${sp} OR c.name ILIKE ${sp})`;
       }
       sql += ` ORDER BY a.created_at DESC`;
 
@@ -647,6 +764,7 @@ async function resolveReferencedDocument(client, doc) {
     const body = req.body || {};
     const {
       type,
+      display_id,
       original_invoice_id,
       reason,
       createddate, // optional override; defaults to now
@@ -819,12 +937,16 @@ async function resolveReferencedDocument(client, doc) {
         );
         if (maxRefundAmount <= MONEY_TOLERANCE) {
           throw new Error(
-            `Cannot create paired Refund Note because Credit Note ${replacementCreditNote.id} did not create a refundable excess. Issue the Credit Note alone to reduce the balance.`
+            `Cannot create paired Refund Note because Credit Note ${formatAdjustmentDocId(
+              replacementCreditNote.display_id || replacementCreditNote.id
+            )} did not create a refundable excess. Issue the Credit Note alone to reduce the balance.`
           );
         }
         if (amt > maxRefundAmount + MONEY_TOLERANCE) {
           throw new Error(
-            `Refund amount RM ${amt.toFixed(2)} cannot exceed refundable excess RM ${maxRefundAmount.toFixed(2)} from Credit Note ${replacementCreditNote.id}.`
+            `Refund amount RM ${amt.toFixed(2)} cannot exceed refundable excess RM ${maxRefundAmount.toFixed(2)} from Credit Note ${formatAdjustmentDocId(
+              replacementCreditNote.display_id || replacementCreditNote.id
+            )}.`
           );
         }
       }
@@ -878,11 +1000,23 @@ async function resolveReferencedDocument(client, doc) {
       );
 
       const year = new Date().getFullYear();
-      const docId = await generateNextDocId(client, type, year);
+      const requestedDisplayId = normalizeDisplayIdForType(
+        display_id,
+        type,
+        year
+      );
+      const docIds = await allocateDocIdentifiers(
+        client,
+        type,
+        year,
+        requestedDisplayId
+      );
+      const docId = docIds.id;
       const docCreatedDate = createddate || Date.now().toString();
 
       const doc = {
         id: docId,
+        display_id: docIds.display_id,
         type,
         original_invoice_id,
         customerid: invoice.customerid,
@@ -933,9 +1067,16 @@ async function resolveReferencedDocument(client, doc) {
           throw new Error("Paired refund requires bank_account for non-cash methods");
         }
 
-        const rnId = await generateNextDocId(client, "refund_note", year);
+        const rnIds = await allocateDocIdentifiers(
+          client,
+          "refund_note",
+          year,
+          null
+        );
+        const rnId = rnIds.id;
         const rnDoc = {
           id: rnId,
+          display_id: rnIds.display_id,
           type: "refund_note",
           original_invoice_id,
           customerid: invoice.customerid,
@@ -974,11 +1115,11 @@ async function resolveReferencedDocument(client, doc) {
       res.status(201).json({
         message: pairedDoc
           ? `Credit Note ${formatAdjustmentDocId(
-              docId
+              doc.display_id
             )} and paired Refund Note ${formatAdjustmentDocId(
-              pairedDoc.id
+              pairedDoc.display_id
             )} created`
-          : `${TYPE_PREFIX[type]} ${formatAdjustmentDocId(docId)} created`,
+          : `${TYPE_PREFIX[type]} ${formatAdjustmentDocId(doc.display_id)} created`,
         document: {
           ...fresh,
           total_excluding_tax: parseFloat(fresh.total_excluding_tax || 0),
@@ -997,9 +1138,14 @@ async function resolveReferencedDocument(client, doc) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Error creating adjustment document:", error);
+      const message =
+        error.code === "23505" &&
+        String(error.constraint || "").includes("active_display_id")
+          ? "Document No. is already used by an active adjustment document"
+          : error.message || "Error creating adjustment document";
       res
         .status(400)
-        .json({ message: error.message || "Error creating adjustment document" });
+        .json({ message });
     } finally {
       client.release();
     }
@@ -1022,7 +1168,11 @@ async function resolveReferencedDocument(client, doc) {
       const doc = docResult.rows[0];
 
       if (doc.status === "cancelled") {
-        throw new Error(`Document ${id} is already cancelled`);
+        throw new Error(
+          `Document ${formatAdjustmentDocId(
+            doc.display_id || doc.id
+          )} is already cancelled`
+        );
       }
 
       // Block CN cancel if a paired active RN exists.
@@ -1049,7 +1199,9 @@ async function resolveReferencedDocument(client, doc) {
         doc.einvoice_status === "pending"
       ) {
         throw new Error(
-          `Document ${id} has an active e-invoice (${doc.einvoice_status}). Cancel the e-invoice first.`
+          `Document ${formatAdjustmentDocId(
+            doc.display_id || doc.id
+          )} has an active e-invoice (${doc.einvoice_status}). Cancel the e-invoice first.`
         );
       }
 
@@ -1150,7 +1302,9 @@ async function resolveReferencedDocument(client, doc) {
 
       const fresh = await fetchDocWithRelations(client, id);
       res.json({
-        message: `Document ${id} cancelled. Accounting reversed.`,
+        message: `Document ${formatAdjustmentDocId(
+          doc.display_id || doc.id
+        )} cancelled. Accounting reversed.`,
         document: fresh,
       });
     } catch (error) {
@@ -1190,18 +1344,19 @@ async function resolveReferencedDocument(client, doc) {
         return res.status(404).json({ message: "Document not found" });
       }
       const doc = docResult.rows[0];
+      const docDisplayId = formatAdjustmentDocId(doc.display_id || doc.id);
       if (doc.status !== "active") {
         await client.query("ROLLBACK");
         txActive = false;
         return res
           .status(400)
-          .json({ message: "Cannot submit a cancelled document" });
+          .json({ message: `Cannot submit cancelled document ${docDisplayId}` });
       }
       if (doc.einvoice_status === "valid" || doc.einvoice_status === "pending") {
         await client.query("ROLLBACK");
         txActive = false;
         return res.status(400).json({
-          message: `Document already has e-invoice status '${doc.einvoice_status}'. Cancel or update status first.`,
+          message: `Document ${docDisplayId} already has e-invoice status '${doc.einvoice_status}'. Cancel or update status first.`,
         });
       }
 
@@ -1316,7 +1471,7 @@ async function resolveReferencedDocument(client, doc) {
 
       res.json({
         success: true,
-        message: `Submitted ${id} to MyInvois (status: ${status})`,
+        message: `Submitted ${docDisplayId} to MyInvois (status: ${status})`,
         status,
         uuid,
         longId,
@@ -1448,11 +1603,12 @@ async function resolveReferencedDocument(client, doc) {
         return res.status(404).json({ message: "Document not found" });
       }
       const doc = docResult.rows[0];
+      const docDisplayId = formatAdjustmentDocId(doc.display_id || doc.id);
       const current = doc.einvoice_status?.toLowerCase();
       if (current !== "valid" && current !== "invalid") {
         await client.query("ROLLBACK");
         return res.status(400).json({
-          message: `Cannot cancel e-invoice with status: ${doc.einvoice_status}. Only 'valid' or 'invalid' can be cancelled.`,
+          message: `Cannot cancel e-invoice for ${docDisplayId} with status: ${doc.einvoice_status}. Only 'valid' or 'invalid' can be cancelled.`,
         });
       }
       if (!doc.uuid) {
@@ -1510,8 +1666,8 @@ async function resolveReferencedDocument(client, doc) {
       res.json({
         success: true,
         message: doc.is_consolidated
-          ? `E-invoice cancelled at MyInvois for consolidated wrapper ${id}. ${childCascade} child document(s) marked cancelled. Local accounting impact on children remains until you cancel the wrapper.`
-          : `E-invoice cancelled at MyInvois for ${id}. Local accounting impact remains until you cancel the document.`,
+          ? `E-invoice cancelled at MyInvois for consolidated wrapper ${docDisplayId}. ${childCascade} child document(s) marked cancelled. Local accounting impact on children remains until you cancel the wrapper.`
+          : `E-invoice cancelled at MyInvois for ${docDisplayId}. Local accounting impact remains until you cancel the document.`,
       });
     } catch (error) {
       await client.query("ROLLBACK");

@@ -408,6 +408,7 @@ export interface AdjustmentDocLine {
 
 export interface AdjustmentDocument {
   id: string; // CN-2026-0001 / DN-2026-0001 / RN-2026-0001
+  display_id?: string | null;
   type: AdjustmentDocType;
   original_invoice_id: string;
   customerid: string;
@@ -449,6 +450,7 @@ export interface AdjustmentDocument {
   // Joined fields when fetching list
   original_invoice_einvoice_status?: EInvoiceStatus;
   paired_doc_id?: string | null;
+  paired_display_id?: string | null;
   paired_type?: AdjustmentDocType | null;
   paired_status?: "active" | "cancelled" | null;
   paired_einvoice_status?: EInvoiceStatus;
