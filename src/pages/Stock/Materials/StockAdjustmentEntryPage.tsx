@@ -29,6 +29,7 @@ import {
 } from "@tabler/icons-react";
 import clsx from "clsx";
 import Button from "../../../components/Button";
+import Checkbox from "../../../components/Checkbox";
 import MonthNavigator from "../../../components/MonthNavigator";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import GeneralStockCategoryModal from "../../../components/Stock/GeneralStockCategoryModal";
@@ -146,6 +147,23 @@ const makeNumber = (value: number | string | null | undefined): number => {
   return parseFloat(String(value ?? "")) || 0;
 };
 
+const generalStockRowMatchesSearch = (row: GeneralStockRow, query: string): boolean => {
+  if (!query) return true;
+
+  const haystack = [
+    row.category_name,
+    row.description,
+    row.supplier_name,
+    row.purchase_no,
+    row.purchase_date,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return haystack.includes(query);
+};
+
 const recalculateStock = <T extends StockEntryRow | MaterialWithStock>(
   item: T,
   adjustmentQuantity: number,
@@ -219,6 +237,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
   const [generalStockCategories, setGeneralStockCategories] = useState<GeneralStockCategory[]>([]);
   const [generalAdjustmentInputs, setGeneralAdjustmentInputs] = useState<Record<number, string>>({});
   const [generalSearchQuery, setGeneralSearchQuery] = useState<string>("");
+  const [showZeroBalanceGeneralStock, setShowZeroBalanceGeneralStock] = useState<boolean>(false);
   const [newGeneralCategoryName, setNewGeneralCategoryName] = useState<string>("");
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState<boolean>(false);
   const [revertingAdjustmentId, setRevertingAdjustmentId] = useState<number | null>(null);
@@ -883,22 +902,28 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
 
   const filteredGeneralStockRows = useMemo(() => {
     const query = generalSearchQuery.trim().toLowerCase();
-    if (!query) return generalStockRows;
 
     return generalStockRows.filter((row) => {
-      const haystack = [
-        row.category_name,
-        row.description,
-        row.supplier_name,
-        row.purchase_no,
-        row.purchase_date,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(query);
+      if (!generalStockRowMatchesSearch(row, query)) return false;
+
+      if (!showZeroBalanceGeneralStock && makeNumber(row.current_stock) === 0) {
+        return false;
+      }
+
+      return true;
     });
-  }, [generalStockRows, generalSearchQuery]);
+  }, [generalStockRows, generalSearchQuery, showZeroBalanceGeneralStock]);
+
+  const hiddenZeroBalanceGeneralStockCount = useMemo(() => {
+    if (showZeroBalanceGeneralStock) return 0;
+
+    const query = generalSearchQuery.trim().toLowerCase();
+    return generalStockRows.filter(
+      (row) =>
+        generalStockRowMatchesSearch(row, query) &&
+        makeNumber(row.current_stock) === 0
+    ).length;
+  }, [generalStockRows, generalSearchQuery, showZeroBalanceGeneralStock]);
 
   const groupedGeneralStockRows = useMemo(() => {
     const groups = new Map<string, GeneralStockRow[]>();
@@ -1064,68 +1089,34 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
         </div>
       ) : activeTab === "general" ? (
         <div className="space-y-3">
-          <div className="rounded-lg border border-default-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-            <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
-                  General Categories
-                </h2>
-                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-default-100 px-1.5 text-xs font-medium text-default-500 dark:bg-gray-700 dark:text-gray-400">
-                  {generalStockCategories.length}
-                </span>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {generalHeaderActions && (
-                  <>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {generalHeaderActions}
-                    </div>
-                    <span className="text-default-300 dark:text-gray-600">|</span>
-                  </>
-                )}
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newGeneralCategoryName}
-                    onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                      setNewGeneralCategoryName(event.target.value)
-                    }
-                    onKeyDown={(event: React.KeyboardEvent<HTMLInputElement>) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        handleAddGeneralCategory();
-                      }
-                    }}
-                    placeholder="New category"
-                    className="h-8 rounded-lg border border-default-300 bg-white px-3 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-                  />
-                  <Button
-                    type="button"
-                    color="sky"
-                    size="sm"
-                    icon={IconPlus}
-                    onClick={handleAddGeneralCategory}
-                    disabled={!newGeneralCategoryName.trim()}
-                  >
-                    Add
-                  </Button>
+          <div className="overflow-hidden rounded-lg border border-default-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div className="flex flex-col lg:flex-row">
+              <section className="min-w-0 flex-1 p-3">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
+                      Categories
+                    </h2>
+                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-default-100 px-1.5 text-xs font-medium text-default-500 dark:bg-gray-700 dark:text-gray-400">
+                      {generalStockCategories.length}
+                    </span>
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     icon={IconSettings}
+                    className="h-8 rounded-lg !px-3"
                     onClick={() => setIsCategoryModalOpen(true)}
                   >
                     Manage
                   </Button>
                 </div>
-              </div>
-            </div>
             {generalStockCategories.length === 0 ? (
               <button
                 type="button"
                 onClick={() => setIsCategoryModalOpen(true)}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-default-300 px-3 py-3 text-sm text-default-500 transition-colors hover:border-sky-400 hover:text-sky-600 dark:border-gray-600 dark:text-gray-400 dark:hover:border-sky-500 dark:hover:text-sky-300"
+                className="flex min-h-16 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-default-300 px-3 py-3 text-sm text-default-500 transition-colors hover:border-sky-400 hover:text-sky-600 dark:border-gray-600 dark:text-gray-400 dark:hover:border-sky-500 dark:hover:text-sky-300"
               >
                 <IconPlus size={16} />
                 No categories yet — add your first one
@@ -1149,33 +1140,95 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                 ))}
               </div>
             )}
+              </section>
+
+              <aside className="border-t border-default-200 p-3 dark:border-gray-700 lg:w-[430px] lg:border-l lg:border-t-0">
+                {generalHeaderActions && (
+                  <div className="border-b border-default-200 pb-3 dark:border-gray-700">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {generalHeaderActions}
+                    </div>
+                  </div>
+                )}
+                <div className={clsx("flex flex-col gap-2 sm:flex-row", generalHeaderActions && "pt-3")}>
+                  <input
+                    type="text"
+                    value={newGeneralCategoryName}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                      setNewGeneralCategoryName(event.target.value)
+                    }
+                    onKeyDown={(event: React.KeyboardEvent<HTMLInputElement>) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        handleAddGeneralCategory();
+                      }
+                    }}
+                    placeholder="New category"
+                    className="h-8 min-w-0 flex-1 rounded-lg border border-default-300 bg-white px-3 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                  />
+                  <Button
+                    type="button"
+                    color="sky"
+                    size="sm"
+                    icon={IconPlus}
+                    className="h-8 rounded-lg !px-3"
+                    onClick={handleAddGeneralCategory}
+                    disabled={!newGeneralCategoryName.trim()}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </aside>
+            </div>
           </div>
 
-          <div className="relative max-w-sm">
-            <IconSearch
-              size={16}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-500"
-            />
-            <input
-              type="text"
-              value={generalSearchQuery}
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                setGeneralSearchQuery(event.target.value)
-              }
-              placeholder="Search category, item, supplier..."
-              className="h-9 w-full rounded-lg border border-default-300 bg-white pl-9 pr-9 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-            />
-            {generalSearchQuery && (
-              <button
-                type="button"
-                onClick={() => setGeneralSearchQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-default-400 hover:bg-default-100 hover:text-default-700 dark:text-gray-500 dark:hover:bg-gray-600 dark:hover:text-gray-200"
-                title="Clear search"
-                aria-label="Clear search"
-              >
-                <IconX size={14} />
-              </button>
-            )}
+          <div className="rounded-lg border border-default-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div className="relative w-full max-w-sm">
+              <IconSearch
+                size={16}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-500"
+              />
+              <input
+                type="text"
+                value={generalSearchQuery}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  setGeneralSearchQuery(event.target.value)
+                }
+                placeholder="Search category, item, supplier..."
+                className="h-9 w-full rounded-lg border border-default-300 bg-white pl-9 pr-9 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+              />
+              {generalSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setGeneralSearchQuery("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-default-400 hover:bg-default-100 hover:text-default-700 dark:text-gray-500 dark:hover:bg-gray-600 dark:hover:text-gray-200"
+                  title="Clear search"
+                  aria-label="Clear search"
+                >
+                  <IconX size={14} />
+                </button>
+              )}
+              </div>
+
+              <div className="inline-flex h-9 items-center gap-2 rounded-lg border border-default-200 bg-white px-2.5 text-sm text-default-600 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+              {!showZeroBalanceGeneralStock && hiddenZeroBalanceGeneralStockCount > 0 && (
+                <span className="border-r border-default-200 pr-2 text-xs text-default-400 dark:border-gray-700 dark:text-gray-500">
+                  {hiddenZeroBalanceGeneralStockCount} hidden
+                </span>
+              )}
+              <Checkbox
+                checked={showZeroBalanceGeneralStock}
+                onChange={setShowZeroBalanceGeneralStock}
+                size={18}
+                checkedColor="text-indigo-600 dark:text-indigo-400"
+                uncheckedColor="text-default-400 dark:text-gray-500"
+                label="Show zero balance"
+                buttonClassName="rounded"
+                ariaLabel="Show zero balance general stock items"
+              />
+              </div>
+            </div>
           </div>
 
           <div className="overflow-hidden rounded-lg border border-default-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
@@ -1305,8 +1358,12 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                       <IconPackage size={32} className="mx-auto mb-2 text-default-300 dark:text-gray-600" />
                       <p>
                         {generalSearchQuery.trim()
-                          ? "No General stock rows match your search."
-                          : "No General stock rows found."}
+                          ? hiddenZeroBalanceGeneralStockCount > 0
+                            ? "Only zero-balance rows match your search."
+                            : "No General stock rows match your search."
+                          : showZeroBalanceGeneralStock
+                            ? "No General stock rows found."
+                            : "No General stock rows with balance found."}
                       </p>
                     </td>
                   </tr>
