@@ -23,7 +23,15 @@ import { OTH_PRODUCTION_IDS } from "../../config/othProductionProducts";
 
 type ProductTab = "BH" | "MEE" | "OTH";
 
-const ProductStockAdjustmentEntryPage: React.FC = () => {
+interface ProductStockAdjustmentEntryPageProps {
+  // Restrict the page to specific product types (e.g. ["JP"] for the Jelly
+  // Polly adjustments page). Default: TH behaviour (BH/MEE/OTH tabs).
+  productTypes?: string[];
+}
+
+const ProductStockAdjustmentEntryPage: React.FC<
+  ProductStockAdjustmentEntryPageProps
+> = ({ productTypes }) => {
   // Month selection state
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => new Date());
 
@@ -71,13 +79,22 @@ const ProductStockAdjustmentEntryPage: React.FC = () => {
     );
   }, [products]);
 
+  // Restricted mode (e.g. Jelly Polly): a single product list, no BH/MEE tabs
+  const restrictedProducts = useMemo(() => {
+    if (!productTypes) return null;
+    return products.filter((p) =>
+      productTypes.includes(p.type)
+    ) as StockProduct[];
+  }, [products, productTypes]);
+
   // Get current tab products
   const currentProducts =
-    activeTab === "BH"
+    restrictedProducts ??
+    (activeTab === "BH"
       ? bhProducts
       : activeTab === "MEE"
       ? meeProducts
-      : othProducts;
+      : othProducts);
 
   // Format month for API calls (YYYY-MM)
   const monthString = useMemo(() => {
@@ -523,7 +540,8 @@ const ProductStockAdjustmentEntryPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Tabs */}
+              {/* Tabs (hidden in restricted single-type mode, e.g. JP) */}
+              {!restrictedProducts && (
               <div className="border-b border-default-200 dark:border-gray-700">
                 <div className="flex">
                   {(["BH", "MEE", "OTH"] as ProductTab[]).map((tab) => (
@@ -554,6 +572,7 @@ const ProductStockAdjustmentEntryPage: React.FC = () => {
                   ))}
                 </div>
               </div>
+              )}
 
               {/* Products Table */}
               <div className="flex-1 overflow-auto">

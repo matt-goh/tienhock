@@ -1,5 +1,6 @@
 // src/routes/stock/production-entries.js
 import { Router } from "express";
+import { reprocessJPEmployeesSafe } from "../jellypolly/jpPayrollProcessor.js";
 
 const STOCK_ONLY_WORKER_ID = "__STOCK_ONLY__";
 const STOCK_ONLY_PRODUCT_IDS = new Set([
@@ -12,7 +13,11 @@ const PACKING_JOB_BY_PRODUCT_TYPE = {
   MEE: "MEE_PACKING",
   BH: "BH_PACKING",
 };
-const WORKER_ORDER_SCOPES = new Set(["BH_PACKING", "MEE_PACKING"]);
+const WORKER_ORDER_SCOPES = new Set([
+  "BH_PACKING",
+  "MEE_PACKING",
+  "JP_PRODUCTION",
+]);
 
 let workerOrderTableReady = false;
 
@@ -21,7 +26,7 @@ const ensureWorkerOrderTable = async (pool) => {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS production_worker_orders (
-      scope text NOT NULL CHECK (scope IN ('BH_PACKING', 'MEE_PACKING')),
+      scope text NOT NULL CHECK (scope IN ('BH_PACKING', 'MEE_PACKING', 'JP_PRODUCTION')),
       worker_id varchar(50) NOT NULL REFERENCES staffs(id) ON DELETE CASCADE,
       sort_order integer NOT NULL CHECK (sort_order >= 0),
       updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
@@ -79,6 +84,29 @@ const getPackingCutiConflicts = async (client, date, productId, workerIds) => {
 
 export default function (pool) {
   const router = Router();
+
+  // JP products feed the Jelly Polly payroll — reprocess the worker's month
+  // when a JP product's entry changes
+  const reprocessIfJPProduct = async (productId, entryDate, workerId) => {
+    if (!productId || !workerId) return;
+    const productTypeResult = await pool.query(
+      "SELECT type FROM products WHERE id = $1",
+      [productId]
+    );
+    if (productTypeResult.rows[0]?.type !== "JP") return;
+    const date =
+      entryDate instanceof Date
+        ? { year: entryDate.getFullYear(), month: entryDate.getMonth() + 1 }
+        : (() => {
+            const [y, m] = String(entryDate).split("-");
+            return { year: parseInt(y), month: parseInt(m) };
+          })();
+    await reprocessJPEmployeesSafe(pool, {
+      year: date.year,
+      month: date.month,
+      employeeIds: [workerId],
+    });
+  };
 
   // ========== MACHINE STATUS ROUTES (must be before /:id routes) ==========
 
@@ -326,8 +354,22 @@ export default function (pool) {
 
       if (!product_type) {
         return res.status(400).json({
-          message: "product_type parameter is required (MEE or BH)",
+          message: "product_type parameter is required (MEE, BH or JP)",
         });
+      }
+
+      // Jelly Polly production workers come from the user-managed JP
+      // assignments (jellypolly.payroll_employees), not staffs.job
+      if (product_type.toUpperCase() === "JP") {
+        const jpResult = await pool.query(
+          `SELECT s.id, s.name, s.job
+           FROM jellypolly.payroll_employees pe
+           JOIN staffs s ON s.id = pe.employee_id
+           WHERE pe.job_type = 'PRODUCTION' AND pe.is_active = true
+             AND (s.date_resigned IS NULL OR s.date_resigned > CURRENT_DATE)
+           ORDER BY s.name ASC`
+        );
+        return res.json(jpResult.rows);
       }
 
       // Map product type to job type
@@ -636,6 +678,28 @@ export default function (pool) {
 
         await client.query("COMMIT");
 
+        // JP products feed the Jelly Polly payroll (bags × product pay code);
+        // reprocess the affected workers' JP payroll for that month
+        const productTypeResult = await pool.query(
+          "SELECT type FROM products WHERE id = $1",
+          [product_id]
+        );
+        if (productTypeResult.rows[0]?.type === "JP") {
+          const [yearStr, monthStr] = String(date).split("-");
+          const workerIds = entries
+            .map((entry) => entry.worker_id)
+            .filter(
+              (workerId) => workerId && workerId !== STOCK_ONLY_WORKER_ID
+            );
+          if (workerIds.length > 0) {
+            await reprocessJPEmployeesSafe(pool, {
+              year: parseInt(yearStr),
+              month: parseInt(monthStr),
+              employeeIds: workerIds,
+            });
+          }
+        }
+
         res.json({
           message: "Production entries saved successfully",
           entries: savedEntries,
@@ -717,6 +781,12 @@ export default function (pool) {
         });
       }
 
+      await reprocessIfJPProduct(
+        result.rows[0].product_id,
+        result.rows[0].entry_date,
+        result.rows[0].worker_id
+      );
+
       res.json({
         message: "Production entry updated successfully",
         entry: result.rows[0],
@@ -744,6 +814,12 @@ export default function (pool) {
           message: "Production entry not found",
         });
       }
+
+      await reprocessIfJPProduct(
+        result.rows[0].product_id,
+        result.rows[0].entry_date,
+        result.rows[0].worker_id
+      );
 
       res.json({
         message: "Production entry deleted successfully",

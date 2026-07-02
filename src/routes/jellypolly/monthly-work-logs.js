@@ -1,19 +1,35 @@
-// src/routes/payroll/monthly-work-logs.js
+// src/routes/jellypolly/monthly-work-logs.js
+// Jelly Polly Office/Maintenance monthly entry. Port of the TH
+// payroll/monthly-work-logs.js onto the jellypolly schema. Leave is 1:1 with
+// TH and shares public.leave_records (one ledger per person keeps balances
+// correct across companies); monthly-page leave rows have no work-log link,
+// exactly like TH's monthly leave. Saving/updating/deleting a log
+// auto-reprocesses the affected employees' JP payroll.
 import { Router } from "express";
+import { reprocessJPEmployeesSafe } from "./jpPayrollProcessor.js";
 
 export default function (pool) {
   const router = Router();
 
-  const monthlySectionJobIds = {
-    MAINTENANCE: ["MAINTEN"],
-    OFFICE: ["OFFICE"],
-    SAPU: ["SAPU"],
+  const parseLeaveAmount = (amount) => {
+    const parsedAmount = Number(amount || 0);
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 0) {
+      return null;
+    }
+    return Math.round(parsedAmount * 100) / 100;
   };
 
-  const getMonthlySectionJobIds = (section) => {
+  // Staff ids assigned to a JP section/job type (leave lists are scoped to the
+  // page's assigned staff, mirroring TH's staffs.job section filter)
+  const getSectionEmployeeIds = async (section) => {
     const sectionKey = Array.isArray(section) ? section[0] : section;
     if (!sectionKey) return [];
-    return monthlySectionJobIds[sectionKey] || [sectionKey];
+    const result = await pool.query(
+      `SELECT employee_id FROM jellypolly.payroll_employees
+       WHERE job_type = $1 AND is_active = true`,
+      [sectionKey]
+    );
+    return result.rows.map((r) => r.employee_id);
   };
 
   const getMonthlyEntryHours = (entry) => ({
@@ -35,30 +51,15 @@ export default function (pool) {
     );
 
   const getMonthlyEntryHoursError = (entry) => {
-    const {
-      totalHours,
-      overtimeHours,
-      ahadHours,
-      ahadOvertimeHours,
-      umumHours,
-      umumOvertimeHours,
-    } =
-      getMonthlyEntryHours(entry);
-    const hourValues = [
-      totalHours,
-      overtimeHours,
-      ahadHours,
-      ahadOvertimeHours,
-      umumHours,
-      umumOvertimeHours,
-    ];
+    const hours = getMonthlyEntryHours(entry);
+    const hourValues = Object.values(hours);
 
-    if (hourValues.some((hours) => hours < 0)) {
+    if (hourValues.some((value) => value < 0)) {
       return "Monthly log hours cannot be negative";
     }
 
     if (
-      hourValues.reduce((sum, hours) => sum + hours, 0) <= 0 &&
+      hourValues.reduce((sum, value) => sum + value, 0) <= 0 &&
       !hasSelectedActivityAmount(entry)
     ) {
       return "At least one monthly log hour value or paid activity is required";
@@ -67,24 +68,9 @@ export default function (pool) {
     return null;
   };
 
-  const parseLeaveAmount = (amount) => {
-    const parsedAmount = Number(amount || 0);
-    if (!Number.isFinite(parsedAmount) || parsedAmount < 0) {
-      return null;
-    }
-    return Math.round(parsedAmount * 100) / 100;
-  };
-
   // Get monthly work logs with filtering
   router.get("/", async (req, res) => {
-    const {
-      month,
-      year,
-      section,
-      status,
-      page = 1,
-      limit = 20,
-    } = req.query;
+    const { month, year, section, status, page = 1, limit = 20 } = req.query;
 
     try {
       let query = `
@@ -97,8 +83,8 @@ export default function (pool) {
           CAST(COALESCE(SUM(mwle.ahad_overtime_hours), 0) AS NUMERIC(10, 2)) as total_ahad_overtime_hours,
           CAST(COALESCE(SUM(mwle.umum_hours), 0) AS NUMERIC(10, 2)) as total_umum_hours,
           CAST(COALESCE(SUM(mwle.umum_overtime_hours), 0) AS NUMERIC(10, 2)) as total_umum_overtime_hours
-        FROM monthly_work_logs mwl
-        LEFT JOIN monthly_work_log_entries mwle ON mwl.id = mwle.monthly_log_id
+        FROM jellypolly.monthly_work_logs mwl
+        LEFT JOIN jellypolly.monthly_work_log_entries mwle ON mwl.id = mwle.monthly_log_id
         WHERE 1=1
       `;
 
@@ -134,10 +120,9 @@ export default function (pool) {
         ORDER BY mwl.log_year DESC, mwl.log_month DESC
       `;
 
-      // Get total count for pagination
       const countQuery = `
         SELECT COUNT(DISTINCT mwl.id) as total
-        FROM monthly_work_logs mwl
+        FROM jellypolly.monthly_work_logs mwl
         WHERE 1=1 ${query.split("WHERE 1=1")[1].split("GROUP BY")[0]}
       `;
 
@@ -146,7 +131,6 @@ export default function (pool) {
         pool.query(query, values),
       ]);
 
-      // Apply pagination
       const offset = (page - 1) * limit;
       const paginatedLogs = dataResult.rows
         .slice(offset, offset + parseInt(limit))
@@ -169,7 +153,7 @@ export default function (pool) {
         totalPages: Math.ceil(countResult.rows[0].total / limit),
       });
     } catch (error) {
-      console.error("Error fetching monthly work logs:", error);
+      console.error("Error fetching JP monthly work logs:", error);
       res.status(500).json({
         message: "Error fetching monthly work logs",
         error: error.message,
@@ -182,13 +166,10 @@ export default function (pool) {
     const { id } = req.params;
 
     try {
-      // Get main monthly work log
-      const workLogQuery = `
-        SELECT mwl.*
-        FROM monthly_work_logs mwl
-        WHERE mwl.id = $1
-      `;
-      const workLogResult = await pool.query(workLogQuery, [id]);
+      const workLogResult = await pool.query(
+        "SELECT mwl.* FROM jellypolly.monthly_work_logs mwl WHERE mwl.id = $1",
+        [id]
+      );
 
       if (workLogResult.rows.length === 0) {
         return res.status(404).json({ message: "Monthly work log not found" });
@@ -196,9 +177,8 @@ export default function (pool) {
 
       const workLog = workLogResult.rows[0];
 
-      // Get employee entries with job information
-      const entriesQuery = `
-        SELECT
+      const entriesResult = await pool.query(
+        `SELECT
           mwle.*,
           CAST(mwle.total_hours AS NUMERIC(10, 2)) as total_hours,
           CAST(mwle.overtime_hours AS NUMERIC(10, 2)) as overtime_hours,
@@ -208,25 +188,17 @@ export default function (pool) {
           CAST(mwle.umum_overtime_hours AS NUMERIC(10, 2)) as umum_overtime_hours,
           s.name as employee_name,
           j.name as job_name
-        FROM monthly_work_log_entries mwle
-        LEFT JOIN staffs s ON mwle.employee_id = s.id
-        LEFT JOIN jobs j ON mwle.job_id = j.id
-        WHERE mwle.monthly_log_id = $1
-      `;
-      const entriesResult = await pool.query(entriesQuery, [id]);
-      const leaveJobIds = [
-        ...new Set(entriesResult.rows.map((entry) => entry.job_id).filter(Boolean)),
-      ];
-      const leaveFilterJobIds =
-        leaveJobIds.length > 0
-          ? leaveJobIds
-          : getMonthlySectionJobIds(workLog.section);
+        FROM jellypolly.monthly_work_log_entries mwle
+        LEFT JOIN public.staffs s ON mwle.employee_id = s.id
+        LEFT JOIN public.jobs j ON mwle.job_id = j.id
+        WHERE mwle.monthly_log_id = $1`,
+        [id]
+      );
 
-      // Get activities for each entry
       const entriesWithActivities = await Promise.all(
         entriesResult.rows.map(async (entry) => {
-          const activitiesQuery = `
-            SELECT
+          const activitiesResult = await pool.query(
+            `SELECT
               mwla.*,
               CAST(mwla.hours_applied AS NUMERIC(10, 2)) as hours_applied,
               CAST(mwla.units_produced AS NUMERIC(10, 2)) as units_produced,
@@ -235,11 +207,11 @@ export default function (pool) {
               COALESCE(mwla.description, pc.description) as description,
               pc.pay_type,
               pc.rate_unit
-            FROM monthly_work_log_activities mwla
-            LEFT JOIN pay_codes pc ON mwla.pay_code_id = pc.id
-            WHERE mwla.monthly_entry_id = $1
-          `;
-          const activitiesResult = await pool.query(activitiesQuery, [entry.id]);
+            FROM jellypolly.monthly_work_log_activities mwla
+            LEFT JOIN public.pay_codes pc ON mwla.pay_code_id = pc.id
+            WHERE mwla.monthly_entry_id = $1`,
+            [entry.id]
+          );
 
           return {
             ...entry,
@@ -264,37 +236,37 @@ export default function (pool) {
         })
       );
 
-      // Get leave records for this month and monthly job's employees.
-      // Include employees whose staff job matches this monthly log's job IDs.
-      const leaveQuery = `
-        SELECT
-          lr.*,
-          CAST(lr.amount_paid AS NUMERIC(10, 2)) as amount_paid,
-          s.name as employee_name
-        FROM leave_records lr
-        LEFT JOIN staffs s ON lr.employee_id = s.id
-        WHERE lr.company <> 'JP'
-          AND EXTRACT(MONTH FROM lr.leave_date) = $1
-          AND EXTRACT(YEAR FROM lr.leave_date) = $2
-          AND COALESCE(s.job::jsonb, '[]'::jsonb) ?| $3::text[]
-        ORDER BY lr.leave_date, s.name
-      `;
-      const leaveResult = await pool.query(leaveQuery, [
-        workLog.log_month,
-        workLog.log_year,
-        leaveFilterJobIds,
-      ]);
+      // Leave records for this month scoped to the section's assigned staff
+      const sectionEmployeeIds = await getSectionEmployeeIds(workLog.section);
+      let leaveRecords = [];
+      if (sectionEmployeeIds.length > 0) {
+        const leaveResult = await pool.query(
+          `SELECT
+            lr.*,
+            CAST(lr.amount_paid AS NUMERIC(10, 2)) as amount_paid,
+            s.name as employee_name
+          FROM public.leave_records lr
+          LEFT JOIN public.staffs s ON lr.employee_id = s.id
+          WHERE EXTRACT(MONTH FROM lr.leave_date) = $1
+            AND EXTRACT(YEAR FROM lr.leave_date) = $2
+            AND lr.company = 'JP'
+            AND lr.employee_id = ANY($3)
+          ORDER BY lr.leave_date, s.name`,
+          [workLog.log_month, workLog.log_year, sectionEmployeeIds]
+        );
+        leaveRecords = leaveResult.rows.map((record) => ({
+          ...record,
+          amount_paid: parseFloat(record.amount_paid),
+        }));
+      }
 
       res.json({
         ...workLog,
         employeeEntries: entriesWithActivities,
-        leaveRecords: leaveResult.rows.map((record) => ({
-          ...record,
-          amount_paid: parseFloat(record.amount_paid),
-        })),
+        leaveRecords,
       });
     } catch (error) {
-      console.error("Error fetching monthly work log details:", error);
+      console.error("Error fetching JP monthly work log details:", error);
       res.status(500).json({
         message: "Error fetching monthly work log details",
         error: error.message,
@@ -333,16 +305,11 @@ export default function (pool) {
     try {
       await pool.query("BEGIN");
 
-      // Check for duplicate (same month/year/section)
-      const duplicateCheck = `
-        SELECT id FROM monthly_work_logs
-        WHERE log_month = $1 AND log_year = $2 AND section = $3
-      `;
-      const duplicateResult = await pool.query(duplicateCheck, [
-        logMonth,
-        logYear,
-        section,
-      ]);
+      const duplicateResult = await pool.query(
+        `SELECT id FROM jellypolly.monthly_work_logs
+         WHERE log_month = $1 AND log_year = $2 AND section = $3`,
+        [logMonth, logYear, section]
+      );
 
       if (duplicateResult.rows.length > 0) {
         await pool.query("ROLLBACK");
@@ -352,25 +319,16 @@ export default function (pool) {
         });
       }
 
-      // Insert main monthly work log
-      const workLogQuery = `
-        INSERT INTO monthly_work_logs (
+      const workLogResult = await pool.query(
+        `INSERT INTO jellypolly.monthly_work_logs (
           log_month, log_year, section, context_data, status
         ) VALUES ($1, $2, $3, $4, $5)
-        RETURNING id
-      `;
-
-      const workLogResult = await pool.query(workLogQuery, [
-        logMonth,
-        logYear,
-        section,
-        contextData || {},
-        status || "Submitted",
-      ]);
+        RETURNING id`,
+        [logMonth, logYear, section, contextData || {}, status || "Submitted"]
+      );
 
       const workLogId = workLogResult.rows[0].id;
 
-      // Insert employee entries and activities
       for (const entry of employeeEntries) {
         const { employeeId, jobType, activities } = entry;
         const {
@@ -380,62 +338,58 @@ export default function (pool) {
           ahadOvertimeHours,
           umumHours,
           umumOvertimeHours,
-        } =
-          getMonthlyEntryHours(entry);
+        } = getMonthlyEntryHours(entry);
 
-        // Insert employee entry
-        const entryQuery = `
-          INSERT INTO monthly_work_log_entries (
+        const entryResult = await pool.query(
+          `INSERT INTO jellypolly.monthly_work_log_entries (
             monthly_log_id, employee_id, job_id, total_hours, overtime_hours,
             ahad_hours, ahad_overtime_hours, umum_hours, umum_overtime_hours
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-          RETURNING id
-        `;
-
-        const entryResult = await pool.query(entryQuery, [
-          workLogId,
-          employeeId,
-          jobType,
-          totalHours,
-          overtimeHours || 0,
-          ahadHours || 0,
-          ahadOvertimeHours || 0,
-          umumHours || 0,
-          umumOvertimeHours || 0,
-        ]);
+          RETURNING id`,
+          [
+            workLogId,
+            employeeId,
+            jobType,
+            totalHours,
+            overtimeHours || 0,
+            ahadHours || 0,
+            ahadOvertimeHours || 0,
+            umumHours || 0,
+            umumOvertimeHours || 0,
+          ]
+        );
 
         const entryId = entryResult.rows[0].id;
 
-        // Insert activities for this employee entry
         if (activities && activities.length > 0) {
           for (const activity of activities) {
             if (activity.isSelected) {
-              const activityQuery = `
-                INSERT INTO monthly_work_log_activities (
+              await pool.query(
+                `INSERT INTO jellypolly.monthly_work_log_activities (
                   monthly_entry_id, pay_code_id, description, hours_applied,
                   units_produced, rate_used, calculated_amount, is_manually_added
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-              `;
-
-              await pool.query(activityQuery, [
-                entryId,
-                activity.payCodeId,
-                activity.description || null,
-                activity.hoursApplied || null,
-                activity.unitsProduced || null,
-                parseFloat(activity.rate),
-                parseFloat(activity.calculatedAmount),
-                activity.isManuallyAdded || false,
-              ]);
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                [
+                  entryId,
+                  activity.payCodeId,
+                  activity.description || null,
+                  activity.hoursApplied || null,
+                  activity.unitsProduced || null,
+                  parseFloat(activity.rate),
+                  parseFloat(activity.calculatedAmount),
+                  activity.isManuallyAdded || false,
+                ]
+              );
             }
           }
         }
       }
 
-      // Insert leave records if any
+      // Insert new leave records (shared public.leave_records, no work-log
+      // link — same as TH monthly leave)
       if (leaveEntries && Array.isArray(leaveEntries) && leaveEntries.length > 0) {
         for (const leave of leaveEntries) {
-          const { employeeId, leaveDate, leaveType, amount_paid, activities } = leave;
+          const { employeeId, leaveDate, leaveType, amount_paid } = leave;
           const leaveAmount = parseLeaveAmount(amount_paid);
 
           if (leaveAmount === null) {
@@ -445,26 +399,18 @@ export default function (pool) {
             });
           }
 
-          // Check if leave record already exists for this date/employee
           const existingLeave = await pool.query(
-            `SELECT id FROM leave_records WHERE employee_id = $1 AND leave_date = $2`,
+            `SELECT id FROM public.leave_records WHERE employee_id = $1 AND leave_date = $2`,
             [employeeId, leaveDate]
           );
 
           if (existingLeave.rows.length === 0) {
-            // Insert new leave record (not linked to monthly_log, but to individual date)
-            const leaveQuery = `
-              INSERT INTO leave_records (
-                employee_id, leave_date, leave_type, days_taken, status, amount_paid
-              ) VALUES ($1, $2, $3, $4, 'approved', $5)
-            `;
-            await pool.query(leaveQuery, [
-              employeeId,
-              leaveDate,
-              leaveType,
-              1.0,
-              leaveAmount,
-            ]);
+            await pool.query(
+              `INSERT INTO public.leave_records (
+                employee_id, leave_date, leave_type, days_taken, status, amount_paid, company
+              ) VALUES ($1, $2, $3, $4, 'approved', $5, 'JP')`,
+              [employeeId, leaveDate, leaveType, 1.0, leaveAmount]
+            );
           }
         }
       }
@@ -487,7 +433,7 @@ export default function (pool) {
           }
 
           await pool.query(
-            "UPDATE leave_records SET amount_paid = $1 WHERE id = $2",
+            "UPDATE public.leave_records SET amount_paid = $1 WHERE id = $2",
             [leaveAmount, leaveId]
           );
         }
@@ -495,13 +441,26 @@ export default function (pool) {
 
       await pool.query("COMMIT");
 
+      // Auto-reprocess the affected employees' JP payroll for this month
+      await reprocessJPEmployeesSafe(pool, {
+        year: parseInt(logYear),
+        month: parseInt(logMonth),
+        employeeIds: [
+          ...employeeEntries.map((e) => e.employeeId),
+          ...(leaveEntries || []).map((l) => l.employeeId),
+          ...(updatedLeaveEntries || [])
+            .map((l) => l.employeeId)
+            .filter(Boolean),
+        ],
+      });
+
       res.status(201).json({
         message: "Monthly work log created successfully",
         workLogId,
       });
     } catch (error) {
       await pool.query("ROLLBACK");
-      console.error("Error creating monthly work log:", error);
+      console.error("Error creating JP monthly work log:", error);
       res.status(500).json({
         message: "Error creating monthly work log",
         error: error.message,
@@ -542,48 +501,35 @@ export default function (pool) {
     try {
       await pool.query("BEGIN");
 
-      // Check if the work log exists and is not processed
-      const checkQuery = `
-        SELECT status FROM monthly_work_logs WHERE id = $1
-      `;
-      const checkResult = await pool.query(checkQuery, [id]);
+      const checkResult = await pool.query(
+        "SELECT status FROM jellypolly.monthly_work_logs WHERE id = $1",
+        [id]
+      );
 
       if (checkResult.rows.length === 0) {
         await pool.query("ROLLBACK");
         return res.status(404).json({ message: "Monthly work log not found" });
       }
 
-      if (checkResult.rows[0].status === "Processed") {
-        await pool.query("ROLLBACK");
-        return res.status(400).json({
-          message: "Cannot edit processed monthly work log",
-        });
-      }
-
-      // Update main monthly work log
-      const updateQuery = `
-        UPDATE monthly_work_logs
-        SET log_month = $1, log_year = $2, section = $3,
-            context_data = $4, status = $5, updated_at = CURRENT_TIMESTAMP
-        WHERE id = $6
-      `;
-
-      await pool.query(updateQuery, [
-        logMonth,
-        logYear,
-        section,
-        contextData || {},
-        status,
-        id,
-      ]);
-
-      // Delete old entries (cascade will handle activities)
-      await pool.query(
-        "DELETE FROM monthly_work_log_entries WHERE monthly_log_id = $1",
+      // Previously entered employees also need reprocessing if they are removed
+      const previousEntries = await pool.query(
+        "SELECT DISTINCT employee_id FROM jellypolly.monthly_work_log_entries WHERE monthly_log_id = $1",
         [id]
       );
 
-      // Insert updated employee entries and activities
+      await pool.query(
+        `UPDATE jellypolly.monthly_work_logs
+         SET log_month = $1, log_year = $2, section = $3,
+             context_data = $4, status = $5, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $6`,
+        [logMonth, logYear, section, contextData || {}, status, id]
+      );
+
+      await pool.query(
+        "DELETE FROM jellypolly.monthly_work_log_entries WHERE monthly_log_id = $1",
+        [id]
+      );
+
       for (const entry of employeeEntries) {
         const { employeeId, jobType, activities } = entry;
         const {
@@ -593,64 +539,72 @@ export default function (pool) {
           ahadOvertimeHours,
           umumHours,
           umumOvertimeHours,
-        } =
-          getMonthlyEntryHours(entry);
+        } = getMonthlyEntryHours(entry);
 
-        const entryQuery = `
-          INSERT INTO monthly_work_log_entries (
+        const entryResult = await pool.query(
+          `INSERT INTO jellypolly.monthly_work_log_entries (
             monthly_log_id, employee_id, job_id, total_hours, overtime_hours,
             ahad_hours, ahad_overtime_hours, umum_hours, umum_overtime_hours
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-          RETURNING id
-        `;
-
-        const entryResult = await pool.query(entryQuery, [
-          id,
-          employeeId,
-          jobType,
-          totalHours,
-          overtimeHours || 0,
-          ahadHours || 0,
-          ahadOvertimeHours || 0,
-          umumHours || 0,
-          umumOvertimeHours || 0,
-        ]);
+          RETURNING id`,
+          [
+            id,
+            employeeId,
+            jobType,
+            totalHours,
+            overtimeHours || 0,
+            ahadHours || 0,
+            ahadOvertimeHours || 0,
+            umumHours || 0,
+            umumOvertimeHours || 0,
+          ]
+        );
 
         const entryId = entryResult.rows[0].id;
 
         if (activities && activities.length > 0) {
           for (const activity of activities) {
             if (activity.isSelected) {
-              const activityQuery = `
-                INSERT INTO monthly_work_log_activities (
+              await pool.query(
+                `INSERT INTO jellypolly.monthly_work_log_activities (
                   monthly_entry_id, pay_code_id, description, hours_applied,
                   units_produced, rate_used, calculated_amount, is_manually_added
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-              `;
-
-              await pool.query(activityQuery, [
-                entryId,
-                activity.payCodeId,
-                activity.description || null,
-                activity.hoursApplied || null,
-                activity.unitsProduced || null,
-                parseFloat(activity.rate),
-                parseFloat(activity.calculatedAmount),
-                activity.isManuallyAdded || false,
-              ]);
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                [
+                  entryId,
+                  activity.payCodeId,
+                  activity.description || null,
+                  activity.hoursApplied || null,
+                  activity.unitsProduced || null,
+                  parseFloat(activity.rate),
+                  parseFloat(activity.calculatedAmount),
+                  activity.isManuallyAdded || false,
+                ]
+              );
             }
           }
         }
       }
 
       // Delete specified leave records
-      if (deletedLeaveIds && Array.isArray(deletedLeaveIds) && deletedLeaveIds.length > 0) {
+      const deletedLeaveEmployeeIds = [];
+      if (
+        deletedLeaveIds &&
+        Array.isArray(deletedLeaveIds) &&
+        deletedLeaveIds.length > 0
+      ) {
         for (const leaveId of deletedLeaveIds) {
-          await pool.query("DELETE FROM leave_records WHERE id = $1", [leaveId]);
+          const deleted = await pool.query(
+            "DELETE FROM public.leave_records WHERE id = $1 RETURNING employee_id",
+            [leaveId]
+          );
+          if (deleted.rows[0]) {
+            deletedLeaveEmployeeIds.push(deleted.rows[0].employee_id);
+          }
         }
       }
 
-      // Handle leave entries - only insert new ones
+      // Insert new leave records (isNew only, same as TH)
       if (leaveEntries && Array.isArray(leaveEntries) && leaveEntries.length > 0) {
         for (const leave of leaveEntries) {
           if (leave.isNew) {
@@ -664,25 +618,18 @@ export default function (pool) {
               });
             }
 
-            // Check if leave record already exists
             const existingLeave = await pool.query(
-              `SELECT id FROM leave_records WHERE employee_id = $1 AND leave_date = $2`,
+              `SELECT id FROM public.leave_records WHERE employee_id = $1 AND leave_date = $2`,
               [employeeId, leaveDate]
             );
 
             if (existingLeave.rows.length === 0) {
-              const leaveQuery = `
-                INSERT INTO leave_records (
-                  employee_id, leave_date, leave_type, days_taken, status, amount_paid
-                ) VALUES ($1, $2, $3, $4, 'approved', $5)
-              `;
-              await pool.query(leaveQuery, [
-                employeeId,
-                leaveDate,
-                leaveType,
-                1.0,
-                leaveAmount,
-              ]);
+              await pool.query(
+                `INSERT INTO public.leave_records (
+                  employee_id, leave_date, leave_type, days_taken, status, amount_paid, company
+                ) VALUES ($1, $2, $3, $4, 'approved', $5, 'JP')`,
+                [employeeId, leaveDate, leaveType, 1.0, leaveAmount]
+              );
             }
           }
         }
@@ -706,7 +653,7 @@ export default function (pool) {
           }
 
           await pool.query(
-            "UPDATE leave_records SET amount_paid = $1 WHERE id = $2",
+            "UPDATE public.leave_records SET amount_paid = $1 WHERE id = $2",
             [leaveAmount, leaveId]
           );
         }
@@ -714,13 +661,30 @@ export default function (pool) {
 
       await pool.query("COMMIT");
 
+      const affectedIds = [
+        ...new Set([
+          ...previousEntries.rows.map((r) => r.employee_id),
+          ...employeeEntries.map((e) => e.employeeId),
+          ...(leaveEntries || []).map((l) => l.employeeId).filter(Boolean),
+          ...(updatedLeaveEntries || [])
+            .map((l) => l.employeeId)
+            .filter(Boolean),
+          ...deletedLeaveEmployeeIds,
+        ]),
+      ];
+      await reprocessJPEmployeesSafe(pool, {
+        year: parseInt(logYear),
+        month: parseInt(logMonth),
+        employeeIds: affectedIds,
+      });
+
       res.json({
         message: "Monthly work log updated successfully",
         workLogId: id,
       });
     } catch (error) {
       await pool.query("ROLLBACK");
-      console.error("Error updating monthly work log:", error);
+      console.error("Error updating JP monthly work log:", error);
       res.status(500).json({
         message: "Error updating monthly work log",
         error: error.message,
@@ -728,40 +692,46 @@ export default function (pool) {
     }
   });
 
-  // Delete monthly work log (only if not processed)
+  // Delete monthly work log
   router.delete("/:id", async (req, res) => {
     const { id } = req.params;
 
     try {
       await pool.query("BEGIN");
 
-      // Check if the work log is processed
-      const checkQuery = `
-        SELECT status FROM monthly_work_logs WHERE id = $1
-      `;
-      const checkResult = await pool.query(checkQuery, [id]);
+      const checkResult = await pool.query(
+        "SELECT log_month, log_year FROM jellypolly.monthly_work_logs WHERE id = $1",
+        [id]
+      );
 
       if (checkResult.rows.length === 0) {
         await pool.query("ROLLBACK");
         return res.status(404).json({ message: "Monthly work log not found" });
       }
 
-      if (checkResult.rows[0].status === "Processed") {
-        await pool.query("ROLLBACK");
-        return res.status(400).json({
-          message: "Cannot delete processed monthly work log",
-        });
-      }
+      const { log_month, log_year } = checkResult.rows[0];
 
-      // Delete the monthly work log (cascade will handle entries and activities)
-      await pool.query("DELETE FROM monthly_work_logs WHERE id = $1", [id]);
+      const affectedEntries = await pool.query(
+        "SELECT DISTINCT employee_id FROM jellypolly.monthly_work_log_entries WHERE monthly_log_id = $1",
+        [id]
+      );
+
+      await pool.query("DELETE FROM jellypolly.monthly_work_logs WHERE id = $1", [
+        id,
+      ]);
 
       await pool.query("COMMIT");
+
+      await reprocessJPEmployeesSafe(pool, {
+        year: log_year,
+        month: log_month,
+        employeeIds: affectedEntries.rows.map((r) => r.employee_id),
+      });
 
       res.json({ message: "Monthly work log deleted successfully" });
     } catch (error) {
       await pool.query("ROLLBACK");
-      console.error("Error deleting monthly work log:", error);
+      console.error("Error deleting JP monthly work log:", error);
       res.status(500).json({
         message: "Error deleting monthly work log",
         error: error.message,
@@ -769,7 +739,9 @@ export default function (pool) {
     }
   });
 
-  // Get leave records for a specific month (for displaying in the monthly form)
+  // Leave records for a month, scoped to the JP section's assigned staff
+  // (mirrors TH's /leave/:year/:month, but filtered by JP assignments instead
+  // of staffs.job)
   router.get("/leave/:year/:month", async (req, res) => {
     const { year, month } = req.params;
     const { section } = req.query;
@@ -781,19 +753,21 @@ export default function (pool) {
           CAST(lr.amount_paid AS NUMERIC(10, 2)) as amount_paid,
           s.name as employee_name,
           s.job as employee_jobs
-        FROM leave_records lr
-        LEFT JOIN staffs s ON lr.employee_id = s.id
-        WHERE lr.company <> 'JP'
-          AND EXTRACT(MONTH FROM lr.leave_date) = $1
+        FROM public.leave_records lr
+        LEFT JOIN public.staffs s ON lr.employee_id = s.id
+        WHERE EXTRACT(MONTH FROM lr.leave_date) = $1
           AND EXTRACT(YEAR FROM lr.leave_date) = $2
+          AND lr.company = 'JP'
       `;
-
       const values = [parseInt(month), parseInt(year)];
 
-      // If section is provided, filter by employees whose job includes this section
       if (section) {
-        query += ` AND COALESCE(s.job::jsonb, '[]'::jsonb) ?| $3::text[]`;
-        values.push(getMonthlySectionJobIds(section));
+        const sectionEmployeeIds = await getSectionEmployeeIds(section);
+        if (sectionEmployeeIds.length === 0) {
+          return res.json([]);
+        }
+        query += ` AND lr.employee_id = ANY($3)`;
+        values.push(sectionEmployeeIds);
       }
 
       query += ` ORDER BY lr.leave_date, s.name`;
@@ -807,7 +781,7 @@ export default function (pool) {
         }))
       );
     } catch (error) {
-      console.error("Error fetching leave records:", error);
+      console.error("Error fetching JP leave records:", error);
       res.status(500).json({
         message: "Error fetching leave records",
         error: error.message,

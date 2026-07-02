@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-02",
+    ms: "Jelly Polly kini mempunyai sistem gaji dan pengeluaran sendiri: halaman Staff Assignment untuk menetapkan pekerja ke Office, Maintenance, Salesman, mesin harian, mesin plastik dan pengeluaran; kemasukan bulanan Office/Maintenance; kemasukan harian Salesman, Ice-Polly, Jelly Cup dan Mesin Plastik (karton 30ml/70ml); rekod cuti; Bonus, Pinjam, Others dan Gaji Pertengahan Bulan; Payrolls dengan slip gaji, Salary Report dan e-Caruman; serta Production Entry, Product Stock dan pemetaan pay code produk untuk produk JP. Gaji dikira semula secara automatik untuk pekerja terlibat setiap kali kemasukan disimpan. Pekerja yang bekerja untuk kedua-dua syarikat akan nampak kad jumlah bawa pulang gabungan (TH + JP) pada halaman butiran gaji.",
+    en: "Jelly Polly now has its own payroll and production system: a Staff Assignment page to assign staff to Office, Maintenance, Salesman, daily machines, plastic machine and production; Office/Maintenance monthly entry; daily entries for Salesman, Ice-Polly, Jelly Cup and the Plastic Machine (30ml/70ml cartons); leave records; Bonus, Pinjam, Others and Mid-month Pay; Payrolls with payslips, Salary Report and e-Caruman; plus Production Entry, Product Stock and product pay-code mapping for JP products. Payroll is automatically recalculated for the affected staff whenever an entry is saved. Staff working for both companies see a combined take-home card (TH + JP) on the payroll details page.",
+  },
+  {
+    date: "2026-07-02",
     ms: "Menu cetak slip gaji: slip MEE dan BIHUN kini boleh dipilih mengikut kerja (contoh MEE_ROLL atau BIHUN_SANGKUT), bukan lagi satu bahagian MEE/BIHUN sahaja. Bahagian lain kekal dicetak mengikut bahagian seperti biasa.",
     en: "Payroll print menu: MEE and BIHUN payslips can now be selected by job (for example MEE_ROLL or BIHUN_SANGKUT) instead of one whole MEE/BIHUN section. Other sections keep the same section-based printing.",
   },

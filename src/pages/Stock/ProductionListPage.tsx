@@ -176,7 +176,15 @@ const getRangeLabel = (dateRange: DateRange): string => {
   return `${formatDisplayDate(start)} - ${formatDisplayDate(end)}`;
 };
 
-const ProductionListPage: React.FC = () => {
+interface ProductionListPageProps {
+  // Restrict the page to specific product types (e.g. ["JP"] for the Jelly
+  // Polly production records page). Default: TH behaviour (all types).
+  productTypes?: string[];
+}
+
+const ProductionListPage: React.FC<ProductionListPageProps> = ({
+  productTypes,
+}) => {
   const navigate = useNavigate();
   const today: Date = useMemo(() => new Date(), []);
 
@@ -215,7 +223,14 @@ const ProductionListPage: React.FC = () => {
       const response: ProductionEntry[] = await api.get(
         `/api/production-entries?${params.toString()}`
       );
-      setEntries(response || []);
+      const allEntries: ProductionEntry[] = response || [];
+      setEntries(
+        productTypes
+          ? allEntries.filter((entry) =>
+              productTypes.includes(entry.product_type)
+            )
+          : allEntries
+      );
     } catch (error) {
       console.error("Error fetching production records:", error);
       toast.error("Failed to load production records");
@@ -223,7 +238,7 @@ const ProductionListPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [dateRange.end, dateRange.start]);
+  }, [dateRange.end, dateRange.start, productTypes]);
 
   useEffect(() => {
     fetchEntries();
@@ -584,8 +599,13 @@ const ProductionListPage: React.FC = () => {
           <ProductSelector
             value={selectedProductId}
             onChange={setSelectedProductId}
-            productTypes={["MEE", "BH", "BUNDLE", "OTH"]}
-            productFilter={productionProductFilter}
+            productTypes={productTypes || ["MEE", "BH", "BUNDLE", "OTH"]}
+            productFilter={
+              productTypes
+                ? (product: StockProduct) =>
+                    productTypes.includes(product.type)
+                : productionProductFilter
+            }
             placeholder="All production products"
             showCategories
           />

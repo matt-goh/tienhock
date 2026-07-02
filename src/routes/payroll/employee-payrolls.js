@@ -199,6 +199,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
         AND EXTRACT(YEAR FROM leave_date) = $2
         AND EXTRACT(MONTH FROM leave_date) = $3
         AND status = 'approved'
+        AND company <> 'JP'
       ORDER BY leave_date ASC
     `,
       [employee_name, year, month],
@@ -779,6 +780,7 @@ export default function (pool) {
         AND EXTRACT(YEAR FROM lr.leave_date) = mp.year
         AND EXTRACT(MONTH FROM lr.leave_date) = mp.month
         AND lr.status = 'approved'
+        AND lr.company <> 'JP'
       ORDER BY ep.id, lr.leave_date ASC
     `;
       const leaveRecordsResult = await pool.query(leaveRecordsQuery, [
@@ -1220,6 +1222,7 @@ export default function (pool) {
             AND EXTRACT(YEAR FROM lr.leave_date) = $2
             AND EXTRACT(MONTH FROM lr.leave_date) = $3
             AND lr.status = 'approved'
+            AND lr.company <> 'JP'
           ORDER BY lr.leave_date ASC
         `,
           [payrollData.employee_id, payrollData.year, payrollData.month],
@@ -1635,6 +1638,7 @@ export default function (pool) {
             AND EXTRACT(YEAR FROM lr.leave_date) = $2
             AND EXTRACT(MONTH FROM lr.leave_date) = $3
             AND lr.status = 'approved'
+            AND lr.company <> 'JP'
           ORDER BY lr.leave_date ASC
         `,
           [payrollData.employee_id, payrollData.year, payrollData.month],

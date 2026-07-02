@@ -1199,7 +1199,10 @@ export interface ProductionWorker {
   job: string[];
 }
 
-export type ProductionWorkerOrderScope = "BH_PACKING" | "MEE_PACKING";
+export type ProductionWorkerOrderScope =
+  | "BH_PACKING"
+  | "MEE_PACKING"
+  | "JP_PRODUCTION";
 
 export interface ProductionWorkerOrderResponse {
   scope: ProductionWorkerOrderScope;

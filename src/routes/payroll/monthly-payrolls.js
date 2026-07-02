@@ -1472,6 +1472,7 @@ export default function (pool) {
                 AND EXTRACT(YEAR FROM leave_date) = $2
                 AND EXTRACT(MONTH FROM leave_date) = $3
                 AND status = 'approved'
+                AND company <> 'JP'
             `,
                 [employeeName, year, month],
               ),
