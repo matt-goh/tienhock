@@ -33,8 +33,16 @@ export const useEffectiveRates = () => {
       month: number | null | undefined,
       tuples: ResolveTuple[],
     ) => {
+      // Preserve the previous object identity whenever the content is
+      // unchanged: consumers keep rateMap-derived callbacks in effect
+      // dependency arrays, and a fresh-but-equal object would re-trigger
+      // those effects in a feedback loop of /resolve calls.
+      const setIfChanged = (next: Record<string, EffectiveRate>) =>
+        setRateMap((prev) =>
+          JSON.stringify(prev) === JSON.stringify(next) ? prev : next,
+        );
       if (!year || !month || !Array.isArray(tuples) || tuples.length === 0) {
-        setRateMap({});
+        setIfChanged({});
         return;
       }
       try {
@@ -42,11 +50,11 @@ export const useEffectiveRates = () => {
           "/api/pay-rate-schedules/resolve",
           { year, month, items: tuples },
         );
-        setRateMap(map && typeof map === "object" ? map : {});
+        setIfChanged(map && typeof map === "object" ? map : {});
       } catch (err) {
         // Non-fatal: callers fall back to base/override rates on null.
         console.error("Error resolving effective rates:", err);
-        setRateMap({});
+        setIfChanged({});
       }
     },
     [],

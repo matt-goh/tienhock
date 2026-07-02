@@ -45,7 +45,10 @@ import { parseDatabaseTimestamp, formatDisplayDate } from "../../utils/invoice/d
 import AdjustmentDocPrintOverlay from "../../utils/adjustments/PDF/AdjustmentDocPrintOverlay";
 import { generateAdjustmentDocPDFFilename } from "../../utils/adjustments/PDF/generateAdjustmentDocPDFFilename";
 import { generateAdjustmentDocPDFBlob } from "../../utils/adjustments/PDF/AdjustmentDocPDFHandler";
-import { formatAdjustmentDocId } from "../../utils/adjustments/formatDocId";
+import {
+  formatAdjustmentDocDisplayId,
+  formatAdjustmentDocId,
+} from "../../utils/adjustments/formatDocId";
 
 interface FilterState {
   type: AdjustmentDocType | "all";
@@ -220,7 +223,7 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
       total: targets.length,
       success: 0,
       failed: 0,
-      currentId: targets[0].id,
+      currentId: formatAdjustmentDocDisplayId(targets[0]),
     });
     const toastId = toast.loading(
       `Submitting ${targets.length} document(s) to MyInvois...`
@@ -234,10 +237,12 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
         total: targets.length,
         success,
         failed,
-        currentId: d.id,
+        currentId: formatAdjustmentDocDisplayId(d),
       });
       toast.loading(
-        `Submitting ${i + 1}/${targets.length}: ${d.id}...`,
+        `Submitting ${i + 1}/${targets.length}: ${formatAdjustmentDocDisplayId(
+          d
+        )}...`,
         { id: toastId }
       );
       try {
@@ -699,15 +704,18 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
                         </button>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-default-900 dark:text-gray-100">
-                        {formatAdjustmentDocId(doc.id)}
+                        {formatAdjustmentDocDisplayId(doc)}
                         {doc.paired_doc_id && (
                           <span
                             className="block text-xs text-default-500 dark:text-gray-400"
                             title={`Paired with ${formatAdjustmentDocId(
-                              doc.paired_doc_id
+                              doc.paired_display_id || doc.paired_doc_id
                             )}`}
                           >
-                            ↔ {formatAdjustmentDocId(doc.paired_doc_id)}
+                            ↔{" "}
+                            {formatAdjustmentDocId(
+                              doc.paired_display_id || doc.paired_doc_id
+                            )}
                           </span>
                         )}
                       </td>

@@ -231,6 +231,7 @@ export async function EInvoiceAdjustmentNoteTemplate(
   supplierInfo = TIENHOCK_INFO
 ) {
   const SUPPLIER = supplierInfo || TIENHOCK_INFO;
+  const displayId = adjustmentDoc?.display_id || adjustmentDoc?.id;
   if (!adjustmentDoc) {
     throw { type: "validation", message: "No adjustment data", invoiceNo: "Unknown" };
   }
@@ -238,7 +239,7 @@ export async function EInvoiceAdjustmentNoteTemplate(
     throw {
       type: "validation",
       message: "Customer data is required",
-      invoiceNo: adjustmentDoc.id || "Unknown",
+      invoiceNo: displayId || "Unknown",
     };
   }
   if (!referenced || !referenced.uuid) {
@@ -247,7 +248,7 @@ export async function EInvoiceAdjustmentNoteTemplate(
       code: "REF_MISSING",
       message:
         "Referenced source document UUID is required (original invoice must be e-invoiced or have a consolidated parent)",
-      invoiceNo: adjustmentDoc.id,
+      invoiceNo: displayId,
     };
   }
 
@@ -256,7 +257,7 @@ export async function EInvoiceAdjustmentNoteTemplate(
     throw {
       type: "validation",
       message: `Unknown adjustment doc type: ${adjustmentDoc.type}`,
-      invoiceNo: adjustmentDoc.id,
+      invoiceNo: displayId,
     };
   }
 
@@ -273,7 +274,7 @@ export async function EInvoiceAdjustmentNoteTemplate(
       type: "validation",
       code: "DATE_VALIDATION",
       message: "Adjustment document date must be within the last 3 days",
-      invoiceNo: adjustmentDoc.id,
+      invoiceNo: displayId,
     };
   }
 
@@ -288,7 +289,7 @@ export async function EInvoiceAdjustmentNoteTemplate(
       type: "validation",
       code: "INV_VALIDATION",
       message: "Adjustment document must have at least one line item",
-      invoiceNo: adjustmentDoc.id,
+      invoiceNo: displayId,
     };
   }
   const lines = adjustmentDoc.lines.map((l) => ({
@@ -313,7 +314,7 @@ export async function EInvoiceAdjustmentNoteTemplate(
          xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">`;
 
   xml += `
-  <cbc:ID>${escapeXml(formatAdjustmentDocId(adjustmentDoc.id))}</cbc:ID>
+  <cbc:ID>${escapeXml(formatAdjustmentDocId(displayId))}</cbc:ID>
   <cbc:IssueDate>${formattedDate}</cbc:IssueDate>
   <cbc:IssueTime>${formattedTime}</cbc:IssueTime>
   <cbc:InvoiceTypeCode listVersionID="1.0">${typeCode}</cbc:InvoiceTypeCode>

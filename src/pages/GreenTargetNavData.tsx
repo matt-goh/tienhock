@@ -128,6 +128,7 @@ export const GreenTargetNavData: SidebarItem[] = [
         name: "Payrolls",
         path: "/payroll",
         component: GTPayrollPage,
+        group: "Payroll",
         subItems: [
           {
             name: "Payroll Details",
@@ -137,54 +138,64 @@ export const GreenTargetNavData: SidebarItem[] = [
         ],
       },
       {
-        name: "Office",
-        path: "/payroll/office-log",
-        component: GTMonthlyLogEntryPage,
-      },
-      {
-        name: "Daily Lori Habuk",
-        path: "/payroll/daily-lori-habuk",
-        component: GTDailyLoriHabukEntryPage,
-      },
-      {
-        name: "Bonus",
-        path: "/payroll/bonus",
-        component: GTBonusPage,
-      },
-      {
-        name: "Others (Advance)",
-        path: "/payroll/others-advance",
-        component: GTOthersAdvancePage,
-      },
-      {
-        name: "Others (Kerja Luar OT)",
-        path: "/payroll/others",
-        component: GTOthersKerjaLuarOtPage,
-      },
-      {
-        name: "Mid-month Payroll",
-        path: "/payroll/mid-month",
-        component: GTMidMonthPayrollPage,
-      },
-      {
-        name: "Pinjam",
-        path: "/payroll/pinjam",
-        component: GTPinjamListPage,
-      },
-      {
         name: "Salary Report",
         path: "/payroll/salary-report",
         component: GTSalaryReportPage,
+        group: "Payroll",
       },
       {
         name: "E-Caruman",
         path: "/payroll/e-caruman",
         component: GTECarumanPage,
+        group: "Payroll",
+      },
+      {
+        name: "Office",
+        path: "/payroll/office-log",
+        component: GTMonthlyLogEntryPage,
+        group: "Work Logs",
+      },
+      {
+        name: "Daily Lori Habuk",
+        path: "/payroll/daily-lori-habuk",
+        component: GTDailyLoriHabukEntryPage,
+        group: "Work Logs",
+      },
+      {
+        name: "Bonus",
+        path: "/payroll/bonus",
+        component: GTBonusPage,
+        group: "Add-Ons",
+      },
+      {
+        name: "Others (Advance)",
+        path: "/payroll/others-advance",
+        component: GTOthersAdvancePage,
+        group: "Add-Ons",
+      },
+      {
+        name: "Others (Kerja Luar OT)",
+        path: "/payroll/others",
+        component: GTOthersKerjaLuarOtPage,
+        group: "Add-Ons",
+      },
+      {
+        name: "Mid-month Payroll",
+        path: "/payroll/mid-month",
+        component: GTMidMonthPayrollPage,
+        group: "Add-Ons",
+      },
+      {
+        name: "Pinjam",
+        path: "/payroll/pinjam",
+        component: GTPinjamListPage,
+        group: "Add-Ons",
       },
       {
         name: "Payroll Settings",
         path: "/payroll/settings",
         component: PayrollRulesPage,
+        group: "Payroll",
       },
     ],
   },

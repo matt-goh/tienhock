@@ -28,7 +28,9 @@ import {
   getAdjustmentDocsPaths,
 } from "../../components/AdjustmentDocs/useAdjustmentDocsPaths";
 import { parseDatabaseTimestamp, formatDisplayDate } from "../../utils/invoice/dateUtils";
-import { formatAdjustmentDocId } from "../../utils/adjustments/formatDocId";
+import {
+  formatAdjustmentDocDisplayId,
+} from "../../utils/adjustments/formatDocId";
 import AdjustmentDocPDFHandler from "../../utils/adjustments/PDF/AdjustmentDocPDFHandler";
 import AdjustmentDocPrintOverlay from "../../utils/adjustments/PDF/AdjustmentDocPrintOverlay";
 
@@ -121,7 +123,9 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
   const handleCancel = async () => {
     if (!doc) return;
     setIsCancelling(true);
-    const toastId = toast.loading(`Cancelling ${doc.id}...`);
+    const toastId = toast.loading(
+      `Cancelling ${formatAdjustmentDocDisplayId(doc)}...`
+    );
     try {
       const response = await api.post(`${paths.apiBase}/${doc.id}/cancel`, {
         reason: cancelReason || null,
@@ -140,7 +144,9 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
   const handleSubmitEinvoice = async () => {
     if (!doc) return;
     setIsSubmittingEinvoice(true);
-    const toastId = toast.loading(`Submitting ${doc.id} to MyInvois...`);
+    const toastId = toast.loading(
+      `Submitting ${formatAdjustmentDocDisplayId(doc)} to MyInvois...`
+    );
     try {
       const response = await api.post(
         `${paths.apiBase}/${doc.id}/submit-einvoice`
@@ -161,7 +167,9 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
   const handleUpdateStatus = async () => {
     if (!doc) return;
     setIsUpdatingStatus(true);
-    const toastId = toast.loading(`Checking MyInvois status for ${doc.id}...`);
+    const toastId = toast.loading(
+      `Checking MyInvois status for ${formatAdjustmentDocDisplayId(doc)}...`
+    );
     try {
       const response = await api.post(
         `${paths.apiBase}/${doc.id}/update-status`
@@ -183,7 +191,9 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
   const handleCancelEinvoice = async () => {
     if (!doc) return;
     setIsCancellingEinvoice(true);
-    const toastId = toast.loading(`Cancelling e-invoice for ${doc.id}...`);
+    const toastId = toast.loading(
+      `Cancelling e-invoice for ${formatAdjustmentDocDisplayId(doc)}...`
+    );
     try {
       const response = await api.post(
         `${paths.apiBase}/${doc.id}/cancel-einvoice`,
@@ -264,7 +274,7 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
             />
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
             <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100 flex items-center gap-2 flex-wrap">
-              {meta.label} {formatAdjustmentDocId(doc.id)}
+              {meta.label} {formatAdjustmentDocDisplayId(doc)}
               <AdjustmentDocTypeBadge type={doc.type} />
               <AdjustmentDocStatusBadge
                 status={doc.status}
@@ -358,7 +368,9 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
                 disabled={cnBlockedByPaired}
                 title={
                   cnBlockedByPaired
-                    ? `Cancel paired Refund Note ${pairedDoc?.id} first`
+                    ? `Cancel paired Refund Note ${
+                        pairedDoc ? formatAdjustmentDocDisplayId(pairedDoc) : ""
+                      } first`
                     : "Cancel this document"
                 }
               >
@@ -376,7 +388,9 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
                 variant="outline"
                 color="sky"
                 size="md"
-                title={`Create a new Refund Note for Credit Note ${doc.id}`}
+                title={`Create a new Refund Note for Credit Note ${formatAdjustmentDocDisplayId(
+                  doc
+                )}`}
               >
                 {pairedDoc ? "Reissue Refund Note" : "Issue Refund Note"}
               </Button>
@@ -486,7 +500,7 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
                 </span>
                 <AdjustmentDocTypeBadge type={pairedDoc.type} />
                 <span className="font-medium text-default-900 dark:text-gray-100">
-                  {formatAdjustmentDocId(pairedDoc.id)}
+                  {formatAdjustmentDocDisplayId(pairedDoc)}
                 </span>
                 <AdjustmentDocStatusBadge
                   status={pairedDoc.status}
@@ -771,7 +785,7 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
           }
         }}
         onConfirm={handleCancel}
-        title={`Cancel ${doc.id}?`}
+        title={`Cancel ${formatAdjustmentDocDisplayId(doc)}?`}
         message={`This will reverse the accounting impact${
           doc.type === "credit_note" || doc.type === "debit_note"
             ? " on the original invoice's balance and customer credit"
@@ -790,7 +804,7 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
           }
         }}
         onConfirm={handleCancelEinvoice}
-        title={`Cancel e-invoice for ${doc.id}?`}
+        title={`Cancel e-invoice for ${formatAdjustmentDocDisplayId(doc)}?`}
         message="This sets the MyInvois document state to cancelled. The local document accounting stays intact — cancel the document separately if you want to reverse it."
         confirmButtonText={
           isCancellingEinvoice ? "Cancelling..." : "Cancel e-Invoice"

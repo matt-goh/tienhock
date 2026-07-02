@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-07-02",
+    ms: "Semasa membuat Credit Note, Debit Note atau Refund Note untuk Tien Hock dan Jelly Polly, nombor dokumen kini boleh ditukar pada nombor terakhir sahaja. Sistem akan menghalang nombor yang sedang digunakan oleh dokumen aktif, tetapi nombor daripada dokumen yang sudah dibatalkan boleh digunakan semula.",
+    en: "When creating a Tien Hock or Jelly Polly Credit Note, Debit Note, or Refund Note, the final document running number can now be changed. The system blocks numbers used by active documents, while numbers from cancelled documents can be reused.",
+  },
+  {
     date: "2026-06-30",
     ms: "Senarai General Purchases kini memaparkan nombor penghantaran dalam lajur Reference, dan menggunakan nombor order jika nombor penghantaran tiada. Butang refresh e-invois juga disembunyikan apabila status e-invois sudah Valid.",
     en: "The General Purchases list now shows the shipping number in the Reference column, and uses the order number when the shipping number is missing. The e-invoice refresh button is also hidden when the e-invoice status is already Valid.",

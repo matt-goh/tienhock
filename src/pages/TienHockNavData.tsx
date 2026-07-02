@@ -132,6 +132,7 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     name: "Payrolls",
     path: "/payroll/monthly-payrolls",
     component: PayrollPage,
+    group: "Payroll",
     subItems: [
       {
         name: "Employee Payroll Details",
@@ -145,12 +146,14 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     name: "Salary Report",
     path: "/payroll/salary-report",
     component: SalaryReportPage,
+    group: "Payroll",
   });
 
   payrollSubItems.push({
     name: "e-Caruman",
     path: "/payroll/e-caruman",
     component: ECarumanPage,
+    group: "Payroll",
   });
 
   // Add each production type dynamically
@@ -166,6 +169,7 @@ const generatePayrollSubItems = (): SidebarItem[] => {
         component: (props: any) => (
           <MonthlyLogListPage jobType={jobConfig.id} {...props} />
         ),
+        group: "Monthly Logs",
         subItems: [
           {
             name: `New ${jobConfig.name} Entry`,
@@ -199,6 +203,7 @@ const generatePayrollSubItems = (): SidebarItem[] => {
         component: (props: any) => (
           <DailyLogListPage jobType={jobConfig.id} {...props} />
         ),
+        group: "Daily Logs",
         subItems: [
           {
             name: `New ${jobConfig.name} Entry`,
@@ -228,6 +233,7 @@ const generatePayrollSubItems = (): SidebarItem[] => {
         component: (props: any) => (
           <DailyLogListPage jobType={jobConfig.id} {...props} />
         ),
+        group: "Daily Logs",
         subItems: [
           {
             name: `New ${jobConfig.name} Entry`,
@@ -269,6 +275,7 @@ const generatePayrollSubItems = (): SidebarItem[] => {
           component: (props: any) => (
             <PackingCutiEntryPage jobType={packingJobType} {...props} />
           ),
+          group: "Daily Logs",
         });
       }
     }
@@ -278,30 +285,35 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     name: "Mid-month Pay",
     path: "/payroll/mid-month-payrolls",
     component: MidMonthPayrollPage,
+    group: "Add-Ons",
   });
 
   payrollSubItems.push({
     name: "Others (Advance)",
     path: "/payroll/commission",
     component: OthersAdvancePage,
+    group: "Add-Ons",
   });
 
   payrollSubItems.push({
     name: "Others (Kerja Luar OT)",
     path: "/payroll/others",
     component: OthersKerjaLuarOtPage,
+    group: "Add-Ons",
   });
 
   payrollSubItems.push({
     name: "Bonus",
     path: "/payroll/bonus",
     component: BonusPage,
+    group: "Add-Ons",
   });
 
   payrollSubItems.push({
     name: "Pinjam",
     path: "/payroll/pinjam",
     component: PinjamListPage,
+    group: "Add-Ons",
   });
 
   return payrollSubItems;
@@ -322,6 +334,7 @@ export const TienHockNavData: SidebarItem[] = [
         name: "Journal Entries",
         path: "/accounting/journal-entries",
         component: JournalEntryListPage,
+        group: "Generation",
         subItems: [
           {
             name: "New Entry",
@@ -342,9 +355,71 @@ export const TienHockNavData: SidebarItem[] = [
         ],
       },
       {
+        name: "Voucher Generator",
+        path: "/accounting/voucher-generator",
+        component: VoucherGeneratorPage,
+        group: "Generation",
+      },
+      {
+        name: "Payroll Bank Payment",
+        path: "/accounting/payroll-payment",
+        component: PayrollPaymentPage,
+        group: "Generation",
+      },
+      {
+        name: "Supplier Payments",
+        path: "/accounting/supplier-payments",
+        component: SupplierPaymentListPage,
+        group: "Generation",
+        subItems: [
+          {
+            name: "Payment Details",
+            path: "/accounting/supplier-payments/:id",
+            component: SupplierPaymentFormPage,
+          },
+        ],
+      },
+      {
+        name: "Bank Statement",
+        path: "/accounting/reports/bank-statement",
+        component: BankStatementPage,
+        group: "Reports",
+      },
+      {
+        name: "Debtors",
+        path: "/sales/debtors",
+        component: DebtorsReportPage,
+        group: "Reports",
+      },
+      {
+        name: "Trial Balance",
+        path: "/accounting/reports/trial-balance",
+        component: TrialBalancePage,
+        group: "Reports",
+      },
+      {
+        name: "Income Statement",
+        path: "/accounting/reports/income-statement",
+        component: IncomeStatementPage,
+        group: "Reports",
+      },
+      {
+        name: "Balance Sheet",
+        path: "/accounting/reports/balance-sheet",
+        component: BalanceSheetPage,
+        group: "Reports",
+      },
+      {
+        name: "Cost of Goods Manufactured",
+        path: "/accounting/reports/cogm",
+        component: CogmPage,
+        group: "Reports",
+      },
+      {
         name: "Chart of Accounts",
         path: "/accounting/account-codes",
         component: AccountCodeListPage,
+        group: "Setup",
         subItems: [
           {
             name: "New Account",
@@ -360,61 +435,10 @@ export const TienHockNavData: SidebarItem[] = [
         ],
       },
       {
-        name: "Debtors",
-        path: "/sales/debtors",
-        component: DebtorsReportPage,
-      },
-      {
-        name: "Voucher Generator",
-        path: "/accounting/voucher-generator",
-        component: VoucherGeneratorPage,
-      },
-      {
-        name: "Payroll Bank Payment",
-        path: "/accounting/payroll-payment",
-        component: PayrollPaymentPage,
-      },
-      {
-        name: "Supplier Payments",
-        path: "/accounting/supplier-payments",
-        component: SupplierPaymentListPage,
-        subItems: [
-          {
-            name: "Payment Details",
-            path: "/accounting/supplier-payments/:id",
-            component: SupplierPaymentFormPage,
-          },
-        ],
-      },
-      {
         name: "Account Mappings",
         path: "/accounting/location-account-mappings",
         component: LocationAccountMappingsPage,
-      },
-      {
-        name: "Bank Statement",
-        path: "/accounting/reports/bank-statement",
-        component: BankStatementPage,
-      },
-      {
-        name: "Trial Balance",
-        path: "/accounting/reports/trial-balance",
-        component: TrialBalancePage,
-      },
-      {
-        name: "Income Statement",
-        path: "/accounting/reports/income-statement",
-        component: IncomeStatementPage,
-      },
-      {
-        name: "Balance Sheet",
-        path: "/accounting/reports/balance-sheet",
-        component: BalanceSheetPage,
-      },
-      {
-        name: "Cost of Goods Manufactured",
-        path: "/accounting/reports/cogm",
-        component: CogmPage,
+        group: "Setup",
       },
     ],
   },
@@ -485,31 +509,37 @@ export const TienHockNavData: SidebarItem[] = [
         name: "Product Stock",
         path: "/stock/movement",
         component: ProductStockMovementPage,
+        group: "Products",
       },
       {
         name: "Production Records",
         path: "/stock/production-records",
         component: ProductionListPage,
+        group: "Products",
       },
       {
         name: "Production Entry",
         path: "/stock/production",
         component: ProductionEntryPage,
+        group: "Products",
       },
       {
         name: "Product Adjustments",
         path: "/stock/adjustments",
         component: ProductStockAdjustmentEntryPage,
+        group: "Products",
       },
       {
         name: "Material Stock",
         path: "/stock/material-stock",
         component: MaterialStockPage,
+        group: "Materials & Purchases",
       },
       {
         name: "Material Purchases",
         path: "/stock/material-purchases",
         component: MaterialPurchaseListPage,
+        group: "Materials & Purchases",
         subItems: [
           {
             name: "New Purchase",
@@ -528,11 +558,13 @@ export const TienHockNavData: SidebarItem[] = [
         name: "General Stock",
         path: "/stock/entry",
         component: GeneralStockPage,
+        group: "Materials & Purchases",
       },
       {
         name: "General Purchases",
         path: "/stock/general-purchases",
         component: GeneralPurchaseInvoiceListPage,
+        group: "Materials & Purchases",
         subItems: [
           {
             name: "New Local Purchase",
@@ -568,6 +600,7 @@ export const TienHockNavData: SidebarItem[] = [
         name: "Staff",
         path: "/catalogue/staff",
         component: StaffPage,
+        group: "People",
         subItems: [
           {
             name: "New Staff",
@@ -596,6 +629,7 @@ export const TienHockNavData: SidebarItem[] = [
         name: "Customer",
         path: "/catalogue/customer",
         component: CustomerPage,
+        group: "People",
         subItems: [
           {
             name: "New Customer",
@@ -614,31 +648,37 @@ export const TienHockNavData: SidebarItem[] = [
         name: "Product",
         path: "/catalogue/product",
         component: ProductPage,
+        group: "Products & Materials",
       },
       {
         name: "Job",
         path: "/catalogue/job",
         component: JobPage,
+        group: "Payroll Setup",
       },
       {
         name: "Pay Codes",
         path: "/catalogue/pay-codes",
         component: PayCodePage,
+        group: "Payroll Setup",
       },
       {
         name: "Cuti Management",
         path: "/catalogue/cuti-management",
         component: CutiManagementPage,
+        group: "Payroll Setup",
       },
       {
         name: "Contribution Rates",
         path: "/catalogue/contribution-rates",
         component: ContributionRatesPage,
+        group: "Payroll Setup",
       },
       {
         name: "Materials",
         path: "/materials",
         component: MaterialsListPage,
+        group: "Products & Materials",
         subItems: [
           {
             name: "New Material",
@@ -657,6 +697,7 @@ export const TienHockNavData: SidebarItem[] = [
         name: "Suppliers",
         path: "/accounting/suppliers",
         component: SuppliersListPage,
+        group: "People",
         subItems: [
           {
             name: "New Supplier",
@@ -675,16 +716,19 @@ export const TienHockNavData: SidebarItem[] = [
         name: "Job Category",
         path: "/catalogue/job_category",
         component: JobCategoryPage,
+        group: "Payroll Setup",
       },
       {
         name: "Location",
         path: "/catalogue/location",
         component: LocationPage,
+        group: "Payroll Setup",
       },
       {
         name: "Others",
         path: "/catalogue/others",
         component: OthersPage,
+        group: "Products & Materials",
       },
     ],
   },

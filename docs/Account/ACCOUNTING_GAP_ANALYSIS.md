@@ -7,6 +7,8 @@ Gap analysis requested in the handover, two lists:
 
 Statuses verified against the repo (`src/routes/accounting/`, `src/pages/Accounting/`, the planning docs) and the handover's code scan, as of 26 May 2026. It opens with the chart-of-accounts question, because that decision shapes *how* a few items below get built — but, importantly, not *whether* they are needed.
 
+> **Update 2 Jul 2026** (see [ACCOUNTING_PROGRESS.md](ACCOUNTING_PROGRESS.md) for the current handoff): **1B-3 (General Purchase journals) and 1B-4 (supplier payment entry) are now ✅ built** — GP invoices auto-post `GP` journals and `supplier_payments` auto-posts `PAY` journals with `PV-YYYYMM-XXXX` references. Separately, the **dev DB was refreshed after 9 Jun**, so the session-state notes below (opening anchor set, settlement smoke test, May walk-down prep) no longer reflect the DB: the anchor table is empty and May `BANK_PBB` again has only REC lines. The *features* all still exist; the May tie-out data entry must be redone from step 1 of the handover checklist.
+
 **Legend:** ✅ built · 🟡 partly built · ❌ not built.
 
 ---
@@ -42,8 +44,9 @@ Verified by code scan and a query against the dev DB on 26 May 2026. Grouped by 
 | Material purchase invoice → auto-journal `PUR` (DR purchase account by category · CR Trade Payables) | ✅ | [MaterialPurchaseFormPage](src/pages/Accounting/Purchases/MaterialPurchaseFormPage.tsx), [purchase-invoices.js](src/routes/accounting/purchase-invoices.js) |
 | Material-category → GL-account mapping table (PUR / PM etc.) | ✅ | `material_purchase_account_mappings` |
 | Foreign General Purchase form + manual self-billed e-Invoice submission to MyInvois (FX rate, supporting documents, foreign supplier profiles) | ✅ | [GeneralPurchaseInvoiceFormPage](src/pages/Accounting/Purchases/GeneralPurchaseInvoiceFormPage.tsx), [self-billed-invoices.js](src/routes/accounting/self-billed-invoices.js) |
-| Local General Purchase form (utilities, stationery, services) | 🟡 | [LocalGeneralPurchaseFormPage](src/pages/Accounting/Purchases/LocalGeneralPurchaseFormPage.tsx) — writes the `self_billed_invoices` row but creates **no journal entry** *(= Type 1 / 1B-3, Type 2 / #2)* |
-| Supplier payment entry / AP aging / supplier statement | ❌ | *(= 1B-4 / 1B-5 / 1B-6)* |
+| Local General Purchase form (utilities, stationery, services) → auto-journal `GP` (DR invoice-level expense account · CR `TP`) | ✅ *(since ~29 Jun 2026)* | [LocalGeneralPurchaseFormPage](src/pages/Accounting/Purchases/LocalGeneralPurchaseFormPage.tsx), `createGPJournalEntry` in [self-billed-invoices.js](src/routes/accounting/self-billed-invoices.js) *(closes 1B-3 / Type 2 #2)* |
+| Supplier payment entry → auto-journal `PAY` (DR `TP` · CR bank), PV reference auto-generated, settles both material and general purchase invoices | ✅ *(since ~10 Jun 2026)* | [SupplierPaymentListPage](src/pages/Accounting/Purchases/SupplierPaymentListPage.tsx), [supplier-payments.js](src/routes/accounting/supplier-payments.js) *(closes 1B-4; unused so far — 0 rows in dev)* |
+| AP aging / supplier statement / Payment Voucher print | ❌ | *(= 1B-5 / 1B-6 / 1B-7)* |
 
 ### Payroll → GL
 
@@ -244,10 +247,10 @@ Tien Hock is a Sdn Bhd: every year it must file audited financial statements wit
 
 | # | Capability | Status | Why it matters |
 |---|-----------|--------|----------------|
-| 1 | **Bank statement from journal** | 🟡 *in progress* | A running-ledger view of any bank/cash account (`BANK_PBB`, `BANK_ABB`, `CASH`; legacy `PBB_1`/`PBB_2`) — date, journal, particulars, cheque no., debit, credit, running balance. The most-used legacy report; today there is no way to see a bank account's running balance without doing it by hand. (Handover #1; [Phase 2.2](docs/Account/ACCOUNTING_SYSTEM_IMPLEMENTATION_PLAN.md).) **First accounting build now in progress — see [§ Active build](#active-build-bank-statement-from-journal-item-1b-1) below.** |
+| 1 | **Bank statement from journal** | 🟡 *in progress* | A running-ledger view of any bank/cash account (`BANK_PBB`, `BANK_ABB`, `CASH`; legacy `PBB_1`/`PBB_2`) — date, journal, particulars, cheque no., debit, credit, running balance. The most-used legacy report. **Report built — remaining work is the tie-out data entry; see [§ Active build](#active-build-bank-statement-from-journal-item-1b-1) below.** |
 | 2 | **Account ledger / GL drill-down** | ❌ | The generic version of #1: pick any account, see every transaction and a running balance — a creditor, a director account (`CL_WSF`/`CL_GTH`), a prepayment (`CA_INS`), an inter-company balance. One screen that answers "where did this number come from" for the whole trial balance. |
-| 3 | **Journal posting for General Purchases** | 🟡 | [`LocalGeneralPurchaseFormPage`](src/pages/Accounting/Purchases/LocalGeneralPurchaseFormPage.tsx) writes `self_billed_invoices` rows but creates **no journal entry** (verified in [`self-billed-invoices.js`](src/routes/accounting/self-billed-invoices.js)) — only *material* purchases auto-post. Every local general purchase (utilities, stationery, repairs, services) is currently invisible to the GL. (Handover #2.) |
-| 4 | **Supplier payment entry** | ❌ | No "pay this supplier invoice" screen — supplier payments and their DR Payables / CR Bank journal are done by hand. Pairs with #3 to close the purchase-to-pay loop that customer payments already have. |
+| 3 | **Journal posting for General Purchases** | ✅ *(2 Jul 2026)* | Built: [`LocalGeneralPurchaseFormPage`](src/pages/Accounting/Purchases/LocalGeneralPurchaseFormPage.tsx) / foreign form now auto-post a `GP` journal (DR invoice-level expense account · CR `TP`) via `createGPJournalEntry` in [`self-billed-invoices.js`](src/routes/accounting/self-billed-invoices.js). |
+| 4 | **Supplier payment entry** | ✅ *(2 Jul 2026)* | Built: `supplier_payments` settles material and general purchase invoices, auto-posts `PAY` (DR `TP` · CR bank) with an auto `PV-YYYYMM-XXXX` reference, and reverses on cancellation. Not yet used in anger (0 rows in dev) — activation depends on entering purchase invoices. |
 | 5 | **AP (supplier) aging report** | ❌ | A creditor-aging report — current / 1 / 2 / 3+ months — mirroring the [Debtors aging](src/pages/Accounting/DebtorsReportPage.tsx) the ERP already has. Needed to decide who to pay and when. |
 | 6 | **Supplier statement / per-supplier ledger** | ❌ | A per-supplier running ledger (invoices + payments + balance) — the supplier-side mirror of the customer Statement of Account the legacy prints. Largely falls out of #2 once the account ledger can filter by the supplier subledger. |
 | 7 | **Payment Voucher (PV) print** | ❌ | Only the Cash Receipt Voucher exists. A printable Payment Voucher is needed whenever the company pays a supplier or an expense — the legacy `PV###` / `PBE###` documents. |
@@ -260,7 +263,7 @@ Tien Hock is a Sdn Bhd: every year it must file audited financial statements wit
 | # | Legacy feature → new-ERP shape | Status | Pain it solves |
 |---|-------------------------------|--------|----------------|
 | 1 | PBB bank running ledger → **bank-statement-from-journal page** | 🟡 *in progress* | Can't reconcile the books to the actual bank statement; no view of a bank balance over time. *(= 1B-1; see [§ Active build](#active-build-bank-statement-from-journal-item-1b-1))* |
-| 2 | Every purchase posted to the books → **journal posting for General Purchases** | 🟡 | Local general purchases never reach the GL, so the trial balance understates expenses and payables. *(= 1B-3)* |
+| 2 | Every purchase posted to the books → **journal posting for General Purchases** | ✅ *(2 Jul 2026)* | Built — GP invoices now auto-post to the GL. *(= 1B-3)* |
 | 3 | Print-any-code ledger → **generic Account Ledger** | ❌ | No way to trace any account's transactions or running balance — neither you nor an auditor can drill from a trial-balance number to its movements. |
 | 4 | Detailed P&L → **Schedule B** (admin expense breakdown) | ❌ | The P&L shows Note 5 as one lump; you can't see what the company actually spent money on. *(= 1A-5)* |
 | 5 | `NCA_*`/`AD_*` asset listing → **Fixed Asset Register + depreciation** | ❌ | No asset listing, no depreciation schedule; the PP&E figure can't be substantiated or rolled forward. *(= 1A-4)* |

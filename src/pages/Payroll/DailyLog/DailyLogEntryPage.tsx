@@ -2760,7 +2760,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       existingWorkLog &&
       !loadingStaffs &&
       !loadingJobs &&
-      !loadingPayCodeMappings
+      !loadingPayCodeMappings &&
+      // Restore only once per work log: this effect's callback deps change
+      // identity when month-effective rates resolve, and re-running here would
+      // wipe in-progress edits and re-trigger rate resolution in a loop.
+      restoredWorkLogIdRef.current !== existingWorkLog.id
     ) {
       // Restore selection state for employees
       const newSelectedJobs: Record<string, string[]> = {};
