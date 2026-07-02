@@ -20,7 +20,7 @@ import { SPECIAL_ITEMS, isSpecialItem } from "../../config/specialItems";
 interface Product {
   id: string;
   description: string;
-  type: "MEE" | "BH" | "BUNDLE";
+  type: string;
   isSpecial?: boolean;
 }
 
@@ -38,12 +38,16 @@ interface ProductPayCodeMappingModalProps {
   isOpen: boolean;
   onClose: () => void;
   onMappingComplete?: () => void;
+  // Restrict to specific product types (e.g. ["JP"] for the Jelly Polly
+  // production page). Default: TH behaviour (MEE/BH/BUNDLE + special items).
+  productTypes?: string[];
 }
 
 const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
   isOpen,
   onClose,
   onMappingComplete,
+  productTypes,
 }) => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedPayCodeIds, setSelectedPayCodeIds] = useState<Set<string>>(
@@ -57,13 +61,11 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
   const [payCodeSearch, setPayCodeSearch] = useState("");
 
   // Get products from cache (MEE, BH, BUNDLE for packing)
-  const { products: cachedProducts, isLoading } = useProductsCache([
-    "MEE",
-    "BH",
-    "BUNDLE",
-  ]);
+  const { products: cachedProducts, isLoading } = useProductsCache(
+    productTypes || ["MEE", "BH", "BUNDLE"]
+  );
 
-  // Map cached products and add special items.
+  // Map cached products and add special items (special items are TH-only).
   const products: Product[] = useMemo(() => {
     // Regular products (exclude special items that might be in the DB)
     const regularProducts = cachedProducts
@@ -71,20 +73,24 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
       .map((p) => ({
         id: p.id,
         description: p.description,
-        type: p.type as "MEE" | "BH" | "BUNDLE",
+        type: p.type,
         isSpecial: false,
       }));
+
+    if (productTypes) {
+      return regularProducts;
+    }
 
     // Add special items from config
     const specialProducts = SPECIAL_ITEMS.map((item) => ({
       id: item.id,
       description: `${item.name} (${item.nameBM})`,
-      type: item.productType as "MEE" | "BH" | "BUNDLE",
+      type: item.productType,
       isSpecial: true,
     }));
 
     return [...regularProducts, ...specialProducts];
-  }, [cachedProducts]);
+  }, [cachedProducts, productTypes]);
 
   // Get job pay code mappings and all pay codes for filtering
   const { detailedMappings, productMappings, payCodes, refreshData } =
@@ -110,8 +116,11 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
     // For regular products, filter by job
     // Determine job ID based on product type
     // BUNDLE type uses BH_PACKING for BP/BH bundles, MEE_PACKING for MEE bundles
+    // JP products use the JP production packing job
     let jobId: string;
-    if (selectedProduct.type === "MEE") {
+    if (selectedProduct.type === "JP") {
+      jobId = "JP_PACKING";
+    } else if (selectedProduct.type === "MEE") {
       jobId = "MEE_PACKING";
     } else if (selectedProduct.type === "BUNDLE") {
       // BUNDLE_MEE uses MEE_PACKING, others use BH_PACKING

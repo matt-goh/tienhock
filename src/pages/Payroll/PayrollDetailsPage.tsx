@@ -44,6 +44,7 @@ import {
 } from "../../utils/payroll/payrollUtils";
 import toast from "react-hot-toast";
 import AddManualItemModal from "../../components/Payroll/AddManualItemModal";
+import CrossCompanyTakeHomeCard from "../../components/Payroll/CrossCompanyTakeHomeCard";
 import {
   EmployeePayroll,
   CommissionRecord,
@@ -3400,6 +3401,15 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Combined take-home across companies (renders only for staff who
+            also have Jelly Polly pay this month) */}
+        <CrossCompanyTakeHomeCard
+          employeeId={payroll.employee_id}
+          year={payroll.year}
+          month={payroll.month}
+          currentCompany="tienhock"
+        />
       </div>
 
       {/* Add Manual Item Modal */}

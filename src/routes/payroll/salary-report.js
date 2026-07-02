@@ -158,6 +158,7 @@ export default function (pool) {
                 JOIN staffs s2 ON lr2.employee_id = s2.id
                 WHERE s2.name = (SELECT name FROM staffs WHERE id = ep.employee_id)
                   AND lr2.status = 'approved'
+                  AND lr2.company <> 'JP'
                   AND lr2.leave_date = pi.source_date
               )
             )
@@ -243,6 +244,7 @@ export default function (pool) {
           WHERE EXTRACT(YEAR FROM lr.leave_date) = $1 
             AND EXTRACT(MONTH FROM lr.leave_date) = $2
             AND lr.status = 'approved'
+            AND lr.company <> 'JP'
           GROUP BY lr.employee_id, lr.leave_type
         ),
         pinjam_by_name AS (
@@ -1276,6 +1278,7 @@ export default function (pool) {
                 JOIN staffs s2 ON lr2.employee_id = s2.id
                 WHERE s2.name = (SELECT name FROM staffs WHERE id = ep.employee_id)
                   AND lr2.status = 'approved'
+                  AND lr2.company <> 'JP'
                   AND lr2.leave_date = pi.source_date
               )
             )
@@ -1360,6 +1363,7 @@ export default function (pool) {
           FROM leave_records lr
           WHERE EXTRACT(YEAR FROM lr.leave_date) = $1
             AND lr.status = 'approved'
+            AND lr.company <> 'JP'
           GROUP BY lr.employee_id, lr.leave_type
         ),
         pinjam_by_name AS (
