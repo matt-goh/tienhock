@@ -1334,17 +1334,32 @@ export default function (pool) {
               ],
             ),
 
-        // Get pinjam records for this employee for the specific month/year.
-        pool.query(
-          `
-          SELECT p.*, s.name as employee_name
-          FROM pinjam_records p
-          LEFT JOIN staffs s ON p.employee_id = s.id
-          WHERE p.employee_id = $1 AND p.year = $2 AND p.month = $3
-          ORDER BY p.year DESC, p.month DESC, p.employee_id, p.pinjam_type, p.description
-        `,
-          [payrollData.employee_id, payrollData.year, payrollData.month],
-        ),
+        // Get pinjam records for this payroll month. Grouped payrolls can have
+        // pinjam entered against any same-name sibling ID, so mirror the
+        // mid-month/commission/Others sibling lookup used above.
+        isGroupedPayroll
+          ? pool.query(
+              `
+              SELECT p.*, s.name as employee_name
+              FROM pinjam_records p
+              JOIN staffs s ON p.employee_id = s.id
+              WHERE s.name = (SELECT name FROM staffs WHERE id = $1)
+                AND p.year = $2
+                AND p.month = $3
+              ORDER BY p.year DESC, p.month DESC, p.employee_id, p.pinjam_type, p.description
+            `,
+              [payrollData.employee_id, payrollData.year, payrollData.month],
+            )
+          : pool.query(
+              `
+              SELECT p.*, s.name as employee_name
+              FROM pinjam_records p
+              LEFT JOIN staffs s ON p.employee_id = s.id
+              WHERE p.employee_id = $1 AND p.year = $2 AND p.month = $3
+              ORDER BY p.year DESC, p.month DESC, p.employee_id, p.pinjam_type, p.description
+            `,
+              [payrollData.employee_id, payrollData.year, payrollData.month],
+            ),
       ]);
 
       // Parse items
