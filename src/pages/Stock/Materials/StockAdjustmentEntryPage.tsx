@@ -606,6 +606,10 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     }));
   };
 
+  const getSelectedMonthStartDate = (): string => {
+    return `${year}-${String(month).padStart(2, "0")}-01`;
+  };
+
   const getGeneralPurchasePath = (row: GeneralStockRow): string => {
     return row.purchase_kind === "local"
       ? `/stock/general-purchases/local/${row.self_billed_invoice_id}`
@@ -643,6 +647,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
           line_id: Number.parseInt(lineId, 10),
           self_billed_invoice_line_id: Number.parseInt(lineId, 10),
           general_stock_category_id: row?.general_stock_category_id || null,
+          adjustment_date: getSelectedMonthStartDate(),
           adjustment_quantity: makeNumber(value),
         };
       })

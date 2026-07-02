@@ -74,6 +74,20 @@ function parseNullableDecimal(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function normalizeDateString(value) {
+  const normalized = normalizeText(value);
+  return normalized && /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : null;
+}
+
+function getPeriodStart(year, month) {
+  return `${year}-${String(month).padStart(2, "0")}-01`;
+}
+
+function getNextPeriod(year, month) {
+  if (month === 12) return { year: year + 1, month: 1 };
+  return { year, month: month + 1 };
+}
+
 function isLockedInvoice(invoice) {
   return (
     invoice?.invoice_status === LOCAL_STATUS_CANCELLED ||
@@ -1986,11 +2000,23 @@ export default function (pool, config) {
       const hasMonthFilter =
         Number.isInteger(year) && Number.isInteger(month) && month >= 1 && month <= 12;
 
-      const monthFilterClause = hasMonthFilter
-        ? `AND EXTRACT(YEAR FROM sbi.purchase_date) = $1
-              AND EXTRACT(MONTH FROM sbi.purchase_date) = $2`
+      const nextPeriod = hasMonthFilter ? getNextPeriod(year, month) : null;
+      const nextPeriodStart = nextPeriod
+        ? getPeriodStart(nextPeriod.year, nextPeriod.month)
+        : null;
+      const periodEndClause = hasMonthFilter
+        ? `AND sbi.purchase_date < $1::date`
         : "";
-      const monthFilterParams = hasMonthFilter ? [year, month] : [];
+      const appendPeriodClause = hasMonthFilter
+        ? `AND (
+                   (gsa.source_self_billed_invoice_line_id IS NULL AND gsa.adjustment_date < $1::date)
+                   OR (gsa.source_self_billed_invoice_line_id IS NOT NULL AND source_sbi.purchase_date < $1::date)
+                 )`
+        : "";
+      const usedPeriodClause = hasMonthFilter
+        ? `AND gsa.adjustment_date < $1::date`
+        : "";
+      const monthFilterParams = hasMonthFilter ? [nextPeriodStart] : [];
 
       const [result, categoriesResult] = await Promise.all([
         pool.query(
@@ -2002,12 +2028,16 @@ export default function (pool, config) {
                    AND (
                      gsa.source_self_billed_invoice_line_id IS NULL
                      OR (
-                       COALESCE(source_sbi.invoice_status, '${LOCAL_STATUS_ACTIVE}') <> '${LOCAL_STATUS_CANCELLED}'
-                       AND COALESCE(source_sbi.einvoice_status, '') <> 'cancelled'
-                     )
+                     COALESCE(source_sbi.invoice_status, '${LOCAL_STATUS_ACTIVE}') <> '${LOCAL_STATUS_CANCELLED}'
+                     AND COALESCE(source_sbi.einvoice_status, '') <> 'cancelled'
                    )
+                 )
+                 ${appendPeriodClause}
                ) AS appended_quantity,
-               SUM(gsa.adjustment_quantity) FILTER (WHERE gsa.adjustment_quantity < 0) AS used_quantity
+               SUM(gsa.adjustment_quantity) FILTER (
+                 WHERE gsa.adjustment_quantity < 0
+                 ${usedPeriodClause}
+               ) AS used_quantity
              FROM general_stock_adjustments gsa
              LEFT JOIN self_billed_invoice_lines source_sbil
                ON source_sbil.id = gsa.source_self_billed_invoice_line_id
@@ -2027,8 +2057,10 @@ export default function (pool, config) {
                    'created_at', created_at
                  )
                  ORDER BY created_at DESC, id DESC
-               ) FILTER (WHERE adjustment_quantity < 0) AS used_adjustments
+               ) AS used_adjustments
              FROM general_stock_adjustments
+             WHERE adjustment_quantity < 0
+               ${hasMonthFilter ? `AND adjustment_date < $1::date` : ""}
              GROUP BY self_billed_invoice_line_id
            ),
            append_sources AS (
@@ -2077,7 +2109,7 @@ export default function (pool, config) {
              AND COALESCE(sbi.invoice_status, '${LOCAL_STATUS_ACTIVE}') <> '${LOCAL_STATUS_CANCELLED}'
              AND COALESCE(sbi.einvoice_status, '') <> 'cancelled'
              AND aps.source_self_billed_invoice_line_id IS NULL
-             ${monthFilterClause}
+             ${periodEndClause}
            ORDER BY COALESCE(gsc.sort_order, 9999), COALESCE(gsc.name, 'Uncategorised'),
                     sbi.purchase_date DESC, sbi.id DESC, sbil.line_number ASC`,
           monthFilterParams
@@ -2122,6 +2154,7 @@ export default function (pool, config) {
           ? Number.parseInt(adjustment.general_stock_category_id, 10)
           : null;
         const adjustmentQuantity = parseDecimal(adjustment.adjustment_quantity, 0);
+        const adjustmentDate = normalizeDateString(adjustment.adjustment_date);
         const notes = normalizeText(adjustment.notes);
 
         if (!Number.isInteger(lineId) || adjustmentQuantity === 0) continue;
@@ -2149,9 +2182,9 @@ export default function (pool, config) {
           await client.query(
             `INSERT INTO general_stock_adjustments (
                self_billed_invoice_line_id, general_stock_category_id,
-               adjustment_quantity, notes, created_by
-             ) VALUES ($1, $2, $3, $4, $5)`,
-            [lineId, finalCategoryId, adjustmentQuantity, notes, req.staffId || null]
+               adjustment_date, adjustment_quantity, notes, created_by
+             ) VALUES ($1, $2, COALESCE($3::date, CURRENT_DATE), $4, $5, $6)`,
+            [lineId, finalCategoryId, adjustmentDate, adjustmentQuantity, notes, req.staffId || null]
           );
           insertedCount++;
         }
