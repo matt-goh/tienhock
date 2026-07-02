@@ -168,11 +168,17 @@ export const downloadBatchPayslips = async (
           Array.isArray(fetchedPayrolls) &&
           fetchedPayrolls.length > 0
         ) {
-          completePayrolls = payrolls.map((payroll) => {
-            const completePayroll = fetchedPayrolls.find(
-              (p) => p.id === payroll.id
-            );
-            return completePayroll || payroll;
+          completePayrolls = payrolls.map((payroll: EmployeePayroll) => {
+            const completePayroll: EmployeePayroll | undefined =
+              fetchedPayrolls.find(
+                (p: EmployeePayroll): boolean => p.id === payroll.id
+              );
+            return completePayroll
+              ? {
+                  ...completePayroll,
+                  print_job_types: payroll.print_job_types,
+                }
+              : payroll;
           });
         }
       } catch (error) {
@@ -381,11 +387,17 @@ export const printBatchPayslips = async (
           Array.isArray(fetchedPayrolls) &&
           fetchedPayrolls.length > 0
         ) {
-          completePayrolls = payrolls.map((payroll) => {
-            const completePayroll = fetchedPayrolls.find(
-              (p) => p.id === payroll.id
-            );
-            return completePayroll || payroll;
+          completePayrolls = payrolls.map((payroll: EmployeePayroll) => {
+            const completePayroll: EmployeePayroll | undefined =
+              fetchedPayrolls.find(
+                (p: EmployeePayroll): boolean => p.id === payroll.id
+              );
+            return completePayroll
+              ? {
+                  ...completePayroll,
+                  print_job_types: payroll.print_job_types,
+                }
+              : payroll;
           });
         }
       } catch (error) {
