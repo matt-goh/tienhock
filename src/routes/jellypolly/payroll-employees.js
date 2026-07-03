@@ -43,7 +43,7 @@ export default function (pool) {
           s.head_staff_id,
           s.date_resigned
         FROM jellypolly.payroll_employees pe
-        LEFT JOIN public.staffs s ON pe.employee_id = s.id
+        LEFT JOIN jellypolly.staffs s ON pe.employee_id = s.id
         WHERE pe.is_active = true ${whereJobType}
         ORDER BY pe.job_type, s.name, pe.employee_id
       `;

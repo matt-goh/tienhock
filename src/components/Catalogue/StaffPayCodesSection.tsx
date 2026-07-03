@@ -12,6 +12,9 @@ import Button from "../Button";
 import ConfirmationDialog from "../ConfirmationDialog";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
+import { useJPStaffsCache } from "../../utils/JellyPolly/useJPStaffsCache";
+import { useJPJobsCache } from "../../utils/JellyPolly/useJPJobsCache";
+import { useJPJobPayCodeMappings } from "../../utils/JellyPolly/useJPJobPayCodeMappings";
 import {
   EmployeePayCodeDetails,
   useJobPayCodeMappings,
@@ -43,21 +46,48 @@ type PayCodeViewMode = "grouped" | "flat";
 
 interface StaffPayCodesSectionProps {
   employee: Employee;
+  // Catalogue source — Jelly Polly pages pass "jellypolly" (own staff/pay-code
+  // catalogue); default is the shared Tien Hock catalogue.
+  company?: "tienhock" | "jellypolly";
 }
 
 const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
   employee,
+  company = "tienhock",
 }) => {
   const id = employee.id;
-  const { jobs } = useJobsCache();
-  const { refreshStaffs } = useStaffsCache();
+  const apiBase = company === "jellypolly" ? "/jellypolly/api" : "/api";
+  const { jobs: thJobs } = useJobsCache();
+  const { jobs: jpJobs } = useJPJobsCache();
+  const jobs = company === "jellypolly" ? jpJobs : thJobs;
+  const { refreshStaffs: refreshThStaffs } = useStaffsCache();
+  const { refreshStaffs: refreshJpStaffs } = useJPStaffsCache();
+  const refreshStaffs =
+    company === "jellypolly" ? refreshJpStaffs : refreshThStaffs;
   const {
-    employeeMappings,
-    payCodes: availablePayCodes,
-    detailedMappings: jobPayCodeDetails,
-    loading: loadingPayCodes,
-    refreshData: refreshPayCodeMappings,
+    employeeMappings: thEmployeeMappings,
+    payCodes: thAvailablePayCodes,
+    detailedMappings: thJobPayCodeDetails,
+    loading: loadingThPayCodes,
+    refreshData: refreshThPayCodeMappings,
   } = useJobPayCodeMappings();
+  const {
+    employeeMappings: jpEmployeeMappings,
+    payCodes: jpAvailablePayCodes,
+    detailedMappings: jpJobPayCodeDetails,
+    loading: loadingJpPayCodes,
+    refreshData: refreshJpPayCodeMappings,
+  } = useJPJobPayCodeMappings();
+  const employeeMappings =
+    company === "jellypolly" ? jpEmployeeMappings : thEmployeeMappings;
+  const availablePayCodes =
+    company === "jellypolly" ? jpAvailablePayCodes : thAvailablePayCodes;
+  const jobPayCodeDetails =
+    company === "jellypolly" ? jpJobPayCodeDetails : thJobPayCodeDetails;
+  const loadingPayCodes =
+    company === "jellypolly" ? loadingJpPayCodes : loadingThPayCodes;
+  const refreshPayCodeMappings =
+    company === "jellypolly" ? refreshJpPayCodeMappings : refreshThPayCodeMappings;
 
   const [showPayCodeModal, setShowPayCodeModal] = useState(false);
   const [selectedPayCodeForEdit, setSelectedPayCodeForEdit] =
@@ -223,7 +253,7 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
 
       try {
         const payCodeIds = payCodes.map((pc) => pc.id);
-        await api.put("/api/employee-pay-codes/batch-default", {
+        await api.put(`${apiBase}/employee-pay-codes/batch-default`, {
           employee_id: id,
           pay_code_ids: payCodeIds,
           is_default: value,
@@ -270,7 +300,7 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
           return;
         }
 
-        await api.put("/api/job-pay-codes/batch-default", {
+        await api.put(`${apiBase}/job-pay-codes/batch-default`, {
           items,
           is_default: value,
         });
@@ -957,6 +987,7 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
       {/* Manage Employee Pay Codes Modal */}
       {employee.id && (
         <BatchManageEmployeePayCodesModal
+          apiBase={apiBase}
           isOpen={showPayCodeModal}
           onClose={() => setShowPayCodeModal(false)}
           employee={employee}
@@ -971,6 +1002,7 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
       {/* Edit Employee Pay Code Rates Modal */}
       {employee.id && (
         <EditEmployeePayCodeRatesModal
+          apiBase={apiBase}
           isOpen={showEditRateModal}
           onClose={() => setShowEditRateModal(false)}
           employeeId={employee.id}
@@ -984,6 +1016,7 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
       {/* Edit Job Pay Code Rates Modal */}
       {employee.id && selectedJobPayCodeForEdit && (
         <EditPayCodeRatesModal
+          apiBase={apiBase}
           isOpen={showJobPayCodeEditModal}
           onClose={() => setShowJobPayCodeEditModal(false)}
           jobId={selectedJobPayCodeForEdit.job_id}
@@ -1000,6 +1033,7 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
       {/* Batch Manage Job Pay Codes Modal */}
       {selectedJobForBatchManage && (
         <BatchManageJobPayCodesModal
+          apiBase={apiBase}
           isOpen={showBatchManageJobPayCodesModal}
           onClose={() => {
             setShowBatchManageJobPayCodesModal(false);

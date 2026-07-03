@@ -28,6 +28,8 @@ interface EmployeeDetail {
 }
 
 interface AssociatePayCodesWithEmployeesModalProps {
+  // API base for pay-code endpoints (JP passes /jellypolly/api)
+  apiBase?: string;
   isOpen: boolean;
   onClose: () => void;
   payCode: PayCode | null;
@@ -45,6 +47,7 @@ const AssociatePayCodesWithEmployeesModal: React.FC<
   availableEmployees,
   currentEmployeeDetails,
   onAssociationComplete,
+  apiBase = "/api",
 }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string>("");
@@ -192,7 +195,7 @@ const AssociatePayCodesWithEmployeesModal: React.FC<
           pay_code_id: payCode.id,
           is_default: defaultEmployees.has(employeeId),
         }));
-        promises.push(api.post("/api/employee-pay-codes/batch", { associations }));
+        promises.push(api.post(`${apiBase}/employee-pay-codes/batch`, { associations }));
       }
 
       // Handle removals with batch API
@@ -201,7 +204,7 @@ const AssociatePayCodesWithEmployeesModal: React.FC<
           employee_id: employeeId,
           pay_code_id: payCode.id,
         }));
-        promises.push(api.post("/api/employee-pay-codes/batch-delete", { items }));
+        promises.push(api.post(`${apiBase}/employee-pay-codes/batch-delete`, { items }));
       }
 
       // Handle default changes (only for existing employees that weren't added/removed)
@@ -219,7 +222,7 @@ const AssociatePayCodesWithEmployeesModal: React.FC<
 
       if (defaultsToSet.length > 0) {
         promises.push(
-          api.put("/api/employee-pay-codes/batch-default", {
+          api.put(`${apiBase}/employee-pay-codes/batch-default`, {
             pay_code_id: payCode.id,
             employee_ids: defaultsToSet,
             is_default: true,
@@ -229,7 +232,7 @@ const AssociatePayCodesWithEmployeesModal: React.FC<
 
       if (defaultsToClear.length > 0) {
         promises.push(
-          api.put("/api/employee-pay-codes/batch-default", {
+          api.put(`${apiBase}/employee-pay-codes/batch-default`, {
             pay_code_id: payCode.id,
             employee_ids: defaultsToClear,
             is_default: false,

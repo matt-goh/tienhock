@@ -51,7 +51,7 @@ const JPProductionEntryPage: React.FC = () => {
     const fetchWorkers = async (): Promise<void> => {
       try {
         const response: ProductionWorker[] = await api.get(
-          "/api/production-entries/workers?product_type=JP"
+          "/jellypolly/api/production-entries/workers?product_type=JP"
         );
         setWorkers(response);
       } catch (error) {
@@ -72,10 +72,10 @@ const JPProductionEntryPage: React.FC = () => {
       try {
         const [entriesResponse, machineResponse] = await Promise.all([
           api.get(
-            `/api/production-entries?date=${selectedDate}&product_id=${selectedProductId}`
+            `/jellypolly/api/production-entries?date=${selectedDate}&product_id=${selectedProductId}`
           ),
           api.get(
-            `/api/production-entries/machine-broken?date=${selectedDate}&product_id=${selectedProductId}`
+            `/jellypolly/api/production-entries/machine-broken?date=${selectedDate}&product_id=${selectedProductId}`
           ),
         ]);
         if (cancelled) return;
@@ -125,7 +125,7 @@ const JPProductionEntryPage: React.FC = () => {
     if (!selectedProductId) return;
     const newValue = !isMachineBroken;
     try {
-      await api.put("/api/production-entries/machine-broken", {
+      await api.put("/jellypolly/api/production-entries/machine-broken", {
         date: selectedDate,
         product_id: selectedProductId,
         machine_broken: newValue,
@@ -160,7 +160,7 @@ const JPProductionEntryPage: React.FC = () => {
         }
       });
 
-      const response = await api.post("/api/production-entries/batch", {
+      const response = await api.post("/jellypolly/api/production-entries/batch", {
         date: selectedDate,
         product_id: selectedProductId,
         entries: entriesArray,
@@ -314,6 +314,7 @@ const JPProductionEntryPage: React.FC = () => {
             isSaving={isSaving}
             unitLabel="bags"
             workerOrderScope="JP_PRODUCTION"
+            workerOrderApiBase="/jellypolly/api/production-entries"
           />
         ))}
 
@@ -322,6 +323,7 @@ const JPProductionEntryPage: React.FC = () => {
         isOpen={showMappingModal}
         onClose={() => setShowMappingModal(false)}
         productTypes={["JP"]}
+        company="jellypolly"
       />
     </div>
   );

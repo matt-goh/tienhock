@@ -158,7 +158,7 @@ export default function (pool) {
               ep.gross_pay, ep.net_pay, ep.digenapkan, ep.setelah_digenapkan,
               s.name as employee_name
        FROM jellypolly.employee_payrolls ep
-       LEFT JOIN public.staffs s ON ep.employee_id = s.id
+       LEFT JOIN jellypolly.staffs s ON ep.employee_id = s.id
        WHERE ep.monthly_payroll_id = ANY($1)`,
       [mpIds]
     );
@@ -172,7 +172,7 @@ export default function (pool) {
                 to_char(pi.source_date, 'YYYY-MM-DD') AS source_date,
                 pc.pay_type, pc.report_column
          FROM jellypolly.payroll_items pi
-         LEFT JOIN public.pay_codes pc ON pi.pay_code_id = pc.id
+         LEFT JOIN jellypolly.pay_codes pc ON pi.pay_code_id = pc.id
          WHERE pi.employee_payroll_id = ANY($1)`,
         [epIds]
       ),
@@ -198,11 +198,10 @@ export default function (pool) {
                 to_char(lr.leave_date, 'YYYY-MM-DD') AS leave_date,
                 EXTRACT(MONTH FROM lr.leave_date)::int AS month,
                 CAST(lr.amount_paid AS NUMERIC(10,2)) AS amount_paid
-         FROM public.leave_records lr
-         LEFT JOIN public.staffs s ON s.id = lr.employee_id
+         FROM jellypolly.leave_records lr
+         LEFT JOIN jellypolly.staffs s ON s.id = lr.employee_id
          WHERE EXTRACT(YEAR FROM lr.leave_date) = $1
-           AND lr.status = 'approved'
-           AND lr.company = 'JP'`,
+           AND lr.status = 'approved'`,
         [year]
       ),
     ]);

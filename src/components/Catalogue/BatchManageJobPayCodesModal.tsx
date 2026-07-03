@@ -23,6 +23,8 @@ import Button from "../Button";
 import toast from "react-hot-toast";
 
 interface BatchManageJobPayCodesModalProps {
+  // API base for pay-code endpoints (JP passes /jellypolly/api)
+  apiBase?: string;
   isOpen: boolean;
   onClose: () => void;
   job: Job | null;
@@ -38,6 +40,7 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
   allPayCodes,
   currentPayCodeDetails,
   onComplete,
+  apiBase = "/api",
 }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string>("");
@@ -176,7 +179,7 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
           pay_code_id: payCodeId,
           is_default: defaultPayCodes.has(payCodeId),
         }));
-        promises.push(api.post("/api/job-pay-codes/batch", { associations }));
+        promises.push(api.post(`${apiBase}/job-pay-codes/batch`, { associations }));
       }
 
       // Handle removals
@@ -185,7 +188,7 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
           job_id: job.id,
           pay_code_id: payCodeId,
         }));
-        promises.push(api.post("/api/job-pay-codes/batch-delete", { items }));
+        promises.push(api.post(`${apiBase}/job-pay-codes/batch-delete`, { items }));
       }
 
       // Handle default changes (only for existing pay codes that weren't added/removed)
@@ -205,7 +208,7 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
           job_id: job.id,
           pay_code_id: payCodeId,
         }));
-        promises.push(api.put("/api/job-pay-codes/batch-default", { items, is_default: true }));
+        promises.push(api.put(`${apiBase}/job-pay-codes/batch-default`, { items, is_default: true }));
       }
 
       if (defaultsToClear.length > 0) {
@@ -213,7 +216,7 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
           job_id: job.id,
           pay_code_id: payCodeId,
         }));
-        promises.push(api.put("/api/job-pay-codes/batch-default", { items, is_default: false }));
+        promises.push(api.put(`${apiBase}/job-pay-codes/batch-default`, { items, is_default: false }));
       }
 
       // Wait for all operations

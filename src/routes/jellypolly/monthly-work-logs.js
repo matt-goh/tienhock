@@ -189,8 +189,8 @@ export default function (pool) {
           s.name as employee_name,
           j.name as job_name
         FROM jellypolly.monthly_work_log_entries mwle
-        LEFT JOIN public.staffs s ON mwle.employee_id = s.id
-        LEFT JOIN public.jobs j ON mwle.job_id = j.id
+        LEFT JOIN jellypolly.staffs s ON mwle.employee_id = s.id
+        LEFT JOIN jellypolly.jobs j ON mwle.job_id = j.id
         WHERE mwle.monthly_log_id = $1`,
         [id]
       );
@@ -208,7 +208,7 @@ export default function (pool) {
               pc.pay_type,
               pc.rate_unit
             FROM jellypolly.monthly_work_log_activities mwla
-            LEFT JOIN public.pay_codes pc ON mwla.pay_code_id = pc.id
+            LEFT JOIN jellypolly.pay_codes pc ON mwla.pay_code_id = pc.id
             WHERE mwla.monthly_entry_id = $1`,
             [entry.id]
           );
@@ -245,11 +245,10 @@ export default function (pool) {
             lr.*,
             CAST(lr.amount_paid AS NUMERIC(10, 2)) as amount_paid,
             s.name as employee_name
-          FROM public.leave_records lr
-          LEFT JOIN public.staffs s ON lr.employee_id = s.id
+          FROM jellypolly.leave_records lr
+          LEFT JOIN jellypolly.staffs s ON lr.employee_id = s.id
           WHERE EXTRACT(MONTH FROM lr.leave_date) = $1
             AND EXTRACT(YEAR FROM lr.leave_date) = $2
-            AND lr.company = 'JP'
             AND lr.employee_id = ANY($3)
           ORDER BY lr.leave_date, s.name`,
           [workLog.log_month, workLog.log_year, sectionEmployeeIds]
@@ -400,15 +399,15 @@ export default function (pool) {
           }
 
           const existingLeave = await pool.query(
-            `SELECT id FROM public.leave_records WHERE employee_id = $1 AND leave_date = $2`,
+            `SELECT id FROM jellypolly.leave_records WHERE employee_id = $1 AND leave_date = $2`,
             [employeeId, leaveDate]
           );
 
           if (existingLeave.rows.length === 0) {
             await pool.query(
-              `INSERT INTO public.leave_records (
-                employee_id, leave_date, leave_type, days_taken, status, amount_paid, company
-              ) VALUES ($1, $2, $3, $4, 'approved', $5, 'JP')`,
+              `INSERT INTO jellypolly.leave_records (
+                employee_id, leave_date, leave_type, days_taken, status, amount_paid
+              ) VALUES ($1, $2, $3, $4, 'approved', $5)`,
               [employeeId, leaveDate, leaveType, 1.0, leaveAmount]
             );
           }
@@ -433,7 +432,7 @@ export default function (pool) {
           }
 
           await pool.query(
-            "UPDATE public.leave_records SET amount_paid = $1 WHERE id = $2",
+            "UPDATE jellypolly.leave_records SET amount_paid = $1 WHERE id = $2",
             [leaveAmount, leaveId]
           );
         }
@@ -595,7 +594,7 @@ export default function (pool) {
       ) {
         for (const leaveId of deletedLeaveIds) {
           const deleted = await pool.query(
-            "DELETE FROM public.leave_records WHERE id = $1 RETURNING employee_id",
+            "DELETE FROM jellypolly.leave_records WHERE id = $1 RETURNING employee_id",
             [leaveId]
           );
           if (deleted.rows[0]) {
@@ -619,15 +618,15 @@ export default function (pool) {
             }
 
             const existingLeave = await pool.query(
-              `SELECT id FROM public.leave_records WHERE employee_id = $1 AND leave_date = $2`,
+              `SELECT id FROM jellypolly.leave_records WHERE employee_id = $1 AND leave_date = $2`,
               [employeeId, leaveDate]
             );
 
             if (existingLeave.rows.length === 0) {
               await pool.query(
-                `INSERT INTO public.leave_records (
-                  employee_id, leave_date, leave_type, days_taken, status, amount_paid, company
-                ) VALUES ($1, $2, $3, $4, 'approved', $5, 'JP')`,
+                `INSERT INTO jellypolly.leave_records (
+                  employee_id, leave_date, leave_type, days_taken, status, amount_paid
+                ) VALUES ($1, $2, $3, $4, 'approved', $5)`,
                 [employeeId, leaveDate, leaveType, 1.0, leaveAmount]
               );
             }
@@ -653,7 +652,7 @@ export default function (pool) {
           }
 
           await pool.query(
-            "UPDATE public.leave_records SET amount_paid = $1 WHERE id = $2",
+            "UPDATE jellypolly.leave_records SET amount_paid = $1 WHERE id = $2",
             [leaveAmount, leaveId]
           );
         }
@@ -753,11 +752,10 @@ export default function (pool) {
           CAST(lr.amount_paid AS NUMERIC(10, 2)) as amount_paid,
           s.name as employee_name,
           s.job as employee_jobs
-        FROM public.leave_records lr
-        LEFT JOIN public.staffs s ON lr.employee_id = s.id
+        FROM jellypolly.leave_records lr
+        LEFT JOIN jellypolly.staffs s ON lr.employee_id = s.id
         WHERE EXTRACT(MONTH FROM lr.leave_date) = $1
           AND EXTRACT(YEAR FROM lr.leave_date) = $2
-          AND lr.company = 'JP'
       `;
       const values = [parseInt(month), parseInt(year)];
 

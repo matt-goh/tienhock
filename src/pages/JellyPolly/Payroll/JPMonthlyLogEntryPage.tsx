@@ -8,10 +8,10 @@ import { format } from "date-fns";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Checkbox from "../../../components/Checkbox";
 import toast from "react-hot-toast";
-import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
-import { useJobsCache } from "../../../utils/catalogue/useJobsCache";
-import { useJobPayCodeMappings } from "../../../utils/catalogue/useJobPayCodeMappings";
-import { useEffectiveRates } from "../../../utils/payroll/useEffectiveRates";
+import { useJPStaffsCache } from "../../../utils/JellyPolly/useJPStaffsCache";
+import { useJPJobsCache } from "../../../utils/JellyPolly/useJPJobsCache";
+import { useJPJobPayCodeMappings } from "../../../utils/JellyPolly/useJPJobPayCodeMappings";
+import { useJPEffectiveRates } from "../../../utils/JellyPolly/useJPEffectiveRates";
 import { api } from "../../../routes/utils/api";
 import { useHolidayCache } from "../../../utils/payroll/useHolidayCache";
 import {
@@ -150,18 +150,18 @@ const JPMonthlyLogEntryPage: React.FC<JPMonthlyLogEntryPageProps> = ({
     staffs: allStaffs,
     loading: loadingStaffs,
     refreshStaffs,
-  } = useStaffsCache();
-  const { jobs: allJobs, refreshJobs } = useJobsCache();
+  } = useJPStaffsCache();
+  const { jobs: allJobs, refreshJobs } = useJPJobsCache();
   const { isHoliday, getHolidayDescription } = useHolidayCache();
   const {
     detailedMappings: jobPayCodeDetails,
     employeeMappings,
     loading: loadingPayCodeMappings,
     refreshData: refreshPayCodeMappings,
-  } = useJobPayCodeMappings();
+  } = useJPJobPayCodeMappings();
   // Month-effective rate overlay (keeps the previewed rate in step with the
   // payslip when a scheduled rate change applies to the log's month).
-  const { resolveEffectiveRates, getEffectiveRate } = useEffectiveRates();
+  const { resolveEffectiveRates, getEffectiveRate } = useJPEffectiveRates();
   const jobConfig = getJPJobConfig(jobType);
   const JOB_IDS = getJobIds(jobType);
   const contextLinkedPayCodes = jobConfig

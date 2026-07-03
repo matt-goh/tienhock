@@ -25,7 +25,7 @@ export default function (pool) {
       let query = `
       SELECT p.*, s.name as employee_name
       FROM jellypolly.mid_month_payrolls p
-      LEFT JOIN public.staffs s ON p.employee_id = s.id
+      LEFT JOIN jellypolly.staffs s ON p.employee_id = s.id
       WHERE 1=1
     `;
 
@@ -116,7 +116,7 @@ export default function (pool) {
           mmp.*,
           s.name as employee_name
         FROM jellypolly.mid_month_payrolls mmp
-        LEFT JOIN public.staffs s ON mmp.employee_id = s.id
+        LEFT JOIN jellypolly.staffs s ON mmp.employee_id = s.id
         WHERE mmp.employee_id = $1 AND mmp.year = $2 AND mmp.month = $3
       `;
 
@@ -152,7 +152,7 @@ export default function (pool) {
           s.name as employee_name,
           s.payment_preference as default_payment_method
         FROM jellypolly.mid_month_payrolls mmp
-        LEFT JOIN public.staffs s ON mmp.employee_id = s.id
+        LEFT JOIN jellypolly.staffs s ON mmp.employee_id = s.id
         WHERE mmp.id = $1
       `;
 
@@ -240,7 +240,7 @@ export default function (pool) {
 
       // Get employee name for response
       const employeeResult = await pool.query(
-        `SELECT name, payment_preference FROM public.staffs WHERE id = $1`,
+        `SELECT name, payment_preference FROM jellypolly.staffs WHERE id = $1`,
         [employee_id]
       );
 
@@ -341,7 +341,7 @@ export default function (pool) {
 
       // Get employee name for response
       const employeeResult = await pool.query(
-        `SELECT name FROM public.staffs WHERE id = $1`,
+        `SELECT name FROM jellypolly.staffs WHERE id = $1`,
         [updateResult.rows[0].employee_id]
       );
 

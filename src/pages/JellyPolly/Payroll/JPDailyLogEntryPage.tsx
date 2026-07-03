@@ -18,10 +18,10 @@ import Checkbox from "../../../components/Checkbox";
 import ManageActivitiesModal from "../../../components/Payroll/ManageActivitiesModal";
 import ActivitiesTooltip from "../../../components/Payroll/ActivitiesTooltip";
 import toast from "react-hot-toast";
-import { useJobsCache } from "../../../utils/catalogue/useJobsCache";
-import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
-import { useJobPayCodeMappings } from "../../../utils/catalogue/useJobPayCodeMappings";
-import { useEffectiveRates } from "../../../utils/payroll/useEffectiveRates";
+import { useJPJobsCache } from "../../../utils/JellyPolly/useJPJobsCache";
+import { useJPStaffsCache } from "../../../utils/JellyPolly/useJPStaffsCache";
+import { useJPJobPayCodeMappings } from "../../../utils/JellyPolly/useJPJobPayCodeMappings";
+import { useJPEffectiveRates } from "../../../utils/JellyPolly/useJPEffectiveRates";
 import { api } from "../../../routes/utils/api";
 import { useHolidayCache } from "../../../utils/payroll/useHolidayCache";
 import {
@@ -146,8 +146,8 @@ const JPDailyLogEntryPage: React.FC<JPDailyLogEntryPageProps> = ({
   jobType = "MEE",
 }) => {
   const navigate = useNavigate();
-  const { jobs: allJobs, loading: loadingJobs, refreshJobs } = useJobsCache();
-  const { staffs: allStaffs, loading: loadingStaffs, refreshStaffs } = useStaffsCache();
+  const { jobs: allJobs, loading: loadingJobs, refreshJobs } = useJPJobsCache();
+  const { staffs: allStaffs, loading: loadingStaffs, refreshStaffs } = useJPStaffsCache();
   const [isRefreshingCache, setIsRefreshingCache] = useState(false);
   const [employeeSelectionState, setEmployeeSelectionState] = useState<{
     selectedJobs: Record<string, string[]>; // employeeId -> list of selected jobIds
@@ -295,10 +295,10 @@ const JPDailyLogEntryPage: React.FC<JPDailyLogEntryPageProps> = ({
     detailedMappings: jobPayCodeDetails,
     loading: loadingPayCodeMappings,
     refreshData: refreshPayCodeMappings,
-  } = useJobPayCodeMappings();
+  } = useJPJobPayCodeMappings();
   // Month-effective rate overlay (keeps the previewed rate in step with the
   // payslip when a scheduled rate change applies to the log's month).
-  const { resolveEffectiveRates, getEffectiveRate } = useEffectiveRates();
+  const { resolveEffectiveRates, getEffectiveRate } = useJPEffectiveRates();
   const [isSaving, setIsSaving] = useState(false);
   const [selectAll, setSelectAll] = useState(false);
   const [initialState, setInitialState] = useState<{
@@ -857,7 +857,7 @@ const JPDailyLogEntryPage: React.FC<JPDailyLogEntryPageProps> = ({
     try {
       const currentYear = new Date(formData.logDate).getFullYear();
       const response = await api.get(
-        `/api/leave-management/balances/batch?employeeIds=${employeeIds.join(
+        `/jellypolly/api/leave-management/balances/batch?employeeIds=${employeeIds.join(
           ","
         )}&year=${currentYear}`
       );

@@ -36,25 +36,39 @@ export default function (pool) {
     const { employeeId, year, month } = req.params;
 
     try {
-      // Sibling group: same name OR same head-based canonical id
-      const staffResult = await pool.query(
-        `SELECT id, name, COALESCE(NULLIF(head_staff_id, ''), id) AS canonical_id
-         FROM public.staffs WHERE id = $1`,
-        [employeeId]
-      );
-      if (staffResult.rows.length === 0) {
+      // TH and JP have SEPARATE staff catalogues, so the person is matched by
+      // NAME across the two. The id may come from either catalogue.
+      const [jpStaffResult, thStaffResult] = await Promise.all([
+        pool.query("SELECT name FROM jellypolly.staffs WHERE id = $1", [
+          employeeId,
+        ]),
+        pool.query("SELECT name FROM public.staffs WHERE id = $1", [
+          employeeId,
+        ]),
+      ]);
+      const name =
+        jpStaffResult.rows[0]?.name || thStaffResult.rows[0]?.name || null;
+      if (!name) {
         return res.status(404).json({ message: "Staff not found" });
       }
-      const { name, canonical_id } = staffResult.rows[0];
 
-      const siblingsResult = await pool.query(
-        `SELECT id FROM public.staffs
-         WHERE name = $1 OR COALESCE(NULLIF(head_staff_id, ''), id) = $2`,
-        [name, canonical_id]
-      );
-      const siblingIds = siblingsResult.rows.map((r) => r.id);
+      const [jpSiblingsResult, thSiblingsResult] = await Promise.all([
+        pool.query(
+          `SELECT id FROM jellypolly.staffs
+           WHERE UPPER(TRIM(name)) = UPPER(TRIM($1))`,
+          [name]
+        ),
+        pool.query(
+          `SELECT id FROM public.staffs
+           WHERE UPPER(TRIM(name)) = UPPER(TRIM($1))`,
+          [name]
+        ),
+      ]);
+      const jpIds = jpSiblingsResult.rows.map((r) => r.id);
+      const thIds = thSiblingsResult.rows.map((r) => r.id);
 
-      const buildCompanySummary = async (schema) => {
+      const buildCompanySummary = async (schema, siblingIds) => {
+        if (siblingIds.length === 0) return null;
         const payrollResult = await pool.query(
           `SELECT ep.id, ep.employee_id, ep.net_pay, ep.setelah_digenapkan
            FROM ${schema}.employee_payrolls ep
@@ -106,8 +120,8 @@ export default function (pool) {
       };
 
       const [tienhock, jellypolly] = await Promise.all([
-        buildCompanySummary("public"),
-        buildCompanySummary("jellypolly"),
+        buildCompanySummary("public", thIds),
+        buildCompanySummary("jellypolly", jpIds),
       ]);
 
       const combined =
@@ -121,7 +135,7 @@ export default function (pool) {
 
       res.json({
         employee_id: employeeId,
-        sibling_ids: siblingIds,
+        sibling_ids: { tienhock: thIds, jellypolly: jpIds },
         year: parseInt(year),
         month: parseInt(month),
         tienhock,
@@ -156,7 +170,7 @@ export default function (pool) {
                 s.name as employee_name, s.ic_no
          FROM jellypolly.employee_payrolls ep
          JOIN jellypolly.monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
-         LEFT JOIN public.staffs s ON ep.employee_id = s.id
+         LEFT JOIN jellypolly.staffs s ON ep.employee_id = s.id
          WHERE ep.id = ANY($1)`,
         [payrollIds]
       );
@@ -166,7 +180,7 @@ export default function (pool) {
                 pi.rate, pi.rate_unit, pi.quantity, pi.foc_units, pi.amount,
                 pi.is_manual, pi.work_log_type, pc.pay_type
          FROM jellypolly.payroll_items pi
-         LEFT JOIN public.pay_codes pc ON pi.pay_code_id = pc.id
+         LEFT JOIN jellypolly.pay_codes pc ON pi.pay_code_id = pc.id
          WHERE pi.employee_payroll_id = ANY($1)
          ORDER BY pi.id`,
         [payrollIds]
@@ -238,7 +252,7 @@ export default function (pool) {
                 s.epf_no, s.socso_no, s.income_tax_no
          FROM jellypolly.employee_payrolls ep
          JOIN jellypolly.monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
-         LEFT JOIN public.staffs s ON ep.employee_id = s.id
+         LEFT JOIN jellypolly.staffs s ON ep.employee_id = s.id
          WHERE ep.id = $1`,
         [id]
       );
@@ -251,10 +265,10 @@ export default function (pool) {
 
       // Leave rolls up like items: include records of the whole sibling group
       const siblingIdsResult = await pool.query(
-        `SELECT id FROM public.staffs
+        `SELECT id FROM jellypolly.staffs
          WHERE COALESCE(NULLIF(head_staff_id, ''), id) =
                (SELECT COALESCE(NULLIF(head_staff_id, ''), id)
-                FROM public.staffs WHERE id = $1)`,
+                FROM jellypolly.staffs WHERE id = $1)`,
         [payrollData.employee_id]
       );
       const siblingIds = siblingIdsResult.rows.map((r) => r.id);
@@ -267,7 +281,7 @@ export default function (pool) {
                     pi.source_employee_id, pi.source_date, pi.work_log_type,
                     pc.pay_type
              FROM jellypolly.payroll_items pi
-             LEFT JOIN public.pay_codes pc ON pi.pay_code_id = pc.id
+             LEFT JOIN jellypolly.pay_codes pc ON pi.pay_code_id = pc.id
              WHERE pi.employee_payroll_id = $1
              ORDER BY pi.id`,
             [id]
@@ -299,12 +313,11 @@ export default function (pool) {
             `SELECT id, employee_id, to_char(leave_date, 'YYYY-MM-DD') AS leave_date,
                     leave_type, days_taken,
                     CAST(amount_paid AS NUMERIC(10,2)) AS amount_paid, status
-             FROM public.leave_records
+             FROM jellypolly.leave_records
              WHERE employee_id = ANY($1)
                AND EXTRACT(YEAR FROM leave_date) = $2
                AND EXTRACT(MONTH FROM leave_date) = $3
                AND status = 'approved'
-               AND company = 'JP'
              ORDER BY leave_date`,
             [
               siblingIds.length > 0 ? siblingIds : [payrollData.employee_id],

@@ -53,8 +53,8 @@ export default function (pool) {
         SELECT orec.*, s.name as employee_name,
                pc.description as pay_code_description
         FROM jellypolly.others_records orec
-        JOIN staffs s ON orec.employee_id = s.id
-        LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
+        JOIN jellypolly.staffs s ON orec.employee_id = s.id
+        LEFT JOIN jellypolly.pay_codes pc ON orec.pay_code_id = pc.id
         WHERE 1=1
       `;
       const values = [];
@@ -365,8 +365,8 @@ export default function (pool) {
         `SELECT orec.*, s.name as employee_name,
                 pc.description as pay_code_description
            FROM jellypolly.others_records orec
-           JOIN staffs s ON orec.employee_id = s.id
-           LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
+           JOIN jellypolly.staffs s ON orec.employee_id = s.id
+           LEFT JOIN jellypolly.pay_codes pc ON orec.pay_code_id = pc.id
           WHERE orec.link_id = $1
           ORDER BY orec.record_date ASC, orec.id ASC`,
         [row.link_id],

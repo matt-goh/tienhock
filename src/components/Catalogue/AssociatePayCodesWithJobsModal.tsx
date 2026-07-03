@@ -21,6 +21,8 @@ import toast from "react-hot-toast";
 import { PayCode, Job } from "../../types/types";
 
 interface AssociatePayCodesWithJobsModalProps {
+  // API base for pay-code endpoints (JP passes /jellypolly/api)
+  apiBase?: string;
   isOpen: boolean;
   onClose: () => void;
   payCode: PayCode | null;
@@ -38,6 +40,7 @@ const AssociatePayCodesWithJobsModal: React.FC<
   availableJobs,
   currentJobIds,
   onAssociationComplete,
+  apiBase = "/api",
 }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string>("");
@@ -143,7 +146,7 @@ const AssociatePayCodesWithJobsModal: React.FC<
           is_default: false,
         }));
 
-        promises.push(api.post("/api/job-pay-codes/batch", { associations }));
+        promises.push(api.post(`${apiBase}/job-pay-codes/batch`, { associations }));
       }
 
       // Handle removals with batch endpoint
@@ -153,7 +156,7 @@ const AssociatePayCodesWithJobsModal: React.FC<
           pay_code_id: payCode.id,
         }));
 
-        promises.push(api.post("/api/job-pay-codes/batch-delete", { items }));
+        promises.push(api.post(`${apiBase}/job-pay-codes/batch-delete`, { items }));
       }
 
       // Wait for all operations using allSettled to handle partial failures gracefully

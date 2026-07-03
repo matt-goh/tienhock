@@ -14,6 +14,8 @@ import {
 import { PayslipPrintMode } from "../../utils/payroll/PaySlipPDFMake";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
+import { useJPStaffsCache } from "../../utils/JellyPolly/useJPStaffsCache";
+import { useJPJobsCache } from "../../utils/JellyPolly/useJPJobsCache";
 import Button from "../../components/Button";
 import LoadingOverlay from "../../components/Payroll/LoadingOverlay";
 
@@ -33,6 +35,8 @@ export interface PayslipButtonProps {
   midMonthPayroll?: MidMonthPayroll | null;
   // Which slip(s) to print; defaults to the print flow's "individual" breakdown.
   mode?: PayslipPrintMode;
+  // Catalogue source for fallback staff/job details (JP has its own catalogue)
+  company?: "tienhock" | "jellypolly";
   onComplete?: () => void;
 }
 
@@ -49,6 +53,8 @@ export interface BatchPayslipButtonProps {
   size?: "sm" | "md" | "lg";
   staffDetailsMap?: Record<string, StaffDetails>;
   midMonthPayrollsMap?: Record<string, MidMonthPayroll | null>;
+  // Catalogue source for fallback staff/job details (JP has its own catalogue)
+  company?: "tienhock" | "jellypolly";
   onComplete?: () => void;
 }
 
@@ -68,11 +74,16 @@ export const DownloadPayslipButton: React.FC<PayslipButtonProps> = ({
   size = "md",
   staffDetails,
   midMonthPayroll,
+  company = "tienhock",
   onComplete,
 }) => {
   const [isDownloading, setIsDownloading] = useState(false);
-  const { staffs } = useStaffsCache();
-  const { jobs } = useJobsCache();
+  const { staffs: thStaffs } = useStaffsCache();
+  const { staffs: jpStaffs } = useJPStaffsCache();
+  const staffs = company === "jellypolly" ? jpStaffs : thStaffs;
+  const { jobs: thJobs } = useJobsCache();
+  const { jobs: jpJobs } = useJPJobsCache();
+  const jobs = company === "jellypolly" ? jpJobs : thJobs;
 
   const handleDownload = async () => {
     // If staff details weren't provided, try to get them from cache
@@ -131,11 +142,16 @@ export const DownloadBatchPayslipsButton: React.FC<BatchPayslipButtonProps> = ({
   size = "md",
   staffDetailsMap,
   midMonthPayrollsMap,
+  company = "tienhock",
   onComplete,
 }) => {
   const [isDownloading, setIsDownloading] = useState(false);
-  const { staffs } = useStaffsCache();
-  const { jobs } = useJobsCache();
+  const { staffs: thStaffs } = useStaffsCache();
+  const { staffs: jpStaffs } = useJPStaffsCache();
+  const staffs = company === "jellypolly" ? jpStaffs : thStaffs;
+  const { jobs: thJobs } = useJobsCache();
+  const { jobs: jpJobs } = useJPJobsCache();
+  const jobs = company === "jellypolly" ? jpJobs : thJobs;
 
   // Generate default batch filename if none provided
   const month = payrolls[0]?.month || new Date().getMonth() + 1;
@@ -199,12 +215,17 @@ export const PrintPayslipButton: React.FC<PayslipButtonProps> = ({
   staffDetails,
   midMonthPayroll,
   mode,
+  company = "tienhock",
   onComplete,
 }) => {
   const [isPrinting, setIsPrinting] = useState(false);
   const [showOverlay, setShowOverlay] = useState(false);
-  const { staffs } = useStaffsCache();
-  const { jobs } = useJobsCache();
+  const { staffs: thStaffs } = useStaffsCache();
+  const { staffs: jpStaffs } = useJPStaffsCache();
+  const staffs = company === "jellypolly" ? jpStaffs : thStaffs;
+  const { jobs: thJobs } = useJobsCache();
+  const { jobs: jpJobs } = useJPJobsCache();
+  const jobs = company === "jellypolly" ? jpJobs : thJobs;
 
   const handlePrint = async () => {
     // If staff details weren't provided, try to get them from cache
@@ -278,12 +299,17 @@ export const PrintBatchPayslipsButton: React.FC<BatchPayslipButtonProps> = ({
   size = "md",
   staffDetailsMap,
   midMonthPayrollsMap,
+  company = "tienhock",
   onComplete,
 }) => {
   const [isPrinting, setIsPrinting] = useState(false);
   const [showOverlay, setShowOverlay] = useState(false);
-  const { staffs } = useStaffsCache();
-  const { jobs } = useJobsCache();
+  const { staffs: thStaffs } = useStaffsCache();
+  const { staffs: jpStaffs } = useJPStaffsCache();
+  const staffs = company === "jellypolly" ? jpStaffs : thStaffs;
+  const { jobs: thJobs } = useJobsCache();
+  const { jobs: jpJobs } = useJPJobsCache();
+  const jobs = company === "jellypolly" ? jpJobs : thJobs;
 
   // Set default button text based on number of payrolls
   const defaultButtonText =

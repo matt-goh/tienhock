@@ -151,7 +151,7 @@ const JPPayrollDetailsPage: React.FC = () => {
       name: payroll.employee_name,
       icNo: payroll.ic_no || "N/A",
       jobName: payroll.job_type,
-      section: payroll.section || "GREEN TARGET",
+      section: payroll.section || "JELLY POLLY",
     };
 
     const midMonthForPdf: MidMonthPayroll | null = payroll.mid_month_payroll
@@ -296,6 +296,7 @@ const JPPayrollDetailsPage: React.FC = () => {
         </div>
         <div className="flex items-center gap-2">
           <PrintPayslipButton
+            company="jellypolly"
             payroll={pdfPayroll}
             staffDetails={staffDetails}
             midMonthPayroll={midMonthForPdf}
@@ -305,6 +306,7 @@ const JPPayrollDetailsPage: React.FC = () => {
             buttonText="Print"
           />
           <DownloadPayslipButton
+            company="jellypolly"
             payroll={pdfPayroll}
             staffDetails={staffDetails}
             midMonthPayroll={midMonthForPdf}
@@ -703,6 +705,7 @@ const JPPayrollDetailsPage: React.FC = () => {
 
       {/* Add Manual Item Modal */}
       <AddManualItemModal
+        company="jellypolly"
         isOpen={showAddItemModal}
         onClose={() => setShowAddItemModal(false)}
         employeePayrollId={payroll.id}

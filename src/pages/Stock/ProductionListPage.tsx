@@ -26,7 +26,7 @@ import { OTH_PRODUCTION_IDS } from "../../config/othProductionProducts";
 import toast from "react-hot-toast";
 
 type ViewMode = "day" | "month" | "year";
-type CategoryKey = "MEE" | "BH" | "HANCUR" | "BUNDLE" | "OTH";
+type CategoryKey = "MEE" | "BH" | "HANCUR" | "BUNDLE" | "JP" | "OTH";
 
 interface DateRange {
   start: Date;
@@ -53,13 +53,14 @@ interface DateGroup {
   rowCount: number;
 }
 
-const CATEGORY_ORDER: CategoryKey[] = ["MEE", "BH", "HANCUR", "BUNDLE", "OTH"];
+const CATEGORY_ORDER: CategoryKey[] = ["MEE", "BH", "HANCUR", "BUNDLE", "JP", "OTH"];
 
 const CATEGORY_LABELS: Record<CategoryKey, string> = {
   MEE: "Mee",
   BH: "Bihun",
   HANCUR: "Hancur",
   BUNDLE: "Bundle",
+  JP: "Jelly Polly",
   OTH: "Other Stock",
 };
 
@@ -68,6 +69,7 @@ const CATEGORY_CLASSES: Record<CategoryKey, string> = {
   BH: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300",
   HANCUR: "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-900/20 dark:text-purple-300",
   BUNDLE: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300",
+  JP: "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-900/20 dark:text-violet-300",
   OTH: "border-slate-200 bg-slate-50 text-slate-700 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300",
 };
 
@@ -124,6 +126,7 @@ const getCategory = (entry: ProductionEntry): CategoryKey => {
   if (entry.product_type === "BUNDLE" || entry.product_id.startsWith("BUNDLE_")) {
     return "BUNDLE";
   }
+  if (entry.product_type === "JP") return "JP";
   if (entry.product_type === "MEE") return "MEE";
   if (entry.product_type === "BH") return "BH";
   return "OTH";
@@ -143,6 +146,8 @@ const getWorkerOrderScope = (
       return "BH_PACKING";
     case "BUNDLE":
       return group.productId === "BUNDLE_MEE" ? "MEE_PACKING" : "BH_PACKING";
+    case "JP":
+      return "JP_PRODUCTION";
     default:
       return null;
   }
@@ -180,10 +185,13 @@ interface ProductionListPageProps {
   // Restrict the page to specific product types (e.g. ["JP"] for the Jelly
   // Polly production records page). Default: TH behaviour (all types).
   productTypes?: string[];
+  // API base for entries/worker-order (JP passes /jellypolly/api/production-entries)
+  apiBasePath?: string;
 }
 
 const ProductionListPage: React.FC<ProductionListPageProps> = ({
   productTypes,
+  apiBasePath = "/api/production-entries",
 }) => {
   const navigate = useNavigate();
   const today: Date = useMemo(() => new Date(), []);
@@ -201,7 +209,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const [workerOrderByScope, setWorkerOrderByScope] = useState<
     Record<ProductionWorkerOrderScope, string[]>
-  >({ BH_PACKING: [], MEE_PACKING: [] });
+  >({ BH_PACKING: [], MEE_PACKING: [], JP_PRODUCTION: [] });
 
   const dateRange: DateRange = useMemo(() => {
     if (viewMode === "day") {
@@ -221,7 +229,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
       });
 
       const response: ProductionEntry[] = await api.get(
-        `/api/production-entries?${params.toString()}`
+        `${apiBasePath}?${params.toString()}`
       );
       const allEntries: ProductionEntry[] = response || [];
       setEntries(
@@ -238,7 +246,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [dateRange.end, dateRange.start, productTypes]);
+  }, [dateRange.end, dateRange.start, productTypes, apiBasePath]);
 
   useEffect(() => {
     fetchEntries();
@@ -248,13 +256,15 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
   // displayed in the same order as the Production Entry page.
   useEffect(() => {
     let isCurrent: boolean = true;
-    const scopes: ProductionWorkerOrderScope[] = ["BH_PACKING", "MEE_PACKING"];
+    const scopes: ProductionWorkerOrderScope[] = productTypes?.includes("JP")
+      ? ["JP_PRODUCTION"]
+      : ["BH_PACKING", "MEE_PACKING"];
 
     Promise.all(
       scopes.map((scope: ProductionWorkerOrderScope) =>
         api
           .get(
-            `/api/production-entries/worker-order?scope=${encodeURIComponent(
+            `${apiBasePath}/worker-order?scope=${encodeURIComponent(
               scope
             )}`
           )

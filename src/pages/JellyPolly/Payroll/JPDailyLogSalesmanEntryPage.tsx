@@ -18,11 +18,11 @@ import Checkbox from "../../../components/Checkbox";
 import ManageActivitiesModal from "../../../components/Payroll/ManageActivitiesModal";
 import ActivitiesTooltip from "../../../components/Payroll/ActivitiesTooltip";
 import toast from "react-hot-toast";
-import { useJobsCache } from "../../../utils/catalogue/useJobsCache";
-import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
-import { useJobPayCodeMappings } from "../../../utils/catalogue/useJobPayCodeMappings";
+import { useJPJobsCache } from "../../../utils/JellyPolly/useJPJobsCache";
+import { useJPStaffsCache } from "../../../utils/JellyPolly/useJPStaffsCache";
+import { useJPJobPayCodeMappings } from "../../../utils/JellyPolly/useJPJobPayCodeMappings";
 import { useProductsCache } from "../../../utils/invoice/useProductsCache";
-import { useEffectiveRates } from "../../../utils/payroll/useEffectiveRates";
+import { useJPEffectiveRates } from "../../../utils/JellyPolly/useJPEffectiveRates";
 import { api } from "../../../routes/utils/api";
 import { useHolidayCache } from "../../../utils/payroll/useHolidayCache";
 import {
@@ -151,8 +151,8 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
   // Hardcode jobType for salesman page
   const jobType = "SALESMAN";
   const navigate = useNavigate();
-  const { jobs: allJobs, loading: loadingJobs, refreshJobs } = useJobsCache();
-  const { staffs: allStaffs, loading: loadingStaffs, refreshStaffs } = useStaffsCache();
+  const { jobs: allJobs, loading: loadingJobs, refreshJobs } = useJPJobsCache();
+  const { staffs: allStaffs, loading: loadingStaffs, refreshStaffs } = useJPStaffsCache();
   const { products: payrollProducts } = useProductsCache(["MEE", "BH", "JP"]);
   const [isRefreshingCache, setIsRefreshingCache] = useState(false);
   const [employeeSelectionState, setEmployeeSelectionState] = useState<{
@@ -319,10 +319,10 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
     detailedMappings: jobPayCodeDetails,
     loading: loadingPayCodeMappings,
     refreshData: refreshPayCodeMappings,
-  } = useJobPayCodeMappings();
+  } = useJPJobPayCodeMappings();
   // Month-effective rate overlay (keeps the previewed rate in step with the
   // payslip when a scheduled rate change applies to the log's month).
-  const { resolveEffectiveRates, getEffectiveRate } = useEffectiveRates();
+  const { resolveEffectiveRates, getEffectiveRate } = useJPEffectiveRates();
   const applyEffectiveRate = useCallback(
     (payCode: any, employeeId: string, jobTypeId: string) => {
       const eff = getEffectiveRate(employeeId, jobTypeId, payCode?.id);
@@ -781,7 +781,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
     try {
       const currentYear = new Date(formData.logDate).getFullYear();
       const response = await api.get(
-        `/api/leave-management/balances/batch?employeeIds=${employeeIds.join(
+        `/jellypolly/api/leave-management/balances/batch?employeeIds=${employeeIds.join(
           ","
         )}&year=${currentYear}`
       );

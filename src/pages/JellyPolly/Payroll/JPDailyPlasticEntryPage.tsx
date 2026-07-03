@@ -14,8 +14,8 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import TimeNavigator from "../../../components/TimeNavigator";
 import { api } from "../../../routes/utils/api";
-import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
-import { useJobPayCodeMappings } from "../../../utils/catalogue/useJobPayCodeMappings";
+import { useJPStaffsCache } from "../../../utils/JellyPolly/useJPStaffsCache";
+import { useJPJobPayCodeMappings } from "../../../utils/JellyPolly/useJPJobPayCodeMappings";
 import { useHolidayCache } from "../../../utils/payroll/useHolidayCache";
 import { useJPPayrollEmployees } from "../../../utils/JellyPolly/useJPPayrollEmployees";
 
@@ -41,11 +41,11 @@ interface RateSet {
 }
 
 const JPDailyPlasticEntryPage: React.FC = () => {
-  const { staffs } = useStaffsCache();
+  const { staffs } = useJPStaffsCache();
   const { employeesByJobType, loading: loadingAssignments } =
     useJPPayrollEmployees();
   const { detailedMappings, loading: loadingPayCodes } =
-    useJobPayCodeMappings();
+    useJPJobPayCodeMappings();
   const { isHoliday, getHolidayDescription } = useHolidayCache();
 
   const [logDate, setLogDate] = useState<string>(

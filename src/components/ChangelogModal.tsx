@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-07-03",
+    ms: "Jelly Polly kini mempunyai katalog sendiri yang berasingan daripada Tien Hock: halaman Staff, Pay Codes dan Cuti Management baharu di bawah menu Catalogue Jelly Polly. Semua pekerja, kod gaji, pemetaan kerja, kadar berjadual, cuti dan rekod pengeluaran JP kini disimpan berasingan — tiada lagi perkongsian dengan senarai Tien Hock. Pekerja JP dimasukkan melalui Catalogue → Staff JP, dan kad jumlah bawa pulang gabungan memadankan pekerja dua syarikat melalui nama yang sama.",
+    en: "Jelly Polly now has its own catalogue separate from Tien Hock: new Staff, Pay Codes and Cuti Management pages under the Jelly Polly Catalogue menu. All JP staff, pay codes, job mappings, scheduled rates, leave and production records are now stored separately — nothing is shared with the Tien Hock lists anymore. JP staff are entered via the JP Catalogue → Staff page, and the combined take-home card matches dual-company staff by identical name.",
+  },
+  {
     date: "2026-07-02",
     ms: "Pembetulan Pinjam: pekerja yang mempunyai lebih daripada satu ID tetapi nama yang sama kini dipaparkan sebagai satu jumlah dalam halaman Pinjam. Untuk Butiran Gaji Tien Hock, kad Pinjam juga kini mengambil rekod pinjam daripada ID berkembar, supaya pinjam bulanan dan jumlah masuk bank sepadan dengan Salary Report.",
     en: "Pinjam fix: staff with more than one ID but the same name now show as one combined total on the Pinjam page. In Tien Hock Payroll Details, the Pinjam card now also picks up pinjam records from sibling IDs, so monthly pinjam and bank-in amount match the Salary Report.",
