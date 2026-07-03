@@ -946,7 +946,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                     }
                   >
                     <div className="relative">
-                      <ListboxButton className="rounded-lg border border-default-300 dark:border-gray-600 py-1 px-2 text-sm bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 w-32 text-left flex items-center justify-between">
+                      <ListboxButton className="rounded-lg border border-default-300 dark:border-gray-600 py-1 px-2 text-sm bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 w-32 text-left flex items-center justify-between">
                         <span className="block truncate">
                           {monthOptions[selectedMonth].name}
                         </span>
@@ -1216,7 +1216,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                     disabled={isLoadingHistory || !!processingHistoryId}
                   >
                     <div className="relative">
-                      <ListboxButton className="rounded-lg border border-default-300 dark:border-gray-600 py-1 px-2 text-sm bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 w-28 text-left flex items-center justify-between">
+                      <ListboxButton className="rounded-lg border border-default-300 dark:border-gray-600 py-1 px-2 text-sm bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 w-28 text-left flex items-center justify-between">
                         <span className="block truncate">{historyYear}</span>
                         <IconChevronDown
                           className="h-4 w-4 text-default-400 dark:text-gray-400"

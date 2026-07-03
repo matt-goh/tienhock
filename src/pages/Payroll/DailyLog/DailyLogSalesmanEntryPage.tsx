@@ -4318,7 +4318,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
                                 selectedLeaveEmployeesForBulk.length === 0 ||
                                 isSaving
                                   ? "bg-default-100 dark:bg-gray-700 text-default-400 dark:text-gray-500 cursor-not-allowed border-default-200 dark:border-gray-600"
-                                  : "bg-white dark:bg-gray-700 text-default-700 dark:text-gray-200 border-default-300 dark:border-gray-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                  : "bg-white dark:bg-gray-900/50 text-default-700 dark:text-gray-200 border-default-300 dark:border-gray-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500"
                               }`}
                             >
                               <span className="block truncate">
@@ -4501,7 +4501,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
                                   className={`relative w-full pl-3 pr-8 py-2 text-left rounded-md border ${
                                     !isSelected || isSaving
                                       ? "bg-default-100 dark:bg-gray-700 text-default-400 dark:text-gray-500 cursor-not-allowed border-default-200 dark:border-gray-600"
-                                      : "bg-white dark:bg-gray-700 text-default-700 dark:text-gray-200 border-default-300 dark:border-gray-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                      : "bg-white dark:bg-gray-900/50 text-default-700 dark:text-gray-200 border-default-300 dark:border-gray-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500"
                                   }`}
                                 >
                                   <span className="block truncate text-sm">
