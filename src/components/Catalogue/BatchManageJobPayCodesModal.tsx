@@ -314,7 +314,7 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
                         <input
                           type="text"
                           placeholder="Search assigned..."
-                          className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-600 dark:text-gray-100 dark:placeholder-gray-400"
+                          className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder-gray-400"
                           value={assignedSearch}
                           onChange={(e) => setAssignedSearch(e.target.value)}
                           disabled={isSaving}
@@ -413,7 +413,7 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
                         <input
                           type="text"
                           placeholder="Search available..."
-                          className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-600 dark:text-gray-100 dark:placeholder-gray-400"
+                          className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder-gray-400"
                           value={availableSearch}
                           onChange={(e) => setAvailableSearch(e.target.value)}
                           disabled={isSaving}

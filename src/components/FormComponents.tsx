@@ -200,7 +200,7 @@ export const FormListbox: React.FC<ListboxProps> = ({
           <HeadlessListboxButton
             id={`${name}-button`}
             className={clsx(
-              "relative w-full cursor-pointer rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 pl-3 pr-10 text-left shadow-sm",
+              "relative w-full cursor-pointer rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-10 text-left shadow-sm",
               "text-gray-900 dark:text-gray-100",
               "focus:outline-none focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm",
               disabled ? "bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed" : ""
@@ -393,7 +393,7 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
           {/* Input area */}
           <div
             className={clsx(
-              "relative w-full cursor-default overflow-hidden rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-left shadow-sm",
+              "relative w-full cursor-default overflow-hidden rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-left shadow-sm",
               "focus-within:ring-1 focus-within:ring-sky-500 dark:focus-within:ring-sky-400 focus-within:border-sky-500 dark:focus-within:border-sky-400",
               disabled ? "bg-gray-50 dark:bg-gray-700" : ""
             )}

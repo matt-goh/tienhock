@@ -461,7 +461,7 @@ const AccountCodeFormPage: React.FC = () => {
                         <ListboxButton
                           id="parent_code-button"
                           className={clsx(
-                            "relative w-full cursor-pointer rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-sm text-default-900 dark:text-gray-100",
+                            "relative w-full cursor-pointer rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-10 text-left shadow-sm text-default-900 dark:text-gray-100",
                             "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
                             isSaving ? "bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed" : ""
                           )}
@@ -490,7 +490,7 @@ const AccountCodeFormPage: React.FC = () => {
                                   value={parentSearchQuery}
                                   onChange={(e) => setParentSearchQuery(e.target.value)}
                                   placeholder="Search accounts..."
-                                  className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-md focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+                                  className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-md focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
                                   onClick={(e) => e.stopPropagation()}
                                   onKeyDown={(e) => e.stopPropagation()}
                                 />

@@ -678,7 +678,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
                 setSearchTerm(event.target.value)
               }
               placeholder="Search product or worker"
-              className="w-full rounded-lg border border-default-300 bg-white py-2 pl-9 pr-9 text-sm leading-5 text-default-900 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+              className="w-full rounded-lg border border-default-300 bg-white py-2 pl-9 pr-9 text-sm leading-5 text-default-900 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100"
             />
             {searchTerm && (
               <button

@@ -329,7 +329,7 @@ const DumpsterFormPage: React.FC = () => {
                     disabled={isEditMode && formData.status === "Rented"}
                   >
                     <div className="relative">
-                      <ListboxButton className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 disabled:bg-default-50 dark:bg-gray-900/50">
+                      <ListboxButton className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 disabled:bg-default-50">
                         <span className="block truncate">
                           {formData.status.charAt(0).toUpperCase() +
                             formData.status.slice(1)}

@@ -216,7 +216,7 @@ const JobCategoryPage: React.FC = () => {
       <span className="font-semibold text-sm text-default-700 dark:text-gray-200">Section:</span>
       <Listbox value={selectedSection} onChange={setSelectedSection}>
         <div className="relative">
-          <ListboxButton className="relative w-48 cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-default-900 dark:text-gray-100">
+          <ListboxButton className="relative w-48 cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-default-900 dark:text-gray-100">
             <span className="block truncate">{selectedSection}</span>
             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
               <IconChevronDown
@@ -440,7 +440,7 @@ const JobCategoryPage: React.FC = () => {
             <input
               type="text"
               placeholder="Search ID or Category..."
-              className="w-full rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 py-2 pl-10 pr-4 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 placeholder:text-default-400 dark:placeholder:text-gray-400"
+              className="w-full rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 py-2 pl-10 pr-4 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 placeholder:text-default-400 dark:placeholder:text-gray-400"
               value={searchTerm}
               onChange={handleSearchChange}
             />

@@ -256,7 +256,7 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
             buttonClasses,
             isAtMinDate
               ? "cursor-not-allowed text-default-300 dark:text-gray-600"
-              : "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+              : "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-800"
           )}
           title="Previous month"
           aria-label="Previous month"
@@ -364,7 +364,7 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
             buttonClasses,
             isNextDisabled
               ? "cursor-not-allowed text-default-300 dark:text-gray-600"
-              : "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+              : "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-800"
           )}
           title="Next month"
           aria-label="Next month"
@@ -383,7 +383,7 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
               buttonClasses,
               isCurrentMonth
                 ? "cursor-not-allowed text-default-300 dark:text-gray-600"
-                : "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                : "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-800"
             )}
           >
             <IconChevronsRight size={iconSize} />

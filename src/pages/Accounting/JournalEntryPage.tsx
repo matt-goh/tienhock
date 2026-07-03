@@ -52,6 +52,19 @@ interface JournalEntryFormData {
   lines: JournalLineFormData[];
 }
 
+const LAST_ENTRY_TYPE_KEY = "journalEntryLastType";
+
+// Load the last journal type the user selected (shared cache with the list page session)
+const loadLastEntryType = (): JournalEntryType => {
+  try {
+    const cached = localStorage.getItem(LAST_ENTRY_TYPE_KEY);
+    if (cached) return cached as JournalEntryType;
+  } catch (e) {
+    console.error("Error loading last entry type:", e);
+  }
+  return "J";
+};
+
 const emptyLine = (lineNumber: number): JournalLineFormData => ({
   line_number: lineNumber,
   account_code: "",
@@ -250,10 +263,10 @@ const JournalEntryPage: React.FC = () => {
     [allAccountCodes]
   );
 
-  // Form state
+  // Form state - new entries default to the last journal type used
   const [formData, setFormData] = useState<JournalEntryFormData>({
     reference_no: "",
-    entry_type: "J",
+    entry_type: isCreateMode ? loadLastEntryType() : "J",
     entry_date: format(new Date(), "yyyy-MM-dd"),
     description: "",
     cheque_no: "",
@@ -377,6 +390,10 @@ const JournalEntryPage: React.FC = () => {
         // Create mode - fetch next reference
         if (isCreateMode) {
           await fetchNextReference(formData.entry_type);
+          // Cached last type may be Cash Payment - pre-fill its cheque number too
+          if (formData.entry_type === "C") {
+            await fetchNextChequeNo();
+          }
         }
         initialFormDataRef.current = JSON.parse(JSON.stringify(formData));
         setLoading(false);
@@ -399,6 +416,12 @@ const JournalEntryPage: React.FC = () => {
   // Handle entry type change
   const handleEntryTypeChange = async (value: string) => {
     const newType = value as JournalEntryType;
+    // Remember the last selected type for the next new entry
+    try {
+      localStorage.setItem(LAST_ENTRY_TYPE_KEY, newType);
+    } catch (e) {
+      console.error("Error caching last entry type:", e);
+    }
     // Clear the cheque number when switching away from Cash Payment
     setFormData((prev) => ({
       ...prev,

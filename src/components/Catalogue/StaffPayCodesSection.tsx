@@ -616,7 +616,7 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
               placeholder="Search pay codes..."
               value={payCodeSearchQuery}
               onChange={(e) => setPayCodeSearchQuery(e.target.value)}
-              className="px-3 py-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 min-w-[200px]"
+              className="px-3 py-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 min-w-[200px]"
             />
             {payCodeSearchQuery && (
               <button

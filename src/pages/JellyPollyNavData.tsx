@@ -144,6 +144,17 @@ const dailyMachineSubItems = (
 
 export const JellyPollyNavData: SidebarItem[] = [
   {
+    name: "Accounting",
+    icon: IconReportMoney,
+    subItems: [
+      {
+        name: "Debtors",
+        path: "/sales/debtors",
+        component: DebtorsReportPage,
+      },
+    ],
+  },
+  {
     name: "Payroll",
     icon: IconUserDollar,
     subItems: [
@@ -253,57 +264,6 @@ export const JellyPollyNavData: SidebarItem[] = [
     ],
   },
   {
-    name: "Stock",
-    icon: IconPackage,
-    subItems: [
-      {
-        name: "Product Stock",
-        path: "/stock/movement",
-        component: (props: any) => (
-          <ProductStockMovementPage productTypes={["JP"]} {...props} />
-        ),
-        group: "Products",
-      },
-      {
-        name: "Production Records",
-        path: "/stock/production-records",
-        component: (props: any) => (
-          <ProductionListPage
-            productTypes={["JP"]}
-            apiBasePath="/jellypolly/api/production-entries"
-            {...props}
-          />
-        ),
-        group: "Products",
-      },
-      {
-        name: "Production Entry",
-        path: "/stock/production",
-        component: JPProductionEntryPage,
-        group: "Products",
-      },
-      {
-        name: "Product Adjustments",
-        path: "/stock/adjustments",
-        component: (props: any) => (
-          <ProductStockAdjustmentEntryPage productTypes={["JP"]} {...props} />
-        ),
-        group: "Products",
-      },
-    ],
-  },
-  {
-    name: "Accounting",
-    icon: IconReportMoney,
-    subItems: [
-      {
-        name: "Debtors",
-        path: "/sales/debtors",
-        component: DebtorsReportPage,
-      },
-    ],
-  },
-  {
     name: "Sales",
     icon: IconFileInvoice,
     subItems: [
@@ -357,6 +317,46 @@ export const JellyPollyNavData: SidebarItem[] = [
       },
     ],
     defaultOpen: true,
+  },
+  {
+    name: "Stock",
+    icon: IconPackage,
+    subItems: [
+      {
+        name: "Product Stock",
+        path: "/stock/movement",
+        component: (props: any) => (
+          <ProductStockMovementPage productTypes={["JP"]} {...props} />
+        ),
+        group: "Products",
+      },
+      {
+        name: "Production Records",
+        path: "/stock/production-records",
+        component: (props: any) => (
+          <ProductionListPage
+            productTypes={["JP"]}
+            apiBasePath="/jellypolly/api/production-entries"
+            {...props}
+          />
+        ),
+        group: "Products",
+      },
+      {
+        name: "Production Entry",
+        path: "/stock/production",
+        component: JPProductionEntryPage,
+        group: "Products",
+      },
+      {
+        name: "Product Adjustments",
+        path: "/stock/adjustments",
+        component: (props: any) => (
+          <ProductStockAdjustmentEntryPage productTypes={["JP"]} {...props} />
+        ),
+        group: "Products",
+      },
+    ],
   },
   {
     name: "Catalogue",

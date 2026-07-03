@@ -615,7 +615,7 @@ const PayrollRulesPage: React.FC = () => {
                   placeholder="Search..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-7 pr-7 py-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 dark:focus:ring-amber-400 focus:border-amber-500 dark:focus:border-amber-400 w-32 placeholder-gray-400 dark:placeholder-gray-500"
+                  className="pl-7 pr-7 py-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-gray-900 dark:text-gray-100 rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 dark:focus:ring-amber-400 focus:border-amber-500 dark:focus:border-amber-400 w-32 placeholder-gray-400 dark:placeholder-gray-500"
                 />
                 {searchTerm && (
                   <button
@@ -1493,7 +1493,7 @@ const PayrollRulesPage: React.FC = () => {
                         }}
                       >
                         <div className="relative">
-                          <ListboxButton className="relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-amber-500 sm:text-sm">
+                          <ListboxButton className="relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-amber-500 sm:text-sm">
                             <span className="block truncate text-default-800 dark:text-gray-200">
                               {ruleForm.rule_type}
                             </span>
@@ -1600,7 +1600,7 @@ const PayrollRulesPage: React.FC = () => {
                             }
                           >
                             <div className="relative">
-                              <ListboxButton className="relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-8 text-left text-sm focus:outline-none focus:ring-1 focus:ring-amber-500">
+                              <ListboxButton className="relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-8 text-left text-sm focus:outline-none focus:ring-1 focus:ring-amber-500">
                                 <span className="block truncate text-default-800 dark:text-gray-200">
                                   {ruleForm.condition_field}
                                 </span>
@@ -1656,7 +1656,7 @@ const PayrollRulesPage: React.FC = () => {
                             }
                           >
                             <div className="relative">
-                              <ListboxButton className="relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-8 text-left text-sm focus:outline-none focus:ring-1 focus:ring-amber-500">
+                              <ListboxButton className="relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-8 text-left text-sm focus:outline-none focus:ring-1 focus:ring-amber-500">
                                 <span className="block truncate text-default-800 dark:text-gray-200">
                                   {ruleForm.condition_operator}
                                 </span>
@@ -1740,7 +1740,7 @@ const PayrollRulesPage: React.FC = () => {
                               }
                             >
                               <div className="relative">
-                                <ListboxButton className="relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-8 text-left text-sm focus:outline-none focus:ring-1 focus:ring-amber-500">
+                                <ListboxButton className="relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-8 text-left text-sm focus:outline-none focus:ring-1 focus:ring-amber-500">
                                   <span className="block truncate text-default-800 dark:text-gray-200">
                                     {ruleForm.secondary_condition_field ||
                                       "None"}
@@ -1804,7 +1804,7 @@ const PayrollRulesPage: React.FC = () => {
                               <div className="relative">
                                 <ListboxButton
                                   className={clsx(
-                                    "relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-8 text-left text-sm focus:outline-none focus:ring-1 focus:ring-amber-500",
+                                    "relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-8 text-left text-sm focus:outline-none focus:ring-1 focus:ring-amber-500",
                                     !ruleForm.secondary_condition_field &&
                                       "opacity-50 cursor-not-allowed"
                                   )}
@@ -1890,7 +1890,7 @@ const PayrollRulesPage: React.FC = () => {
                         }
                       >
                         <div className="relative">
-                          <ListboxButton className="relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-amber-500 sm:text-sm">
+                          <ListboxButton className="relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-amber-500 sm:text-sm">
                             <span
                               className={clsx(
                                 "block truncate",
@@ -2090,7 +2090,7 @@ const PayrollRulesPage: React.FC = () => {
                         }}
                       >
                         <div className="relative">
-                          <ListboxButton className="relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-amber-500 sm:text-sm">
+                          <ListboxButton className="relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-amber-500 sm:text-sm">
                             <span
                               className={clsx(
                                 "block truncate",

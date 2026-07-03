@@ -67,15 +67,29 @@ export default function (pool) {
       }
 
       if (entry_type) {
-        query += ` AND je.entry_type = $${paramIndex}`;
-        params.push(entry_type);
-        paramIndex++;
+        // Supports a single value or a comma-separated list (multi-toggle pills)
+        const types = String(entry_type)
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean);
+        if (types.length > 0) {
+          query += ` AND je.entry_type = ANY($${paramIndex})`;
+          params.push(types);
+          paramIndex++;
+        }
       }
 
       if (status) {
-        query += ` AND je.status = $${paramIndex}`;
-        params.push(status);
-        paramIndex++;
+        // Supports a single value or a comma-separated list (multi-toggle pills)
+        const statuses = String(status)
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        if (statuses.length > 0) {
+          query += ` AND je.status = ANY($${paramIndex})`;
+          params.push(statuses);
+          paramIndex++;
+        }
       }
 
       if (search) {

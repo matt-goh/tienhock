@@ -257,7 +257,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                     <div className="relative">
                       <div className="flex items-center">
                         <div className="relative w-full">
-                          <ComboboxButton className="w-full text-left py-2 pl-3 pr-4 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg flex items-center justify-between">
+                          <ComboboxButton className="w-full text-left py-2 pl-3 pr-4 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-gray-900 dark:text-gray-100 rounded-lg flex items-center justify-between">
                             <span className="block truncate">
                               {pendingFilters.salespersonId &&
                               pendingFilters.salespersonId.length > 0
@@ -393,7 +393,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                       }
                     >
                       <div className="relative w-full">
-                        <ListboxButton className="w-full text-left py-2 pl-3 pr-4 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg flex items-center justify-between">
+                        <ListboxButton className="w-full text-left py-2 pl-3 pr-4 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-gray-900 dark:text-gray-100 rounded-lg flex items-center justify-between">
                           <span className="block truncate">
                             {pendingFilters.paymentType === "Cash"
                               ? "Cash Sales"
