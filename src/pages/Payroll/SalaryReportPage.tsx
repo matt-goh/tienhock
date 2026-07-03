@@ -165,6 +165,10 @@ interface SalaryReportResponse {
   }[];
 }
 
+const isBankPaymentPreference = (
+  paymentPreference: string | null | undefined
+): boolean => (paymentPreference ?? "").trim().toLowerCase() === "bank";
+
 // Comprehensive salary data for location-based reporting
 interface LocationSalaryData {
   location: string;
@@ -506,6 +510,14 @@ const SalaryReportPage: React.FC = () => {
   const bankTableData = useMemo(() => {
     if (!reportData?.bank_data) return [];
     return reportData.bank_data;
+  }, [reportData]);
+
+  const bankExportRows = useMemo<SalaryReportData[]>(() => {
+    if (!reportData?.data) return [];
+    return reportData.data.filter((row: SalaryReportData): boolean => {
+      const finalTotal: number = parseFloat(row.final_total.toString());
+      return isBankPaymentPreference(row.payment_preference) && finalTotal > 0;
+    });
   }, [reportData]);
 
   // Generate year and month options
@@ -1200,8 +1212,8 @@ const SalaryReportPage: React.FC = () => {
   };
 
   const generateTextExport = async () => {
-    if (!reportData || reportData.data.length === 0) {
-      toast.error("No data available to export");
+    if (bankExportRows.length === 0) {
+      toast.error("No bank payment data available to export");
       return;
     }
 
@@ -1290,45 +1302,43 @@ const SalaryReportPage: React.FC = () => {
       ];
 
       // Generate data rows
-      const dataRows = reportData.data
-        .filter((row) => parseFloat(row.final_total.toString()) > 0)
-        .map((row) => {
-          const staff = staffs?.find((s) => s.id === row.staff_id);
-          const paymentAmount = parseFloat(row.final_total.toString()).toFixed(
-            2
-          );
+      const dataRows = bankExportRows.map((row: SalaryReportData) => {
+        const staff = staffs?.find((s) => s.id === row.staff_id);
+        const paymentAmount = parseFloat(row.final_total.toString()).toFixed(2);
 
-          const columns = [
-            "PBB", // Column 1
-            (staff?.bankAccountNumber || "").replace(/-/g, ""), // Column 2 - remove hyphens
-            "PBBEMYKL", // Column 3
-            (row.staff_name || "").replace(/,/g, " "), // Column 4 - remove commas
-            staff?.document || "", // Column 5
-            (staff?.icNo || "").replace(/-/g, ""), // Column 6 - remove hyphens
-            paymentAmount, // Column 7 - plain number format
-            "Salary", // Column 8
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "", // Columns 9-16
-            "Content Line 1", // Column 17
-            "Content Line 2", // Column 18
-            "Content Line 3", // Column 19
-            "Content Line 4", // Column 20
-            "Content Line 5", // Column 21
-          ];
+        const columns = [
+          "PBB", // Column 1
+          (staff?.bankAccountNumber || "").replace(/-/g, ""), // Column 2 - remove hyphens
+          "PBBEMYKL", // Column 3
+          (row.staff_name || "").replace(/,/g, " "), // Column 4 - remove commas
+          staff?.document || "", // Column 5
+          (staff?.icNo || "").replace(/-/g, ""), // Column 6 - remove hyphens
+          paymentAmount, // Column 7 - plain number format
+          "Salary", // Column 8
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "", // Columns 9-16
+          "Content Line 1", // Column 17
+          "Content Line 2", // Column 18
+          "Content Line 3", // Column 19
+          "Content Line 4", // Column 20
+          "Content Line 5", // Column 21
+        ];
 
-          return columns;
-        });
+        return columns;
+      });
 
       // Calculate total payment amount
-      const totalAmount = reportData.data
-        .filter((row) => parseFloat(row.final_total.toString()) > 0)
-        .reduce((sum, row) => sum + parseFloat(row.final_total.toString()), 0);
+      const totalAmount = bankExportRows.reduce(
+        (sum: number, row: SalaryReportData): number =>
+          sum + parseFloat(row.final_total.toString()),
+        0
+      );
 
       // Create total row
       const totalRow = [
@@ -3987,7 +3997,7 @@ const SalaryReportPage: React.FC = () => {
                     variant="outline"
                     disabled={
                       !displayedReportData ||
-                      displayedReportData.data.length === 0 ||
+                      bankExportRows.length === 0 ||
                       isGeneratingExport
                     }
                     size="sm"
@@ -4161,7 +4171,7 @@ const SalaryReportPage: React.FC = () => {
                       variant="outline"
                       disabled={
                         !displayedReportData ||
-                        displayedReportData.data.length === 0 ||
+                        bankExportRows.length === 0 ||
                         isGeneratingExport
                       }
                       size="sm"

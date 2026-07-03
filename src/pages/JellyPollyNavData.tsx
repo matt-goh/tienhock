@@ -293,48 +293,6 @@ export const JellyPollyNavData: SidebarItem[] = [
     ],
   },
   {
-    name: "Catalogue",
-    icon: IconListDetails,
-    subItems: [
-      {
-        name: "Staff",
-        path: "/catalogue/staff",
-        component: JPStaffPage,
-        group: "People",
-        subItems: [
-          {
-            name: "New Staff",
-            path: "/catalogue/staff/new",
-            component: JPStaffAddPage,
-            showInPopover: true,
-          },
-          {
-            name: "Staff Details",
-            path: "/catalogue/staff/:id",
-            component: JPStaffDetailsPage,
-          },
-          {
-            name: "Staff Edit",
-            path: "/catalogue/staff/:id/edit",
-            component: JPStaffFormPage,
-          },
-        ],
-      },
-      {
-        name: "Pay Codes",
-        path: "/catalogue/pay-codes",
-        component: JPPayCodePage,
-        group: "Payroll Setup",
-      },
-      {
-        name: "Cuti Management",
-        path: "/catalogue/cuti-management",
-        component: JPCutiManagementPage,
-        group: "Payroll Setup",
-      },
-    ],
-  },
-  {
     name: "Accounting",
     icon: IconReportMoney,
     subItems: [
@@ -399,5 +357,47 @@ export const JellyPollyNavData: SidebarItem[] = [
       },
     ],
     defaultOpen: true,
+  },
+  {
+    name: "Catalogue",
+    icon: IconListDetails,
+    subItems: [
+      {
+        name: "Staff",
+        path: "/catalogue/staff",
+        component: JPStaffPage,
+        group: "People",
+        subItems: [
+          {
+            name: "New Staff",
+            path: "/catalogue/staff/new",
+            component: JPStaffAddPage,
+            showInPopover: true,
+          },
+          {
+            name: "Staff Details",
+            path: "/catalogue/staff/:id",
+            component: JPStaffDetailsPage,
+          },
+          {
+            name: "Staff Edit",
+            path: "/catalogue/staff/:id/edit",
+            component: JPStaffFormPage,
+          },
+        ],
+      },
+      {
+        name: "Pay Codes",
+        path: "/catalogue/pay-codes",
+        component: JPPayCodePage,
+        group: "Payroll Setup",
+      },
+      {
+        name: "Cuti Management",
+        path: "/catalogue/cuti-management",
+        component: JPCutiManagementPage,
+        group: "Payroll Setup",
+      },
+    ],
   },
 ];
