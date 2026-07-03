@@ -32,11 +32,27 @@ const STOCK_SYSTEM_START_DATE = new Date(2026, 0, 1); // January 1, 2026
 const STOCK_SYSTEM_START_DATE_STRING = "2026-01-01";
 
 type ViewType = "month" | "rolling" | "custom";
+type ProductSelectorProductType = Exclude<StockProduct["type"], "TAX">;
+
+const PRODUCT_SELECTOR_TYPES = new Set<ProductSelectorProductType>([
+  "BH",
+  "MEE",
+  "JP",
+  "OTH",
+  "BUNDLE",
+]);
+const DEFAULT_PRODUCT_TYPES: ProductSelectorProductType[] = ["BH", "MEE", "OTH"];
+
+const isProductSelectorProductType = (
+  value: string | undefined
+): value is ProductSelectorProductType =>
+  value !== undefined &&
+  PRODUCT_SELECTOR_TYPES.has(value as ProductSelectorProductType);
 
 interface ProductStockMovementPageProps {
   // Restrict the page to specific product types (e.g. ["JP"] for the Jelly
   // Polly stock page). Default: TH behaviour (BH/MEE + whitelisted OTH).
-  productTypes?: string[];
+  productTypes?: ProductSelectorProductType[];
 }
 
 const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
@@ -107,15 +123,20 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
   // Get favorite products (BH, MEE, and the whitelisted OTH stock products —
   // or the restricted productTypes when set)
   const favoriteProducts = useMemo(() => {
-    return products.filter(
-      (product) =>
-        favorites.has(product.id) &&
-        (productTypes
-          ? productTypes.includes(product.type)
-          : product.type === "BH" ||
-            product.type === "MEE" ||
-            isOthProductionProduct(product.id))
-    ) as StockProduct[];
+    return (products as StockProduct[]).filter(
+      (product: StockProduct): boolean => {
+        const productType: string | undefined = product.type;
+        return (
+          favorites.has(product.id) &&
+          (productTypes
+            ? isProductSelectorProductType(productType) &&
+              productTypes.includes(productType)
+            : product.type === "BH" ||
+              product.type === "MEE" ||
+              isOthProductionProduct(product.id))
+        );
+      }
+    );
   }, [products, favorites, productTypes]);
 
   // Selectable products grouped by category, for the empty-state picker
@@ -300,12 +321,14 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
               label="Product"
               value={selectedProductId}
               onChange={setSelectedProductId}
-              productTypes={productTypes || ["BH", "MEE", "OTH"]}
-              productFilter={(product) =>
-                productTypes
-                  ? productTypes.includes(product.type)
-                  : product.type !== "OTH" || isOthProductionProduct(product.id)
-              }
+              productTypes={productTypes || DEFAULT_PRODUCT_TYPES}
+              productFilter={(product: StockProduct): boolean => {
+                const productType: string | undefined = product.type;
+                return productTypes
+                  ? isProductSelectorProductType(productType) &&
+                      productTypes.includes(productType)
+                  : product.type !== "OTH" || isOthProductionProduct(product.id);
+              }}
               showCategories={true}
               required
             />
