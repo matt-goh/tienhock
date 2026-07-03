@@ -21,7 +21,7 @@ export default function (pool) {
     const monthInt = month ? parseInt(month) : currentDate.getMonth() + 1;
 
     try {
-      // Combined query to get salary report data with staff information
+      // Combined query to get bank salary payment data with staff information
       const query = `
         WITH employee_payroll_data AS (
           SELECT 
@@ -31,12 +31,14 @@ export default function (pool) {
             s.bank_account_number,
             s.document,
             s.ic_no,
+            s.payment_preference,
             COALESCE(ep.net_pay, 0) as net_pay
           FROM employee_payrolls ep
           JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
           JOIN staffs s ON ep.employee_id = s.id
           WHERE mp.year = $1 AND mp.month = $2
           AND (s.date_resigned IS NULL OR s.date_resigned > CURRENT_DATE)
+          AND LOWER(COALESCE(s.payment_preference, '')) = 'bank'
         ),
         mid_month_data AS (
           SELECT 
