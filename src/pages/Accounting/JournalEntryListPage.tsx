@@ -14,47 +14,76 @@ import {
   IconSearch,
   IconPencil,
   IconTrash,
-  IconCheck,
   IconRefresh,
   IconX,
 } from "@tabler/icons-react";
-import {
-  Listbox,
-  ListboxButton,
-  ListboxOption,
-  ListboxOptions,
-} from "@headlessui/react";
-import { IconChevronDown } from "@tabler/icons-react";
 
 interface JournalEntryListItem extends JournalEntry {
   entry_type_name?: string;
 }
 
-const STORAGE_KEY = "journalEntryListDateRange";
+const LEGACY_STORAGE_KEY = "journalEntryListDateRange";
+const FILTERS_STORAGE_KEY = "journalEntryListFilters";
 
-// Load cached date range from localStorage
-const loadCachedDateRange = (): { start: Date; end: Date } => {
+const STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: "active", label: "Active" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+interface CachedListFilters {
+  dateRange: { start: Date; end: Date };
+  types: string[];
+  statuses: string[];
+}
+
+// Load cached filters (date range + type/status pill selections) from localStorage
+const loadCachedFilters = (): CachedListFilters => {
+  const fallback: CachedListFilters = {
+    dateRange: { start: new Date(), end: new Date() },
+    types: [],
+    statuses: [],
+  };
   try {
-    const cached = localStorage.getItem(STORAGE_KEY);
+    const cached = localStorage.getItem(FILTERS_STORAGE_KEY);
     if (cached) {
       const parsed = JSON.parse(cached);
       return {
-        start: new Date(parsed.start),
-        end: new Date(parsed.end),
+        dateRange: {
+          start: new Date(parsed.start),
+          end: new Date(parsed.end),
+        },
+        types: Array.isArray(parsed.types)
+          ? parsed.types.filter((t: unknown) => typeof t === "string")
+          : [],
+        statuses: Array.isArray(parsed.statuses)
+          ? parsed.statuses.filter((s: unknown) => typeof s === "string")
+          : [],
+      };
+    }
+    // Migrate from the old date-range-only cache
+    const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (legacy) {
+      const parsed = JSON.parse(legacy);
+      return {
+        ...fallback,
+        dateRange: {
+          start: new Date(parsed.start),
+          end: new Date(parsed.end),
+        },
       };
     }
   } catch (e) {
-    console.error("Error loading cached date range:", e);
+    console.error("Error loading cached filters:", e);
   }
-  return { start: new Date(), end: new Date() };
+  return fallback;
 };
 
 // Helper to parse URL params and return initial state
 const getInitialStateFromParams = (params: URLSearchParams): {
   search: string;
-  type: string;
+  types: string[];
+  statuses: string[];
   dateRange: { start: Date; end: Date };
-  selectedMonth: Date;
 } => {
   const urlSearch = params.get("search");
   const urlType = params.get("type");
@@ -72,9 +101,9 @@ const getInitialStateFromParams = (params: URLSearchParams): {
     endDate.setHours(23, 59, 59, 999);
     return {
       search: urlSearch || "",
-      type: urlType || "All",
+      types: urlType ? [urlType] : [],
+      statuses: [],
       dateRange: { start: startDate, end: endDate },
-      selectedMonth: startDate,
     };
   }
 
@@ -86,19 +115,19 @@ const getInitialStateFromParams = (params: URLSearchParams): {
     endOfDay.setHours(23, 59, 59, 999);
     return {
       search: urlSearch || "",
-      type: urlType || "All",
+      types: urlType ? [urlType] : [],
+      statuses: [],
       dateRange: { start: date, end: endOfDay },
-      selectedMonth: date,
     };
   }
 
-  // Fall back to cached date range
-  const cached = loadCachedDateRange();
+  // Fall back to cached filters
+  const cached = loadCachedFilters();
   return {
     search: urlSearch || "",
-    type: urlType || "All",
-    dateRange: cached,
-    selectedMonth: cached.start,
+    types: urlType ? [urlType] : cached.types,
+    statuses: cached.statuses,
+    dateRange: cached.dateRange,
   };
 };
 
@@ -115,18 +144,23 @@ const JournalEntryListPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
 
-  // Filters - load date range from cache initially
+  // Filters - load date range and pill selections from cache initially
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedType, setSelectedType] = useState<string>("All");
-  const [selectedStatus, setSelectedStatus] = useState<string>("All");
-  const [dateRange, setDateRange] = useState(loadCachedDateRange);
+  const [selectedTypes, setSelectedTypes] = useState<string[]>(
+    () => loadCachedFilters().types
+  );
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(
+    () => loadCachedFilters().statuses
+  );
+  const [dateRange, setDateRange] = useState(() => loadCachedFilters().dateRange);
 
   // Apply URL params on mount
   useEffect(() => {
     if (!initialized) {
       const initialState = getInitialStateFromParams(searchParams);
       setSearchTerm(initialState.search);
-      setSelectedType(initialState.type);
+      setSelectedTypes(initialState.types);
+      setSelectedStatuses(initialState.statuses);
       setDateRange(initialState.dateRange);
       setInitialized(true);
     }
@@ -173,9 +207,15 @@ const JournalEntryListPage: React.FC = () => {
       params.append("offset", ((page - 1) * limit).toString());
 
       if (searchTerm) params.append("search", searchTerm);
-      if (selectedType !== "All") params.append("entry_type", selectedType);
-      if (selectedStatus !== "All")
-        params.append("status", selectedStatus.toLowerCase());
+      if (selectedTypes.length > 0)
+        params.append("entry_type", selectedTypes.join(","));
+      if (selectedStatuses.length > 0) {
+        // The UI's "Active" means "not cancelled"; the DB stores posted/draft
+        const dbStatuses = selectedStatuses.flatMap((s) =>
+          s === "active" ? ["posted", "draft"] : [s]
+        );
+        params.append("status", dbStatuses.join(","));
+      }
       if (dateRange.start)
         params.append("start_date", formatDateForAPI(dateRange.start));
       if (dateRange.end)
@@ -197,7 +237,7 @@ const JournalEntryListPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, searchTerm, selectedType, selectedStatus, dateRange]);
+  }, [page, limit, searchTerm, selectedTypes, selectedStatuses, dateRange]);
 
   useEffect(() => {
     fetchEntries();
@@ -206,22 +246,24 @@ const JournalEntryListPage: React.FC = () => {
   // Reset pagination when filters change
   useEffect(() => {
     setPage(1);
-  }, [searchTerm, selectedType, selectedStatus, dateRange]);
+  }, [searchTerm, selectedTypes, selectedStatuses, dateRange]);
 
-  // Cache date range to localStorage
+  // Cache date range and pill selections to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(
-        STORAGE_KEY,
+        FILTERS_STORAGE_KEY,
         JSON.stringify({
           start: dateRange.start.toISOString(),
           end: dateRange.end.toISOString(),
+          types: selectedTypes,
+          statuses: selectedStatuses,
         })
       );
     } catch (e) {
-      console.error("Error caching date range:", e);
+      console.error("Error caching filters:", e);
     }
-  }, [dateRange]);
+  }, [dateRange, selectedTypes, selectedStatuses]);
 
   // Handlers
   const handleCreateNew = () => {
@@ -290,10 +332,25 @@ const JournalEntryListPage: React.FC = () => {
     }
   };
 
+  const toggleType = (code: string) => {
+    setSelectedTypes((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
+    );
+  };
+
+  const toggleStatus = (value: string) => {
+    setSelectedStatuses((prev) =>
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
+    );
+  };
+
+  const hasActiveFilters =
+    searchTerm !== "" || selectedTypes.length > 0 || selectedStatuses.length > 0;
+
   const clearFilters = () => {
     setSearchTerm("");
-    setSelectedType("All");
-    setSelectedStatus("All");
+    setSelectedTypes([]);
+    setSelectedStatuses([]);
   };
 
   // Format date for display
@@ -335,32 +392,123 @@ const JournalEntryListPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4">
+      {/* Header - row 1: title, search, date controls; row 2: filter pills. Search drops to its own row on mobile */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         {/* Title */}
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-              Journal Entries
-            </h1>
-            <span className="text-default-400 dark:text-gray-500">|</span>
-            <span className="text-sm text-default-600 dark:text-gray-300">
-              Showing{" "}
-              <span className="font-medium text-default-900 dark:text-gray-100">
-                {entries.length}
-              </span>{" "}
-              of{" "}
-              <span className="font-medium text-default-900 dark:text-gray-100">
-                {total}
-              </span>{" "}
-              entries
+        <div className="order-1 flex items-center gap-2 flex-shrink-0">
+          <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
+            Journal Entries
+          </h1>
+          <span className="text-default-400 dark:text-gray-500">|</span>
+          <span className="text-sm text-default-600 dark:text-gray-300 whitespace-nowrap">
+            Showing{" "}
+            <span className="font-medium text-default-900 dark:text-gray-100">
+              {entries.length}
+            </span>{" "}
+            of{" "}
+            <span className="font-medium text-default-900 dark:text-gray-100">
+              {total}
             </span>
-          </div>
+          </span>
+        </div>
+
+        {/* Search - first row left of the date controls; own row on mobile */}
+        <div className="relative order-3 w-full md:order-2 md:w-64 md:ml-auto">
+          <IconSearch
+            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-default-400"
+            stroke={1.5}
+          />
+          <input
+            type="text"
+            placeholder="Search reference or description..."
+            className="w-full rounded-lg border border-default-300 dark:border-gray-600 py-1.5 pl-9 pr-8 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-700 text-default-800 dark:text-gray-100"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-default-400 hover:text-default-600 dark:hover:text-gray-300"
+              title="Clear search"
+            >
+              <IconX size={16} />
+            </button>
+          )}
+        </div>
+
+        {/* Filters - own row below the title/date controls; all pills flow in one wrapping line */}
+        <div className="order-4 w-full flex flex-wrap items-center gap-1.5 min-w-0">
+          {/* Type pills - toggle each journal type on/off (none selected = show all) */}
+          {entryTypes.map((type) => {
+            const active = selectedTypes.includes(type.code);
+            return (
+              <button
+                key={type.code}
+                type="button"
+                onClick={() => toggleType(type.code)}
+                aria-pressed={active}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border transition-colors select-none whitespace-nowrap ${
+                  active
+                    ? "border-sky-500 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300"
+                    : "border-default-300 dark:border-gray-600 text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700"
+                }`}
+              >
+                <span className="font-semibold">{type.code}</span>
+                <span
+                  className={
+                    active
+                      ? "text-sky-600/80 dark:text-sky-300/80"
+                      : "text-default-500 dark:text-gray-400"
+                  }
+                >
+                  {type.name}
+                </span>
+              </button>
+            );
+          })}
+
+          {/* Divider */}
+          <span className="h-5 w-px bg-default-300 dark:bg-gray-600 mx-1" />
+
+          {/* Status pills */}
+          {STATUS_OPTIONS.map((status) => {
+            const active = selectedStatuses.includes(status.value);
+            const activeClass =
+              status.value === "cancelled"
+                ? "border-rose-500 bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300"
+                : "border-emerald-500 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300";
+            return (
+              <button
+                key={status.value}
+                type="button"
+                onClick={() => toggleStatus(status.value)}
+                aria-pressed={active}
+                className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors select-none ${
+                  active
+                    ? activeClass
+                    : "border-default-300 dark:border-gray-600 text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700"
+                }`}
+              >
+                {status.label}
+              </button>
+            );
+          })}
+
+          {/* Clear Filters */}
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="flex items-center gap-1 text-sm text-default-600 dark:text-gray-300 hover:text-default-900 dark:hover:text-gray-100"
+              title="Clear filters"
+            >
+              <IconRefresh size={16} />
+              Clear
+            </button>
+          )}
         </div>
 
         {/* Date Controls and Actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          {/* Time Navigator */}
+        <div className="order-2 ml-auto md:order-3 md:ml-0 flex items-center gap-3 flex-shrink-0">
           <TimeNavigator
             range={dateRange}
             onChange={handleTimeNavigatorChange}
@@ -374,172 +522,8 @@ const JournalEntryListPage: React.FC = () => {
             iconPosition="left"
             size="md"
           >
-            New Entry
+            New
           </Button>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="mb-4 p-4 bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Search */}
-          <div className="relative flex-1 min-w-[200px]">
-            <IconSearch
-              className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-default-400"
-              stroke={1.5}
-            />
-            <input
-              type="text"
-              placeholder="Search reference or description..."
-              className="w-full rounded-lg border border-default-300 dark:border-gray-600 py-2 pl-10 pr-8 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-700 text-default-800 dark:text-gray-100"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-default-400 hover:text-default-600 dark:hover:text-gray-300"
-                title="Clear search"
-              >
-                <IconX size={16} />
-              </button>
-            )}
-          </div>
-
-          {/* Type Filter */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-default-600 dark:text-gray-300">
-              Type:
-            </span>
-            <Listbox value={selectedType} onChange={setSelectedType}>
-              <div className="relative w-48">
-                <ListboxButton className="relative w-full cursor-pointer rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 text-default-800 dark:text-gray-100">
-                  <span className="block truncate">{selectedType}</span>
-                  <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                    <IconChevronDown size={16} className="text-gray-400" />
-                  </span>
-                </ListboxButton>
-                <ListboxOptions className="absolute z-10 mt-1 max-h-60 min-w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                  <ListboxOption
-                    value="All"
-                    className={({ active }) =>
-                      `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
-                        active
-                          ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-100"
-                          : "text-gray-900 dark:text-gray-100"
-                      }`
-                    }
-                  >
-                    {({ selected }) => (
-                      <>
-                        <span
-                          className={`block truncate ${
-                            selected ? "font-medium" : ""
-                          }`}
-                        >
-                          All
-                        </span>
-                        {selected && (
-                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-400">
-                            <IconCheck size={16} />
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </ListboxOption>
-                  {entryTypes.map((type) => (
-                    <ListboxOption
-                      key={type.code}
-                      value={type.code}
-                      className={({ active }) =>
-                        `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
-                          active
-                            ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-100"
-                            : "text-gray-900 dark:text-gray-100"
-                        }`
-                      }
-                    >
-                      {({ selected }) => (
-                        <>
-                          <span
-                            className={`block truncate ${
-                              selected ? "font-medium" : ""
-                            }`}
-                          >
-                            {type.code} - {type.name}
-                          </span>
-                          {selected && (
-                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-400">
-                              <IconCheck size={16} />
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </ListboxOption>
-                  ))}
-                </ListboxOptions>
-              </div>
-            </Listbox>
-          </div>
-
-          {/* Status Filter */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-default-600 dark:text-gray-300">
-              Status:
-            </span>
-            <Listbox value={selectedStatus} onChange={setSelectedStatus}>
-              <div className="relative w-32">
-                <ListboxButton className="relative w-full cursor-pointer rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 text-default-800 dark:text-gray-100">
-                  <span className="block truncate">{selectedStatus}</span>
-                  <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                    <IconChevronDown size={16} className="text-gray-400" />
-                  </span>
-                </ListboxButton>
-                <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                  {["All", "Active"].map((status) => (
-                    <ListboxOption
-                      key={status}
-                      value={status}
-                      className={({ active }) =>
-                        `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
-                          active
-                            ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-100"
-                            : "text-gray-900 dark:text-gray-100"
-                        }`
-                      }
-                    >
-                      {({ selected }) => (
-                        <>
-                          <span
-                            className={`block truncate ${
-                              selected ? "font-medium" : ""
-                            }`}
-                          >
-                            {status}
-                          </span>
-                          {selected && (
-                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-400">
-                              <IconCheck size={16} />
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </ListboxOption>
-                  ))}
-                </ListboxOptions>
-              </div>
-            </Listbox>
-          </div>
-
-          {/* Clear Filters */}
-          <button
-            onClick={clearFilters}
-            className="flex items-center gap-1 text-sm text-default-600 dark:text-gray-300 hover:text-default-900 dark:hover:text-gray-100"
-            title="Clear filters"
-          >
-            <IconRefresh size={16} />
-            Clear
-          </button>
         </div>
       </div>
 
@@ -645,9 +629,7 @@ const JournalEntryListPage: React.FC = () => {
                     className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                   >
                     No journal entries found.{" "}
-                    {(searchTerm ||
-                      selectedType !== "All" ||
-                      selectedStatus !== "All") && (
+                    {hasActiveFilters && (
                       <span>Try adjusting your filters or </span>
                     )}
                     <button
