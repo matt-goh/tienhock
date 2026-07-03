@@ -393,7 +393,7 @@ const JournalEntryListPage: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Header - row 1: title, search, date controls; row 2: filter pills. Search drops to its own row on mobile */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-3">
         {/* Title */}
         <div className="order-1 flex items-center gap-2 flex-shrink-0">
           <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
@@ -421,7 +421,7 @@ const JournalEntryListPage: React.FC = () => {
           <input
             type="text"
             placeholder="Search reference or description..."
-            className="w-full rounded-lg border border-default-300 dark:border-gray-600 py-1.5 pl-9 pr-8 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-700 text-default-800 dark:text-gray-100"
+            className="w-full h-[40px] rounded-lg border border-default-300 dark:border-gray-600 pl-9 pr-8 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 text-default-800 dark:text-gray-100"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />

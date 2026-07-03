@@ -219,7 +219,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
           <ComboboxButton as="div" className={clsx("relative w-full", value ? "" : "cursor-pointer")}>
             <ComboboxInput
               className={clsx(
-                "w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-10 pr-10",
+                "w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-10 pr-10",
                 "text-sm leading-5 text-default-900 dark:text-gray-100 cursor-pointer",
                 "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500",
                 "disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed"

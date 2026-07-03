@@ -1111,7 +1111,7 @@ const ProductionEntryPage: React.FC = () => {
                         placeholder="Search worker..."
                         value={workerSearchQuery}
                         onChange={(e) => setWorkerSearchQuery(e.target.value)}
-                        className="w-32 sm:w-40 rounded-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 py-1 pl-7 pr-7 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                        className="w-32 sm:w-40 rounded-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 py-1 pl-7 pr-7 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                       />
                       {workerSearchQuery && (
                         <button
@@ -1292,7 +1292,7 @@ const ProductionEntryPage: React.FC = () => {
                     placeholder="Search worker..."
                     value={workerSearchQuery}
                     onChange={(e) => setWorkerSearchQuery(e.target.value)}
-                    className="w-32 sm:w-40 rounded-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 py-1 pl-7 pr-7 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    className="w-32 sm:w-40 rounded-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 py-1 pl-7 pr-7 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                   />
                   {workerSearchQuery && (
                     <button
@@ -1411,7 +1411,7 @@ const ProductionEntryPage: React.FC = () => {
                     placeholder="Search worker..."
                     value={workerSearchQuery}
                     onChange={(e) => setWorkerSearchQuery(e.target.value)}
-                    className="w-32 sm:w-40 rounded-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 py-1 pl-7 pr-7 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    className="w-32 sm:w-40 rounded-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 py-1 pl-7 pr-7 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                   />
                   {workerSearchQuery && (
                     <button

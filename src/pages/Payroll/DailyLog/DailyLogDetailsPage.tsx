@@ -436,7 +436,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                   setEmployeeSearchQuery(event.target.value)
                 }
                 placeholder="Search employee..."
-                className="w-36 rounded-md border border-default-300 bg-white py-1.5 pl-7 pr-7 text-xs text-default-900 placeholder:text-default-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder:text-gray-400 sm:w-44"
+                className="w-36 rounded-md border border-default-300 bg-white py-1.5 pl-7 pr-7 text-xs text-default-900 placeholder:text-default-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder:text-gray-400 sm:w-44"
               />
               {employeeSearchQuery && (
                 <button

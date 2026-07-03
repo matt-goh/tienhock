@@ -615,7 +615,7 @@ const PayrollRulesPage: React.FC = () => {
                   placeholder="Search..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-7 pr-7 py-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 dark:focus:ring-amber-400 focus:border-amber-500 dark:focus:border-amber-400 w-32 placeholder-gray-400 dark:placeholder-gray-500"
+                  className="pl-7 pr-7 py-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-gray-900 dark:text-gray-100 rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 dark:focus:ring-amber-400 focus:border-amber-500 dark:focus:border-amber-400 w-32 placeholder-gray-400 dark:placeholder-gray-500"
                 />
                 {searchTerm && (
                   <button
