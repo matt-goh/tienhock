@@ -22,6 +22,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 15. After you're done implementing a new moderately to extremely complex system, ask me if I want you to scan through all the files/code you have created or modified, and find any bugs, limitations, or holes that you can improve upon/fix.
 16. Update the changelog (`CHANGELOG_ENTRIES` in `src/components/ChangelogModal.tsx`) when you ship a change big enough for users to notice. **Add an entry for:** new pages/features, renamed or removed user-facing fields/buttons/menus, changes to how data is calculated, processed, stored, imported, or exported, bug fixes that change visible numbers/behaviour, and anything that changes a workflow the user already knows. **Do not add an entry for:** spacing/padding/colour tweaks, dark-mode-only adjustments, refactors with no behavioural change, internal renames, comment/typo edits, dependency bumps, or other purely cosmetic/internal work. Each entry must have a `date` (ISO `yyyy-mm-dd`, the date the change is implemented), an `ms` (Bahasa Melayu) field, and an `en` (English) field, be written from the end-user's perspective with no technical jargon, and be **prepended** to the array (newest first).
 17. Date handling: never use `new Date(value).toISOString().split('T')[0]` to derive a `yyyy-MM-dd` string for display, form pre-fill, or comparison. `toISOString()` returns the UTC date, but the server (and users) run in Asia/Kuala_Lumpur (UTC+8), and PostgreSQL `date` columns get serialized as UTC midnight of the local date — so this expression shifts the date back one day. Use `format(new Date(value), 'yyyy-MM-dd')` from date-fns (local timezone), or pass `yyyy-MM-dd` strings through without round-tripping through `Date`. For "today" defaults use `format(new Date(), 'yyyy-MM-dd')`. The same rule applies when comparing dates: compare `yyyy-MM-dd` strings, not Date objects.
+18. Checkbox UI: use the shared `src/components/Checkbox.tsx` component for app checkboxes instead of raw `<input type="checkbox">`, unless a native checkbox is specifically required by a form/library integration. Keep checkbox labels and helper counts compact and inline where possible.
 
 ## Architecture Overview
 
@@ -103,7 +104,7 @@ This is a comprehensive ERP system supporting three companies:
 - `products` - id, description, price_per_unit, type, tax, is_active
 - `production_entries` - id, entry_date, product_id, worker_id (nullable for stock-only OTH production records), bags_packed, created_at, updated_at, created_by
 - `production_machine_status` - id, entry_date, product_id (FK products), machine_broken, notes, created_at, updated_at, created_by (tracks machine broken status per date/product for production bonus threshold override - when machine_broken=true, workers below threshold still receive bonus pay codes)
-- `production_worker_orders` - scope (BH_PACKING/MEE_PACKING), worker_id (FK staffs), sort_order, updated_at, updated_by (shared drag-and-drop worker card order for Production Entry worker grids)
+- `production_worker_orders` - scope (BH_PACKING/MEE_PACKING/JP_PRODUCTION), worker_id (FK staffs), sort_order, updated_at, updated_by (shared drag-and-drop worker card order for Production Entry worker grids; JP_PRODUCTION scope is the Jelly Polly production page)
 - `product_pay_codes` - id, product_id, pay_code_id, created_at, updated_at
 - `stock_adjustments` - id, entry_date, product_id, adjustment_type, quantity, reason, created_at, created_by, reference
 - `stock_opening_balances` - id, product_id, balance, effective_date, created_at, updated_at, created_by, notes (unique: product_id, effective_date). One opening balance per product. `effective_date` is an anchor: `balance` represents stock as of the START of that date. The Stock Movement / closing-stock calculations seed from the anchor and sum production + sales + adjustments on/after `effective_date`, ignoring everything before it. Defaults to the stock system start date (2026-01-01) when not set.
@@ -169,7 +170,7 @@ This is a comprehensive ERP system supporting three companies:
 **Leave Management:**
 
 - `employee_leave_balances` - id, employee_id, year, cuti_umum_total, cuti_tahunan_total, cuti_sakit_total, cuti_rawatan_total (default 60, fixed for all employees - Hospital Leave), created_at, updated_at. NOTE: leave allowances and usage are aggregated by `staffs.name` across sibling IDs — the canonical row is tied to the senior sibling (earliest date_joined; tie-breaker: lowest id). Multi-ID employees share one entitlement bucket.
-- `leave_records` - id, employee_id, leave_date, leave_type ('cuti_umum' | 'cuti_sakit' | 'cuti_tahunan' | 'cuti_rawatan'), work_log_id, days_taken, amount_paid, status, notes, created_by, created_at, updated_at
+- `leave_records` - id, employee_id, leave_date, leave_type ('cuti_umum' | 'cuti_sakit' | 'cuti_tahunan' | 'cuti_rawatan'), work_log_id (TH daily log FK), company (varchar, default 'TH'; TH payroll filters company <> 'JP' — reserved marker, currently always 'TH' since Jelly Polly keeps its own separate ledger in jellypolly.leave_records), days_taken, amount_paid, status, notes, created_by, created_at, updated_at
 - `holiday_calendar` - id, holiday_date, description, is_active, is_cuti_umum (checked holidays count toward yearly Cuti Umum entitlement)
 
 **Reference Data:**
@@ -203,6 +204,35 @@ This is a comprehensive ERP system supporting three companies:
 - `greentarget.payroll_settings` - id, setting_key (unique), setting_value, description, created_at, updated_at (global payroll settings)
 - `greentarget.adjustment_documents` - id (stored URL-safe with dashes, e.g. GT-CN-26-1 / GT-DN-26-1 / GT-RN-26-1 = GT-type-YY-runningNo, running number unpadded restarting at 1 per type/year; rendered with slashes as GT/CN/26/1 via `src/utils/adjustments/formatDocId`. Legacy ids like GT-CN-2026-0001 are left unchanged), type (credit_note/debit_note/refund_note), original_invoice_id (FK greentarget.invoices.invoice_id), original_invoice_number (snapshot), customer_id (nullable FK greentarget.customers), customer_name (snapshot), date_issued, reason, paired_with_id (self-FK; CN<->RN pairing), references_consolidated_id (parent consolidated invoice_id when applicable), amount_before_tax, tax_amount, total_amount, refund_method, refund_reference, bank_account (RN-only fields), uuid, submission_uid, long_id, datetime_validated, einvoice_status (valid/pending/invalid/cancelled), is_consolidated, consolidated_adjustments (JSONB array of child adj doc IDs when wrapper), status (active/cancelled), cancellation_reason, cancellation_date, created_by, created_at, updated_at. Green Target Credit Notes / Debit Notes / Refund Notes. Atomic create updates greentarget.invoices.balance_due and re-derives status; **no journal posting** (GT is outside the shared ledger) and **no customer credit cascade** (no credit_used column). Cancellation reverses balance_due. Refund Notes are paired-RN only — standalone overpayment RNs are out of scope since greentarget.payments has no 'overpaid' status.
 - `greentarget.adjustment_document_lines` - id, adjustment_doc_id (FK greentarget.adjustment_documents CASCADE), line_number, description, quantity, price, tax, total, issubtotal (description-driven lines; no code system, no rounding column on GT side)
+
+**Jelly Polly Payroll & Catalogue (jellypolly schema; dev migrations `dev/migrations/008_jp_payroll_foundation.sql` (v2) + `009_jp_seed_mock_data.sql` (v2); production bundle `dev/migrations/JP_PROD_DEPLOY.sql`):**
+
+JP has its OWN catalogue — nothing is shared with the TH staff/pay-code tables. Products remain shared (`public.products`, `type='JP'`) and the holiday calendar is shared. Mock/test staff are seeded with ids `JPT_*` / names ending "(JP TEST)" — delete with `DELETE FROM jellypolly.staffs WHERE id LIKE 'JPT_%'` when real data is entered. JP catalogue/routes are served under `/jellypolly/api/*` (staffs, jobs, pay-codes, job-pay-codes, employee-pay-codes, pay-rate-schedules, product-pay-codes, leave-management, production-entries — clones of the TH routes on the jellypolly tables).
+
+Catalogue:
+
+- `jellypolly.staffs` - full TH staffs shape (incl. statutory override columns and `head_staff_id` for the HEAD/sub-ID system). JP staff are managed on the JP Catalogue → Staff pages.
+- `jellypolly.jobs` - id, name, section. Seeded: JP_OFFICE, JP_MAINTEN, JP_SALESMAN, JP_SALESMAN_IKUT, JP_ICE_POLLY, JP_JELLY_CUP, JP_PLASTIC, JP_PACKING.
+- `jellypolly.pay_codes` - TH pay_codes shape (incl. report_column). Salesman commission codes are named after the JP PRODUCT ids (S-25ML, MEQ-60ML, ...) so the salesman entry maps each sold product to the same-id pay code (TH convention).
+- `jellypolly.job_pay_codes`, `jellypolly.employee_pay_codes` - TH shapes, FKs to jellypolly.jobs/staffs/pay_codes. Salesman product codes are mapped to BOTH salesman jobs; JP_SALESMAN_IKUT carries lower override rates.
+- `jellypolly.pay_rate_schedules` + SQL function `jellypolly.get_effective_pay_rate(...)` - effective-month-dated rate overrides over the JP catalogue (mirror of the public function).
+- `jellypolly.product_pay_codes` - product_id (FK public.products) → pay_code_id (FK jellypolly.pay_codes); production packing pay mapping (managed via the Mappings button on JP Production Entry; JP_PACKING job carries the Ctn codes).
+
+Payroll (per-employee auto-reprocess on every save via `src/routes/jellypolly/jpPayrollProcessor.js`; HEAD rollup: payroll rows only for canonical HEAD ids, sub-ID work keeps source_employee_id):
+
+- `jellypolly.payroll_employees` - id, employee_id (FK jellypolly.staffs), job_type (OFFICE/MAINTENANCE/SALESMAN/SALESMAN_IKUT/ICE_POLLY/JELLY_CUP/PLASTIC/PRODUCTION), date_added, is_active, notes (unique: employee_id, job_type). User-managed staff→page assignments; one employee may hold multiple job types.
+- `jellypolly.monthly_payrolls` (unique year+month), `jellypolly.employee_payrolls` (unique monthly_payroll_id+employee_id, has updated_at), `jellypolly.payroll_items` (TH shape incl. foc_units; pay_code_id FK jellypolly.pay_codes), `jellypolly.payroll_deductions` (epf/socso/sip/income_tax) - statutory math shared with GT via `gtStatutoryCalc.js`.
+- `jellypolly.monthly_work_logs` / `_entries` / `_activities` - TH shape incl. ahad/umum hours (Office/Maintenance monthly entry).
+- `jellypolly.daily_work_logs` / `_entries` / `_activities` - TH shape (Salesman, Ice-Polly, Jelly Cup, Plastic). Machine-page `bungkusan` lives in the log header context_data (no pay code).
+- `jellypolly.leave_records` - JP-owned leave ledger (employee_id FK jellypolly.staffs; work_log_id FK jellypolly.daily_work_logs ON DELETE CASCADE; leave_type cuti_umum/sakit/tahunan/rawatan, amount_paid). Leave pay adds to gross; daily work items on the owner's leave day are stored but excluded from gross (TH convention). `jellypolly.employee_leave_balances` - per staff/year entitlements. (`public.leave_records.company` exists as a TH-side marker; JP never writes the shared ledger.)
+- `jellypolly.pinjam_records`, `jellypolly.mid_month_payrolls`, `jellypolly.commission_records` (Bonus/Advance via is_advance), `jellypolly.others_records` (Kerja Luar OT) - GT-shaped clones on the JP catalogue.
+- `jellypolly.payroll_settings` - setting_key (unique), setting_value (e-caruman registration codes etc.)
+
+Production (products shared, workers are JP staff):
+
+- `jellypolly.production_entries` - entry_date, product_id (FK public.products), worker_id (FK jellypolly.staffs), bags_packed (unique date+product+worker). Feeds JP payroll via jellypolly.product_pay_codes (base per-bag/ctn pay; no TH threshold tiers). Machine-broken status stays in shared `public.production_machine_status` (product-keyed).
+- `jellypolly.production_worker_orders` - scope ('JP_PRODUCTION'), worker_id (FK jellypolly.staffs), sort_order (drag-and-drop worker card order on JP Production Entry).
+- `/api/stock/movements` + `/api/stock/closing-batch` branch by product type: JP products read jellypolly.production_entries and union sales from BOTH companies' invoices; TH products keep the original public-only sources.
 
 ### Styling
 

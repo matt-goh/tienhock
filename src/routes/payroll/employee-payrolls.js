@@ -199,6 +199,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
         AND EXTRACT(YEAR FROM leave_date) = $2
         AND EXTRACT(MONTH FROM leave_date) = $3
         AND status = 'approved'
+        AND company <> 'JP'
       ORDER BY leave_date ASC
     `,
       [employee_name, year, month],
@@ -779,6 +780,7 @@ export default function (pool) {
         AND EXTRACT(YEAR FROM lr.leave_date) = mp.year
         AND EXTRACT(MONTH FROM lr.leave_date) = mp.month
         AND lr.status = 'approved'
+        AND lr.company <> 'JP'
       ORDER BY ep.id, lr.leave_date ASC
     `;
       const leaveRecordsResult = await pool.query(leaveRecordsQuery, [
@@ -1220,6 +1222,7 @@ export default function (pool) {
             AND EXTRACT(YEAR FROM lr.leave_date) = $2
             AND EXTRACT(MONTH FROM lr.leave_date) = $3
             AND lr.status = 'approved'
+            AND lr.company <> 'JP'
           ORDER BY lr.leave_date ASC
         `,
           [payrollData.employee_id, payrollData.year, payrollData.month],
@@ -1331,17 +1334,32 @@ export default function (pool) {
               ],
             ),
 
-        // Get pinjam records for this employee for the specific month/year.
-        pool.query(
-          `
-          SELECT p.*, s.name as employee_name
-          FROM pinjam_records p
-          LEFT JOIN staffs s ON p.employee_id = s.id
-          WHERE p.employee_id = $1 AND p.year = $2 AND p.month = $3
-          ORDER BY p.year DESC, p.month DESC, p.employee_id, p.pinjam_type, p.description
-        `,
-          [payrollData.employee_id, payrollData.year, payrollData.month],
-        ),
+        // Get pinjam records for this payroll month. Grouped payrolls can have
+        // pinjam entered against any same-name sibling ID, so mirror the
+        // mid-month/commission/Others sibling lookup used above.
+        isGroupedPayroll
+          ? pool.query(
+              `
+              SELECT p.*, s.name as employee_name
+              FROM pinjam_records p
+              JOIN staffs s ON p.employee_id = s.id
+              WHERE s.name = (SELECT name FROM staffs WHERE id = $1)
+                AND p.year = $2
+                AND p.month = $3
+              ORDER BY p.year DESC, p.month DESC, p.employee_id, p.pinjam_type, p.description
+            `,
+              [payrollData.employee_id, payrollData.year, payrollData.month],
+            )
+          : pool.query(
+              `
+              SELECT p.*, s.name as employee_name
+              FROM pinjam_records p
+              LEFT JOIN staffs s ON p.employee_id = s.id
+              WHERE p.employee_id = $1 AND p.year = $2 AND p.month = $3
+              ORDER BY p.year DESC, p.month DESC, p.employee_id, p.pinjam_type, p.description
+            `,
+              [payrollData.employee_id, payrollData.year, payrollData.month],
+            ),
       ]);
 
       // Parse items
@@ -1635,6 +1653,7 @@ export default function (pool) {
             AND EXTRACT(YEAR FROM lr.leave_date) = $2
             AND EXTRACT(MONTH FROM lr.leave_date) = $3
             AND lr.status = 'approved'
+            AND lr.company <> 'JP'
           ORDER BY lr.leave_date ASC
         `,
           [payrollData.employee_id, payrollData.year, payrollData.month],

@@ -1,5 +1,6 @@
 // src/routes/payroll/pinjam-records.js
 import { Router } from "express";
+import { buildPinjamDashboardData } from "./pinjam-dashboard.js";
 
 export default function (pool) {
   const router = Router();
@@ -164,59 +165,24 @@ export default function (pool) {
         `, [yearInt, monthInt])
       ]);
 
-      // Process pinjam summary data
-      const pinjamSummary = {};
-      pinjamSummaryResult.rows.forEach(row => {
-        if (!pinjamSummary[row.employee_id]) {
-          pinjamSummary[row.employee_id] = {
-            employee_id: row.employee_id,
-            employee_name: row.employee_name,
-            mid_month: { total_amount: 0, details: [], record_count: 0 },
-            monthly: { total_amount: 0, details: [], record_count: 0 }
-          };
-        }
-
-        const type = row.pinjam_type === 'mid_month' ? 'mid_month' : 'monthly';
-        pinjamSummary[row.employee_id][type] = {
-          total_amount: parseFloat(row.total_amount),
-          details: row.details ? row.details.split(', ') : [],
-          record_count: parseInt(row.record_count)
-        };
-      });
-
-      // Process employee payrolls data
-      const employeePayrolls = [];
-      monthlyPayrollsResult.rows.forEach(row => {
-        if (row.employee_id) {
-          employeePayrolls.push({
-            employee_payroll_id: row.employee_payroll_id,
-            employee_id: row.employee_id,
-            employee_name: row.employee_name,
-            net_pay: parseFloat(row.net_pay || 0),
-            setelah_digenapkan: row.setelah_digenapkan == null
-              ? undefined
-              : parseFloat(row.setelah_digenapkan)
-          });
-        }
+      const dashboardData = buildPinjamDashboardData({
+        pinjamRecordsRows: pinjamRecordsResult.rows,
+        pinjamSummaryRows: pinjamSummaryResult.rows,
+        midMonthPayrollRows: midMonthPayrollsResult.rows,
+        monthlyPayrollRows: monthlyPayrollsResult.rows,
       });
 
       // Format response
       res.json({
-        pinjamRecords: pinjamRecordsResult.rows.map(row => ({
-          ...row,
-          amount: parseFloat(row.amount)
-        })),
-        pinjamSummary: Object.values(pinjamSummary),
-        midMonthPayrolls: midMonthPayrollsResult.rows,
-        employeePayrolls: employeePayrolls,
+        ...dashboardData,
         meta: {
           year: yearInt,
           month: monthInt,
           recordCounts: {
-            pinjamRecords: pinjamRecordsResult.rows.length,
-            pinjamSummary: Object.keys(pinjamSummary).length,
-            midMonthPayrolls: midMonthPayrollsResult.rows.length,
-            employeePayrolls: employeePayrolls.length
+            pinjamRecords: dashboardData.pinjamRecords.length,
+            pinjamSummary: dashboardData.pinjamSummary.length,
+            midMonthPayrolls: dashboardData.midMonthPayrolls.length,
+            employeePayrolls: dashboardData.employeePayrolls.length
           }
         }
       });

@@ -33,7 +33,15 @@ const STOCK_SYSTEM_START_DATE_STRING = "2026-01-01";
 
 type ViewType = "month" | "rolling" | "custom";
 
-const ProductStockMovementPage: React.FC = () => {
+interface ProductStockMovementPageProps {
+  // Restrict the page to specific product types (e.g. ["JP"] for the Jelly
+  // Polly stock page). Default: TH behaviour (BH/MEE + whitelisted OTH).
+  productTypes?: string[];
+}
+
+const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
+  productTypes,
+}) => {
   // State
   const [selectedProductId, setSelectedProductId] = useState<string | null>(
     null
@@ -96,19 +104,34 @@ const ProductStockMovementPage: React.FC = () => {
       window.removeEventListener("favorites-changed", handleFavoritesChange);
   }, []);
 
-  // Get favorite products (BH, MEE, and the whitelisted OTH stock products)
+  // Get favorite products (BH, MEE, and the whitelisted OTH stock products —
+  // or the restricted productTypes when set)
   const favoriteProducts = useMemo(() => {
     return products.filter(
       (product) =>
         favorites.has(product.id) &&
-        (product.type === "BH" ||
-          product.type === "MEE" ||
-          isOthProductionProduct(product.id))
+        (productTypes
+          ? productTypes.includes(product.type)
+          : product.type === "BH" ||
+            product.type === "MEE" ||
+            isOthProductionProduct(product.id))
     ) as StockProduct[];
-  }, [products, favorites]);
+  }, [products, favorites, productTypes]);
 
   // Selectable products grouped by category, for the empty-state picker
   const selectableProductGroups = useMemo(() => {
+    if (productTypes) {
+      // Restricted mode (e.g. Jelly Polly): one flat group per type
+      return productTypes
+        .map((type) => ({
+          label: type === "JP" ? "Jelly Polly Products" : `${type} Products`,
+          products: (products as StockProduct[]).filter(
+            (product) => product.type === type
+          ),
+        }))
+        .filter((group) => group.products.length > 0);
+    }
+
     const bh: StockProduct[] = [];
     const mee: StockProduct[] = [];
     const oth: StockProduct[] = [];
@@ -128,7 +151,7 @@ const ProductStockMovementPage: React.FC = () => {
       { label: "Mee Products", products: mee },
       { label: "Other Products", products: oth },
     ].filter((group) => group.products.length > 0);
-  }, [products]);
+  }, [products, productTypes]);
 
   // Format date to YYYY-MM-DD in local timezone (not UTC)
   const formatDateLocal = (date: Date): string => {
@@ -277,9 +300,11 @@ const ProductStockMovementPage: React.FC = () => {
               label="Product"
               value={selectedProductId}
               onChange={setSelectedProductId}
-              productTypes={["BH", "MEE", "OTH"]}
+              productTypes={productTypes || ["BH", "MEE", "OTH"]}
               productFilter={(product) =>
-                product.type !== "OTH" || isOthProductionProduct(product.id)
+                productTypes
+                  ? productTypes.includes(product.type)
+                  : product.type !== "OTH" || isOthProductionProduct(product.id)
               }
               showCategories={true}
               required

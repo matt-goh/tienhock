@@ -110,6 +110,26 @@ import jellypollyPaymentRouter from "./jellypolly/payments.js";
 import jellypollyEInvoiceRouter from "./jellypolly/e-invoices.js";
 import jellypollyDebtorsRouter from "./jellypolly/debtors.js";
 import jellypollyAdjustmentDocsRouter from "./jellypolly/adjustment-docs.js";
+import jellypollyPayrollEmployeesRouter from "./jellypolly/payroll-employees.js";
+import jellypollyMonthlyPayrollsRouter from "./jellypolly/monthly-payrolls.js";
+import jellypollyEmployeePayrollsRouter from "./jellypolly/employee-payrolls.js";
+import jellypollyMonthlyWorkLogsRouter from "./jellypolly/monthly-work-logs.js";
+import jellypollyDailyWorkLogsRouter from "./jellypolly/daily-work-logs.js";
+import jellypollyPinjamRecordsRouter from "./jellypolly/pinjam-records.js";
+import jellypollyMidMonthPayrollsRouter from "./jellypolly/mid-month-payrolls.js";
+import jellypollyIncentivesRouter from "./jellypolly/incentives.js";
+import jellypollyOthersRecordsRouter from "./jellypolly/others-records.js";
+import jellypollySalaryReportRouter from "./jellypolly/salary-report.js";
+import jellypollyECarumanRouter from "./jellypolly/e-caruman.js";
+import jellypollyStaffsRouter from "./jellypolly/staffs.js";
+import jellypollyJobsRouter from "./jellypolly/jobs.js";
+import jellypollyPayCodesRouter from "./jellypolly/pay-codes.js";
+import jellypollyJobPayCodesRouter from "./jellypolly/job-pay-codes.js";
+import jellypollyEmployeePayCodesRouter from "./jellypolly/employee-pay-codes.js";
+import jellypollyPayRateSchedulesRouter from "./jellypolly/pay-rate-schedules.js";
+import jellypollyProductPayCodesRouter from "./jellypolly/product-pay-codes.js";
+import jellypollyLeaveManagementRouter from "./jellypolly/leave-management.js";
+import jellypollyProductionEntriesRouter from "./jellypolly/production-entries.js";
 
 // Excel routes
 import paymentExportRouter from "./excel/payment-export.js";
@@ -309,6 +329,68 @@ export default function setupRoutes(app, pool) {
   app.use(
     "/jellypolly/api/adjustment-docs",
     jellypollyAdjustmentDocsRouter(pool, myInvoisJPConfig)
+  );
+  app.use(
+    "/jellypolly/api/payroll-employees",
+    jellypollyPayrollEmployeesRouter(pool)
+  );
+  app.use(
+    "/jellypolly/api/monthly-payrolls",
+    jellypollyMonthlyPayrollsRouter(pool)
+  );
+  app.use(
+    "/jellypolly/api/employee-payrolls",
+    jellypollyEmployeePayrollsRouter(pool)
+  );
+  app.use(
+    "/jellypolly/api/monthly-work-logs",
+    jellypollyMonthlyWorkLogsRouter(pool)
+  );
+  app.use(
+    "/jellypolly/api/daily-work-logs",
+    jellypollyDailyWorkLogsRouter(pool)
+  );
+  app.use(
+    "/jellypolly/api/pinjam-records",
+    jellypollyPinjamRecordsRouter(pool)
+  );
+  app.use(
+    "/jellypolly/api/mid-month-payrolls",
+    jellypollyMidMonthPayrollsRouter(pool)
+  );
+  app.use("/jellypolly/api/incentives", jellypollyIncentivesRouter(pool));
+  app.use(
+    "/jellypolly/api/others-records",
+    jellypollyOthersRecordsRouter(pool)
+  );
+  app.use(
+    "/jellypolly/api/salary-report",
+    jellypollySalaryReportRouter(pool)
+  );
+  app.use("/jellypolly/api/e-caruman", jellypollyECarumanRouter(pool));
+  app.use("/jellypolly/api/staffs", jellypollyStaffsRouter(pool));
+  app.use("/jellypolly/api/jobs", jellypollyJobsRouter(pool));
+  app.use("/jellypolly/api/pay-codes", jellypollyPayCodesRouter(pool));
+  app.use("/jellypolly/api/job-pay-codes", jellypollyJobPayCodesRouter(pool));
+  app.use(
+    "/jellypolly/api/employee-pay-codes",
+    jellypollyEmployeePayCodesRouter(pool)
+  );
+  app.use(
+    "/jellypolly/api/pay-rate-schedules",
+    jellypollyPayRateSchedulesRouter(pool)
+  );
+  app.use(
+    "/jellypolly/api/product-pay-codes",
+    jellypollyProductPayCodesRouter(pool)
+  );
+  app.use(
+    "/jellypolly/api/leave-management",
+    jellypollyLeaveManagementRouter(pool)
+  );
+  app.use(
+    "/jellypolly/api/production-entries",
+    jellypollyProductionEntriesRouter(pool)
   );
 
   // Catalogue - Main routes

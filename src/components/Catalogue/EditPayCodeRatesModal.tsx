@@ -23,6 +23,8 @@ interface EditRatesState {
 }
 
 interface EditPayCodeRatesModalProps {
+  // API base for pay-code endpoints (JP passes /jellypolly/api)
+  apiBase?: string;
   isOpen: boolean;
   onClose: () => void;
   jobId: string;
@@ -38,6 +40,7 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
   jobName,
   payCodeDetail,
   onRatesSaved,
+  apiBase = "/api",
 }) => {
   const [editRates, setEditRates] = useState<EditRatesState>({
     biasa: "",
@@ -95,7 +98,7 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
     if (!payCodeDetail || !jobId) return;
 
     try {
-      await api.delete(`/api/job-pay-codes/${jobId}/${payCodeDetail.id}`);
+      await api.delete(`${apiBase}/job-pay-codes/${jobId}/${payCodeDetail.id}`);
       toast.success("Pay code unlinked successfully");
       onRatesSaved();
       onClose();
@@ -163,7 +166,7 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
     }
 
     try {
-      await api.put(`/api/job-pay-codes/${jobId}/${payCodeDetail.id}`, payload);
+      await api.put(`${apiBase}/job-pay-codes/${jobId}/${payCodeDetail.id}`, payload);
       toast.success("Pay code settings updated successfully");
       onRatesSaved(); // Trigger refresh in parent
       onClose();

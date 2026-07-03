@@ -16,6 +16,7 @@ import {
 import Button from "../Button";
 import { FormInput } from "../FormComponents";
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
+import { useJPJobPayCodeMappings } from "../../utils/JellyPolly/useJPJobPayCodeMappings";
 import {
   addManualPayrollItem,
   calculateAmount,
@@ -36,6 +37,8 @@ interface AddManualItemModalProps {
   onItemAdded: () => void;
   employeeJobType?: string; // Optional job type for filtering pay codes
   apiBasePath?: string; // Override the API base path (e.g. Green Target)
+  // Catalogue source — Jelly Polly pages pass "jellypolly" (own pay codes).
+  company?: "tienhock" | "jellypolly";
 }
 
 interface PayCodeOption {
@@ -54,12 +57,23 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
   onItemAdded,
   employeeJobType,
   apiBasePath,
+  company = "tienhock",
 }) => {
   const {
-    payCodes,
-    detailedMappings,
-    loading: loadingPayCodes,
+    payCodes: thPayCodes,
+    detailedMappings: thDetailedMappings,
+    loading: loadingThPayCodes,
   } = useJobPayCodeMappings();
+  const {
+    payCodes: jpPayCodes,
+    detailedMappings: jpDetailedMappings,
+    loading: loadingJpPayCodes,
+  } = useJPJobPayCodeMappings();
+  const payCodes = company === "jellypolly" ? jpPayCodes : thPayCodes;
+  const detailedMappings =
+    company === "jellypolly" ? jpDetailedMappings : thDetailedMappings;
+  const loadingPayCodes =
+    company === "jellypolly" ? loadingJpPayCodes : loadingThPayCodes;
 
   const [selectedPayCode, setSelectedPayCode] = useState<string>("");
   const [customDescription, setCustomDescription] = useState<string>("");
