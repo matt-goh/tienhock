@@ -283,7 +283,7 @@ const MaterialsListPage: React.FC = () => {
               placeholder="Search..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="px-3 py-1 pr-7 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-default-500 dark:focus:ring-default-400 focus:border-default-500 dark:focus:border-default-400 w-[140px] placeholder-gray-400 dark:placeholder-gray-500"
+              className="px-3 py-1 pr-7 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-gray-900 dark:text-gray-100 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-default-500 dark:focus:ring-default-400 focus:border-default-500 dark:focus:border-default-400 w-[140px] placeholder-gray-400 dark:placeholder-gray-500"
             />
             {searchTerm && (
               <button

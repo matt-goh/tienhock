@@ -550,7 +550,7 @@ const MidMonthPayrollPage: React.FC = () => {
                   setSearchQuery(event.target.value)
                 }
                 placeholder="Search employee..."
-                className="w-full rounded-lg border border-default-300 bg-white py-1.5 pl-8 pr-8 text-sm text-default-900 shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 sm:w-56"
+                className="w-full rounded-lg border border-default-300 bg-white py-1.5 pl-8 pr-8 text-sm text-default-900 shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder:text-gray-500 sm:w-56"
               />
               {searchQuery && (
                 <button

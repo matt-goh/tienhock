@@ -1947,7 +1947,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       value={leaveEmployeeSearch}
                       onChange={(e) => setLeaveEmployeeSearch(e.target.value)}
                       placeholder="Search by name or ID..."
-                      className="w-full pl-9 pr-3 py-2 text-sm border border-default-300 dark:border-gray-600 rounded-lg focus:ring-1 focus:ring-sky-500 focus:border-sky-500 bg-white dark:bg-gray-700 dark:text-gray-100"
+                      className="w-full pl-9 pr-3 py-2 text-sm border border-default-300 dark:border-gray-600 rounded-lg focus:ring-1 focus:ring-sky-500 focus:border-sky-500 bg-white dark:bg-gray-900/50 dark:text-gray-100"
                     />
                   </div>
 

@@ -1,5 +1,5 @@
 // src/components/Navbar/NavbarDropdown.tsx
-import React, { useRef, useEffect, useState, useCallback } from "react";
+import React, { useRef, useEffect, useLayoutEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Transition } from "@headlessui/react";
@@ -105,18 +105,46 @@ export default function NavbarDropdown({
     ? Math.min(groupedItems.length, 4)
     : getMegaMenuColumns(navigableItems.length);
 
-  // Calculate position based on anchor element (centered using transform)
-  useEffect(() => {
-    if (anchorRef.current && isOpen) {
-      const rect = anchorRef.current.getBoundingClientRect();
-      const anchorCenter = rect.left + rect.width / 2;
+  // Calculate position based on anchor element (centered using transform),
+  // then clamp so the dropdown never spills past the viewport edge. This
+  // matters most for the leftmost/rightmost nav buttons (e.g. Accounting),
+  // whose mega-menu/list width is often much wider than the button itself -
+  // centering blindly can push most of the box off-screen.
+  const recalcPosition = useCallback(() => {
+    if (!anchorRef.current) return;
+    const rect = anchorRef.current.getBoundingClientRect();
+    const anchorCenter = rect.left + rect.width / 2;
+    const margin = 8;
 
-      setPosition({
-        top: rect.bottom + 4,
-        left: anchorCenter,
-      });
-    }
-  }, [anchorRef, isOpen]);
+    // Prefer the dropdown's actual rendered width; fall back to the known
+    // min-width formula for the very first paint, before it has measured.
+    const dropdownWidth =
+      dropdownRef.current?.getBoundingClientRect().width ??
+      (isMegaMenu ? columns * 200 : 220);
+
+    const idealLeftEdge = anchorCenter - dropdownWidth / 2;
+    const clampedLeftEdge = Math.max(
+      margin,
+      Math.min(idealLeftEdge, window.innerWidth - dropdownWidth - margin)
+    );
+
+    setPosition({
+      top: rect.bottom + 4,
+      left: clampedLeftEdge + dropdownWidth / 2,
+    });
+  }, [anchorRef, isMegaMenu, columns]);
+
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    recalcPosition();
+  }, [isOpen, recalcPosition]);
+
+  // Re-clamp if the viewport is resized while the dropdown stays open.
+  useEffect(() => {
+    if (!isOpen) return;
+    window.addEventListener("resize", recalcPosition);
+    return () => window.removeEventListener("resize", recalcPosition);
+  }, [isOpen, recalcPosition]);
 
   // Close dropdown when clicking outside
   useEffect(() => {

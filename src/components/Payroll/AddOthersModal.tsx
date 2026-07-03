@@ -667,7 +667,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                                             setBulkStaffQuery(e.target.value)
                                           }
                                           placeholder="Search staff..."
-                                          className="w-full rounded-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 px-2 text-sm text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                                          className="w-full rounded-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-1.5 px-2 text-sm text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                                         />
                                         <div className="mt-2 max-h-60 overflow-auto space-y-0.5">
                                           {filteredBulkStaffOptions.length === 0 ? (
