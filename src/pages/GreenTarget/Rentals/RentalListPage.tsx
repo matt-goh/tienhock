@@ -786,7 +786,7 @@ const RentalListPage = () => {
                     </label>
                     <Listbox value={selectedDestination} onChange={setSelectedDestination}>
                       <div className="relative">
-                        <Listbox.Button className="relative w-full cursor-pointer rounded-lg bg-white dark:bg-gray-700 py-2.5 pl-3 pr-10 text-left border border-default-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400">
+                        <Listbox.Button className="relative w-full cursor-pointer rounded-lg bg-white dark:bg-gray-900/50 py-2.5 pl-3 pr-10 text-left border border-default-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400">
                           <span className="block truncate text-default-800 dark:text-gray-200">
                             {pickupDestinations.find((d) => d.code === selectedDestination)?.name ||
                               "Select destination..."}

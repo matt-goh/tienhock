@@ -1066,7 +1066,7 @@ const LocationAccountMappingsPage: React.FC = () => {
                     onChange={setSelectedMappingType}
                   >
                     <div className="relative">
-                      <ListboxButton className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 pr-10 text-left text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
+                      <ListboxButton className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 px-3 py-2 pr-10 text-left text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
                         <span className="block truncate">
                           {getMappingTypeLabel(selectedMappingType)}
                         </span>

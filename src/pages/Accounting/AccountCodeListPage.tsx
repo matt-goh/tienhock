@@ -515,7 +515,7 @@ const AccountCodeListPage: React.FC = () => {
               onChange={setSelectedLedgerType}
             >
               <div className="relative">
-                <ListboxButton className="relative w-40 cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm dark:text-gray-100">
+                <ListboxButton className="relative w-40 cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm dark:text-gray-100">
                   <span className="block truncate text-gray-900 dark:text-gray-100">
                     {selectedLedgerType === "All"
                       ? "All Types"

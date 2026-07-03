@@ -567,15 +567,15 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
 
                 return (
                   <div className="mb-3">
-                    <h4 className="text-sm font-medium text-default-700 mb-2">
+                    <h4 className="text-sm font-medium text-default-700 dark:text-gray-300 mb-2">
                       Auto-Consolidation Status
                     </h4>
 
                     {windowInfo.inWindow ? (
-                      <div className="text-xs text-default-600 bg-green-50 border border-green-200 rounded-lg p-3">
+                      <div className="text-xs text-default-600 dark:text-gray-300 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
                         <div className="flex items-center mb-2">
                           <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                          <strong className="text-green-800">
+                          <strong className="text-green-800 dark:text-green-300">
                             Active Consolidation Window
                           </strong>
                         </div>
@@ -601,10 +601,10 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                         </div>
                       </div>
                     ) : (
-                      <div className="text-xs text-default-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <div className="text-xs text-default-600 dark:text-gray-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
                         <div className="flex items-center mb-2">
                           <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
-                          <strong className="text-blue-800">
+                          <strong className="text-blue-800 dark:text-blue-300">
                             Outside Consolidation Window
                           </strong>
                         </div>
@@ -647,7 +647,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                     }
                   >
                     <div className="relative">
-                      <ListboxButton className="rounded-lg border border-default-300 dark:border-gray-600 py-1 px-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-100 w-32 text-left flex items-center justify-between">
+                      <ListboxButton className="rounded-lg border border-default-300 dark:border-gray-600 py-1 px-2 text-sm bg-white dark:bg-gray-900/50 dark:text-gray-100 w-32 text-left flex items-center justify-between">
                         <span className="block truncate">
                           {monthOptions[selectedMonth].name}
                         </span>
@@ -746,12 +746,12 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
 
               {/* Loading, Error, Empty states remain the same */}
               {isLoadingEligible && (
-                <div className="flex justify-center items-center py-16 text-default-500">
+                <div className="flex justify-center items-center py-16 text-default-500 dark:text-gray-400">
                   <LoadingSpinner size="md" />
                 </div>
               )}
               {!isLoadingEligible && error && (
-                <div className="bg-rose-50 border border-rose-200 rounded-lg p-4 text-rose-700">
+                <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg p-4 text-rose-700 dark:text-rose-300">
                   <div className="flex items-center">
                     <IconAlertTriangle
                       className="mr-2.5 flex-shrink-0"
@@ -798,16 +798,16 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                       {selectedInvoices.size === eligibleInvoices.length &&
                       eligibleInvoices.length > 0 ? (
                         <IconSquareCheckFilled
-                          className="text-blue-600"
+                          className="text-blue-600 dark:text-blue-400"
                           size={20}
                         />
                       ) : (
                         <IconSquare
-                          className="text-default-400 group-hover:text-blue-500 transition-colors"
+                          className="text-default-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors"
                           size={20}
                         />
                       )}
-                      <span className="ml-2 text-sm font-medium text-default-700 hidden sm:inline">
+                      <span className="ml-2 text-sm font-medium text-default-700 dark:text-gray-200 hidden sm:inline">
                         {selectedInvoices.size === eligibleInvoices.length
                           ? "Deselect All"
                           : "Select All"}
@@ -815,7 +815,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                     </div>
                     <div className="flex-grow mb-0.5">
                       {selectedInvoices.size > 0 && (
-                        <span className="text-sm text-blue-800 font-medium">
+                        <span className="text-sm text-blue-800 dark:text-blue-300 font-medium">
                           {selectedInvoices.size} selected • Total:{" "}
                           <span className="font-semibold">
                             {formatCurrency(getTotalAmountSelected())}
@@ -917,7 +917,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                     disabled={isLoadingHistory || !!processingHistoryId}
                   >
                     <div className="relative">
-                      <ListboxButton className="rounded-lg border border-default-300 dark:border-gray-600 py-1 px-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-100 w-28 text-left flex items-center justify-between">
+                      <ListboxButton className="rounded-lg border border-default-300 dark:border-gray-600 py-1 px-2 text-sm bg-white dark:bg-gray-900/50 dark:text-gray-100 w-28 text-left flex items-center justify-between">
                         <span className="block truncate">{historyYear}</span>
                         <IconChevronDown
                           className="h-4 w-4 text-default-400 dark:text-gray-400"
@@ -996,7 +996,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
 
               {/* Loading State */}
               {isLoadingHistory && !processingHistoryId && (
-                <div className="flex justify-center items-center py-16 text-default-500">
+                <div className="flex justify-center items-center py-16 text-default-500 dark:text-gray-400">
                   <LoadingSpinner size="md" />
                 </div>
               )}

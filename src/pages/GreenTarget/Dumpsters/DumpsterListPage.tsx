@@ -323,7 +323,7 @@ const DumpsterListPage: React.FC = () => {
           <div className="w-48">
             <Listbox value={statusFilter} onChange={setStatusFilter}>
               <div className="relative">
-                <ListboxButton className="w-full rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
+                <ListboxButton className="w-full rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
                   <span className="pl-2 block truncate">
                     {statusFilter === "All"
                       ? "All Statuses"
