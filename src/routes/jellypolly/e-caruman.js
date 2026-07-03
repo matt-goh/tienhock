@@ -238,7 +238,7 @@ export default function (pool) {
           pd.employee_amount as emp_share
         FROM jellypolly.employee_payrolls ep
         JOIN jellypolly.monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
-        JOIN public.staffs s ON ep.employee_id = s.id
+        JOIN jellypolly.staffs s ON ep.employee_id = s.id
         JOIN jellypolly.payroll_deductions pd ON pd.employee_payroll_id = ep.id AND pd.deduction_type = 'epf'
         WHERE mp.month = $1 AND mp.year = $2
           AND s.epf_no IS NOT NULL AND s.epf_no != '' AND pd.employee_amount > 0
@@ -250,7 +250,7 @@ export default function (pool) {
           pd.employee_amount as emp_share, pd.employer_amount as em_share
         FROM jellypolly.employee_payrolls ep
         JOIN jellypolly.monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
-        JOIN public.staffs s ON ep.employee_id = s.id
+        JOIN jellypolly.staffs s ON ep.employee_id = s.id
         JOIN jellypolly.payroll_deductions pd ON pd.employee_payroll_id = ep.id AND pd.deduction_type = 'epf'
         WHERE mp.month = $1 AND mp.year = $2
           AND (s.epf_no IS NULL OR s.epf_no = '') AND pd.employee_amount > 0
@@ -268,7 +268,7 @@ export default function (pool) {
           COALESCE(sip.employee_amount, 0) as eis_employee
         FROM jellypolly.employee_payrolls ep
         JOIN jellypolly.monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
-        JOIN public.staffs s ON ep.employee_id = s.id
+        JOIN jellypolly.staffs s ON ep.employee_id = s.id
         LEFT JOIN jellypolly.payroll_deductions socso ON socso.employee_payroll_id = ep.id AND socso.deduction_type = 'socso'
         LEFT JOIN jellypolly.payroll_deductions sip ON sip.employee_payroll_id = ep.id AND sip.deduction_type = 'sip'
         WHERE mp.month = $1 AND mp.year = $2
@@ -284,7 +284,7 @@ export default function (pool) {
           COALESCE(sip.employee_amount, 0) as eis_employee
         FROM jellypolly.employee_payrolls ep
         JOIN jellypolly.monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
-        JOIN public.staffs s ON ep.employee_id = s.id
+        JOIN jellypolly.staffs s ON ep.employee_id = s.id
         JOIN jellypolly.payroll_deductions sip ON sip.employee_payroll_id = ep.id AND sip.deduction_type = 'sip'
         WHERE mp.month = $1 AND mp.year = $2
           AND s.ic_no IS NOT NULL AND s.ic_no != '' AND s.nationality = 'Malaysian'
@@ -298,7 +298,7 @@ export default function (pool) {
           COALESCE(pcb.employee_amount, 0) as pcb_amount
         FROM jellypolly.employee_payrolls ep
         JOIN jellypolly.monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
-        JOIN public.staffs s ON ep.employee_id = s.id
+        JOIN jellypolly.staffs s ON ep.employee_id = s.id
         JOIN jellypolly.payroll_deductions pcb ON pcb.employee_payroll_id = ep.id AND pcb.deduction_type = 'income_tax'
         WHERE mp.month = $1 AND mp.year = $2
           AND s.income_tax_no IS NOT NULL AND s.income_tax_no != ''
@@ -447,7 +447,7 @@ export default function (pool) {
           pd.employee_amount as emp_share
         FROM jellypolly.employee_payrolls ep
         JOIN jellypolly.monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
-        JOIN public.staffs s ON ep.employee_id = s.id
+        JOIN jellypolly.staffs s ON ep.employee_id = s.id
         JOIN jellypolly.payroll_deductions pd ON pd.employee_payroll_id = ep.id AND pd.deduction_type = 'epf'
         WHERE mp.month = $1 AND mp.year = $2
           AND s.epf_no IS NOT NULL AND s.epf_no != '' AND pd.employee_amount > 0
@@ -513,7 +513,7 @@ export default function (pool) {
           COALESCE(sip.employee_amount, 0) as eis_employee
         FROM jellypolly.employee_payrolls ep
         JOIN jellypolly.monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
-        JOIN public.staffs s ON ep.employee_id = s.id
+        JOIN jellypolly.staffs s ON ep.employee_id = s.id
         LEFT JOIN jellypolly.payroll_deductions socso ON socso.employee_payroll_id = ep.id AND socso.deduction_type = 'socso'
         LEFT JOIN jellypolly.payroll_deductions sip ON sip.employee_payroll_id = ep.id AND sip.deduction_type = 'sip'
         WHERE mp.month = $1 AND mp.year = $2
@@ -560,7 +560,7 @@ export default function (pool) {
           COALESCE(pcb.employee_amount, 0) as pcb_amount
         FROM jellypolly.employee_payrolls ep
         JOIN jellypolly.monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
-        JOIN public.staffs s ON ep.employee_id = s.id
+        JOIN jellypolly.staffs s ON ep.employee_id = s.id
         JOIN jellypolly.payroll_deductions pcb ON pcb.employee_payroll_id = ep.id AND pcb.deduction_type = 'income_tax'
         WHERE mp.month = $1 AND mp.year = $2
           AND s.income_tax_no IS NOT NULL AND s.income_tax_no != ''

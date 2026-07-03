@@ -30,7 +30,7 @@ export default function (pool) {
       let query = `
         SELECT cr.*, s.name as employee_name
         FROM jellypolly.commission_records cr
-        JOIN staffs s ON cr.employee_id = s.id
+        JOIN jellypolly.staffs s ON cr.employee_id = s.id
         WHERE 1=1
       `;
       const values = [];

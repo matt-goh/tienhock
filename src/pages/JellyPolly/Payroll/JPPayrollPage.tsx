@@ -286,6 +286,7 @@ const JPPayrollPage: React.FC = () => {
           {batchPayrolls.length > 0 && (
             <>
               <PrintBatchPayslipsButton
+                company="jellypolly"
                 payrolls={batchPayrolls}
                 companyName="JELLY POLLY"
                 size="sm"
@@ -293,6 +294,7 @@ const JPPayrollPage: React.FC = () => {
                 color="sky"
               />
               <DownloadBatchPayslipsButton
+                company="jellypolly"
                 payrolls={batchPayrolls}
                 companyName="JELLY POLLY"
                 size="sm"

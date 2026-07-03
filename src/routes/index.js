@@ -121,6 +121,15 @@ import jellypollyIncentivesRouter from "./jellypolly/incentives.js";
 import jellypollyOthersRecordsRouter from "./jellypolly/others-records.js";
 import jellypollySalaryReportRouter from "./jellypolly/salary-report.js";
 import jellypollyECarumanRouter from "./jellypolly/e-caruman.js";
+import jellypollyStaffsRouter from "./jellypolly/staffs.js";
+import jellypollyJobsRouter from "./jellypolly/jobs.js";
+import jellypollyPayCodesRouter from "./jellypolly/pay-codes.js";
+import jellypollyJobPayCodesRouter from "./jellypolly/job-pay-codes.js";
+import jellypollyEmployeePayCodesRouter from "./jellypolly/employee-pay-codes.js";
+import jellypollyPayRateSchedulesRouter from "./jellypolly/pay-rate-schedules.js";
+import jellypollyProductPayCodesRouter from "./jellypolly/product-pay-codes.js";
+import jellypollyLeaveManagementRouter from "./jellypolly/leave-management.js";
+import jellypollyProductionEntriesRouter from "./jellypolly/production-entries.js";
 
 // Excel routes
 import paymentExportRouter from "./excel/payment-export.js";
@@ -359,6 +368,30 @@ export default function setupRoutes(app, pool) {
     jellypollySalaryReportRouter(pool)
   );
   app.use("/jellypolly/api/e-caruman", jellypollyECarumanRouter(pool));
+  app.use("/jellypolly/api/staffs", jellypollyStaffsRouter(pool));
+  app.use("/jellypolly/api/jobs", jellypollyJobsRouter(pool));
+  app.use("/jellypolly/api/pay-codes", jellypollyPayCodesRouter(pool));
+  app.use("/jellypolly/api/job-pay-codes", jellypollyJobPayCodesRouter(pool));
+  app.use(
+    "/jellypolly/api/employee-pay-codes",
+    jellypollyEmployeePayCodesRouter(pool)
+  );
+  app.use(
+    "/jellypolly/api/pay-rate-schedules",
+    jellypollyPayRateSchedulesRouter(pool)
+  );
+  app.use(
+    "/jellypolly/api/product-pay-codes",
+    jellypollyProductPayCodesRouter(pool)
+  );
+  app.use(
+    "/jellypolly/api/leave-management",
+    jellypollyLeaveManagementRouter(pool)
+  );
+  app.use(
+    "/jellypolly/api/production-entries",
+    jellypollyProductionEntriesRouter(pool)
+  );
 
   // Catalogue - Main routes
   app.use("/api/staffs", staffRouter(pool));

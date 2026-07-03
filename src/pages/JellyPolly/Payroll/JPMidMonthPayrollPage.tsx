@@ -32,7 +32,7 @@ import {
 import TimeNavigator from "../../../components/TimeNavigator";
 import { api } from "../../../routes/utils/api";
 import { getMonthName } from "../../../utils/payroll/payrollUtils";
-import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
+import { useJPStaffsCache } from "../../../utils/JellyPolly/useJPStaffsCache";
 import {
   generateMidMonthPayrollReportPDF,
   MidMonthPayrollReportPDFData,
@@ -293,7 +293,7 @@ const JPMidMonthPayrollPage: React.FC = () => {
   const [pinjamByEmp, setPinjamByEmp] = useState<Record<string, number>>({});
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isGeneratingExport, setIsGeneratingExport] = useState(false);
-  const { staffs } = useStaffsCache();
+  const { staffs } = useJPStaffsCache();
 
   // Filters
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());

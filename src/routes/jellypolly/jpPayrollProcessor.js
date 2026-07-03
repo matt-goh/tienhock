@@ -96,7 +96,7 @@ export const reprocessJPEmployees = async (
     // Canonical (HEAD) mapping across all staff
     const canonicalRows = await client.query(
       `SELECT id, COALESCE(NULLIF(head_staff_id, ''), id) AS canonical_id
-       FROM public.staffs`
+       FROM jellypolly.staffs`
     );
     const idToCanonical = new Map(
       canonicalRows.rows.map((r) => [r.id, r.canonical_id])
@@ -163,7 +163,7 @@ export const reprocessJPEmployees = async (
                   spouse_employment_status, number_of_children,
                   epf_age_override, epf_nationality_override,
                   socso_age_override, sip_age_override
-           FROM public.staffs
+           FROM jellypolly.staffs
            WHERE id = ANY($1)`,
           [targetCanonicalIds]
         ),
@@ -178,7 +178,7 @@ export const reprocessJPEmployees = async (
            FROM jellypolly.monthly_work_logs mwl
            JOIN jellypolly.monthly_work_log_entries mwle ON mwl.id = mwle.monthly_log_id
            JOIN jellypolly.monthly_work_log_activities mwla ON mwla.monthly_entry_id = mwle.id
-           LEFT JOIN public.pay_codes pc ON mwla.pay_code_id = pc.id
+           LEFT JOIN jellypolly.pay_codes pc ON mwla.pay_code_id = pc.id
            WHERE mwl.log_month = $1 AND mwl.log_year = $2
              AND mwl.status = 'Submitted'
              AND mwle.employee_id = ANY($3)`,
@@ -194,7 +194,7 @@ export const reprocessJPEmployees = async (
            FROM jellypolly.daily_work_logs dwl
            JOIN jellypolly.daily_work_log_entries dwle ON dwl.id = dwle.work_log_id
            JOIN jellypolly.daily_work_log_activities dwla ON dwla.log_entry_id = dwle.id
-           LEFT JOIN public.pay_codes pc ON dwla.pay_code_id = pc.id
+           LEFT JOIN jellypolly.pay_codes pc ON dwla.pay_code_id = pc.id
            WHERE dwl.log_date >= $1 AND dwl.log_date <= $2
              AND dwl.status <> 'Draft'
              AND dwle.employee_id = ANY($3)`,
@@ -214,7 +214,7 @@ export const reprocessJPEmployees = async (
                   orec.rate, orec.rate_unit, orec.quantity, orec.amount,
                   pc.pay_type
            FROM jellypolly.others_records orec
-           LEFT JOIN public.pay_codes pc ON orec.pay_code_id = pc.id
+           LEFT JOIN jellypolly.pay_codes pc ON orec.pay_code_id = pc.id
            WHERE DATE(orec.record_date) >= $1 AND DATE(orec.record_date) <= $2
              AND orec.employee_id = ANY($3)`,
           [startDate, endDate, targetSiblingIds]
@@ -232,7 +232,7 @@ export const reprocessJPEmployees = async (
           `SELECT ep.employee_id AS canonical_id, pi.amount, pc.pay_type
            FROM jellypolly.employee_payrolls ep
            JOIN jellypolly.payroll_items pi ON pi.employee_payroll_id = ep.id
-           LEFT JOIN public.pay_codes pc ON pi.pay_code_id = pc.id
+           LEFT JOIN jellypolly.pay_codes pc ON pi.pay_code_id = pc.id
            WHERE ep.monthly_payroll_id = $1
              AND ep.employee_id = ANY($2)
              AND pi.is_manual = true`,
@@ -244,10 +244,9 @@ export const reprocessJPEmployees = async (
         client.query(
           `SELECT employee_id, to_char(leave_date, 'YYYY-MM-DD') AS leave_date,
                   leave_type, CAST(amount_paid AS NUMERIC(10,2)) AS amount_paid
-           FROM public.leave_records
+           FROM jellypolly.leave_records
            WHERE leave_date >= $1 AND leave_date <= $2
              AND status = 'approved'
-             AND company = 'JP'
              AND employee_id = ANY($3)`,
           [startDate, endDate, targetSiblingIds]
         ),
@@ -261,7 +260,7 @@ export const reprocessJPEmployees = async (
         client.query(
           `SELECT pe.entry_date, to_char(pe.entry_date, 'YYYY-MM-DD') AS entry_date_str,
                   pe.product_id, pe.worker_id, pe.bags_packed
-           FROM public.production_entries pe
+           FROM jellypolly.production_entries pe
            JOIN public.products p ON pe.product_id = p.id
            WHERE pe.entry_date BETWEEN $1 AND $2
              AND pe.bags_packed > 0
@@ -276,10 +275,10 @@ export const reprocessJPEmployees = async (
                   CAST(eff.rate_biasa AS NUMERIC(10,2)) as rate_biasa,
                   CAST(eff.rate_ahad AS NUMERIC(10,2)) as rate_ahad,
                   CAST(eff.rate_umum AS NUMERIC(10,2)) as rate_umum
-           FROM public.product_pay_codes ppc
-           JOIN public.pay_codes pc ON ppc.pay_code_id = pc.id
+           FROM jellypolly.product_pay_codes ppc
+           JOIN jellypolly.pay_codes pc ON ppc.pay_code_id = pc.id
            JOIN public.products p ON ppc.product_id = p.id
-           LEFT JOIN LATERAL public.get_effective_pay_rate(
+           LEFT JOIN LATERAL jellypolly.get_effective_pay_rate(
              NULL::varchar, NULL::varchar, ppc.pay_code_id, $1, $2
            ) eff ON true
            WHERE pc.is_active = true AND p.type = 'JP'`,

@@ -372,6 +372,7 @@ const JPOthersAdvancePage: React.FC = () => {
       {/* Modals */}
       {showAddModal && (
         <AddIncentiveModal
+          company="jellypolly"
           isOpen={showAddModal}
           onClose={() => setShowAddModal(false)}
           onSuccess={fetchAdvances}

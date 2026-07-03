@@ -39,7 +39,7 @@ export default function (pool) {
             const employeePayrollsResult = await pool.query(
               `SELECT ep.*, s.name as employee_name
                FROM jellypolly.employee_payrolls ep
-               LEFT JOIN public.staffs s ON ep.employee_id = s.id
+               LEFT JOIN jellypolly.staffs s ON ep.employee_id = s.id
                WHERE ep.monthly_payroll_id = $1`,
               [payroll.id]
             );
@@ -80,7 +80,7 @@ export default function (pool) {
       const employeePayrollsResult = await pool.query(
         `SELECT ep.*, s.name as employee_name
          FROM jellypolly.employee_payrolls ep
-         LEFT JOIN public.staffs s ON ep.employee_id = s.id
+         LEFT JOIN jellypolly.staffs s ON ep.employee_id = s.id
          WHERE ep.monthly_payroll_id = $1
          ORDER BY s.name`,
         [id]
@@ -97,7 +97,7 @@ export default function (pool) {
                     pi.is_manual, pi.job_type, pi.source_employee_id,
                     pi.work_log_type, pc.pay_type
              FROM jellypolly.payroll_items pi
-             LEFT JOIN public.pay_codes pc ON pi.pay_code_id = pc.id
+             LEFT JOIN jellypolly.pay_codes pc ON pi.pay_code_id = pc.id
              WHERE pi.employee_payroll_id = ANY($1)
              ORDER BY pi.id`,
             [epIds]

@@ -881,6 +881,7 @@ const JPOthersKerjaLuarOtPage: React.FC = () => {
 
       {showAddModal && (
         <AddOthersModal
+          company="jellypolly"
           isOpen={showAddModal}
           onClose={() => setShowAddModal(false)}
           onSuccess={fetchRecords}
@@ -893,6 +894,7 @@ const JPOthersKerjaLuarOtPage: React.FC = () => {
       )}
 
       <EditOthersModal
+        company="jellypolly"
         isOpen={showEditModal}
         onClose={() => {
           setShowEditModal(false);

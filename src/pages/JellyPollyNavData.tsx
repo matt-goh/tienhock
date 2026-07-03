@@ -4,6 +4,7 @@ import {
   IconReportMoney,
   IconUserDollar,
   IconPackage,
+  IconListDetails,
 } from "@tabler/icons-react";
 import { SidebarItem } from "./pagesRoute";
 
@@ -46,6 +47,14 @@ import JPOthersAdvancePage from "./JellyPolly/Payroll/JPOthersAdvancePage";
 import JPOthersKerjaLuarOtPage from "./JellyPolly/Payroll/JPOthersKerjaLuarOtPage";
 import JPPinjamListPage from "./JellyPolly/Payroll/JPPinjamListPage";
 import JPMidMonthPayrollPage from "./JellyPolly/Payroll/JPMidMonthPayrollPage";
+
+// Catalogue related imports (JP's own staff/pay-code catalogue)
+import JPStaffPage from "./JellyPolly/Catalogue/JPStaffPage";
+import JPStaffAddPage from "./JellyPolly/Catalogue/JPStaffAddPage";
+import JPStaffFormPage from "./JellyPolly/Catalogue/JPStaffFormPage";
+import JPStaffDetailsPage from "./JellyPolly/Catalogue/JPStaffDetailsPage";
+import JPPayCodePage from "./JellyPolly/Catalogue/JPPayCodePage";
+import JPCutiManagementPage from "./JellyPolly/Catalogue/JPCutiManagementPage";
 
 // Stock / production related imports
 import JPProductionEntryPage from "./JellyPolly/Stock/JPProductionEntryPage";
@@ -259,7 +268,11 @@ export const JellyPollyNavData: SidebarItem[] = [
         name: "Production Records",
         path: "/stock/production-records",
         component: (props: any) => (
-          <ProductionListPage productTypes={["JP"]} {...props} />
+          <ProductionListPage
+            productTypes={["JP"]}
+            apiBasePath="/jellypolly/api/production-entries"
+            {...props}
+          />
         ),
         group: "Products",
       },
@@ -276,6 +289,48 @@ export const JellyPollyNavData: SidebarItem[] = [
           <ProductStockAdjustmentEntryPage productTypes={["JP"]} {...props} />
         ),
         group: "Products",
+      },
+    ],
+  },
+  {
+    name: "Catalogue",
+    icon: IconListDetails,
+    subItems: [
+      {
+        name: "Staff",
+        path: "/catalogue/staff",
+        component: JPStaffPage,
+        group: "People",
+        subItems: [
+          {
+            name: "New Staff",
+            path: "/catalogue/staff/new",
+            component: JPStaffAddPage,
+            showInPopover: true,
+          },
+          {
+            name: "Staff Details",
+            path: "/catalogue/staff/:id",
+            component: JPStaffDetailsPage,
+          },
+          {
+            name: "Staff Edit",
+            path: "/catalogue/staff/:id/edit",
+            component: JPStaffFormPage,
+          },
+        ],
+      },
+      {
+        name: "Pay Codes",
+        path: "/catalogue/pay-codes",
+        component: JPPayCodePage,
+        group: "Payroll Setup",
+      },
+      {
+        name: "Cuti Management",
+        path: "/catalogue/cuti-management",
+        component: JPCutiManagementPage,
+        group: "Payroll Setup",
       },
     ],
   },

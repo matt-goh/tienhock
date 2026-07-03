@@ -130,13 +130,13 @@ If database changes are needed, keep JP data separated where appropriate and upd
 
 ## Confirmed Design Decisions
 
-1. JP staff, pay codes, jobs, job pay-code mappings, employee pay-code overrides, rate schedules, statutory data, and HEAD/sub-ID data use the shared public catalogue tables. JP membership is managed by `jellypolly.payroll_employees`.
+1. ~~(v1)~~ **Superseded by the v2 pivot below:** JP now has its OWN catalogue (jellypolly.staffs/jobs/pay_codes/mappings/rate schedules/leave). JP membership is managed by `jellypolly.payroll_employees`.
 2. Plastic carton pay uses `JP_CTN_30ML` and `JP_CTN_70ML` with `rate_unit='Ctn'`; sub-ID work rolls up to HEAD payroll rows.
-3. JP production/stock reuses public production tables. JP products use `products.type='JP'`; worker card order uses `production_worker_orders.scope='JP_PRODUCTION'`.
+3. ~~(v1)~~ **Superseded:** JP production entries/worker orders live in `jellypolly.production_entries` / `jellypolly.production_worker_orders`; products stay shared (`products.type='JP'`); stock movement branches by product type.
 4. JP Salesman rows come from JP invoices through `/jellypolly/api/invoices/salesman-products`.
 5. Statutory contributions are computed per company on that company's gross. Combined TH+JP statutory contribution calculation is out of scope for v1.
 6. Payslip/report display name is "JELLY POLLY"; GOH THAI HO remains relevant only to e-invoice submission context.
-7. JP leave/cuti is enabled 1:1 with TH using shared leave balances and company-scoped payroll payment.
+7. JP leave/cuti is 1:1 with TH but on JP's own ledger (`jellypolly.leave_records` + `jellypolly.employee_leave_balances`) since the catalogues are separate.
 
 ## Completed Work
 
@@ -153,7 +153,7 @@ If database changes are needed, keep JP data separated where appropriate and upd
 
 ## Current Open Items / Flags
 
-1. TH salesman double-pay risk: TH's `/api/invoices/salesman-products` still merges TH + Jelly Polly invoices, and the TH SALESMAN job already carries the ice-polly Ctn codes. Leave this unchanged for now while the user confirms whether to remove the JP union from TH payroll or skip JP Salesman payroll.
+1. ~~TH salesman double-pay risk~~ **RESOLVED (2026-07-03): double pay is INTENDED, confirmed with the user.** TH's `/api/invoices/salesman-products` keeps merging TH + Jelly Polly invoices (TH salesmen are paid for JP sales through the TH product-named pay codes / public.product_pay_codes), AND the JP salesman page pays the same JP sales again from JP invoices via the JP catalogue's product-named pay codes on the JP_SALESMAN/JP_SALESMAN_IKUT job mappings. Do not "fix" this.
 2. E-Caruman registration codes must be entered on the JP E-Caruman page before exports work.
 3. Mock rates in `009_jp_seed_mock_data.sql` and `JP_PROD_DEPLOY.sql` are placeholders; real pay codes/rates should be configured in the shared Pay Codes catalogue before first real payroll.
 4. Mock staff cleanup in dev: `DELETE FROM public.staffs WHERE id LIKE 'JPT_%'` (assignments/logs cascade), plus `DELETE FROM jellypolly.monthly_payrolls;` for test payroll data.
@@ -163,3 +163,33 @@ If database changes are needed, keep JP data separated where appropriate and upd
 
 - Backend syntax checks previously passed for `src/routes/jellypolly/jpPayrollProcessor.js`, `src/routes/jellypolly/monthly-work-logs.js`, and `src/routes/jellypolly/daily-work-logs.js`.
 - Dev DB spot checks previously verified office fixed salary processing, plastic carton HEAD rollup, JP leave pay, and JP production pay through mapped product pay codes.
+
+## v2 Pivot — JP OWN Catalogue (2026-07-03)
+
+Per user direction, JP no longer shares the TH staff/pay-code catalogue. Everything JP now lives in the jellypolly schema; only products (`public.products`, type='JP') and the holiday calendar stay shared.
+
+**DB (fresh dev migrations, applied 2026-07-03):**
+- `008_jp_payroll_foundation.sql` (v2) — Section 0 cleans the old shared-catalogue build (drops v1 jellypolly payroll tables, deletes the JP rows/mock staff from the public catalogue by EXACT ids — `JP_IP`/`JP_STOCK`/`JPTOCK` are real TH codes and untouched — restores the TH worker-order scope, drops `leave_records.jp_work_log_id`; `leave_records.company` stays as an inert TH-side marker). Then creates: `jellypolly.staffs/jobs/pay_codes/job_pay_codes/employee_pay_codes/pay_rate_schedules` + `jellypolly.get_effective_pay_rate()` + `jellypolly.product_pay_codes`, the payroll/work-log/add-on tables (FKs now to the JP catalogue), `jellypolly.leave_records` (work_log_id FK jellypolly.daily_work_logs CASCADE) + `jellypolly.employee_leave_balances`, and `jellypolly.production_entries` + `jellypolly.production_worker_orders` (scope JP_PRODUCTION).
+- `009_jp_seed_mock_data.sql` (v2) — JP jobs (JP_* ids kept so code refs stay stable), JP pay codes incl. product-named salesman Ctn codes (S-25ML, MEQ-25ML, MEQ-60ML, S-60ML, AQ-60ML; ikut via job_pay_codes override rates on JP_SALESMAN_IKUT), mappings, mock JPT_* staff (now in jellypolly.staffs; cleanup `DELETE FROM jellypolly.staffs WHERE id LIKE 'JPT_%'`), leave balances, one product mapping.
+- `010_jp_leave_link.sql` deleted (superseded); `011_jp_leave_company.sql` kept for the record (user ran the company ALTER manually).
+- `JP_PROD_DEPLOY.sql` rewritten (v2): guarded company ALTER + full schema + structural seeds (jobs/pay codes/mappings), NO mock data.
+
+**Backend:**
+- New JP catalogue routes (clones of the TH ones, schema-qualified): `src/routes/jellypolly/{staffs,jobs,pay-codes,job-pay-codes,employee-pay-codes,pay-rate-schedules,product-pay-codes,leave-management,production-entries}.js`, mounted under `/jellypolly/api/*`.
+- All existing jellypolly routes + `jpPayrollProcessor.js` repointed to the JP catalogue (staffs/pay_codes/jobs joins, `jellypolly.get_effective_pay_rate`, `jellypolly.product_pay_codes`, `jellypolly.production_entries`); leave reads/writes `jellypolly.leave_records` (no company column, `work_log_id` link).
+- Public `stock/production-entries.js` fully reverted to pre-JP state. `stock/stock.js` movements + closing-batch branch by product type: JP products read `jellypolly.production_entries` and union sales from BOTH companies' invoices (TH products keep byte-identical semantics via an equivalent subquery form).
+- Cross-company endpoint reworked: matches the person BY NAME across `public.staffs` and `jellypolly.staffs` (per-catalogue sibling id sets).
+- TH `company <> 'JP'` leave filters kept (inert no-ops; column exists).
+
+**Frontend:**
+- New JP cache hooks in `src/utils/JellyPolly/`: `useJPStaffsCache`, `useJPJobsCache`, `useJPJobPayCodeMappings`, `useJPEffectiveRates` (own localStorage keys). All JP pages swapped onto them.
+- Shared components gained a `company?: "tienhock" | "jellypolly"` (or `apiBase`) prop, defaults unchanged for TH: `AddIncentiveModal`, `AddOthersModal`, `EditOthersModal`, `AddManualItemModal`, `StaffPayCodesSection` (+ its nested `BatchManageEmployeePayCodesModal`, `EditEmployeePayCodeRatesModal`, `EditPayCodeRatesModal`, `BatchManageJobPayCodesModal`), `AssociatePayCodesWithJobsModal`, `AssociatePayCodesWithEmployeesModal`, `ProductPayCodeMappingModal`, the four PayslipButtons, and `WorkerEntryGrid` (`workerOrderApiBase`). JP pages pass the JP values.
+- New JP Catalogue pages (clones on `/jellypolly/api/*`): `src/pages/JellyPolly/Catalogue/{JPStaffPage,JPStaffAddPage,JPStaffFormPage,JPStaffDetailsPage,JPPayCodePage,JPCutiManagementPage,JPCutiReportPage}.tsx`; JP nav gained a Catalogue group (Staff / Pay Codes / Cuti Management — holiday calendar tab is the shared TH page).
+- `ProductionListPage` gained `apiBasePath` + a "Jelly Polly" category (JP nav passes `/jellypolly/api/production-entries`); JP Production Entry fully on JP endpoints.
+
+**Verified on dev DB (2026-07-03):** processor run over the new schema — office fixed salary via jellypolly.employee_pay_codes override (1800 → net 1576.60), JP leave pay from jellypolly.leave_records (55), JP production pay via jellypolly.product_pay_codes + jellypolly.get_effective_pay_rate (40 ctn × 0.50 = 20).
+
+**Consequences to note:**
+- Dual-company staff exist as separate rows in each catalogue; the cross-company card matches by NAME (exact, case/space-insensitive).
+- Leave entitlements are now per company (a dual-company person has separate JP and TH balance buckets).
+- Flag #1 resolved: intended double pay (see Open Items). JP product→pay-code mapping systems: salesman pay resolves via the JP_SALESMAN job mappings (product-named codes, seeded); production packing pay maps via the Mappings button on JP Production Entry → `jellypolly.product_pay_codes` + JP_PACKING Ctn codes (mirror of TH's ProductPayCodeMappingModal flow).

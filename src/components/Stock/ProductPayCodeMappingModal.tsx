@@ -14,6 +14,7 @@ import toast from "react-hot-toast";
 import LoadingSpinner from "../LoadingSpinner";
 import { IconSearch, IconPackage, IconX, IconCheck, IconPlus, IconMinus, IconSparkles } from "@tabler/icons-react";
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
+import { useJPJobPayCodeMappings } from "../../utils/JellyPolly/useJPJobPayCodeMappings";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import { SPECIAL_ITEMS, isSpecialItem } from "../../config/specialItems";
 
@@ -41,6 +42,9 @@ interface ProductPayCodeMappingModalProps {
   // Restrict to specific product types (e.g. ["JP"] for the Jelly Polly
   // production page). Default: TH behaviour (MEE/BH/BUNDLE + special items).
   productTypes?: string[];
+  // Catalogue source — Jelly Polly passes "jellypolly" (own pay codes +
+  // jellypolly.product_pay_codes); default is the shared Tien Hock catalogue.
+  company?: "tienhock" | "jellypolly";
 }
 
 const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
@@ -48,7 +52,12 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
   onClose,
   onMappingComplete,
   productTypes,
+  company = "tienhock",
 }) => {
+  const productPayCodesApiBase =
+    company === "jellypolly"
+      ? "/jellypolly/api/product-pay-codes"
+      : "/api/product-pay-codes";
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedPayCodeIds, setSelectedPayCodeIds] = useState<Set<string>>(
     new Set()
@@ -93,8 +102,24 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
   }, [cachedProducts, productTypes]);
 
   // Get job pay code mappings and all pay codes for filtering
-  const { detailedMappings, productMappings, payCodes, refreshData } =
-    useJobPayCodeMappings();
+  const {
+    detailedMappings: thDetailedMappings,
+    productMappings: thProductMappings,
+    payCodes: thPayCodes,
+    refreshData: refreshThData,
+  } = useJobPayCodeMappings();
+  const {
+    detailedMappings: jpDetailedMappings,
+    productMappings: jpProductMappings,
+    payCodes: jpPayCodes,
+    refreshData: refreshJpData,
+  } = useJPJobPayCodeMappings();
+  const detailedMappings =
+    company === "jellypolly" ? jpDetailedMappings : thDetailedMappings;
+  const productMappings =
+    company === "jellypolly" ? jpProductMappings : thProductMappings;
+  const payCodes = company === "jellypolly" ? jpPayCodes : thPayCodes;
+  const refreshData = company === "jellypolly" ? refreshJpData : refreshThData;
 
   // Get available pay codes for the selected product type
   const availablePayCodes = useMemo((): PayCodeOption[] => {
@@ -252,7 +277,7 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
           pay_code_id,
         }));
         promises.push(
-          api.post("/api/product-pay-codes/batch", { associations })
+          api.post(`${productPayCodesApiBase}/batch`, { associations })
         );
       }
 
@@ -262,7 +287,7 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
           product_id: selectedProduct.id,
           pay_code_id,
         }));
-        promises.push(api.post("/api/product-pay-codes/batch-delete", { items }));
+        promises.push(api.post(`${productPayCodesApiBase}/batch-delete`, { items }));
       }
 
       await Promise.all(promises);

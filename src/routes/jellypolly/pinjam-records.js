@@ -23,7 +23,7 @@ export default function (pool) {
       let query = `
         SELECT p.*, s.name as employee_name
         FROM jellypolly.pinjam_records p
-        LEFT JOIN public.staffs s ON p.employee_id = s.id
+        LEFT JOIN jellypolly.staffs s ON p.employee_id = s.id
         WHERE 1=1
       `;
 
@@ -124,7 +124,7 @@ export default function (pool) {
         pool.query(`
           SELECT p.*, s.name as employee_name
           FROM jellypolly.pinjam_records p
-          LEFT JOIN public.staffs s ON p.employee_id = s.id
+          LEFT JOIN jellypolly.staffs s ON p.employee_id = s.id
           WHERE p.year = $1 AND p.month = $2
           ORDER BY p.year DESC, p.month DESC, p.employee_id, p.pinjam_type, p.description
           LIMIT 1000
@@ -140,7 +140,7 @@ export default function (pool) {
             COUNT(*) as record_count,
             STRING_AGG(p.description || ': ' || p.amount::text, ', ' ORDER BY p.description) as details
           FROM jellypolly.pinjam_records p
-          LEFT JOIN public.staffs s ON p.employee_id = s.id
+          LEFT JOIN jellypolly.staffs s ON p.employee_id = s.id
           WHERE p.year = $1 AND p.month = $2
           GROUP BY p.employee_id, s.name, p.pinjam_type
           ORDER BY s.name, p.pinjam_type
@@ -150,7 +150,7 @@ export default function (pool) {
         pool.query(`
           SELECT p.*, s.name as employee_name
           FROM jellypolly.mid_month_payrolls p
-          LEFT JOIN public.staffs s ON p.employee_id = s.id
+          LEFT JOIN jellypolly.staffs s ON p.employee_id = s.id
           WHERE p.year = $1 AND p.month = $2
           ORDER BY p.year DESC, p.month DESC, p.employee_id
           LIMIT 1000
@@ -161,7 +161,7 @@ export default function (pool) {
           SELECT mp.*, ep.id as employee_payroll_id, ep.employee_id, s.name as employee_name, ep.net_pay, ep.setelah_digenapkan
           FROM jellypolly.monthly_payrolls mp
           LEFT JOIN jellypolly.employee_payrolls ep ON mp.id = ep.monthly_payroll_id
-          LEFT JOIN public.staffs s ON ep.employee_id = s.id
+          LEFT JOIN jellypolly.staffs s ON ep.employee_id = s.id
           WHERE mp.year = $1 AND mp.month = $2
           ORDER BY mp.year DESC, mp.month DESC
         `, [yearInt, monthInt])
@@ -217,7 +217,7 @@ export default function (pool) {
           COUNT(*) as record_count,
           STRING_AGG(p.description || ': ' || p.amount::text, ', ' ORDER BY p.description) as details
         FROM jellypolly.pinjam_records p
-        LEFT JOIN public.staffs s ON p.employee_id = s.id
+        LEFT JOIN jellypolly.staffs s ON p.employee_id = s.id
         WHERE p.year = $1 AND p.month = $2
       `;
 
@@ -283,7 +283,7 @@ export default function (pool) {
           pr.*,
           s.name as employee_name
         FROM jellypolly.pinjam_records pr
-        LEFT JOIN public.staffs s ON pr.employee_id = s.id
+        LEFT JOIN jellypolly.staffs s ON pr.employee_id = s.id
         WHERE pr.id = $1
       `;
 
@@ -362,7 +362,7 @@ export default function (pool) {
 
       // Get employee name for response
       const employeeResult = await pool.query(
-        `SELECT name FROM public.staffs WHERE id = $1`,
+        `SELECT name FROM jellypolly.staffs WHERE id = $1`,
         [employee_id]
       );
 
@@ -624,7 +624,7 @@ export default function (pool) {
 
       // Get employee name for response
       const employeeResult = await pool.query(
-        `SELECT name FROM public.staffs WHERE id = $1`,
+        `SELECT name FROM jellypolly.staffs WHERE id = $1`,
         [updateResult.rows[0].employee_id]
       );
 

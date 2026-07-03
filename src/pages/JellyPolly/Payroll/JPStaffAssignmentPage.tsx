@@ -1,7 +1,8 @@
 // src/pages/JellyPolly/Payroll/JPStaffAssignmentPage.tsx
 // User-managed staff → page/job assignments for Jelly Polly payroll,
-// daily machine, plastic, and production workflows. Staff come from the shared
-// public.staffs catalogue; assignments live in jellypolly.payroll_employees.
+// daily machine, plastic, and production workflows. Staff come from the JP
+// staff catalogue (jellypolly.staffs); assignments live in
+// jellypolly.payroll_employees.
 import React, { useMemo, useState } from "react";
 import { IconRefresh, IconTrash, IconUsers } from "@tabler/icons-react";
 import toast from "react-hot-toast";
@@ -9,7 +10,7 @@ import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import { FormCombobox, SelectOption } from "../../../components/FormComponents";
-import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
+import { useJPStaffsCache } from "../../../utils/JellyPolly/useJPStaffsCache";
 import {
   useJPPayrollEmployees,
   JPPayrollEmployee,
@@ -127,7 +128,7 @@ const AssignmentSection: React.FC<AssignmentSectionProps> = ({
 };
 
 const JPStaffAssignmentPage: React.FC = () => {
-  const { staffs, loading: staffsLoading } = useStaffsCache();
+  const { staffs, loading: staffsLoading } = useJPStaffsCache();
   const {
     employeesByJobType,
     loading: assignmentsLoading,
