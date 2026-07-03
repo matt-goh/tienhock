@@ -476,7 +476,7 @@ const PackingCutiEntryPage: React.FC<PackingCutiEntryPageProps> = ({
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Search workers"
-                className="h-10 w-full rounded-lg border border-default-300 bg-white pl-10 pr-9 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                className="h-10 w-full rounded-lg border border-default-300 bg-white pl-10 pr-9 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100"
               />
               {searchQuery && (
                 <button

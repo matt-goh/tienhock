@@ -316,7 +316,7 @@ const PayrollEmployeeManagementModal: React.FC<
                           <input
                             type="text"
                             placeholder="Search members..."
-                            className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-600 dark:text-gray-100 dark:placeholder-gray-400"
+                            className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder-gray-400"
                             value={memberSearch}
                             onChange={(e) => setMemberSearch(e.target.value)}
                             disabled={isSaving}
@@ -484,7 +484,7 @@ const PayrollEmployeeManagementModal: React.FC<
                           <input
                             type="text"
                             placeholder="Search employees..."
-                            className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-600 dark:text-gray-100 dark:placeholder-gray-400"
+                            className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder-gray-400"
                             value={employeeSearch}
                             onChange={(e) => setEmployeeSearch(e.target.value)}
                             disabled={isSaving}

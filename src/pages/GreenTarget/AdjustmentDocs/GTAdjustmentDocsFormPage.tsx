@@ -678,7 +678,7 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
                 autoFocus
                 type="text"
                 placeholder="Search by invoice number or customer name..."
-                className="w-full pl-10 pr-3 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                className="w-full pl-10 pr-3 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                 value={pickerQuery}
                 onChange={(e) => setPickerQuery(e.target.value)}
               />

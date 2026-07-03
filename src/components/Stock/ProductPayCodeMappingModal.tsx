@@ -421,7 +421,7 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                           <input
                             type="text"
                             placeholder="Search products..."
-                            className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-600 dark:text-gray-100 dark:placeholder-gray-400"
+                            className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder-gray-400"
                             value={productSearch}
                             onChange={(e) => setProductSearch(e.target.value)}
                           />
@@ -568,7 +568,7 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                             <input
                               type="text"
                               placeholder="Search pay codes..."
-                              className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-600 dark:text-gray-100 dark:placeholder-gray-400"
+                              className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder-gray-400"
                               value={payCodeSearch}
                               onChange={(e) => setPayCodeSearch(e.target.value)}
                             />

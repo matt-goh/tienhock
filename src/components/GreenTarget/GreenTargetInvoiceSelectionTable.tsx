@@ -60,7 +60,7 @@ const GreenTargetInvoiceSelectionTable: React.FC<GreenTargetInvoiceSelectionTabl
               type="text"
               placeholder="Search"
               title="Search by invoice number or customer..."
-              className="w-full pl-10 pr-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-full focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              className="w-full pl-10 pr-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-full focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 text-gray-900 dark:text-gray-100"
               value={searchTerm}
               onChange={(e) => onSearchChange(e.target.value)}
             />
