@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-04",
+    ms: "Laporan Bank Statement: PDF kini mempunyai reka bentuk baharu yang lebih kemas (kepala surat syarikat berlogo, ringkasan baki pembukaan/penutupan dan jadual yang lebih mudah dibaca). Butang eksport kini terus membuka paparan cetak dan bukannya memuat turun fail — pada telefon, PDF akan dibuka dalam tab baharu.",
+    en: "Bank Statement report: the PDF has a refreshed, cleaner design (company letterhead with logo, opening/closing balance summary and an easier-to-read table). The export button now opens the print view directly instead of downloading the file — on phones, the PDF opens in a new tab.",
+  },
+  {
+    date: "2026-07-04",
     ms: "Halaman Journal Entries diperbaharui: penapis Type dan Status kini menggunakan butang pil berlabel (kod dan nama jenis) yang boleh ditekan untuk hidup/mati, dan lebih daripada satu boleh dipilih serentak. Kotak carian kini berada di sebelah kanan baris penapis. Pilihan penapis, julat tarikh dan jenis jurnal terakhir yang dipilih kini diingati secara automatik untuk lawatan seterusnya.",
     en: "Journal Entries page refreshed: the Type and Status filters are now labelled pill buttons (showing both the type code and name) you can toggle on/off, with multiple active at once. The search box now sits on the right of the filter row. Your filter selections, date range and last-used journal type are now remembered automatically for your next visit.",
   },
