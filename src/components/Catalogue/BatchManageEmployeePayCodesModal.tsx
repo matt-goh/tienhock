@@ -24,6 +24,8 @@ import Button from "../Button";
 import toast from "react-hot-toast";
 
 interface BatchManageEmployeePayCodesModalProps {
+  // API base for pay-code endpoints (JP passes /jellypolly/api)
+  apiBase?: string;
   isOpen: boolean;
   onClose: () => void;
   employee: Employee;
@@ -39,6 +41,7 @@ const BatchManageEmployeePayCodesModal: React.FC<BatchManageEmployeePayCodesModa
   availablePayCodes,
   currentPayCodeDetails,
   onAssociationComplete,
+  apiBase = "/api",
 }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string>("");
@@ -173,7 +176,7 @@ const BatchManageEmployeePayCodesModal: React.FC<BatchManageEmployeePayCodesModa
       // Handle additions
       for (const payCodeId of paycodesToAdd) {
         promises.push(
-          api.post("/api/employee-pay-codes", {
+          api.post(`${apiBase}/employee-pay-codes`, {
             employee_id: employee.id,
             pay_code_id: payCodeId,
             is_default: defaultPayCodes.has(payCodeId),
@@ -184,7 +187,7 @@ const BatchManageEmployeePayCodesModal: React.FC<BatchManageEmployeePayCodesModa
       // Handle removals
       for (const payCodeId of paycodesToRemove) {
         promises.push(
-          api.delete(`/api/employee-pay-codes/${employee.id}/${payCodeId}`)
+          api.delete(`${apiBase}/employee-pay-codes/${employee.id}/${payCodeId}`)
         );
       }
 
@@ -202,7 +205,7 @@ const BatchManageEmployeePayCodesModal: React.FC<BatchManageEmployeePayCodesModa
 
       if (defaultsToSet.length > 0) {
         promises.push(
-          api.put("/api/employee-pay-codes/batch-default", {
+          api.put(`${apiBase}/employee-pay-codes/batch-default`, {
             employee_id: employee.id,
             pay_code_ids: defaultsToSet,
             is_default: true,
@@ -212,7 +215,7 @@ const BatchManageEmployeePayCodesModal: React.FC<BatchManageEmployeePayCodesModa
 
       if (defaultsToClear.length > 0) {
         promises.push(
-          api.put("/api/employee-pay-codes/batch-default", {
+          api.put(`${apiBase}/employee-pay-codes/batch-default`, {
             employee_id: employee.id,
             pay_code_ids: defaultsToClear,
             is_default: false,

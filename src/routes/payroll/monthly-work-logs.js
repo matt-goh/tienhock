@@ -273,7 +273,8 @@ export default function (pool) {
           s.name as employee_name
         FROM leave_records lr
         LEFT JOIN staffs s ON lr.employee_id = s.id
-        WHERE EXTRACT(MONTH FROM lr.leave_date) = $1
+        WHERE lr.company <> 'JP'
+          AND EXTRACT(MONTH FROM lr.leave_date) = $1
           AND EXTRACT(YEAR FROM lr.leave_date) = $2
           AND COALESCE(s.job::jsonb, '[]'::jsonb) ?| $3::text[]
         ORDER BY lr.leave_date, s.name
@@ -782,7 +783,8 @@ export default function (pool) {
           s.job as employee_jobs
         FROM leave_records lr
         LEFT JOIN staffs s ON lr.employee_id = s.id
-        WHERE EXTRACT(MONTH FROM lr.leave_date) = $1
+        WHERE lr.company <> 'JP'
+          AND EXTRACT(MONTH FROM lr.leave_date) = $1
           AND EXTRACT(YEAR FROM lr.leave_date) = $2
       `;
 

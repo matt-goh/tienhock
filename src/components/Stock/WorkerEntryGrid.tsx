@@ -207,6 +207,8 @@ interface WorkerEntryGridProps {
   hideFooter?: boolean;
   // Shared worker order persistence
   workerOrderScope?: ProductionWorkerOrderScope;
+  // API base for worker-order persistence (JP passes /jellypolly/api/production-entries)
+  workerOrderApiBase?: string;
   workerOrderRefreshKey?: number;
 }
 
@@ -227,6 +229,7 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
   onSearchChange,
   hideFooter = false,
   workerOrderScope,
+  workerOrderApiBase = "/api/production-entries",
   workerOrderRefreshKey = 0,
 }) => {
   // Use internal state only if no external control is provided
@@ -299,7 +302,7 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
 
       try {
         const response: ProductionWorkerOrderResponse = await api.get(
-          `/api/production-entries/worker-order?scope=${encodeURIComponent(
+          `${workerOrderApiBase}/worker-order?scope=${encodeURIComponent(
             workerOrderScope
           )}`
         );
@@ -581,7 +584,7 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
           scope: workerOrderScope,
           worker_ids: nextWorkerOrderIds,
         };
-        await api.put("/api/production-entries/worker-order", payload);
+        await api.put(`${workerOrderApiBase}/worker-order`, payload);
         cacheWorkerOrder(workerOrderScope, nextWorkerOrderIds);
       } catch (error) {
         console.error("Error saving worker order:", error);

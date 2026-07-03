@@ -106,6 +106,27 @@ export default function (pool) {
 
       const product = productResult.rows[0];
 
+      // Jelly Polly products: production lives in jellypolly.production_entries
+      // and sales flow through BOTH companies' invoices. TH products keep the
+      // original public-only sources (identical semantics to the old queries).
+      const isJPProduct = product.type === "JP";
+      const productionSource = isJPProduct
+        ? "jellypolly.production_entries"
+        : "production_entries";
+      const publicSalesSelect = `
+        SELECT i.createddate, i.invoice_status, i.is_consolidated,
+               od.code, od.quantity, od.freeproduct, od.returnproduct, od.issubtotal
+        FROM invoices i
+        JOIN order_details od ON od.invoiceid = i.id`;
+      const jpSalesSelect = `
+        SELECT i.createddate, i.invoice_status, i.is_consolidated,
+               od.code, od.quantity, od.freeproduct, od.returnproduct, od.issubtotal
+        FROM jellypolly.invoices i
+        JOIN jellypolly.order_details od ON od.invoiceid = i.id`;
+      const salesSource = isJPProduct
+        ? `(${publicSalesSelect} UNION ALL ${jpSalesSelect}) s`
+        : `(${publicSalesSelect}) s`;
+
       // Get initial balance (admin-set migration/opening balance) and its anchor date.
       // The balance represents stock as of the START of `anchorDate`; movements on/after
       // that date are applied on top, and anything before it is ignored. When no opening
@@ -134,7 +155,7 @@ export default function (pool) {
       // Get prior production total (only from system start date onwards)
       const priorProductionQuery = `
         SELECT COALESCE(SUM(bags_packed), 0) as total
-        FROM production_entries
+        FROM ${productionSource}
         WHERE product_id = $1
           AND entry_date >= $2::date
           AND entry_date < $3::date
@@ -150,17 +171,16 @@ export default function (pool) {
       // Use DATE extraction to match the period query's date grouping logic
       const priorSalesQuery = `
         SELECT
-          COALESCE(SUM(od.quantity), 0) as sold,
-          COALESCE(SUM(COALESCE(od.freeproduct, 0)), 0) as foc,
-          COALESCE(SUM(COALESCE(od.returnproduct, 0)), 0) as returns
-        FROM invoices i
-        JOIN order_details od ON od.invoiceid = i.id
-        WHERE od.code = $1
-          AND i.invoice_status != 'cancelled'
-          AND od.issubtotal IS NOT TRUE
-          AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
-          AND DATE(TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) >= $2::date
-          AND DATE(TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) < $3::date
+          COALESCE(SUM(s.quantity), 0) as sold,
+          COALESCE(SUM(COALESCE(s.freeproduct, 0)), 0) as foc,
+          COALESCE(SUM(COALESCE(s.returnproduct, 0)), 0) as returns
+        FROM ${salesSource}
+        WHERE s.code = $1
+          AND s.invoice_status != 'cancelled'
+          AND s.issubtotal IS NOT TRUE
+          AND (s.is_consolidated = false OR s.is_consolidated IS NULL)
+          AND DATE(TO_TIMESTAMP(CAST(s.createddate AS bigint) / 1000)) >= $2::date
+          AND DATE(TO_TIMESTAMP(CAST(s.createddate AS bigint) / 1000)) < $3::date
       `;
       const priorSalesResult = await pool.query(priorSalesQuery, [
         product_id,
@@ -210,7 +230,7 @@ export default function (pool) {
         SELECT
           entry_date::text as date,
           SUM(bags_packed) as production
-        FROM production_entries
+        FROM ${productionSource}
         WHERE product_id = $1
           AND entry_date BETWEEN $2 AND $3
         GROUP BY entry_date
@@ -226,18 +246,17 @@ export default function (pool) {
       // Use DATE comparison for consistency with prior sales query
       const salesQuery = `
         SELECT
-          DATE(TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000))::text as date,
-          SUM(od.quantity) as sold,
-          SUM(COALESCE(od.freeproduct, 0)) as foc,
-          SUM(COALESCE(od.returnproduct, 0)) as returns
-        FROM invoices i
-        JOIN order_details od ON od.invoiceid = i.id
-        WHERE od.code = $1
-          AND i.invoice_status != 'cancelled'
-          AND od.issubtotal IS NOT TRUE
-          AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
-          AND DATE(TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) BETWEEN $2::date AND $3::date
-        GROUP BY DATE(TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000))
+          DATE(TO_TIMESTAMP(CAST(s.createddate AS bigint) / 1000))::text as date,
+          SUM(s.quantity) as sold,
+          SUM(COALESCE(s.freeproduct, 0)) as foc,
+          SUM(COALESCE(s.returnproduct, 0)) as returns
+        FROM ${salesSource}
+        WHERE s.code = $1
+          AND s.invoice_status != 'cancelled'
+          AND s.issubtotal IS NOT TRUE
+          AND (s.is_consolidated = false OR s.is_consolidated IS NULL)
+          AND DATE(TO_TIMESTAMP(CAST(s.createddate AS bigint) / 1000)) BETWEEN $2::date AND $3::date
+        GROUP BY DATE(TO_TIMESTAMP(CAST(s.createddate AS bigint) / 1000))
         ORDER BY date
       `;
       const salesResult = await pool.query(salesQuery, [
@@ -425,10 +444,35 @@ export default function (pool) {
       // Results map
       const results = {};
 
+      // Product types decide the data sources (JP products read the
+      // jellypolly production table and both companies' invoices)
+      const typesResult = await pool.query(
+        "SELECT id, type FROM products WHERE id = ANY($1)",
+        [productIdList]
+      );
+      const typeById = new Map(typesResult.rows.map((r) => [r.id, r.type]));
+      const publicSalesSelect = `
+        SELECT i.createddate, i.invoice_status, i.is_consolidated,
+               od.code, od.quantity, od.freeproduct, od.returnproduct, od.issubtotal
+        FROM invoices i
+        JOIN order_details od ON od.invoiceid = i.id`;
+      const jpSalesSelect = `
+        SELECT i.createddate, i.invoice_status, i.is_consolidated,
+               od.code, od.quantity, od.freeproduct, od.returnproduct, od.issubtotal
+        FROM jellypolly.invoices i
+        JOIN jellypolly.order_details od ON od.invoiceid = i.id`;
+
       // Process in parallel for efficiency
       await Promise.all(
         productIdList.map(async (product_id) => {
           try {
+            const isJPProduct = typeById.get(product_id) === "JP";
+            const productionSource = isJPProduct
+              ? "jellypolly.production_entries"
+              : "production_entries";
+            const salesSource = isJPProduct
+              ? `(${publicSalesSelect} UNION ALL ${jpSalesSelect}) s`
+              : `(${publicSalesSelect}) s`;
             // Get initial balance and its anchor (effective) date
             const initialResult = await pool.query(
               `SELECT balance, effective_date::text AS effective_date FROM stock_opening_balances
@@ -447,7 +491,7 @@ export default function (pool) {
             // Get all production from system start date up to and including end date
             const productionResult = await pool.query(
               `SELECT COALESCE(SUM(bags_packed), 0) as total
-               FROM production_entries
+               FROM ${productionSource}
                WHERE product_id = $1
                  AND entry_date >= $2::date
                  AND entry_date <= $3::date`,
@@ -458,17 +502,16 @@ export default function (pool) {
             // Get all sales from system start date up to and including end date
             const salesResult = await pool.query(
               `SELECT
-                 COALESCE(SUM(od.quantity), 0) as sold,
-                 COALESCE(SUM(COALESCE(od.freeproduct, 0)), 0) as foc,
-                 COALESCE(SUM(COALESCE(od.returnproduct, 0)), 0) as returns
-               FROM invoices i
-               JOIN order_details od ON od.invoiceid = i.id
-               WHERE od.code = $1
-                 AND i.invoice_status != 'cancelled'
-                 AND od.issubtotal IS NOT TRUE
-                 AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
-                 AND DATE(TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) >= $2::date
-                 AND DATE(TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) <= $3::date`,
+                 COALESCE(SUM(s.quantity), 0) as sold,
+                 COALESCE(SUM(COALESCE(s.freeproduct, 0)), 0) as foc,
+                 COALESCE(SUM(COALESCE(s.returnproduct, 0)), 0) as returns
+               FROM ${salesSource}
+               WHERE s.code = $1
+                 AND s.invoice_status != 'cancelled'
+                 AND s.issubtotal IS NOT TRUE
+                 AND (s.is_consolidated = false OR s.is_consolidated IS NULL)
+                 AND DATE(TO_TIMESTAMP(CAST(s.createddate AS bigint) / 1000)) >= $2::date
+                 AND DATE(TO_TIMESTAMP(CAST(s.createddate AS bigint) / 1000)) <= $3::date`,
               [product_id, anchorDate, endDateStr]
             );
             const totalSold = parseInt(salesResult.rows[0]?.sold) || 0;

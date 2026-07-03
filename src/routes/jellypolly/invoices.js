@@ -585,19 +585,115 @@ export default function (pool, config) {
     }
   });
 
+  // GET /jellypolly/api/invoices/salesman-products
+  // Products sold by multiple salesmen on a specific date, from JP invoices ONLY.
+  // Feeds the JP Salesman daily entry (port of the TH salesman-products endpoint,
+  // which merges TH + JP invoices — the JP payroll must count JP sales only).
+  router.get("/salesman-products", async (req, res) => {
+    const { salesmanIds, date } = req.query;
+
+    if (!salesmanIds || !date) {
+      return res
+        .status(400)
+        .json({ message: "Missing required parameters: salesmanIds and date" });
+    }
+
+    try {
+      const salesmanIdArray = salesmanIds.split(",");
+
+      // Convert the date to a Malaysia-time (UTC+8) day range of epoch millis,
+      // matching the TH endpoint's handling of createddate.
+      let startTimestamp, endTimestamp;
+      if (isNaN(date)) {
+        const [year, month, day] = date.split("-").map(Number);
+        const startDate = new Date(Date.UTC(year, month - 1, day, -8, 0, 0, 0));
+        const endDate = new Date(
+          Date.UTC(year, month - 1, day, -8 + 23, 59, 59, 999)
+        );
+        startTimestamp = startDate.getTime().toString();
+        endTimestamp = endDate.getTime().toString();
+      } else {
+        const dateValue = new Date(parseInt(date));
+        const startDate = new Date(dateValue);
+        startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(dateValue);
+        endDate.setHours(23, 59, 59, 999);
+        startTimestamp = startDate.getTime().toString();
+        endTimestamp = endDate.getTime().toString();
+      }
+
+      const productsQuery = `
+      SELECT
+        i.salespersonid,
+        od.code as product_id,
+        p.description as product_name,
+        SUM(od.quantity) as quantity,
+        SUM(COALESCE(od.freeproduct, 0)) as foc_quantity
+      FROM jellypolly.invoices i
+      JOIN jellypolly.order_details od ON i.id = od.invoiceid
+      LEFT JOIN products p ON od.code = p.id
+      WHERE i.salespersonid = ANY($1)
+        AND CAST(i.createddate AS bigint) BETWEEN $2 AND $3
+        AND i.invoice_status != 'cancelled'
+        AND od.issubtotal IS NOT TRUE
+      GROUP BY i.salespersonid, od.code, p.description
+    `;
+
+      const queryResult = await pool.query(productsQuery, [
+        salesmanIdArray,
+        startTimestamp,
+        endTimestamp,
+      ]);
+
+      const productsBySalesman = {};
+      salesmanIdArray.forEach((id) => {
+        productsBySalesman[id] = {};
+      });
+
+      queryResult.rows.forEach((row) => {
+        const { salespersonid, product_id, product_name, quantity, foc_quantity } =
+          row;
+        if (!productsBySalesman[salespersonid]) {
+          productsBySalesman[salespersonid] = {};
+        }
+        productsBySalesman[salespersonid][product_id] = {
+          product_id,
+          product_name: product_name || product_id,
+          quantity: parseInt(quantity) || 0,
+          foc_quantity: parseInt(foc_quantity) || 0,
+        };
+      });
+
+      const result = {};
+      Object.keys(productsBySalesman).forEach((salesmanId) => {
+        result[salesmanId] = Object.values(productsBySalesman[salesmanId]).sort(
+          (a, b) => b.quantity - a.quantity
+        );
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching JP salesman products:", error);
+      res.status(500).json({
+        message: "Error fetching salesman products",
+        error: error.message,
+      });
+    }
+  });
+
   // Get order details for a specific invoice
   router.get("/details/:id/items", async (req, res) => {
     const { id } = req.params;
 
     try {
       const orderDetailsQuery = `
-      SELECT 
+      SELECT
         description,
         quantity as qty,
         price,
         total,
         tax
-      FROM 
+      FROM
         jellypolly.order_details
       WHERE 
         invoiceid = $1

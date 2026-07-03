@@ -717,6 +717,7 @@ export default function (pool) {
         });
       }
 
+
       res.json({
         message: "Production entry updated successfully",
         entry: result.rows[0],
@@ -744,6 +745,7 @@ export default function (pool) {
           message: "Production entry not found",
         });
       }
+
 
       res.json({
         message: "Production entry deleted successfully",

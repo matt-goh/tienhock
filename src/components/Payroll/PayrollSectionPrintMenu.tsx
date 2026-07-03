@@ -10,9 +10,11 @@ import {
   printBatchPayslips,
   createStaffDetailsMap,
 } from "../../utils/payroll/PayslipManager";
+import type { StaffDetails } from "../../utils/payroll/PayslipManager";
 import { MidMonthPayroll } from "../../utils/payroll/midMonthPayrollUtils";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
+import { JOB_CONFIGS } from "../../configs/payrollJobConfigs";
 
 interface PayrollSectionPrintMenuProps {
   payrolls: EmployeePayroll[];
@@ -23,6 +25,61 @@ interface PayrollSectionPrintMenuProps {
   buttonLabel?: string;
 }
 
+interface PayrollPrintGroup {
+  key: string;
+  label: string;
+  rows: EmployeePayroll[];
+  count: number;
+}
+
+const JOB_GROUPED_PAYSLIP_IDS: ReadonlySet<string> = new Set<string>([
+  JOB_CONFIGS.MEE.id,
+  ...JOB_CONFIGS.MEE.jobIds,
+  JOB_CONFIGS.BIHUN.id,
+  ...JOB_CONFIGS.BIHUN.jobIds,
+]);
+
+const splitJobTypes = (jobType: string): string[] => {
+  return jobType
+    .split(",")
+    .map((value: string): string => value.trim())
+    .filter((value: string): boolean => value.length > 0);
+};
+
+const uniqueJobTypes = (jobTypes: string[]): string[] => {
+  return Array.from(new Set<string>(jobTypes));
+};
+
+const getPayrollJobTypes = (payroll: EmployeePayroll): string[] => {
+  const mappedJobTypes: string[] = payroll.employee_job_mapping
+    ? Object.values(payroll.employee_job_mapping).flatMap(
+        (jobType: string): string[] => splitJobTypes(jobType)
+      )
+    : [];
+
+  return uniqueJobTypes(
+    mappedJobTypes.length > 0
+      ? mappedJobTypes
+      : splitJobTypes(payroll.job_type)
+  );
+};
+
+const createScopedPayroll = (
+  payroll: EmployeePayroll,
+  printJobTypes?: string[]
+): EmployeePayroll => {
+  const scopedJobTypes: string[] = uniqueJobTypes(printJobTypes || []);
+
+  if (scopedJobTypes.length === 0) {
+    return payroll;
+  }
+
+  return {
+    ...payroll,
+    print_job_types: scopedJobTypes,
+  };
+};
+
 const PayrollSectionPrintMenu: React.FC<PayrollSectionPrintMenuProps> = ({
   payrolls,
   midMonthPayrollsMap,
@@ -32,8 +89,11 @@ const PayrollSectionPrintMenu: React.FC<PayrollSectionPrintMenuProps> = ({
   buttonLabel = "Print Payslips",
 }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const [position, setPosition] = useState({ top: 0, left: 0 });
-  const [selectedSections, setSelectedSections] = useState<
+  const [position, setPosition] = useState<{ top: number; left: number }>({
+    top: 0,
+    left: 0,
+  });
+  const [selectedGroups, setSelectedGroups] = useState<
     Record<string, boolean>
   >({});
   const [isPrinting, setIsPrinting] = useState(false);
@@ -46,36 +106,87 @@ const PayrollSectionPrintMenu: React.FC<PayrollSectionPrintMenuProps> = ({
   const { staffs } = useStaffsCache();
   const { jobs } = useJobsCache();
 
-  const sectionGroups = useMemo(() => {
-    const map = new Map<string, EmployeePayroll[]>();
-    for (const p of payrolls) {
-      const key = p.section || "Unknown";
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(p);
-    }
-    return [...map.entries()]
-      .map(([section, rows]) => ({ section, rows, count: rows.length }))
-      .sort((a, b) => a.section.localeCompare(b.section));
-  }, [payrolls]);
+  const jobNameById = useMemo<Map<string, string>>(() => {
+    return new Map<string, string>(
+      jobs.map((job): [string, string] => [job.id, job.name || job.id])
+    );
+  }, [jobs]);
 
-  // Default all sections to checked; resync when the set of sections changes
-  const sectionKey = useMemo(
-    () => sectionGroups.map((g) => g.section).join("|"),
-    [sectionGroups]
+  const printGroups = useMemo<PayrollPrintGroup[]>(() => {
+    const map = new Map<string, PayrollPrintGroup>();
+
+    const addGroupRow = (
+      key: string,
+      label: string,
+      payroll: EmployeePayroll,
+      printJobTypes?: string[]
+    ): void => {
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          label,
+          rows: [],
+          count: 0,
+        });
+      }
+
+      const group: PayrollPrintGroup = map.get(key)!;
+      group.rows.push(createScopedPayroll(payroll, printJobTypes));
+      group.count = group.rows.length;
+    };
+
+    for (const payroll of payrolls) {
+      const section: string = payroll.section || "Unknown";
+      const payrollJobTypes: string[] = getPayrollJobTypes(payroll);
+      const jobGroupedTypes: string[] = payrollJobTypes.filter(
+        (jobType: string): boolean => JOB_GROUPED_PAYSLIP_IDS.has(jobType)
+      );
+
+      if (jobGroupedTypes.length === 0) {
+        addGroupRow(`section:${section}`, section, payroll);
+        continue;
+      }
+
+      jobGroupedTypes.forEach((jobType: string): void => {
+        addGroupRow(
+          `job:${jobType}`,
+          jobNameById.get(jobType) || jobType,
+          payroll,
+          [jobType]
+        );
+      });
+
+      const remainingJobTypes: string[] = payrollJobTypes.filter(
+        (jobType: string): boolean => !JOB_GROUPED_PAYSLIP_IDS.has(jobType)
+      );
+      if (remainingJobTypes.length > 0) {
+        addGroupRow(`section:${section}`, section, payroll, remainingJobTypes);
+      }
+    }
+
+    return [...map.values()].sort((a: PayrollPrintGroup, b: PayrollPrintGroup) =>
+      a.label.localeCompare(b.label)
+    );
+  }, [jobNameById, payrolls]);
+
+  // Default all groups to checked; resync when the set of groups changes
+  const groupKey = useMemo(
+    (): string => printGroups.map((g: PayrollPrintGroup) => g.key).join("|"),
+    [printGroups]
   );
   useEffect(() => {
     const next: Record<string, boolean> = {};
-    sectionGroups.forEach((g) => {
-      next[g.section] = true;
+    printGroups.forEach((g: PayrollPrintGroup): void => {
+      next[g.key] = true;
     });
-    setSelectedSections(next);
-    // sectionGroups is derived from sectionKey
+    setSelectedGroups(next);
+    // printGroups is derived from groupKey
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sectionKey]);
+  }, [groupKey]);
 
   useEffect(() => {
     if (isVisible && buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect();
+      const rect: DOMRect = buttonRef.current.getBoundingClientRect();
       setPosition({
         top: rect.bottom + 8,
         left: rect.right,
@@ -89,46 +200,49 @@ const PayrollSectionPrintMenu: React.FC<PayrollSectionPrintMenuProps> = ({
     };
   }, []);
 
-  const handleMouseEnter = () => {
+  const handleMouseEnter = (): void => {
     if (disabled) return;
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => setIsVisible(true), 0);
   };
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = (): void => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => setIsVisible(false), 100);
   };
 
-  const handleToggleSection = (section: string) => {
-    setSelectedSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  const handleToggleGroup = (groupKey: string): void => {
+    setSelectedGroups((prev: Record<string, boolean>) => ({
+      ...prev,
+      [groupKey]: !prev[groupKey],
+    }));
   };
 
-  const allSelected =
-    sectionGroups.length > 0 &&
-    sectionGroups.every((g) => selectedSections[g.section]);
+  const allSelected: boolean =
+    printGroups.length > 0 &&
+    printGroups.every((g: PayrollPrintGroup): boolean => selectedGroups[g.key]);
 
-  const handleSelectAll = () => {
+  const handleSelectAll = (): void => {
     const next: Record<string, boolean> = {};
-    sectionGroups.forEach((g) => {
-      next[g.section] = !allSelected;
+    printGroups.forEach((g: PayrollPrintGroup): void => {
+      next[g.key] = !allSelected;
     });
-    setSelectedSections(next);
+    setSelectedGroups(next);
   };
 
-  const selectedSectionCount = sectionGroups.filter(
-    (g) => selectedSections[g.section]
+  const selectedGroupCount: number = printGroups.filter(
+    (g: PayrollPrintGroup): boolean => selectedGroups[g.key]
   ).length;
 
-  const selectedPayrolls = useMemo(
-    () =>
-      sectionGroups
-        .filter((g) => selectedSections[g.section])
-        .flatMap((g) => g.rows),
-    [sectionGroups, selectedSections]
+  const selectedPayrolls = useMemo<EmployeePayroll[]>(
+    (): EmployeePayroll[] =>
+      printGroups
+        .filter((g: PayrollPrintGroup): boolean => selectedGroups[g.key])
+        .flatMap((g: PayrollPrintGroup): EmployeePayroll[] => g.rows),
+    [printGroups, selectedGroups]
   );
 
-  const print = async (filtered: EmployeePayroll[]) => {
+  const print = async (filtered: EmployeePayroll[]): Promise<void> => {
     if (filtered.length === 0) {
       toast.error("No payslips to print");
       return;
@@ -138,7 +252,11 @@ const PayrollSectionPrintMenu: React.FC<PayrollSectionPrintMenuProps> = ({
     setIsPrinting(true);
     setShowOverlay(true);
 
-    const details = createStaffDetailsMap(filtered, staffs, jobs);
+    const details: Record<string, StaffDetails> = createStaffDetailsMap(
+      filtered,
+      staffs,
+      jobs
+    );
 
     // The mid-month advance is resolved inside printBatchPayslips from the
     // /batch payroll fetch, so the (selection-scoped) parent map is only a
@@ -146,30 +264,34 @@ const PayrollSectionPrintMenu: React.FC<PayrollSectionPrintMenuProps> = ({
     await printBatchPayslips(filtered, details, {
       companyName,
       midMonthPayrollsMap,
-      onBeforePrint: () => {
+      onBeforePrint: (): void => {
         setShowOverlay(true);
       },
-      onAfterPrint: () => {
+      onAfterPrint: (): void => {
         setIsPrinting(false);
         setShowOverlay(false);
       },
-      onError: () => {
+      onError: (): void => {
         setIsPrinting(false);
         setShowOverlay(false);
       },
     });
   };
 
-  const buttonClasses =
+  const buttonClasses: string =
     size === "sm"
       ? "flex items-center px-3 h-8 text-sm font-medium text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-900/30 hover:bg-sky-100 dark:hover:bg-sky-900/50 border border-default-300 dark:border-gray-600 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       : "flex items-center px-4 h-[42px] text-sm font-medium text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-900/30 hover:bg-sky-100 dark:hover:bg-sky-900/50 border border-default-300 dark:border-gray-600 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
 
-  const iconSize = size === "sm" ? 16 : 18;
+  const iconSize: number = size === "sm" ? 16 : 18;
 
-  const totalEmployees = sectionGroups.reduce((sum, g) => sum + g.count, 0);
-  const selectedEmployeeCount = selectedPayrolls.length;
-  const triggerDisabled = disabled || isPrinting || payrolls.length === 0;
+  const totalPayslipCount: number = printGroups.reduce(
+    (sum: number, g: PayrollPrintGroup): number => sum + g.count,
+    0
+  );
+  const selectedPayslipCount: number = selectedPayrolls.length;
+  const triggerDisabled: boolean =
+    disabled || isPrinting || payrolls.length === 0;
 
   return (
     <>
@@ -177,13 +299,13 @@ const PayrollSectionPrintMenu: React.FC<PayrollSectionPrintMenuProps> = ({
         ref={buttonRef}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        onClick={() => {
+        onClick={(): void => {
           if (!triggerDisabled) setIsVisible(true);
         }}
         className={buttonClasses}
         type="button"
         disabled={triggerDisabled}
-        title="Print pay slips by section"
+        title="Print pay slips by section or job"
       >
         <IconPrinter size={iconSize} className="mr-2" />
         {isPrinting ? "Printing..." : buttonLabel}
@@ -210,10 +332,10 @@ const PayrollSectionPrintMenu: React.FC<PayrollSectionPrintMenuProps> = ({
             >
               <div className="flex justify-between items-center">
                 <h3 className="text-base font-medium text-default-800 dark:text-gray-100">
-                  Print Pay Slips by Section
+                  Print Pay Slips
                 </h3>
                 <div className="px-2 py-0.5 bg-sky-100 dark:bg-sky-900/50 text-sky-800 dark:text-sky-300 rounded-full text-xs font-medium">
-                  {selectedSectionCount}/{sectionGroups.length}
+                  {selectedGroupCount}/{printGroups.length}
                 </div>
               </div>
               <div className="flex items-center mt-2 text-sm text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-200">
@@ -228,23 +350,23 @@ const PayrollSectionPrintMenu: React.FC<PayrollSectionPrintMenuProps> = ({
               </div>
             </div>
 
-            {/* Section Options */}
+            {/* Print Options */}
             <div className="flex-grow overflow-y-auto py-1 max-h-80">
-              {sectionGroups.length === 0 ? (
+              {printGroups.length === 0 ? (
                 <div className="px-4 py-6 text-center text-sm text-default-500 dark:text-gray-400">
                   No pay slips available.
                 </div>
               ) : (
                 <div className="px-1 space-y-1">
-                  {sectionGroups.map(({ section, rows, count }) => (
+                  {printGroups.map(({ key, label, rows, count }) => (
                     <div
-                      key={section}
+                      key={key}
                       className="flex items-center px-3 py-2.5 hover:bg-default-50 dark:hover:bg-gray-700 rounded-lg cursor-pointer transition-colors"
-                      onClick={() => handleToggleSection(section)}
+                      onClick={(): void => handleToggleGroup(key)}
                     >
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-default-700 dark:text-gray-200">
-                          {section}
+                          {label}
                         </div>
                         <div className="text-xs text-default-500 dark:text-gray-400">
                           {count} {count === 1 ? "employee" : "employees"}
@@ -252,18 +374,20 @@ const PayrollSectionPrintMenu: React.FC<PayrollSectionPrintMenuProps> = ({
                       </div>
                       <button
                         type="button"
-                        onClick={(e) => {
+                        onClick={(
+                          e: React.MouseEvent<HTMLButtonElement>
+                        ): void => {
                           e.stopPropagation();
-                          print(rows);
+                          void print(rows);
                         }}
                         className="ml-2 mr-1 p-1.5 rounded-md text-sky-600 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/40 transition-colors"
-                        title={`Print ${section} only`}
+                        title={`Print ${label} only`}
                       >
                         <IconPrinter size={16} />
                       </button>
                       <Checkbox
-                        checked={!!selectedSections[section]}
-                        onChange={() => handleToggleSection(section)}
+                        checked={!!selectedGroups[key]}
+                        onChange={(): void => handleToggleGroup(key)}
                         size={18}
                         className="ml-1"
                         checkedColor="text-sky-600"
@@ -278,19 +402,21 @@ const PayrollSectionPrintMenu: React.FC<PayrollSectionPrintMenuProps> = ({
             <div className="flex-shrink-0 border-t border-default-200 dark:border-gray-700 px-4 py-3 bg-default-50 dark:bg-gray-800/50 rounded-b-lg">
               <div className="text-sm text-default-600 dark:text-gray-400 mb-2">
                 <span className="font-medium">Selected:</span>{" "}
-                {selectedEmployeeCount} of {totalEmployees} employee
-                {totalEmployees === 1 ? "" : "s"}
+                {selectedPayslipCount} of {totalPayslipCount} payslip
+                {totalPayslipCount === 1 ? "" : "s"}
               </div>
               <button
-                onClick={() => print(selectedPayrolls)}
-                disabled={selectedEmployeeCount === 0}
+                onClick={(): void => {
+                  void print(selectedPayrolls);
+                }}
+                disabled={selectedPayslipCount === 0}
                 type="button"
                 className="w-full flex items-center justify-center px-3 h-9 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <IconPrinter size={16} className="mr-2" />
                 Print
-                {selectedEmployeeCount > 0 ? ` ${selectedEmployeeCount} ` : " "}
-                Payslip{selectedEmployeeCount === 1 ? "" : "s"}
+                {selectedPayslipCount > 0 ? ` ${selectedPayslipCount} ` : " "}
+                Payslip{selectedPayslipCount === 1 ? "" : "s"}
               </button>
             </div>
           </div>,

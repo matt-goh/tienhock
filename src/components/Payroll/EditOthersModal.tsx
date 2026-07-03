@@ -22,6 +22,7 @@ import { format } from "date-fns";
 import Button from "../Button";
 import { FormInput } from "../FormComponents";
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
+import { useJPJobPayCodeMappings } from "../../utils/JellyPolly/useJPJobPayCodeMappings";
 import { calculateAmount } from "../../utils/payroll/payrollUtils";
 import { OthersRecord, PayCode, RateUnit } from "../../types/types";
 import toast from "react-hot-toast";
@@ -36,6 +37,8 @@ interface EditOthersModalProps {
   displayLabel: string;
   // API base path for the records endpoint (default Tien Hock /api/others-records).
   apiBasePath?: string;
+  // Catalogue source — Jelly Polly pages pass "jellypolly" (own pay codes).
+  company?: "tienhock" | "jellypolly";
 }
 
 const formatCurrency = (amount: number): string =>
@@ -71,8 +74,11 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
   record,
   displayLabel,
   apiBasePath = "/api/others-records",
+  company = "tienhock",
 }) => {
-  const { payCodes } = useJobPayCodeMappings();
+  const { payCodes: thPayCodes } = useJobPayCodeMappings();
+  const { payCodes: jpPayCodes } = useJPJobPayCodeMappings();
+  const payCodes = company === "jellypolly" ? jpPayCodes : thPayCodes;
 
   const [recordDate, setRecordDate] = useState("");
   const [linkedDates, setLinkedDates] = useState<string[]>([]);

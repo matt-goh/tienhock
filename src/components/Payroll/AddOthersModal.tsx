@@ -27,6 +27,8 @@ import {
 import { format } from "date-fns";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
+import { useJPStaffsCache } from "../../utils/JellyPolly/useJPStaffsCache";
+import { useJPJobPayCodeMappings } from "../../utils/JellyPolly/useJPJobPayCodeMappings";
 import Button from "../Button";
 import { FormInput } from "../FormComponents";
 import { calculateAmount } from "../../utils/payroll/payrollUtils";
@@ -71,6 +73,9 @@ interface AddOthersModalProps {
   apiBasePath?: string;
   // When provided, restrict the staff pickers to these employee ids.
   allowedEmployeeIds?: string[];
+  // Catalogue source — Jelly Polly pages pass "jellypolly" (JP has its own
+  // staff/pay-code catalogue); default is the shared Tien Hock catalogue.
+  company?: "tienhock" | "jellypolly";
 }
 
 const PAY_CODE_PAGE_SIZE = 50;
@@ -115,9 +120,14 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
   displayLabel,
   apiBasePath = "/api/others-records",
   allowedEmployeeIds,
+  company = "tienhock",
 }) => {
-  const { staffs } = useStaffsCache();
-  const { payCodes } = useJobPayCodeMappings();
+  const { staffs: thStaffs } = useStaffsCache();
+  const { staffs: jpStaffs } = useJPStaffsCache();
+  const { payCodes: thPayCodes } = useJobPayCodeMappings();
+  const { payCodes: jpPayCodes } = useJPJobPayCodeMappings();
+  const staffs = company === "jellypolly" ? jpStaffs : thStaffs;
+  const payCodes = company === "jellypolly" ? jpPayCodes : thPayCodes;
   const { user } = useAuth();
 
   const [entries, setEntries] = useState<OthersEntry[]>([]);

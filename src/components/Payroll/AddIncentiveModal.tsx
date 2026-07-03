@@ -9,6 +9,7 @@ import {
   TransitionChild,
 } from "@headlessui/react";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
+import { useJPStaffsCache } from "../../utils/JellyPolly/useJPStaffsCache";
 import { useLocationMappingsCache } from "../../utils/catalogue/useLocationMappingsCache";
 import Button from "../Button";
 import Checkbox from "../Checkbox";
@@ -49,6 +50,9 @@ interface AddIncentiveModalProps {
   forceIsAdvance?: boolean;
   // When provided, restrict the staff picker to these employee ids.
   allowedEmployeeIds?: string[];
+  // Staff catalogue source — Jelly Polly pages pass "jellypolly" (JP has its
+  // own staff catalogue); default is the shared Tien Hock catalogue.
+  company?: "tienhock" | "jellypolly";
 }
 
 const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
@@ -63,10 +67,13 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
   apiBasePath = "/api/incentives",
   forceIsAdvance,
   allowedEmployeeIds,
+  company = "tienhock",
 }) => {
   const showAdvanceColumn =
     incentiveType === "Bonus" && forceIsAdvance === undefined;
-  const { staffs } = useStaffsCache();
+  const { staffs: thStaffs } = useStaffsCache();
+  const { staffs: jpStaffs } = useJPStaffsCache();
+  const staffs = company === "jellypolly" ? jpStaffs : thStaffs;
   const { locations } = useLocationMappingsCache();
   const { user } = useAuth();
   const [incentiveDate, setIncentiveDate] = useState(
