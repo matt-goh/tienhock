@@ -27,6 +27,27 @@ import toast from "react-hot-toast";
 
 type ViewMode = "day" | "month" | "year";
 type CategoryKey = "MEE" | "BH" | "HANCUR" | "BUNDLE" | "JP" | "OTH";
+type ProductSelectorProductType = Exclude<StockProduct["type"], "TAX">;
+
+const PRODUCT_SELECTOR_TYPES = new Set<ProductSelectorProductType>([
+  "BH",
+  "MEE",
+  "JP",
+  "OTH",
+  "BUNDLE",
+]);
+const DEFAULT_PRODUCTION_PRODUCT_TYPES: ProductSelectorProductType[] = [
+  "MEE",
+  "BH",
+  "BUNDLE",
+  "OTH",
+];
+
+const isProductSelectorProductType = (
+  value: string | undefined
+): value is ProductSelectorProductType =>
+  value !== undefined &&
+  PRODUCT_SELECTOR_TYPES.has(value as ProductSelectorProductType);
 
 interface DateRange {
   start: Date;
@@ -184,7 +205,7 @@ const getRangeLabel = (dateRange: DateRange): string => {
 interface ProductionListPageProps {
   // Restrict the page to specific product types (e.g. ["JP"] for the Jelly
   // Polly production records page). Default: TH behaviour (all types).
-  productTypes?: string[];
+  productTypes?: ProductSelectorProductType[];
   // API base for entries/worker-order (JP passes /jellypolly/api/production-entries)
   apiBasePath?: string;
 }
@@ -234,9 +255,13 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
       const allEntries: ProductionEntry[] = response || [];
       setEntries(
         productTypes
-          ? allEntries.filter((entry) =>
-              productTypes.includes(entry.product_type)
-            )
+          ? allEntries.filter((entry: ProductionEntry): boolean => {
+              const productType: string | undefined = entry.product_type;
+              return (
+                isProductSelectorProductType(productType) &&
+                productTypes.includes(productType)
+              );
+            })
           : allEntries
       );
     } catch (error) {
@@ -275,16 +300,24 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
       )
     ).then((results: string[][]) => {
       if (!isCurrent) return;
-      setWorkerOrderByScope({
-        BH_PACKING: results[0],
-        MEE_PACKING: results[1],
+      const nextWorkerOrderByScope: Record<
+        ProductionWorkerOrderScope,
+        string[]
+      > = {
+        BH_PACKING: [],
+        MEE_PACKING: [],
+        JP_PRODUCTION: [],
+      };
+      scopes.forEach((scope: ProductionWorkerOrderScope, index: number): void => {
+        nextWorkerOrderByScope[scope] = results[index] || [];
       });
+      setWorkerOrderByScope(nextWorkerOrderByScope);
     });
 
     return (): void => {
       isCurrent = false;
     };
-  }, []);
+  }, [apiBasePath, productTypes]);
 
   const productionProductFilter = useCallback(
     (product: StockProduct): boolean =>
@@ -339,6 +372,14 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
       ),
       MEE_PACKING: new Map(
         workerOrderByScope.MEE_PACKING.map(
+          (workerId: string, index: number): [string, number] => [
+            workerId,
+            index,
+          ]
+        )
+      ),
+      JP_PRODUCTION: new Map(
+        workerOrderByScope.JP_PRODUCTION.map(
           (workerId: string, index: number): [string, number] => [
             workerId,
             index,
@@ -415,6 +456,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
           BH: [],
           HANCUR: [],
           BUNDLE: [],
+          JP: [],
           OTH: [],
         };
 
@@ -609,11 +651,16 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
           <ProductSelector
             value={selectedProductId}
             onChange={setSelectedProductId}
-            productTypes={productTypes || ["MEE", "BH", "BUNDLE", "OTH"]}
+            productTypes={productTypes || DEFAULT_PRODUCTION_PRODUCT_TYPES}
             productFilter={
               productTypes
-                ? (product: StockProduct) =>
-                    productTypes.includes(product.type)
+                ? (product: StockProduct): boolean => {
+                    const productType: string | undefined = product.type;
+                    return (
+                      isProductSelectorProductType(productType) &&
+                      productTypes.includes(productType)
+                    );
+                  }
                 : productionProductFilter
             }
             placeholder="All production products"

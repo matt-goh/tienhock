@@ -3404,12 +3404,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
         {/* Combined take-home across companies (renders only for staff who
             also have Jelly Polly pay this month) */}
-        <CrossCompanyTakeHomeCard
-          employeeId={payroll.employee_id}
-          year={payroll.year}
-          month={payroll.month}
-          currentCompany="tienhock"
-        />
+        {payroll.year !== undefined && payroll.month !== undefined && (
+          <CrossCompanyTakeHomeCard
+            employeeId={payroll.employee_id}
+            year={payroll.year}
+            month={payroll.month}
+            currentCompany="tienhock"
+          />
+        )}
       </div>
 
       {/* Add Manual Item Modal */}
