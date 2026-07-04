@@ -148,15 +148,15 @@ export default function (pool) {
           WHERE mp.year = $1 AND mp.month = $2
             -- Exclude daily work items dated on a leave day: they pay nothing as
             -- work (the day is paid via leave) and are excluded from gross_pay, so
-            -- the base/tambahan/overtime breakdown must drop them too. Matches by
-            -- staff name (siblings share leave) like the payslip filter.
+            -- the base/tambahan/overtime breakdown must drop them too. Scoped per
+            -- source_employee_id like removeLeaveDayWorkItems: leave under one
+            -- sibling ID must not drop another sibling job's work that day.
             AND NOT (
               pi.work_log_type = 'daily'
               AND pi.source_date IS NOT NULL
               AND EXISTS (
                 SELECT 1 FROM leave_records lr2
-                JOIN staffs s2 ON lr2.employee_id = s2.id
-                WHERE s2.name = (SELECT name FROM staffs WHERE id = ep.employee_id)
+                WHERE lr2.employee_id = pi.source_employee_id
                   AND lr2.status = 'approved'
                   AND lr2.company <> 'JP'
                   AND lr2.leave_date = pi.source_date
@@ -1275,8 +1275,7 @@ export default function (pool) {
               AND pi.source_date IS NOT NULL
               AND EXISTS (
                 SELECT 1 FROM leave_records lr2
-                JOIN staffs s2 ON lr2.employee_id = s2.id
-                WHERE s2.name = (SELECT name FROM staffs WHERE id = ep.employee_id)
+                WHERE lr2.employee_id = pi.source_employee_id
                   AND lr2.status = 'approved'
                   AND lr2.company <> 'JP'
                   AND lr2.leave_date = pi.source_date
