@@ -43,21 +43,17 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ onNavigate }) => {
   const theme = companyThemes[activeCompany.id] || companyThemes.tienhock;
 
   // Handle hover open/close
-  const handleMouseEnter = () => {
+  const handleMouseEnter = (): void => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
     }
     setIsOpen(true);
   };
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = (): void => {
     hoverTimeoutRef.current = setTimeout(() => {
       setIsOpen(false);
     }, 150);
-  };
-
-  const handleButtonClick = () => {
-    setIsOpen((prev) => !prev);
   };
 
   // Close dropdown when clicking outside
@@ -98,6 +94,24 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ onNavigate }) => {
   const getCompanyHomePath = (company: Company): string =>
     company.routePrefix ? `/${company.routePrefix}` : "/";
 
+  const navigateToCompanyHome = (company: Company): void => {
+    navigate(getCompanyHomePath(company));
+
+    if (onNavigate) {
+      onNavigate();
+    }
+  };
+
+  const handleButtonClick = (): void => {
+    if (!isOpen) {
+      setIsOpen(true);
+      return;
+    }
+
+    setIsOpen(false);
+    navigateToCompanyHome(activeCompany);
+  };
+
   const handleCompanyChange = (company: Company): void => {
     setIsOpen(false);
 
@@ -105,11 +119,7 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ onNavigate }) => {
       setActiveCompany(company);
     }
 
-    navigate(getCompanyHomePath(company));
-
-    if (onNavigate) {
-      onNavigate();
-    }
+    navigateToCompanyHome(company);
   };
 
   return (
