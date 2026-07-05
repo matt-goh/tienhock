@@ -10,10 +10,19 @@ import {
   TransitionChild,
 } from "@headlessui/react";
 import { IconX } from "@tabler/icons-react";
+import { format } from "date-fns";
 import { api } from "../../routes/utils/api";
 import Button from "../Button";
 import ListboxSelect from "../ListboxSelect";
+import TimeNavigator from "../TimeNavigator";
 import toast from "react-hot-toast";
+
+// 'yyyy-MM-dd' -> local Date (never via new Date(string), which parses as UTC)
+const parseLocalDate = (s: string): Date | null => {
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  return new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+};
 
 interface OpeningBalanceModalProps {
   isOpen: boolean;
@@ -115,7 +124,8 @@ const OpeningBalanceModal: React.FC<OpeningBalanceModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 text-left align-middle shadow-xl transition-all">
+              {/* No overflow-hidden: the TimeNavigator popover must escape the panel */}
+              <DialogPanel className="w-full max-w-md transform rounded-2xl bg-white dark:bg-gray-800 p-6 text-left align-middle shadow-xl transition-all">
                 <div className="flex items-center justify-between mb-1">
                   <DialogTitle
                     as="h3"
@@ -141,12 +151,19 @@ const OpeningBalanceModal: React.FC<OpeningBalanceModalProps> = ({
                     <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
                       As of date
                     </label>
-                    <input
-                      type="date"
-                      value={asOfDate}
-                      onChange={(e) => setAsOfDate(e.target.value)}
-                      disabled={isSaving}
-                      className="w-full px-3 py-2 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    <TimeNavigator
+                      range={{
+                        start: asOfDate ? parseLocalDate(asOfDate) : null,
+                        end: asOfDate ? parseLocalDate(asOfDate) : null,
+                      }}
+                      onChange={({ start }) =>
+                        setAsOfDate(format(start, "yyyy-MM-dd"))
+                      }
+                      modes={["day"]}
+                      presets={false}
+                      showArrows={false}
+                      allowFuture
+                      placeholder="Pick a date"
                     />
                     <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
                       The report seeds opening from this anchor and ignores every line before it.
@@ -165,19 +182,24 @@ const OpeningBalanceModal: React.FC<OpeningBalanceModalProps> = ({
                         onChange={(e) => setAmount(e.target.value)}
                         placeholder="0.00"
                         disabled={isSaving}
-                        className="flex-1 px-3 py-2 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 text-right font-mono focus:outline-none focus:ring-2 focus:ring-sky-500"
+                        className="flex-1 h-[40px] px-3 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 text-right font-mono hover:border-default-400 dark:hover:border-gray-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-colors"
                       />
                       <ListboxSelect
                         value={drcr}
                         onChange={(v) => setDrcr(v as "DR" | "CR")}
                         disabled={isSaving}
                         className="w-24"
+                        buttonClassName="h-[40px] flex items-center hover:border-default-400 dark:hover:border-gray-500 transition-colors"
                         options={[
                           { value: "DR", label: "DR" },
                           { value: "CR", label: "CR" },
                         ]}
                       />
                     </div>
+                    <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
+                      DR for asset balances (money in the bank); CR for an overdrawn
+                      account.
+                    </p>
                   </div>
 
                   <div>
@@ -190,7 +212,7 @@ const OpeningBalanceModal: React.FC<OpeningBalanceModalProps> = ({
                       onChange={(e) => setNotes(e.target.value)}
                       placeholder="e.g. Migration opening from legacy statement"
                       disabled={isSaving}
-                      className="w-full px-3 py-2 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                      className="w-full h-[40px] px-3 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 hover:border-default-400 dark:hover:border-gray-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-colors"
                     />
                   </div>
 
