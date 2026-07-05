@@ -140,7 +140,16 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ onNavigate }) => {
         `}
       >
         {getCompanyLogo(activeCompany.id, 22)}
-        <span className="font-semibold text-sm">{activeCompany.name}</span>
+        <span className="font-semibold text-sm">
+          {activeCompany.id === "greentarget" ? (
+            <>
+              <span className="2xl:hidden">GT</span>
+              <span className="hidden 2xl:inline">{activeCompany.name}</span>
+            </>
+          ) : (
+            activeCompany.name
+          )}
+        </span>
         <IconChevronDown
           size={16}
           className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
