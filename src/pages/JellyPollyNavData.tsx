@@ -26,7 +26,6 @@ import JPAdjustmentDocsDetailsPage from "./JellyPolly/AdjustmentDocs/JPAdjustmen
 import DebtorsReportPage from "./JellyPolly/DebtorsReportPage";
 
 // Payroll related imports
-import JPStaffAssignmentPage from "./JellyPolly/Payroll/JPStaffAssignmentPage";
 import JPPayrollPage from "./JellyPolly/Payroll/JPPayrollPage";
 import JPPayrollDetailsPage from "./JellyPolly/Payroll/JPPayrollDetailsPage";
 import JPSalaryReportPage from "./JellyPolly/Payroll/JPSalaryReportPage";
@@ -63,6 +62,12 @@ import ProductionListPage from "./Stock/ProductionListPage";
 import ProductStockMovementPage from "./Stock/ProductStockMovementPage";
 import ProductStockAdjustmentEntryPage from "./Stock/ProductStockAdjustmentEntryPage";
 
+const JP_PAYROLL_DROPDOWN_COLUMNS = {
+  main: { key: "jp-payroll-main", order: 2 },
+  dailyLogs: { key: "jp-payroll-daily-logs", order: 1 },
+  addOns: { key: "jp-payroll-add-ons", order: 3 },
+} as const;
+
 // Monthly (Office / Maintenance) page group generator
 const monthlyLogSubItems = (
   jobType: "OFFICE" | "MAINTENANCE",
@@ -76,6 +81,8 @@ const monthlyLogSubItems = (
       <JPMonthlyLogListPage jobType={jobType} {...props} />
     ),
     group: "Monthly Logs",
+    dropdownColumn: JP_PAYROLL_DROPDOWN_COLUMNS.main.key,
+    dropdownColumnOrder: JP_PAYROLL_DROPDOWN_COLUMNS.main.order,
     subItems: [
       {
         name: `New ${name} Entry`,
@@ -116,6 +123,8 @@ const dailyMachineSubItems = (
       <JPDailyLogListPage jobType={jobType} {...props} />
     ),
     group: "Daily Logs",
+    dropdownColumn: JP_PAYROLL_DROPDOWN_COLUMNS.dailyLogs.key,
+    dropdownColumnOrder: JP_PAYROLL_DROPDOWN_COLUMNS.dailyLogs.order,
     subItems: [
       {
         name: `New ${name} Entry`,
@@ -164,6 +173,8 @@ export const JellyPollyNavData: SidebarItem[] = [
         path: "/payroll/monthly-payrolls",
         component: JPPayrollPage,
         group: "Payroll",
+        dropdownColumn: JP_PAYROLL_DROPDOWN_COLUMNS.main.key,
+        dropdownColumnOrder: JP_PAYROLL_DROPDOWN_COLUMNS.main.order,
         subItems: [
           {
             name: "Employee Payroll Details",
@@ -177,12 +188,16 @@ export const JellyPollyNavData: SidebarItem[] = [
         path: "/payroll/salary-report",
         component: JPSalaryReportPage,
         group: "Payroll",
+        dropdownColumn: JP_PAYROLL_DROPDOWN_COLUMNS.main.key,
+        dropdownColumnOrder: JP_PAYROLL_DROPDOWN_COLUMNS.main.order,
       },
       {
         name: "e-Caruman",
         path: "/payroll/e-caruman",
         component: JPECarumanPage,
         group: "Payroll",
+        dropdownColumn: JP_PAYROLL_DROPDOWN_COLUMNS.main.key,
+        dropdownColumnOrder: JP_PAYROLL_DROPDOWN_COLUMNS.main.order,
       },
       monthlyLogSubItems("OFFICE", "Office"),
       monthlyLogSubItems("MAINTENANCE", "Maintenance"),
@@ -193,6 +208,8 @@ export const JellyPollyNavData: SidebarItem[] = [
           <JPDailyLogListPage jobType="SALESMAN" {...props} />
         ),
         group: "Daily Logs",
+        dropdownColumn: JP_PAYROLL_DROPDOWN_COLUMNS.dailyLogs.key,
+        dropdownColumnOrder: JP_PAYROLL_DROPDOWN_COLUMNS.dailyLogs.order,
         subItems: [
           {
             name: "New Salesman Entry",
@@ -225,42 +242,48 @@ export const JellyPollyNavData: SidebarItem[] = [
         path: "/payroll/plastic-entry",
         component: JPDailyPlasticEntryPage,
         group: "Daily Logs",
+        dropdownColumn: JP_PAYROLL_DROPDOWN_COLUMNS.dailyLogs.key,
+        dropdownColumnOrder: JP_PAYROLL_DROPDOWN_COLUMNS.dailyLogs.order,
       },
       {
         name: "Mid-month Pay",
         path: "/payroll/mid-month-payrolls",
         component: JPMidMonthPayrollPage,
         group: "Add-Ons",
+        dropdownColumn: JP_PAYROLL_DROPDOWN_COLUMNS.addOns.key,
+        dropdownColumnOrder: JP_PAYROLL_DROPDOWN_COLUMNS.addOns.order,
       },
       {
         name: "Others (Advance)",
         path: "/payroll/commission",
         component: JPOthersAdvancePage,
         group: "Add-Ons",
+        dropdownColumn: JP_PAYROLL_DROPDOWN_COLUMNS.addOns.key,
+        dropdownColumnOrder: JP_PAYROLL_DROPDOWN_COLUMNS.addOns.order,
       },
       {
         name: "Others (Kerja Luar OT)",
         path: "/payroll/others",
         component: JPOthersKerjaLuarOtPage,
         group: "Add-Ons",
+        dropdownColumn: JP_PAYROLL_DROPDOWN_COLUMNS.addOns.key,
+        dropdownColumnOrder: JP_PAYROLL_DROPDOWN_COLUMNS.addOns.order,
       },
       {
         name: "Bonus",
         path: "/payroll/bonus",
         component: JPBonusPage,
         group: "Add-Ons",
+        dropdownColumn: JP_PAYROLL_DROPDOWN_COLUMNS.addOns.key,
+        dropdownColumnOrder: JP_PAYROLL_DROPDOWN_COLUMNS.addOns.order,
       },
       {
         name: "Pinjam",
         path: "/payroll/pinjam",
         component: JPPinjamListPage,
         group: "Add-Ons",
-      },
-      {
-        name: "Staff Assignment",
-        path: "/payroll/staff-assignment",
-        component: JPStaffAssignmentPage,
-        group: "Setup",
+        dropdownColumn: JP_PAYROLL_DROPDOWN_COLUMNS.addOns.key,
+        dropdownColumnOrder: JP_PAYROLL_DROPDOWN_COLUMNS.addOns.order,
       },
     ],
   },

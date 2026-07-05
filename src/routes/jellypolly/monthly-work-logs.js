@@ -6,7 +6,15 @@
 // exactly like TH's monthly leave. Saving/updating/deleting a log
 // auto-reprocesses the affected employees' JP payroll.
 import { Router } from "express";
-import { reprocessJPEmployeesSafe } from "./jpPayrollProcessor.js";
+import {
+  reprocessJPEmployeesSafe,
+  JP_JOB_ID_TO_TYPE,
+} from "./jpPayrollProcessor.js";
+
+// JP job type -> jellypolly.jobs id
+const JP_TYPE_TO_JOB_ID = Object.fromEntries(
+  Object.entries(JP_JOB_ID_TO_TYPE).map(([jobId, jobType]) => [jobType, jobId])
+);
 
 export default function (pool) {
   const router = Router();
@@ -19,17 +27,17 @@ export default function (pool) {
     return Math.round(parsedAmount * 100) / 100;
   };
 
-  // Staff ids assigned to a JP section/job type (leave lists are scoped to the
-  // page's assigned staff, mirroring TH's staffs.job section filter)
+  // Staff ids holding the JP job for this section/job type (leave lists are
+  // scoped to the page's staff, mirroring TH's staffs.job section filter)
   const getSectionEmployeeIds = async (section) => {
     const sectionKey = Array.isArray(section) ? section[0] : section;
-    if (!sectionKey) return [];
+    const jobId = JP_TYPE_TO_JOB_ID[sectionKey];
+    if (!jobId) return [];
     const result = await pool.query(
-      `SELECT employee_id FROM jellypolly.payroll_employees
-       WHERE job_type = $1 AND is_active = true`,
-      [sectionKey]
+      `SELECT id FROM jellypolly.staffs WHERE job ? $1`,
+      [jobId]
     );
-    return result.rows.map((r) => r.employee_id);
+    return result.rows.map((r) => r.id);
   };
 
   const getMonthlyEntryHours = (entry) => ({
