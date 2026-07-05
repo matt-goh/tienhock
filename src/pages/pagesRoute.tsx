@@ -22,6 +22,10 @@ export interface SidebarItem {
   showInPopover?: boolean;
   /** Section label used to group items inside the navbar dropdown */
   group?: string;
+  /** Optional key for stacking multiple groups in one navbar dropdown column */
+  dropdownColumn?: string;
+  /** Optional order for navbar dropdown columns; lower values render first */
+  dropdownColumnOrder?: number;
 }
 
 export interface RouteItem {
