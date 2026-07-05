@@ -1,7 +1,7 @@
 // src/pages/GreenTarget/Invoices/InvoiceListPage.tsx
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import TimeNavigator from "../../../components/TimeNavigator";
+import TimeNavigator, { TimeRange } from "../../../components/TimeNavigator";
 import {
   IconSearch,
   IconChevronLeft,
@@ -74,6 +74,16 @@ interface InvoiceFilters {
   customer_id: string | null;
   status: string[] | null;
   consolidation: "all" | "individual" | "consolidated"; // Whether it's part of consolidated invoice
+}
+
+interface InvoiceDateRange {
+  start: Date | null;
+  end: Date | null;
+}
+
+interface StoredInvoiceDateRange {
+  start?: string | null;
+  end?: string | null;
 }
 
 const STORAGE_KEY = "greentarget_invoice_filters";
@@ -843,10 +853,10 @@ const InvoiceCard = ({
 const InvoiceListPage: React.FC = () => {
   const ITEMS_PER_PAGE = 12;
   // Function to get initial dates from localStorage
-  const getInitialDates = () => {
-    const savedFilters = localStorage.getItem(STORAGE_KEY);
+  const getInitialDates = (): InvoiceDateRange => {
+    const savedFilters: string | null = localStorage.getItem(STORAGE_KEY);
     if (savedFilters) {
-      const { start, end } = JSON.parse(savedFilters);
+      const { start, end }: StoredInvoiceDateRange = JSON.parse(savedFilters);
       return {
         start: start
           ? new Date(start)
@@ -869,7 +879,8 @@ const InvoiceListPage: React.FC = () => {
     status: ["active", "overdue", "paid", "cancelled"],
     consolidation: "all",
   };
-  const [dateRange, setDateRange] = useState(getInitialDates());
+  const [dateRange, setDateRange] =
+    useState<InvoiceDateRange>(getInitialDates());
   const [invoices, setInvoices] = useState<InvoiceGT[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -937,7 +948,7 @@ const InvoiceListPage: React.FC = () => {
   }, [filters]); // This will reset hasViewedFilters whenever filters change
 
   // Function to save dates to localStorage
-  const saveDatesToStorage = (startDate: Date, endDate: Date) => {
+  const saveDatesToStorage = (startDate: Date, endDate: Date): void => {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
@@ -959,7 +970,7 @@ const InvoiceListPage: React.FC = () => {
 
   // Unified Time Navigator change handler. Handles day, month, and custom-range
   // selections from the single TimeNavigator control.
-  const handleTimeNavigatorChange = (range: { start: Date; end: Date }) => {
+  const handleTimeNavigatorChange = (range: TimeRange): void => {
     // Keep the consolidation modals' month in sync with the selection.
     setSelectedMonth(range.start);
 
