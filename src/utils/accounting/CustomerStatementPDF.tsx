@@ -10,7 +10,7 @@ import {
   Image,
 } from "@react-pdf/renderer";
 import TienHockLogo from "../tienhock.png";
-import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
+import { type CompanyInfo, TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
 
 // Types for the statement data
@@ -46,6 +46,11 @@ interface CustomerStatementData {
   transactions: Transaction[];
   total_amount_due: number;
   aging: Aging;
+}
+
+interface CustomerStatementPDFOptions {
+  companyInfo?: CompanyInfo;
+  companyName?: string;
 }
 
 // Color palette
@@ -237,10 +242,63 @@ const formatCurrencyFull = (amount: number): string => {
   });
 };
 
-// PDF Component
-const CustomerStatementPDF: React.FC<{ data: CustomerStatementData }> = ({
-  data,
+const CompanyHeader: React.FC<{ companyInfo: CompanyInfo; companyName?: string }> = ({
+  companyInfo,
+  companyName,
 }) => {
+  const isTienHock = companyInfo.name === TIENHOCK_INFO.name;
+  const displayCompanyName = companyName || companyInfo.name;
+
+  if (isTienHock) {
+    return (
+      <View style={styles.header}>
+        <Image src={TienHockLogo} style={styles.logo} />
+        <Text style={styles.companyName}>
+          TIEN HOCK FOOD INDUSTRIES SDN BHD (953309-T)
+        </Text>
+        <Text style={styles.companyDetails}>{TIENHOCK_INFO.address_pdf}</Text>
+        <Text style={styles.companyDetails}>
+          P.O.BOX 11090, {TIENHOCK_INFO.postcode} {TIENHOCK_INFO.city_pdf},{" "}
+          {TIENHOCK_INFO.state_pdf}
+        </Text>
+        <Text style={styles.companyDetails}>
+          TEL : {TIENHOCK_INFO.phone} & 714306
+        </Text>
+        <Text style={styles.companyDetails}>
+          FAX : 088-726452 H/P : 016-8328244
+        </Text>
+        <Text style={styles.companyDetails}>GST ID NO : 000397869056</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.header}>
+      <Text style={styles.companyName}>
+        {displayCompanyName} ({companyInfo.reg_no})
+      </Text>
+      <Text style={styles.companyDetails}>{companyInfo.address_pdf}</Text>
+      <Text style={styles.companyDetails}>
+        {companyInfo.postcode} {companyInfo.city_pdf}, {companyInfo.state_pdf}
+      </Text>
+      <Text style={styles.companyDetails}>
+        TEL : {companyInfo.phone}
+        {companyInfo.office_phone_pdf ? ` / ${companyInfo.office_phone_pdf}` : ""}
+      </Text>
+      <Text style={styles.companyDetails}>EMAIL : {companyInfo.email}</Text>
+      <Text style={styles.companyDetails}>
+        SST ID NO : {companyInfo.sst_id_pdf || "-"}
+      </Text>
+    </View>
+  );
+};
+
+// PDF Component
+const CustomerStatementPDF: React.FC<{
+  data: CustomerStatementData;
+  companyInfo?: CompanyInfo;
+  companyName?: string;
+}> = ({ data, companyInfo = TIENHOCK_INFO, companyName }) => {
   const { customer, statement_date, previous_balance, transactions, total_amount_due, aging } = data;
 
   // Build customer address string
@@ -255,27 +313,7 @@ const CustomerStatementPDF: React.FC<{ data: CustomerStatementData }> = ({
     <Document title={`Statement of Account - ${customer.id} - ${statement_date}`}>
       <Page size="A4" style={styles.page}>
         {/* Company Header */}
-        <View style={styles.header}>
-          <Image src={TienHockLogo} style={styles.logo} />
-          <Text style={styles.companyName}>
-            TIEN HOCK FOOD INDUSTRIES SDN BHD (953309-T)
-          </Text>
-          <Text style={styles.companyDetails}>
-            {TIENHOCK_INFO.address_pdf}
-          </Text>
-          <Text style={styles.companyDetails}>
-            P.O.BOX 11090, {TIENHOCK_INFO.postcode} {TIENHOCK_INFO.city_pdf}, {TIENHOCK_INFO.state_pdf}
-          </Text>
-          <Text style={styles.companyDetails}>
-            TEL : {TIENHOCK_INFO.phone} & 714306
-          </Text>
-          <Text style={styles.companyDetails}>
-            FAX : 088-726452 H/P : 016-8328244
-          </Text>
-          <Text style={styles.companyDetails}>
-            GST ID NO : 000397869056
-          </Text>
-        </View>
+        <CompanyHeader companyInfo={companyInfo} companyName={companyName} />
 
         {/* Statement Title */}
         <Text style={styles.statementTitle}>
@@ -399,10 +437,17 @@ const CustomerStatementPDF: React.FC<{ data: CustomerStatementData }> = ({
 // PDF Generation Function
 export const generateCustomerStatementPDF = async (
   data: CustomerStatementData,
-  action: "download" | "print"
+  action: "download" | "print",
+  options: CustomerStatementPDFOptions = {}
 ): Promise<void> => {
   try {
-    const doc = <CustomerStatementPDF data={data} />;
+    const doc = (
+      <CustomerStatementPDF
+        data={data}
+        companyInfo={options.companyInfo}
+        companyName={options.companyName}
+      />
+    );
     const pdfBlob = await pdf(doc).toBlob();
 
     if (action === "download") {

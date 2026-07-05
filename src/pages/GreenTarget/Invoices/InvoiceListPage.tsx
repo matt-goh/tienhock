@@ -1053,6 +1053,10 @@ const InvoiceListPage: React.FC = () => {
       let filtersChanged = false;
 
       // Re-apply or confirm filters from URL (handles potential direct navigation)
+      if (customerIdParam) {
+        setDateRange({ start: null, end: null });
+      }
+
       if (customerIdParam && newFilters.customer_id !== customerIdParam) {
         newFilters.customer_id = customerIdParam;
         filtersChanged = true;
