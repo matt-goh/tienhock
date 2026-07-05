@@ -26,7 +26,6 @@ import JPAdjustmentDocsDetailsPage from "./JellyPolly/AdjustmentDocs/JPAdjustmen
 import DebtorsReportPage from "./JellyPolly/DebtorsReportPage";
 
 // Payroll related imports
-import JPStaffAssignmentPage from "./JellyPolly/Payroll/JPStaffAssignmentPage";
 import JPPayrollPage from "./JellyPolly/Payroll/JPPayrollPage";
 import JPPayrollDetailsPage from "./JellyPolly/Payroll/JPPayrollDetailsPage";
 import JPSalaryReportPage from "./JellyPolly/Payroll/JPSalaryReportPage";
@@ -285,14 +284,6 @@ export const JellyPollyNavData: SidebarItem[] = [
         group: "Add-Ons",
         dropdownColumn: JP_PAYROLL_DROPDOWN_COLUMNS.addOns.key,
         dropdownColumnOrder: JP_PAYROLL_DROPDOWN_COLUMNS.addOns.order,
-      },
-      {
-        name: "Staff Assignment",
-        path: "/payroll/staff-assignment",
-        component: JPStaffAssignmentPage,
-        group: "Setup",
-        dropdownColumn: JP_PAYROLL_DROPDOWN_COLUMNS.dailyLogs.key,
-        dropdownColumnOrder: JP_PAYROLL_DROPDOWN_COLUMNS.dailyLogs.order,
       },
     ],
   },

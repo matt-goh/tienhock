@@ -20,7 +20,11 @@ import { getMonthName } from "../../../utils/payroll/payrollUtils";
 import TimeNavigator from "../../../components/TimeNavigator";
 import AddIncentiveModal from "../../../components/Payroll/AddIncentiveModal";
 import EditIncentiveModal from "../../../components/Payroll/EditIncentiveModal";
-import { useJPPayrollEmployees } from "../../../utils/JellyPolly/useJPPayrollEmployees";
+import { useJPStaffsCache } from "../../../utils/JellyPolly/useJPStaffsCache";
+import {
+  JP_ALL_JOB_IDS,
+  staffHoldsJPJob,
+} from "../../../configs/jpPayrollJobConfigs";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 
@@ -64,10 +68,14 @@ const JPBonusPage: React.FC = () => {
     return params.get("search") || "";
   };
 
-  const { employees: gtEmployees } = useJPPayrollEmployees();
+  const { staffs } = useJPStaffsCache();
+  // Staff holding at least one JP payroll job in staffs.job
   const allowedEmployeeIds = useMemo(
-    () => gtEmployees.map((e) => e.employee_id),
-    [gtEmployees]
+    () =>
+      staffs
+        .filter((staff) => staffHoldsJPJob(staff.job, JP_ALL_JOB_IDS))
+        .map((staff) => staff.id),
+    [staffs]
   );
 
   const [bonuses, setBonuses] = useState<Bonus[]>([]);

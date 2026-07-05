@@ -12,11 +12,6 @@ import {
   JP_JOB_ID_TO_TYPE,
 } from "./jpPayrollProcessor.js";
 
-// jellypolly.payroll_employees job_type -> public.jobs id
-const JP_TYPE_TO_JOB_ID = Object.fromEntries(
-  Object.entries(JP_JOB_ID_TO_TYPE).map(([jobId, jobType]) => [jobType, jobId])
-);
-
 // Overtime threshold by day of week: Saturday = 5 hours, other days = 8 hours
 // (same rule as TH daily logs).
 function getOvertimeThreshold(logDate) {
@@ -332,24 +327,13 @@ export default function (pool) {
   const insertLeaveEntry = async (workLogId, logDate, leave) => {
     const { employeeId, leaveType, amount_paid, activities } = leave;
 
-    // Resolve the employee's JP job id (assignment first, staffs.job fallback)
-    const assignmentResult = await pool.query(
-      `SELECT job_type FROM jellypolly.payroll_employees
-       WHERE employee_id = $1 AND is_active = true
-       ORDER BY id LIMIT 1`,
+    // Resolve the employee's JP job id from staffs.job
+    const staffResult = await pool.query(
+      "SELECT job FROM jellypolly.staffs WHERE id = $1",
       [employeeId]
     );
-    let jobId = assignmentResult.rows[0]
-      ? JP_TYPE_TO_JOB_ID[assignmentResult.rows[0].job_type]
-      : null;
-    if (!jobId) {
-      const staffResult = await pool.query(
-        "SELECT job FROM jellypolly.staffs WHERE id = $1",
-        [employeeId]
-      );
-      const jobs = staffResult.rows[0]?.job || [];
-      jobId = jobs.find((j) => JP_JOB_ID_TO_TYPE[j]) || jobs[0] || null;
-    }
+    const jobs = staffResult.rows[0]?.job || [];
+    const jobId = jobs.find((j) => JP_JOB_ID_TO_TYPE[j]) || jobs[0] || null;
     if (!jobId) {
       throw new Error(`Employee ${employeeId} has no JP job assignment`);
     }

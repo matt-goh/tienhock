@@ -34,6 +34,10 @@ import { api } from "../../../routes/utils/api";
 import { getMonthName } from "../../../utils/payroll/payrollUtils";
 import { useJPStaffsCache } from "../../../utils/JellyPolly/useJPStaffsCache";
 import {
+  JP_ALL_JOB_IDS,
+  staffHoldsJPJob,
+} from "../../../configs/jpPayrollJobConfigs";
+import {
   generateMidMonthPayrollReportPDF,
   MidMonthPayrollReportPDFData,
 } from "../../../utils/payroll/MidMonthPayrollReportPDF";
@@ -56,7 +60,6 @@ interface JPMidMonthPayroll {
 interface JPPayrollEmployee {
   employee_id: string;
   employee_name: string;
-  job_type: string;
 }
 
 const PAYMENT_METHOD_OPTIONS = [
@@ -283,7 +286,6 @@ const JPMidMonthPayrollModal: React.FC<JPMidMonthPayrollModalProps> = ({
 const JPMidMonthPayrollPage: React.FC = () => {
   // State
   const [payrolls, setPayrolls] = useState<JPMidMonthPayroll[]>([]);
-  const [gtEmployees, setGtEmployees] = useState<JPPayrollEmployee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingPayroll, setEditingPayroll] =
@@ -294,6 +296,18 @@ const JPMidMonthPayrollPage: React.FC = () => {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isGeneratingExport, setIsGeneratingExport] = useState(false);
   const { staffs } = useJPStaffsCache();
+
+  // JP payroll staff (holding a JP job in staffs.job) for the add/edit modal
+  const gtEmployees = useMemo<JPPayrollEmployee[]>(
+    () =>
+      staffs
+        .filter((staff) => staffHoldsJPJob(staff.job, JP_ALL_JOB_IDS))
+        .map((staff) => ({
+          employee_id: staff.id,
+          employee_name: staff.name,
+        })),
+    [staffs]
+  );
 
   // Filters
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
@@ -321,14 +335,13 @@ const JPMidMonthPayrollPage: React.FC = () => {
   const fetchPayrolls = async () => {
     setIsLoading(true);
     try {
-      const [payrollsResponse, pinjamSummary, employees] = await Promise.all([
+      const [payrollsResponse, pinjamSummary] = await Promise.all([
         api.get(
           `/jellypolly/api/mid-month-payrolls?year=${currentYear}&month=${currentMonth}&limit=100`
         ),
         api.get(
           `/jellypolly/api/pinjam-records/summary?year=${currentYear}&month=${currentMonth}`
         ),
-        api.get("/jellypolly/api/payroll-employees"),
       ]);
       setPayrolls(
         (payrollsResponse.payrolls || []).map((p: any) => ({
@@ -336,7 +349,6 @@ const JPMidMonthPayrollPage: React.FC = () => {
           amount: parseFloat(p.amount),
         }))
       );
-      setGtEmployees(employees || []);
 
       const pinjamMap: Record<string, number> = {};
       if (Array.isArray(pinjamSummary)) {
