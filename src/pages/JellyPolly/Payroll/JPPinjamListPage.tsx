@@ -17,6 +17,11 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import PinjamFormModal from "../../../components/Payroll/PinjamFormModal";
 import { api } from "../../../routes/utils/api";
+import { useJPStaffsCache } from "../../../utils/JellyPolly/useJPStaffsCache";
+import {
+  JP_ALL_JOB_IDS,
+  staffHoldsJPJob,
+} from "../../../configs/jpPayrollJobConfigs";
 import TimeNavigator from "../../../components/TimeNavigator";
 import {
   generatePinjamPDF,
@@ -67,12 +72,6 @@ interface PinjamSummary {
   };
 }
 
-interface JPPayrollEmployee {
-  employee_id: string;
-  employee_name: string;
-  job_type: string;
-}
-
 interface EmployeePinjamData {
   employee_payroll_id?: number;
   employee_id: string;
@@ -108,7 +107,7 @@ const JPPinjamListPage: React.FC = () => {
   const [employeePayrolls, setEmployeePayrolls] = useState<
     EmployeePayrollSummary[]
   >([]);
-  const [gtEmployees, setGtEmployees] = useState<JPPayrollEmployee[]>([]);
+  const { staffs } = useJPStaffsCache();
   const [isLoading, setIsLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<PinjamRecord | null>(null);
@@ -145,18 +144,14 @@ const JPPinjamListPage: React.FC = () => {
   const fetchAllData = async () => {
     setIsLoading(true);
     try {
-      const [dashboard, employees] = await Promise.all([
-        api.get(
-          `/jellypolly/api/pinjam-records/dashboard?year=${currentYear}&month=${currentMonth}`
-        ),
-        api.get("/jellypolly/api/payroll-employees"),
-      ]);
+      const dashboard = await api.get(
+        `/jellypolly/api/pinjam-records/dashboard?year=${currentYear}&month=${currentMonth}`
+      );
 
       setPinjamRecords(dashboard.pinjamRecords || []);
       setPinjamSummary(dashboard.pinjamSummary || []);
       setMidMonthPayrolls(dashboard.midMonthPayrolls || []);
       setEmployeePayrolls(dashboard.employeePayrolls || []);
-      setGtEmployees(employees || []);
     } catch (error) {
       console.error("Error fetching JP pinjam data:", error);
       toast.error("Failed to load pinjam data");
@@ -202,14 +197,16 @@ const JPPinjamListPage: React.FC = () => {
     handleModalClose();
   };
 
-  // JP payroll employees for the pinjam form combobox
+  // JP payroll staff (holding a JP job in staffs.job) for the pinjam combobox
   const gtEmployeeOptions = useMemo(
     () =>
-      gtEmployees.map((emp) => ({
-        id: emp.employee_id,
-        name: `${emp.employee_name} (${emp.employee_id})`,
-      })),
-    [gtEmployees]
+      staffs
+        .filter((staff) => staffHoldsJPJob(staff.job, JP_ALL_JOB_IDS))
+        .map((staff) => ({
+          id: staff.id,
+          name: `${staff.name} (${staff.id})`,
+        })),
+    [staffs]
   );
 
   const employeeData = useMemo<EmployeePinjamData[]>(() => {

@@ -17,7 +17,6 @@ import { api } from "../../../routes/utils/api";
 import { useJPStaffsCache } from "../../../utils/JellyPolly/useJPStaffsCache";
 import { useJPJobPayCodeMappings } from "../../../utils/JellyPolly/useJPJobPayCodeMappings";
 import { useHolidayCache } from "../../../utils/payroll/useHolidayCache";
-import { useJPPayrollEmployees } from "../../../utils/JellyPolly/useJPPayrollEmployees";
 
 const SECTION = "PLASTIC";
 const JOB_ID = "JP_PLASTIC";
@@ -41,9 +40,7 @@ interface RateSet {
 }
 
 const JPDailyPlasticEntryPage: React.FC = () => {
-  const { staffs } = useJPStaffsCache();
-  const { employeesByJobType, loading: loadingAssignments } =
-    useJPPayrollEmployees();
+  const { staffs, loading: loadingStaffs } = useJPStaffsCache();
   const { detailedMappings, loading: loadingPayCodes } =
     useJPJobPayCodeMappings();
   const { isHoliday, getHolidayDescription } = useHolidayCache();
@@ -69,17 +66,17 @@ const JPDailyPlasticEntryPage: React.FC = () => {
     return new Map(staffs.map((s) => [s.id, s.name]));
   }, [staffs]);
 
-  // PLASTIC-assigned staff, sub-IDs listed individually
+  // Staff holding the JP_PLASTIC job (staffs.job), sub-IDs listed individually
   const plasticStaff = useMemo(() => {
-    return (employeesByJobType[SECTION] || []).map((assignment) => ({
-      employeeId: assignment.employee_id,
-      employeeName:
-        assignment.employee_name ||
-        staffNameById.get(assignment.employee_id) ||
-        assignment.employee_id,
-      headStaffId: assignment.head_staff_id,
-    }));
-  }, [employeesByJobType, staffNameById]);
+    return staffs
+      .filter((staff) => Array.isArray(staff.job) && staff.job.includes(JOB_ID))
+      .map((staff) => ({
+        employeeId: staff.id,
+        employeeName: staff.name || staff.id,
+        headStaffId: staff.headStaffId ?? null,
+      }))
+      .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+  }, [staffs]);
 
   // Rate per pay code for the current day type (job mapping override wins)
   const rateFor = useCallback(
@@ -107,7 +104,7 @@ const JPDailyPlasticEntryPage: React.FC = () => {
   useEffect(() => {
     let cancelled = false;
     const loadExisting = async (): Promise<void> => {
-      if (loadingAssignments) return;
+      if (loadingStaffs) return;
       setIsLoading(true);
       try {
         const listResponse = await api.get(
@@ -168,7 +165,7 @@ const JPDailyPlasticEntryPage: React.FC = () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [logDate, shift, plasticStaff, loadingAssignments]);
+  }, [logDate, shift, plasticStaff, loadingStaffs]);
 
   const handleCartonChange = (
     employeeId: string,

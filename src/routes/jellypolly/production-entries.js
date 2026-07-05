@@ -310,16 +310,14 @@ export default function (pool) {
     }
   });
 
-  // GET /jellypolly/api/production-entries/workers - JP PRODUCTION-assigned staff
+  // GET /jellypolly/api/production-entries/workers - JP production staff
   router.get("/workers", async (req, res) => {
     try {
-      // JP production workers come from the user-managed PRODUCTION
-      // assignments (jellypolly.payroll_employees)
+      // JP production workers = staff holding the JP_PACKING job (staffs.job)
       const result = await pool.query(
         `SELECT s.id, s.name, s.job
-         FROM jellypolly.payroll_employees pe
-         JOIN jellypolly.staffs s ON s.id = pe.employee_id
-         WHERE pe.job_type = 'PRODUCTION' AND pe.is_active = true
+         FROM jellypolly.staffs s
+         WHERE s.job ? 'JP_PACKING'
            AND (s.date_resigned IS NULL OR s.date_resigned > CURRENT_DATE)
          ORDER BY s.name ASC`
       );

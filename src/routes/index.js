@@ -110,7 +110,6 @@ import jellypollyPaymentRouter from "./jellypolly/payments.js";
 import jellypollyEInvoiceRouter from "./jellypolly/e-invoices.js";
 import jellypollyDebtorsRouter from "./jellypolly/debtors.js";
 import jellypollyAdjustmentDocsRouter from "./jellypolly/adjustment-docs.js";
-import jellypollyPayrollEmployeesRouter from "./jellypolly/payroll-employees.js";
 import jellypollyMonthlyPayrollsRouter from "./jellypolly/monthly-payrolls.js";
 import jellypollyEmployeePayrollsRouter from "./jellypolly/employee-payrolls.js";
 import jellypollyMonthlyWorkLogsRouter from "./jellypolly/monthly-work-logs.js";
@@ -329,10 +328,6 @@ export default function setupRoutes(app, pool) {
   app.use(
     "/jellypolly/api/adjustment-docs",
     jellypollyAdjustmentDocsRouter(pool, myInvoisJPConfig)
-  );
-  app.use(
-    "/jellypolly/api/payroll-employees",
-    jellypollyPayrollEmployeesRouter(pool)
   );
   app.use(
     "/jellypolly/api/monthly-payrolls",

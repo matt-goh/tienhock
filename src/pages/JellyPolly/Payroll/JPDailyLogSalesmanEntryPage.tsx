@@ -198,36 +198,19 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
   // Get job configuration
   const jobConfig = getJPJobConfig(jobType);
 
-  // JP staff membership is user-managed (jellypolly.payroll_employees), not
-  // derived from staffs.job. Map: employee_id -> assigned JP job ids.
-  const [jpAssignedJobIdsByStaff, setJpAssignedJobIdsByStaff] = useState<
-    Record<string, string[]>
-  >({});
-  useEffect(() => {
-    const fetchJpAssignments = async () => {
-      try {
-        const assignments = await api.get("/jellypolly/api/payroll-employees");
-        const map: Record<string, string[]> = {};
-        (assignments || []).forEach(
-          (a: { employee_id: string; job_type: string }) => {
-            const jobId =
-              a.job_type === "SALESMAN"
-                ? "JP_SALESMAN"
-                : a.job_type === "SALESMAN_IKUT"
-                ? "JP_SALESMAN_IKUT"
-                : null;
-            if (!jobId) return;
-            if (!map[a.employee_id]) map[a.employee_id] = [];
-            map[a.employee_id].push(jobId);
-          }
-        );
-        setJpAssignedJobIdsByStaff(map);
-      } catch (error) {
-        console.error("Error fetching JP payroll assignments:", error);
-      }
-    };
-    fetchJpAssignments();
-  }, []);
+  // JP staff membership is derived from staffs.job (TH-style): staff holding
+  // JP_SALESMAN / JP_SALESMAN_IKUT belong to this page.
+  // Map: employee_id -> the staff's salesman JP job ids.
+  const jpAssignedJobIdsByStaff = useMemo<Record<string, string[]>>(() => {
+    const map: Record<string, string[]> = {};
+    allStaffs.forEach((staff) => {
+      const salesmanJobs = Array.isArray(staff.job)
+        ? staff.job.filter((jobId: string) => JOB_IDS.includes(jobId))
+        : [];
+      if (salesmanJobs.length > 0) map[staff.id] = salesmanJobs;
+    });
+    return map;
+  }, [allStaffs, JOB_IDS]);
   const contextLinkedPayCodes = jobConfig
     ? getContextLinkedPayCodes(jobConfig)
     : {};
@@ -505,8 +488,8 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
       }));
   }, [allJobs, JOB_IDS]);
 
-  // Available employees = staff assigned to JP Salesman / Salesman Ikut on the
-  // Staff Assignment page.
+  // Available employees = staff holding JP_SALESMAN / JP_SALESMAN_IKUT in
+  // staffs.job.
   const availableEmployees = useMemo(() => {
     return allStaffs
       .filter((staff) => (jpAssignedJobIdsByStaff[staff.id] || []).length > 0)

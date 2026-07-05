@@ -16,8 +16,9 @@
 -- After deploying:
 --   1. Adjust the JP pay code rates in Jelly Polly -> Catalogue -> Pay Codes
 --      (the rates below are placeholders).
---   2. Add real staff in Jelly Polly -> Catalogue -> Staff, then assign them
---      on Jelly Polly -> Payroll -> Staff Assignment.
+--   2. Add real staff in Jelly Polly -> Catalogue -> Staff, then give each
+--      staff their JP job(s) (Catalogue -> Job "Manage Staff", or the staff
+--      form) — holding a JP_* job puts them on the matching payroll pages.
 --   3. Map JP products to pay codes via the "Mappings" button on the JP
 --      Production Entry page (job JP_PACKING carries the packing Ctn codes).
 --   4. Enter the JP e-Caruman registration codes on the JP e-Caruman page.
@@ -255,21 +256,13 @@ CREATE TABLE jellypolly.product_pay_codes (
 );
 
 -- ============================================================
--- 2. JP payroll employee assignments (staff -> page/job)
+-- 2. JP payroll membership
 -- ============================================================
-CREATE TABLE jellypolly.payroll_employees (
-    id SERIAL PRIMARY KEY,
-    employee_id VARCHAR(255) NOT NULL REFERENCES jellypolly.staffs(id) ON DELETE CASCADE,
-    job_type VARCHAR(50) NOT NULL,
-    date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_active BOOLEAN DEFAULT true,
-    notes TEXT,
-    CONSTRAINT jp_payroll_employees_job_type_check CHECK (
-        job_type IN ('OFFICE','MAINTENANCE','SALESMAN','SALESMAN_IKUT','ICE_POLLY','JELLY_CUP','PLASTIC','PRODUCTION')
-    ),
-    CONSTRAINT jp_payroll_employees_employee_job_key UNIQUE (employee_id, job_type)
-);
-CREATE INDEX idx_jp_payroll_employees_job_type ON jellypolly.payroll_employees (job_type);
+-- Derived from jellypolly.staffs.job (TH-style): holding a JP_* job id makes
+-- the staff a member of the matching payroll page/section. No table needed.
+-- (An earlier version of this script created jellypolly.payroll_employees
+-- here; databases that ran it should apply 012_jp_staffs_job_membership.sql,
+-- which folds the assignments into staffs.job and drops the table.)
 
 -- ============================================================
 -- 3. Payroll core
