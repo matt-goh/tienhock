@@ -1,6 +1,6 @@
 // src/pages/Accounting/Reports/IncomeStatementPage.tsx
 import React, { useState, useEffect, useCallback } from "react";
-import { IconDownload, IconRefresh } from "@tabler/icons-react";
+import { IconPrinter, IconRefresh } from "@tabler/icons-react";
 import MonthNavigator from "../../../components/MonthNavigator";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -73,16 +73,15 @@ const IncomeStatementPage: React.FC = () => {
     setSelectedMonth(newMonth);
   };
 
-  const handleExportPDF = async (): Promise<void> => {
+  const handlePrintPDF = async (): Promise<void> => {
     if (!data) return;
 
     setExporting(true);
     try {
       await generateIncomeStatementPDF(data);
-      toast.success("PDF exported successfully");
     } catch (err) {
-      console.error("Error exporting PDF:", err);
-      toast.error("Failed to export PDF");
+      console.error("Error printing PDF:", err);
+      toast.error("Failed to generate PDF");
     } finally {
       setExporting(false);
     }
@@ -108,7 +107,7 @@ const IncomeStatementPage: React.FC = () => {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="w-full">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -127,20 +126,30 @@ const IncomeStatementPage: React.FC = () => {
             onChange={handleMonthChange}
           />
 
-          <div className="flex items-center gap-3">
-            <Button onClick={fetchData} variant="outline" disabled={loading}>
-              <IconRefresh className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-              Refresh
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              onClick={fetchData}
+              variant="outline"
+              disabled={loading}
+              additionalClasses="flex-shrink-0"
+            >
+              <span className="flex items-center justify-center whitespace-nowrap">
+                <IconRefresh className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+                Refresh
+              </span>
             </Button>
 
             <Button
-              onClick={handleExportPDF}
+              onClick={handlePrintPDF}
               variant="filled"
               color="sky"
               disabled={exporting || !data}
+              additionalClasses="flex-shrink-0"
             >
-              <IconDownload className="h-4 w-4 mr-2" />
-              {exporting ? "Exporting..." : "Export PDF"}
+              <span className="flex items-center justify-center whitespace-nowrap">
+                <IconPrinter className="h-4 w-4 mr-2" />
+                {exporting ? "Preparing..." : "Print PDF"}
+              </span>
             </Button>
           </div>
         </div>

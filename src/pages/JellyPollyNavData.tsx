@@ -53,6 +53,7 @@ import JPStaffPage from "./JellyPolly/Catalogue/JPStaffPage";
 import JPStaffAddPage from "./JellyPolly/Catalogue/JPStaffAddPage";
 import JPStaffFormPage from "./JellyPolly/Catalogue/JPStaffFormPage";
 import JPStaffDetailsPage from "./JellyPolly/Catalogue/JPStaffDetailsPage";
+import JPJobPage from "./JellyPolly/Catalogue/JPJobPage";
 import JPPayCodePage from "./JellyPolly/Catalogue/JPPayCodePage";
 import JPCutiManagementPage from "./JellyPolly/Catalogue/JPCutiManagementPage";
 
@@ -385,6 +386,12 @@ export const JellyPollyNavData: SidebarItem[] = [
             component: JPStaffFormPage,
           },
         ],
+      },
+      {
+        name: "Job",
+        path: "/catalogue/job",
+        component: JPJobPage,
+        group: "Payroll Setup",
       },
       {
         name: "Pay Codes",

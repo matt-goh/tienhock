@@ -1,7 +1,7 @@
 // src/pages/Accounting/Reports/TrialBalancePage.tsx
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  IconDownload,
+  IconPrinter,
   IconRefresh,
   IconFilter,
   IconSearch,
@@ -10,6 +10,7 @@ import {
 } from "@tabler/icons-react";
 import MonthNavigator from "../../../components/MonthNavigator";
 import Button from "../../../components/Button";
+import Checkbox from "../../../components/Checkbox";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { api } from "../../../routes/utils/api";
 import { generateTrialBalancePDF } from "../../../utils/accounting/TrialBalancePDF";
@@ -103,16 +104,15 @@ const TrialBalancePage: React.FC = () => {
     setSelectedMonth(newMonth);
   };
 
-  const handleExportPDF = async (): Promise<void> => {
+  const handlePrintPDF = async (): Promise<void> => {
     if (!trialBalance) return;
 
     setExporting(true);
     try {
       await generateTrialBalancePDF(trialBalance, filteredAccounts);
-      toast.success("PDF exported successfully");
     } catch (err) {
-      console.error("Error exporting PDF:", err);
-      toast.error("Failed to export PDF");
+      console.error("Error printing PDF:", err);
+      toast.error("Failed to generate PDF");
     } finally {
       setExporting(false);
     }
@@ -153,7 +153,7 @@ const TrialBalancePage: React.FC = () => {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="w-full">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -174,7 +174,7 @@ const TrialBalancePage: React.FC = () => {
           />
 
           {/* Filters and Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {/* Search */}
             <div className="relative">
               <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -205,35 +205,39 @@ const TrialBalancePage: React.FC = () => {
             </div>
 
             {/* Hide Zero Balance Toggle */}
-            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={hideZeroBalance}
-                onChange={(e) => setHideZeroBalance(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:bg-gray-700"
-              />
-              <span>Hide zero</span>
-            </label>
+            <Checkbox
+              checked={hideZeroBalance}
+              onChange={setHideZeroBalance}
+              label="Hide zero"
+              size={18}
+              className="flex-shrink-0"
+            />
 
             {/* Refresh Button */}
             <Button
               onClick={fetchTrialBalance}
               variant="outline"
               disabled={loading}
+              additionalClasses="flex-shrink-0"
             >
-              <IconRefresh className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-              Refresh
+              <span className="flex items-center justify-center whitespace-nowrap">
+                <IconRefresh className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+                Refresh
+              </span>
             </Button>
 
-            {/* Export PDF Button */}
+            {/* Print PDF Button */}
             <Button
-              onClick={handleExportPDF}
+              onClick={handlePrintPDF}
               variant="filled"
               color="sky"
               disabled={exporting || !trialBalance || filteredAccounts.length === 0}
+              additionalClasses="flex-shrink-0"
             >
-              <IconDownload className="h-4 w-4 mr-2" />
-              {exporting ? "Exporting..." : "Export PDF"}
+              <span className="flex items-center justify-center whitespace-nowrap">
+                <IconPrinter className="h-4 w-4 mr-2" />
+                {exporting ? "Preparing..." : "Print PDF"}
+              </span>
             </Button>
           </div>
         </div>

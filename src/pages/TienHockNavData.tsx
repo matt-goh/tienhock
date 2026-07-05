@@ -123,6 +123,12 @@ import JobCategoryPage from "./Catalogue/JobCategoryPage";
 import OthersPage from "./Catalogue/OthersPage";
 import LocationPage from "./Catalogue/LocationPage";
 
+const PAYROLL_DROPDOWN_COLUMNS = {
+  main: { key: "payroll-main", order: 2 },
+  dailyLogs: { key: "payroll-daily-logs", order: 1 },
+  addOns: { key: "payroll-add-ons", order: 3 },
+} as const;
+
 // Function to generate payroll subitems for each job type
 const generatePayrollSubItems = (): SidebarItem[] => {
   const payrollSubItems: SidebarItem[] = [];
@@ -133,6 +139,8 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     path: "/payroll/monthly-payrolls",
     component: PayrollPage,
     group: "Payroll",
+    dropdownColumn: PAYROLL_DROPDOWN_COLUMNS.main.key,
+    dropdownColumnOrder: PAYROLL_DROPDOWN_COLUMNS.main.order,
     subItems: [
       {
         name: "Employee Payroll Details",
@@ -147,6 +155,8 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     path: "/payroll/salary-report",
     component: SalaryReportPage,
     group: "Payroll",
+    dropdownColumn: PAYROLL_DROPDOWN_COLUMNS.main.key,
+    dropdownColumnOrder: PAYROLL_DROPDOWN_COLUMNS.main.order,
   });
 
   payrollSubItems.push({
@@ -154,6 +164,8 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     path: "/payroll/e-caruman",
     component: ECarumanPage,
     group: "Payroll",
+    dropdownColumn: PAYROLL_DROPDOWN_COLUMNS.main.key,
+    dropdownColumnOrder: PAYROLL_DROPDOWN_COLUMNS.main.order,
   });
 
   // Add each production type dynamically
@@ -170,6 +182,8 @@ const generatePayrollSubItems = (): SidebarItem[] => {
           <MonthlyLogListPage jobType={jobConfig.id} {...props} />
         ),
         group: "Monthly Logs",
+        dropdownColumn: PAYROLL_DROPDOWN_COLUMNS.main.key,
+        dropdownColumnOrder: PAYROLL_DROPDOWN_COLUMNS.main.order,
         subItems: [
           {
             name: `New ${jobConfig.name} Entry`,
@@ -204,6 +218,8 @@ const generatePayrollSubItems = (): SidebarItem[] => {
           <DailyLogListPage jobType={jobConfig.id} {...props} />
         ),
         group: "Daily Logs",
+        dropdownColumn: PAYROLL_DROPDOWN_COLUMNS.dailyLogs.key,
+        dropdownColumnOrder: PAYROLL_DROPDOWN_COLUMNS.dailyLogs.order,
         subItems: [
           {
             name: `New ${jobConfig.name} Entry`,
@@ -234,6 +250,8 @@ const generatePayrollSubItems = (): SidebarItem[] => {
           <DailyLogListPage jobType={jobConfig.id} {...props} />
         ),
         group: "Daily Logs",
+        dropdownColumn: PAYROLL_DROPDOWN_COLUMNS.dailyLogs.key,
+        dropdownColumnOrder: PAYROLL_DROPDOWN_COLUMNS.dailyLogs.order,
         subItems: [
           {
             name: `New ${jobConfig.name} Entry`,
@@ -276,6 +294,8 @@ const generatePayrollSubItems = (): SidebarItem[] => {
             <PackingCutiEntryPage jobType={packingJobType} {...props} />
           ),
           group: "Daily Logs",
+          dropdownColumn: PAYROLL_DROPDOWN_COLUMNS.dailyLogs.key,
+          dropdownColumnOrder: PAYROLL_DROPDOWN_COLUMNS.dailyLogs.order,
         });
       }
     }
@@ -286,6 +306,8 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     path: "/payroll/mid-month-payrolls",
     component: MidMonthPayrollPage,
     group: "Add-Ons",
+    dropdownColumn: PAYROLL_DROPDOWN_COLUMNS.addOns.key,
+    dropdownColumnOrder: PAYROLL_DROPDOWN_COLUMNS.addOns.order,
   });
 
   payrollSubItems.push({
@@ -293,6 +315,8 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     path: "/payroll/commission",
     component: OthersAdvancePage,
     group: "Add-Ons",
+    dropdownColumn: PAYROLL_DROPDOWN_COLUMNS.addOns.key,
+    dropdownColumnOrder: PAYROLL_DROPDOWN_COLUMNS.addOns.order,
   });
 
   payrollSubItems.push({
@@ -300,6 +324,8 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     path: "/payroll/others",
     component: OthersKerjaLuarOtPage,
     group: "Add-Ons",
+    dropdownColumn: PAYROLL_DROPDOWN_COLUMNS.addOns.key,
+    dropdownColumnOrder: PAYROLL_DROPDOWN_COLUMNS.addOns.order,
   });
 
   payrollSubItems.push({
@@ -307,6 +333,8 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     path: "/payroll/bonus",
     component: BonusPage,
     group: "Add-Ons",
+    dropdownColumn: PAYROLL_DROPDOWN_COLUMNS.addOns.key,
+    dropdownColumnOrder: PAYROLL_DROPDOWN_COLUMNS.addOns.order,
   });
 
   payrollSubItems.push({
@@ -314,6 +342,8 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     path: "/payroll/pinjam",
     component: PinjamListPage,
     group: "Add-Ons",
+    dropdownColumn: PAYROLL_DROPDOWN_COLUMNS.addOns.key,
+    dropdownColumnOrder: PAYROLL_DROPDOWN_COLUMNS.addOns.order,
   });
 
   return payrollSubItems;

@@ -27,6 +27,7 @@ interface AssociateEmployeesWithJobModalProps {
   availableEmployees: Employee[];
   currentEmployeeIds: string[];
   onAssociationComplete: () => Promise<void>;
+  apiBase?: string; // "/api" (Tien Hock, default) or "/jellypolly/api"
 }
 
 const AssociateEmployeesWithJobModal: React.FC<
@@ -38,6 +39,7 @@ const AssociateEmployeesWithJobModal: React.FC<
   availableEmployees,
   currentEmployeeIds,
   onAssociationComplete,
+  apiBase = "/api",
 }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string>("");
@@ -140,7 +142,7 @@ const AssociateEmployeesWithJobModal: React.FC<
       );
 
       // Use batch update endpoint
-      await api.put("/api/staffs/batch-job-update", {
+      await api.put(`${apiBase}/staffs/batch-job-update`, {
         jobId: job.id,
         addEmployees: employeesToAdd,
         removeEmployees: employeesToRemove,

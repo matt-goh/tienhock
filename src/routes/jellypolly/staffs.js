@@ -5,6 +5,9 @@ import cache, { CACHE_TTL, CACHE_KEYS } from "../utils/memory-cache.js";
 export default function (pool) {
   const router = Router();
 
+  // JP-scoped cache prefix — must not collide with the TH /api/staffs route
+  const JP_STAFFS_CACHE_PREFIX = `jp:${CACHE_KEYS.STAFFS}`;
+
   // Helper functions
   async function checkDuplicateStaffId(id) {
     const query = "SELECT * FROM jellypolly.staffs WHERE btrim(id) = btrim($1)";
@@ -38,7 +41,7 @@ export default function (pool) {
   router.get("/", async (req, res) => {
     try {
       const { salesmenOnly } = req.query;
-      const cacheKey = `${CACHE_KEYS.STAFFS}:${salesmenOnly || 'all'}`;
+      const cacheKey = `${JP_STAFFS_CACHE_PREFIX}:${salesmenOnly || 'all'}`;
 
       // Check cache first
       const cached = cache.get(cacheKey);
@@ -252,7 +255,7 @@ export default function (pool) {
       const result = await pool.query(query, values);
 
       // Invalidate cache
-      cache.invalidatePrefix(CACHE_KEYS.STAFFS);
+      cache.invalidatePrefix(JP_STAFFS_CACHE_PREFIX);
 
       res.status(201).json({
         message: "Staff member created successfully",
@@ -400,7 +403,7 @@ export default function (pool) {
         await client.query("COMMIT");
 
         // Invalidate cache
-        cache.invalidatePrefix(CACHE_KEYS.STAFFS);
+        cache.invalidatePrefix(JP_STAFFS_CACHE_PREFIX);
 
         res.json({
           message: "Head staff updated successfully",
@@ -560,7 +563,7 @@ export default function (pool) {
         await client.query("COMMIT");
 
         // Invalidate cache
-        cache.invalidatePrefix(CACHE_KEYS.STAFFS);
+        cache.invalidatePrefix(JP_STAFFS_CACHE_PREFIX);
 
         res.json({
           message: "Staff jobs updated successfully",
@@ -634,7 +637,7 @@ export default function (pool) {
         await client.query("COMMIT");
 
         // Invalidate cache
-        cache.invalidatePrefix(CACHE_KEYS.STAFFS);
+        cache.invalidatePrefix(JP_STAFFS_CACHE_PREFIX);
 
         res.json({
           message: "Staff locations updated successfully",
@@ -782,7 +785,7 @@ export default function (pool) {
         await client.query("COMMIT");
 
         // Invalidate cache
-        cache.invalidatePrefix(CACHE_KEYS.STAFFS);
+        cache.invalidatePrefix(JP_STAFFS_CACHE_PREFIX);
 
         res.json({
           message: "Staff member updated successfully",
@@ -833,7 +836,7 @@ export default function (pool) {
         await client.query("COMMIT");
 
         // Invalidate cache
-        cache.invalidatePrefix(CACHE_KEYS.STAFFS);
+        cache.invalidatePrefix(JP_STAFFS_CACHE_PREFIX);
 
         res.json({
           message: "Staff member deleted successfully",

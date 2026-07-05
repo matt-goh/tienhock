@@ -11,6 +11,31 @@ export interface PrintPdfFrameResult {
   usedFallback: boolean;
 }
 
+// Convenience wrapper: prints a PDF Blob via a hidden iframe using
+// printPdfFrameWithFallback, then cleans up the iframe and object URL when the
+// window regains focus (i.e. after the print dialog / fallback tab closes).
+export const printPdfBlob = (pdfBlob: Blob, logLabel: string = "PDF"): void => {
+  const url = URL.createObjectURL(pdfBlob);
+  const printFrame = document.createElement("iframe");
+  printFrame.style.display = "none";
+  document.body.appendChild(printFrame);
+
+  printFrame.onload = () => {
+    if (printFrame.contentWindow) {
+      printPdfFrameWithFallback(printFrame, url, { logLabel });
+      const cleanup = () => {
+        if (document.body.contains(printFrame)) {
+          document.body.removeChild(printFrame);
+        }
+        URL.revokeObjectURL(url);
+        window.removeEventListener("focus", cleanup);
+      };
+      window.addEventListener("focus", cleanup, { once: true });
+    }
+  };
+  printFrame.src = url;
+};
+
 export const printPdfFrameWithFallback = (
   printFrame: HTMLIFrameElement,
   pdfUrl: string,
