@@ -12,6 +12,7 @@ interface JobsAndEmployeesUsingPayCodeTooltipProps {
   employeesList: { id: string; name: string }[];
   className?: string;
   disableNavigation?: boolean;
+  navigateBase?: string; // route prefix, e.g. "/jellypolly" (defaults to Tien Hock)
 }
 
 const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
@@ -24,6 +25,7 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
   employeesList,
   className = "",
   disableNavigation = false,
+  navigateBase = "",
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -166,7 +168,7 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
                         title={`View job details: ${job.name}`}
                         onClick={() => {
                           if (!disableNavigation) {
-                            navigate(`/catalogue/job?id=${job.id}&paycode=${payCodeId}`);
+                            navigate(`${navigateBase}/catalogue/job?id=${job.id}&paycode=${payCodeId}`);
                           }
                         }}
                       >
@@ -201,7 +203,7 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
                         title={`View employee details: ${employee.name}`}
                         onClick={() => {
                           if (!disableNavigation) {
-                            navigate(`/catalogue/staff/${employee.id}`);
+                            navigate(`${navigateBase}/catalogue/staff/${employee.id}`);
                           }
                         }}
                       >

@@ -5,6 +5,9 @@ import cache, { CACHE_TTL, CACHE_KEYS } from "../utils/memory-cache.js";
 export default function (pool) {
   const router = Router();
 
+  // JP-scoped cache key — must not collide with the TH /api/pay-codes route
+  const JP_PAY_CODES_CACHE_KEY = `jp:${CACHE_KEYS.PAY_CODES}`;
+
   // Allowed Salary Report column overrides (NULL/"" = automatic bucketing rule).
   const REPORT_COLUMNS = ["GAJI", "OT", "BONUS", "CIO", "CUTI"];
   // Normalize incoming report_column to a valid value or null; throws on invalid.
@@ -25,7 +28,7 @@ export default function (pool) {
   // GET / - Remove 'code' from SELECT
   router.get("/", async (req, res) => {
     try {
-      const cacheKey = CACHE_KEYS.PAY_CODES;
+      const cacheKey = JP_PAY_CODES_CACHE_KEY;
 
       // Check cache first
       const cached = cache.get(cacheKey);
@@ -174,7 +177,7 @@ export default function (pool) {
       const result = await pool.query(query, values);
 
       // Invalidate cache
-      cache.invalidate(CACHE_KEYS.PAY_CODES);
+      cache.invalidate(JP_PAY_CODES_CACHE_KEY);
 
       // Parse numeric values in returned object
       const newPayCode = {
@@ -295,7 +298,7 @@ export default function (pool) {
       }
 
       // Invalidate cache
-      cache.invalidate(CACHE_KEYS.PAY_CODES);
+      cache.invalidate(JP_PAY_CODES_CACHE_KEY);
 
       // Parse numeric values in returned object
       const updatedPayCode = {
@@ -354,7 +357,7 @@ export default function (pool) {
       }
 
       // Invalidate cache
-      cache.invalidate(CACHE_KEYS.PAY_CODES);
+      cache.invalidate(JP_PAY_CODES_CACHE_KEY);
 
       res.json({
         error: false,

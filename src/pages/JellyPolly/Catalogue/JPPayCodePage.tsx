@@ -652,6 +652,7 @@ const JPPayCodePage: React.FC = () => {
                           {pc.id}
                           <JobsAndEmployeesUsingPayCodeTooltip
                             payCodeId={pc.id}
+                            navigateBase="/jellypolly"
                             jobsMap={payCodeToJobsMap}
                             jobsList={jobs}
                             employeesMap={payCodeToEmployeesMap}

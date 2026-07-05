@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-07-05",
+    ms: "Jelly Polly: halaman Job baharu di bawah Catalogue → Job untuk mengurus kerja JP dan kod gaji yang dipautkan kepadanya (tambah/padam kerja, urus staf kerja, kadar override dan urusan pukal) — sama seperti halaman Job Tien Hock tetapi menggunakan katalog JP sendiri. Pautan kerja/staf pada halaman Pay Codes JP kini membuka halaman JP yang betul dan bukannya halaman Tien Hock.",
+    en: "Jelly Polly: new Job page under Catalogue → Job to manage JP jobs and their linked pay codes (add/delete jobs, manage job staff, override rates and batch manage) — same as the Tien Hock Job page but using JP's own catalogue. Job/staff links on the JP Pay Codes page now open the correct JP pages instead of the Tien Hock ones.",
+  },
+  {
     date: "2026-07-04",
     ms: "Pembetulan Salary Report: bagi pekerja yang mempunyai lebih daripada satu ID kerja, cuti yang direkodkan di bawah satu ID tidak lagi menggugurkan gaji kerja harian ID lain pada hari yang sama daripada lajur GAJI. Angka laporan kini sepadan dengan gaji kasar dan slip gaji.",
     en: "Salary Report fix: for staff with more than one job ID, leave recorded under one ID no longer removes the other ID's daily work pay for that day from the GAJI column. Report figures now match gross pay and the payslip.",
