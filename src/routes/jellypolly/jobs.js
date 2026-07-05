@@ -5,6 +5,9 @@ import cache, { CACHE_TTL, CACHE_KEYS } from "../utils/memory-cache.js";
 export default function (pool) {
   const router = Router();
 
+  // JP-scoped cache key — must not collide with the TH /api/jobs route
+  const JP_JOBS_CACHE_KEY = `jp:${CACHE_KEYS.JOBS}`;
+
   // Helper functions
   async function checkDuplicateJobName(name, id = null) {
     const query = id
@@ -24,7 +27,7 @@ export default function (pool) {
   // Get all jobs
   router.get("/", async (req, res) => {
     try {
-      const cacheKey = CACHE_KEYS.JOBS;
+      const cacheKey = JP_JOBS_CACHE_KEY;
 
       // Check cache first
       const cached = cache.get(cacheKey);
@@ -86,7 +89,7 @@ export default function (pool) {
       const result = await pool.query(query, values);
 
       // Invalidate cache
-      cache.invalidate(CACHE_KEYS.JOBS);
+      cache.invalidate(JP_JOBS_CACHE_KEY);
 
       res
         .status(201)
@@ -196,7 +199,7 @@ export default function (pool) {
       await pool.query("COMMIT");
 
       // Invalidate cache
-      cache.invalidate(CACHE_KEYS.JOBS);
+      cache.invalidate(JP_JOBS_CACHE_KEY);
 
       res
         .status(200)
@@ -248,7 +251,7 @@ export default function (pool) {
       const result = await pool.query(query, values);
 
       // Invalidate cache
-      cache.invalidate(CACHE_KEYS.JOBS);
+      cache.invalidate(JP_JOBS_CACHE_KEY);
 
       res.json({ message: "Job updated successfully", job: result.rows[0] });
     } catch (error) {
