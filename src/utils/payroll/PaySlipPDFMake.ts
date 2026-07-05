@@ -1774,7 +1774,7 @@ const buildMainPayrollPage = (
       table: {
         headerRows: 1,
         dontBreakRows: true,
-        widths: ["*", 60, 100, 70],
+        widths: ["*", 40, 140, 50],
         body: tableBody,
       },
       layout: {
@@ -2539,7 +2539,7 @@ const buildIndividualJobPage = (
       table: {
         headerRows: 1,
         dontBreakRows: true,
-        widths: ["*", 60, 100, 70],
+        widths: ["*", 40, 140, 50],
         body: tableBody,
       },
       layout: {
