@@ -442,16 +442,17 @@ const DebtorsReportPDF: React.FC<{
   companyName?: string;
   filterMonthName?: string;
 }> = ({ data, companyName = TIENHOCK_INFO.name, filterMonthName }) => {
+  const showTienHockLogo = companyName === TIENHOCK_INFO.name;
   const reportTitleText = filterMonthName
     ? `Unpaid Bills (Invoices from ${filterMonthName}) as at ${data.report_date}`
     : `Unpaid Bills by Salesmen as at ${data.report_date}`;
 
   return (
-    <Document title={`Tien Hock Debtors Report ${data.report_date}`}>
+    <Document title={`${companyName} Debtors Report ${data.report_date}`}>
       <Page size="A4" style={styles.page}>
         {/* Header with logo and company name - matching InvoicePDF style */}
         <View style={styles.header}>
-          <Image src={TienHockLogo} style={styles.logo} />
+          {showTienHockLogo && <Image src={TienHockLogo} style={styles.logo} />}
           <View style={styles.headerTextContainer}>
             <Text style={styles.companyName}>{companyName}</Text>
             <Text style={styles.reportTitle}>{reportTitleText}</Text>
@@ -524,11 +525,21 @@ const DebtorsReportPDF: React.FC<{
 export const generateDebtorsReportPDF = async (
   data: any,
   action: "download" | "print",
-  filterMonthName?: string
+  filterMonthNameOrOptions?:
+    | string
+    | { filterMonthName?: string; companyName?: string }
 ) => {
   try {
+    const options =
+      typeof filterMonthNameOrOptions === "string"
+        ? { filterMonthName: filterMonthNameOrOptions }
+        : filterMonthNameOrOptions || {};
     const doc = (
-      <DebtorsReportPDF data={data} filterMonthName={filterMonthName} />
+      <DebtorsReportPDF
+        data={data}
+        companyName={options.companyName}
+        filterMonthName={options.filterMonthName}
+      />
     );
     const pdfBlob = await pdf(doc).toBlob();
     if (action === "download") {

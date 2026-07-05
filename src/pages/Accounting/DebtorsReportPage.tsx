@@ -21,10 +21,13 @@ import MonthNavigator from "../../components/MonthNavigator";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { api } from "../../routes/utils/api";
-import { useCompany } from "../../contexts/CompanyContext";
 import { generateDebtorsReportPDF } from "../../utils/accounting/DebtorsReportPDF";
 import { generateCustomerStatementPDF } from "../../utils/accounting/CustomerStatementPDF";
 import { generateGeneralStatementPDF } from "../../utils/accounting/GeneralStatementPDF";
+import {
+  type CompanyInfo,
+  TIENHOCK_INFO,
+} from "../../utils/invoice/einvoice/companyInfo";
 import toast from "react-hot-toast";
 
 interface Payment {
@@ -80,6 +83,54 @@ interface DebtorsTotals {
   totalBalance: number;
 }
 
+export interface DebtorsReportPageConfig {
+  debtorsEndpoint: string;
+  statementEndpoint: (
+    customerId: string,
+    month: number,
+    year: number
+  ) => string;
+  generalStatementEndpoint: (month: number, year: number) => string;
+  customerDetailsPath: (customerId: string) => string;
+  customerInvoicesPath: (customerId: string) => string;
+  invoiceDetailsPath: (invoiceId: string) => string;
+  companyName: string;
+  statementCompanyInfo?: CompanyInfo;
+  statementCompanyName?: string;
+  monthPickerPlacement?: "bottom-center" | "bottom-right" | "bottom-left-button";
+}
+
+interface DebtorsReportPageProps {
+  config?: DebtorsReportPageConfig;
+}
+
+const DEFAULT_DEBTORS_REPORT_CONFIG: DebtorsReportPageConfig = {
+  debtorsEndpoint: "/api/debtors",
+  statementEndpoint: (customerId: string, month: number, year: number): string =>
+    `/api/debtors/statement/${customerId}?month=${month}&year=${year}`,
+  generalStatementEndpoint: (month: number, year: number): string =>
+    `/api/debtors/general-statement?month=${month}&year=${year}`,
+  customerDetailsPath: (customerId: string): string =>
+    `/catalogue/customer/${customerId}`,
+  customerInvoicesPath: (customerId: string): string =>
+    `/sales/invoice?customerId=${customerId}`,
+  invoiceDetailsPath: (invoiceId: string): string =>
+    `/sales/invoice/${invoiceId}`,
+  companyName: TIENHOCK_INFO.name,
+  statementCompanyInfo: TIENHOCK_INFO,
+  statementCompanyName: "TIEN HOCK FOOD INDUSTRIES SDN BHD (953309-T)",
+  monthPickerPlacement: "bottom-left-button",
+};
+
+const appendMonthYearParams = (
+  endpoint: string,
+  month: number,
+  year: number
+): string => {
+  const separator = endpoint.includes("?") ? "&" : "?";
+  return `${endpoint}${separator}month=${month}&year=${year}`;
+};
+
 const calculateCustomerTotals = (customers: Customer[]): DebtorsTotals => {
   return customers.reduce<DebtorsTotals>(
     (totals: DebtorsTotals, customer: Customer): DebtorsTotals => ({
@@ -106,9 +157,10 @@ const calculateSalesmenTotals = (salesmen: Salesman[]): DebtorsTotals => {
 };
 
 
-const DebtorsReportPage: React.FC = () => {
+const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
+  config = DEFAULT_DEBTORS_REPORT_CONFIG,
+}) => {
   const navigate = useNavigate();
-  const { activeCompany } = useCompany();
   const [debtorsData, setDebtorsData] = useState<DebtorsData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -130,9 +182,9 @@ const DebtorsReportPage: React.FC = () => {
   // Centralized data fetching function with manual URL construction
   const fetchDebtors = useCallback(
     async (params?: { month: number; year: number }): Promise<void> => {
-      let url = "/api/debtors";
+      let url = config.debtorsEndpoint;
       if (params && params.month && params.year) {
-        url += `?month=${params.month}&year=${params.year}`;
+        url = appendMonthYearParams(url, params.month, params.year);
       }
 
       try {
@@ -173,7 +225,7 @@ const DebtorsReportPage: React.FC = () => {
         setLoading(false);
       }
     },
-    []
+    [config.debtorsEndpoint]
   );
 
   // Initial data fetch for the default (current) month
@@ -365,7 +417,7 @@ const DebtorsReportPage: React.FC = () => {
   };
 
   const handleCustomerClick = (customerId: string): void => {
-    navigate(`/sales/invoice?customerId=${customerId}`);
+    navigate(config.customerInvoicesPath(customerId));
   };
 
   const handlePrint = async (): Promise<void> => {
@@ -378,7 +430,10 @@ const DebtorsReportPage: React.FC = () => {
             month: "long",
             year: "numeric",
           });
-      await generateDebtorsReportPDF(filteredData, "print", filterName);
+      await generateDebtorsReportPDF(filteredData, "print", {
+        filterMonthName: filterName,
+        companyName: config.companyName,
+      });
       toast.dismiss(loadingToast);
       toast.success("Print dialog opened");
     } catch (error) {
@@ -399,10 +454,13 @@ const DebtorsReportPage: React.FC = () => {
       const year = selectedMonth.getFullYear();
 
       const statementData = await api.get(
-        `/api/debtors/statement/${customer.customer_id}?month=${month}&year=${year}`
+        config.statementEndpoint(customer.customer_id, month, year)
       );
 
-      await generateCustomerStatementPDF(statementData, "print");
+      await generateCustomerStatementPDF(statementData, "print", {
+        companyInfo: config.statementCompanyInfo,
+        companyName: config.statementCompanyName,
+      });
       toast.dismiss(loadingToast);
       toast.success("Statement generated");
     } catch (error) {
@@ -423,10 +481,12 @@ const DebtorsReportPage: React.FC = () => {
       const year = selectedMonth.getFullYear();
 
       const statementData = await api.get(
-        `/api/debtors/general-statement?month=${month}&year=${year}`
+        config.generalStatementEndpoint(month, year)
       );
 
-      await generateGeneralStatementPDF(statementData, "print");
+      await generateGeneralStatementPDF(statementData, "print", {
+        companyName: config.statementCompanyName || config.companyName,
+      });
       toast.dismiss(loadingToast);
       toast.success("Trade debtor list generated");
     } catch (error) {
@@ -507,6 +567,10 @@ const DebtorsReportPage: React.FC = () => {
             onChange={handleMonthChange}
             showGoToCurrentButton={false}
             size="sm"
+            pickerPlacement={
+              config.monthPickerPlacement ??
+              DEFAULT_DEBTORS_REPORT_CONFIG.monthPickerPlacement
+            }
           />
 
           {/* Compact Stats */}
@@ -728,9 +792,7 @@ const DebtorsReportPage: React.FC = () => {
                                   }
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    navigate(
-                                      `/catalogue/customer/${customer.customer_id}`
-                                    );
+                                    navigate(config.customerDetailsPath(customer.customer_id));
                                   }}
                                 >
                                   {customer.customer_name ||
@@ -867,12 +929,10 @@ const DebtorsReportPage: React.FC = () => {
                                         <tr
                                           className="hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer text-default-800 dark:text-gray-100"
                                           onClick={() => {
-                                            const basePath =
-                                              activeCompany.id === "jellypolly"
-                                                ? "/jellypolly"
-                                                : "";
                                             navigate(
-                                              `${basePath}/sales/invoice/${invoice.invoice_id}`,
+                                              config.invoiceDetailsPath(
+                                                invoice.invoice_id
+                                              ),
                                               {
                                                 state: {
                                                   showPaymentForm: true,
@@ -921,13 +981,10 @@ const DebtorsReportPage: React.FC = () => {
                                               }`}
                                               onClick={() => {
                                                 if (invoice.balance !== 0) {
-                                                  const basePath =
-                                                    activeCompany.id ===
-                                                    "jellypolly"
-                                                      ? "/jellypolly"
-                                                      : "";
                                                   navigate(
-                                                    `${basePath}/sales/invoice/${invoice.invoice_id}`,
+                                                    config.invoiceDetailsPath(
+                                                      invoice.invoice_id
+                                                    ),
                                                     {
                                                       state: {
                                                         showPaymentForm: true,
