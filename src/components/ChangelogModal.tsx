@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-07-05",
+    ms: "Laporan Debtors untuk Jelly Polly dan Green Target kini menggunakan susun atur yang sama seperti Tien Hock: pilihan bulan, mod All Time, carian, buka/tutup semua, ringkasan jumlah, butang Report, Debtor List, Statement dan Invoices, serta jadual invois dan bayaran yang boleh dibuka. PDF laporan, penyata pelanggan dan senarai debtor kini menggunakan nama syarikat yang betul.",
+    en: "Jelly Polly and Green Target Debtors Reports now use the same layout as Tien Hock: month selection, All Time mode, search, expand/collapse all, total summaries, Report, Debtor List, Statement and Invoices buttons, plus expandable invoice and payment tables. Report, customer statement and debtor list PDFs now show the correct company name.",
+  },
+  {
     date: "2026-07-04",
     ms: "Pembetulan Salary Report: bagi pekerja yang mempunyai lebih daripada satu ID kerja, cuti yang direkodkan di bawah satu ID tidak lagi menggugurkan gaji kerja harian ID lain pada hari yang sama daripada lajur GAJI. Angka laporan kini sepadan dengan gaji kasar dan slip gaji.",
     en: "Salary Report fix: for staff with more than one job ID, leave recorded under one ID no longer removes the other ID's daily work pay for that day from the GAJI column. Report figures now match gross pay and the payslip.",
