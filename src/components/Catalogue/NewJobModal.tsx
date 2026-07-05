@@ -33,12 +33,16 @@ interface NewJobModalProps {
   onClose: () => void;
   // Updated prop type: Expects ID to be included in the job data passed back
   onJobAdded: (job: Omit<Job, "newId">) => Promise<void>;
+  // When provided, use this static list instead of fetching /api/sections
+  // (Jelly Polly has its own section set with no sections table)
+  sectionOptions?: string[];
 }
 
 const NewJobModal: React.FC<NewJobModalProps> = ({
   isOpen,
   onClose,
   onJobAdded,
+  sectionOptions,
 }) => {
   const [formData, setFormData] = useState<{
     id: string;
@@ -51,8 +55,10 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
   });
   const [error, setError] = useState<string | null>(null); // Changed initial state to null
   const [sectionQuery, setSectionQuery] = useState("");
-  const [sections, setSections] = useState<Section[]>([]);
-  const [loadingSections, setLoadingSections] = useState(true);
+  const [sections, setSections] = useState<Section[]>(() =>
+    sectionOptions ? sectionOptions.map((s) => ({ id: s, name: s })) : []
+  );
+  const [loadingSections, setLoadingSections] = useState(!sectionOptions);
   const [isSaving, setIsSaving] = useState(false);
 
   const fetchSections = useCallback(async () => {
@@ -76,10 +82,10 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
 
   // Fetch sections when modal opens or if it's already open and sections haven't loaded
   useEffect(() => {
-    if (isOpen && sections.length === 0) {
+    if (isOpen && !sectionOptions && sections.length === 0) {
       fetchSections();
     }
-  }, [isOpen, sections.length, fetchSections]);
+  }, [isOpen, sectionOptions, sections.length, fetchSections]);
 
   // Reset form when modal closes
   useEffect(() => {

@@ -25,6 +25,17 @@ interface NavbarDropdownProps {
   onMouseLeave?: () => void;
 }
 
+interface DropdownGroup {
+  label: string | null;
+  items: SidebarItem[];
+}
+
+interface DropdownColumn {
+  key: string;
+  order: number;
+  groups: DropdownGroup[];
+}
+
 // Determine if a category should use mega menu layout
 const shouldUseMegaMenu = (categoryName: string, itemCount: number): boolean => {
   const megaMenuCategories = ["Catalogue", "Payroll"];
@@ -85,24 +96,40 @@ export default function NavbarDropdown({
   );
 
   // Group items by their optional `group` label, preserving first-seen order.
-  // Ungrouped items fall into a headerless leading section.
-  const groupedItems: { label: string | null; items: SidebarItem[] }[] = [];
-  navigableItems.forEach((item) => {
+  // `dropdownColumn` lets a category stack multiple groups in the same visual
+  // column without changing the default one-group-per-column layout.
+  const groupedColumns: DropdownColumn[] = [];
+  navigableItems.forEach((item, index) => {
     const label = item.group || null;
-    const existing = groupedItems.find((g) => g.label === label);
-    if (existing) {
-      existing.items.push(item);
+    const columnKey = item.dropdownColumn || `group:${label ?? "__ungrouped"}`;
+    let column = groupedColumns.find((existing) => existing.key === columnKey);
+
+    if (!column) {
+      column = {
+        key: columnKey,
+        order: item.dropdownColumnOrder ?? index,
+        groups: [],
+      };
+      groupedColumns.push(column);
+    }
+
+    const group = column.groups.find((existing) => existing.label === label);
+    if (group) {
+      group.items.push(item);
     } else {
-      groupedItems.push({ label, items: [item] });
+      column.groups.push({ label, items: [item] });
     }
   });
-  const hasGroups = groupedItems.some((g) => g.label !== null);
+  groupedColumns.sort((a, b) => a.order - b.order);
+  const hasGroups = groupedColumns.some((column) =>
+    column.groups.some((group) => group.label !== null)
+  );
 
-  // Grouped categories always render as one column per group
+  // Grouped categories render one column per dropdown column key.
   const isMegaMenu =
     hasGroups || shouldUseMegaMenu(categoryName, navigableItems.length);
   const columns = hasGroups
-    ? Math.min(groupedItems.length, 4)
+    ? Math.min(groupedColumns.length, 4)
     : getMegaMenuColumns(navigableItems.length);
 
   // Calculate position based on anchor element (centered using transform),
@@ -374,14 +401,21 @@ export default function NavbarDropdown({
             className="grid gap-x-3 gap-y-1 items-start"
             style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
           >
-            {groupedItems.map((group) => (
-              <div key={group.label ?? "__ungrouped"} className="space-y-0.5">
-                {group.label && (
-                  <div className="px-3 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-default-400 dark:text-gray-500 select-none">
-                    {group.label}
+            {groupedColumns.map((column) => (
+              <div key={column.key} className="space-y-3">
+                {column.groups.map((group) => (
+                  <div
+                    key={`${column.key}:${group.label ?? "__ungrouped"}`}
+                    className="space-y-0.5"
+                  >
+                    {group.label && (
+                      <div className="px-3 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-default-400 dark:text-gray-500 select-none">
+                        {group.label}
+                      </div>
+                    )}
+                    {group.items.map(renderDropdownItem)}
                   </div>
-                )}
-                {group.items.map(renderDropdownItem)}
+                ))}
               </div>
             ))}
           </div>

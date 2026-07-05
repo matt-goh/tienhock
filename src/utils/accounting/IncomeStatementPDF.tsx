@@ -10,6 +10,7 @@ import {
 } from "@react-pdf/renderer";
 import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
+import { printPdfBlob } from "../pdfPrintFallback";
 
 const colors = {
   textPrimary: "#0f172a",
@@ -347,12 +348,5 @@ export const generateIncomeStatementPDF = async (
     <IncomeStatementPDFDocument data={data} />
   ).toBlob();
 
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `Income_Statement_${data.period.year}_${String(data.period.month).padStart(2, "0")}.pdf`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  printPdfBlob(blob, "income statement PDF");
 };

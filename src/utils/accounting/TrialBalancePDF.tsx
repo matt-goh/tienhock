@@ -10,6 +10,7 @@ import {
 } from "@react-pdf/renderer";
 import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
+import { printPdfBlob } from "../pdfPrintFallback";
 
 const colors = {
   textPrimary: "#0f172a",
@@ -73,26 +74,6 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: colors.textSecondary,
     marginTop: 2,
-  },
-  balanceStatus: {
-    marginTop: 8,
-    marginBottom: 8,
-    padding: 6,
-    borderRadius: 4,
-    borderWidth: 1,
-  },
-  balanceStatusBalanced: {
-    backgroundColor: "#f0fdf4",
-    borderColor: "#86efac",
-  },
-  balanceStatusUnbalanced: {
-    backgroundColor: "#fef2f2",
-    borderColor: "#fca5a5",
-  },
-  balanceStatusText: {
-    fontSize: 9,
-    fontFamily: "Helvetica-Bold",
-    textAlign: "center",
   },
   table: {
     marginTop: 8,
@@ -242,8 +223,6 @@ const TrialBalancePDFDocument: React.FC<TrialBalancePDFDocumentProps> = ({
     { debit: 0, credit: 0 }
   );
 
-  const isBalanced = Math.abs(filteredTotals.debit - filteredTotals.credit) < 0.01;
-
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -257,29 +236,6 @@ const TrialBalancePDFDocument: React.FC<TrialBalancePDFDocumentProps> = ({
               As at {data.period.end_date} | Period: {getMonthName(data.period.year, data.period.month)}
             </Text>
           </View>
-        </View>
-
-        {/* Balance Status */}
-        <View
-          style={[
-            styles.balanceStatus,
-            isBalanced
-              ? styles.balanceStatusBalanced
-              : styles.balanceStatusUnbalanced,
-          ]}
-        >
-          <Text
-            style={[
-              styles.balanceStatusText,
-              { color: isBalanced ? colors.success : colors.danger },
-            ]}
-          >
-            {isBalanced
-              ? "TRIAL BALANCE IS BALANCED"
-              : `TRIAL BALANCE IS NOT BALANCED (Difference: RM ${formatCurrency(
-                  Math.abs(filteredTotals.debit - filteredTotals.credit)
-                )})`}
-          </Text>
         </View>
 
         {/* Table */}
@@ -358,12 +314,5 @@ export const generateTrialBalancePDF = async (
     <TrialBalancePDFDocument data={data} accounts={accounts} />
   ).toBlob();
 
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `Trial_Balance_${data.period.year}_${String(data.period.month).padStart(2, "0")}.pdf`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  printPdfBlob(blob, "trial balance PDF");
 };
