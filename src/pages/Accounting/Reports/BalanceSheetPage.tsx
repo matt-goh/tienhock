@@ -124,7 +124,7 @@ const BalanceSheetPage: React.FC = () => {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="w-full">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -143,7 +143,7 @@ const BalanceSheetPage: React.FC = () => {
             onChange={handleMonthChange}
           />
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Button
               onClick={fetchData}
               variant="outline"

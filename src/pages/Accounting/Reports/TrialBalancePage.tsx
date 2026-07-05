@@ -153,7 +153,7 @@ const TrialBalancePage: React.FC = () => {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="w-full">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -174,7 +174,7 @@ const TrialBalancePage: React.FC = () => {
           />
 
           {/* Filters and Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {/* Search */}
             <div className="relative">
               <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />

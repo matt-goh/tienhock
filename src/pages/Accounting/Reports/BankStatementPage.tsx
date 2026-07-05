@@ -127,7 +127,7 @@ const BankStatementPage: React.FC = () => {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="w-full">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -141,7 +141,7 @@ const BankStatementPage: React.FC = () => {
       {/* Controls */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {/* Account selector */}
             <ListboxSelect
               value={selectedAccount}
@@ -176,7 +176,7 @@ const BankStatementPage: React.FC = () => {
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Button
               onClick={fetchStatement}
               variant="outline"
