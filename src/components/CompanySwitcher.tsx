@@ -43,21 +43,17 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ onNavigate }) => {
   const theme = companyThemes[activeCompany.id] || companyThemes.tienhock;
 
   // Handle hover open/close
-  const handleMouseEnter = () => {
+  const handleMouseEnter = (): void => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
     }
     setIsOpen(true);
   };
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = (): void => {
     hoverTimeoutRef.current = setTimeout(() => {
       setIsOpen(false);
     }, 150);
-  };
-
-  const handleButtonClick = () => {
-    setIsOpen((prev) => !prev);
   };
 
   // Close dropdown when clicking outside
@@ -95,22 +91,35 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ onNavigate }) => {
     return companyThemes[companyId] || companyThemes.tienhock;
   };
 
-  const handleCompanyChange = (company: Company) => {
-    if (company.id === activeCompany.id) {
-      setIsOpen(false);
-      return;
-    }
+  const getCompanyHomePath = (company: Company): string =>
+    company.routePrefix ? `/${company.routePrefix}` : "/";
 
-    setActiveCompany(company);
-    setIsOpen(false);
-
-    // Navigate to the company homepage
-    const homePath = company.routePrefix ? `/${company.routePrefix}` : "/";
-    navigate(homePath);
+  const navigateToCompanyHome = (company: Company): void => {
+    navigate(getCompanyHomePath(company));
 
     if (onNavigate) {
       onNavigate();
     }
+  };
+
+  const handleButtonClick = (): void => {
+    if (!isOpen) {
+      setIsOpen(true);
+      return;
+    }
+
+    setIsOpen(false);
+    navigateToCompanyHome(activeCompany);
+  };
+
+  const handleCompanyChange = (company: Company): void => {
+    setIsOpen(false);
+
+    if (company.id !== activeCompany.id) {
+      setActiveCompany(company);
+    }
+
+    navigateToCompanyHome(company);
   };
 
   return (
@@ -131,7 +140,16 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ onNavigate }) => {
         `}
       >
         {getCompanyLogo(activeCompany.id, 22)}
-        <span className="font-semibold text-sm">{activeCompany.name}</span>
+        <span className="font-semibold text-sm">
+          {activeCompany.id === "greentarget" ? (
+            <>
+              <span className="2xl:hidden">GT</span>
+              <span className="hidden 2xl:inline">{activeCompany.name}</span>
+            </>
+          ) : (
+            activeCompany.name
+          )}
+        </span>
         <IconChevronDown
           size={16}
           className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}

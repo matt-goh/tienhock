@@ -44,6 +44,10 @@ interface GeneralStatementData {
   totals: Totals;
 }
 
+interface GeneralStatementPDFOptions {
+  companyName?: string;
+}
+
 // Styles for typewriter/monospace aesthetic
 const styles = StyleSheet.create({
   page: {
@@ -158,15 +162,21 @@ const PageHeader: React.FC<{
   report_datetime: string;
   reportDateStr: string;
   pageNumber: number;
+  companyName: string;
   showReportDatetime?: boolean;
-}> = ({ statement_date, reportDateStr, pageNumber, report_datetime, showReportDatetime = false }) => (
+}> = ({
+  statement_date,
+  reportDateStr,
+  pageNumber,
+  report_datetime,
+  companyName,
+  showReportDatetime = false,
+}) => (
   <View style={styles.headerSection}>
     <View style={styles.headerTopRow}>
       <View style={{ width: 220 }} />
       <View style={styles.headerCenter}>
-        <Text style={styles.companyName}>
-          TIEN HOCK FOOD INDUSTRIES SDN BHD (953309-T)
-        </Text>
+        <Text style={styles.companyName}>{companyName}</Text>
         <Text style={styles.title}>
           TRADE DEBTOR LIST AS AT {statement_date}
         </Text>
@@ -223,9 +233,10 @@ const DataRow: React.FC<{ customer: CustomerRow }> = ({ customer }) => (
 );
 
 // PDF Component using manual pagination
-const GeneralStatementPDF: React.FC<{ data: GeneralStatementData }> = ({
-  data,
-}) => {
+const GeneralStatementPDF: React.FC<{
+  data: GeneralStatementData;
+  companyName?: string;
+}> = ({ data, companyName = "TIEN HOCK FOOD INDUSTRIES SDN BHD (953309-T)" }) => {
   const { statement_date, report_datetime, customers, totals } = data;
 
   // Format report date for header
@@ -274,6 +285,7 @@ const GeneralStatementPDF: React.FC<{ data: GeneralStatementData }> = ({
             report_datetime={report_datetime}
             reportDateStr={reportDateStr}
             pageNumber={pageIndex + 1}
+            companyName={companyName}
             showReportDatetime={pageIndex === 0}
           />
 
@@ -319,10 +331,13 @@ const GeneralStatementPDF: React.FC<{ data: GeneralStatementData }> = ({
 // PDF Generation Function
 export const generateGeneralStatementPDF = async (
   data: GeneralStatementData,
-  action: "download" | "print"
+  action: "download" | "print",
+  options: GeneralStatementPDFOptions = {}
 ): Promise<void> => {
   try {
-    const doc = <GeneralStatementPDF data={data} />;
+    const doc = (
+      <GeneralStatementPDF data={data} companyName={options.companyName} />
+    );
     const pdfBlob = await pdf(doc).toBlob();
 
     if (action === "download") {
