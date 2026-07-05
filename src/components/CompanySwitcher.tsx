@@ -95,18 +95,17 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ onNavigate }) => {
     return companyThemes[companyId] || companyThemes.tienhock;
   };
 
-  const handleCompanyChange = (company: Company) => {
-    if (company.id === activeCompany.id) {
-      setIsOpen(false);
-      return;
-    }
+  const getCompanyHomePath = (company: Company): string =>
+    company.routePrefix ? `/${company.routePrefix}` : "/";
 
-    setActiveCompany(company);
+  const handleCompanyChange = (company: Company): void => {
     setIsOpen(false);
 
-    // Navigate to the company homepage
-    const homePath = company.routePrefix ? `/${company.routePrefix}` : "/";
-    navigate(homePath);
+    if (company.id !== activeCompany.id) {
+      setActiveCompany(company);
+    }
+
+    navigate(getCompanyHomePath(company));
 
     if (onNavigate) {
       onNavigate();
