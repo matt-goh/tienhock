@@ -1,8 +1,8 @@
 // src/pages/JellyPolly/Payroll/JPPayrollPage.tsx
 // Jelly Polly monthly payrolls list. Mirrors the GT payroll page but sections
-// are generated from the JP job types and employee management lives on the
-// Staff Assignment page. Processing rebuilds every assigned JP employee via
-// the per-employee processor (JP data is small).
+// are generated from the JP job types; membership is derived from staffs.job
+// (TH-style, managed on the JP Job page/staff form). Processing rebuilds every
+// JP employee holding a JP job via the per-employee processor (JP is small).
 import React, { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import {
@@ -12,7 +12,6 @@ import {
   IconPlus,
   IconChevronDown,
   IconChevronUp,
-  IconSettings,
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -24,8 +23,12 @@ import {
   DownloadBatchPayslipsButton,
 } from "../../../utils/payroll/PayslipButtons";
 import { buildJPPayslipPayroll } from "../../../utils/JellyPolly/buildJPPayslipPayroll";
-import { useJPPayrollEmployees } from "../../../utils/JellyPolly/useJPPayrollEmployees";
-import { JP_JOB_TYPES } from "../../../configs/jpPayrollJobConfigs";
+import { useJPStaffsCache } from "../../../utils/JellyPolly/useJPStaffsCache";
+import {
+  JP_JOB_TYPES,
+  JP_ALL_JOB_IDS,
+  staffHoldsJPJob,
+} from "../../../configs/jpPayrollJobConfigs";
 import { getMonthName } from "../../../utils/payroll/payrollUtils";
 
 interface JPMonthlyPayroll {
@@ -59,7 +62,11 @@ const jobTypeLabel = (jobType: string): string =>
 const JPPayrollPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { employees: jpEmployees } = useJPPayrollEmployees();
+  const { staffs } = useJPStaffsCache();
+  // Staff holding at least one JP payroll job in staffs.job
+  const assignedStaffCount = staffs.filter((staff) =>
+    staffHoldsJPJob(staff.job, JP_ALL_JOB_IDS)
+  ).length;
 
   // Initialize with URL params or current month
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
@@ -147,8 +154,10 @@ const JPPayrollPage: React.FC = () => {
   const handleProcessPayroll = async () => {
     if (!payroll) return;
 
-    if (jpEmployees.length === 0) {
-      toast.error("No employees assigned to JP payroll. Assign staff first.");
+    if (assignedStaffCount === 0) {
+      toast.error(
+        "No staff hold a JP payroll job. Assign jobs on the Job page first."
+      );
       return;
     }
 
@@ -303,15 +312,6 @@ const JPPayrollPage: React.FC = () => {
               />
             </>
           )}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => navigate("/jellypolly/payroll/staff-assignment")}
-            icon={IconSettings}
-            iconSize={16}
-          >
-            Staff Assignment
-          </Button>
         </div>
       </div>
 
@@ -332,15 +332,15 @@ const JPPayrollPage: React.FC = () => {
             color="emerald"
             variant="filled"
             onClick={handleCreatePayroll}
-            disabled={isCreating || jpEmployees.length === 0}
+            disabled={isCreating || assignedStaffCount === 0}
             icon={isCreating ? undefined : IconPlus}
             iconSize={18}
           >
             {isCreating ? "Creating..." : "Create Payroll"}
           </Button>
-          {jpEmployees.length === 0 && (
+          {assignedStaffCount === 0 && (
             <p className="text-sm text-amber-600 dark:text-amber-400 mt-2">
-              Assign staff to JP payroll first on the Staff Assignment page
+              Assign JP jobs to staff first (Catalogue → Job or the staff form)
             </p>
           )}
         </div>

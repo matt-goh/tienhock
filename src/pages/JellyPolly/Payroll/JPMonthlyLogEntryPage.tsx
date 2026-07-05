@@ -18,6 +18,7 @@ import {
   getJPJobConfig,
   getJobIds,
   getContextLinkedPayCodes,
+  staffHoldsJPJob,
 } from "../../../configs/jpPayrollJobConfigs";
 import StyledListbox from "../../../components/StyledListbox";
 import TimeNavigator from "../../../components/TimeNavigator";
@@ -203,31 +204,6 @@ const JPMonthlyLogEntryPage: React.FC<JPMonthlyLogEntryPageProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isRefreshingCache, setIsRefreshingCache] = useState(false);
 
-  // JP staff membership is user-managed on the Staff Assignment page
-  // (jellypolly.payroll_employees), NOT derived from staffs.job like TH.
-  const [jpAssignedEmployeeIds, setJpAssignedEmployeeIds] = useState<
-    Set<string>
-  >(new Set());
-
-  useEffect(() => {
-    const fetchJpAssignments = async () => {
-      try {
-        const assignments = await api.get(
-          `/jellypolly/api/payroll-employees?job_type=${jobType}`,
-        );
-        setJpAssignedEmployeeIds(
-          new Set(
-            (assignments || []).map(
-              (emp: { employee_id: string }) => emp.employee_id,
-            ),
-          ),
-        );
-      } catch (error) {
-        console.error("Error fetching JP payroll assignments:", error);
-      }
-    };
-    fetchJpAssignments();
-  }, [jobType]);
 
   // Activities state
   const [showActivitiesModal, setShowActivitiesModal] = useState(false);
@@ -298,14 +274,14 @@ const JPMonthlyLogEntryPage: React.FC<JPMonthlyLogEntryPageProps> = ({
     });
   };
 
-  // Eligible employees = staff assigned to this JP page on the Staff
-  // Assignment page (no hardcoded lists, no staffs.job dependency).
+  // Eligible employees = staff holding this page's JP job in staffs.job
+  // (TH-style membership, managed on the JP Job page/staff form)
   const eligibleEmployees = useMemo(() => {
     if (!allStaffs || loadingStaffs) return [];
     return allStaffs.filter((staff: Employee) =>
-      jpAssignedEmployeeIds.has(staff.id),
+      staffHoldsJPJob(staff.job, JOB_IDS),
     );
-  }, [allStaffs, loadingStaffs, jpAssignedEmployeeIds]);
+  }, [allStaffs, loadingStaffs, JOB_IDS]);
 
   // Leave is aggregated per name on the backend, so the Add Leave modal
   // picker collapses multi-ID employees to a single row (senior ID kept).

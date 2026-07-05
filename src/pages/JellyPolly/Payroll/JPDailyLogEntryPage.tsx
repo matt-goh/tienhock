@@ -28,6 +28,7 @@ import {
   getJPJobConfig,
   getContextLinkedPayCodes,
   getJobIds,
+  staffHoldsJPJob,
 } from "../../../configs/jpPayrollJobConfigs";
 import DynamicContextForm from "../../../components/Payroll/DynamicContextForm";
 import {
@@ -673,30 +674,15 @@ const JPDailyLogEntryPage: React.FC<JPDailyLogEntryPageProps> = ({
       }));
   }, [allJobs, JOB_IDS]);
 
-  // JP staff membership is user-managed on the Staff Assignment page
-  // (jellypolly.payroll_employees), NOT derived from staffs.job like TH.
-  const [jpAssignedEmployeeIds, setJpAssignedEmployeeIds] = useState<
-    Set<string>
-  >(new Set());
-  useEffect(() => {
-    const fetchJpAssignments = async () => {
-      try {
-        const assignments = await api.get(
-          `/jellypolly/api/payroll-employees?job_type=${jobType}`
-        );
-        setJpAssignedEmployeeIds(
-          new Set(
-            (assignments || []).map(
-              (a: { employee_id: string }) => a.employee_id
-            )
-          )
-        );
-      } catch (error) {
-        console.error("Error fetching JP payroll assignments:", error);
-      }
-    };
-    fetchJpAssignments();
-  }, [jobType]);
+  // JP staff membership is derived from staffs.job (TH-style): staff holding
+  // this page's JP job id belong to it. Managed on the JP Job page/staff form.
+  const jpAssignedEmployeeIds = useMemo<Set<string>>(() => {
+    return new Set(
+      allStaffs
+        .filter((staff) => staffHoldsJPJob(staff.job, JOB_IDS))
+        .map((staff) => staff.id)
+    );
+  }, [allStaffs, JOB_IDS]);
 
   // Update available employees from the JP assignments
   const availableEmployees = useMemo(() => {

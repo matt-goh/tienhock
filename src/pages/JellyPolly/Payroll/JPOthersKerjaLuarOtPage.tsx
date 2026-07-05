@@ -32,7 +32,11 @@ import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import TimeNavigator from "../../../components/TimeNavigator";
 import AddOthersModal from "../../../components/Payroll/AddOthersModal";
 import EditOthersModal from "../../../components/Payroll/EditOthersModal";
-import { useJPPayrollEmployees } from "../../../utils/JellyPolly/useJPPayrollEmployees";
+import { useJPStaffsCache } from "../../../utils/JellyPolly/useJPStaffsCache";
+import {
+  JP_ALL_JOB_IDS,
+  staffHoldsJPJob,
+} from "../../../configs/jpPayrollJobConfigs";
 import { api } from "../../../routes/utils/api";
 import { OthersRecord } from "../../../types/types";
 import toast from "react-hot-toast";
@@ -74,10 +78,14 @@ const JPOthersKerjaLuarOtPage: React.FC = () => {
     return params.get("search") || "";
   };
 
-  const { employees: gtEmployees } = useJPPayrollEmployees();
+  const { staffs } = useJPStaffsCache();
+  // Staff holding at least one JP payroll job in staffs.job
   const allowedEmployeeIds = useMemo(
-    () => gtEmployees.map((e) => e.employee_id),
-    [gtEmployees]
+    () =>
+      staffs
+        .filter((staff) => staffHoldsJPJob(staff.job, JP_ALL_JOB_IDS))
+        .map((staff) => staff.id),
+    [staffs]
   );
 
   const [records, setRecords] = useState<OthersRecord[]>([]);

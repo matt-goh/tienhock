@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-05",
+    ms: "Jelly Polly: halaman Staff Assignment telah dibuang. Keahlian staf pada halaman gaji dan kemasukan kerja JP (Office, Maintenance, Salesman, mesin harian, Plastic, Production) kini ditentukan oleh kerja yang dipegang staf — sama seperti Tien Hock. Tetapkan kerja staf melalui Catalogue → Job (butang Manage Staff) atau borang staf; staf yang memegang kerja JP berkenaan akan terus muncul pada halaman yang sepadan.",
+    en: "Jelly Polly: the Staff Assignment page has been removed. Staff membership on JP payroll and entry pages (Office, Maintenance, Salesman, daily machines, Plastic, Production) is now determined by the jobs a staff holds — the same way as Tien Hock. Set a staff's jobs via Catalogue → Job (Manage Staff button) or the staff form; staff holding the relevant JP job automatically appear on the matching pages.",
+  },
+  {
+    date: "2026-07-05",
     ms: "Jelly Polly: halaman Job baharu di bawah Catalogue → Job untuk mengurus kerja JP dan kod gaji yang dipautkan kepadanya (tambah/padam kerja, urus staf kerja, kadar override dan urusan pukal) — sama seperti halaman Job Tien Hock tetapi menggunakan katalog JP sendiri. Pautan kerja/staf pada halaman Pay Codes JP kini membuka halaman JP yang betul dan bukannya halaman Tien Hock.",
     en: "Jelly Polly: new Job page under Catalogue → Job to manage JP jobs and their linked pay codes (add/delete jobs, manage job staff, override rates and batch manage) — same as the Tien Hock Job page but using JP's own catalogue. Job/staff links on the JP Pay Codes page now open the correct JP pages instead of the Tien Hock ones.",
   },

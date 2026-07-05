@@ -1,12 +1,23 @@
 // src/configs/jpPayrollJobConfigs.ts
 // Jelly Polly payroll job/page configuration, mirroring payrollJobConfigs.ts.
-// JP staff membership is user-managed via jellypolly.payroll_employees
-// (job_type below), NOT via staffs.job — jobIds here point at the JP_* rows in
-// public.jobs and are used for pay-code mappings and work-log entry job_id.
+// JP staff membership is derived from jellypolly.staffs.job (the staff's JP_*
+// job ids), exactly like TH — manage it on the JP Job page or the staff form.
+// jobIds here point at the JP_* rows in jellypolly.jobs and are used for
+// pay-code mappings, work-log entry job_id, and page membership.
 
 import { JobTypeConfig, JobTypeConfigs } from "./payrollJobConfigs";
 
-// Assignment job types available on the JP Staff Assignment page.
+export type JPJobType =
+  | "OFFICE"
+  | "MAINTENANCE"
+  | "SALESMAN"
+  | "SALESMAN_IKUT"
+  | "ICE_POLLY"
+  | "JELLY_CUP"
+  | "PLASTIC"
+  | "PRODUCTION";
+
+// JP payroll job types (used for payroll section labels).
 export interface JPJobTypeInfo {
   id: string;
   label: string;
@@ -55,6 +66,31 @@ export const JP_JOB_TYPES: JPJobTypeInfo[] = [
     description: "JP production entry workers (packing)",
   },
 ];
+
+// Exact JP job type -> jellypolly.jobs id(s) mapping. Holding one of these
+// jobs in staffs.job makes a staff a member of the corresponding page.
+export const JP_JOB_TYPE_TO_JOB_IDS: Record<JPJobType, string[]> = {
+  OFFICE: ["JP_OFFICE"],
+  MAINTENANCE: ["JP_MAINTEN"],
+  SALESMAN: ["JP_SALESMAN"],
+  SALESMAN_IKUT: ["JP_SALESMAN_IKUT"],
+  ICE_POLLY: ["JP_ICE_POLLY"],
+  JELLY_CUP: ["JP_JELLY_CUP"],
+  PLASTIC: ["JP_PLASTIC"],
+  PRODUCTION: ["JP_PACKING"],
+};
+
+// Every JP job id that grants payroll membership.
+export const JP_ALL_JOB_IDS: string[] = Object.values(
+  JP_JOB_TYPE_TO_JOB_IDS
+).flat();
+
+// True when the staff's job array contains one of the given JP job ids.
+export const staffHoldsJPJob = (
+  staffJob: string[] | null | undefined,
+  jobIds: string[]
+): boolean =>
+  Array.isArray(staffJob) && staffJob.some((jobId) => jobIds.includes(jobId));
 
 export const JP_JOB_CONFIGS: JobTypeConfigs = {
   OFFICE: {

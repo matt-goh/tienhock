@@ -19,7 +19,9 @@ import {
   fetchActiveContributionRates,
 } from "../greentarget/gtStatutoryCalc.js";
 
-// public.jobs id -> jellypolly.payroll_employees job_type
+// jellypolly.jobs id -> JP payroll job type. Membership is derived from
+// jellypolly.staffs.job (TH-style): holding one of these job ids makes the
+// staff part of the corresponding payroll page/section.
 export const JP_JOB_ID_TO_TYPE = {
   JP_OFFICE: "OFFICE",
   JP_MAINTEN: "MAINTENANCE",
@@ -93,9 +95,10 @@ export const reprocessJPEmployees = async (
       createdBy
     );
 
-    // Canonical (HEAD) mapping across all staff
+    // Canonical (HEAD) mapping across all staff, plus their JP jobs
     const canonicalRows = await client.query(
-      `SELECT id, COALESCE(NULLIF(head_staff_id, ''), id) AS canonical_id
+      `SELECT id, COALESCE(NULLIF(head_staff_id, ''), id) AS canonical_id,
+              job, date_resigned
        FROM jellypolly.staffs`
     );
     const idToCanonical = new Map(
@@ -109,19 +112,27 @@ export const reprocessJPEmployees = async (
       canonicalToSiblings.get(row.canonical_id).push(row.id);
     }
 
-    // Active JP assignments (job types per employee)
-    const assignmentsResult = await client.query(
-      `SELECT employee_id, job_type
-       FROM jellypolly.payroll_employees
-       WHERE is_active = true`
-    );
+    // JP membership derived from staffs.job (TH-style): a staff belongs to a
+    // job type when their job array holds the matching JP_* job id. Staff who
+    // resigned before the payroll month are skipped on full runs.
     const assignedJobTypesByCanonical = new Map();
-    for (const row of assignmentsResult.rows) {
-      const canonical = idToCanonical.get(row.employee_id) || row.employee_id;
-      if (!assignedJobTypesByCanonical.has(canonical)) {
-        assignedJobTypesByCanonical.set(canonical, new Set());
+    for (const row of canonicalRows.rows) {
+      if (
+        row.date_resigned &&
+        new Date(row.date_resigned) < new Date(startDate)
+      ) {
+        continue;
       }
-      assignedJobTypesByCanonical.get(canonical).add(row.job_type);
+      const staffJobs = Array.isArray(row.job) ? row.job : [];
+      for (const jobId of staffJobs) {
+        const jobType = JP_JOB_ID_TO_TYPE[jobId];
+        if (!jobType) continue;
+        const canonical = idToCanonical.get(row.id) || row.id;
+        if (!assignedJobTypesByCanonical.has(canonical)) {
+          assignedJobTypesByCanonical.set(canonical, new Set());
+        }
+        assignedJobTypesByCanonical.get(canonical).add(jobType);
+      }
     }
 
     // Target canonical employees
