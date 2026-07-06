@@ -531,15 +531,34 @@ export default function (pool) {
       if (payment.status === "active") {
         // Get current balance *after* locking
         const currentInvoiceState = await client.query(
-          "SELECT balance_due, invoice_status FROM jellypolly.invoices WHERE id = $1",
+          "SELECT balance_due, invoice_status, totalamountpayable FROM jellypolly.invoices WHERE id = $1",
           [invoice_id]
         );
         const currentBalance = parseFloat(
           currentInvoiceState.rows[0].balance_due || 0
         );
         const currentStatus = currentInvoiceState.rows[0].invoice_status;
+        const totalPayable = parseFloat(
+          currentInvoiceState.rows[0].totalamountpayable || 0
+        );
 
-        const newBalance = currentBalance + paidAmount;
+        // Cap the restored balance at what is genuinely unpaid (invoice total
+        // minus the remaining active payments), so a stray active payment can
+        // never inflate the balance past the invoice total. Safe because
+        // cancellation is blocked when active adjustment documents exist.
+        const otherActiveResult = await client.query(
+          `SELECT COALESCE(SUM(amount_paid), 0) AS active_paid
+           FROM jellypolly.payments
+           WHERE invoice_id = $1 AND payment_id != $2
+             AND (status IS NULL OR status = 'active')`,
+          [invoice_id, paymentIdNum]
+        );
+        const otherActivePaid = parseFloat(
+          otherActiveResult.rows[0].active_paid || 0
+        );
+        const maxBalance = Math.max(0, totalPayable - otherActivePaid);
+
+        const newBalance = Math.min(currentBalance + paidAmount, maxBalance);
         // Round to 2 decimal places
         const finalNewBalance = parseFloat(newBalance.toFixed(2));
 
@@ -569,7 +588,13 @@ export default function (pool) {
 
         // 4. Update Customer Credit if it was an INVOICE payment
         if (paymenttype === "INVOICE") {
-          await updateCustomerCredit(client, customerid, paidAmount); // Add back the amount to credit used
+          // Add back the actual balance increase (matches the cap above)
+          const balanceRestored = parseFloat(
+            (finalNewBalance - currentBalance).toFixed(2)
+          );
+          if (balanceRestored > 0) {
+            await updateCustomerCredit(client, customerid, balanceRestored);
+          }
         }
       } else {
         // For pending payments, no balance or credit adjustments needed

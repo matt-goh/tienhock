@@ -210,9 +210,10 @@ const JournalEntryListPage: React.FC = () => {
       if (selectedTypes.length > 0)
         params.append("entry_type", selectedTypes.join(","));
       if (selectedStatuses.length > 0) {
-        // The UI's "Active" means "not cancelled"; the DB stores posted/draft
+        // The UI's "Active" means "not cancelled"; the DB stores posted plus
+        // legacy draft/active rows from before entries were posted on creation
         const dbStatuses = selectedStatuses.flatMap((s) =>
-          s === "active" ? ["posted", "draft"] : [s]
+          s === "active" ? ["posted", "draft", "active"] : [s]
         );
         params.append("status", dbStatuses.join(","));
       }

@@ -146,7 +146,7 @@ export default function (pool) {
           entry_type: row.entry_type,
           entry_date:
             row.entry_date instanceof Date
-              ? row.entry_date.toISOString().split("T")[0]
+              ? `${row.entry_date.getFullYear()}-${pad(row.entry_date.getMonth() + 1)}-${pad(row.entry_date.getDate())}`
               : String(row.entry_date).split("T")[0],
           cheque_no: row.cheque_no || null,
           particulars: row.particulars || row.entry_description || "",
