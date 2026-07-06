@@ -13,6 +13,12 @@ import { printPdfBlob } from "../pdfPrintFallback";
 
 (pdfMake as any).vfs = (pdfFonts as any).pdfMake?.vfs || pdfFonts;
 
+type HeaderCellOptions = {
+  rowSpan?: number;
+  colSpan?: number;
+  alignment?: "left" | "right" | "center";
+};
+
 export interface PayrollSummaryRow {
   gaji: number;
   bonus: number;
@@ -87,7 +93,7 @@ const buildDocDefinition = (
   data: PayrollSummaryPDFData,
   logoDataUrl: string | null
 ): TDocumentDefinitions => {
-  const th = (text: string, extra: Partial<TableCell> = {}): TableCell => ({
+  const th = (text: string, extra: HeaderCellOptions = {}): TableCell => ({
     text,
     style: "th",
     alignment: "center",
