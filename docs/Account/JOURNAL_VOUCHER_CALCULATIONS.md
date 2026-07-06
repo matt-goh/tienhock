@@ -54,16 +54,26 @@ difference is debited back to the salary expense account (`MBDRS`) as a
 
 | Account Code Pattern | Description | Calculation | Source |
 |---------------------|-------------|-------------|--------|
-| **MBS_**** | Salary by location | Base + Tambahan pay (non-product) | `payroll_items` where `pay_type IN ('Base', 'Tambahan')` |
-| **MBS_**** (overtime) | Overtime by location | Overtime pay | `payroll_items` where `pay_type = 'Overtime'` |
-| **MBS_**** (bonus) | Bonus by location | Bonus amounts | `commission_records` where `location_code IS NULL` |
-| **MBS_**** (commission) | Commission by location | Commission amounts (16-24) | `commission_records` where `location_code IS NOT NULL` |
-| **MBS_**** (product) | Commission MEE/BH | Product-linked commissions | `payroll_items` linked to `product_pay_codes` |
+| **MBS_**** | Salary by location | **FULL gross per location** (since 6 Jul 2026, matching the legacy voucher): the location's entire `SUM(gross_pay)` — base, OT, commissions (incl. located 16-24), cuti/leave, bonus, product/packing pay and Others ALL fold into this one line. No separate OT/commission/cuti/bonus debit rows exist. | `employee_payrolls.gross_pay` summed per job location |
 | **MBE_**** | EPF Employer by location | Employer EPF | `payroll_deductions` where `deduction_type = 'epf'` |
 | **MBSC_**** | SOCSO Employer by location | Employer SOCSO | `payroll_deductions` where `deduction_type = 'socso'` |
 | **MBSIP_**** | SIP Employer by location | Employer SIP | `payroll_deductions` where `deduction_type = 'sip'` |
 
-**Note:** Product-linked commissions (MEE/BH) go to `commission_mee` and `commission_bh` mapping types for locations 03 and 04.
+**Debit model (6 Jul 2026 — matches legacy 1:1):** the JVSL debit side is ONLY these four
+per-location rows — Salary, and employer EPF/SOCSO/SIP. There are **no** separate rows for
+OT, commissions, cuti/leave, bonus or product pay; those are all inside the Salary row. So
+the only JVSL mappings needed per location are `salary`, `epf_employer`, `socso_employer`,
+`sip_employer` (the old `overtime`/`bonus`/`commission_mee`/`commission_bh`/`cuti_tahunan`
+mapping types are retired).
+
+**Rounding (digenapkan) folds into salary — no separate line, no mapping.** Each location's
+Salary debit = its `SUM(gross_pay)` **+ that location's per-employee CEIL(net)−net rounding**,
+and `ACW_SAL` credits the rounded net of everyone. Balance:
+`Σ(gross + rounding) + Σemployer(EPF+SOCSO+SIP) = ACW_SAL(net + Σrounding) + ACW_EPF + ACW_SC + ACW_SIP + ACW_PCB`.
+Jun 2026: DR salary 162,019.90 (161,984.54 + 35.36) + employer 19,679.20 = **181,699.10**;
+ACW_SAL **143,513.00** (143,477.64 + 35.36) + accruals 38,186.10 = **181,699.10**. Computed by
+`computeJvslRoundingByLocation()`. (JVDR keeps its separate "Rounding Adjustment" line to
+`MBDRS` — the legacy JVDR prints one; JVSL does not.)
 
 ### Credit Accounts (Aggregate Payables)
 
@@ -318,6 +328,27 @@ bonus_by_location AS (
 - `src/routes/accounting/journal-vouchers.js` - Changed `bonus_by_location` CTE to use job-based location
 
 ---
+
+### Bug #6: Voucher gross far below payroll gross (Jul 2026) — FIXED
+
+The JVSL captured only pattern-matched components (Base/Tambahan non-product items,
+OT, MEE/BH product items at locations 03/04, commission_records). Everything else fell
+through on BOTH sides: product/packing per-bag pay outside 03/04 (Jun 2026: 27,552.46
+at locations 02/08/11), non-cuti-tahunan leave pay (10,851.64), Others records
+(10,711.71) — so the voucher (181,699.10 in legacy) generated at ~30k less even when
+balanced. **Fix:** the salary line per location is now the residual of
+`employee_payrolls.gross_pay` after the classified components, and the credit-side
+gross is Σ `gross_pay` directly — both sides equal full payroll gross by construction.
+The out-of-balance guard also lists the exact unmapped location/component amounts.
+
+### Shared line builders (6 Jul 2026)
+
+Preview and generation now call ONE pair of pure builders — `buildJvdrLines()` /
+`buildJvslLines()` (+ `computeJvslRounding()`) in [journal-vouchers.js](../../src/routes/accounting/journal-vouchers.js).
+The `/preview` response carries the exact `lines` (account_code · particulars · debit ·
+credit), `total_debit`, `total_credit`, `balanced` and `unmapped` — identical to what
+`/generate` posts — so the Voucher Generator page renders the journal 1:1. Any future
+change to voucher composition must be made in the builders, not duplicated.
 
 ## Data Sources Summary
 

@@ -20,6 +20,26 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-06",
+    ms: "Baucar gaji JVSL kini dijana sepadan 100% dengan sistem lama: setiap jabatan mempunyai SATU baris Gaji yang merangkumi keseluruhan gaji kasar (gaji, OT, komisen, cuti/cuti tahunan, bonus, bayaran ikut produk dan Others semuanya dimasukkan di sini — termasuk pembundaran), diikuti caruman majikan EPF/SOCSO/SIP, dan satu baris Accrual (Salary Payables). Anda tidak perlu lagi memetakan akaun berasingan untuk OT/komisen/cuti/pembundaran — jadi ralat 'pemetaan tidak lengkap' yang menyekat penjanaan JVSL sebelum ini telah hilang. Pilihan pemetaan yang tidak diperlukan pada halaman Location Account Mappings juga telah dibuang.",
+    en: "The JVSL payroll voucher now generates as a 100% match to the legacy system: each department has ONE Salary line covering its full gross pay (salary, OT, commission, cuti/annual leave, bonus, product-based pay and Others all fold in here — including the rounding), followed by the employer EPF/SOCSO/SIP contributions and one Accrual (Salary Payables) line. You no longer need to map separate accounts for OT/commission/cuti/rounding — so the 'incomplete mappings' error that previously blocked JVSL generation is gone. Unnecessary mapping options on the Location Account Mappings page have also been removed.",
+  },
+  {
+    date: "2026-07-06",
+    ms: "Butang baharu 'Payroll Summary' pada halaman Penjana Baucar Gaji mencetak ringkasan gaji yang mengkategorikan Pengarah dan Pekerja: GAJI, BONUS, GAJI KASAR, EPF/SOCSO/SIP (Majikan & Pekerja) dengan jumlah, PCB, Jumlah Gaji, Jumlah Digenapkan dan Gaji Bersih — serta jumlah baucar JV-DIRECTOR (JVDR) dan JV-WORKERS (JVSL) dengan jumlah besar. Ia dikira terus daripada data gaji, jadi boleh dicetak walaupun sebelum baucar dijana.",
+    en: "New 'Payroll Summary' button on the Payroll Voucher Generator prints a salary summary categorized into Director and Workers: GAJI, BONUS, GAJI KASAR, EPF/SOCSO/SIP (employer & employee) with totals, PCB, Jumlah Gaji, Jumlah Digenapkan and Gaji Bersih — plus the JV-DIRECTOR (JVDR) and JV-WORKERS (JVSL) voucher totals with a grand total. It's computed straight from payroll data, so it prints even before the vouchers are generated.",
+  },
+  {
+    date: "2026-07-06",
+    ms: "Penjana Baucar Gaji kini memaparkan pratonton catatan jurnal sebenar (kod akaun, keterangan, debit, kredit dan jumlah) — sama persis dengan baucar yang akan disimpan, jadi anda boleh semak baris demi baris sebelum menjananya. Halaman Penjana Baucar dan Bayaran Gaji Bank juga kini mengingati bulan terakhir yang anda lihat.",
+    en: "The Payroll Voucher Generator now shows a live preview of the actual journal entry (account codes, descriptions, debit, credit and totals) — exactly matching the voucher that will be posted, so you can check it line by line before generating. The Voucher Generator and Payroll Bank Payment pages now also remember the last month you viewed.",
+  },
+  {
+    date: "2026-07-06",
+    ms: "Catatan jurnal kini boleh dicetak sebagai Journal Voucher PDF (butang Print Voucher pada halaman butiran catatan) — sepadan dengan cetakan baucar sistem lama: kod akaun, keterangan, debit/kredit, jumlah dan particulars. Baucar gaji JVSL kini merangkumi KESEMUA gaji kasar (upah packing/mesin ikut produk, bayaran cuti, rekod Others, komisen) — sebelum ini sebahagian komponen tercicir dan jumlah baucar terkurang nyata berbanding sistem lama. Jika ada pemetaan akaun yang belum lengkap, mesej ralat kini menyenaraikan lokasi dan komponen yang tepat. Jurnal JVDR/JVSL juga kini mempunyai penapis jenis tersendiri di halaman Journal Entries.",
+    en: "Journal entries can now be printed as a Journal Voucher PDF (Print Voucher button on the entry details page) — matching the legacy voucher print: account codes, descriptions, debit/credit, totals and particulars. The JVSL payroll voucher now covers ALL of gross pay (product/packing piece pay, leave pay, Others records, commissions) — previously some components fell through and the voucher understated the legacy totals. When account mappings are incomplete, the error message now lists the exact locations and components. JVDR/JVSL journals also now have their own type filters on the Journal Entries page.",
+  },
+  {
+    date: "2026-07-06",
     ms: "Tab Transaction History pelanggan kini mempunyai penapis status dan jenis bayaran yang boleh ditekan, serta lajur Payment Type supaya jenis Cash atau Invoice boleh dilihat terus. Apabila invois dibuka dari tab ini, butang Back dan pautan pelanggan akan kembali ke tab Transaction History.",
     en: "Customer Transaction History now has clickable status and payment-type filters, plus a Payment Type column so Cash or Invoice can be seen at a glance. When an invoice is opened from this tab, Back and the customer link return to Transaction History.",
   },
