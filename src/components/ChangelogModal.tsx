@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-06",
+    ms: "Laporan baharu: Account Ledger (Accounting → Reports). Cari mana-mana kod akaun (contohnya kod perbelanjaan seperti MGT untuk Menggatal atau MBRMF untuk boiler, akaun pembekal, atau akaun pengarah) dan lihat sejarah transaksi penuh untuk bulan tersebut — baki pembukaan, setiap catatan jurnal, baki berjalan dan jumlah penutup, dengan cetakan PDF.",
+    en: "New report: Account Ledger (Accounting → Reports). Search any account code (e.g. expenditure codes like MGT for Menggatal or MBRMF for boiler, a supplier account, or a director account) and view its full transaction history for the month — opening balance, every journal entry, running balance and closing totals, with PDF printing.",
+  },
+  {
+    date: "2026-07-06",
     ms: "Pembetulan Journal Entries: catatan jurnal yang dikunci secara manual kini terus dikira dalam laporan (Bank Statement, Trial Balance dan lain-lain) sebaik sahaja disimpan — sebelum ini ia tersimpan sebagai draf tersembunyi dan tidak pernah muncul dalam mana-mana laporan. Catatan yang dijana sistem (resit, pembelian, baucar gaji) tidak lagi boleh diedit secara terus — batalkan atau jana semula dari skrin asalnya. Pembetulan tambahan: tarikh catatan tidak lagi beranjak sehari ke belakang setiap kali catatan diedit, dan baucar JVSL/JVDR yang tidak seimbang (pemetaan akaun lokasi belum lengkap) kini disekat daripada dijana.",
     en: "Journal Entries fix: manually keyed journal entries now count in reports (Bank Statement, Trial Balance, etc.) as soon as they are saved — previously they were stored as hidden drafts and never appeared in any report. System-generated entries (receipts, purchases, payroll vouchers) can no longer be edited directly — cancel or regenerate them from their source screen. Also fixed: an entry's date no longer slips back one day each time it is edited, and unbalanced JVSL/JVDR vouchers (incomplete location account mappings) are now blocked from being generated.",
   },
