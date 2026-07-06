@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-07-06",
+    ms: "Pembetulan invois: menukar jenis bayaran invois daripada CASH kepada INVOICE kini membatalkan bayaran automatik dengan betul (sebelum ini bayaran itu kekal aktif secara senyap, menyebabkan baki tertunggak berganda — cth. RM68 pada invois RM34 — apabila bayaran dibatalkan kemudian). Menukar INVOICE kepada CASH kini merekod bayaran untuk baki tertunggak sahaja dan mencatat resit dalam lejar. Pembatalan bayaran juga tidak lagi boleh menaikkan baki melebihi jumlah sebenar invois. Invois yang terjejas sebelum ini telah diperbetulkan.",
+    en: "Invoice fix: changing an invoice's payment type from CASH to INVOICE now correctly cancels the automatic payment (previously it silently stayed active, causing the outstanding balance to double — e.g. RM68 on a RM34 invoice — when payments were later cancelled). Changing INVOICE to CASH now records a payment for the outstanding balance only and posts the receipt to the ledger. Cancelling a payment can also no longer push the balance above the invoice's actual total. Previously affected invoices have been corrected.",
+  },
+  {
     date: "2026-07-05",
     ms: "Laporan Debtors untuk Jelly Polly dan Green Target kini menggunakan susun atur yang sama seperti Tien Hock: pilihan bulan, mod All Time, carian, buka/tutup semua, ringkasan jumlah, butang Report, Debtor List, Statement dan Invoices, serta jadual invois dan bayaran yang boleh dibuka. PDF laporan, penyata pelanggan dan senarai debtor kini menggunakan nama syarikat yang betul.",
     en: "Jelly Polly and Green Target Debtors Reports now use the same layout as Tien Hock: month selection, All Time mode, search, expand/collapse all, total summaries, Report, Debtor List, Statement and Invoices buttons, plus expandable invoice and payment tables. Report, customer statement and debtor list PDFs now show the correct company name.",
