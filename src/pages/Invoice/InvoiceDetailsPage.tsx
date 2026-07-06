@@ -2161,13 +2161,13 @@ const InvoiceDetailsPage: React.FC = () => {
               </div>
               {/* Manual UUID Edit - only when einvoice_status is null */}
               {invoiceData.einvoice_status === null && (
-                <div className="mt-3 pt-3 border-t border-default-100 group flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity">
+                <div className="mt-3 pt-3 border-t border-default-100 dark:border-gray-700 group flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity">
                   <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Manual UUID:</span>
-                  <span className="text-gray-600 font-mono text-sm">
+                  <span className="text-gray-600 dark:text-gray-400 font-mono text-sm">
                     {invoiceData.uuid || "Not set"}
                   </span>
                   <button
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 rounded"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded"
                     onClick={handleOpenUUIDEdit}
                     title="Set UUID manually"
                     disabled={isLoading}
