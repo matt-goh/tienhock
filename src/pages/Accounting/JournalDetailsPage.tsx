@@ -13,6 +13,7 @@ import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import CashReceiptVoucherModal from "../../components/Accounting/CashReceiptVoucherModal";
+import { generateJournalVoucherPDF } from "../../utils/accounting/JournalVoucherPDFMake";
 import {
   IconFileText,
   IconPencil,
@@ -51,6 +52,9 @@ const JournalDetailsPage: React.FC = () => {
   const [showVoucherModal, setShowVoucherModal] = useState(false);
   const [voucherData, setVoucherData] = useState<CashReceiptVoucherData | null>(null);
   const [isLoadingVoucher, setIsLoadingVoucher] = useState(false);
+
+  // Journal voucher PDF print state
+  const [isPrintingJournal, setIsPrintingJournal] = useState(false);
 
   // Fetch entry data
   const fetchEntry = useCallback(async () => {
@@ -209,6 +213,38 @@ const JournalDetailsPage: React.FC = () => {
     }
   };
 
+  // Handle print journal voucher PDF (legacy "JOURNAL VOUCHER" report)
+  const handlePrintJournalVoucher = async () => {
+    if (!entry) return;
+
+    setIsPrintingJournal(true);
+    try {
+      const accountDescriptions: Record<string, string> = {};
+      (entry.lines || []).forEach((line) => {
+        const account = accountCodes.find((a) => a.code === line.account_code);
+        if (account) accountDescriptions[line.account_code] = account.description;
+      });
+      await generateJournalVoucherPDF({
+        reference_no: entry.reference_no,
+        entry_type: entry.entry_type,
+        entry_type_name: getEntryTypeName(entry.entry_type),
+        entry_date: entry.entry_date,
+        status: entry.status,
+        description: entry.description,
+        cheque_no: entry.cheque_no,
+        lines: entry.lines || [],
+        total_debit: entry.total_debit,
+        total_credit: entry.total_credit,
+        accountDescriptions,
+      });
+    } catch (err: unknown) {
+      console.error("Error printing journal voucher:", err);
+      toast.error("Failed to generate voucher PDF");
+    } finally {
+      setIsPrintingJournal(false);
+    }
+  };
+
   // Status badge
   const getStatusBadge = (status: string) => {
     const isCancelled = status === "cancelled";
@@ -301,6 +337,18 @@ const JournalDetailsPage: React.FC = () => {
                   disabled={isLoadingVoucher}
                 >
                   {isLoadingVoucher ? "Loading..." : "Print Voucher"}
+                </Button>
+              )}
+              {!canPrintVoucher && (
+                <Button
+                  onClick={handlePrintJournalVoucher}
+                  variant="filled"
+                  color="sky"
+                  icon={IconPrinter}
+                  iconPosition="left"
+                  disabled={isPrintingJournal}
+                >
+                  {isPrintingJournal ? "Preparing..." : "Print Voucher"}
                 </Button>
               )}
               {canEdit && (
