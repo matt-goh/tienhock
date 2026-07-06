@@ -127,102 +127,69 @@ const JVDR_ACCOUNT_CODES: ExpectedAccountCode[] = [
 // JVSL Account Codes (Staff Salary - Multiple Locations)
 // Based on JVSL voucher: 73 line items matching the voucher exactly
 const JVSL_ACCOUNT_CODES: ExpectedAccountCode[] = [
-  // ========== SALARY/WAGES BASE (16 entries) ==========
+  // ========== SALARY/WAGES (one per department) ==========
+  // Each Salary account receives the department's FULL gross pay — base, OT,
+  // commissions, cuti/leave, bonus, product/packing pay and Others all fold in
+  // here, so the only mapping type needed is "salary".
   {
     code: "MBS_O",
-    description: "Office (Salary/OT/Bonus)",
-    category: "salary",
-    mappingTypes: ["salary", "overtime", "bonus"],
-  },
-  {
-    code: "MS_SM",
-    description: "Salesman-Commission Mee/Bonus",
-    category: "salary",
-    mappingTypes: ["commission_mee", "bonus"],
-  },
-  {
-    code: "BS_SM",
-    description: "Salesman-Commission Bihun",
-    category: "salary",
-    mappingTypes: ["commission_bh"],
-  },
-  {
-    code: "THJ_CK",
-    description: "Commission Jelly",
-    category: "salary",
-    mappingTypes: ["commission"],
-  },
-  {
-    code: "MBS_SMO",
-    description: "Salesman-Others",
+    description: "Office (Salary)",
     category: "salary",
     mappingTypes: ["salary"],
   },
   {
-    code: "MS_IL",
-    description: "Ikut Lori-Commission Mee",
-    category: "salary",
-    mappingTypes: ["commission_mee"],
-  },
-  {
-    code: "BS_IL",
-    description: "Ikut Lori-Commission Bihun",
-    category: "salary",
-    mappingTypes: ["commission_bh"],
-  },
-  {
-    code: "THJ_SM",
-    description: "Tien Hock (Jelly) - Salary Salesman",
+    code: "MBS_SMO",
+    description: "Salesman",
     category: "salary",
     mappingTypes: ["salary"],
   },
   {
     code: "MBS_ILO",
-    description: "Ikut Lori-Others",
+    description: "Ikut Lori",
     category: "salary",
     mappingTypes: ["salary"],
   },
   {
     code: "MBS_JB",
-    description: "Jaga Boiler (Salary/OT)",
+    description: "Jaga Boiler (Salary)",
     category: "salary",
-    mappingTypes: ["salary", "overtime"],
+    mappingTypes: ["salary"],
   },
   {
     code: "MS_MM",
-    description: "Mesin & Sangkut Mee (Salary/OT)",
+    description: "Mesin & Sangkut Mee (Salary)",
     category: "salary",
-    mappingTypes: ["salary", "overtime"],
+    mappingTypes: ["salary"],
   },
   {
     code: "MS_PM",
-    description: "Packing Mee (Salary/OT)",
+    description: "Packing Mee (Salary)",
     category: "salary",
-    mappingTypes: ["salary", "overtime"],
+    mappingTypes: ["salary"],
   },
   {
     code: "BS_MB",
-    description: "Mesin & Sangkut Bihun (Salary/OT)",
+    description: "Mesin & Sangkut Bihun (Salary)",
     category: "salary",
-    mappingTypes: ["salary", "overtime"],
+    mappingTypes: ["salary"],
   },
   {
     code: "BS_PB",
-    description: "Packing Bihun (Salary/OT)",
+    description: "Packing Bihun (Salary)",
     category: "salary",
-    mappingTypes: ["salary", "overtime"],
+    mappingTypes: ["salary"],
   },
   {
     code: "MBS_TS",
-    description: "Tukang Sapu (Salary/OT)",
+    description: "Tukang Sapu (Salary)",
     category: "salary",
-    mappingTypes: ["salary", "overtime"],
+    mappingTypes: ["salary"],
   },
   {
     code: "MBS_M",
-    description: "Maint/Comm/Bonus/Cuti (Salary/OT)",
+    description: "Maintenance (Salary)",
     category: "salary",
-    mappingTypes: ["salary", "overtime"],
+    mappingTypes: ["salary"],
   },
 
   // ========== EPF EMPLOYER (10 entries) ==========
@@ -1451,8 +1418,9 @@ const LocationAccountMappingsPage: React.FC = () => {
                       <li className="flex items-center gap-2">
                         <span className="text-green-600">💰</span>
                         <span>
-                          <strong>Salary & Wages</strong> - Base pay, overtime,
-                          bonus, commission expenses
+                          <strong>Salary & Wages</strong> - the department's full
+                          gross pay (base, OT, commission, cuti/leave, bonus,
+                          product pay — all fold into one Salary line)
                         </span>
                       </li>
                       <li className="flex items-center gap-2">

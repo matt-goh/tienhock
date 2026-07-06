@@ -32,6 +32,13 @@ interface AccountCodeFormData {
   notes: string;
 }
 
+const FORM_INPUT_SURFACE_CLASSNAME: string =
+  "dark:[&_input]:!bg-gray-900/50 [&_input]:shadow-none";
+const FORM_LISTBOX_SURFACE_CLASSNAME: string =
+  "dark:[&>div>button]:!bg-gray-900/50 [&>div>button]:shadow-none";
+const FIELD_SURFACE_CLASSNAME: string =
+  "dark:!bg-gray-900/50 !shadow-none";
+
 const AccountCodeFormPage: React.FC = () => {
   const navigate = useNavigate();
   const { code } = useParams<{ code: string }>();
@@ -407,26 +414,30 @@ const AccountCodeFormPage: React.FC = () => {
 
                 <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
                   {/* Account Code */}
-                  <FormInput
-                    name="code"
-                    label="Account Code"
-                    value={formData.code}
-                    onChange={handleInputChange}
-                    placeholder="e.g., 1000, SALES-001"
-                    required
-                    disabled={isEditMode || isSaving} // Code cannot be changed in edit mode
-                  />
+                  <div className={FORM_INPUT_SURFACE_CLASSNAME}>
+                    <FormInput
+                      name="code"
+                      label="Account Code"
+                      value={formData.code}
+                      onChange={handleInputChange}
+                      placeholder="e.g., 1000, SALES-001"
+                      required
+                      disabled={isEditMode || isSaving} // Code cannot be changed in edit mode
+                    />
+                  </div>
 
                   {/* Description */}
-                  <FormInput
-                    name="description"
-                    label="Description"
-                    value={formData.description}
-                    onChange={handleInputChange}
-                    placeholder="e.g., Cash and Bank"
-                    required
-                    disabled={isSaving}
-                  />
+                  <div className={FORM_INPUT_SURFACE_CLASSNAME}>
+                    <FormInput
+                      name="description"
+                      label="Description"
+                      value={formData.description}
+                      onChange={handleInputChange}
+                      placeholder="e.g., Cash and Bank"
+                      required
+                      disabled={isSaving}
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
@@ -441,6 +452,7 @@ const AccountCodeFormPage: React.FC = () => {
                     options={ledgerTypeOptions}
                     disabled={isSaving}
                     placeholder="Select ledger type..."
+                    className={FORM_LISTBOX_SURFACE_CLASSNAME}
                   />
 
                   {/* Parent Account - Custom listbox with search and load more */}
@@ -461,7 +473,8 @@ const AccountCodeFormPage: React.FC = () => {
                         <ListboxButton
                           id="parent_code-button"
                           className={clsx(
-                            "relative w-full cursor-pointer rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-10 text-left shadow-sm text-default-900 dark:text-gray-100",
+                            "relative w-full cursor-pointer rounded-lg border border-default-300 dark:border-gray-600 bg-white py-2 pl-3 pr-10 text-left text-default-900 dark:text-gray-100",
+                            FIELD_SURFACE_CLASSNAME,
                             "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
                             isSaving ? "bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed" : ""
                           )}
@@ -490,7 +503,10 @@ const AccountCodeFormPage: React.FC = () => {
                                   value={parentSearchQuery}
                                   onChange={(e) => setParentSearchQuery(e.target.value)}
                                   placeholder="Search accounts..."
-                                  className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-md focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+                                  className={clsx(
+                                    "w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 bg-white text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-md focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500",
+                                    FIELD_SURFACE_CLASSNAME
+                                  )}
                                   onClick={(e) => e.stopPropagation()}
                                   onKeyDown={(e) => e.stopPropagation()}
                                 />
@@ -567,16 +583,18 @@ const AccountCodeFormPage: React.FC = () => {
 
                 <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
                   {/* Sort Order */}
-                  <FormInput
-                    name="sort_order"
-                    label="Sort Order"
-                    value={formData.sort_order}
-                    onChange={handleInputChange}
-                    type="number"
-                    min={0}
-                    placeholder="0"
-                    disabled={isSaving}
-                  />
+                  <div className={FORM_INPUT_SURFACE_CLASSNAME}>
+                    <FormInput
+                      name="sort_order"
+                      label="Sort Order"
+                      value={formData.sort_order}
+                      onChange={handleInputChange}
+                      type="number"
+                      min={0}
+                      placeholder="0"
+                      disabled={isSaving}
+                    />
+                  </div>
 
                   {/* Active Status */}
                   <div className="flex items-center pt-8">
@@ -623,7 +641,10 @@ const AccountCodeFormPage: React.FC = () => {
                     }
                     disabled={isSaving}
                     placeholder="Optional notes about this account..."
-                    className="block w-full px-3 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:text-gray-500 dark:disabled:text-gray-400 disabled:cursor-not-allowed"
+                    className={clsx(
+                      "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 bg-white text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:text-gray-500 dark:disabled:text-gray-400 disabled:cursor-not-allowed",
+                      FIELD_SURFACE_CLASSNAME
+                    )}
                   />
                 </div>
               </div>

@@ -38,6 +38,7 @@ const KIND_LABELS: Record<TxnKind, string> = {
 
 // --- Public types (shared with the parent cache) ---
 export type TxnKind = "invoice" | "payment" | AdjustmentDocType;
+export type TxnPaymentType = "CASH" | "INVOICE";
 
 export interface TxnRow {
   key: string;
@@ -49,6 +50,7 @@ export interface TxnRow {
   amount: number;
   direction: "debit" | "credit";
   status: string | null;
+  paymentType: TxnPaymentType | null;
   einvoiceStatus: EInvoiceStatus;
 }
 
@@ -89,20 +91,136 @@ const ADJ_KINDS: TxnKind[] = ["credit_note", "debit_note", "refund_note"];
 const isAdjustmentKind = (kind: TxnKind): kind is AdjustmentDocType =>
   ADJ_KINDS.includes(kind);
 
+const PAYMENT_TYPE_OPTIONS: { value: TxnPaymentType; label: string }[] = [
+  { value: "CASH", label: "Cash" },
+  { value: "INVOICE", label: "Invoice" },
+];
+
+const STATUS_SORT_ORDER: string[] = [
+  "paid",
+  "active",
+  "unpaid",
+  "overdue",
+  "overpaid",
+  "pending",
+  "cancelled",
+];
+
+const DEFAULT_SELECTED_STATUS_FILTERS: string[] = ["paid", "active"];
+
+interface RawInvoiceTxn {
+  id: string;
+  createddate: string | number | null;
+  totalamountpayable: number | string | null;
+  invoice_status?: string | null;
+  einvoice_status?: EInvoiceStatus;
+  paymenttype?: string | null;
+}
+
+interface RawPaymentTxn {
+  payment_id: number | string;
+  invoice_id?: string | null;
+  payment_date?: string | null;
+  amount_paid: number | string | null;
+  internal_reference?: string | null;
+  payment_reference?: string | null;
+  status?: string | null;
+  paymenttype?: string | null;
+}
+
+interface RawAdjustmentTxn {
+  id: string;
+  display_id?: string | null;
+  type: AdjustmentDocType;
+  original_invoice_id?: string | null;
+  createddate: string | number | null;
+  totalamountpayable: number | string | null;
+  status?: string | null;
+  einvoice_status?: EInvoiceStatus;
+  paymenttype?: string | null;
+}
+
+const toArray = <T,>(value: unknown): T[] => {
+  if (Array.isArray(value)) return value as T[];
+  if (
+    value &&
+    typeof value === "object" &&
+    Array.isArray((value as { data?: unknown }).data)
+  ) {
+    return (value as { data: T[] }).data;
+  }
+  return [];
+};
+
+const normalizePaymentType = (
+  value: string | null | undefined
+): TxnPaymentType | null => {
+  const normalized = value?.toUpperCase();
+  return normalized === "CASH" || normalized === "INVOICE"
+    ? normalized
+    : null;
+};
+
+const getStatusFilterValue = (status: string | null): string | null => {
+  const trimmed = status?.trim();
+  return trimmed ? trimmed.toLowerCase() : null;
+};
+
+const formatStatusLabel = (status: string): string => {
+  const knownLabels: Record<string, string> = {
+    paid: "Paid",
+    unpaid: "Unpaid",
+    overdue: "Overdue",
+    active: "Active",
+    overpaid: "Overpaid",
+    pending: "Pending",
+    cancelled: "Cancelled",
+  };
+  const normalized = status.toLowerCase();
+  return (
+    knownLabels[normalized] ??
+    status
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (char: string) => char.toUpperCase())
+  );
+};
+
+const getStatusFilterActiveClass = (statusValue: string): string => {
+  if (statusValue === "cancelled" || statusValue === "overdue") {
+    return "border-rose-500 bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300";
+  }
+  if (statusValue === "pending") {
+    return "border-amber-500 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300";
+  }
+  if (
+    statusValue === "paid" ||
+    statusValue === "active" ||
+    statusValue === "overpaid"
+  ) {
+    return "border-emerald-500 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300";
+  }
+  return "border-sky-500 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300";
+};
+
+const paymentTypeLabel = (paymentType: TxnPaymentType | null): string =>
+  paymentType === "CASH"
+    ? "Cash"
+    : paymentType === "INVOICE"
+    ? "Invoice"
+    : "-";
+
 // Build the merged, date-sorted (newest first) row list from the three sources.
 const buildRows = (
-  invoicesRaw: any,
-  adjustmentsRaw: any,
-  paymentsRaw: any
+  invoicesRaw: unknown,
+  adjustmentsRaw: unknown,
+  paymentsRaw: unknown
 ): TxnRow[] => {
   const paths = getAdjustmentDocsPaths(); // Tien Hock by default
   const invoiceUiBase = paths.invoiceUiBase; // "/sales/invoice"
 
-  const invoices: any[] = Array.isArray(invoicesRaw)
-    ? invoicesRaw
-    : invoicesRaw?.data ?? [];
-  const adjustments: any[] = Array.isArray(adjustmentsRaw) ? adjustmentsRaw : [];
-  const payments: any[] = Array.isArray(paymentsRaw) ? paymentsRaw : [];
+  const invoices = toArray<RawInvoiceTxn>(invoicesRaw);
+  const adjustments = toArray<RawAdjustmentTxn>(adjustmentsRaw);
+  const payments = toArray<RawPaymentTxn>(paymentsRaw);
 
   const rows: TxnRow[] = [];
 
@@ -118,6 +236,7 @@ const buildRows = (
       amount: Number(inv.totalamountpayable) || 0,
       direction: "debit",
       status: inv.invoice_status ?? null,
+      paymentType: normalizePaymentType(inv.paymenttype),
       einvoiceStatus: (inv.einvoice_status ?? null) as EInvoiceStatus,
     });
   }
@@ -135,6 +254,7 @@ const buildRows = (
       amount: Number(pay.amount_paid) || 0,
       direction: "credit",
       status: pay.status ?? "active",
+      paymentType: normalizePaymentType(pay.paymenttype),
       einvoiceStatus: null,
     });
   }
@@ -153,6 +273,7 @@ const buildRows = (
       // Debit notes increase what the customer owes; credit/refund notes reduce it.
       direction: type === "debit_note" ? "debit" : "credit",
       status: adj.status ?? "active",
+      paymentType: normalizePaymentType(adj.paymenttype),
       einvoiceStatus: (adj.einvoice_status ?? null) as EInvoiceStatus,
     });
   }
@@ -163,7 +284,9 @@ const buildRows = (
 
 // Small status pill for invoice/payment rows (adjustments use their own badge).
 const StatusPill: React.FC<{ status: string | null }> = ({ status }) => {
-  if (!status) return <span className="text-default-400 dark:text-gray-500">—</span>;
+  if (!status) {
+    return <span className="text-default-400 dark:text-gray-500">-</span>;
+  }
   const s = status.toLowerCase();
   const color =
     s === "paid" || s === "active" || s === "overpaid"
@@ -231,8 +354,15 @@ const CustomerTransactionsTab: React.FC<CustomerTransactionsTabProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(
+    () => [...DEFAULT_SELECTED_STATUS_FILTERS]
+  );
+  const [selectedPaymentTypes, setSelectedPaymentTypes] = useState<
+    TxnPaymentType[]
+  >([]);
 
   const currentKey = rangeKey(range);
+  const customerTransactionsPath = `/catalogue/customer/${customerId}?tab=transactions`;
 
   useEffect(() => {
     // Cache hit for the current range → no fetch (covers tab re-opens).
@@ -252,11 +382,15 @@ const CustomerTransactionsTab: React.FC<CustomerTransactionsTabProps> = ({
         if (cancelled) return;
         const rows = buildRows(res?.invoices, res?.adjustments, res?.payments);
         onCacheChange({ fetchedKey: currentKey, rows });
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!cancelled) {
+          const apiError = err as {
+            response?: { data?: { message?: string } };
+            message?: string;
+          };
           setError(
-            err?.response?.data?.message ||
-              err?.message ||
+            apiError.response?.data?.message ||
+              apiError.message ||
               "Failed to load transaction history."
           );
         }
@@ -277,30 +411,111 @@ const CustomerTransactionsTab: React.FC<CustomerTransactionsTabProps> = ({
   const rows = cache?.rows ?? [];
   const showingCurrent = cache?.fetchedKey === currentKey;
 
+  const statusOptions = useMemo(() => {
+    const labelsByValue = new Map<string, string>();
+    for (const status of DEFAULT_SELECTED_STATUS_FILTERS) {
+      labelsByValue.set(status, formatStatusLabel(status));
+    }
+    for (const row of rows) {
+      const value = getStatusFilterValue(row.status);
+      if (!value || labelsByValue.has(value)) continue;
+      labelsByValue.set(value, formatStatusLabel(row.status ?? value));
+    }
+
+    return Array.from(labelsByValue.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => {
+        const aIndex = STATUS_SORT_ORDER.indexOf(a.value);
+        const bIndex = STATUS_SORT_ORDER.indexOf(b.value);
+        if (aIndex !== -1 || bIndex !== -1) {
+          return (
+            (aIndex === -1 ? 999 : aIndex) -
+            (bIndex === -1 ? 999 : bIndex)
+          );
+        }
+        return a.label.localeCompare(b.label);
+      });
+  }, [rows]);
+
+  useEffect(() => {
+    const availableStatuses = new Set(
+      statusOptions.map((option) => option.value)
+    );
+    setSelectedStatuses((previous) => {
+      const next = previous.filter((value) => availableStatuses.has(value));
+      return next.length === previous.length ? previous : next;
+    });
+  }, [statusOptions]);
+
+  const filteredRows = useMemo(
+    () =>
+      rows.filter((row) => {
+        const rowStatus = getStatusFilterValue(row.status);
+        const matchesStatus =
+          selectedStatuses.length === 0 ||
+          (rowStatus !== null && selectedStatuses.includes(rowStatus));
+        const matchesPaymentType =
+          selectedPaymentTypes.length === 0 ||
+          (row.paymentType !== null &&
+            selectedPaymentTypes.includes(row.paymentType));
+        return matchesStatus && matchesPaymentType;
+      }),
+    [rows, selectedPaymentTypes, selectedStatuses]
+  );
+
   const summary = useMemo(() => {
     let invoiced = 0;
     let paid = 0;
     let adjustments = 0;
-    for (const r of rows) {
+    for (const r of filteredRows) {
       if (r.kind === "invoice") invoiced += r.amount;
       else if (r.kind === "payment") {
         if (r.status !== "cancelled") paid += r.amount;
       } else adjustments += 1;
     }
     return { invoiced, paid, adjustments };
-  }, [rows]);
+  }, [filteredRows]);
+
+  const toggleStatus = (value: string): void => {
+    setSelectedStatuses((previous) =>
+      previous.includes(value)
+        ? previous.filter((status) => status !== value)
+        : [...previous, value]
+    );
+  };
+
+  const togglePaymentType = (value: TxnPaymentType): void => {
+    setSelectedPaymentTypes((previous) =>
+      previous.includes(value)
+        ? previous.filter((paymentType) => paymentType !== value)
+        : [...previous, value]
+    );
+  };
+
+  const handleRowClick = (row: TxnRow): void => {
+    if (row.kind === "invoice" || row.kind === "payment") {
+      navigate(row.navTo, {
+        state: {
+          previousPath: customerTransactionsPath,
+          fromCustomerTransactions: true,
+        },
+      });
+      return;
+    }
+    navigate(row.navTo);
+  };
 
   const handleExport = async (action: "print" | "download") => {
-    if (rows.length === 0 || isExporting) return;
+    if (filteredRows.length === 0 || isExporting) return;
     setIsExporting(true);
     try {
       await generateTransactionHistoryPDF(
         {
           customer: { id: customerId, name: customerName ?? "" },
-          periodLabel: `${formatDisplayDate(range.start)} – ${formatDisplayDate(
+          periodLabel: `${formatDisplayDate(range.start)} - ${formatDisplayDate(
             range.end
           )}`,
-          rows: rows.map((r) => ({
+          rows: filteredRows.map((r) => ({
             date: formatDisplayDate(r.date),
             typeLabel: KIND_LABELS[r.kind],
             reference: r.reference,
@@ -321,7 +536,7 @@ const CustomerTransactionsTab: React.FC<CustomerTransactionsTabProps> = ({
     }
   };
 
-  const canExport = showingCurrent && rows.length > 0;
+  const canExport = showingCurrent && filteredRows.length > 0;
 
   return (
     <div className="space-y-5 mt-5">
@@ -330,7 +545,55 @@ const CustomerTransactionsTab: React.FC<CustomerTransactionsTabProps> = ({
         <h3 className="text-base font-medium text-default-700 dark:text-gray-200">
           Transaction History
         </h3>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {statusOptions.map((status) => {
+            const active = selectedStatuses.includes(status.value);
+            return (
+              <button
+                key={status.value}
+                type="button"
+                onClick={() => toggleStatus(status.value)}
+                aria-pressed={active}
+                className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors select-none ${
+                  active
+                    ? getStatusFilterActiveClass(status.value)
+                    : "border-default-300 dark:border-gray-600 text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700"
+                }`}
+              >
+                {status.label}
+              </button>
+            );
+          })}
+
+          {statusOptions.length > 0 && (
+            <span className="h-5 w-px bg-default-300 dark:bg-gray-600 mx-1" />
+          )}
+
+          {PAYMENT_TYPE_OPTIONS.map((option) => {
+            const active = selectedPaymentTypes.includes(option.value);
+            const activeClass =
+              option.value === "CASH"
+                ? "border-emerald-500 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300"
+                : "border-sky-500 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300";
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => togglePaymentType(option.value)}
+                aria-pressed={active}
+                className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors select-none ${
+                  active
+                    ? activeClass
+                    : "border-default-300 dark:border-gray-600 text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700"
+                }`}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+
+          <span className="h-5 w-px bg-default-300 dark:bg-gray-600 mx-1" />
+
           <button
             type="button"
             onClick={() => handleExport("print")}
@@ -392,30 +655,40 @@ const CustomerTransactionsTab: React.FC<CustomerTransactionsTabProps> = ({
           <div className="p-10 text-center text-default-500 dark:text-gray-400">
             No transactions found for this period.
           </div>
+        ) : !isLoading && showingCurrent && filteredRows.length === 0 ? (
+          <div className="p-10 text-center text-default-500 dark:text-gray-400">
+            No transactions match the selected filters.
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
               <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
-                  {["Date", "Type", "Reference", "Related Invoice", "Amount", "Status"].map(
-                    (h) => (
-                      <th
-                        key={h}
-                        className={`px-4 py-2.5 text-xs font-semibold text-default-500 dark:text-gray-400 uppercase tracking-wider ${
-                          h === "Amount" ? "text-right" : "text-left"
-                        }`}
-                      >
-                        {h}
-                      </th>
-                    )
-                  )}
+                  {[
+                    "Date",
+                    "Type",
+                    "Reference",
+                    "Related Invoice",
+                    "Payment Type",
+                    "Amount",
+                    "Status",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      className={`px-4 py-2.5 text-xs font-semibold text-default-500 dark:text-gray-400 uppercase tracking-wider ${
+                        h === "Amount" ? "text-right" : "text-left"
+                      }`}
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-default-100 dark:divide-gray-700/50">
-                {rows.map((row) => (
+                {filteredRows.map((row) => (
                   <tr
                     key={row.key}
-                    onClick={() => navigate(row.navTo)}
+                    onClick={() => handleRowClick(row)}
                     className="group cursor-pointer hover:bg-sky-50 dark:hover:bg-sky-900/20 transition-colors"
                     title="View details"
                   >
@@ -435,7 +708,10 @@ const CustomerTransactionsTab: React.FC<CustomerTransactionsTabProps> = ({
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-default-500 dark:text-gray-400 whitespace-nowrap">
-                      {row.relatedInvoice ?? "—"}
+                      {row.relatedInvoice ?? "-"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-default-600 dark:text-gray-300 whitespace-nowrap">
+                      {paymentTypeLabel(row.paymentType)}
                     </td>
                     <td
                       className={`px-4 py-3 text-sm font-semibold text-right whitespace-nowrap ${
@@ -444,7 +720,7 @@ const CustomerTransactionsTab: React.FC<CustomerTransactionsTabProps> = ({
                           : "text-rose-600 dark:text-rose-400"
                       }`}
                     >
-                      {row.direction === "credit" ? "−" : "+"}
+                      {row.direction === "credit" ? "-" : "+"}
                       {fmtRM(row.amount)}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">

@@ -20,6 +20,41 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-06",
+    ms: "Baucar gaji JVSL kini dijana sepadan 100% dengan sistem lama: setiap jabatan mempunyai SATU baris Gaji yang merangkumi keseluruhan gaji kasar (gaji, OT, komisen, cuti/cuti tahunan, bonus, bayaran ikut produk dan Others semuanya dimasukkan di sini — termasuk pembundaran), diikuti caruman majikan EPF/SOCSO/SIP, dan satu baris Accrual (Salary Payables). Anda tidak perlu lagi memetakan akaun berasingan untuk OT/komisen/cuti/pembundaran — jadi ralat 'pemetaan tidak lengkap' yang menyekat penjanaan JVSL sebelum ini telah hilang. Pilihan pemetaan yang tidak diperlukan pada halaman Location Account Mappings juga telah dibuang.",
+    en: "The JVSL payroll voucher now generates as a 100% match to the legacy system: each department has ONE Salary line covering its full gross pay (salary, OT, commission, cuti/annual leave, bonus, product-based pay and Others all fold in here — including the rounding), followed by the employer EPF/SOCSO/SIP contributions and one Accrual (Salary Payables) line. You no longer need to map separate accounts for OT/commission/cuti/rounding — so the 'incomplete mappings' error that previously blocked JVSL generation is gone. Unnecessary mapping options on the Location Account Mappings page have also been removed.",
+  },
+  {
+    date: "2026-07-06",
+    ms: "Butang baharu 'Payroll Summary' pada halaman Penjana Baucar Gaji mencetak ringkasan gaji yang mengkategorikan Pengarah dan Pekerja: GAJI, BONUS, GAJI KASAR, EPF/SOCSO/SIP (Majikan & Pekerja) dengan jumlah, PCB, Jumlah Gaji, Jumlah Digenapkan dan Gaji Bersih — serta jumlah baucar JV-DIRECTOR (JVDR) dan JV-WORKERS (JVSL) dengan jumlah besar. Ia dikira terus daripada data gaji, jadi boleh dicetak walaupun sebelum baucar dijana.",
+    en: "New 'Payroll Summary' button on the Payroll Voucher Generator prints a salary summary categorized into Director and Workers: GAJI, BONUS, GAJI KASAR, EPF/SOCSO/SIP (employer & employee) with totals, PCB, Jumlah Gaji, Jumlah Digenapkan and Gaji Bersih — plus the JV-DIRECTOR (JVDR) and JV-WORKERS (JVSL) voucher totals with a grand total. It's computed straight from payroll data, so it prints even before the vouchers are generated.",
+  },
+  {
+    date: "2026-07-06",
+    ms: "Penjana Baucar Gaji kini memaparkan pratonton catatan jurnal sebenar (kod akaun, keterangan, debit, kredit dan jumlah) — sama persis dengan baucar yang akan disimpan, jadi anda boleh semak baris demi baris sebelum menjananya. Halaman Penjana Baucar dan Bayaran Gaji Bank juga kini mengingati bulan terakhir yang anda lihat.",
+    en: "The Payroll Voucher Generator now shows a live preview of the actual journal entry (account codes, descriptions, debit, credit and totals) — exactly matching the voucher that will be posted, so you can check it line by line before generating. The Voucher Generator and Payroll Bank Payment pages now also remember the last month you viewed.",
+  },
+  {
+    date: "2026-07-06",
+    ms: "Catatan jurnal kini boleh dicetak sebagai Journal Voucher PDF (butang Print Voucher pada halaman butiran catatan) — sepadan dengan cetakan baucar sistem lama: kod akaun, keterangan, debit/kredit, jumlah dan particulars. Baucar gaji JVSL kini merangkumi KESEMUA gaji kasar (upah packing/mesin ikut produk, bayaran cuti, rekod Others, komisen) — sebelum ini sebahagian komponen tercicir dan jumlah baucar terkurang nyata berbanding sistem lama. Jika ada pemetaan akaun yang belum lengkap, mesej ralat kini menyenaraikan lokasi dan komponen yang tepat. Jurnal JVDR/JVSL juga kini mempunyai penapis jenis tersendiri di halaman Journal Entries.",
+    en: "Journal entries can now be printed as a Journal Voucher PDF (Print Voucher button on the entry details page) — matching the legacy voucher print: account codes, descriptions, debit/credit, totals and particulars. The JVSL payroll voucher now covers ALL of gross pay (product/packing piece pay, leave pay, Others records, commissions) — previously some components fell through and the voucher understated the legacy totals. When account mappings are incomplete, the error message now lists the exact locations and components. JVDR/JVSL journals also now have their own type filters on the Journal Entries page.",
+  },
+  {
+    date: "2026-07-06",
+    ms: "Tab Transaction History pelanggan kini mempunyai penapis status dan jenis bayaran yang boleh ditekan, serta lajur Payment Type supaya jenis Cash atau Invoice boleh dilihat terus. Apabila invois dibuka dari tab ini, butang Back dan pautan pelanggan akan kembali ke tab Transaction History.",
+    en: "Customer Transaction History now has clickable status and payment-type filters, plus a Payment Type column so Cash or Invoice can be seen at a glance. When an invoice is opened from this tab, Back and the customer link return to Transaction History.",
+  },
+  {
+    date: "2026-07-06",
+    ms: "Baucar gaji (JVDR/JVSL) kini mengikut kaedah pembundaran sistem lama: gaji bersih setiap pekerja/pengarah digenapkan ke ringgit penuh sebelum dikreditkan ke akaun akruan, dengan baris 'Rounding Adjustment' untuk perbezaannya — jumlah baucar kini sepadan dengan cetakan sistem lama (cth. JVDR Jun 12,940.00). Kad pratonton 'Salary Payable' juga diperbetulkan — sebelum ini ia terkurang nyata kerana tidak mengambil kira komisen.",
+    en: "Payroll vouchers (JVDR/JVSL) now follow the legacy rounding method: each employee's/director's net pay is rounded up to the whole ringgit before crediting the accrual accounts, with a 'Rounding Adjustment' line for the difference — voucher totals now match the legacy prints (e.g. June JVDR 12,940.00). The 'Salary Payable' preview card is also fixed — it previously understated the figure by excluding commissions.",
+  },
+  {
+    date: "2026-07-06",
+    ms: "Laporan baharu: Account Ledger (Accounting → Reports). Cari mana-mana kod akaun (contohnya kod perbelanjaan seperti MGT untuk Menggatal atau MBRMF untuk boiler, akaun pembekal, atau akaun pengarah) dan lihat sejarah transaksi penuh untuk bulan tersebut — baki pembukaan, setiap catatan jurnal, baki berjalan dan jumlah penutup, dengan cetakan PDF.",
+    en: "New report: Account Ledger (Accounting → Reports). Search any account code (e.g. expenditure codes like MGT for Menggatal or MBRMF for boiler, a supplier account, or a director account) and view its full transaction history for the month — opening balance, every journal entry, running balance and closing totals, with PDF printing.",
+  },
+  {
+    date: "2026-07-06",
     ms: "Pembetulan Journal Entries: catatan jurnal yang dikunci secara manual kini terus dikira dalam laporan (Bank Statement, Trial Balance dan lain-lain) sebaik sahaja disimpan — sebelum ini ia tersimpan sebagai draf tersembunyi dan tidak pernah muncul dalam mana-mana laporan. Catatan yang dijana sistem (resit, pembelian, baucar gaji) tidak lagi boleh diedit secara terus — batalkan atau jana semula dari skrin asalnya. Pembetulan tambahan: tarikh catatan tidak lagi beranjak sehari ke belakang setiap kali catatan diedit, dan baucar JVSL/JVDR yang tidak seimbang (pemetaan akaun lokasi belum lengkap) kini disekat daripada dijana.",
     en: "Journal Entries fix: manually keyed journal entries now count in reports (Bank Statement, Trial Balance, etc.) as soon as they are saved — previously they were stored as hidden drafts and never appeared in any report. System-generated entries (receipts, purchases, payroll vouchers) can no longer be edited directly — cancel or regenerate them from their source screen. Also fixed: an entry's date no longer slips back one day each time it is edited, and unbalanced JVSL/JVDR vouchers (incomplete location account mappings) are now blocked from being generated.",
   },

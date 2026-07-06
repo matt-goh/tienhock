@@ -36,13 +36,29 @@ const CustomerFormPage: React.FC = () => {
   const isEditMode = !!id;
   // Deep-link to a specific tab via ?tab=credit | ?tab=transactions (from the
   // customer card shortcut buttons). Defaults to the Info tab.
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
   const initialTab =
-    searchParams.get("tab") === "credit"
+    tabParam === "credit"
       ? 1
-      : searchParams.get("tab") === "transactions"
+      : tabParam === "transactions" && isEditMode
       ? 2
       : 0;
+
+  const handleTabChange = useCallback(
+    (tabIndex: number): void => {
+      const nextParams = new URLSearchParams(searchParams);
+      if (tabIndex === 1) {
+        nextParams.set("tab", "credit");
+      } else if (tabIndex === 2 && isEditMode) {
+        nextParams.set("tab", "transactions");
+      } else {
+        nextParams.delete("tab");
+      }
+      setSearchParams(nextParams, { replace: true });
+    },
+    [isEditMode, searchParams, setSearchParams]
+  );
 
   // Add this helper function at the component level
   const getIdNumberPlaceholder = (idType: string) => {
@@ -760,6 +776,7 @@ const CustomerFormPage: React.FC = () => {
             <div className="px-6 py-3">
               <Tab
                 defaultActiveTab={initialTab}
+                onTabChange={handleTabChange}
                 labels={
                   isEditMode
                     ? ["Info", "Credit & Pricing", "Transaction History"]
