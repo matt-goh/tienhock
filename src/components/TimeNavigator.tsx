@@ -44,7 +44,10 @@ interface TimeNavigatorProps {
   showArrows?: boolean;
   /** Text shown on the trigger when no range is selected */
   placeholder?: string;
+  /** Disable the trigger and stepping arrows */
+  disabled?: boolean;
   className?: string;
+  triggerClassName?: string;
 }
 
 // --- Date helpers (all local-timezone safe; never round-trip through toISOString) ---
@@ -534,7 +537,9 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
   size = "md",
   showArrows = true,
   placeholder = "All dates",
+  disabled = false,
   className,
+  triggerClassName,
 }) => {
   const availableModes = useMemo(
     () =>
@@ -575,6 +580,10 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
   const [hoverDate, setHoverDate] = useState<Date | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (disabled) setIsOpen(false);
+  }, [disabled]);
 
   // Sync popover view to the applied range each time it opens.
   useEffect(() => {
@@ -752,10 +761,10 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
         <button
           type="button"
           onClick={() => step("prev")}
-          disabled={!canStepPrev}
+          disabled={disabled || !canStepPrev}
           className={clsx(
             stepButtonClass,
-            canStepPrev
+            !disabled && canStepPrev
               ? "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
               : "cursor-not-allowed text-default-300 dark:text-gray-600"
           )}
@@ -769,15 +778,19 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
       {/* Trigger */}
       <button
         type="button"
-        onClick={() => setIsOpen((o) => !o)}
+        onClick={() => !disabled && setIsOpen((o) => !o)}
+        disabled={disabled}
         className={clsx(
           "inline-flex items-center gap-2 rounded-lg border bg-default-50 dark:bg-gray-900/50 font-medium text-default-900 dark:text-gray-100 transition-colors",
           size === "sm" ? "px-2.5" : "px-3",
           heightClass,
           textClass,
-          isOpen
+          disabled
+            ? "cursor-not-allowed border-default-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400"
+            : isOpen
             ? "border-sky-500 ring-1 ring-sky-500"
-            : "border-default-300 dark:border-gray-600 hover:border-default-400 dark:hover:border-gray-500"
+            : "border-default-300 dark:border-gray-600 hover:border-default-400 dark:hover:border-gray-500",
+          triggerClassName
         )}
         aria-haspopup="dialog"
         aria-expanded={isOpen}
@@ -798,10 +811,10 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
         <button
           type="button"
           onClick={() => step("next")}
-          disabled={!canStepNext}
+          disabled={disabled || !canStepNext}
           className={clsx(
             stepButtonClass,
-            canStepNext
+            !disabled && canStepNext
               ? "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
               : "cursor-not-allowed text-default-300 dark:text-gray-600"
           )}

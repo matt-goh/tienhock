@@ -24,6 +24,7 @@ import Button from "../../components/Button";
 import { FormListbox, SelectOption } from "../../components/FormComponents";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
+import TimeNavigator, { type TimeRange } from "../../components/TimeNavigator";
 import {
   IconPlus,
   IconTrash,
@@ -53,6 +54,12 @@ interface JournalEntryFormData {
 }
 
 const LAST_ENTRY_TYPE_KEY = "journalEntryLastType";
+const HEADER_FIELD_CLASSNAME: string =
+  "h-[38px] w-full px-3 text-sm border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 rounded-lg focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:cursor-not-allowed";
+const HEADER_LISTBOX_CLASSNAME: string =
+  "[&>div>button]:h-[38px] [&>div>button]:bg-white dark:[&>div>button]:bg-gray-900/50 [&>div>button]:shadow-none";
+const HEADER_TIME_NAVIGATOR_TRIGGER_CLASSNAME: string =
+  "w-full !h-[38px] justify-between !bg-white dark:!bg-gray-900/50 !font-normal disabled:!bg-gray-50 dark:disabled:!bg-gray-800";
 
 // Load the last journal type the user selected (shared cache with the list page session)
 const loadLastEntryType = (): JournalEntryType => {
@@ -73,6 +80,21 @@ const emptyLine = (lineNumber: number): JournalLineFormData => ({
   debit_amount: "",
   credit_amount: "",
 });
+
+const parseLocalDateString = (dateString: string): Date | null => {
+  const match: RegExpMatchArray | null = dateString.match(
+    /^(\d{4})-(\d{2})-(\d{2})$/
+  );
+  if (!match) return null;
+
+  const year: number = Number(match[1]);
+  const month: number = Number(match[2]);
+  const day: number = Number(match[3]);
+
+  if (!year || !month || !day) return null;
+
+  return new Date(year, month - 1, day);
+};
 
 // Inline searchable combobox for account code selection
 interface AccountCodeCellProps {
@@ -290,6 +312,26 @@ const JournalEntryPage: React.FC = () => {
 
   // Combined loading state (page + cache)
   const loading = pageLoading || entryTypesLoading || accountCodesLoading;
+
+  const entryDate = useMemo<Date | null>(
+    () => parseLocalDateString(formData.entry_date),
+    [formData.entry_date]
+  );
+
+  const entryDateRange = useMemo<{ start: Date | null; end: Date | null }>(
+    () => ({
+      start: entryDate,
+      end: entryDate,
+    }),
+    [entryDate]
+  );
+
+  const handleEntryDateChange = useCallback((range: TimeRange): void => {
+    setFormData((prev: JournalEntryFormData): JournalEntryFormData => ({
+      ...prev,
+      entry_date: format(range.start, "yyyy-MM-dd"),
+    }));
+  }, []);
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -746,7 +788,7 @@ const JournalEntryPage: React.FC = () => {
                     }
                     placeholder="e.g., PBE001/06"
                     disabled={isSaving}
-                    className="w-full px-3 py-2 text-sm border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-lg focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:cursor-not-allowed font-mono"
+                    className={`${HEADER_FIELD_CLASSNAME} placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono`}
                   />
                 </div>
 
@@ -761,6 +803,7 @@ const JournalEntryPage: React.FC = () => {
                     onChange={handleEntryTypeChange}
                     options={entryTypeOptions}
                     disabled={isSaving}
+                    className={HEADER_LISTBOX_CLASSNAME}
                   />
                 </div>
 
@@ -769,17 +812,17 @@ const JournalEntryPage: React.FC = () => {
                   <label className="block text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wide mb-1.5">
                     Date <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="date"
-                    value={formData.entry_date}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        entry_date: e.target.value,
-                      }))
-                    }
+                  <TimeNavigator
+                    range={entryDateRange}
+                    onChange={handleEntryDateChange}
+                    modes={["day"]}
+                    presets={false}
+                    showArrows={false}
+                    allowFuture
+                    placeholder="Pick a date"
                     disabled={isSaving}
-                    className="w-full px-3 py-2 text-sm border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 rounded-lg focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
+                    className="w-full"
+                    triggerClassName={HEADER_TIME_NAVIGATOR_TRIGGER_CLASSNAME}
                   />
                 </div>
 
@@ -799,7 +842,7 @@ const JournalEntryPage: React.FC = () => {
                     }
                     placeholder="Optional description"
                     disabled={isSaving}
-                    className="w-full px-3 py-2 text-sm border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-lg focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
+                    className={`${HEADER_FIELD_CLASSNAME} placeholder:text-gray-400 dark:placeholder:text-gray-500`}
                   />
                 </div>
 
@@ -820,7 +863,7 @@ const JournalEntryPage: React.FC = () => {
                       }
                       placeholder="e.g., PBB350779"
                       disabled={isSaving}
-                      className="w-full px-3 py-2 text-sm border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-lg focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:cursor-not-allowed font-mono"
+                      className={`${HEADER_FIELD_CLASSNAME} placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono`}
                     />
                   </div>
                 )}
