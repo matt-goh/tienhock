@@ -1109,9 +1109,9 @@ export default function (pool) {
 
             // Insert journal entry
             const entryResult = await client.query(
-              `INSERT INTO journal_entries (reference_no, entry_date, entry_type, description, status, created_by)
-               VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-              [jvdrRef, entryDate, "JVDR", `Director's Remuneration - ${monthStr}/${yearInt}`, "active", req.staffId || null]
+              `INSERT INTO journal_entries (reference_no, entry_date, entry_type, description, status, created_by, posted_at, posted_by)
+               VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, $6) RETURNING id`,
+              [jvdrRef, entryDate, "JVDR", `Director's Remuneration - ${monthStr}/${yearInt}`, "posted", req.staffId || null]
             );
             const entryId = entryResult.rows[0].id;
 
@@ -1183,6 +1183,15 @@ export default function (pool) {
               const pcbE = parseFloat(d.pcb) || 0;
               return sum + (gross - epfE - socsoE - sipE - pcbE);
             }, 0) + otherCreditLines.reduce((sum, l) => sum + l.amount, 0)) * 100) / 100;
+            // A voucher that doesn't balance (usually missing account mappings on the
+            // debit side) must never reach the ledger — abort the whole generation.
+            if (Math.abs(jvdrTotalDebit - jvdrTotalCredit) > 0.01) {
+              await client.query("ROLLBACK");
+              return res.status(400).json({
+                message: `JVDR voucher is out of balance (DR ${jvdrTotalDebit.toFixed(2)} vs CR ${jvdrTotalCredit.toFixed(2)}). Check the JVDR account mappings in Location Account Mappings, then generate again.`,
+              });
+            }
+
             await client.query(
               `UPDATE journal_entries SET total_debit = $1, total_credit = $2 WHERE id = $3`,
               [jvdrTotalDebit, jvdrTotalCredit, entryId]
@@ -1212,9 +1221,9 @@ export default function (pool) {
           if (staffData.length > 0) {
             // Insert journal entry
             const entryResult = await client.query(
-              `INSERT INTO journal_entries (reference_no, entry_date, entry_type, description, status, created_by)
-               VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-              [jvslRef, entryDate, "JVSL", `Staff Salary Wages - ${monthStr}/${yearInt}`, "active", req.staffId || null]
+              `INSERT INTO journal_entries (reference_no, entry_date, entry_type, description, status, created_by, posted_at, posted_by)
+               VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, $6) RETURNING id`,
+              [jvslRef, entryDate, "JVSL", `Staff Salary Wages - ${monthStr}/${yearInt}`, "posted", req.staffId || null]
             );
             const entryId = entryResult.rows[0].id;
 
@@ -1375,6 +1384,16 @@ export default function (pool) {
             // Round to 2 decimal places to avoid floating point precision issues
             const jvslTotalDebitRounded = Math.round(jvslTotalDebit * 100) / 100;
             const jvslTotalCredit = Math.round(creditLines.reduce((sum, l) => sum + l.amount, 0) * 100) / 100;
+            // A voucher that doesn't balance (usually locations missing account
+            // mappings on the debit side while the credit totals still include them)
+            // must never reach the ledger — abort the whole generation.
+            if (Math.abs(jvslTotalDebitRounded - jvslTotalCredit) > 0.01) {
+              await client.query("ROLLBACK");
+              return res.status(400).json({
+                message: `JVSL voucher is out of balance (DR ${jvslTotalDebitRounded.toFixed(2)} vs CR ${jvslTotalCredit.toFixed(2)}). Some locations are missing account mappings — configure them in Location Account Mappings, then generate again.`,
+              });
+            }
+
             await client.query(
               `UPDATE journal_entries SET total_debit = $1, total_credit = $2 WHERE id = $3`,
               [jvslTotalDebitRounded, jvslTotalCredit, entryId]
