@@ -189,10 +189,19 @@ const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
   );
 };
 
+interface InvoiceDetailsLocationState {
+  showPaymentForm?: boolean;
+  fromList?: boolean;
+  previousPath?: string;
+  fromCustomerTransactions?: boolean;
+}
+
 // --- Main Component ---
 const InvoiceDetailsPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const locationState =
+    (location.state as InvoiceDetailsLocationState | null) ?? {};
   const { id } = useParams<{ id: string }>();
   const invoiceId = id || "";
 
@@ -215,7 +224,7 @@ const InvoiceDetailsPage: React.FC = () => {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(
-    location.state?.showPaymentForm || false
+    locationState.showPaymentForm || false
   );
   const [paymentFormData, setPaymentFormData] = useState<
     Omit<Payment, "payment_id" | "invoice_id" | "created_at">
@@ -1416,6 +1425,27 @@ const InvoiceDetailsPage: React.FC = () => {
     };
   };
 
+  const getCustomerPagePath = (customerId: string): string =>
+    locationState.fromCustomerTransactions
+      ? `/catalogue/customer/${customerId}?tab=transactions`
+      : `/catalogue/customer/${customerId}`;
+
+  const handleBackClick = (): void => {
+    if (locationState.fromList) {
+      navigate(-1);
+      return;
+    }
+    if (locationState.fromCustomerTransactions && locationState.previousPath) {
+      navigate(locationState.previousPath);
+      return;
+    }
+    if (locationState.fromCustomerTransactions && invoiceData?.customerid) {
+      navigate(getCustomerPagePath(invoiceData.customerid));
+      return;
+    }
+    navigate("/sales/invoice");
+  };
+
   // --- Render Logic ---
   if (isLoading && !invoiceData) {
     // Show full page spinner only on initial load
@@ -1429,7 +1459,7 @@ const InvoiceDetailsPage: React.FC = () => {
   if (error) {
     return (
       <div className="p-6">
-        <BackButton onClick={() => navigate("/sales/invoice")} />
+        <BackButton onClick={handleBackClick} />
         <div className="p-4 text-center text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 rounded-lg mt-4">
           Error: {error}
         </div>
@@ -1440,7 +1470,7 @@ const InvoiceDetailsPage: React.FC = () => {
   if (!invoiceData) {
     return (
       <div className="p-6">
-        <BackButton onClick={() => navigate("/sales/invoice")} />
+        <BackButton onClick={handleBackClick} />
         <div className="p-4 text-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 rounded-lg mt-4">
           Invoice data could not be loaded or invoice not found.
         </div>
@@ -1512,13 +1542,7 @@ const InvoiceDetailsPage: React.FC = () => {
         <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
           <div className="flex items-center gap-3">
             <BackButton
-              onClick={() => {
-                if (location.state?.fromList) {
-                  navigate(-1);
-                } else {
-                  navigate("/sales/invoice");
-                }
-              }}
+              onClick={handleBackClick}
               disabled={isLoading}
             />
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
@@ -1745,7 +1769,7 @@ const InvoiceDetailsPage: React.FC = () => {
             <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">Customer</span>
             <div className="flex items-center gap-1">
               <button
-                onClick={() => navigate(`/catalogue/customer/${invoiceData.customerid}`)}
+                onClick={() => navigate(getCustomerPagePath(invoiceData.customerid))}
                 className="text-sm font-medium text-gray-900 dark:text-gray-100 hover:text-sky-600 dark:hover:text-sky-400 hover:underline truncate"
                 title={`${invoiceData.customerName} (${invoiceData.customerid})`}
               >

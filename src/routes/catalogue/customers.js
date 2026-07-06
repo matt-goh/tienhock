@@ -294,7 +294,8 @@ export default function (pool) {
 
       // Invoices (DEBIT) — exclude cancelled, mirroring the main invoice list.
       let invSql = `
-        SELECT id, createddate, totalamountpayable, invoice_status, einvoice_status
+        SELECT id, createddate, totalamountpayable, invoice_status, einvoice_status,
+               paymenttype
         FROM invoices
         WHERE customerid = $1 AND invoice_status != 'cancelled'`;
       const invParams = [id];
@@ -306,7 +307,8 @@ export default function (pool) {
       // Payments (CREDIT) — include cancelled so the history is complete.
       let paySql = `
         SELECT p.payment_id, p.invoice_id, p.payment_date, p.amount_paid,
-               p.payment_method, p.internal_reference, p.payment_reference, p.status
+               p.payment_method, p.internal_reference, p.payment_reference, p.status,
+               i.paymenttype
         FROM payments p
         JOIN invoices i ON p.invoice_id = i.id
         WHERE i.customerid = $1`;
@@ -318,14 +320,15 @@ export default function (pool) {
 
       // Adjustment documents (CN/DN/RN) — include cancelled.
       let adjSql = `
-        SELECT id, display_id, type, original_invoice_id, createddate, totalamountpayable,
-               status, einvoice_status
-        FROM adjustment_documents
-        WHERE customerid = $1`;
+        SELECT a.id, a.display_id, a.type, a.original_invoice_id, a.createddate,
+               a.totalamountpayable, a.status, a.einvoice_status, i.paymenttype
+        FROM adjustment_documents a
+        LEFT JOIN invoices i ON a.original_invoice_id = i.id
+        WHERE a.customerid = $1`;
       const adjParams = [id];
       if (hasRange) {
         adjParams.push(String(startMs), String(endMs));
-        adjSql += ` AND CAST(createddate AS bigint) BETWEEN $2::bigint AND $3::bigint`;
+        adjSql += ` AND CAST(a.createddate AS bigint) BETWEEN $2::bigint AND $3::bigint`;
       }
 
       const [invoices, payments, adjustments] = await Promise.all([

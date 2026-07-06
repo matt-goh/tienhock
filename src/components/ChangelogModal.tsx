@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-06",
+    ms: "Tab Transaction History pelanggan kini mempunyai penapis status dan jenis bayaran yang boleh ditekan, serta lajur Payment Type supaya jenis Cash atau Invoice boleh dilihat terus. Apabila invois dibuka dari tab ini, butang Back dan pautan pelanggan akan kembali ke tab Transaction History.",
+    en: "Customer Transaction History now has clickable status and payment-type filters, plus a Payment Type column so Cash or Invoice can be seen at a glance. When an invoice is opened from this tab, Back and the customer link return to Transaction History.",
+  },
+  {
+    date: "2026-07-06",
     ms: "Baucar gaji (JVDR/JVSL) kini mengikut kaedah pembundaran sistem lama: gaji bersih setiap pekerja/pengarah digenapkan ke ringgit penuh sebelum dikreditkan ke akaun akruan, dengan baris 'Rounding Adjustment' untuk perbezaannya — jumlah baucar kini sepadan dengan cetakan sistem lama (cth. JVDR Jun 12,940.00). Kad pratonton 'Salary Payable' juga diperbetulkan — sebelum ini ia terkurang nyata kerana tidak mengambil kira komisen.",
     en: "Payroll vouchers (JVDR/JVSL) now follow the legacy rounding method: each employee's/director's net pay is rounded up to the whole ringgit before crediting the accrual accounts, with a 'Rounding Adjustment' line for the difference — voucher totals now match the legacy prints (e.g. June JVDR 12,940.00). The 'Salary Payable' preview card is also fixed — it previously understated the figure by excluding commissions.",
   },
