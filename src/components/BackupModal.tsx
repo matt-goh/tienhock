@@ -56,6 +56,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
   const tableBodyRef = useRef<HTMLDivElement>(null);
   const lockedLocationRef = useRef<string | null>(null);
   const navigationToastShownRef = useRef(false);
+  const skipBeforeUnloadPromptRef = useRef<boolean>(false);
   const [backupToDelete, setBackupToDelete] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -138,6 +139,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
         setRestoring(false);
         setUploading(false);
         onClose();
+        skipBeforeUnloadPromptRef.current = true;
         window.location.reload();
 
         return true;
@@ -350,6 +352,8 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
     if (!isBlockingOperation) return;
 
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (skipBeforeUnloadPromptRef.current) return;
+
       event.preventDefault();
       event.returnValue = "";
     };

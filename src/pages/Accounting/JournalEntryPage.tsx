@@ -363,7 +363,9 @@ const JournalEntryPage: React.FC = () => {
       const fetchedFormData: JournalEntryFormData = {
         reference_no: entry.reference_no,
         entry_type: entry.entry_type,
-        entry_date: entry.entry_date.split("T")[0],
+        // Serialized date columns are UTC midnight-shifted; format in local TZ
+        // so the date doesn't slip back a day on every edit
+        entry_date: format(new Date(entry.entry_date), "yyyy-MM-dd"),
         description: entry.description || "",
         cheque_no: entry.cheque_no || "",
         lines,
