@@ -110,7 +110,8 @@ const loadLogoDataUrl = async (): Promise<string | null> => {
 
 const buildDocDefinition = (
   data: BankStatementData,
-  logoDataUrl: string | null
+  logoDataUrl: string | null,
+  reportTitle: string
 ): TDocumentDefinitions => {
   const periodLabel = `${MONTH_NAMES[data.period.month - 1]} ${data.period.year}`;
 
@@ -195,7 +196,7 @@ const buildDocDefinition = (
       {
         width: "auto",
         stack: [
-          { text: "BANK STATEMENT", style: "reportTitle", alignment: "right" },
+          { text: reportTitle.toUpperCase(), style: "reportTitle", alignment: "right" },
           {
             text: `${data.account.code} — ${data.account.description}`,
             style: "reportSubtitle",
@@ -265,7 +266,7 @@ const buildDocDefinition = (
 
   return {
     info: {
-      title: `Bank Statement ${data.account.code} ${periodLabel}`,
+      title: `${reportTitle} ${data.account.code} ${periodLabel}`,
       author: TIENHOCK_INFO.name,
     },
     pageSize: "A4",
@@ -348,10 +349,15 @@ const buildDocDefinition = (
 // If the iframe print is blocked (common on mobile browsers), the shared
 // fallback opens the blob URL in a new tab instead.
 export const generateBankStatementPDF = async (
-  data: BankStatementData
+  data: BankStatementData,
+  options?: { title?: string }
 ): Promise<void> => {
   const logoDataUrl = await loadLogoDataUrl();
-  const docDefinition = buildDocDefinition(data, logoDataUrl);
+  const docDefinition = buildDocDefinition(
+    data,
+    logoDataUrl,
+    options?.title || "Bank Statement"
+  );
 
   const pdfBlob: Blob = await new Promise<Blob>((resolve) => {
     pdfMake.createPdf(docDefinition).getBlob(resolve);
