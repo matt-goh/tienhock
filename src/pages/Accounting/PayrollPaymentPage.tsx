@@ -7,7 +7,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { format } from "date-fns";
 import { IconRefresh, IconCheck } from "@tabler/icons-react";
-import MonthNavigator from "../../components/MonthNavigator";
+import TimeNavigator, { type TimeRange } from "../../components/TimeNavigator";
 import Button from "../../components/Button";
 import Checkbox from "../../components/Checkbox";
 import ListboxSelect from "../../components/ListboxSelect";
@@ -40,13 +40,101 @@ const formatCurrency = (amount: number): string =>
     maximumFractionDigits: 2,
   }).format(amount);
 
+// Remembers the last month this user viewed on the Payroll Bank Payment page.
+const LAST_MONTH_KEY = "payrollPaymentLastMonth";
+const loadLastMonth = (): Date | null => {
+  try {
+    const cached = localStorage.getItem(LAST_MONTH_KEY);
+    if (cached) {
+      const [y, m] = cached.split("-").map(Number);
+      if (y && m) return new Date(y, m - 1, 1);
+    }
+  } catch (e) {
+    console.error("Error loading last payroll-payment month:", e);
+  }
+  return null;
+};
+const saveLastMonth = (date: Date): void => {
+  try {
+    localStorage.setItem(
+      LAST_MONTH_KEY,
+      `${date.getFullYear()}-${date.getMonth() + 1}`
+    );
+  } catch (e) {
+    console.error("Error saving last payroll-payment month:", e);
+  }
+};
+
+const tableInputClassName: string =
+  "h-9 w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 shadow-sm transition-colors placeholder:text-gray-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-500/70 dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-sky-400 dark:focus:ring-sky-400";
+const monoInputClassName: string = `${tableInputClassName} font-mono`;
+const dateNavigatorTriggerClassName: string =
+  "w-full !h-9 justify-between !rounded-md !border-gray-300 !bg-white !px-2.5 !font-normal !shadow-sm dark:!border-gray-500/70 dark:!bg-gray-900/50";
+
+const parseLocalDateString = (value: string): Date | null => {
+  const match: RegExpMatchArray | null = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+
+  const year: number = Number(match[1]);
+  const month: number = Number(match[2]);
+  const day: number = Number(match[3]);
+  const date: Date = new Date(year, month - 1, day);
+
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return date;
+};
+
+const getSingleDayRange = (
+  dateString: string
+): { start: Date | null; end: Date | null } => {
+  const date: Date | null = parseLocalDateString(dateString);
+  return { start: date, end: date };
+};
+
 const PayrollPaymentPage: React.FC = () => {
   const { accountCodes, isLoading: accountsLoading } = useAccountCodesCache();
 
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
+    const cached = loadLastMonth();
+    if (cached) return cached;
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
+
+  // Remember the month whenever it changes (including the initial restored value)
+  useEffect(() => {
+    saveLastMonth(selectedMonth);
+  }, [selectedMonth]);
+
+  const monthRange = useMemo(
+    (): TimeRange => ({
+      start: new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1),
+      end: new Date(
+        selectedMonth.getFullYear(),
+        selectedMonth.getMonth() + 1,
+        0,
+        23,
+        59,
+        59,
+        999
+      ),
+    }),
+    [selectedMonth]
+  );
+
+  const handleTimeNavigatorChange = (range: TimeRange): void => {
+    setSelectedMonth(
+      new Date(range.start.getFullYear(), range.start.getMonth(), 1)
+    );
+  };
+
   const [rows, setRows] = useState<EditableRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -171,7 +259,12 @@ const PayrollPaymentPage: React.FC = () => {
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <MonthNavigator selectedMonth={selectedMonth} onChange={setSelectedMonth} />
+          <TimeNavigator
+            range={monthRange}
+            onChange={handleTimeNavigatorChange}
+            modes={["month"]}
+            presets={false}
+          />
           <div className="flex items-center gap-3">
             <Button onClick={fetchPreview} variant="outline" disabled={loading}>
               <span className="flex items-center justify-center whitespace-nowrap">
@@ -250,15 +343,24 @@ const PayrollPaymentPage: React.FC = () => {
                         step="0.01"
                         value={r.amountStr}
                         onChange={(e) => updateRow(i, { amountStr: e.target.value })}
-                        className="w-full px-2 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-right font-mono focus:outline-none focus:ring-1 focus:ring-sky-500"
+                        className={`${monoInputClassName} text-right`}
                       />
                     </td>
                     <td className="px-3 py-2.5">
-                      <input
-                        type="date"
-                        value={r.payment_date}
-                        onChange={(e) => updateRow(i, { payment_date: e.target.value })}
-                        className="w-full px-2 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                      <TimeNavigator
+                        range={getSingleDayRange(r.payment_date)}
+                        onChange={(range: TimeRange): void =>
+                          updateRow(i, {
+                            payment_date: format(range.start, "yyyy-MM-dd"),
+                          })
+                        }
+                        modes={["day"]}
+                        presets={false}
+                        showArrows={false}
+                        allowFuture
+                        placeholder="Pick date"
+                        className="w-full"
+                        triggerClassName={dateNavigatorTriggerClassName}
                       />
                     </td>
                     <td className="px-3 py-2.5">
@@ -266,13 +368,15 @@ const PayrollPaymentPage: React.FC = () => {
                         type="text"
                         value={r.contra_account}
                         onChange={(e) => updateRow(i, { contra_account: e.target.value })}
-                        className="w-full px-2 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono focus:outline-none focus:ring-1 focus:ring-sky-500"
+                        className={monoInputClassName}
                       />
                     </td>
                     <td className="px-3 py-2.5">
                       <ListboxSelect
                         value={r.bank_account}
                         onChange={(v) => updateRow(i, { bank_account: v })}
+                        className="w-full"
+                        buttonClassName="h-9 font-mono shadow-none"
                         options={
                           bankAccounts.length === 0
                             ? [{ value: "BANK_PBB", label: "BANK_PBB" }]
@@ -289,7 +393,7 @@ const PayrollPaymentPage: React.FC = () => {
                         value={r.reference}
                         onChange={(e) => updateRow(i, { reference: e.target.value })}
                         placeholder="—"
-                        className="w-full px-2 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono focus:outline-none focus:ring-1 focus:ring-sky-500"
+                        className={monoInputClassName}
                       />
                     </td>
                   </tr>
@@ -298,13 +402,12 @@ const PayrollPaymentPage: React.FC = () => {
             </tbody>
             <tfoot className="bg-gray-100 dark:bg-gray-900 border-t-2 border-gray-300 dark:border-gray-600">
               <tr>
-                <td colSpan={2} className="px-3 py-3 text-right font-bold text-gray-900 dark:text-white">
-                  TOTAL TO BANK (included):
+                <td colSpan={7} className="px-3 py-3">
+                  <div className="flex items-baseline justify-end gap-6 font-bold text-gray-900 dark:text-white">
+                    <span>TOTAL TO BANK (included):</span>
+                    <span className="font-mono">{formatCurrency(includedTotal)}</span>
+                  </div>
                 </td>
-                <td className="px-3 py-3 text-right font-mono font-bold text-gray-900 dark:text-white">
-                  {formatCurrency(includedTotal)}
-                </td>
-                <td colSpan={4}></td>
               </tr>
             </tfoot>
           </table>

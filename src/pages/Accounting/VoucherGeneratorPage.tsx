@@ -1,11 +1,16 @@
 // src/pages/Accounting/VoucherGeneratorPage.tsx
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import MonthNavigator from "../../components/MonthNavigator";
+import { useAccountCodesCache } from "../../utils/accounting/useAccountingCache";
+import {
+  generatePayrollSummaryPDF,
+  PayrollSummaryPDFData,
+} from "../../utils/accounting/PayrollSummaryPDFMake";
 import {
   IconFileInvoice,
   IconCheck,
@@ -15,7 +20,38 @@ import {
   IconCash,
   IconReceipt,
   IconBuildingBank,
+  IconTableExport,
 } from "@tabler/icons-react";
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+// Remembers the last month this user viewed on the Voucher Generator (per browser).
+const LAST_MONTH_KEY = "voucherGeneratorLastMonth";
+const loadLastMonth = (): Date | null => {
+  try {
+    const cached = localStorage.getItem(LAST_MONTH_KEY);
+    if (cached) {
+      const [y, m] = cached.split("-").map(Number);
+      if (y && m) return new Date(y, m - 1, 1);
+    }
+  } catch (e) {
+    console.error("Error loading last voucher month:", e);
+  }
+  return null;
+};
+const saveLastMonth = (date: Date): void => {
+  try {
+    localStorage.setItem(
+      LAST_MONTH_KEY,
+      `${date.getFullYear()}-${date.getMonth() + 1}`
+    );
+  } catch (e) {
+    console.error("Error saving last voucher month:", e);
+  }
+};
 
 // ============================================================================
 // Types
@@ -24,6 +60,7 @@ import {
 interface VoucherLocation {
   location_id: string;
   location_name: string;
+  // salary = the location's FULL gross pay (all earnings fold in here)
   salary: number;
   epf_employer: number;
   socso_employer: number;
@@ -43,11 +80,25 @@ interface VoucherLocation {
   };
 }
 
+// One posted journal line (exactly as it will be written to journal_entry_lines)
+interface JournalLine {
+  account_code: string;
+  particulars: string;
+  debit: number;
+  credit: number;
+}
+
 interface VoucherData {
   reference: string;
   exists: boolean;
   entry_id: number | null;
   locations: VoucherLocation[];
+  // The exact lines the voucher will post (1:1 with the generated journal)
+  lines?: JournalLine[];
+  total_debit?: number;
+  total_credit?: number;
+  balanced?: boolean;
+  unmapped?: string[];
   totals?: {
     salary: number;
     epf_employer: number;
@@ -271,6 +322,113 @@ const AccountCodeTooltip: React.FC<AccountCodeTooltipProps> = ({
   );
 };
 
+// Journal Entry Preview — the exact debit/credit lines that will be posted (1:1
+// with the generated journal / the printed voucher). Mirrors the legacy voucher
+// layout: ACC/CODE · DESCRIPTION · DEBIT · CREDIT, with a balancing totals row.
+interface JournalPreviewTableProps {
+  lines: JournalLine[];
+  totalDebit: number;
+  totalCredit: number;
+  accountName: (code: string) => string;
+}
+
+const JournalPreviewTable: React.FC<JournalPreviewTableProps> = ({
+  lines,
+  totalDebit,
+  totalCredit,
+  accountName,
+}) => {
+  const fmt = (n: number): string =>
+    new Intl.NumberFormat("en-MY", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(n);
+  const balanced = Math.abs(totalDebit - totalCredit) <= 0.01;
+
+  return (
+    <div className="p-4 border-t border-default-200 dark:border-gray-700">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-sm font-medium text-default-700 dark:text-gray-200">
+          Journal entry preview — exactly what will be posted
+        </h4>
+        {balanced ? (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
+            <IconCheck size={12} /> Balanced
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300">
+            <IconAlertCircle size={12} /> Out of balance
+          </span>
+        )}
+      </div>
+      <div className="overflow-x-auto rounded-lg border border-default-200 dark:border-gray-700">
+        <table className="min-w-full text-sm">
+          <thead className="bg-default-100 dark:bg-gray-900/50">
+            <tr>
+              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-default-600 dark:text-gray-400 w-28">
+                Acc/Code
+              </th>
+              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-default-600 dark:text-gray-400">
+                Description
+              </th>
+              <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-default-600 dark:text-gray-400 w-32">
+                Debit (RM)
+              </th>
+              <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-default-600 dark:text-gray-400 w-32">
+                Credit (RM)
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-default-100 dark:divide-gray-800 bg-white dark:bg-gray-800">
+            {lines.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-3 py-6 text-center text-default-500 dark:text-gray-400">
+                  No lines to post for this month
+                </td>
+              </tr>
+            ) : (
+              lines.map((line, i) => (
+                <tr key={i} className="hover:bg-default-50/50 dark:hover:bg-gray-700/30">
+                  <td className="px-3 py-2 font-mono text-default-800 dark:text-gray-200 whitespace-nowrap">
+                    {line.account_code}
+                  </td>
+                  <td className="px-3 py-2 text-default-700 dark:text-gray-300">
+                    <span>{line.particulars}</span>
+                    {accountName(line.account_code) && (
+                      <span className="ml-2 text-xs text-default-400 dark:text-gray-500">
+                        {accountName(line.account_code)}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-default-900 dark:text-gray-100">
+                    {line.debit > 0 ? fmt(line.debit) : "-"}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-default-900 dark:text-gray-100">
+                    {line.credit > 0 ? fmt(line.credit) : "-"}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+          <tfoot className="bg-default-100 dark:bg-gray-900/50 border-t-2 border-default-300 dark:border-gray-600">
+            <tr className="font-semibold">
+              <td colSpan={2} className="px-3 py-2 text-right text-default-800 dark:text-gray-200">
+                Total
+              </td>
+              <td className="px-3 py-2 text-right font-mono text-default-900 dark:text-gray-100">
+                {fmt(totalDebit)}
+              </td>
+              <td className="px-3 py-2 text-right font-mono text-default-900 dark:text-gray-100">
+                {fmt(totalCredit)}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 // ============================================================================
 // Main Component
 // ============================================================================
@@ -278,31 +436,49 @@ const AccountCodeTooltip: React.FC<AccountCodeTooltipProps> = ({
 const VoucherGeneratorPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { accountCodes } = useAccountCodesCache();
 
-  // Initialize selectedMonth from URL params or default to current month
+  // account code -> description, for the journal preview's Description column
+  const accountName = useMemo(() => {
+    const map = new Map<string, string>();
+    accountCodes.forEach((a) => map.set(a.code, a.description));
+    return (code: string): string => map.get(code) || "";
+  }, [accountCodes]);
+
+  // Initialize selectedMonth from URL params, else the last month this user viewed,
+  // else current month.
   const getInitialMonth = (): Date => {
     const urlYear = searchParams.get("year");
     const urlMonth = searchParams.get("month");
     if (urlYear && urlMonth) {
       return new Date(parseInt(urlYear), parseInt(urlMonth) - 1, 1);
     }
-    return new Date();
+    return loadLastMonth() ?? new Date();
   };
 
   const [selectedMonth, setSelectedMonth] = useState<Date>(getInitialMonth);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [printingSummary, setPrintingSummary] = useState(false);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [helpLanguage, setHelpLanguage] = useState<"ms" | "en">("ms");
 
-  // Update URL params when month changes
+  // Update URL params when month changes and remember it for next visit
   const handleMonthChange = (date: Date) => {
     setSelectedMonth(date);
+    saveLastMonth(date);
     setSearchParams({
       year: date.getFullYear().toString(),
       month: (date.getMonth() + 1).toString(),
     });
   };
+
+  // Also persist the initial month (URL-driven or restored) so a later visit
+  // without URL params lands on the same month.
+  useEffect(() => {
+    saveLastMonth(selectedMonth);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Fetch preview data
   const fetchPreview = useCallback(async () => {
@@ -368,6 +544,28 @@ const VoucherGeneratorPage: React.FC = () => {
     }
   };
 
+  // Print the DIRECTOR/WORKERS payroll summary that reconciles to the vouchers
+  const handlePrintSummary = async () => {
+    setPrintingSummary(true);
+    try {
+      const year = selectedMonth.getFullYear();
+      const month = selectedMonth.getMonth() + 1;
+      const res = (await api.get(
+        `/api/journal-vouchers/payroll-summary/${year}/${month}`
+      )) as Omit<PayrollSummaryPDFData, "periodLabel">;
+      await generatePayrollSummaryPDF({
+        ...res,
+        periodLabel: `${MONTH_NAMES[month - 1]} ${year}`,
+      });
+    } catch (error: unknown) {
+      console.error("Error printing payroll summary:", error);
+      const msg = error instanceof Error ? error.message : "Failed to print payroll summary";
+      toast.error(msg);
+    } finally {
+      setPrintingSummary(false);
+    }
+  };
+
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat("en-MY", {
       minimumFractionDigits: 2,
@@ -410,7 +608,9 @@ const VoucherGeneratorPage: React.FC = () => {
     };
   };
 
-  // Check for missing mappings in JVSL
+  // Check for missing mappings in JVSL. Only four accounts per location are needed:
+  // Salary (full gross), and employer EPF/SOCSO/SIP. Generation is blocked until each
+  // with an amount has an account (otherwise the voucher would not balance).
   const getMissingMappings = (loc: VoucherLocation): string[] => {
     return [
       !loc.accounts.salary && loc.salary > 0 ? "Salary" : null,
@@ -438,6 +638,19 @@ const VoucherGeneratorPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          <Button
+            onClick={handlePrintSummary}
+            color="default"
+            variant="outline"
+            icon={IconTableExport}
+            iconPosition="left"
+            size="md"
+            disabled={loading || printingSummary}
+            title="Print the Director/Workers payroll summary that reconciles to these vouchers"
+          >
+            {printingSummary ? "Preparing..." : "Payroll Summary"}
+          </Button>
+          <span className="h-6 w-px bg-default-300 dark:bg-gray-600" />
           <MonthNavigator
             selectedMonth={selectedMonth}
             onChange={handleMonthChange}
@@ -677,6 +890,16 @@ const VoucherGeneratorPage: React.FC = () => {
                     </tfoot>
                   </table>
                 </div>
+
+                {/* Exact journal lines that will be posted (1:1) */}
+                {previewData.jvdr.lines && (
+                  <JournalPreviewTable
+                    lines={previewData.jvdr.lines}
+                    totalDebit={previewData.jvdr.total_debit || 0}
+                    totalCredit={previewData.jvdr.total_credit || 0}
+                    accountName={accountName}
+                  />
+                )}
               </>
             ) : (
               <div className="p-8 text-center text-default-500 dark:text-gray-400">
@@ -751,7 +974,8 @@ const VoucherGeneratorPage: React.FC = () => {
                           Some locations are missing account mappings
                         </h4>
                         <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
-                          Amounts from locations with missing mappings won't be included in the journal voucher.
+                          Generation is blocked until every amount has an account —
+                          an incomplete voucher would not balance.
                         </p>
                         <Button
                           onClick={() => navigate("/accounting/location-account-mappings")}
@@ -938,67 +1162,15 @@ const VoucherGeneratorPage: React.FC = () => {
                   </table>
                 </div>
 
-                {/* What Will Be Generated Visual */}
-                <div className="p-4 border-t border-default-200 dark:border-gray-700">
-                  <h4 className="text-sm font-medium text-default-700 dark:text-gray-200 mb-3">
-                    What the voucher will record:
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Expenses (Debits) */}
-                    <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-                      <div className="text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wider mb-2">
-                        Expenses (Debits)
-                      </div>
-                      <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1.5">
-                        <li className="flex justify-between">
-                          <span>Salary expenses by location</span>
-                          <span className="font-mono">{formatCurrency(calculateJVSLTotals(previewData.jvsl.locations).totalSalary)}</span>
-                        </li>
-                        <li className="flex justify-between">
-                          <span>EPF contributions by location</span>
-                          <span className="font-mono">{formatCurrency(calculateJVSLTotals(previewData.jvsl.locations).totalEPF)}</span>
-                        </li>
-                        <li className="flex justify-between">
-                          <span>SOCSO contributions by location</span>
-                          <span className="font-mono">{formatCurrency(calculateJVSLTotals(previewData.jvsl.locations).totalSOCSO)}</span>
-                        </li>
-                        <li className="flex justify-between">
-                          <span>SIP contributions by location</span>
-                          <span className="font-mono">{formatCurrency(calculateJVSLTotals(previewData.jvsl.locations).totalSIP)}</span>
-                        </li>
-                      </ul>
-                    </div>
-
-                    {/* Payables (Credits) */}
-                    <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                      <div className="text-xs font-semibold text-amber-700 dark:text-amber-300 uppercase tracking-wider mb-2">
-                        Payables (Credits)
-                      </div>
-                      <ul className="text-sm text-amber-800 dark:text-amber-200 space-y-1.5">
-                        <li className="flex justify-between">
-                          <span>Salary Payable ({previewData.jvsl.totals?.accrual_accounts?.accrual_salary || "ACW_SAL"})</span>
-                          <span className="font-mono">{formatCurrency(calculateJVSLTotals(previewData.jvsl.locations).totalNetSalary)}</span>
-                        </li>
-                        <li className="flex justify-between">
-                          <span>EPF Payable ({previewData.jvsl.totals?.accrual_accounts?.accrual_epf || "ACW_EPF"})</span>
-                          <span className="font-mono">{formatCurrency(calculateJVSLTotals(previewData.jvsl.locations).totalEPF)}</span>
-                        </li>
-                        <li className="flex justify-between">
-                          <span>SOCSO Payable ({previewData.jvsl.totals?.accrual_accounts?.accrual_socso || "ACW_SC"})</span>
-                          <span className="font-mono">{formatCurrency(calculateJVSLTotals(previewData.jvsl.locations).totalSOCSO)}</span>
-                        </li>
-                        <li className="flex justify-between">
-                          <span>SIP Payable ({previewData.jvsl.totals?.accrual_accounts?.accrual_sip || "ACW_SIP"})</span>
-                          <span className="font-mono">{formatCurrency(calculateJVSLTotals(previewData.jvsl.locations).totalSIP)}</span>
-                        </li>
-                        <li className="flex justify-between">
-                          <span>PCB Payable ({previewData.jvsl.totals?.accrual_accounts?.accrual_pcb || "ACW_PCB"})</span>
-                          <span className="font-mono">{formatCurrency(calculateJVSLTotals(previewData.jvsl.locations).totalPCB)}</span>
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
+                {/* Exact journal lines that will be posted (1:1) */}
+                {previewData.jvsl.lines && (
+                  <JournalPreviewTable
+                    lines={previewData.jvsl.lines}
+                    totalDebit={previewData.jvsl.total_debit || 0}
+                    totalCredit={previewData.jvsl.total_credit || 0}
+                    accountName={accountName}
+                  />
+                )}
               </>
             ) : (
               <div className="p-8 text-center text-default-500 dark:text-gray-400">
