@@ -690,10 +690,10 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
               </span>
             </div>
             <div className="px-4 py-3">
-              <div className="text-xl font-bold">{formatCurrency(summary.totalSales)}</div>
-              <div className="mt-1 text-sm font-bold text-sky-600 dark:text-sky-400">
+              <div className="text-xl font-bold text-sky-600 dark:text-sky-400">
                 {salesData.reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
               </div>
+              <div className="mt-1 text-sm font-bold">{formatCurrency(summary.totalSales)}</div>
             </div>
           </div>
           {isJp ? (
@@ -706,10 +706,10 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                 </span>
               </div>
               <div className="px-4 py-3">
-                <div className="text-xl font-bold">{formatCurrency(summary.othTotal)}</div>
-                <div className="mt-1 text-sm font-bold text-orange-600 dark:text-orange-400">
+                <div className="text-xl font-bold text-orange-600 dark:text-orange-400">
                   {salesData.filter(p => p.type === "JP").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
                 </div>
+                <div className="mt-1 text-sm font-bold">{formatCurrency(summary.othTotal)}</div>
               </div>
             </div>
           ) : (
@@ -723,10 +723,10 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                   </span>
                 </div>
                 <div className="px-4 py-3">
-                  <div className="text-xl font-bold">{formatCurrency(summary.bhTotal)}</div>
-                  <div className="mt-1 text-sm font-bold text-blue-600 dark:text-blue-400">
+                  <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
                     {salesData.filter(p => p.type === "BH").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
                   </div>
+                  <div className="mt-1 text-sm font-bold">{formatCurrency(summary.bhTotal)}</div>
                 </div>
               </div>
               {/* MEE Products */}
@@ -738,10 +738,10 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                   </span>
                 </div>
                 <div className="px-4 py-3">
-                  <div className="text-xl font-bold">{formatCurrency(summary.meeTotal)}</div>
-                  <div className="mt-1 text-sm font-bold text-green-600 dark:text-green-400">
+                  <div className="text-xl font-bold text-green-600 dark:text-green-400">
                     {salesData.filter(p => p.type === "MEE").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
                   </div>
+                  <div className="mt-1 text-sm font-bold">{formatCurrency(summary.meeTotal)}</div>
                 </div>
               </div>
               {/* OTH Products */}
@@ -753,10 +753,10 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                   </span>
                 </div>
                 <div className="px-4 py-3">
-                  <div className="text-xl font-bold">{formatCurrency(summary.othTotal)}</div>
-                  <div className="mt-1 text-sm font-bold text-purple-600 dark:text-purple-400">
+                  <div className="text-xl font-bold text-purple-600 dark:text-purple-400">
                     {salesData.filter(p => p.type === "OTH").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
                   </div>
+                  <div className="mt-1 text-sm font-bold">{formatCurrency(summary.othTotal)}</div>
                 </div>
               </div>
             </>
@@ -814,11 +814,11 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                             </span>
                           </HoverTooltip>
                         )}
-                        <span className="font-bold">{formatCurrency(salesman.totalSales)}</span>
-                        <span className="text-default-400 dark:text-gray-500">·</span>
                         <span className="text-sky-600 dark:text-sky-400 font-bold">
                           {salesman.totalQuantity.toLocaleString()} units
                         </span>
+                        <span className="text-default-400 dark:text-gray-500">·</span>
+                        <span className="font-bold">{formatCurrency(salesman.totalSales)}</span>
                       </div>
                     </div>
                     {/* Products Table */}
@@ -883,14 +883,14 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
             <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex justify-between items-center">
               <h3 className="text-base font-semibold">All Products Summary</h3>
               <div className="flex items-center gap-2 text-sm font-bold">
-                <span>{formatCurrency(summary.totalSales)}</span>
-                <span className="text-default-400 dark:text-gray-500">·</span>
-                <span className="text-sky-600 dark:text-sky-400">
-                  {filteredAndSortedData.reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
-                </span>
                 <span className="text-default-400 dark:text-gray-500 font-normal">
                   ({filteredAndSortedData.length} products)
                 </span>
+                <span className="text-sky-600 dark:text-sky-400">
+                  {filteredAndSortedData.reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
+                </span>
+                <span className="text-default-400 dark:text-gray-500">·</span>
+                <span>{formatCurrency(summary.totalSales)}</span>
               </div>
             </div>
             {filteredAndSortedData.length > 0 ? (
@@ -1128,10 +1128,10 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                       fontWeight: 600,
                     }}
                   >
-                    <div>Total: {formatCurrency(summary.bhTotal)}</div>
-                    <div className="text-sm opacity-80">
+                    <div>
                       {salesData.filter(p => p.type === "BH").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
                     </div>
+                    <div className="text-sm opacity-80">Total: {formatCurrency(summary.bhTotal)}</div>
                   </div>
                 </>
               ) : (
@@ -1190,10 +1190,10 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                       fontWeight: 600,
                     }}
                   >
-                    <div>Total: {formatCurrency(summary.meeTotal)}</div>
-                    <div className="text-sm opacity-80">
+                    <div>
                       {salesData.filter(p => p.type === "MEE").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
                     </div>
+                    <div className="text-sm opacity-80">Total: {formatCurrency(summary.meeTotal)}</div>
                   </div>
                 </>
               ) : (
@@ -1251,10 +1251,10 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                       fontWeight: 600,
                     }}
                   >
-                    <div>Total: {formatCurrency(summary.othTotal)}</div>
-                    <div className="text-sm opacity-80">
+                    <div>
                       {salesData.filter(p => isJp ? p.type === "JP" : p.type === "OTH").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
                     </div>
+                    <div className="text-sm opacity-80">Total: {formatCurrency(summary.othTotal)}</div>
                   </div>
                 </>
               ) : (
