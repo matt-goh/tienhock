@@ -4,7 +4,7 @@
 // entries…). Content mirrors the legacy voucher: journal no + posted status +
 // date header, ACC/CODE · DESCRIPTION · DEBIT · CREDIT lines, totals, and a
 // PARTICULARS footer. Styled after the shared report design language
-// (BankStatementPDFMake): slate palette, company letterhead with logo.
+// (AccountLedgerPDFMake): slate palette, company letterhead with logo.
 import pdfMake from "pdfmake/build/pdfmake";
 import * as pdfFonts from "pdfmake/build/vfs_fonts";
 import { TDocumentDefinitions, TableCell, Content } from "pdfmake/interfaces";
@@ -12,7 +12,7 @@ import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfBlob } from "../pdfPrintFallback";
 
-// Initialize pdfmake with the bundled fonts (same pattern as BankStatementPDFMake)
+// Initialize pdfmake with the bundled fonts (same pattern as AccountLedgerPDFMake)
 (pdfMake as any).vfs = (pdfFonts as any).pdfMake?.vfs || pdfFonts;
 
 export interface JournalVoucherPDFLine {

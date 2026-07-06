@@ -97,7 +97,7 @@ The read-only bank-statement report is complete and verified against live data.
 
 - **Backend:** [bank-statement.js](src/routes/accounting/bank-statement.js) — `GET /api/bank-statement/:accountCode/:year/:month`. Returns `opening_balance` (from the opening-balance anchor when one is set — see build piece 2 — otherwise the net of all posted lines *before* the month), `opening_source` (`anchored` + as-of-date/amount, or `derived`), `transactions` (each posted journal line for the account, with a running balance), `closing_balance`, `totals`. Filters `status='posted'`, half-open month range, TZ-safe date strings. Mounted in [index.js](src/routes/index.js) (`/api/bank-statement`).
 - **Frontend:** [BankStatementPage.tsx](src/pages/Accounting/Reports/BankStatementPage.tsx) — **Accounting → Bank Statement** (`/accounting/reports/bank-statement`), registered in [TienHockNavData.tsx](src/pages/TienHockNavData.tsx). Account selector (BK-ledger accounts + `CASH`, default `BANK_PBB`), `MonthNavigator`, Date · Journal · Particulars · Cheque · Debit · Credit · running Balance (DR/CR), opening/closing summary cards.
-- **PDF:** [BankStatementPDFMake.ts](src/utils/accounting/BankStatementPDFMake.ts) — **pdfMake** (user prefers it over `@react-pdf/renderer`), landscape, mirrors legacy layout.
+- **PDF:** [AccountLedgerPDFMake.ts](src/utils/accounting/AccountLedgerPDFMake.ts) — **pdfMake** (user prefers it over `@react-pdf/renderer`), shared by the Bank Statement and Account Ledger reports, mirrors legacy layout.
 
 ### Key findings (verified against dev DB, May 2026)
 

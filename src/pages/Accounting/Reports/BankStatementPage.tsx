@@ -12,9 +12,9 @@ import OpeningBalanceModal from "../../../components/Accounting/OpeningBalanceMo
 import { api } from "../../../routes/utils/api";
 import { useAccountCodesCache } from "../../../utils/accounting/useAccountingCache";
 import {
-  generateBankStatementPDF,
-  BankStatementData,
-} from "../../../utils/accounting/BankStatementPDFMake";
+  generateAccountLedgerPDF,
+  AccountLedgerData,
+} from "../../../utils/accounting/AccountLedgerPDFMake";
 import toast from "react-hot-toast";
 
 const DEFAULT_ACCOUNT = "BANK_PBB";
@@ -39,7 +39,7 @@ const BankStatementPage: React.FC = () => {
   const { accountCodes, isLoading: accountsLoading } = useAccountCodesCache();
 
   const [selectedAccount, setSelectedAccount] = useState<string>(DEFAULT_ACCOUNT);
-  const [statement, setStatement] = useState<BankStatementData | null>(null);
+  const [statement, setStatement] = useState<AccountLedgerData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState<boolean>(false);
@@ -109,7 +109,7 @@ const BankStatementPage: React.FC = () => {
     if (!statement) return;
     setExporting(true);
     try {
-      await generateBankStatementPDF(statement);
+      await generateAccountLedgerPDF(statement);
     } catch (err) {
       console.error("Error printing PDF:", err);
       toast.error("Failed to generate PDF");
