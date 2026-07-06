@@ -672,7 +672,9 @@ export default function (pool) {
             socso_employer: 0,
             sip_employer: 0,
             pcb: 0,
-            net_salary: 0,
+            // Commissions have no deductions: the full amount is payable, so it must
+            // count toward net salary or the preview understates ACW_SAL
+            net_salary: amount,
             commission_mee: 0,
             commission_bh: 0,
             cuti_tahunan: 0,
@@ -1115,9 +1117,27 @@ export default function (pool) {
             );
             const entryId = entryResult.rows[0].id;
 
-            // Insert debit lines (using totals)
+            // Per-director net pay (gross - employee deductions), rounded UP to the
+            // whole ringgit per the legacy digenapkan convention. The accruals are
+            // credited with the rounded figures (what actually gets paid) and the
+            // rounding difference is debited back as a Rounding Adjustment line.
+            const directorNets = directorResult.rows.map((director) => {
+              const grossPay = parseFloat(director.gross_pay) || 0;
+              const epfEmp = parseFloat(director.epf_employee) || 0;
+              const socsoEmp = parseFloat(director.socso_employee) || 0;
+              const sipEmp = parseFloat(director.sip_employee) || 0;
+              const pcbAmt = parseFloat(director.pcb) || 0;
+              const net = Math.round((grossPay - epfEmp - socsoEmp - sipEmp - pcbAmt) * 100) / 100;
+              const rounded = net > 0 ? Math.ceil(net) : net;
+              return { particulars: director.particulars, rounded, roundingDiff: rounded - net };
+            });
+            const jvdrRounding =
+              Math.round(directorNets.reduce((sum, d) => sum + d.roundingDiff, 0) * 100) / 100;
+
+            // Insert debit lines (using totals; rounding right after salary, like legacy)
             const debitLines = [
               { account: directorMappings.salary, amount: directorTotals.gross_pay, desc: "Salary" },
+              { account: directorMappings.salary, amount: jvdrRounding, desc: "Rounding Adjustment" },
               { account: directorMappings.epf_employer, amount: directorTotals.epf_employer, desc: "EPF Employer" },
               { account: directorMappings.socso_employer, amount: directorTotals.socso_employer, desc: "SOCSO Employer" },
               { account: directorMappings.sip_employer, amount: directorTotals.sip_employer, desc: "SIP Employer" },
@@ -1132,22 +1152,14 @@ export default function (pool) {
               );
             }
 
-            // Insert individual director salary credit lines (ACD_SAL for each director)
-            for (const director of directorResult.rows) {
-              // Calculate net pay from gross minus employee deductions (instead of using stored net_pay)
-              // This ensures journal entry balances correctly
-              // Round to 2 decimal places to avoid floating point precision issues
-              const grossPay = parseFloat(director.gross_pay) || 0;
-              const epfEmp = parseFloat(director.epf_employee) || 0;
-              const socsoEmp = parseFloat(director.socso_employee) || 0;
-              const sipEmp = parseFloat(director.sip_employee) || 0;
-              const pcbAmt = parseFloat(director.pcb) || 0;
-              const calculatedNetPay = Math.round((grossPay - epfEmp - socsoEmp - sipEmp - pcbAmt) * 100) / 100;
-              if (directorMappings.accrual_salary && calculatedNetPay > 0) {
+            // Insert individual director salary credit lines (ACD_SAL for each director,
+            // rounded net per the digenapkan convention above)
+            for (const director of directorNets) {
+              if (directorMappings.accrual_salary && director.rounded > 0) {
                 await client.query(
                   `INSERT INTO journal_entry_lines (journal_entry_id, line_number, account_code, debit_amount, credit_amount, particulars)
                    VALUES ($1, $2, $3, $4, $5, $6)`,
-                  [entryId, lineNumber++, directorMappings.accrual_salary, 0, calculatedNetPay, director.particulars]
+                  [entryId, lineNumber++, directorMappings.accrual_salary, 0, director.rounded, director.particulars]
                 );
               }
             }
@@ -1174,15 +1186,11 @@ export default function (pool) {
             // Calculate and update totals
             // Round to 2 decimal places to avoid floating point precision issues
             const jvdrTotalDebit = Math.round(debitLines.reduce((sum, l) => sum + l.amount, 0) * 100) / 100;
-            // Use calculated net pay (gross - employee deductions) instead of stored net_pay
-            const jvdrTotalCredit = Math.round((directorResult.rows.reduce((sum, d) => {
-              const gross = parseFloat(d.gross_pay) || 0;
-              const epfE = parseFloat(d.epf_employee) || 0;
-              const socsoE = parseFloat(d.socso_employee) || 0;
-              const sipE = parseFloat(d.sip_employee) || 0;
-              const pcbE = parseFloat(d.pcb) || 0;
-              return sum + (gross - epfE - socsoE - sipE - pcbE);
-            }, 0) + otherCreditLines.reduce((sum, l) => sum + l.amount, 0)) * 100) / 100;
+            // Credits = rounded per-director nets (digenapkan) + other accruals
+            const jvdrTotalCredit = Math.round((
+              directorNets.reduce((sum, d) => sum + (d.rounded > 0 ? d.rounded : 0), 0) +
+              otherCreditLines.reduce((sum, l) => sum + l.amount, 0)
+            ) * 100) / 100;
             // A voucher that doesn't balance (usually missing account mappings on the
             // debit side) must never reach the ledger — abort the whole generation.
             if (Math.abs(jvdrTotalDebit - jvdrTotalCredit) > 0.01) {
@@ -1364,8 +1372,40 @@ export default function (pool) {
             // This maintains audit trail: net pay derived from actual payroll components
             const calculatedTotalNet = round2(totalGrossFromItems - totalEpfEmployee - totalSocsoEmployee - totalSipEmployee - totalPcb);
 
+            // Legacy digenapkan convention: each employee's net payable is rounded UP
+            // to the whole ringgit, ACW_SAL is credited with the rounded total, and the
+            // difference is debited back as a Rounding Adjustment. Needs a JVSL
+            // location-00 'rounding' mapping for the debit account; when absent the
+            // voucher is generated unrounded (still balanced) as before.
+            let jvslRounding = 0;
+            if (staffAccruals.rounding) {
+              const roundingResult = await client.query(
+                `WITH per_emp AS (
+                   SELECT ep.gross_pay - COALESCE(SUM(pd.employee_amount), 0) AS net
+                     FROM employee_payrolls ep
+                     JOIN monthly_payrolls mp ON mp.id = ep.monthly_payroll_id
+                     LEFT JOIN payroll_deductions pd ON pd.employee_payroll_id = ep.id
+                    WHERE mp.year = $1 AND mp.month = $2
+                      AND ep.employee_id NOT IN ('GOH', 'WONG', 'WINNIE', 'WINNIE.G')
+                    GROUP BY ep.id, ep.gross_pay
+                 )
+                 SELECT COALESCE(SUM(CEIL(net) - net), 0) AS rounding
+                   FROM per_emp WHERE net > 0`,
+                [yearInt, monthInt]
+              );
+              jvslRounding = round2(parseFloat(roundingResult.rows[0].rounding) || 0);
+              if (jvslRounding > 0) {
+                await client.query(
+                  `INSERT INTO journal_entry_lines (journal_entry_id, line_number, account_code, debit_amount, credit_amount, particulars)
+                   VALUES ($1, $2, $3, $4, $5, $6)`,
+                  [entryId, lineNumber++, staffAccruals.rounding, jvslRounding, 0, "Rounding Adjustment"]
+                );
+                jvslTotalDebit += jvslRounding;
+              }
+            }
+
             const creditLines = [
-              { account: staffAccruals.accrual_salary, amount: calculatedTotalNet, desc: "Total Salary Payable" },
+              { account: staffAccruals.accrual_salary, amount: round2(calculatedTotalNet + jvslRounding), desc: "Total Salary Payable" },
               { account: staffAccruals.accrual_epf, amount: round2(totalEpf + totalEpfEmployee), desc: "Total EPF Payable" },
               { account: staffAccruals.accrual_socso, amount: round2(totalSocso + totalSocsoEmployee), desc: "Total SOCSO Payable" },
               { account: staffAccruals.accrual_sip, amount: round2(totalSip + totalSipEmployee), desc: "Total SIP Payable" },

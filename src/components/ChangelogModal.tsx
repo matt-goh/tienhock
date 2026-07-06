@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-06",
+    ms: "Baucar gaji (JVDR/JVSL) kini mengikut kaedah pembundaran sistem lama: gaji bersih setiap pekerja/pengarah digenapkan ke ringgit penuh sebelum dikreditkan ke akaun akruan, dengan baris 'Rounding Adjustment' untuk perbezaannya — jumlah baucar kini sepadan dengan cetakan sistem lama (cth. JVDR Jun 12,940.00). Kad pratonton 'Salary Payable' juga diperbetulkan — sebelum ini ia terkurang nyata kerana tidak mengambil kira komisen.",
+    en: "Payroll vouchers (JVDR/JVSL) now follow the legacy rounding method: each employee's/director's net pay is rounded up to the whole ringgit before crediting the accrual accounts, with a 'Rounding Adjustment' line for the difference — voucher totals now match the legacy prints (e.g. June JVDR 12,940.00). The 'Salary Payable' preview card is also fixed — it previously understated the figure by excluding commissions.",
+  },
+  {
+    date: "2026-07-06",
     ms: "Laporan baharu: Account Ledger (Accounting → Reports). Cari mana-mana kod akaun (contohnya kod perbelanjaan seperti MGT untuk Menggatal atau MBRMF untuk boiler, akaun pembekal, atau akaun pengarah) dan lihat sejarah transaksi penuh untuk bulan tersebut — baki pembukaan, setiap catatan jurnal, baki berjalan dan jumlah penutup, dengan cetakan PDF.",
     en: "New report: Account Ledger (Accounting → Reports). Search any account code (e.g. expenditure codes like MGT for Menggatal or MBRMF for boiler, a supplier account, or a director account) and view its full transaction history for the month — opening balance, every journal entry, running balance and closing totals, with PDF printing.",
   },
