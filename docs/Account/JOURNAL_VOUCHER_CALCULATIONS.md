@@ -38,6 +38,14 @@ Balance Verification:
   Gross = Net + EPF_employee + SOCSO_employee + SIP_employee + PCB
 ```
 
+### Rounding (digenapkan) — added 6 Jul 2026
+
+Legacy convention, now reproduced: each director's net pay is rounded **up to the whole
+ringgit** before crediting `ACD_SAL` (e.g. 3,077.05 → 3,078.00), and the total rounding
+difference is debited back to the salary expense account (`MBDRS`) as a
+**"Rounding Adjustment"** line — exactly like the legacy JVDR print
+(Jun 2026: nets 9,819.05 → 9,821.00, rounding 1.95, voucher total 12,940.00).
+
 ---
 
 ## JVSL - Staff Salary Voucher
@@ -61,11 +69,35 @@ Balance Verification:
 
 | Account Code | Description | Calculation | Notes |
 |--------------|-------------|-------------|-------|
-| **ACW_SAL** | Salary Payable | Total net pay | Sum of all staff net pay |
+| **ACW_SAL** | Salary Payable | Total net pay (+ rounding, see below) | Sum of all staff net pay |
 | **ACW_EPF** | EPF Payable | `totalEpf + totalEpfEmployee` | Total EPF (both portions) |
 | **ACW_SC** | SOCSO Payable | `totalSocso + totalSocsoEmployee` | Total SOCSO (both portions) |
 | **ACW_SIP** | SIP Payable | `totalSip + totalSipEmployee` | Total SIP (both portions) |
 | **ACW_PCB** | PCB Payable | `totalPcb` | Total employee tax withheld |
+
+### Rounding (digenapkan) — added 6 Jul 2026
+
+Legacy convention, now reproduced **when a `rounding` mapping exists** for
+`voucher_type='JVSL', location_id='00'` in `location_account_mappings`: per-employee
+net (`gross_pay − Σ employee statutory − PCB`, directors excluded) is rounded **up to
+the whole ringgit**; `ACW_SAL` is credited with the rounded total and the difference is
+debited to the mapped rounding account as a **"Rounding Adjustment"** line
+(Jun 2026: 143,477.64 → 143,513.00, rounding 35.36 — matches the legacy JVSL).
+Without the mapping the voucher is generated unrounded (still balanced) as before.
+Add the mapping with:
+
+```sql
+INSERT INTO location_account_mappings
+  (location_id, location_name, mapping_type, account_code, voucher_type, is_active)
+VALUES ('00', 'Accruals', 'rounding', '<EXPENSE_CODE_FROM_LEGACY_JVSL_PAGE_1>', 'JVSL', true);
+```
+
+Note: `ACW_SAL` accrues the **full** rounded net *before* advance deductions (advance
+commissions `commission_records.is_advance = true` and Others records are part of gross
+and payable) and *before* the mid-month advance — those channels each settle `ACW_SAL`
+when paid (bank monthly payment, half-month payment, cash PV entries). Jun 2026 proof:
+advance commissions 13,217.25 are inside the 143,513.00, and the payroll page's net
+figures that deduct them are payment-side numbers, not accrual-side.
 
 ---
 
