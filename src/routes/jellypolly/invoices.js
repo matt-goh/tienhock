@@ -1930,30 +1930,33 @@ export default function (pool, config) {
 
       // Handle INVOICE to CASH conversion
       if (currentPaymentType === "INVOICE" && paymenttype === "CASH") {
-        // Create automatic payment for the full amount
-        const paymentAmount = currentInvoice.totalamountpayable;
+        // Create automatic payment for the outstanding balance only —
+        // any real payments already recorded keep counting toward the total
+        const paymentAmount = parseFloat(currentInvoice.balance_due || 0);
         const paymentDate = new Date(Number(currentInvoice.createddate))
           .toISOString()
           .split("T")[0]; // YYYY-MM-DD format
 
-        const insertPaymentQuery = `
+        if (paymentAmount > 0) {
+          const insertPaymentQuery = `
         INSERT INTO jellypolly.payments (invoice_id, payment_date, payment_method, amount_paid, notes, status)
         VALUES ($1, $2, 'cash', $3, 'Automatic payment - converted from INVOICE to CASH', 'active')
         RETURNING payment_id
       `;
 
-        await client.query(insertPaymentQuery, [
-          id,
-          paymentDate,
-          paymentAmount,
-        ]);
+          await client.query(insertPaymentQuery, [
+            id,
+            paymentDate,
+            paymentAmount,
+          ]);
 
-        // Reduce customer credit usage since invoice is no longer on credit
-        await updateCustomerCredit(
-          client,
-          currentInvoice.customerid,
-          -paymentAmount // Negative amount decreases credit_used
-        );
+          // Reduce customer credit usage by the settled outstanding amount
+          await updateCustomerCredit(
+            client,
+            currentInvoice.customerid,
+            -paymentAmount // Negative amount decreases credit_used
+          );
+        }
 
         // Update invoice to CASH type with zero balance and paid status
         const updateInvoiceQuery = `
@@ -1967,41 +1970,57 @@ export default function (pool, config) {
       }
       // Handle CASH to INVOICE conversion
       else if (currentPaymentType === "CASH" && paymenttype === "INVOICE") {
-        // Find and cancel the automatic payment if it exists
+        // Cancel ALL active automatic payments. Two note texts exist in the data:
+        // "Automatic payment ..." (backend default / conversions) and
+        // "Payment automatically recorded for CASH invoices" (sent by the invoice form)
         const findPaymentQuery = `
-        SELECT payment_id FROM jellypolly.payments 
-        WHERE invoice_id = $1 AND payment_method = 'cash' 
-        AND notes LIKE '%Automatic payment%' 
+        SELECT payment_id FROM jellypolly.payments
+        WHERE invoice_id = $1
+        AND (notes LIKE 'Automatic payment%' OR notes LIKE 'Payment automatically recorded%')
         AND (status IS NULL OR status = 'active')
-        ORDER BY payment_date DESC 
-        LIMIT 1
       `;
 
         const paymentResult = await client.query(findPaymentQuery, [id]);
 
-        if (paymentResult.rows.length > 0) {
-          const payment = paymentResult.rows[0];
-
+        for (const payment of paymentResult.rows) {
           // Cancel the automatic payment
           const cancelPaymentQuery = `
-          UPDATE jellypolly.payments 
-          SET status = 'cancelled', notes = CONCAT(notes, ' - Cancelled due to payment type change')
+          UPDATE jellypolly.payments
+          SET status = 'cancelled',
+              cancellation_date = NOW(),
+              cancellation_reason = 'Payment type changed from CASH to INVOICE'
           WHERE payment_id = $1
         `;
 
           await client.query(cancelPaymentQuery, [payment.payment_id]);
         }
 
-        // Increase customer credit usage since invoice is now on credit
+        // Any remaining active payments are real receipts and must stay counted
+        const remainingResult = await client.query(
+          `SELECT COALESCE(SUM(amount_paid), 0) AS active_paid
+         FROM jellypolly.payments
+         WHERE invoice_id = $1 AND (status IS NULL OR status = 'active')`,
+          [id]
+        );
+        const activePaid = parseFloat(remainingResult.rows[0].active_paid || 0);
+        const totalPayable = parseFloat(
+          currentInvoice.totalamountpayable || 0
+        );
+        const newBalance = parseFloat(
+          Math.max(0, totalPayable - activePaid).toFixed(2)
+        );
+        const newStatus = newBalance <= 0 ? "paid" : "Unpaid";
+
+        // Increase customer credit usage by the actual outstanding amount
         await updateCustomerCredit(
           client,
           currentInvoice.customerid,
-          currentInvoice.totalamountpayable // Positive amount increases credit_used
+          newBalance // Positive amount increases credit_used
         );
 
-        // Update invoice to INVOICE type with full balance and unpaid status
+        // Update invoice to INVOICE type with the computed balance and status
         const updateInvoiceQuery = `
-        UPDATE jellypolly.invoices 
+        UPDATE jellypolly.invoices
         SET paymenttype = $1, balance_due = $2, invoice_status = $3
         WHERE id = $4
         RETURNING id
@@ -2009,8 +2028,8 @@ export default function (pool, config) {
 
         await client.query(updateInvoiceQuery, [
           "INVOICE",
-          currentInvoice.totalamountpayable,
-          "Unpaid",
+          newBalance,
+          newStatus,
           id,
         ]);
       }
