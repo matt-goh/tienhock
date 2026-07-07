@@ -16,6 +16,7 @@ import { useStaffFormOptions } from "../../../hooks/useStaffFormOptions";
 import SelectedTagsDisplay from "../../../components/Catalogue/SelectedTagsDisplay";
 import { useJPStaffsCache } from "../../../utils/JellyPolly/useJPStaffsCache";
 import { useJPJobsCache } from "../../../utils/JellyPolly/useJPJobsCache";
+import { useJPLocationMappingsCache } from "../../../utils/JellyPolly/useJPLocationMappingsCache";
 
 interface SelectOption {
   id: string;
@@ -94,6 +95,7 @@ const JPStaffAddPage: React.FC = () => {
   const { allStaffs, refreshStaffs } = useJPStaffsCache();
   const { options } = useStaffFormOptions();
   const { jobs } = useJPJobsCache();
+  const { locations: jpLocations } = useJPLocationMappingsCache();
 
   const genderOptions = [
     { id: "Male", name: "Male" },
@@ -251,7 +253,11 @@ const JPStaffAddPage: React.FC = () => {
   const handleComboboxChange = useCallback(
     (name: "job" | "location", value: string[] | null) => {
       if (value === null) {
-        // Do nothing when the input is cleared
+        // Location may be cleared to none; other fields keep their value when
+        // the search input is emptied.
+        if (name === "location") {
+          setFormData((prevData) => ({ ...prevData, location: [] }));
+        }
         return;
       }
       setFormData((prevData) => ({
@@ -529,7 +535,7 @@ const JPStaffAddPage: React.FC = () => {
                   {renderCombobox(
                     "location",
                     "Location",
-                    options.locations,
+                    jpLocations.map((l) => ({ id: l.id, name: l.name })),
                     locationQuery,
                     setLocationQuery
                   )}
