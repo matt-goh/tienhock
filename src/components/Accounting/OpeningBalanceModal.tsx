@@ -182,7 +182,7 @@ const OpeningBalanceModal: React.FC<OpeningBalanceModalProps> = ({
                         onChange={(e) => setAmount(e.target.value)}
                         placeholder="0.00"
                         disabled={isSaving}
-                        className="flex-1 h-[40px] px-3 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 text-right font-mono hover:border-default-400 dark:hover:border-gray-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-colors"
+                        className="flex-1 h-[40px] px-3 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 text-right hover:border-default-400 dark:hover:border-gray-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-colors"
                       />
                       <ListboxSelect
                         value={drcr}

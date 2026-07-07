@@ -187,7 +187,7 @@ const CogmPage: React.FC = () => {
                       <span className="text-gray-700 dark:text-gray-300">
                         {item.name} (Note {item.note})
                       </span>
-                      <span className="font-mono text-gray-900 dark:text-white">
+                      <span className="text-gray-900 dark:text-white">
                         {formatCurrency(item.amount)}
                       </span>
                     </div>
@@ -195,7 +195,7 @@ const CogmPage: React.FC = () => {
                 </div>
                 <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
                   <span className="text-gray-800 dark:text-gray-200">Total Raw Materials</span>
-                  <span className="font-mono text-gray-900 dark:text-white">
+                  <span className="text-gray-900 dark:text-white">
                     {formatCurrency(data.raw_materials.total)}
                   </span>
                 </div>
@@ -214,7 +214,7 @@ const CogmPage: React.FC = () => {
                       <span className="text-gray-700 dark:text-gray-300">
                         {item.name} (Note {item.note})
                       </span>
-                      <span className="font-mono text-gray-900 dark:text-white">
+                      <span className="text-gray-900 dark:text-white">
                         {formatCurrency(item.amount)}
                       </span>
                     </div>
@@ -222,7 +222,7 @@ const CogmPage: React.FC = () => {
                 </div>
                 <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
                   <span className="text-gray-800 dark:text-gray-200">Total Packing Materials</span>
-                  <span className="font-mono text-gray-900 dark:text-white">
+                  <span className="text-gray-900 dark:text-white">
                     {formatCurrency(data.packing_materials.total)}
                   </span>
                 </div>
@@ -241,7 +241,7 @@ const CogmPage: React.FC = () => {
                       <span className="text-gray-700 dark:text-gray-300">
                         {item.name} (Note {item.note})
                       </span>
-                      <span className="font-mono text-gray-900 dark:text-white">
+                      <span className="text-gray-900 dark:text-white">
                         {formatCurrency(item.amount)}
                       </span>
                     </div>
@@ -249,7 +249,7 @@ const CogmPage: React.FC = () => {
                 </div>
                 <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
                   <span className="text-gray-800 dark:text-gray-200">Total Direct Labor</span>
-                  <span className="font-mono text-gray-900 dark:text-white">
+                  <span className="text-gray-900 dark:text-white">
                     {formatCurrency(data.labor_costs.total)}
                   </span>
                 </div>
@@ -268,7 +268,7 @@ const CogmPage: React.FC = () => {
                       <span className="text-gray-700 dark:text-gray-300">
                         {item.name} (Note {item.note})
                       </span>
-                      <span className="font-mono text-gray-900 dark:text-white">
+                      <span className="text-gray-900 dark:text-white">
                         {formatCurrency(item.amount)}
                       </span>
                     </div>
@@ -276,7 +276,7 @@ const CogmPage: React.FC = () => {
                 </div>
                 <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
                   <span className="text-gray-800 dark:text-gray-200">Total Other Costs</span>
-                  <span className="font-mono text-gray-900 dark:text-white">
+                  <span className="text-gray-900 dark:text-white">
                     {formatCurrency(data.other_costs.total)}
                   </span>
                 </div>
@@ -286,7 +286,7 @@ const CogmPage: React.FC = () => {
             {/* Total COGM */}
             <div className="flex justify-between text-lg font-bold py-4 border-y-2 border-gray-400 dark:border-gray-500 bg-amber-50 dark:bg-amber-900/30 -mx-6 px-6">
               <span className="text-gray-900 dark:text-white">COST OF GOODS MANUFACTURED</span>
-              <span className="font-mono text-amber-700 dark:text-amber-400">
+              <span className="text-amber-700 dark:text-amber-400">
                 RM {formatCurrency(data.total_cogm)}
               </span>
             </div>

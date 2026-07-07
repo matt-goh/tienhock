@@ -759,7 +759,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
               {isEditMode ? "Local General Purchase" : "New Local General Purchase"}
             </h1>
             {existingInvoice && (
-              <p className="font-mono text-sm text-default-500 dark:text-gray-400">
+              <p className="text-sm text-default-500 dark:text-gray-400">
                 {existingInvoice.self_billed_no}
               </p>
             )}
@@ -956,7 +956,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
                           <span className="text-[10px] font-semibold uppercase tracking-wide text-indigo-400 dark:text-indigo-300/70">
                             Current
                           </span>
-                          <span className="font-mono text-sm font-medium tabular-nums text-default-700 dark:text-gray-200">
+                          <span className="text-sm font-medium tabular-nums text-default-700 dark:text-gray-200">
                             {formatQty(toNumber(selectedStockRow.current_stock))}
                           </span>
                         </div>
@@ -968,7 +968,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
                           <span className="text-[10px] font-semibold uppercase tracking-wide text-indigo-500 dark:text-indigo-300">
                             After purchase
                           </span>
-                          <span className="font-mono text-sm font-bold tabular-nums text-indigo-700 dark:text-indigo-200">
+                          <span className="text-sm font-bold tabular-nums text-indigo-700 dark:text-indigo-200">
                             {formatQty(newBalance)}
                           </span>
                         </div>
@@ -1106,7 +1106,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
                         onClick={() =>
                           navigate(`/accounting/supplier-payments/${payment.payment_id}`)
                         }
-                        className="font-mono text-sky-700 hover:text-sky-900 hover:underline dark:text-sky-300 dark:hover:text-sky-200"
+                        className="text-sky-700 hover:text-sky-900 hover:underline dark:text-sky-300 dark:hover:text-sky-200"
                       >
                         {payment.internal_reference || `Payment #${payment.payment_id}`}
                       </button>
@@ -1127,10 +1127,10 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
                         </span>
                       )}
                     </td>
-                    <td className="px-2 py-2 text-right font-mono text-default-900 dark:text-gray-100">
+                    <td className="px-2 py-2 text-right text-default-900 dark:text-gray-100">
                       {formatCurrency(toNumber(payment.amount_paid))}
                     </td>
-                    <td className="px-2 py-2 font-mono text-default-700 dark:text-gray-200">
+                    <td className="px-2 py-2 text-default-700 dark:text-gray-200">
                       {payment.journal_reference_no || "-"}
                     </td>
                     <td className="px-2 py-2 capitalize text-default-700 dark:text-gray-200">

@@ -387,7 +387,7 @@ const SupplierPaymentFormPage: React.FC = () => {
               {isEditMode ? "Supplier Payment" : "Record Supplier Payment"}
             </h1>
             {existing && (
-              <p className="font-mono text-sm text-default-500 dark:text-gray-400">
+              <p className="text-sm text-default-500 dark:text-gray-400">
                 {existing.internal_reference || `Payment #${existing.payment_id}`}
                 {existing.status === "cancelled" && (
                   <span className="ml-2 inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300">
@@ -444,19 +444,19 @@ const SupplierPaymentFormPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => navigate(invoiceUrl)}
-                  className="font-mono text-sky-700 hover:text-sky-900 hover:underline dark:text-sky-300 dark:hover:text-sky-200"
+                  className="text-sky-700 hover:text-sky-900 hover:underline dark:text-sky-300 dark:hover:text-sky-200"
                 >
                   {invoice.doc_no}
                 </button>
               ) : (
-                <p className="font-mono text-default-900 dark:text-gray-100">
+                <p className="text-default-900 dark:text-gray-100">
                   {invoice.doc_no}
                 </p>
               )}
             </div>
             <div>
               <p className="text-xs text-default-500 dark:text-gray-400">Total</p>
-              <p className="font-mono text-default-900 dark:text-gray-100">
+              <p className="text-default-900 dark:text-gray-100">
                 {formatCurrency(invoice.total)}
               </p>
             </div>
@@ -464,7 +464,7 @@ const SupplierPaymentFormPage: React.FC = () => {
               <p className="text-xs text-default-500 dark:text-gray-400">
                 {isEditMode ? "Already Paid" : "Outstanding Balance"}
               </p>
-              <p className="font-mono text-default-900 dark:text-gray-100">
+              <p className="text-default-900 dark:text-gray-100">
                 {isEditMode
                   ? formatCurrency(invoice.amount_paid)
                   : formatCurrency(invoice.balance)}
@@ -577,12 +577,12 @@ const SupplierPaymentFormPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => navigate(journalUrl)}
-                  className="font-mono text-sky-700 hover:text-sky-900 hover:underline dark:text-sky-300 dark:hover:text-sky-200"
+                  className="text-sky-700 hover:text-sky-900 hover:underline dark:text-sky-300 dark:hover:text-sky-200"
                 >
                   {existing.journal_reference_no}
                 </button>
               ) : (
-                <p className="font-mono text-default-900 dark:text-gray-100">
+                <p className="text-default-900 dark:text-gray-100">
                   {existing.journal_reference_no || "-"}
                 </p>
               )}

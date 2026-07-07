@@ -227,7 +227,7 @@ const AccountLedgerPage: React.FC = () => {
             <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
               Opening Balance
             </div>
-            <div className="text-lg font-semibold font-mono text-gray-900 dark:text-white mt-1">
+            <div className="text-lg font-semibold text-gray-900 dark:text-white mt-1">
               {formatBalance(statement.opening_balance)}
             </div>
             <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
@@ -240,7 +240,7 @@ const AccountLedgerPage: React.FC = () => {
             <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
               Movement (Dr / Cr)
             </div>
-            <div className="text-lg font-semibold font-mono text-gray-900 dark:text-white mt-1">
+            <div className="text-lg font-semibold text-gray-900 dark:text-white mt-1">
               {formatCurrency(statement.totals.debit)} / {formatCurrency(statement.totals.credit)}
             </div>
           </div>
@@ -248,7 +248,7 @@ const AccountLedgerPage: React.FC = () => {
             <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
               Closing Balance
             </div>
-            <div className="text-lg font-semibold font-mono text-gray-900 dark:text-white mt-1">
+            <div className="text-lg font-semibold text-gray-900 dark:text-white mt-1">
               {formatBalance(statement.closing_balance)}
             </div>
           </div>
@@ -291,7 +291,7 @@ const AccountLedgerPage: React.FC = () => {
                   <td colSpan={6} className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
                     Balance Brought Forward
                   </td>
-                  <td className="px-4 py-3 text-right font-mono font-semibold text-gray-900 dark:text-white">
+                  <td className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">
                     {formatBalance(statement.opening_balance)}
                   </td>
                 </tr>
@@ -311,22 +311,22 @@ const AccountLedgerPage: React.FC = () => {
                       <td className="px-4 py-2.5 text-gray-700 dark:text-gray-300 whitespace-nowrap">
                         {formatDate(t.entry_date)}
                       </td>
-                      <td className="px-4 py-2.5 font-mono text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                      <td className="px-4 py-2.5 text-gray-700 dark:text-gray-300 whitespace-nowrap">
                         {t.reference_no}
                       </td>
                       <td className="px-4 py-2.5 text-gray-700 dark:text-gray-300">
                         {t.particulars}
                       </td>
-                      <td className="px-4 py-2.5 font-mono text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                      <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400 whitespace-nowrap">
                         {t.cheque_no || "-"}
                       </td>
-                      <td className="px-4 py-2.5 text-right font-mono text-gray-900 dark:text-white">
+                      <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">
                         {t.debit > 0 ? formatCurrency(t.debit) : "-"}
                       </td>
-                      <td className="px-4 py-2.5 text-right font-mono text-gray-900 dark:text-white">
+                      <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">
                         {t.credit > 0 ? formatCurrency(t.credit) : "-"}
                       </td>
-                      <td className="px-4 py-2.5 text-right font-mono text-gray-900 dark:text-white whitespace-nowrap">
+                      <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white whitespace-nowrap">
                         {formatBalance(t.balance)}
                       </td>
                     </tr>
@@ -338,13 +338,13 @@ const AccountLedgerPage: React.FC = () => {
                   <td colSpan={4} className="px-4 py-3 font-bold text-gray-900 dark:text-white text-right">
                     TOTALS:
                   </td>
-                  <td className="px-4 py-3 text-right font-mono font-bold text-gray-900 dark:text-white">
+                  <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">
                     {formatCurrency(statement.totals.debit)}
                   </td>
-                  <td className="px-4 py-3 text-right font-mono font-bold text-gray-900 dark:text-white">
+                  <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">
                     {formatCurrency(statement.totals.credit)}
                   </td>
-                  <td className="px-4 py-3 text-right font-mono font-bold text-gray-900 dark:text-white whitespace-nowrap">
+                  <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white whitespace-nowrap">
                     {formatBalance(statement.closing_balance)}
                   </td>
                 </tr>
