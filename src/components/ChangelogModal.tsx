@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-08",
+    ms: "Laporan Trial Balance, Income Statement, Balance Sheet dan CoGM kini menunjukkan angka sebenar daripada rekod jualan, belian, gaji dan bayaran. Butang Panduan (BM/EN) ditambah pada setiap laporan untuk menerangkan dari mana setiap angka datang. Tarikh laporan juga dibetulkan supaya hari terakhir bulan tidak tertinggal.",
+    en: "The Trial Balance, Income Statement, Balance Sheet and CoGM reports now show real figures from sales, purchases, payroll and payment records. A Guide button (BM/EN) was added on each report explaining where every amount comes from. Report dates were also fixed so the last day of the month is no longer left out.",
+  },
+  {
+    date: "2026-07-08",
     ms: "Laporan Bank Statement kini disatukan di Account Ledger. Untuk akaun BANK_PBB, buka Accounting -> Reports -> Account Ledger dan pilih BANK_PBB; baki pembukaan, transaksi, baki berjalan dan cetakan PDF masih tersedia di sana.",
     en: "Bank Statement is now folded into Account Ledger. For BANK_PBB, open Accounting -> Reports -> Account Ledger and select BANK_PBB; opening balance, transactions, running balance and PDF printing are still available there.",
   },

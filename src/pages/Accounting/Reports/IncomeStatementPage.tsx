@@ -4,6 +4,7 @@ import { IconPrinter, IconRefresh } from "@tabler/icons-react";
 import MonthNavigator from "../../../components/MonthNavigator";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import ReportSourceGuide from "../../../components/Accounting/ReportSourceGuide";
 import { api } from "../../../routes/utils/api";
 import { generateIncomeStatementPDF } from "../../../utils/accounting/IncomeStatementPDF";
 import toast from "react-hot-toast";
@@ -127,6 +128,8 @@ const IncomeStatementPage: React.FC = () => {
           />
 
           <div className="flex flex-wrap items-center gap-3">
+            <ReportSourceGuide report="income_statement" />
+
             <Button
               onClick={fetchData}
               variant="outline"

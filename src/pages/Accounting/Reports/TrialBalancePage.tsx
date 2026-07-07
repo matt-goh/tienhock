@@ -12,6 +12,7 @@ import MonthNavigator from "../../../components/MonthNavigator";
 import Button from "../../../components/Button";
 import Checkbox from "../../../components/Checkbox";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import ReportSourceGuide from "../../../components/Accounting/ReportSourceGuide";
 import { api } from "../../../routes/utils/api";
 import { generateTrialBalancePDF } from "../../../utils/accounting/TrialBalancePDF";
 import toast from "react-hot-toast";
@@ -212,6 +213,9 @@ const TrialBalancePage: React.FC = () => {
               size={18}
               className="flex-shrink-0"
             />
+
+            {/* Source Guide */}
+            <ReportSourceGuide report="trial_balance" />
 
             {/* Refresh Button */}
             <Button

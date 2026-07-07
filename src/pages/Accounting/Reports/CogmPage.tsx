@@ -4,6 +4,7 @@ import { IconPrinter, IconRefresh } from "@tabler/icons-react";
 import MonthNavigator from "../../../components/MonthNavigator";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import ReportSourceGuide from "../../../components/Accounting/ReportSourceGuide";
 import { api } from "../../../routes/utils/api";
 import { generateCogmPDF } from "../../../utils/accounting/CogmPDF";
 import toast from "react-hot-toast";
@@ -126,6 +127,8 @@ const CogmPage: React.FC = () => {
           />
 
           <div className="flex flex-wrap items-center gap-3">
+            <ReportSourceGuide report="cogm" />
+
             <Button
               onClick={fetchData}
               variant="outline"

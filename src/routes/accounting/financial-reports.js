@@ -4,6 +4,19 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
 
+  // Build local yyyy-MM-dd period boundaries for a YTD report (Jan 1 -> last day of month).
+  // Never derive these via toISOString(): the server runs in UTC+8, so that shifts the
+  // date back one day (Jan 1 becomes Dec 31, month-end loses its last day).
+  const getYtdPeriod = (year, month) => {
+    const lastDay = new Date(year, month, 0).getDate();
+    const mm = String(month).padStart(2, "0");
+    return {
+      startStr: `${year}-01-01`,
+      endStr: `${year}-${mm}-${String(lastDay).padStart(2, "0")}`,
+      endTs: new Date(year, month, 0, 23, 59, 59, 999).getTime(),
+    };
+  };
+
   // Helper function to validate year/month parameters
   const validateYearMonth = (year, month) => {
     const yearNum = parseInt(year);
@@ -370,11 +383,8 @@ export default function (pool) {
       }
 
       // Calculate YTD period: Jan 1 to end of selected month
-      const periodStart = new Date(validation.year, 0, 1); // Jan 1
-      const periodEnd = new Date(validation.year, validation.month, 0); // Last day of selected month
-      const periodStartStr = periodStart.toISOString().split("T")[0];
-      const periodEndStr = periodEnd.toISOString().split("T")[0];
-      const periodEndTs = new Date(validation.year, validation.month, 0, 23, 59, 59, 999).getTime();
+      const { startStr: periodStartStr, endStr: periodEndStr, endTs: periodEndTs } =
+        getYtdPeriod(validation.year, validation.month);
 
       // Get all account balances from journal entries for YTD period
       let query = `
@@ -499,11 +509,8 @@ export default function (pool) {
       }
 
       // Calculate YTD period: Jan 1 to end of selected month
-      const periodStart = new Date(validation.year, 0, 1); // Jan 1
-      const periodEnd = new Date(validation.year, validation.month, 0); // Last day of selected month
-      const periodStartStr = periodStart.toISOString().split("T")[0];
-      const periodEndStr = periodEnd.toISOString().split("T")[0];
-      const periodEndTs = new Date(validation.year, validation.month, 0, 23, 59, 59, 999).getTime();
+      const { startStr: periodStartStr, endStr: periodEndStr, endTs: periodEndTs } =
+        getYtdPeriod(validation.year, validation.month);
 
       // Get balances grouped by fs_note for the YTD period
       const query = `
@@ -630,11 +637,8 @@ export default function (pool) {
       }
 
       // Calculate YTD period: Jan 1 to end of selected month
-      const periodStart = new Date(validation.year, 0, 1); // Jan 1
-      const periodEnd = new Date(validation.year, validation.month, 0); // Last day of selected month
-      const periodStartStr = periodStart.toISOString().split("T")[0];
-      const periodEndStr = periodEnd.toISOString().split("T")[0];
-      const periodEndTs = new Date(validation.year, validation.month, 0, 23, 59, 59, 999).getTime();
+      const { startStr: periodStartStr, endStr: periodEndStr, endTs: periodEndTs } =
+        getYtdPeriod(validation.year, validation.month);
 
       // Get YTD balances grouped by fs_note
       const query = `
@@ -789,10 +793,8 @@ export default function (pool) {
       }
 
       // Calculate YTD period: Jan 1 to end of selected month
-      const periodStart = new Date(validation.year, 0, 1); // Jan 1
-      const periodEnd = new Date(validation.year, validation.month, 0); // Last day of selected month
-      const periodStartStr = periodStart.toISOString().split("T")[0];
-      const periodEndStr = periodEnd.toISOString().split("T")[0];
+      const { startStr: periodStartStr, endStr: periodEndStr } =
+        getYtdPeriod(validation.year, validation.month);
 
       // Get COGM-related balances
       const query = `
