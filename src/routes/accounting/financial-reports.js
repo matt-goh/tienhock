@@ -370,11 +370,15 @@ export default function (pool) {
   // ==================== TRIAL BALANCE ====================
 
   // GET /trial-balance/:year/:month - Generate trial balance for a period
-  // Date range: YTD from Jan 1 of year to end of selected month
+  // Date range: YTD from Jan 1 of year to end of selected month.
+  // Optional query params: ledger_type, search (code/description/note), hide_zero=true,
+  // limit + offset (server-side pagination; omit limit to get every account — PDF export
+  // relies on this). Totals always cover the whole trial balance (ledger_type filter only),
+  // regardless of search/hide_zero/pagination.
   router.get("/trial-balance/:year/:month", async (req, res) => {
     try {
       const { year, month } = req.params;
-      const { ledger_type } = req.query;
+      const { ledger_type, search, hide_zero, limit, offset } = req.query;
 
       // Validate year/month parameters
       const validation = validateYearMonth(year, month);
@@ -386,8 +390,15 @@ export default function (pool) {
       const { startStr: periodStartStr, endStr: periodEndStr, endTs: periodEndTs } =
         getYtdPeriod(validation.year, validation.month);
 
-      // Get all account balances from journal entries for YTD period
-      let query = `
+      // Shared CTE: every active account with journal activity in the period
+      const baseParams = [periodStartStr, periodEndStr];
+      let ledgerFilter = "";
+      if (ledger_type) {
+        baseParams.push(ledger_type);
+        ledgerFilter = ` AND ac.ledger_type = $${baseParams.length}`;
+      }
+
+      const baseCte = `
         WITH account_balances AS (
           SELECT
             jel.account_code,
@@ -399,64 +410,85 @@ export default function (pool) {
             AND je.entry_date >= $1
             AND je.entry_date <= $2
           GROUP BY jel.account_code
+        ),
+        active_accounts AS (
+          SELECT
+            ac.code,
+            ac.description,
+            ac.ledger_type,
+            ac.fs_note,
+            fsn.name as note_name,
+            ab.total_debit,
+            ab.total_credit,
+            CASE
+              WHEN fsn.normal_balance = 'debit' THEN
+                ab.total_debit - ab.total_credit
+              ELSE
+                ab.total_credit - ab.total_debit
+            END as balance,
+            ab.total_debit - ab.total_credit as net
+          FROM account_codes ac
+          JOIN account_balances ab ON ac.code = ab.account_code
+          LEFT JOIN financial_statement_notes fsn ON ac.fs_note = fsn.code
+          WHERE ac.is_active = true${ledgerFilter}
         )
-        SELECT
-          ac.code,
-          ac.description,
-          ac.ledger_type,
-          ac.fs_note,
-          fsn.name as note_name,
-          COALESCE(ab.total_debit, 0) as total_debit,
-          COALESCE(ab.total_credit, 0) as total_credit,
-          CASE
-            WHEN fsn.normal_balance = 'debit' THEN
-              COALESCE(ab.total_debit, 0) - COALESCE(ab.total_credit, 0)
-            ELSE
-              COALESCE(ab.total_credit, 0) - COALESCE(ab.total_debit, 0)
-          END as balance
-        FROM account_codes ac
-        LEFT JOIN account_balances ab ON ac.code = ab.account_code
-        LEFT JOIN financial_statement_notes fsn ON ac.fs_note = fsn.code
-        WHERE ac.is_active = true
-          AND (ab.total_debit IS NOT NULL OR ab.total_credit IS NOT NULL)
       `;
-      const params = [periodStartStr, periodEndStr];
-      let paramIndex = 3;
 
-      if (ledger_type) {
-        query += ` AND ac.ledger_type = $${paramIndex}`;
-        params.push(ledger_type);
-        paramIndex++;
+      // Totals over the full (unpaginated, unsearched) trial balance
+      const totalsQuery = `
+        ${baseCte}
+        SELECT
+          COALESCE(SUM(CASE WHEN net > 0 THEN net ELSE 0 END), 0) as total_debit,
+          COALESCE(SUM(CASE WHEN net < 0 THEN -net ELSE 0 END), 0) as total_credit
+        FROM active_accounts
+      `;
+      const totalsResult = await pool.query(totalsQuery, baseParams);
+      const totalDebit = parseFloat(totalsResult.rows[0].total_debit);
+      const totalCredit = parseFloat(totalsResult.rows[0].total_credit);
+
+      // Paginated account rows (search + hide-zero applied here)
+      const rowParams = [...baseParams];
+      let rowsQuery = `
+        ${baseCte}
+        SELECT *, COUNT(*) OVER() as full_count
+        FROM active_accounts
+        WHERE 1=1
+      `;
+
+      if (search) {
+        // Escape ILIKE wildcards so e.g. "CR_" matches literally, not "CR + any char"
+        const escaped = String(search).replace(/[\\%_]/g, (m) => `\\${m}`);
+        rowParams.push(`%${escaped}%`);
+        rowsQuery += ` AND (code ILIKE $${rowParams.length} OR description ILIKE $${rowParams.length} OR fs_note ILIKE $${rowParams.length})`;
       }
 
-      query += ` ORDER BY ac.ledger_type, ac.code`;
+      if (hide_zero === "true") {
+        rowsQuery += ` AND ABS(net) > 0.001`;
+      }
 
-      const result = await pool.query(query, params);
+      rowsQuery += ` ORDER BY ledger_type, code`;
 
-      // Calculate totals - show NET balance in appropriate column
-      let totalDebit = 0;
-      let totalCredit = 0;
+      const limitNum = parseInt(limit);
+      const offsetNum = parseInt(offset) || 0;
+      if (!isNaN(limitNum) && limitNum > 0) {
+        rowParams.push(limitNum, offsetNum);
+        rowsQuery += ` LIMIT $${rowParams.length - 1} OFFSET $${rowParams.length}`;
+      }
+
+      const result = await pool.query(rowsQuery, rowParams);
+      const filteredTotal =
+        result.rows.length > 0 ? parseInt(result.rows[0].full_count) : 0;
 
       const accounts = result.rows.map((row) => {
-        const totalDebitAmount = parseFloat(row.total_debit);
-        const totalCreditAmount = parseFloat(row.total_credit);
-        const netBalance = totalDebitAmount - totalCreditAmount;
-
-        // Show net balance in appropriate column
-        const debit = netBalance > 0 ? netBalance : 0;
-        const credit = netBalance < 0 ? Math.abs(netBalance) : 0;
-
-        totalDebit += debit;
-        totalCredit += credit;
-
+        const netBalance = parseFloat(row.net);
         return {
           code: row.code,
           description: row.description,
           ledger_type: row.ledger_type,
           fs_note: row.fs_note,
           note_name: row.note_name,
-          debit: debit,
-          credit: credit,
+          debit: netBalance > 0 ? netBalance : 0,
+          credit: netBalance < 0 ? Math.abs(netBalance) : 0,
           balance: parseFloat(row.balance),
         };
       });
@@ -473,6 +505,11 @@ export default function (pool) {
           end_date: periodEndStr,
         },
         accounts,
+        pagination: {
+          total: filteredTotal,
+          limit: !isNaN(limitNum) && limitNum > 0 ? limitNum : null,
+          offset: offsetNum,
+        },
         totals: {
           debit: totalDebit,
           credit: totalCredit,
