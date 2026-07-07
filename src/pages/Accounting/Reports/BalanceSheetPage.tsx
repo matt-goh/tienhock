@@ -4,6 +4,7 @@ import { IconPrinter, IconRefresh, IconCheck, IconX } from "@tabler/icons-react"
 import MonthNavigator from "../../../components/MonthNavigator";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import ReportSourceGuide from "../../../components/Accounting/ReportSourceGuide";
 import { api } from "../../../routes/utils/api";
 import { generateBalanceSheetPDF } from "../../../utils/accounting/BalanceSheetPDF";
 import toast from "react-hot-toast";
@@ -144,6 +145,8 @@ const BalanceSheetPage: React.FC = () => {
           />
 
           <div className="flex flex-wrap items-center gap-3">
+            <ReportSourceGuide report="balance_sheet" />
+
             <Button
               onClick={fetchData}
               variant="outline"
@@ -240,7 +243,7 @@ const BalanceSheetPage: React.FC = () => {
                         <span className="text-gray-700 dark:text-gray-300">
                           {item.name} (Note {item.note})
                         </span>
-                        <span className="font-mono text-gray-900 dark:text-white">
+                        <span className="text-gray-900 dark:text-white">
                           {formatCurrency(item.amount)}
                         </span>
                       </div>
@@ -248,7 +251,7 @@ const BalanceSheetPage: React.FC = () => {
                   </div>
                   <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
                     <span className="text-gray-800 dark:text-gray-200">Total Non-Current Assets</span>
-                    <span className="font-mono text-gray-900 dark:text-white">
+                    <span className="text-gray-900 dark:text-white">
                       {formatCurrency(data.assets.non_current.total)}
                     </span>
                   </div>
@@ -267,7 +270,7 @@ const BalanceSheetPage: React.FC = () => {
                         <span className="text-gray-700 dark:text-gray-300">
                           {item.name} (Note {item.note})
                         </span>
-                        <span className="font-mono text-gray-900 dark:text-white">
+                        <span className="text-gray-900 dark:text-white">
                           {formatCurrency(item.amount)}
                         </span>
                       </div>
@@ -275,7 +278,7 @@ const BalanceSheetPage: React.FC = () => {
                   </div>
                   <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
                     <span className="text-gray-800 dark:text-gray-200">Total Current Assets</span>
-                    <span className="font-mono text-gray-900 dark:text-white">
+                    <span className="text-gray-900 dark:text-white">
                       {formatCurrency(data.assets.current.total)}
                     </span>
                   </div>
@@ -285,7 +288,7 @@ const BalanceSheetPage: React.FC = () => {
               {/* Total Assets */}
               <div className="flex justify-between text-base font-bold mt-4 pt-3 border-t-2 border-gray-300 dark:border-gray-600">
                 <span className="text-gray-900 dark:text-white">TOTAL ASSETS</span>
-                <span className="font-mono text-gray-900 dark:text-white">
+                <span className="text-gray-900 dark:text-white">
                   RM {formatCurrency(data.assets.total)}
                 </span>
               </div>
@@ -309,7 +312,7 @@ const BalanceSheetPage: React.FC = () => {
                         <span className="text-gray-700 dark:text-gray-300">
                           {item.name} (Note {item.note})
                         </span>
-                        <span className="font-mono text-gray-900 dark:text-white">
+                        <span className="text-gray-900 dark:text-white">
                           {formatCurrency(item.amount)}
                         </span>
                       </div>
@@ -317,7 +320,7 @@ const BalanceSheetPage: React.FC = () => {
                   </div>
                   <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
                     <span className="text-gray-800 dark:text-gray-200">Total Non-Current Liabilities</span>
-                    <span className="font-mono text-gray-900 dark:text-white">
+                    <span className="text-gray-900 dark:text-white">
                       {formatCurrency(data.liabilities.non_current.total)}
                     </span>
                   </div>
@@ -336,7 +339,7 @@ const BalanceSheetPage: React.FC = () => {
                         <span className="text-gray-700 dark:text-gray-300">
                           {item.name} (Note {item.note})
                         </span>
-                        <span className="font-mono text-gray-900 dark:text-white">
+                        <span className="text-gray-900 dark:text-white">
                           {formatCurrency(item.amount)}
                         </span>
                       </div>
@@ -344,7 +347,7 @@ const BalanceSheetPage: React.FC = () => {
                   </div>
                   <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
                     <span className="text-gray-800 dark:text-gray-200">Total Current Liabilities</span>
-                    <span className="font-mono text-gray-900 dark:text-white">
+                    <span className="text-gray-900 dark:text-white">
                       {formatCurrency(data.liabilities.current.total)}
                     </span>
                   </div>
@@ -363,7 +366,7 @@ const BalanceSheetPage: React.FC = () => {
                         <span className="text-gray-700 dark:text-gray-300">
                           {item.name} (Note {item.note})
                         </span>
-                        <span className="font-mono text-gray-900 dark:text-white">
+                        <span className="text-gray-900 dark:text-white">
                           {formatCurrency(item.amount)}
                         </span>
                       </div>
@@ -371,7 +374,7 @@ const BalanceSheetPage: React.FC = () => {
                   </div>
                   <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
                     <span className="text-gray-800 dark:text-gray-200">Total Equity</span>
-                    <span className="font-mono text-gray-900 dark:text-white">
+                    <span className="text-gray-900 dark:text-white">
                       {formatCurrency(data.equity.total)}
                     </span>
                   </div>
@@ -381,7 +384,7 @@ const BalanceSheetPage: React.FC = () => {
               {/* Total Liabilities & Equity */}
               <div className="flex justify-between text-base font-bold mt-4 pt-3 border-t-2 border-gray-300 dark:border-gray-600">
                 <span className="text-gray-900 dark:text-white">TOTAL LIABILITIES & EQUITY</span>
-                <span className="font-mono text-gray-900 dark:text-white">
+                <span className="text-gray-900 dark:text-white">
                   RM {formatCurrency(data.totals.total_liabilities_equity)}
                 </span>
               </div>

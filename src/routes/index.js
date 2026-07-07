@@ -34,6 +34,7 @@ import jobRouter from "./catalogue/jobs.js";
 import nationalitiesRouter from "./catalogue/entities/nationalities.js";
 import locationsRouter from "./catalogue/entities/locations.js";
 import sectionsRouter from "./catalogue/entities/sections.js";
+import departmentsRouter from "./catalogue/entities/departments.js";
 import banksRouter from "./catalogue/entities/banks.js";
 import racesRouter from "./catalogue/entities/races.js";
 import agamaRouter from "./catalogue/entities/agama.js";
@@ -114,6 +115,7 @@ import jellypollyMonthlyPayrollsRouter from "./jellypolly/monthly-payrolls.js";
 import jellypollyEmployeePayrollsRouter from "./jellypolly/employee-payrolls.js";
 import jellypollyMonthlyWorkLogsRouter from "./jellypolly/monthly-work-logs.js";
 import jellypollyDailyWorkLogsRouter from "./jellypolly/daily-work-logs.js";
+import jellypollyDailyPlasticRouter from "./jellypolly/daily-plastic.js";
 import jellypollyPinjamRecordsRouter from "./jellypolly/pinjam-records.js";
 import jellypollyMidMonthPayrollsRouter from "./jellypolly/mid-month-payrolls.js";
 import jellypollyIncentivesRouter from "./jellypolly/incentives.js";
@@ -129,6 +131,8 @@ import jellypollyPayRateSchedulesRouter from "./jellypolly/pay-rate-schedules.js
 import jellypollyProductPayCodesRouter from "./jellypolly/product-pay-codes.js";
 import jellypollyLeaveManagementRouter from "./jellypolly/leave-management.js";
 import jellypollyProductionEntriesRouter from "./jellypolly/production-entries.js";
+import jellypollyLocationsRouter from "./jellypolly/locations.js";
+import jellypollyJobLocationMappingsRouter from "./jellypolly/job-location-mappings.js";
 
 // Excel routes
 import paymentExportRouter from "./excel/payment-export.js";
@@ -346,6 +350,10 @@ export default function setupRoutes(app, pool) {
     jellypollyDailyWorkLogsRouter(pool)
   );
   app.use(
+    "/jellypolly/api/daily-plastic",
+    jellypollyDailyPlasticRouter(pool)
+  );
+  app.use(
     "/jellypolly/api/pinjam-records",
     jellypollyPinjamRecordsRouter(pool)
   );
@@ -367,6 +375,11 @@ export default function setupRoutes(app, pool) {
   app.use("/jellypolly/api/jobs", jellypollyJobsRouter(pool));
   app.use("/jellypolly/api/pay-codes", jellypollyPayCodesRouter(pool));
   app.use("/jellypolly/api/job-pay-codes", jellypollyJobPayCodesRouter(pool));
+  app.use("/jellypolly/api/locations", jellypollyLocationsRouter(pool));
+  app.use(
+    "/jellypolly/api/job-location-mappings",
+    jellypollyJobLocationMappingsRouter(pool)
+  );
   app.use(
     "/jellypolly/api/employee-pay-codes",
     jellypollyEmployeePayCodesRouter(pool)
@@ -412,6 +425,7 @@ export default function setupRoutes(app, pool) {
 
   // Catalogue - Entity routes
   app.use("/api/sections", sectionsRouter(pool));
+  app.use("/api/departments", departmentsRouter(pool));
   app.use("/api/locations", locationsRouter(pool));
   app.use("/api/banks", banksRouter(pool));
   app.use("/api/nationalities", nationalitiesRouter(pool));

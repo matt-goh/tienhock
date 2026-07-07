@@ -498,7 +498,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
           </span>
           <div className="flex h-8 items-center rounded-lg border border-default-200 bg-default-50 px-3 text-sm dark:border-gray-700 dark:bg-gray-900/40">
             <span className="mr-2 text-default-500 dark:text-gray-400">MYR</span>
-            <span className="font-mono font-semibold text-default-900 dark:text-gray-100">
+            <span className="font-semibold text-default-900 dark:text-gray-100">
               {totals.myr.toLocaleString("en-MY", {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
@@ -814,13 +814,13 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
                         <span className="text-default-300 dark:text-gray-600">-</span>
                       )}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-right text-sm font-mono text-default-700 dark:text-gray-300">
+                    <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-default-700 dark:text-gray-300">
                       {formatAmount(
                         invoice.purchase_kind === "local" ? 0 : invoice.total_foreign_amount,
                         invoice.purchase_kind === "local" ? "MYR" : invoice.currency_code
                       )}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-right text-sm font-mono text-default-900 dark:text-gray-100">
+                    <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-default-900 dark:text-gray-100">
                       {formatAmount(invoice.payable_amount_myr, "MYR")}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-sm">

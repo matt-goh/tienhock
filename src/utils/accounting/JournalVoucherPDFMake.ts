@@ -4,7 +4,7 @@
 // entries…). Content mirrors the legacy voucher: journal no + posted status +
 // date header, ACC/CODE · DESCRIPTION · DEBIT · CREDIT lines, totals, and a
 // PARTICULARS footer. Styled after the shared report design language
-// (BankStatementPDFMake): slate palette, company letterhead with logo.
+// (AccountLedgerPDFMake): slate palette, company letterhead with logo.
 import pdfMake from "pdfmake/build/pdfmake";
 import * as pdfFonts from "pdfmake/build/vfs_fonts";
 import { TDocumentDefinitions, TableCell, Content } from "pdfmake/interfaces";
@@ -12,7 +12,7 @@ import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfBlob } from "../pdfPrintFallback";
 
-// Initialize pdfmake with the bundled fonts (same pattern as BankStatementPDFMake)
+// Initialize pdfmake with the bundled fonts (same pattern as AccountLedgerPDFMake)
 (pdfMake as any).vfs = (pdfFonts as any).pdfMake?.vfs || pdfFonts;
 
 export interface JournalVoucherPDFLine {
@@ -56,6 +56,12 @@ const fmt = (n: number): string =>
     maximumFractionDigits: 2,
   }).format(n);
 
+const getReportTitle = (entryType: string): string => {
+  if (entryType === "C") return "PAYMENT VOUCHER";
+  if (entryType === "B") return "PAYMENT ONLINE";
+  return "JOURNAL VOUCHER";
+};
+
 // Any date value -> dd/MM/yyyy in the LOCAL timezone (a serialized date column
 // arrives as UTC midnight-shifted ISO; local components give the stored date)
 const fmtDate = (value: string): string => {
@@ -93,6 +99,7 @@ const buildDocDefinition = (
 ): TDocumentDefinitions => {
   const statusLabel =
     data.status === "cancelled" ? "CANCELLED" : "POSTED";
+  const reportTitle = getReportTitle(data.entry_type);
 
   const headerRow: TableCell[] = [
     { text: "ACC/CODE", style: "th" },
@@ -169,7 +176,7 @@ const buildDocDefinition = (
       {
         width: "auto",
         stack: [
-          { text: "JOURNAL VOUCHER", style: "reportTitle", alignment: "right" },
+          { text: reportTitle, style: "reportTitle", alignment: "right" },
           {
             text: `${data.reference_no}  (${statusLabel})`,
             style: "reportSubtitle",

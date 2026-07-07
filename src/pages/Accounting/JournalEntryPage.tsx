@@ -788,7 +788,7 @@ const JournalEntryPage: React.FC = () => {
                     }
                     placeholder="e.g., PBE001/06"
                     disabled={isSaving}
-                    className={`${HEADER_FIELD_CLASSNAME} placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono`}
+                    className={`${HEADER_FIELD_CLASSNAME} placeholder:text-gray-400 dark:placeholder:text-gray-500`}
                   />
                 </div>
 
@@ -863,7 +863,7 @@ const JournalEntryPage: React.FC = () => {
                       }
                       placeholder="e.g., PBB350779"
                       disabled={isSaving}
-                      className={`${HEADER_FIELD_CLASSNAME} placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono`}
+                      className={`${HEADER_FIELD_CLASSNAME} placeholder:text-gray-400 dark:placeholder:text-gray-500`}
                     />
                   </div>
                 )}
@@ -904,7 +904,7 @@ const JournalEntryPage: React.FC = () => {
                         className="group hover:bg-default-50/50 dark:hover:bg-gray-700/30 transition-colors"
                       >
                         {/* Line Number */}
-                        <td className="px-3 py-1 text-sm text-default-500 dark:text-gray-400 font-mono">
+                        <td className="px-3 py-1 text-sm text-default-500 dark:text-gray-400">
                           {String(line.line_number).padStart(2, "0")}
                         </td>
 
@@ -977,7 +977,7 @@ const JournalEntryPage: React.FC = () => {
                             }}
                             disabled={isSaving}
                             placeholder="0.00"
-                            className={`w-full px-2 py-1.5 text-sm text-right bg-transparent border-0 rounded font-mono placeholder:text-gray-400 dark:placeholder:text-gray-500 text-default-900 dark:text-gray-100 disabled:cursor-not-allowed ${
+                            className={`w-full px-2 py-1.5 text-sm text-right bg-transparent border-0 rounded placeholder:text-gray-400 dark:placeholder:text-gray-500 text-default-900 dark:text-gray-100 disabled:cursor-not-allowed ${
                               focusedCell?.row === index && focusedCell?.col === "debit"
                                 ? "ring-1 ring-sky-500 bg-white dark:bg-gray-700"
                                 : "hover:bg-default-50 dark:hover:bg-gray-700/50"
@@ -1002,7 +1002,7 @@ const JournalEntryPage: React.FC = () => {
                             }}
                             disabled={isSaving}
                             placeholder="0.00"
-                            className={`w-full px-2 py-1.5 text-sm text-right bg-transparent border-0 rounded font-mono placeholder:text-gray-400 dark:placeholder:text-gray-500 text-default-900 dark:text-gray-100 disabled:cursor-not-allowed ${
+                            className={`w-full px-2 py-1.5 text-sm text-right bg-transparent border-0 rounded placeholder:text-gray-400 dark:placeholder:text-gray-500 text-default-900 dark:text-gray-100 disabled:cursor-not-allowed ${
                               focusedCell?.row === index && focusedCell?.col === "credit"
                                 ? "ring-1 ring-sky-500 bg-white dark:bg-gray-700"
                                 : "hover:bg-default-50 dark:hover:bg-gray-700/50"
@@ -1041,12 +1041,12 @@ const JournalEntryPage: React.FC = () => {
                         </button>
                       </td>
                       <td className="px-3 py-2.5 text-right">
-                        <span className="text-sm font-semibold text-default-900 dark:text-gray-100 font-mono">
+                        <span className="text-sm font-semibold text-default-900 dark:text-gray-100">
                           {totals.totalDebit.toFixed(2)}
                         </span>
                       </td>
                       <td className="px-3 py-2.5 text-right">
-                        <span className="text-sm font-semibold text-default-900 dark:text-gray-100 font-mono">
+                        <span className="text-sm font-semibold text-default-900 dark:text-gray-100">
                           {totals.totalCredit.toFixed(2)}
                         </span>
                       </td>
@@ -1073,7 +1073,7 @@ const JournalEntryPage: React.FC = () => {
                   ) : (
                     <>
                       <span>Out of Balance: </span>
-                      <span className="font-mono font-bold">{difference.toFixed(2)}</span>
+                      <span className="font-bold">{difference.toFixed(2)}</span>
                     </>
                   )}
                 </div>

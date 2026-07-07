@@ -49,10 +49,19 @@ export async function generateReceiptReference(client, paymentDate) {
 }
 
 /**
- * Determines the debit account based on payment method and bank selection
- * Now uses centralized utility function
+ * Determines the debit account for a receipt journal.
+ *
+ * For cash-method receipts, the money lands in a cash-received revenue account rather
+ * than the generic CASH account, so the CASH SALES / CREDIT SALES ledgers reconcile:
+ *   - CASH invoice (cash bill, same-day money)      -> CH_REV1
+ *   - INVOICE (payment of an old credit bill)        -> CH_REV2
+ * Non-cash methods keep their bank account (BANK_PBB / BANK_ABB).
+ * Note: this only affects the journal line — payments.bank_account stays 'CASH'.
  */
 function getDebitAccount(payment) {
+  if (payment.payment_method === "cash") {
+    return payment.invoice_paymenttype === "INVOICE" ? "CH_REV2" : "CH_REV1";
+  }
   return determineBankAccount(payment.payment_method, payment.bank_account);
 }
 
@@ -71,6 +80,7 @@ function getDebitAccount(payment) {
  * @param {number} payment.amount_paid - Amount paid
  * @param {string} payment.payment_method - Payment method (cash, cheque, bank_transfer, online)
  * @param {string} payment.bank_account - Bank account code (CASH, BANK_PBB, BANK_ABB)
+ * @param {string} payment.invoice_paymenttype - Invoice paymenttype (CASH/INVOICE); routes cash receipts to CH_REV1/CH_REV2
  * @param {string} payment.payment_reference - Customer's reference (optional)
  * @returns {number} journal_entry_id
  */
@@ -171,7 +181,8 @@ export async function createPaymentJournalEntry(client, payment) {
  *   CR Customer Deposits (increase liability - owed to customer)
  *
  * @param {Object} client - PostgreSQL client (for transaction support)
- * @param {Object} payment - Payment data (same structure as createPaymentJournalEntry)
+ * @param {Object} payment - Payment data (same structure as createPaymentJournalEntry,
+ *   including invoice_paymenttype for cash CH_REV1/CH_REV2 routing)
  * @returns {number} journal_entry_id
  */
 export async function createOverpaidJournalEntry(client, payment) {

@@ -38,6 +38,16 @@ const ENTITY_CONFIGS: EntityConfig[] = [
     ],
   },
   {
+    key: "departments",
+    title: "Department",
+    apiEndpoint: "departments",
+    singularName: "department",
+    fields: [
+      { key: "id", label: "ID", type: "text" },
+      { key: "name", label: "Name", type: "text" },
+    ],
+  },
+  {
     key: "banks",
     title: "Bank",
     apiEndpoint: "banks",
@@ -604,7 +614,7 @@ const OthersPage: React.FC = () => {
         }
 
         toast.success("Saved successfully");
-        if (["nationalities", "races", "agama", "sections", "banks"].includes(config.key)) {
+        if (["nationalities", "races", "agama", "sections", "departments", "banks"].includes(config.key)) {
           await refreshOptions();
         }
       } catch (error) {
@@ -624,7 +634,7 @@ const OthersPage: React.FC = () => {
           [config.key]: prev[config.key].filter((item) => item.id !== id),
         }));
         toast.success("Deleted successfully");
-        if (["nationalities", "races", "agama", "sections", "banks"].includes(config.key)) {
+        if (["nationalities", "races", "agama", "sections", "departments", "banks"].includes(config.key)) {
           await refreshOptions();
         }
       } catch (error) {
@@ -655,7 +665,7 @@ const OthersPage: React.FC = () => {
         }
 
         toast.success("Added successfully");
-        if (["nationalities", "races", "agama", "sections", "banks"].includes(config.key)) {
+        if (["nationalities", "races", "agama", "sections", "departments", "banks"].includes(config.key)) {
           await refreshOptions();
         }
       } catch (error) {

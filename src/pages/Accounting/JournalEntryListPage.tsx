@@ -168,7 +168,7 @@ const JournalEntryListPage: React.FC = () => {
 
   // Pagination
   const [page, setPage] = useState(1);
-  const [limit] = useState(20);
+  const [limit] = useState(50);
 
   // Delete dialog
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -572,7 +572,7 @@ const JournalEntryListPage: React.FC = () => {
                     className="hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer"
                     onClick={() => handleView(entry)}
                   >
-                    <td className="px-4 py-3 text-sm font-mono font-medium text-sky-700 dark:text-sky-400">
+                    <td className="px-4 py-3 text-sm font-medium text-sky-700 dark:text-sky-400">
                       {entry.reference_no}
                     </td>
                     <td className="px-4 py-3 text-sm">
@@ -591,10 +591,10 @@ const JournalEntryListPage: React.FC = () => {
                     <td className="px-4 py-3 text-sm text-default-600 dark:text-gray-300 max-w-xs truncate">
                       {entry.description || "-"}
                     </td>
-                    <td className="px-4 py-3 text-sm text-right font-mono text-default-700 dark:text-gray-200">
+                    <td className="px-4 py-3 text-sm text-right text-default-700 dark:text-gray-200">
                       {formatAmount(entry.total_debit)}
                     </td>
-                    <td className="px-4 py-3 text-sm text-right font-mono text-default-700 dark:text-gray-200">
+                    <td className="px-4 py-3 text-sm text-right text-default-700 dark:text-gray-200">
                       {formatAmount(entry.total_credit)}
                     </td>
                     <td className="px-4 py-3 text-center">

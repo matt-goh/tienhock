@@ -233,7 +233,7 @@ const SuppliersListPage: React.FC = () => {
                     onClick={() => handleEditClick(supplier)}
                   >
                     <td className="px-4 py-2 text-sm">
-                      <span className="font-mono text-sky-700 dark:text-sky-400 font-medium">
+                      <span className="text-sky-700 dark:text-sky-400 font-medium">
                         {supplier.code}
                       </span>
                     </td>

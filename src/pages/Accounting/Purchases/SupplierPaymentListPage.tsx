@@ -261,14 +261,14 @@ const SupplierPaymentListPage: React.FC = () => {
                     }`}
                   >
                     <td className="px-3 py-2">{formatDate(row.payment_date)}</td>
-                    <td className="px-3 py-2 font-mono">
+                    <td className="px-3 py-2">
                       {row.internal_reference || `#${row.payment_id}`}
                     </td>
                     <td className="px-3 py-2">{row.supplier_name || "-"}</td>
-                    <td className="px-3 py-2 font-mono">
+                    <td className="px-3 py-2">
                       {row.invoice_doc_no || `#${row.invoice_id}`}
                     </td>
-                    <td className="px-3 py-2 text-right font-mono">
+                    <td className="px-3 py-2 text-right">
                       {formatCurrency(Number(row.amount_paid))}
                     </td>
                     <td className="px-3 py-2 capitalize">
@@ -279,7 +279,7 @@ const SupplierPaymentListPage: React.FC = () => {
                         </span>
                       )}
                     </td>
-                    <td className="px-3 py-2 font-mono">
+                    <td className="px-3 py-2">
                       {row.journal_reference_no || "-"}
                     </td>
                     <td className="px-3 py-2">
@@ -306,7 +306,7 @@ const SupplierPaymentListPage: React.FC = () => {
                   >
                     Active Total
                   </td>
-                  <td className="px-3 py-2 text-right font-mono font-semibold text-default-900 dark:text-gray-100">
+                  <td className="px-3 py-2 text-right font-semibold text-default-900 dark:text-gray-100">
                     {formatCurrency(totals.active)}
                   </td>
                   <td colSpan={3} />

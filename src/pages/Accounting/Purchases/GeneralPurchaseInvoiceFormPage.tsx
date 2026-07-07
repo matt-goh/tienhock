@@ -1083,7 +1083,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
             </h1>
             {isEditMode && existingInvoice && (
               <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
-                <span className="font-mono text-default-600 dark:text-gray-400">
+                <span className="text-default-600 dark:text-gray-400">
                   {existingInvoice.self_billed_no}
                 </span>
                 <span
@@ -1109,15 +1109,15 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs">
                 <div>
                   <p className="text-default-400 dark:text-gray-500">UUID</p>
-                  <p className="max-w-[160px] truncate font-mono text-default-600 dark:text-gray-400">{existingInvoice.uuid}</p>
+                  <p className="max-w-[160px] truncate text-default-600 dark:text-gray-400">{existingInvoice.uuid}</p>
                 </div>
                 <div>
                   <p className="text-default-400 dark:text-gray-500">Submission</p>
-                  <p className="max-w-[120px] truncate font-mono text-default-600 dark:text-gray-400">{existingInvoice.submission_uid || "-"}</p>
+                  <p className="max-w-[120px] truncate text-default-600 dark:text-gray-400">{existingInvoice.submission_uid || "-"}</p>
                 </div>
                 <div>
                   <p className="text-default-400 dark:text-gray-500">Long ID</p>
-                  <p className="max-w-[120px] truncate font-mono text-default-600 dark:text-gray-400">{existingInvoice.long_id || "-"}</p>
+                  <p className="max-w-[120px] truncate text-default-600 dark:text-gray-400">{existingInvoice.long_id || "-"}</p>
                 </div>
               </div>
             </>
@@ -1229,7 +1229,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                 Purchase Information
               </h2>
               <div className="flex items-center gap-2 text-xs text-default-400 dark:text-gray-500">
-                <span className="rounded bg-default-100 px-1.5 py-0.5 font-mono dark:bg-gray-700">034</span>
+                <span className="rounded bg-default-100 px-1.5 py-0.5 dark:bg-gray-700">034</span>
                 <span>Importation of goods</span>
               </div>
             </div>
@@ -1531,7 +1531,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                             <span className="text-[10px] font-semibold uppercase tracking-wide text-indigo-400 dark:text-indigo-300/70">
                               Current
                             </span>
-                            <span className="font-mono text-sm font-medium tabular-nums text-default-700 dark:text-gray-200">
+                            <span className="text-sm font-medium tabular-nums text-default-700 dark:text-gray-200">
                               {formatQty(toNumber(selectedStockRow.current_stock))}
                             </span>
                           </div>
@@ -1543,7 +1543,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                             <span className="text-[10px] font-semibold uppercase tracking-wide text-indigo-500 dark:text-indigo-300">
                               After purchase
                             </span>
-                            <span className="font-mono text-sm font-bold tabular-nums text-indigo-700 dark:text-indigo-200">
+                            <span className="text-sm font-bold tabular-nums text-indigo-700 dark:text-indigo-200">
                               {formatQty(newBalance)}
                             </span>
                           </div>
@@ -1883,26 +1883,26 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                 <span className="text-default-500 dark:text-gray-400">
                   {formData.currency_code} subtotal
                 </span>
-                <span className="font-mono font-semibold text-default-900 dark:text-gray-100">
+                <span className="font-semibold text-default-900 dark:text-gray-100">
                   {formatAmount(totals.foreign, formData.currency_code)}
                 </span>
               </div>
               <div className="flex justify-between gap-4">
                 <span className="text-default-500 dark:text-gray-400">MYR subtotal</span>
-                <span className="font-mono font-semibold text-default-900 dark:text-gray-100">
+                <span className="font-semibold text-default-900 dark:text-gray-100">
                   {formatAmount(totals.myr, "MYR")}
                 </span>
               </div>
               <div className="flex justify-between gap-4">
                 <span className="text-default-500 dark:text-gray-400">Tax</span>
-                <span className="font-mono font-semibold text-default-900 dark:text-gray-100">
+                <span className="font-semibold text-default-900 dark:text-gray-100">
                   {formatAmount(totals.tax, "MYR")}
                 </span>
               </div>
               <div className="border-t border-default-200 pt-2 dark:border-gray-700">
                 <div className="flex justify-between gap-4">
                   <span className="font-medium text-default-700 dark:text-gray-200">Payable</span>
-                  <span className="font-mono text-lg font-semibold text-default-900 dark:text-gray-100">
+                  <span className="text-lg font-semibold text-default-900 dark:text-gray-100">
                     {formatAmount(totals.myr + totals.tax, "MYR")}
                   </span>
                 </div>

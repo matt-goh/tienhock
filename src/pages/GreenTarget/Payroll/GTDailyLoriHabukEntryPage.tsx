@@ -1,9 +1,8 @@
 // src/pages/GreenTarget/Payroll/GTDailyLoriHabukEntryPage.tsx
 // Green Target Daily Lori Habuk driver entry (Phase 3). Date-centric: pick a
 // date, see each DRIVER employee as a card with that day's trip lines. Rentals
-// prefill PLACEMENT/PICKUP/ADDON lines; manual habuk trips are added on top;
-// the >6-trips/day TRIP_LB6 bonus auto-derives. Monthly processing reads the
-// saved lines (not live rentals).
+// prefill PLACEMENT/PICKUP/ADDON lines; manual habuk trips are added on top.
+// Monthly processing reads the saved lines (not live rentals).
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { format } from "date-fns";
 import {
@@ -24,8 +23,6 @@ import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 
 const API_BASE = "/greentarget/api/daily-lori-habuk";
-const TRIP_LB6 = "TRIP_LB6";
-const TRIP_LB6_THRESHOLD = 6;
 
 type SourceType = "PLACEMENT" | "PICKUP" | "ADDON" | "MANUAL" | "DERIVED";
 
@@ -128,39 +125,6 @@ const GTDailyLoriHabukEntryPage: React.FC = () => {
         [key]: typeof v === "function" ? (v as (p: string) => string)(prev[key] || "") : v,
       }));
 
-  // Re-derive the auto TRIP_LB6 bonus line: drop any existing DERIVED TRIP_LB6,
-  // then add a fresh one when the total Trip-unit quantity exceeds the threshold.
-  const withDerivedLb6 = useCallback(
-    (lines: TripLine[]): TripLine[] => {
-      const base = lines.filter(
-        (l) => !(l.source_type === "DERIVED" && l.pay_code_id === TRIP_LB6)
-      );
-      const tripQty = base.reduce(
-        (sum, l) => (l.rate_unit === "Trip" ? sum + (l.quantity || 0) : sum),
-        0
-      );
-      if (tripQty <= TRIP_LB6_THRESHOLD) return base;
-      const pc = payCodeMap[TRIP_LB6];
-      const rate = pc ? pc.rate_biasa : 0;
-      return [
-        ...base,
-        {
-          key: newKey(),
-          pay_code_id: TRIP_LB6,
-          description: pc?.description || "> 6 TRIP SISA KAYU & HABUK",
-          quantity: 1,
-          rate_used: rate,
-          amount: lineAmount(rate, 1),
-          rate_unit: pc?.rate_unit || "Day",
-          source_type: "DERIVED",
-          rental_id: null,
-          is_manual: false,
-        },
-      ];
-    },
-    [payCodeMap]
-  );
-
   const fetchEntries = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -216,7 +180,7 @@ const GTDailyLoriHabukEntryPage: React.FC = () => {
         entry.employee_id === employeeId
           ? {
               ...entry,
-              lines: withDerivedLb6(mutate(entry.lines)),
+              lines: mutate(entry.lines),
               dirty: true,
             }
           : entry
@@ -465,93 +429,85 @@ const GTDailyLoriHabukEntryPage: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-default-100 dark:divide-gray-700/70">
-                        {entry.lines.map((line) => {
-                          const isDerived = line.source_type === "DERIVED";
-                          return (
-                            <tr key={line.key}>
-                              <td className="py-2 pr-3 align-top">
-                                <FormCombobox
-                                  name={`paycode-${line.key}`}
-                                  label=""
-                                  mode="single"
-                                  value={line.pay_code_id || undefined}
-                                  onChange={(val) =>
-                                    handlePayCodeChange(
-                                      entry.employee_id,
-                                      line.key,
-                                      (Array.isArray(val) ? val[0] : val) || ""
-                                    )
-                                  }
-                                  options={payCodeOptions}
-                                  query={payCodeQueries[line.key] || ""}
-                                  setQuery={setLineQuery(line.key)}
-                                  disabled={isDerived}
-                                  placeholder="Select pay code..."
-                                />
-                              </td>
-                              <td className="py-2 px-3">
-                                <span
-                                  className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${SOURCE_BADGE[line.source_type]}`}
-                                >
-                                  {line.source_type}
-                                </span>
-                              </td>
-                              <td className="py-2 px-3 text-right">
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  value={line.rate_used}
-                                  disabled={isDerived}
-                                  onChange={(e) =>
-                                    handleNumberChange(
-                                      entry.employee_id,
-                                      line.key,
-                                      "rate_used",
-                                      e.target.value
-                                    )
-                                  }
-                                  className="w-20 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 px-2 text-sm text-right text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:bg-default-50 dark:disabled:bg-gray-700/60"
-                                />
-                              </td>
-                              <td className="py-2 px-3 text-right">
-                                <input
-                                  type="number"
-                                  step="1"
-                                  value={line.quantity}
-                                  disabled={isDerived}
-                                  onChange={(e) =>
-                                    handleNumberChange(
-                                      entry.employee_id,
-                                      line.key,
-                                      "quantity",
-                                      e.target.value
-                                    )
-                                  }
-                                  className="w-16 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 px-2 text-sm text-right text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:bg-default-50 dark:disabled:bg-gray-700/60"
-                                />
-                              </td>
-                              <td className="py-2 px-3 text-right font-medium text-default-900 dark:text-gray-100">
-                                {formatCurrency(line.amount)}
-                                <span className="ml-1 text-xs text-default-400 dark:text-gray-500">
-                                  /{line.rate_unit}
-                                </span>
-                              </td>
-                              <td className="py-2 pl-3 text-right">
-                                {!isDerived && (
-                                  <button
-                                    onClick={() =>
-                                      handleRemoveLine(entry.employee_id, line.key)
-                                    }
-                                    className="p-1.5 rounded-full text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50"
-                                    title="Remove trip"
-                                  >
-                                    <IconTrash size={16} />
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
+                        {entry.lines.map((line) => (
+                          <tr key={line.key}>
+                            <td className="py-2 pr-3 align-top">
+                              <FormCombobox
+                                name={`paycode-${line.key}`}
+                                label=""
+                                mode="single"
+                                value={line.pay_code_id || undefined}
+                                onChange={(val) =>
+                                  handlePayCodeChange(
+                                    entry.employee_id,
+                                    line.key,
+                                    (Array.isArray(val) ? val[0] : val) || ""
+                                  )
+                                }
+                                options={payCodeOptions}
+                                query={payCodeQueries[line.key] || ""}
+                                setQuery={setLineQuery(line.key)}
+                                placeholder="Select pay code..."
+                              />
+                            </td>
+                            <td className="py-2 px-3">
+                              <span
+                                className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${SOURCE_BADGE[line.source_type]}`}
+                              >
+                                {line.source_type}
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 text-right">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={line.rate_used}
+                                onChange={(e) =>
+                                  handleNumberChange(
+                                    entry.employee_id,
+                                    line.key,
+                                    "rate_used",
+                                    e.target.value
+                                  )
+                                }
+                                className="w-20 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 px-2 text-sm text-right text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:bg-default-50 dark:disabled:bg-gray-700/60"
+                              />
+                            </td>
+                            <td className="py-2 px-3 text-right">
+                              <input
+                                type="number"
+                                step="1"
+                                value={line.quantity}
+                                onChange={(e) =>
+                                  handleNumberChange(
+                                    entry.employee_id,
+                                    line.key,
+                                    "quantity",
+                                    e.target.value
+                                  )
+                                }
+                                className="w-16 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 px-2 text-sm text-right text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:bg-default-50 dark:disabled:bg-gray-700/60"
+                              />
+                            </td>
+                            <td className="py-2 px-3 text-right font-medium text-default-900 dark:text-gray-100">
+                              {formatCurrency(line.amount)}
+                              <span className="ml-1 text-xs text-default-400 dark:text-gray-500">
+                                /{line.rate_unit}
+                              </span>
+                            </td>
+                            <td className="py-2 pl-3 text-right">
+                              <button
+                                onClick={() =>
+                                  handleRemoveLine(entry.employee_id, line.key)
+                                }
+                                className="p-1.5 rounded-full text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50"
+                                title="Remove trip"
+                              >
+                                <IconTrash size={16} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>

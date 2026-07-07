@@ -1,11 +1,12 @@
 // src/routes/jellypolly/salary-report.js
-// Jelly Polly Salary Report. JP has no locations and no leave, so the report
-// groups by job type (OFFICE / MAINTENANCE / SALESMAN / ...) instead of location, and the
-// per-employee column buckets are computed in JS from the stored payroll
-// (employee_payrolls + payroll_items + payroll_deductions + mid-month).
+// Jelly Polly Salary Report. Groups employees by location (jellypolly.locations
+// via jellypolly.job_location_mappings + employee direct locations), mirroring
+// the Tien Hock report. The per-employee column buckets are computed in JS from
+// the stored payroll (employee_payrolls + payroll_items + payroll_deductions +
+// mid-month).
 //
 // Output shapes match what the shared TH PDF generator
-// (src/utils/payroll/SalaryReportPDF.tsx) consumes, with `location` = job group.
+// (src/utils/payroll/SalaryReportPDF.tsx) consumes, with `location` = location code.
 import { Router } from "express";
 
 const TOTAL_KEYS = [
@@ -29,20 +30,14 @@ const TOTAL_KEYS = [
   "setelah_digenapkan",
 ];
 
-const GROUP_ORDER = [
-  "OFFICE",
-  "MAINTENANCE",
-  "SALESMAN",
-  "SALESMAN_IKUT",
-  "ICE_POLLY",
-  "JELLY_CUP",
-  "PLASTIC",
-  "PRODUCTION",
-];
-const groupRank = (g) => {
-  const i = GROUP_ORDER.indexOf(g);
-  return i === -1 ? 99 : i;
+// Sort location groups by their two-digit code (unknown/empty codes last).
+const locationRank = (code) => {
+  const n = parseInt(code, 10);
+  return Number.isNaN(n) ? 999 : n;
 };
+
+// Location assigned to rows with no resolvable location (Office default).
+const DEFAULT_LOCATION = "01";
 
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
@@ -140,13 +135,69 @@ export default function (pool) {
   const router = Router();
 
   // Fetch every processed employee payroll for a year as flat rows, each already
-  // bucketed: { month, job_type, employee_id, employee_name, ep_id, row }.
+  // bucketed: { month, job_type, location_code, employee_id, employee_name, ep_id, row }.
+  // Returns { rows, locationMap } — locationMap maps location code -> display name.
   const loadYearRows = async (year) => {
+    // Location resolution data (locations, job mappings, exclusions, staff)
+    const [locRes, jlmRes, exclRes, staffRes] = await Promise.all([
+      pool.query("SELECT id, name FROM jellypolly.locations ORDER BY id"),
+      pool.query(
+        "SELECT job_id, location_code FROM jellypolly.job_location_mappings WHERE is_active = true"
+      ),
+      pool.query(
+        "SELECT employee_id, job_id, location_code FROM jellypolly.employee_job_location_exclusions"
+      ),
+      pool.query(
+        "SELECT id, head_staff_id, location, job FROM jellypolly.staffs"
+      ),
+    ]);
+
+    const locationMap = {};
+    locRes.rows.forEach((l) => {
+      locationMap[l.id] = l.name;
+    });
+    const locByJob = {};
+    jlmRes.rows.forEach((m) => {
+      locByJob[m.job_id] = m.location_code;
+    });
+    const excluded = new Set();
+    exclRes.rows.forEach((e) => {
+      excluded.add(`${e.employee_id}|${e.job_id}|${e.location_code}`);
+    });
+    const staffById = {};
+    staffRes.rows.forEach((s) => {
+      staffById[s.id] = s;
+    });
+
+    const asArray = (v) => (Array.isArray(v) ? v : []);
+
+    // Priority: HEAD/self direct location > first mapped (non-excluded) job > default.
+    const resolveLocation = (employeeId) => {
+      const s = staffById[employeeId];
+      const head =
+        s && s.head_staff_id ? staffById[s.head_staff_id] : null;
+
+      const direct =
+        asArray(head?.location)[0] || asArray(s?.location)[0] || null;
+      if (direct) return direct;
+
+      const jobList = asArray(head?.job).length
+        ? asArray(head?.job)
+        : asArray(s?.job);
+      for (const jobId of jobList) {
+        const loc = locByJob[jobId];
+        if (loc && !excluded.has(`${employeeId}|${jobId}|${loc}`)) {
+          return loc;
+        }
+      }
+      return DEFAULT_LOCATION;
+    };
+
     const mps = await pool.query(
       "SELECT id, month FROM jellypolly.monthly_payrolls WHERE year = $1",
       [year]
     );
-    if (mps.rows.length === 0) return [];
+    if (mps.rows.length === 0) return { rows: [], locationMap };
     const monthByMp = {};
     mps.rows.forEach((m) => {
       monthByMp[m.id] = m.month;
@@ -163,7 +214,7 @@ export default function (pool) {
       [mpIds]
     );
     const epIds = eps.rows.map((e) => e.id);
-    if (epIds.length === 0) return [];
+    if (epIds.length === 0) return { rows: [], locationMap };
 
     const [items, deds, mid, leave] = await Promise.all([
       pool.query(
@@ -230,7 +281,7 @@ export default function (pool) {
       leaveDatesByEmpMonth[key].add(`${l.employee_id}|${l.leave_date}`);
     });
 
-    return eps.rows.map((ep) => {
+    const rows = eps.rows.map((ep) => {
       const month = monthByMp[ep.monthly_payroll_id];
       const row = buildRow(
         ep,
@@ -243,12 +294,15 @@ export default function (pool) {
       return {
         month,
         job_type: ep.job_type || "OTHER",
+        location_code: resolveLocation(ep.employee_id),
         employee_id: ep.employee_id,
         employee_name: ep.employee_name || ep.employee_id,
         ep_id: ep.id,
         row,
       };
     });
+
+    return { rows, locationMap };
   };
 
   /**
@@ -262,32 +316,38 @@ export default function (pool) {
       return res.status(400).json({ message: "year and month are required" });
     }
     try {
-      const all = await loadYearRows(year);
+      const { rows: all, locationMap } = await loadYearRows(year);
       const rows = all.filter((r) => r.month === month);
 
       const groups = {};
       const grand = emptyTotals();
       for (const r of rows) {
-        if (!groups[r.job_type]) {
-          groups[r.job_type] = {
-            location: r.job_type,
+        if (!groups[r.location_code]) {
+          groups[r.location_code] = {
+            location: r.location_code,
             employees: [],
             totals: emptyTotals(),
           };
         }
-        groups[r.job_type].employees.push({
+        groups[r.location_code].employees.push({
           employee_payroll_id: r.ep_id,
           staff_id: r.employee_id,
           staff_name: r.employee_name,
           ...r.row,
         });
-        addInto(groups[r.job_type].totals, r.row);
+        addInto(groups[r.location_code].totals, r.row);
         addInto(grand, r.row);
       }
       const locations = Object.values(groups).sort(
-        (a, b) => groupRank(a.location) - groupRank(b.location)
+        (a, b) => locationRank(a.location) - locationRank(b.location)
       );
-      res.json({ year, month, locations, grand_totals: grand });
+      res.json({
+        year,
+        month,
+        locations,
+        grand_totals: grand,
+        location_map: locationMap,
+      });
     } catch (error) {
       console.error("Error building JP salary report:", error);
       res.status(500).json({
@@ -305,15 +365,15 @@ export default function (pool) {
     const year = parseInt(req.query.year, 10);
     if (!year) return res.status(400).json({ message: "year is required" });
     try {
-      const rows = await loadYearRows(year);
+      const { rows, locationMap } = await loadYearRows(year);
       const monthlyMap = {};
       const locMap = {};
       const grand = emptyTotals();
       for (const r of rows) {
         if (!monthlyMap[r.month]) monthlyMap[r.month] = emptyTotals();
         addInto(monthlyMap[r.month], r.row);
-        if (!locMap[r.job_type]) locMap[r.job_type] = emptyTotals();
-        addInto(locMap[r.job_type], r.row);
+        if (!locMap[r.location_code]) locMap[r.location_code] = emptyTotals();
+        addInto(locMap[r.location_code], r.row);
         addInto(grand, r.row);
       }
       const monthly = Object.keys(monthlyMap)
@@ -321,8 +381,14 @@ export default function (pool) {
         .sort((a, b) => a.month - b.month);
       const locations = Object.keys(locMap)
         .map((l) => ({ location: l, totals: locMap[l] }))
-        .sort((a, b) => groupRank(a.location) - groupRank(b.location));
-      res.json({ year, monthly, locations, grand_totals: grand });
+        .sort((a, b) => locationRank(a.location) - locationRank(b.location));
+      res.json({
+        year,
+        monthly,
+        locations,
+        grand_totals: grand,
+        location_map: locationMap,
+      });
     } catch (error) {
       console.error("Error building JP annual salary report:", error);
       res.status(500).json({
@@ -340,18 +406,18 @@ export default function (pool) {
     const year = parseInt(req.query.year, 10);
     if (!year) return res.status(400).json({ message: "year is required" });
     try {
-      const rows = await loadYearRows(year);
+      const { rows, locationMap } = await loadYearRows(year);
       const locMap = {};
       const grand = emptyTotals();
       for (const r of rows) {
-        if (!locMap[r.job_type]) {
-          locMap[r.job_type] = {
-            location: r.job_type,
+        if (!locMap[r.location_code]) {
+          locMap[r.location_code] = {
+            location: r.location_code,
             employees: new Map(),
             totals: emptyTotals(),
           };
         }
-        const loc = locMap[r.job_type];
+        const loc = locMap[r.location_code];
         let emp = loc.employees.get(r.employee_id);
         if (!emp) {
           emp = {
@@ -368,7 +434,7 @@ export default function (pool) {
         addInto(grand, r.row);
       }
       const locations = Object.values(locMap)
-        .sort((a, b) => groupRank(a.location) - groupRank(b.location))
+        .sort((a, b) => locationRank(a.location) - locationRank(b.location))
         .map((loc) => ({
           location: loc.location,
           employees: Array.from(loc.employees.values()).map((e) => ({
@@ -379,7 +445,7 @@ export default function (pool) {
           })),
           totals: loc.totals,
         }));
-      res.json({ year, locations, grand_totals: grand });
+      res.json({ year, locations, grand_totals: grand, location_map: locationMap });
     } catch (error) {
       console.error("Error building JP annual breakdown:", error);
       res.status(500).json({

@@ -60,7 +60,7 @@ This is a comprehensive ERP system supporting three companies:
 - Maintenance mode support for database operations
 - Environment variables for database configuration
 
-#### Database Schema (77 tables)
+#### Database Schema (78 tables)
 
 **Accounting & Finance:**
 
@@ -90,9 +90,9 @@ This is a comprehensive ERP system supporting three companies:
 - `customer_branch_groups` - id, group_name, created_at
 - `customer_branch_mappings` - id, group_id, customer_id, is_main_branch, created_at
 - `customer_products` - id, customer_id, product_id, custom_price, is_available
-- `invoices` - id, salespersonid, customerid, createddate, paymenttype, total_excluding_tax, rounding, totalamountpayable, uuid, submission_uid, long_id, datetime_validated, is_consolidated, consolidated_invoices, invoice_status, einvoice_status, tax_amount, balance_due
+- `invoices` - id, salespersonid, customerid, createddate, paymenttype, total_excluding_tax, rounding, totalamountpayable, uuid, submission_uid, long_id, datetime_validated, is_consolidated, consolidated_invoices, invoice_status, einvoice_status, tax_amount, balance_due, journal_entry_id (FK journal_entries; auto-posted `S` sales journal — DR TR / CR CASH_SALES (cash bill) or CR_SALES (credit invoice), amount = totalamountpayable, reference_no = invoice id. Synced in place on line/paymenttype/date edits and cancelled with the invoice via `src/routes/accounting/sales-journal.js` (`syncSalesJournalEntry`/`cancelSalesJournalEntry`). Consolidated wrappers and zero-amount invoices skip it. Cash-method REC receipts debit CH_REV1 (cash bill) / CH_REV2 (payment of old credit bill) instead of CASH.)
 - `order_details` - id, invoiceid, code, price, quantity, freeproduct, returnproduct, description, tax, total, issubtotal
-- `payments` - payment_id, invoice_id, payment_date, amount_paid, payment_method, payment_reference, internal_reference, notes, created_at, status, cancellation_date, cancellation_reason
+- `payments` - payment_id, invoice_id, payment_date, amount_paid, payment_method, payment_reference, internal_reference, bank_account (CASH/BANK_PBB/BANK_ABB), journal_entry_id (FK journal_entries; REC receipt journal), notes, created_at, status, cancellation_date, cancellation_reason
 - `consolidation_settings` - company_id, auto_consolidation_enabled, last_updated, updated_by
 - `consolidation_tracking` - id, company_id, year, month, status, consolidated_invoice_id, last_attempt, next_attempt, attempt_count, error
 - `adjustment_documents` - id (unique internal row key, stored URL-safe with dashes), display_id (user-facing document number, e.g. TH-CN-26-1 / TH-DN-26-1 / TH-RN-26-1 = company-type-YY-runningNo, running number unpadded restarting at 1 per company/type/year; rendered with slashes as TH/CN/26/1 via `src/utils/adjustments/formatDocId`; active display IDs are unique, cancelled display IDs may be reused), type (credit_note/debit_note/refund_note), original_invoice_id (FK invoices), customerid, salespersonid, createddate (unix ms), reason, paired_with_id (self-FK; CN<->RN pairing), linked_payment_id (FK payments; standalone RN tied to overpaid payment), references_consolidated_id (CON-* parent id when original was consolidated), total_excluding_tax, tax_amount, rounding, totalamountpayable, refund_method, refund_reference, bank_account (RN-only fields), uuid, submission_uid, long_id, datetime_validated, einvoice_status (valid/pending/invalid/cancelled), is_consolidated, consolidated_adjustments (JSONB array of child adj doc IDs when wrapper), status (active/cancelled), cancellation_reason, cancellation_date, journal_entry_id (FK journal_entries), created_by, created_at, updated_at. Legacy ids like CN-2026-0001 are left unchanged. Tien Hock Credit Notes / Debit Notes / Refund Notes against sales invoices. Atomic create updates invoices.balance_due and customers.credit_used and posts a journal entry; cancellation reverses all three.
@@ -178,6 +178,7 @@ This is a comprehensive ERP system supporting three companies:
 
 - `agama` - id, name
 - `banks` - id, name
+- `departments` - id, name (shared staff department lookup used by Tien Hock and Jelly Polly staff forms)
 - `nationalities` - id, name
 - `races` - id, name
 
@@ -218,6 +219,9 @@ Catalogue:
 - `jellypolly.job_pay_codes`, `jellypolly.employee_pay_codes` - TH shapes, FKs to jellypolly.jobs/staffs/pay_codes. Salesman product codes are mapped to BOTH salesman jobs; JP_SALESMAN_IKUT carries lower override rates.
 - `jellypolly.pay_rate_schedules` + SQL function `jellypolly.get_effective_pay_rate(...)` - effective-month-dated rate overrides over the JP catalogue (mirror of the public function).
 - `jellypolly.product_pay_codes` - product_id (FK public.products) → pay_code_id (FK jellypolly.pay_codes); production packing pay mapping (managed via the Mappings button on JP Production Entry; JP_PACKING job carries the Ctn codes).
+- `jellypolly.locations` - id, name. JP-owned location catalogue (clone of public.locations; NOT shared with TH). Seeded 8 rows: 01 Office, 02 Maintenance, 03 Salesman, 04 Ikut Lori, 05 Ice Polly Machine, 06 Jelly Cup Machine, 07 Plastic Machine, 08 Ice Polly Packing & Jelly Cup Packing. Managed on the JP Location page (Catalogue → Location, `src/pages/JellyPolly/Catalogue/JPLocationPage.tsx`, routes `src/routes/jellypolly/locations.js`). No account/journal-voucher mappings (JP has no journal vouchers).
+- `jellypolly.job_location_mappings` - id, job_id (unique FK jellypolly.jobs ON DELETE CASCADE), location_code (FK jellypolly.locations), is_active, created_at, updated_at. One location per job; seeded JP_OFFICE→01, JP_MAINTEN→02, JP_SALESMAN→03, JP_SALESMAN_IKUT→04, JP_ICE_POLLY→05, JP_JELLY_CUP→06, JP_PLASTIC→07, JP_PACKING→08. Routes `src/routes/jellypolly/job-location-mappings.js`.
+- `jellypolly.employee_job_location_exclusions` - id, employee_id (FK jellypolly.staffs ON DELETE CASCADE), job_id (FK jellypolly.jobs ON DELETE CASCADE), location_code (FK jellypolly.locations ON DELETE CASCADE), reason, created_at, created_by (unique: employee_id, job_id, location_code). Excludes an employee-job combo from a location's salary-report grouping. Employee direct locations live on `jellypolly.staffs.location` JSONB. The JP Salary Report (`src/routes/jellypolly/salary-report.js`) groups by resolved location: HEAD/self direct location > first mapped (non-excluded) job > default '01'.
 
 Payroll (per-employee auto-reprocess on every save via `src/routes/jellypolly/jpPayrollProcessor.js`; HEAD rollup: payroll rows only for canonical HEAD ids, sub-ID work keeps source_employee_id):
 

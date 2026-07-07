@@ -1,303 +1,552 @@
 // src/pages/JellyPolly/Payroll/JPDailyPlasticEntryPage.tsx
-// Jelly Polly Daily Machine Plastic entry (JP-exclusive page).
-// Per staff row: 30ml cartons, 70ml cartons; page-level day/night shift.
-// Stored as a jellypolly.daily_work_logs header (section PLASTIC) with one
-// entry per staff and JP_CTN_30ML / JP_CTN_70ML activities. Staff with
-// multiple IDs enter cartons under their sub IDs; payroll processing rolls the
-// pay up into the HEAD id (source_employee_id keeps the sub ID).
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+// Jelly Polly Daily Machine Plastic entry. One card per plastic staff member,
+// with saved pay-code lines stored in JP daily work-log activities.
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
-import { IconDeviceFloppy, IconTrash } from "@tabler/icons-react";
+import {
+  IconDeviceFloppy,
+  IconEraser,
+  IconPlus,
+  IconRefresh,
+  IconTrash,
+} from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
-import TimeNavigator from "../../../components/TimeNavigator";
+import TimeNavigator, { TimeRange } from "../../../components/TimeNavigator";
+import { FormCombobox, SelectOption } from "../../../components/FormComponents";
 import { api } from "../../../routes/utils/api";
-import { useJPStaffsCache } from "../../../utils/JellyPolly/useJPStaffsCache";
-import { useJPJobPayCodeMappings } from "../../../utils/JellyPolly/useJPJobPayCodeMappings";
+import {
+  EmployeePayCodeDetails,
+  useJPJobPayCodeMappings,
+} from "../../../utils/JellyPolly/useJPJobPayCodeMappings";
+import { useJPEffectiveRates } from "../../../utils/JellyPolly/useJPEffectiveRates";
 import { useHolidayCache } from "../../../utils/payroll/useHolidayCache";
+import { JobPayCodeDetails } from "../../../types/types";
 
-const SECTION = "PLASTIC";
+const API_BASE = "/jellypolly/api/daily-plastic";
 const JOB_ID = "JP_PLASTIC";
-const PAY_CODE_30ML = "JP_CTN_30ML";
-const PAY_CODE_70ML = "JP_CTN_70ML";
 
 type DayType = "Biasa" | "Ahad" | "Umum";
+type PayCodeSource = "job" | "employee";
 
-interface PlasticRow {
-  employeeId: string;
-  employeeName: string;
-  headStaffId: string | null;
-  cartons30ml: number;
-  cartons70ml: number;
+interface PlasticLine {
+  key: string;
+  pay_code_id: string;
+  description: string;
+  quantity: number;
+  rate_used: number;
+  amount: number;
+  rate_unit: string;
 }
 
-interface RateSet {
-  rate_biasa: number;
-  rate_ahad: number;
-  rate_umum: number;
+interface PlasticEntry {
+  employee_id: string;
+  employee_name: string;
+  saved: boolean;
+  status: string | null;
+  lines: PlasticLine[];
+  dirty: boolean;
+  savingState: boolean;
 }
+
+interface PlasticPayCode {
+  id: string;
+  description: string;
+  pay_type: string;
+  rate_unit: string;
+  rate_biasa: number | null;
+  rate_ahad: number | null;
+  rate_umum: number | null;
+  override_rate_biasa: number | null;
+  override_rate_ahad: number | null;
+  override_rate_umum: number | null;
+  is_active: boolean;
+  source: PayCodeSource;
+}
+
+interface ApiPlasticLine {
+  pay_code_id: string;
+  description?: string | null;
+  quantity?: number | string | null;
+  rate_used?: number | string | null;
+  amount?: number | string | null;
+  rate_unit?: string | null;
+}
+
+interface ApiPlasticEntry {
+  employee_id: string;
+  employee_name: string;
+  saved: boolean;
+  status: string | null;
+  lines?: ApiPlasticLine[];
+}
+
+const round2 = (value: number): number => Math.round(value * 100) / 100;
+const lineAmount = (rate: number, quantity: number): number =>
+  round2(rate * quantity);
+
+let keyCounter = 0;
+const newKey = (): string => `plastic-line-${Date.now()}-${keyCounter++}`;
+
+const toNumber = (value: number | string | null | undefined): number => {
+  const parsed: number = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const formatCurrency = (amount: number): string =>
+  new Intl.NumberFormat("en-MY", {
+    style: "currency",
+    currency: "MYR",
+  }).format(amount);
+
+const normalizeJobPayCode = (
+  payCode: JobPayCodeDetails,
+  source: PayCodeSource
+): PlasticPayCode => ({
+  id: payCode.id,
+  description: payCode.description || payCode.id,
+  pay_type: payCode.pay_type,
+  rate_unit: payCode.rate_unit || "Fixed",
+  rate_biasa: payCode.rate_biasa,
+  rate_ahad: payCode.rate_ahad,
+  rate_umum: payCode.rate_umum,
+  override_rate_biasa: payCode.override_rate_biasa,
+  override_rate_ahad: payCode.override_rate_ahad,
+  override_rate_umum: payCode.override_rate_umum,
+  is_active: payCode.is_active,
+  source,
+});
+
+const normalizeEmployeePayCode = (
+  payCode: EmployeePayCodeDetails,
+  source: PayCodeSource
+): PlasticPayCode => ({
+  id: payCode.id,
+  description: payCode.description || payCode.id,
+  pay_type: payCode.pay_type,
+  rate_unit: payCode.rate_unit || "Fixed",
+  rate_biasa: payCode.rate_biasa,
+  rate_ahad: payCode.rate_ahad,
+  rate_umum: payCode.rate_umum,
+  override_rate_biasa: payCode.override_rate_biasa,
+  override_rate_ahad: payCode.override_rate_ahad,
+  override_rate_umum: payCode.override_rate_umum,
+  is_active: payCode.is_active,
+  source,
+});
+
+const dayRate = (payCode: PlasticPayCode, dayType: DayType): number => {
+  const biasaRate: number = toNumber(
+    payCode.override_rate_biasa ?? payCode.rate_biasa
+  );
+  if (dayType === "Ahad") {
+    return toNumber(
+      payCode.override_rate_ahad ?? payCode.rate_ahad ?? biasaRate
+    );
+  }
+  if (dayType === "Umum") {
+    return toNumber(
+      payCode.override_rate_umum ?? payCode.rate_umum ?? biasaRate
+    );
+  }
+  return biasaRate;
+};
 
 const JPDailyPlasticEntryPage: React.FC = () => {
-  const { staffs, loading: loadingStaffs } = useJPStaffsCache();
-  const { detailedMappings, loading: loadingPayCodes } =
-    useJPJobPayCodeMappings();
+  const {
+    detailedMappings,
+    employeeMappings,
+    loading: loadingPayCodes,
+  } = useJPJobPayCodeMappings();
+  const { resolveEffectiveRates, getEffectiveRate } = useJPEffectiveRates();
   const { isHoliday, getHolidayDescription } = useHolidayCache();
 
-  const [logDate, setLogDate] = useState<string>(
+  const [selectedDate, setSelectedDate] = useState<string>(
     format(new Date(), "yyyy-MM-dd")
   );
-  const [shift, setShift] = useState<"1" | "2">("1");
-  const [rows, setRows] = useState<Record<string, PlasticRow>>({});
-  const [existingLogId, setExistingLogId] = useState<number | null>(null);
+  const [entries, setEntries] = useState<PlasticEntry[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [showClearDialog, setShowClearDialog] = useState<boolean>(false);
+  const [payCodeQueries, setPayCodeQueries] = useState<Record<string, string>>(
+    {}
+  );
+  const [clearTarget, setClearTarget] = useState<PlasticEntry | null>(null);
+  const [isClearing, setIsClearing] = useState<boolean>(false);
 
-  const dayType = useMemo<DayType>(() => {
-    const date = new Date(logDate);
-    if (isHoliday(date)) return "Umum";
-    if (date.getDay() === 0) return "Ahad";
-    return "Biasa";
-  }, [logDate, isHoliday]);
-
-  const staffNameById = useMemo((): Map<string, string> => {
-    return new Map(staffs.map((s) => [s.id, s.name]));
-  }, [staffs]);
-
-  // Staff holding the JP_PLASTIC job (staffs.job), sub-IDs listed individually
-  const plasticStaff = useMemo(() => {
-    return staffs
-      .filter((staff) => Array.isArray(staff.job) && staff.job.includes(JOB_ID))
-      .map((staff) => ({
-        employeeId: staff.id,
-        employeeName: staff.name || staff.id,
-        headStaffId: staff.headStaffId ?? null,
-      }))
-      .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
-  }, [staffs]);
-
-  // Rate per pay code for the current day type (job mapping override wins)
-  const rateFor = useCallback(
-    (payCodeId: string): number => {
-      const mapping = (detailedMappings[JOB_ID] || []).find(
-        (pc: RateSet & { id: string; override_rate_biasa: number | null }) =>
-          pc.id === payCodeId
-      ) as any;
-      if (!mapping) return 0;
-      const base =
-        dayType === "Ahad"
-          ? mapping.override_rate_ahad ?? mapping.rate_ahad
-          : dayType === "Umum"
-          ? mapping.override_rate_umum ?? mapping.rate_umum
-          : mapping.override_rate_biasa ?? mapping.rate_biasa;
-      return Number(base) || 0;
-    },
-    [detailedMappings, dayType]
+  const selectedDateValue = useMemo<Date>(
+    () => new Date(`${selectedDate}T00:00:00`),
+    [selectedDate]
   );
 
-  const rate30ml = rateFor(PAY_CODE_30ML);
-  const rate70ml = rateFor(PAY_CODE_70ML);
+  const dayType = useMemo<DayType>(() => {
+    if (isHoliday(selectedDateValue)) return "Umum";
+    if (selectedDateValue.getDay() === 0) return "Ahad";
+    return "Biasa";
+  }, [isHoliday, selectedDateValue]);
 
-  // Load the saved log for this date+shift (if any) and build rows
-  useEffect(() => {
-    let cancelled = false;
-    const loadExisting = async (): Promise<void> => {
-      if (loadingStaffs) return;
-      setIsLoading(true);
-      try {
-        const listResponse = await api.get(
-          `/jellypolly/api/daily-work-logs?startDate=${logDate}&endDate=${logDate}&section=${SECTION}&shift=${shift}`
-        );
-        const existing = (listResponse.logs || [])[0] || null;
+  const dayRange = useMemo<TimeRange>(
+    () => ({ start: selectedDateValue, end: selectedDateValue }),
+    [selectedDateValue]
+  );
 
-        const baseRows: Record<string, PlasticRow> = {};
-        for (const staff of plasticStaff) {
-          baseRows[staff.employeeId] = {
-            employeeId: staff.employeeId,
-            employeeName: staff.employeeName,
-            headStaffId: staff.headStaffId,
-            cartons30ml: 0,
-            cartons70ml: 0,
-          };
-        }
-
-        if (existing) {
-          const detail = await api.get(
-            `/jellypolly/api/daily-work-logs/${existing.id}`
-          );
-          for (const entry of detail.employeeEntries || []) {
-            const row = baseRows[entry.employee_id] || {
-              employeeId: entry.employee_id,
-              employeeName:
-                entry.employee_name ||
-                staffNameById.get(entry.employee_id) ||
-                entry.employee_id,
-              headStaffId: null,
-              cartons30ml: 0,
-              cartons70ml: 0,
-            };
-            for (const activity of entry.activities || []) {
-              if (activity.pay_code_id === PAY_CODE_30ML) {
-                row.cartons30ml = Number(activity.units_produced) || 0;
-              } else if (activity.pay_code_id === PAY_CODE_70ML) {
-                row.cartons70ml = Number(activity.units_produced) || 0;
-              }
+  const fetchEntries = useCallback(async (): Promise<void> => {
+    setIsLoading(true);
+    try {
+      const response = await api.get(`${API_BASE}?date=${selectedDate}`);
+      const loadedEntries: PlasticEntry[] = (
+        (response?.entries || []) as ApiPlasticEntry[]
+      ).map(
+        (entry: ApiPlasticEntry): PlasticEntry => ({
+          employee_id: entry.employee_id,
+          employee_name: entry.employee_name,
+          saved: entry.saved,
+          status: entry.status,
+          dirty: false,
+          savingState: false,
+          lines: (entry.lines || []).map(
+            (line: ApiPlasticLine): PlasticLine => {
+              const quantity: number = toNumber(line.quantity);
+              const rate: number = toNumber(line.rate_used);
+              return {
+                key: newKey(),
+                pay_code_id: line.pay_code_id,
+                description: line.description || line.pay_code_id,
+                quantity,
+                rate_used: rate,
+                amount: toNumber(line.amount),
+                rate_unit: line.rate_unit || "Fixed",
+              };
             }
-            baseRows[entry.employee_id] = row;
-          }
-          if (!cancelled) setExistingLogId(existing.id);
-        } else if (!cancelled) {
-          setExistingLogId(null);
-        }
+          ),
+        })
+      );
+      setEntries(loadedEntries);
+      setPayCodeQueries({});
+    } catch (error: unknown) {
+      console.error("Error loading daily plastic:", error);
+      toast.error("Failed to load Daily Machine Plastic");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedDate]);
 
-        if (!cancelled) setRows(baseRows);
-      } catch (error) {
-        console.error("Error loading plastic entry:", error);
-        toast.error("Failed to load plastic entry");
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-    loadExisting();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [logDate, shift, plasticStaff, loadingStaffs]);
+  useEffect(() => {
+    fetchEntries();
+  }, [fetchEntries]);
 
-  const handleCartonChange = (
-    employeeId: string,
-    field: "cartons30ml" | "cartons70ml",
-    value: string
-  ): void => {
-    const cartons = Math.max(0, parseInt(value) || 0);
-    setRows((prev) => ({
-      ...prev,
-      [employeeId]: { ...prev[employeeId], [field]: cartons },
-    }));
-  };
+  const employeeIdsKey = useMemo<string>(
+    () =>
+      entries
+        .map((entry: PlasticEntry): string => entry.employee_id)
+        .sort()
+        .join("|"),
+    [entries]
+  );
 
-  const rowAmount = (row: PlasticRow): number =>
-    Math.round((row.cartons30ml * rate30ml + row.cartons70ml * rate70ml) * 100) /
-    100;
-
-  const totals = useMemo(() => {
-    const rowList = Object.values(rows);
-    return {
-      cartons30ml: rowList.reduce((sum, r) => sum + r.cartons30ml, 0),
-      cartons70ml: rowList.reduce((sum, r) => sum + r.cartons70ml, 0),
-      amount: rowList.reduce((sum, r) => sum + rowAmount(r), 0),
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, rate30ml, rate70ml]);
-
-  const handleSave = async (): Promise<void> => {
-    const activeRows = Object.values(rows).filter(
-      (row) => row.cartons30ml > 0 || row.cartons70ml > 0
-    );
-    if (activeRows.length === 0) {
-      toast.error("Enter cartons for at least one staff member");
+  useEffect(() => {
+    if (loadingPayCodes || !employeeIdsKey) {
+      resolveEffectiveRates(null, null, []);
       return;
     }
 
-    const employeeEntries = activeRows.map((row) => {
-      const activities = [];
-      if (row.cartons30ml > 0) {
-        activities.push({
-          payCodeId: PAY_CODE_30ML,
-          rateUnit: "Ctn",
-          payType: "Base",
-          isSelected: true,
-          unitsProduced: row.cartons30ml,
-          rate: rate30ml,
-          calculatedAmount:
-            Math.round(row.cartons30ml * rate30ml * 100) / 100,
-        });
-      }
-      if (row.cartons70ml > 0) {
-        activities.push({
-          payCodeId: PAY_CODE_70ML,
-          rateUnit: "Ctn",
-          payType: "Base",
-          isSelected: true,
-          unitsProduced: row.cartons70ml,
-          rate: rate70ml,
-          calculatedAmount:
-            Math.round(row.cartons70ml * rate70ml * 100) / 100,
-        });
-      }
-      return {
-        employeeId: row.employeeId,
-        jobType: JOB_ID,
-        hours: 0,
-        activities,
-      };
-    });
+    const year: number = parseInt(selectedDate.slice(0, 4), 10);
+    const month: number = parseInt(selectedDate.slice(5, 7), 10);
+    const employeeIds: string[] = employeeIdsKey.split("|");
+    const seen: Set<string> = new Set<string>();
+    const tuples: {
+      employee_id: string;
+      job_id: string;
+      pay_code_id: string;
+    }[] = [];
 
-    const payload = {
-      logDate,
-      shift: parseInt(shift),
-      dayType,
-      section: SECTION,
-      contextData: {},
-      status: "Submitted",
-      employeeEntries,
+    for (const employeeId of employeeIds) {
+      const payCodes: (JobPayCodeDetails | EmployeePayCodeDetails)[] = [
+        ...(detailedMappings[JOB_ID] || []),
+        ...(employeeMappings[employeeId] || []),
+      ];
+
+      for (const payCode of payCodes) {
+        const key: string = `${employeeId}|${JOB_ID}|${payCode.id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        tuples.push({
+          employee_id: employeeId,
+          job_id: JOB_ID,
+          pay_code_id: payCode.id,
+        });
+      }
+    }
+
+    resolveEffectiveRates(year, month, tuples);
+  }, [
+    detailedMappings,
+    employeeIdsKey,
+    employeeMappings,
+    loadingPayCodes,
+    resolveEffectiveRates,
+    selectedDate,
+  ]);
+
+  const applyEffectiveRate = useCallback(
+    (payCode: PlasticPayCode, employeeId: string): PlasticPayCode => {
+      const effectiveRate = getEffectiveRate(employeeId, JOB_ID, payCode.id);
+      if (!effectiveRate) return payCode;
+      return {
+        ...payCode,
+        override_rate_biasa: effectiveRate.rate_biasa,
+        override_rate_ahad: effectiveRate.rate_ahad,
+        override_rate_umum: effectiveRate.rate_umum,
+      };
+    },
+    [getEffectiveRate]
+  );
+
+  const payCodesByEmployee = useMemo<Record<string, PlasticPayCode[]>>(() => {
+    const result: Record<string, PlasticPayCode[]> = {};
+
+    for (const entry of entries) {
+      const merged: Map<string, PlasticPayCode> = new Map<
+        string,
+        PlasticPayCode
+      >();
+
+      for (const payCode of detailedMappings[JOB_ID] || []) {
+        const normalized: PlasticPayCode = normalizeJobPayCode(payCode, "job");
+        if (normalized.is_active !== false) {
+          merged.set(normalized.id, normalized);
+        }
+      }
+
+      for (const payCode of employeeMappings[entry.employee_id] || []) {
+        const normalized: PlasticPayCode = normalizeEmployeePayCode(
+          payCode,
+          "employee"
+        );
+        if (normalized.is_active !== false) {
+          merged.set(normalized.id, normalized);
+        }
+      }
+
+      result[entry.employee_id] = Array.from(merged.values())
+        .map((payCode: PlasticPayCode): PlasticPayCode =>
+          applyEffectiveRate(payCode, entry.employee_id)
+        )
+        .sort((a: PlasticPayCode, b: PlasticPayCode): number =>
+          a.id.localeCompare(b.id)
+        );
+    }
+
+    return result;
+  }, [applyEffectiveRate, detailedMappings, employeeMappings, entries]);
+
+  const payCodeMapByEmployee = useMemo<
+    Record<string, Record<string, PlasticPayCode>>
+  >(() => {
+    const result: Record<string, Record<string, PlasticPayCode>> = {};
+    for (const [employeeId, payCodes] of Object.entries(payCodesByEmployee)) {
+      result[employeeId] = {};
+      for (const payCode of payCodes) {
+        result[employeeId][payCode.id] = payCode;
+      }
+    }
+    return result;
+  }, [payCodesByEmployee]);
+
+  const setLineQuery =
+    (key: string): React.Dispatch<React.SetStateAction<string>> =>
+    (value: React.SetStateAction<string>): void => {
+      setPayCodeQueries((prev: Record<string, string>) => ({
+        ...prev,
+        [key]:
+          typeof value === "function"
+            ? value(prev[key] || "")
+            : value,
+      }));
     };
 
-    setIsSaving(true);
+  const handleTimeChange = (range: TimeRange): void => {
+    setSelectedDate(format(range.start, "yyyy-MM-dd"));
+  };
+
+  const updateEntryLines = (
+    employeeId: string,
+    mutate: (lines: PlasticLine[]) => PlasticLine[]
+  ): void => {
+    setEntries((prev: PlasticEntry[]) =>
+      prev.map((entry: PlasticEntry): PlasticEntry =>
+        entry.employee_id === employeeId
+          ? {
+              ...entry,
+              lines: mutate(entry.lines),
+              dirty: true,
+            }
+          : entry
+      )
+    );
+  };
+
+  const handlePayCodeChange = (
+    employeeId: string,
+    key: string,
+    payCodeId: string
+  ): void => {
+    updateEntryLines(employeeId, (lines: PlasticLine[]): PlasticLine[] =>
+      lines.map((line: PlasticLine): PlasticLine => {
+        if (line.key !== key) return line;
+        const payCode: PlasticPayCode | undefined =
+          payCodeMapByEmployee[employeeId]?.[payCodeId];
+        const rate: number = payCode ? dayRate(payCode, dayType) : line.rate_used;
+        const rateUnit: string = payCode?.rate_unit || line.rate_unit;
+        return {
+          ...line,
+          pay_code_id: payCodeId,
+          description: payCode?.description || payCodeId,
+          rate_used: rate,
+          rate_unit: rateUnit,
+          amount: lineAmount(rate, line.quantity),
+        };
+      })
+    );
+  };
+
+  const handleNumberChange = (
+    employeeId: string,
+    key: string,
+    field: "quantity" | "rate_used",
+    value: string
+  ): void => {
+    const parsed: number = Number.parseFloat(value);
+    const nextValue: number = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    updateEntryLines(employeeId, (lines: PlasticLine[]): PlasticLine[] =>
+      lines.map((line: PlasticLine): PlasticLine => {
+        if (line.key !== key) return line;
+        const nextLine: PlasticLine = { ...line, [field]: nextValue };
+        nextLine.amount = lineAmount(nextLine.rate_used, nextLine.quantity);
+        return nextLine;
+      })
+    );
+  };
+
+  const handleAddLine = (employeeId: string): void => {
+    updateEntryLines(employeeId, (lines: PlasticLine[]): PlasticLine[] => [
+      ...lines,
+      {
+        key: newKey(),
+        pay_code_id: "",
+        description: "",
+        quantity: 1,
+        rate_used: 0,
+        amount: 0,
+        rate_unit: "Fixed",
+      },
+    ]);
+  };
+
+  const handleRemoveLine = (employeeId: string, key: string): void => {
+    updateEntryLines(employeeId, (lines: PlasticLine[]): PlasticLine[] =>
+      lines.filter((line: PlasticLine): boolean => line.key !== key)
+    );
+  };
+
+  const handleSave = async (entry: PlasticEntry): Promise<void> => {
+    const validLines: PlasticLine[] = entry.lines.filter(
+      (line: PlasticLine): boolean => !!line.pay_code_id
+    );
+    if (validLines.length === 0) {
+      toast.error(
+        entry.saved
+          ? "Add at least one pay code, or use Clear to remove this staff's saved log."
+          : "Add at least one pay code before saving."
+      );
+      return;
+    }
+
+    setEntries((prev: PlasticEntry[]) =>
+      prev.map((currentEntry: PlasticEntry): PlasticEntry =>
+        currentEntry.employee_id === entry.employee_id
+          ? { ...currentEntry, savingState: true }
+          : currentEntry
+      )
+    );
+
     try {
-      if (existingLogId) {
-        await api.put(`/jellypolly/api/daily-work-logs/${existingLogId}`, payload);
-      } else {
-        const response = await api.post("/jellypolly/api/daily-work-logs", payload);
-        setExistingLogId(response.workLogId);
-      }
-      toast.success("Plastic entry saved and payroll updated");
+      await api.post(API_BASE, {
+        date: selectedDate,
+        employee_id: entry.employee_id,
+        status: "Submitted",
+        lines: validLines.map((line: PlasticLine) => ({
+          pay_code_id: line.pay_code_id,
+          quantity: line.quantity,
+          rate_used: line.rate_used,
+          amount: line.amount,
+        })),
+      });
+
+      toast.success(`Saved ${entry.employee_name}'s plastic entry`);
+      setEntries((prev: PlasticEntry[]) =>
+        prev.map((currentEntry: PlasticEntry): PlasticEntry =>
+          currentEntry.employee_id === entry.employee_id
+            ? {
+                ...currentEntry,
+                saved: true,
+                status: "Submitted",
+                dirty: false,
+                savingState: false,
+                lines: validLines,
+              }
+            : currentEntry
+        )
+      );
     } catch (error: unknown) {
-      console.error("Error saving plastic entry:", error);
-      const message =
+      console.error("Error saving daily plastic:", error);
+      const message: string =
         error instanceof Error ? error.message : "Failed to save plastic entry";
       toast.error(message);
-    } finally {
-      setIsSaving(false);
+      setEntries((prev: PlasticEntry[]) =>
+        prev.map((currentEntry: PlasticEntry): PlasticEntry =>
+          currentEntry.employee_id === entry.employee_id
+            ? { ...currentEntry, savingState: false }
+            : currentEntry
+        )
+      );
     }
   };
 
   const handleClear = async (): Promise<void> => {
-    if (!existingLogId) return;
+    if (!clearTarget) return;
+    setIsClearing(true);
     try {
-      await api.delete(`/jellypolly/api/daily-work-logs/${existingLogId}`);
-      setExistingLogId(null);
-      setRows((prev) => {
-        const cleared: Record<string, PlasticRow> = {};
-        for (const [id, row] of Object.entries(prev)) {
-          cleared[id] = { ...row, cartons30ml: 0, cartons70ml: 0 };
-        }
-        return cleared;
-      });
-      toast.success("Plastic entry cleared");
-    } catch (error) {
-      console.error("Error clearing plastic entry:", error);
-      toast.error("Failed to clear plastic entry");
+      await api.delete(
+        `${API_BASE}?date=${selectedDate}&employee_id=${encodeURIComponent(
+          clearTarget.employee_id
+        )}`
+      );
+      toast.success(`Cleared ${clearTarget.employee_name}'s plastic entry`);
+      setClearTarget(null);
+      await fetchEntries();
+    } catch (error: unknown) {
+      console.error("Error clearing daily plastic:", error);
+      toast.error("Failed to clear saved plastic entry");
     } finally {
-      setShowClearDialog(false);
+      setIsClearing(false);
     }
   };
 
-  const selectedDateRange = useMemo(
-    () => ({
-      start: new Date(`${logDate}T00:00:00`),
-      end: new Date(`${logDate}T23:59:59`),
-    }),
-    [logDate]
-  );
+  const entryTotal = (entry: PlasticEntry): number =>
+    round2(
+      entry.lines.reduce(
+        (sum: number, line: PlasticLine): number => sum + (line.amount || 0),
+        0
+      )
+    );
 
-  const rowList = Object.values(rows).sort((a, b) =>
-    a.employeeName.localeCompare(b.employeeName) ||
-    a.employeeId.localeCompare(b.employeeId)
-  );
+  const dayTypeClassName: string =
+    dayType === "Umum"
+      ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
+      : dayType === "Ahad"
+      ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300"
+      : "bg-default-100 dark:bg-gray-700 text-default-700 dark:text-gray-200";
 
   return (
     <div className="space-y-4">
@@ -306,10 +555,6 @@ const JPDailyPlasticEntryPage: React.FC = () => {
           <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
             Daily Machine Plastic
           </h1>
-          <p className="text-sm text-default-500 dark:text-gray-400">
-            30ml / 70ml carton production per staff. Sub-ID entries roll up into
-            the HEAD staff's payroll.
-          </p>
         </div>
         <div className="flex items-end flex-wrap gap-3">
           <div>
@@ -317,10 +562,8 @@ const JPDailyPlasticEntryPage: React.FC = () => {
               Date
             </label>
             <TimeNavigator
-              range={selectedDateRange}
-              onChange={(range: { start: Date }) =>
-                setLogDate(format(range.start, "yyyy-MM-dd"))
-              }
+              range={dayRange}
+              onChange={handleTimeChange}
               modes={["day"]}
               presets={false}
               allowFuture
@@ -328,39 +571,24 @@ const JPDailyPlasticEntryPage: React.FC = () => {
             />
           </div>
           <span
-            className={`inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium ${
-              dayType === "Umum"
-                ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
-                : dayType === "Ahad"
-                ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300"
-                : "bg-default-100 dark:bg-gray-700 text-default-700 dark:text-gray-200"
-            }`}
+            className={`inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium ${dayTypeClassName}`}
           >
             {dayType}
             {dayType === "Umum" &&
-              getHolidayDescription(new Date(logDate)) && (
+              getHolidayDescription(selectedDateValue) && (
                 <span className="ml-1 text-xs font-normal">
-                  ({getHolidayDescription(new Date(logDate))})
+                  ({getHolidayDescription(selectedDateValue)})
                 </span>
               )}
           </span>
-          {/* Day / Night shift toggle */}
-          <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
-            {(["1", "2"] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setShift(value)}
-                className={`px-4 py-2 text-sm font-medium transition-colors ${
-                  shift === value
-                    ? "bg-sky-600 text-white"
-                    : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
-                }`}
-              >
-                {value === "1" ? "Day Shift" : "Night Shift"}
-              </button>
-            ))}
-          </div>
+          <Button
+            onClick={fetchEntries}
+            icon={IconRefresh}
+            variant="outline"
+            disabled={isLoading}
+          >
+            Refresh
+          </Button>
         </div>
       </div>
 
@@ -368,142 +596,227 @@ const JPDailyPlasticEntryPage: React.FC = () => {
         <div className="flex justify-center py-16">
           <LoadingSpinner />
         </div>
-      ) : rowList.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
+      ) : entries.length === 0 ? (
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm p-8 text-center">
           <p className="text-default-500 dark:text-gray-400">
-            No staff assigned to Daily Machine Plastic. Assign staff on the
-            Staff Assignment page first.
+            No staff assigned to Daily Machine Plastic.
           </p>
         </div>
       ) : (
-        <>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-x-auto">
-            <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
-              <thead className="bg-default-50 dark:bg-gray-900/50">
-                <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                    Staff
-                  </th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                    30ml Cartons (RM {rate30ml.toFixed(2)}/ctn)
-                  </th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                    70ml Cartons (RM {rate70ml.toFixed(2)}/ctn)
-                  </th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                    Amount
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-default-100 dark:divide-gray-700/60">
-                {rowList.map((row) => (
-                  <tr key={row.employeeId}>
-                    <td className="px-4 py-2">
-                      <span className="text-sm text-default-800 dark:text-gray-200">
-                        {row.employeeName}
-                      </span>
-                      <span className="block text-xs text-default-400 dark:text-gray-500">
-                        {row.employeeId}
-                        {row.headStaffId
-                          ? ` · pays to ${row.headStaffId}`
-                          : ""}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <input
-                        type="number"
-                        min={0}
-                        step={1}
-                        value={row.cartons30ml === 0 ? "" : row.cartons30ml}
-                        placeholder="0"
-                        onChange={(e) =>
-                          handleCartonChange(
-                            row.employeeId,
-                            "cartons30ml",
-                            e.target.value
-                          )
-                        }
-                        className="w-28 px-2 py-1.5 text-right text-sm rounded-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                        disabled={isSaving}
-                      />
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <input
-                        type="number"
-                        min={0}
-                        step={1}
-                        value={row.cartons70ml === 0 ? "" : row.cartons70ml}
-                        placeholder="0"
-                        onChange={(e) =>
-                          handleCartonChange(
-                            row.employeeId,
-                            "cartons70ml",
-                            e.target.value
-                          )
-                        }
-                        className="w-28 px-2 py-1.5 text-right text-sm rounded-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                        disabled={isSaving}
-                      />
-                    </td>
-                    <td className="px-4 py-2 text-right text-sm font-medium text-default-800 dark:text-gray-200">
-                      RM {rowAmount(row).toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-default-50 dark:bg-gray-900/50">
-                <tr>
-                  <td className="px-4 py-2 text-sm font-semibold text-default-700 dark:text-gray-200">
-                    Total
-                  </td>
-                  <td className="px-4 py-2 text-right text-sm font-semibold text-default-700 dark:text-gray-200">
-                    {totals.cartons30ml}
-                  </td>
-                  <td className="px-4 py-2 text-right text-sm font-semibold text-default-700 dark:text-gray-200">
-                    {totals.cartons70ml}
-                  </td>
-                  <td className="px-4 py-2 text-right text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                    RM {totals.amount.toFixed(2)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+        <div className="space-y-4">
+          {entries.map((entry: PlasticEntry) => {
+            const payCodes: PlasticPayCode[] =
+              payCodesByEmployee[entry.employee_id] || [];
+            const payCodeOptions: SelectOption[] = payCodes.map(
+              (payCode: PlasticPayCode): SelectOption => ({
+                id: payCode.id,
+                name: payCode.id,
+                job: payCode.description,
+              })
+            );
 
-          <div className="flex justify-end gap-2">
-            {existingLogId && (
-              <Button
-                variant="outline"
-                color="rose"
-                icon={IconTrash}
-                onClick={() => setShowClearDialog(true)}
-                disabled={isSaving}
+            return (
+              <div
+                key={entry.employee_id}
+                className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm"
               >
-                Clear Day
-              </Button>
-            )}
-            <Button
-              color="sky"
-              variant="filled"
-              icon={IconDeviceFloppy}
-              onClick={handleSave}
-              disabled={isSaving}
-            >
-              {isSaving ? "Saving..." : existingLogId ? "Update" : "Save"}
-            </Button>
-          </div>
-        </>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 px-5 py-3 border-b border-default-200 dark:border-gray-700">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <h2 className="text-base font-semibold text-default-800 dark:text-gray-100 truncate">
+                      {entry.employee_name}{" "}
+                      <span className="font-normal text-default-500 dark:text-gray-400">
+                        ({entry.employee_id})
+                      </span>
+                    </h2>
+                    {entry.saved ? (
+                      <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                        Saved
+                      </span>
+                    ) : (
+                      <span className="inline-flex rounded-full bg-default-100 px-2 py-0.5 text-[11px] font-medium text-default-600 dark:bg-gray-700 dark:text-gray-300">
+                        Unsaved
+                      </span>
+                    )}
+                    {entry.dirty && (
+                      <span className="inline-flex rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-medium text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                        Unsaved changes
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-sm font-semibold text-default-800 dark:text-gray-100 md:text-right">
+                    {formatCurrency(entryTotal(entry))}
+                  </div>
+                </div>
+
+                <div className="px-5 py-3">
+                  {entry.lines.length === 0 ? (
+                    <p className="text-sm text-default-500 dark:text-gray-400 py-2">
+                      No codes for this day.
+                    </p>
+                  ) : (
+                    <div className="space-y-2 overflow-visible">
+                      <div className="hidden md:grid grid-cols-[minmax(220px,1fr)_96px_80px_130px_32px] gap-3 text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider items-end">
+                        <div>Pay Code</div>
+                        <div className="text-right">Rate</div>
+                        <div className="text-right">Qty</div>
+                        <div className="text-right">Amount</div>
+                        <div></div>
+                      </div>
+                      <div className="divide-y divide-default-100 dark:divide-gray-700/70 overflow-visible">
+                        {entry.lines.map((line: PlasticLine) => (
+                          <div
+                            key={line.key}
+                            className="grid grid-cols-1 md:grid-cols-[minmax(220px,1fr)_96px_80px_130px_32px] gap-3 py-2 overflow-visible md:items-start"
+                          >
+                            <div className="relative">
+                              <label className="md:hidden block text-xs font-medium text-default-500 dark:text-gray-400 uppercase mb-1">
+                                Pay Code
+                              </label>
+                              <div className="[&_.overflow-hidden]:h-10 [&_.overflow-hidden]:box-border [&_input]:h-full [&_input]:py-0">
+                                <FormCombobox
+                                  name={`paycode-${line.key}`}
+                                  label=""
+                                  mode="single"
+                                  value={line.pay_code_id || undefined}
+                                  onChange={(value: string | string[] | null) =>
+                                    handlePayCodeChange(
+                                      entry.employee_id,
+                                      line.key,
+                                      (Array.isArray(value)
+                                        ? value[0]
+                                        : value) || ""
+                                    )
+                                  }
+                                  options={payCodeOptions}
+                                  query={payCodeQueries[line.key] || ""}
+                                  setQuery={setLineQuery(line.key)}
+                                  placeholder="Code"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="md:hidden block text-xs font-medium text-default-500 dark:text-gray-400 uppercase mb-1">
+                                Rate
+                              </label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min={0}
+                                value={line.rate_used}
+                                onChange={(
+                                  event: React.ChangeEvent<HTMLInputElement>
+                                ) =>
+                                  handleNumberChange(
+                                    entry.employee_id,
+                                    line.key,
+                                    "rate_used",
+                                    event.target.value
+                                  )
+                                }
+                                className="h-10 w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 text-sm text-right text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="md:hidden block text-xs font-medium text-default-500 dark:text-gray-400 uppercase mb-1">
+                                Qty
+                              </label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min={0}
+                                value={line.quantity}
+                                onChange={(
+                                  event: React.ChangeEvent<HTMLInputElement>
+                                ) =>
+                                  handleNumberChange(
+                                    entry.employee_id,
+                                    line.key,
+                                    "quantity",
+                                    event.target.value
+                                  )
+                                }
+                                className="h-10 w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 text-sm text-right text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                              />
+                            </div>
+                            <div className="text-right font-medium text-default-900 dark:text-gray-100">
+                              <label className="md:hidden block text-xs font-medium text-default-500 dark:text-gray-400 uppercase mb-1">
+                                Amount
+                              </label>
+                              <div className="h-10 flex items-center justify-end">
+                                {formatCurrency(line.amount)}
+                                <span className="ml-1 text-xs text-default-400 dark:text-gray-500">
+                                  /{line.rate_unit}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex justify-end md:h-10 md:items-center">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleRemoveLine(entry.employee_id, line.key)
+                                }
+                                className="h-8 w-8 inline-flex items-center justify-center rounded-full text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50"
+                                title="Remove code"
+                              >
+                                <IconTrash size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between mt-3">
+                    <Button
+                      onClick={() => handleAddLine(entry.employee_id)}
+                      icon={IconPlus}
+                      variant="outline"
+                      size="sm"
+                    >
+                      Add Code
+                    </Button>
+                    <div className="flex items-center gap-2">
+                      {entry.saved && (
+                        <Button
+                          onClick={() => setClearTarget(entry)}
+                          icon={IconEraser}
+                          color="rose"
+                          variant="outline"
+                          size="sm"
+                        >
+                          Clear
+                        </Button>
+                      )}
+                      <Button
+                        onClick={() => handleSave(entry)}
+                        icon={IconDeviceFloppy}
+                        color="sky"
+                        size="sm"
+                        disabled={entry.savingState}
+                      >
+                        {entry.savingState ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
 
       <ConfirmationDialog
-        isOpen={showClearDialog}
-        onClose={() => setShowClearDialog(false)}
+        isOpen={!!clearTarget}
+        onClose={() => {
+          if (!isClearing) setClearTarget(null);
+        }}
         onConfirm={handleClear}
-        title="Clear plastic entry"
-        message={`Delete the saved plastic entry for ${logDate} (${
-          shift === "1" ? "Day" : "Night"
-        } shift)? Payroll will be reprocessed without it.`}
-        confirmButtonText="Clear"
+        title="Clear saved plastic entry"
+        message={`Clear ${
+          clearTarget?.employee_name ?? "this staff"
+        }'s saved plastic entry for ${selectedDate}? This cannot be undone.`}
+        confirmButtonText={isClearing ? "Clearing..." : "Clear"}
         variant="danger"
       />
     </div>

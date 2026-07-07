@@ -25,6 +25,22 @@ interface PayRateScheduleManagerProps {
   baseRates: { biasa?: number | null; ahad?: number | null; umum?: number | null };
 }
 
+type RateValue = number | string | null | undefined;
+
+const toFiniteRate = (value: RateValue): number => {
+  const numericValue = Number(value ?? 0);
+  return Number.isFinite(numericValue) ? numericValue : 0;
+};
+
+const formatRate = (value: RateValue): string => toFiniteRate(value).toFixed(2);
+
+const parseOptionalRate = (value: string): number | null => {
+  const trimmedValue = value.trim();
+  if (trimmedValue === "") return null;
+  const numericValue = Number(trimmedValue);
+  return Number.isFinite(numericValue) ? numericValue : NaN;
+};
+
 const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
   scope,
   payCodeId,
@@ -43,6 +59,11 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
     ahad: "",
     umum: "",
   });
+  const resolvedBaseRates = {
+    biasa: toFiniteRate(baseRates.biasa),
+    ahad: toFiniteRate(baseRates.ahad),
+    umum: toFiniteRate(baseRates.umum),
+  };
 
   const fetchSchedules = useCallback(async () => {
     if (!payCodeId) return;
@@ -66,7 +87,7 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
     fetchSchedules();
   }, [fetchSchedules]);
 
-  const handleField = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleField = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const { name, value } = e.target;
     if (name === "year") {
       if (value === "" || /^\d{0,4}$/.test(value)) setForm((p) => ({ ...p, year: value }));
@@ -77,11 +98,19 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
     }
   };
 
-  const handleAdd = async () => {
-    const toRate = (v: string) => (v.trim() === "" ? null : parseFloat(v));
-    const biasa = toRate(form.biasa);
-    const ahad = toRate(form.ahad);
-    const umum = toRate(form.umum);
+  const handleAdd = async (): Promise<void> => {
+    const biasa = parseOptionalRate(form.biasa);
+    const ahad = parseOptionalRate(form.ahad);
+    const umum = parseOptionalRate(form.umum);
+    const hasInvalidRate = [biasa, ahad, umum].some(
+      (rate: number | null): boolean =>
+        rate !== null && !Number.isFinite(rate),
+    );
+
+    if (hasInvalidRate) {
+      toast.error("Rates must be valid numbers.");
+      return;
+    }
     if (biasa === null && ahad === null && umum === null) {
       toast.error("Enter at least one rate for the change.");
       return;
@@ -109,7 +138,7 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: number): Promise<void> => {
     try {
       await api.delete(`/api/pay-rate-schedules/${id}`);
       toast.success("Rate change removed");
@@ -119,10 +148,10 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
     }
   };
 
-  const fmt = (v: number | null, base?: number | null) =>
-    v === null || v === undefined
-      ? `(base ${(base ?? 0).toFixed(2)})`
-      : v.toFixed(2);
+  const fmt = (v: RateValue, base?: RateValue): string =>
+    v === null || v === undefined || v === ""
+      ? `(base ${formatRate(base)})`
+      : formatRate(v);
 
   // Build the effective timeline: months before the first change use the base
   // rate; each change applies from its month until the next change (or onward).
@@ -201,9 +230,9 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
                   : "All months"}
               </span>
               <span className="flex-1 text-default-500 dark:text-gray-400">
-                Base rate — B {(baseRates.biasa ?? 0).toFixed(2)} · A{" "}
-                {(baseRates.ahad ?? 0).toFixed(2)} · U{" "}
-                {(baseRates.umum ?? 0).toFixed(2)}
+                Base rate — B {formatRate(resolvedBaseRates.biasa)} · A{" "}
+                {formatRate(resolvedBaseRates.ahad)} · U{" "}
+                {formatRate(resolvedBaseRates.umum)}
               </span>
               <span className="w-[23px] shrink-0" />
             </div>
@@ -218,9 +247,9 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
                   {rangeLabel(idx)}
                 </span>
                 <span className="flex-1 text-default-600 dark:text-gray-300">
-                  B {fmt(s.rate_biasa, baseRates.biasa)} · A{" "}
-                  {fmt(s.rate_ahad, baseRates.ahad)} · U{" "}
-                  {fmt(s.rate_umum, baseRates.umum)}
+                  B {fmt(s.rate_biasa, resolvedBaseRates.biasa)} · A{" "}
+                  {fmt(s.rate_ahad, resolvedBaseRates.ahad)} · U{" "}
+                  {fmt(s.rate_umum, resolvedBaseRates.umum)}
                 </span>
                 <button
                   type="button"
@@ -273,7 +302,7 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
             name="biasa"
             value={form.biasa}
             onChange={handleField}
-            placeholder={(baseRates.biasa ?? 0).toFixed(2)}
+            placeholder={formatRate(resolvedBaseRates.biasa)}
             className="mt-1 w-full rounded border border-default-300 dark:border-gray-600 p-1 text-xs text-right bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
             disabled={saving}
           />
@@ -286,7 +315,7 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
             name="ahad"
             value={form.ahad}
             onChange={handleField}
-            placeholder={(baseRates.ahad ?? 0).toFixed(2)}
+            placeholder={formatRate(resolvedBaseRates.ahad)}
             className="mt-1 w-full rounded border border-default-300 dark:border-gray-600 p-1 text-xs text-right bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
             disabled={saving}
           />
@@ -299,7 +328,7 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
             name="umum"
             value={form.umum}
             onChange={handleField}
-            placeholder={(baseRates.umum ?? 0).toFixed(2)}
+            placeholder={formatRate(resolvedBaseRates.umum)}
             className="mt-1 w-full rounded border border-default-300 dark:border-gray-600 p-1 text-xs text-right bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
             disabled={saving}
           />
@@ -310,7 +339,7 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
           <p className="text-xs text-amber-600 dark:text-amber-400">
             A change already exists for{" "}
             <span className="font-medium">{newFromLabel}</span> (currently B{" "}
-            {fmt(existingForSelected.rate_biasa, baseRates.biasa)}) — saving will
+            {fmt(existingForSelected.rate_biasa, resolvedBaseRates.biasa)}) — saving will
             replace it.
           </p>
         ) : (

@@ -23,8 +23,6 @@ import {
   IconUserMinus,
 } from "@tabler/icons-react";
 import { Location } from "../../utils/catalogue/useLocationMappingsCache";
-import { useJobsCache } from "../../utils/catalogue/useJobsCache";
-import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { api } from "../../routes/utils/api";
 import Button from "../Button";
 
@@ -38,6 +36,11 @@ interface EmployeeMapping {
   employee_name: string;
 }
 
+interface SimpleOption {
+  id: string;
+  name: string;
+}
+
 interface LocationModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -47,6 +50,10 @@ interface LocationModalProps {
   existingLocations: Location[];
   initialJobMappings?: JobMapping[];
   initialEmployeeMappings?: EmployeeMapping[];
+  // Company-scoped data + API base. Defaults keep the TH behaviour.
+  jobs: SimpleOption[];
+  staffs: SimpleOption[];
+  apiBase?: string;
 }
 
 const LocationModal: React.FC<LocationModalProps> = ({
@@ -58,6 +65,9 @@ const LocationModal: React.FC<LocationModalProps> = ({
   existingLocations,
   initialJobMappings = [],
   initialEmployeeMappings = [],
+  jobs,
+  staffs,
+  apiBase = "/api",
 }) => {
   const [formData, setFormData] = useState<Location>({ id: "", name: "" });
   const [error, setError] = useState<string>("");
@@ -105,9 +115,6 @@ const LocationModal: React.FC<LocationModalProps> = ({
   const [candidateSearch, setCandidateSearch] = useState("");
   const [isAddingExclusion, setIsAddingExclusion] = useState(false);
 
-  const { jobs } = useJobsCache();
-  const { staffs } = useStaffsCache();
-
   const isEditing = !!initialData;
 
   // Convert staffs to the format needed for the modal
@@ -132,8 +139,8 @@ const LocationModal: React.FC<LocationModalProps> = ({
 
     try {
       const [exclusionsRes, candidatesRes] = await Promise.all([
-        api.get(`/api/locations/${initialData.id}/exclusions`),
-        api.get(`/api/locations/${initialData.id}/exclusion-candidates`),
+        api.get(`${apiBase}/locations/${initialData.id}/exclusions`),
+        api.get(`${apiBase}/locations/${initialData.id}/exclusion-candidates`),
       ]);
       setExclusions(exclusionsRes);
       setExclusionCandidates(candidatesRes);
@@ -337,7 +344,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
     if (!initialData) return;
     setIsAddingExclusion(true);
     try {
-      await api.post(`/api/locations/${initialData.id}/exclusions`, {
+      await api.post(`${apiBase}/locations/${initialData.id}/exclusions`, {
         employee_id: employeeId,
         job_id: jobId,
       });
@@ -354,7 +361,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
     if (!initialData) return;
     try {
       await api.delete(
-        `/api/locations/${initialData.id}/exclusions/${exclusionId}`
+        `${apiBase}/locations/${initialData.id}/exclusions/${exclusionId}`
       );
       await fetchExclusions();
     } catch (err: any) {
@@ -407,12 +414,12 @@ const LocationModal: React.FC<LocationModalProps> = ({
 
       // Remove mappings
       for (const jobId of jobsToRemove) {
-        await api.delete(`/api/job-location-mappings/${jobId}`);
+        await api.delete(`${apiBase}/job-location-mappings/${jobId}`);
       }
 
       // Add mappings
       if (jobsToAdd.length > 0) {
-        await api.post("/api/job-location-mappings/batch", {
+        await api.post(`${apiBase}/job-location-mappings/batch`, {
           mappings: jobsToAdd.map((jobId) => ({
             job_id: jobId,
             location_code: locationId,
@@ -429,7 +436,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
       );
 
       if (employeesToAdd.length > 0 || employeesToRemove.length > 0) {
-        await api.put("/api/staffs/batch-location-update", {
+        await api.put(`${apiBase}/staffs/batch-location-update`, {
           locationCode: locationId,
           addEmployees: employeesToAdd,
           removeEmployees: employeesToRemove,

@@ -2,14 +2,17 @@
 
 ## Current Status
 
-**MAPPING COMPLETE:** All account codes have been assigned to financial statement notes.
+**MAPPING COMPLETE (re-applied 8 Jul 2026):** All 2,750 account codes have `fs_note` assigned.
 
-```
-Total Active Account Codes: 2,754
-Account Codes with fs_note assigned: 2,754 (100%)
-```
+The original January 2026 bulk mapping was **lost in a dev-DB refresh** (only 2 codes still had `fs_note`), which left the Income Statement / Balance Sheet / CoGM completely empty. The mapping was re-applied on 8 Jul 2026 with a **corrected script**: [`dev/migrations/fs_note_remap_2026-07.sql`](../../dev/migrations/fs_note_remap_2026-07.sql) — that file is now the single source of truth for the mapping rules (idempotent, safe to re-run; **run it in prod too**). Corrections vs the old script embedded in earlier versions of this doc:
 
-Last bulk mapping performed: **January 2026**
+- `MB*` admin-by-nature codes and vehicle codes → Note **5**, not 5-1 (per the legacy prefix table in [LEGACY_SYSTEM_REFERENCE.md](LEGACY_SYSTEM_REFERENCE.md)); only factory-section salary codes (suffix `_MM/_PM/_MB/_PB/_JB/_K`) + `THJ_*` → **5-1**.
+- `CASH% → 6` no longer clobbers `CASH_SALES` (revenue); `CR_SALES` added to Note 7.
+- `CH_REV1`/`CH_REV2` (cash-method receipt holding accounts = cash received, not yet banked) → Note **6**, not 18-2.
+- Taxation codes (`TAX_CP`, `TAX_IT`, `CL_TAX`) tagged Note 12 *before* the vehicle road-tax `TAX_%` → 5 rule; `DF_TAX` → Note 1 (legacy BS convention).
+- `CL_*` family handled: `CL_WSF`/`CL_GTH` → 9, `CL_PB%`/`CL_SCB`/`CL_LOAN` → 11, other `CL_%`/`OC_%`/`CUST_DEP` → 10.
+- Lean-GL codes added: `TP`/`CL_TP` → 13, `PUR%` → 3-5, `NCA_%` → 4, `DEBTOR` → 22, `OP` (Overseas Purchases, used by GP journals) → 5 ⚠️ *provisional — confirm with the user whether GP overseas purchases belong in admin expenses (5) or raw-material purchases (3-5)*.
+- `BE_%`/`BL_%` are payroll codes (EPF/Levy per section), removed from the old PPE (Note 4) rule.
 
 ---
 
@@ -121,11 +124,11 @@ Last bulk mapping performed: **January 2026**
 | `DPE`, `AE_DEP` | 15 | Depreciation |
 | `CA_*` | 8 | Prepayments & Deposits |
 | `DR*` | 9 | Amount Due to Director |
-| `PU_*`, `PUR_*`, `RAW` | 3-5 | Purchase of Raw Materials |
-| `PM*`, `PACKING` | 3-2 | Purchase of Packing Materials |
-| `FT` | 3-6 | Freight & Transportation |
-| `BS_*`, `MS_*`, `MB*` (factory) | 5-1 | Factory Worker Salaries |
-| `AE_*`, `SAL*`, `SW`, vehicle codes | 5 | Administrative Expenses |
+| `PU_*`, `PUR*`, `RAW` | 3-5 | Purchase of Raw Materials (`PU_CHEM`/`PU_MBCHEM` → 3-4) |
+| `PM`, `PM_*`, `PACKING` | 3-2 | Purchase of Packing Materials |
+| `FT`, `BFT_*` | 3-6 | Freight & Transportation |
+| Salary-family prefixes with factory suffix `_MM/_PM/_MB/_PB/_JB/_K`, plus `THJ_*` | 5-1 | Factory Worker Salaries (mesin/packing mee+bihun, jaga boiler, kilang) |
+| `MB*` (admin by nature), `AE_*`, `SAL*`, `SW`, vehicle codes (`BT*/OIL*/R*/SV*/TAX*/TY*/INS*/PT*`) | 5 | Administrative Expenses |
 | `SC` | 21 | Share Capital |
 | `RP`, `RP_MTH` | 20 | Retained Profit |
 
@@ -210,68 +213,13 @@ ORDER BY fs_note;
 
 ## SQL Scripts for Full Re-mapping
 
-If you need to completely re-apply all mappings from scratch:
+The complete, corrected re-mapping script lives at [`dev/migrations/fs_note_remap_2026-07.sql`](../../dev/migrations/fs_note_remap_2026-07.sql) — idempotent, wrapped in a transaction, ends with a per-note count for verification. Run with:
 
-```sql
--- STEP 1: Clear all existing mappings
-UPDATE account_codes SET fs_note = NULL;
-
--- STEP 2: Map by ledger type
-UPDATE account_codes SET fs_note = '22' WHERE ledger_type = 'TD';
-UPDATE account_codes SET fs_note = '13' WHERE ledger_type = 'TC';
-UPDATE account_codes SET fs_note = '19' WHERE ledger_type = 'BK';
-
--- STEP 3: Map Closing Stock (CS)
-UPDATE account_codes SET fs_note = '14-1' WHERE ledger_type = 'CS' AND (code LIKE '%FIN%' OR code = 'CS');
-UPDATE account_codes SET fs_note = '14-2' WHERE ledger_type = 'CS' AND fs_note IS NULL AND (code LIKE '%BER%' OR code LIKE '%JAG%' OR code LIKE '%SAG%' OR code LIKE '%SDM%' OR code LIKE '%TH%' OR code LIKE '%CHEM%');
-UPDATE account_codes SET fs_note = '14-3' WHERE ledger_type = 'CS' AND fs_note IS NULL AND (code LIKE '%PM%' OR code LIKE '%TAP%');
-UPDATE account_codes SET fs_note = '14-1' WHERE ledger_type = 'CS' AND fs_note IS NULL;
-
--- STEP 4: Map Opening Stock (OS)
-UPDATE account_codes SET fs_note = '3-1' WHERE ledger_type = 'OS' AND (code LIKE '%FIN%' OR code = 'OS');
-UPDATE account_codes SET fs_note = '3-3' WHERE ledger_type = 'OS' AND fs_note IS NULL AND (code LIKE '%BER%' OR code LIKE '%JAG%' OR code LIKE '%SAG%' OR code LIKE '%SDM%' OR code LIKE '%TH%' OR code LIKE '%CHEM%');
-UPDATE account_codes SET fs_note = '3-7' WHERE ledger_type = 'OS' AND fs_note IS NULL AND (code LIKE '%PM%' OR code LIKE '%TAP%');
-UPDATE account_codes SET fs_note = '3-1' WHERE ledger_type = 'OS' AND fs_note IS NULL;
-
--- STEP 5: Map GL - Revenue & Equity
-UPDATE account_codes SET fs_note = '7' WHERE ledger_type = 'GL' AND code IN ('SLS', 'SL_MBH', 'SL_THJ', 'CASH_SALES', 'SLS_B', 'SLS_M', 'SLS_SC');
-UPDATE account_codes SET fs_note = '6' WHERE ledger_type = 'GL' AND code LIKE 'CASH%';
-UPDATE account_codes SET fs_note = '21' WHERE ledger_type = 'GL' AND code = 'SC';
-UPDATE account_codes SET fs_note = '20' WHERE ledger_type = 'GL' AND code IN ('RP', 'RP_MTH');
-
--- STEP 6: Map GL - Liabilities
-UPDATE account_codes SET fs_note = '1' WHERE ledger_type = 'GL' AND (code LIKE 'ACC%' OR code LIKE 'AC\_%' OR code LIKE 'ACW%' OR code LIKE 'ACD%');
-UPDATE account_codes SET fs_note = '16' WHERE ledger_type = 'GL' AND code LIKE 'HPA\_%';
-UPDATE account_codes SET fs_note = '23' WHERE ledger_type = 'GL' AND (code LIKE 'HPB\_%' OR code = 'HPI');
-
--- STEP 7: Map GL - Assets & Depreciation
-UPDATE account_codes SET fs_note = '15' WHERE ledger_type = 'GL' AND (code = 'DPE' OR code = 'AE_DEP');
-UPDATE account_codes SET fs_note = '4' WHERE ledger_type = 'GL' AND fs_note IS NULL AND (code LIKE 'AD\_%' OR code IN ('CAR', 'E', 'FV', 'LRY', 'PPE') OR code LIKE 'BE\_%' OR code LIKE 'BL\_%');
-UPDATE account_codes SET fs_note = '8' WHERE ledger_type = 'GL' AND fs_note IS NULL AND code LIKE 'CA\_%';
-
--- STEP 8: Map GL - COGM
-UPDATE account_codes SET fs_note = '3-5' WHERE ledger_type = 'GL' AND fs_note IS NULL AND (code LIKE 'PU\_%' OR code LIKE 'PUR\_%' OR code = 'RAW');
-UPDATE account_codes SET fs_note = '3-2' WHERE ledger_type = 'GL' AND fs_note IS NULL AND (code LIKE 'PM\_%' OR code = 'PM' OR code = 'PACKING');
-UPDATE account_codes SET fs_note = '3-6' WHERE ledger_type = 'GL' AND fs_note IS NULL AND code = 'FT';
-
--- STEP 9: Map GL - Factory Labor (COGM)
-UPDATE account_codes SET fs_note = '5-1' WHERE ledger_type = 'GL' AND fs_note IS NULL AND (code LIKE 'BS\_%' OR code LIKE 'BSC\_%' OR code LIKE 'BSIP\_%' OR code LIKE 'BRM%' OR code LIKE 'MS\_%' OR code LIKE 'MSC\_%' OR code LIKE 'MSIP\_%' OR code LIKE 'MRM%' OR code LIKE 'MB%');
-
--- STEP 10: Map GL - Admin Expenses
-UPDATE account_codes SET fs_note = '5' WHERE ledger_type = 'GL' AND fs_note IS NULL AND (code LIKE 'AE\_%' OR code LIKE 'SAL%' OR code = 'SW' OR code LIKE 'CAR\_%' OR code LIKE 'LRY\_%' OR code LIKE 'FV\_%' OR code LIKE 'E\_%' OR code LIKE 'R\_%' OR code LIKE 'SV\_%' OR code LIKE 'TAX\_%' OR code LIKE 'PT\_%' OR code IN ('EN', 'EPF', 'SOCSO', 'SIP', 'EW', 'REN', 'PS', 'LC', 'LP', 'DON', 'SF', 'SS', 'SM', 'SA', 'SAF', 'ST', 'SU', 'SUN', 'BC', 'BK', 'ADV', 'SEC', 'WP', 'PEN', 'LEV', 'LEVY', 'BLEV'));
-
--- STEP 11: Map GL - Director & Others
-UPDATE account_codes SET fs_note = '12' WHERE ledger_type = 'GL' AND fs_note IS NULL AND code IN ('TAX_CP', 'TAX_IT', 'DF_TAX');
-UPDATE account_codes SET fs_note = '9' WHERE ledger_type = 'GL' AND fs_note IS NULL AND code LIKE 'DR%';
-UPDATE account_codes SET fs_note = '18-2' WHERE ledger_type = 'GL' AND fs_note IS NULL AND code LIKE 'CH\_%';
-UPDATE account_codes SET fs_note = '7' WHERE ledger_type = 'GL' AND fs_note IS NULL AND code IN ('RETURN', 'BRET');
-
--- STEP 12: Catch-all for remaining GL accounts
-UPDATE account_codes SET fs_note = '5' WHERE ledger_type = 'GL' AND fs_note IS NULL;
-
--- STEP 13: Catch-all for any remaining
-UPDATE account_codes SET fs_note = '5' WHERE is_active = true AND fs_note IS NULL;
+```bash
+docker exec -i tienhock_dev_db psql -U postgres -d tienhock < dev/migrations/fs_note_remap_2026-07.sql
 ```
+
+Do **not** copy SQL from older versions of this doc — the pre-Jul-2026 embedded script had ordering bugs (`CASH%` clobbered `CASH_SALES`, `TAX_%` → 5 ran before taxation codes) and mis-bucketed `MB*` under 5-1 and `BE_%/BL_%` under Note 4.
 
 ---
 
@@ -308,27 +256,27 @@ This section documents where each financial statement note gets its data from.
 
 ---
 
-### SHOULD BE AUTOMATED (Data Exists, Needs Implementation)
+### AUTOMATED SINCE (status 8 Jul 2026)
 
-**Note 19 - Cash at Bank**
-- Expected source: `payments` table
-- Current data: 0 completed payments
-- Needs: Payment → Journal Entry system
+**Note 19 - Cash at Bank** ✅ — `REC` receipt journals (customer payments), `PAY` supplier payments, `B`/PBE payroll bank payments, manual `J`/`C` entries.
 
-**Note 13 - Trade Payables**
-- Expected source: Supplier invoices/purchases
-- Current data: No automated system
-- Needs: AP module or manual entry
+**Note 13 - Trade Payables** ✅ — `PUR` material purchase invoices and `GP` general purchases credit `TP`/`CR_*`; `PAY` supplier payments debit them.
 
-**Notes 14-1, 14-2, 14-3 - Closing Stock**
-- Expected source: `production_entries`, `stock_adjustments`
-- Current data: 0 records
-- Needs: Stock valuation → Journal Entry at period end
+**Notes 3-2 / 3-5 - Purchases (Packing / Raw Material)** ✅ — `PUR` journals debit the purchase account by material category (`material_purchase_account_mappings`).
 
-**Notes 3-1, 3-3, 3-7 - Opening Stock**
-- Expected source: Previous period closing stock
-- Current data: 0 records
-- Needs: Period-end closing process
+**Notes 1 / 5 / 5-1 - Accruals & salaries** ✅ — `JVSL`/`JVDR` monthly payroll vouchers.
+
+### STILL NOT AUTOMATED (report gaps)
+
+**Notes 14-1/14-2/14-3 (Closing Stock) & 3-1/3-3/3-7 (Opening Stock)** — no stock-valuation journal at period end yet; CoGM shows purchase totals, not material *used*.
+
+**Note 4 (PPE) / Note 15 (Depreciation)** — needs the fixed-asset register (gap 1A-4).
+
+**Note 23 (HP Interest) / Note 16 (HP Payable)** — needs the HP schedule (gap 1A-6); currently only manual journals.
+
+**Notes 20/21 (Retained Profit, Share Capital)** — pure opening-balance items; blocked on gap 1A-7.
+
+**Note 3 (Tax Expenses), 3-6 (Freight In), 18-1/18-2 (Other income)** — manual journals only.
 
 ---
 
@@ -410,6 +358,5 @@ All financial reports now use **Year-to-Date (YTD)** date ranges:
 
 ---
 
-*Last Updated: January 2026*
-*All 2,754 account codes mapped*
-*Note 22 (Trade Receivables) and Note 7 (Revenue) now automated from invoices*
+*Last Updated: 8 Jul 2026 — mapping re-applied via `dev/migrations/fs_note_remap_2026-07.sql`; per-note "Mapped Count" figures above are from the original Jan 2026 run and are approximate (notably Note 5 ≈ 583 and Note 5-1 ≈ 42 after the MB\* correction).*
+*Note 22 (Trade Receivables) and Note 7 (Revenue) are automated from invoices.*

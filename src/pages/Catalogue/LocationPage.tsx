@@ -18,6 +18,8 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import LocationModal from "../../components/Catalogue/LocationModal";
+import { useJobsCache } from "../../utils/catalogue/useJobsCache";
+import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 
 interface JobMapping {
   job_id: string;
@@ -54,6 +56,9 @@ const LocationPage: React.FC = () => {
     error,
     refreshData,
   } = useLocationMappingsCache();
+
+  const { jobs } = useJobsCache();
+  const { staffs } = useStaffsCache();
 
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -426,6 +431,9 @@ const LocationPage: React.FC = () => {
         existingLocations={locations}
         initialJobMappings={locationToEdit ? (locationToEdit as LocationWithMappings).jobs : []}
         initialEmployeeMappings={locationToEdit ? (locationToEdit as LocationWithMappings).employees : []}
+        jobs={jobs.map((j) => ({ id: j.id, name: j.name }))}
+        staffs={staffs.map((s) => ({ id: s.id, name: s.name }))}
+        apiBase="/api"
       />
 
       {/* Delete Confirmation */}
