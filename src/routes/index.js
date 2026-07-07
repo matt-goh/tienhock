@@ -115,6 +115,7 @@ import jellypollyMonthlyPayrollsRouter from "./jellypolly/monthly-payrolls.js";
 import jellypollyEmployeePayrollsRouter from "./jellypolly/employee-payrolls.js";
 import jellypollyMonthlyWorkLogsRouter from "./jellypolly/monthly-work-logs.js";
 import jellypollyDailyWorkLogsRouter from "./jellypolly/daily-work-logs.js";
+import jellypollyDailyPlasticRouter from "./jellypolly/daily-plastic.js";
 import jellypollyPinjamRecordsRouter from "./jellypolly/pinjam-records.js";
 import jellypollyMidMonthPayrollsRouter from "./jellypolly/mid-month-payrolls.js";
 import jellypollyIncentivesRouter from "./jellypolly/incentives.js";
@@ -345,6 +346,10 @@ export default function setupRoutes(app, pool) {
   app.use(
     "/jellypolly/api/daily-work-logs",
     jellypollyDailyWorkLogsRouter(pool)
+  );
+  app.use(
+    "/jellypolly/api/daily-plastic",
+    jellypollyDailyPlasticRouter(pool)
   );
   app.use(
     "/jellypolly/api/pinjam-records",
