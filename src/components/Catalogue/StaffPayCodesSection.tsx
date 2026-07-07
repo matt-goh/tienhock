@@ -99,10 +99,9 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
   const [payCodeSearchQuery, setPayCodeSearchQuery] = useState<string>("");
   const [payCodeViewMode, setPayCodeViewMode] =
     useState<PayCodeViewMode>("grouped");
-  // Initialize with all groups collapsed except employee-Base
+  // Initialize with all groups collapsed except employee Base and Tambahan.
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     new Set([
-      "employee-Tambahan",
       "employee-Overtime",
       "job-Base",
       "job-Tambahan",
