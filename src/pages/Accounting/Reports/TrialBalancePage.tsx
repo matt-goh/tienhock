@@ -13,6 +13,7 @@ import Button from "../../../components/Button";
 import Checkbox from "../../../components/Checkbox";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ReportSourceGuide from "../../../components/Accounting/ReportSourceGuide";
+import Pagination from "../../../components/Invoice/Pagination";
 import { api } from "../../../routes/utils/api";
 import { generateTrialBalancePDF } from "../../../utils/accounting/TrialBalancePDF";
 import toast from "react-hot-toast";
@@ -35,6 +36,12 @@ interface TrialBalanceTotals {
   is_balanced: boolean;
 }
 
+interface TrialBalancePagination {
+  total: number;
+  limit: number | null;
+  offset: number;
+}
+
 interface TrialBalanceData {
   period: {
     year: number;
@@ -43,12 +50,15 @@ interface TrialBalanceData {
     end_date: string;
   };
   accounts: TrialBalanceAccount[];
+  pagination: TrialBalancePagination;
   totals: TrialBalanceTotals;
   invoice_based?: {
     note_22_trade_receivables: number;
     note_7_revenue: number;
   };
 }
+
+const PAGE_SIZE = 100;
 
 const LEDGER_TYPE_LABELS: Record<string, string> = {
   BK: "Bank",
@@ -64,9 +74,11 @@ const TrialBalancePage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [selectedLedgerType, setSelectedLedgerType] = useState<string>("");
   const [exporting, setExporting] = useState<boolean>(false);
   const [hideZeroBalance, setHideZeroBalance] = useState<boolean>(true);
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
   // Month selection state
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
@@ -74,20 +86,39 @@ const TrialBalancePage: React.FC = () => {
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
 
+  // Debounce the search input; new search always restarts from page 1
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Filters (except pagination) as query params, shared by the list fetch and PDF export
+  const buildFilterParams = useCallback((): URLSearchParams => {
+    const params = new URLSearchParams();
+    if (selectedLedgerType) params.set("ledger_type", selectedLedgerType);
+    if (debouncedSearch) params.set("search", debouncedSearch);
+    if (hideZeroBalance) params.set("hide_zero", "true");
+    return params;
+  }, [selectedLedgerType, debouncedSearch, hideZeroBalance]);
+
   const fetchTrialBalance = useCallback(async (): Promise<void> => {
     const year = selectedMonth.getFullYear();
     const month = selectedMonth.getMonth() + 1;
 
-    let url = `/api/financial-reports/trial-balance/${year}/${month}`;
-    if (selectedLedgerType) {
-      url += `?ledger_type=${selectedLedgerType}`;
-    }
+    const params = buildFilterParams();
+    params.set("limit", String(PAGE_SIZE));
+    params.set("offset", String((currentPage - 1) * PAGE_SIZE));
 
     try {
       setLoading(true);
       setError(null);
 
-      const response = await api.get(url);
+      const response = await api.get(
+        `/api/financial-reports/trial-balance/${year}/${month}?${params.toString()}`
+      );
       setTrialBalance(response);
     } catch (err) {
       setError("Failed to fetch trial balance. Please try again later.");
@@ -95,7 +126,7 @@ const TrialBalancePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth, selectedLedgerType]);
+  }, [selectedMonth, buildFilterParams, currentPage]);
 
   useEffect(() => {
     fetchTrialBalance();
@@ -103,6 +134,17 @@ const TrialBalancePage: React.FC = () => {
 
   const handleMonthChange = (newMonth: Date): void => {
     setSelectedMonth(newMonth);
+    setCurrentPage(1);
+  };
+
+  const handleLedgerTypeChange = (value: string): void => {
+    setSelectedLedgerType(value);
+    setCurrentPage(1);
+  };
+
+  const handleHideZeroChange = (checked: boolean): void => {
+    setHideZeroBalance(checked);
+    setCurrentPage(1);
   };
 
   const handlePrintPDF = async (): Promise<void> => {
@@ -110,7 +152,13 @@ const TrialBalancePage: React.FC = () => {
 
     setExporting(true);
     try {
-      await generateTrialBalancePDF(trialBalance, filteredAccounts);
+      // PDF always prints the full filtered set, not just the current page
+      const year = selectedMonth.getFullYear();
+      const month = selectedMonth.getMonth() + 1;
+      const fullData: TrialBalanceData = await api.get(
+        `/api/financial-reports/trial-balance/${year}/${month}?${buildFilterParams().toString()}`
+      );
+      await generateTrialBalancePDF(fullData, fullData.accounts);
     } catch (err) {
       console.error("Error printing PDF:", err);
       toast.error("Failed to generate PDF");
@@ -126,20 +174,10 @@ const TrialBalancePage: React.FC = () => {
     }).format(amount);
   };
 
-  const filteredAccounts = trialBalance?.accounts.filter((account) => {
-    // Hide zero balance accounts if toggle is on
-    if (hideZeroBalance && account.debit === 0 && account.credit === 0) {
-      return false;
-    }
-    // Search filter
-    if (!searchTerm) return true;
-    const search = searchTerm.toLowerCase();
-    return (
-      account.code.toLowerCase().includes(search) ||
-      account.description.toLowerCase().includes(search) ||
-      (account.fs_note && account.fs_note.toLowerCase().includes(search))
-    );
-  }) || [];
+  // Search/hide-zero/pagination are applied server-side
+  const accounts = trialBalance?.accounts || [];
+  const totalFiltered = trialBalance?.pagination?.total || 0;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
 
   const getMonthName = (date: Date): string => {
     return date.toLocaleString("default", { month: "long", year: "numeric" });
@@ -193,7 +231,7 @@ const TrialBalancePage: React.FC = () => {
               <IconFilter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <select
                 value={selectedLedgerType}
-                onChange={(e) => setSelectedLedgerType(e.target.value)}
+                onChange={(e) => handleLedgerTypeChange(e.target.value)}
                 className="pl-9 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none cursor-pointer"
               >
                 <option value="">All Ledger Types</option>
@@ -208,7 +246,7 @@ const TrialBalancePage: React.FC = () => {
             {/* Hide Zero Balance Toggle */}
             <Checkbox
               checked={hideZeroBalance}
-              onChange={setHideZeroBalance}
+              onChange={handleHideZeroChange}
               label="Hide zero"
               size={18}
               className="flex-shrink-0"
@@ -235,7 +273,7 @@ const TrialBalancePage: React.FC = () => {
               onClick={handlePrintPDF}
               variant="filled"
               color="sky"
-              disabled={exporting || !trialBalance || filteredAccounts.length === 0}
+              disabled={exporting || !trialBalance || totalFiltered === 0}
               additionalClasses="flex-shrink-0"
             >
               <span className="flex items-center justify-center whitespace-nowrap">
@@ -316,14 +354,14 @@ const TrialBalancePage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredAccounts.length === 0 ? (
+                {accounts.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                       No accounts found matching the criteria
                     </td>
                   </tr>
                 ) : (
-                  filteredAccounts.map((account) => (
+                  accounts.map((account) => (
                     <tr
                       key={account.code}
                       className="hover:bg-gray-50 dark:hover:bg-gray-700/50"
@@ -369,15 +407,18 @@ const TrialBalancePage: React.FC = () => {
             </table>
           </div>
 
-          {/* Summary Footer */}
-          <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-              <span>
-                Showing {filteredAccounts.length} of {trialBalance.accounts.length} accounts
-              </span>
-              <span>
-                Period: January - {getMonthName(selectedMonth)}
-              </span>
+          {/* Summary Footer with pagination */}
+          <div className="px-4 pb-3 bg-gray-50 dark:bg-gray-900">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              itemsCount={accounts.length}
+              totalItems={totalFiltered}
+              pageSize={PAGE_SIZE}
+            />
+            <div className="text-right text-xs text-gray-500 dark:text-gray-400 mt-2">
+              Period: January - {getMonthName(selectedMonth)}
             </div>
           </div>
         </div>
