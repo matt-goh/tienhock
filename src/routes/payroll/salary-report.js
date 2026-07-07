@@ -1,8 +1,25 @@
 // src/routes/payroll/salary-report.js
 import { Router } from "express";
 
+// Lazy module-level handle to the per-month salary report computer defined inside
+// the router factory below. The factory runs once at app startup (app.use in
+// routes/index.js), which sets this before any HTTP request is served — so other
+// routes (e.g. the JVSL journal voucher generator) can reuse the EXACT salary
+// report figures as their single source of truth.
+let _computeMonthlySalaryReport = null;
+export function computeMonthlySalaryReport(pool, yearInt, monthInt) {
+  if (!_computeMonthlySalaryReport) {
+    throw new Error(
+      "Salary report router not initialised yet — computeMonthlySalaryReport unavailable"
+    );
+  }
+  return _computeMonthlySalaryReport(pool, yearInt, monthInt);
+}
+
 export default function (pool) {
   const router = Router();
+  // Expose the inner computer to the module-level wrapper above (see note there).
+  _computeMonthlySalaryReport = computeMonthlySalaryReport;
 
   // Compute the full monthly salary report (all tabs) for the given year/month.
   // Returns the exact object shape the "/" route responds with. Reused by the

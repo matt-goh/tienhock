@@ -964,19 +964,29 @@ const VoucherGeneratorPage: React.FC = () => {
 
             {previewData.jvsl.locations.length > 0 ? (
               <>
-                {/* Missing Mappings Warning */}
-                {hasAnyMissingMappings(previewData.jvsl.locations) && (
+                {/* Missing Mappings Warning — combine the per-location check with the
+                    backend's exact list of unmapped component amounts (e.g. a
+                    department's commission_mee/bh that has no account yet). */}
+                {(hasAnyMissingMappings(previewData.jvsl.locations) ||
+                  (previewData.jvsl.unmapped?.length ?? 0) > 0) && (
                   <div className="m-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
                     <div className="flex items-start gap-3">
                       <IconAlertTriangle className="text-amber-500 mt-0.5 flex-shrink-0" size={20} />
                       <div>
                         <h4 className="font-medium text-amber-800 dark:text-amber-300">
-                          Some locations are missing account mappings
+                          Some amounts are missing account mappings
                         </h4>
                         <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
                           Generation is blocked until every amount has an account —
                           an incomplete voucher would not balance.
                         </p>
+                        {(previewData.jvsl.unmapped?.length ?? 0) > 0 && (
+                          <ul className="mt-2 text-xs text-amber-700 dark:text-amber-400 list-disc list-inside space-y-0.5">
+                            {previewData.jvsl.unmapped!.map((u, i) => (
+                              <li key={i}>{u}</li>
+                            ))}
+                          </ul>
+                        )}
                         <Button
                           onClick={() => navigate("/accounting/location-account-mappings")}
                           variant="outline"

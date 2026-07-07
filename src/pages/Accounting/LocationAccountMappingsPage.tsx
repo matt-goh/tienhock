@@ -127,10 +127,12 @@ const JVDR_ACCOUNT_CODES: ExpectedAccountCode[] = [
 // JVSL Account Codes (Staff Salary - Multiple Locations)
 // Based on JVSL voucher: 73 line items matching the voucher exactly
 const JVSL_ACCOUNT_CODES: ExpectedAccountCode[] = [
-  // ========== SALARY/WAGES (one per department) ==========
-  // Each Salary account receives the department's FULL gross pay — base, OT,
-  // commissions, cuti/leave, bonus, product/packing pay and Others all fold in
-  // here, so the only mapping type needed is "salary".
+  // ========== SALARY / COMMISSION (per department) ==========
+  // Each department's Salary account receives its gaji + commission + cuti (+ bonus
+  // unless a dedicated Bonus account is mapped). OT and RND post to the same Salary
+  // account on their own lines. Salesman / Ikut Lori are the exception: their
+  // commission is booked 50/50 to a MEE and a BIHUN account (Ikut Lori's commission
+  // column is booked to "Others").
   {
     code: "MBS_O",
     description: "Office (Salary)",
@@ -138,16 +140,52 @@ const JVSL_ACCOUNT_CODES: ExpectedAccountCode[] = [
     mappingTypes: ["salary"],
   },
   {
-    code: "MBS_SMO",
-    description: "Salesman",
+    code: "MBS_O",
+    description: "Office (Bonus)",
     category: "salary",
-    mappingTypes: ["salary"],
+    mappingTypes: ["bonus"],
+  },
+  {
+    code: "MS_SM",
+    description: "Salesman-Commission Mee",
+    category: "salary",
+    mappingTypes: ["commission_mee"],
+  },
+  {
+    code: "BS_SM",
+    description: "Salesman-Commission Bihun",
+    category: "salary",
+    mappingTypes: ["commission_bh"],
+  },
+  {
+    code: "THJ_CK",
+    description: "Commission Jelly (Salesman)",
+    category: "salary",
+    mappingTypes: ["commission_jelly"],
+  },
+  {
+    code: "MS_IL",
+    description: "Ikut Lori-Commission Mee",
+    category: "salary",
+    mappingTypes: ["commission_mee"],
+  },
+  {
+    code: "BS_IL",
+    description: "Ikut Lori-Commission Bihun",
+    category: "salary",
+    mappingTypes: ["commission_bh"],
+  },
+  {
+    code: "THJ_SM",
+    description: "Salary Salesman (Jelly, Ikut Lori)",
+    category: "salary",
+    mappingTypes: ["commission_jelly"],
   },
   {
     code: "MBS_ILO",
-    description: "Ikut Lori",
+    description: "Ikut Lori-Others",
     category: "salary",
-    mappingTypes: ["salary"],
+    mappingTypes: ["others"],
   },
   {
     code: "MBS_JB",
@@ -639,6 +677,8 @@ const LocationAccountMappingsPage: React.FC = () => {
       commission: "Comm",
       commission_mee: "Comm-MEE",
       commission_bh: "Comm-BH",
+      commission_jelly: "Comm-Jelly",
+      others: "Others",
       cuti_tahunan: "CT",
       special_ot: "SOT",
       epf_employer: "EPF",

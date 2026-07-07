@@ -1,5 +1,6 @@
 // src/routes/accounting/journal-vouchers.js
 import { Router } from "express";
+import { computeMonthlySalaryReport } from "../payroll/salary-report.js";
 
 export default function (pool) {
   const router = Router();
@@ -195,6 +196,327 @@ export default function (pool) {
     };
   };
 
+  // ==================== JVSL DEPARTMENT MODEL (legacy 1:1) ====================
+  //
+  // The legacy JVSL is the monthly Salary Report, transposed into GL lines. So the
+  // voucher is built from the EXACT salary-report per-location figures (single
+  // source of truth) — see computeMonthlySalaryReport in payroll/salary-report.js.
+  //
+  // Each legacy "department" line aggregates one or more salary-report locations and
+  // is composed by component TYPE (all Salary/Commission first, then Bonus, OT, RND,
+  // then employer EPF/SOCSO/SIP, then the ACW_* accrual credits) — matching the
+  // printed voucher's ordering. Rules reverse-engineered from the legacy print:
+  //   - A department's Salary line = gaji + comm + cuti (+ bonus, unless a dedicated
+  //     bonus account is mapped, e.g. Office).
+  //   - OT is always its own line; RND (= the department's per-employee digenapkan)
+  //     is always its own line, both on the department's primary salary account.
+  //   - Salesman / Ikut Lori (split5050): the department's salary is booked 50/50 to
+  //     a MEE and a BIHUN commission account, and their OT and RND split the same
+  //     way. Ikut Lori's "Others" = its salary-report commission column.
+  //   - Jelly pay is treated as ordinary Tien Hock payroll (folded into the
+  //     salesman/ikut-lori 50/50 split — no separate jelly line).
+  //   - Directors (location 01) are excluded (they go to JVDR).
+  const JVSL_DEPARTMENTS = [
+    { id: "02", name: "Office", locs: ["02"] },
+    { id: "03", name: "Salesman", locs: ["03"], split5050: true, jelly: true, jellyLabel: "Commission Jelly" },
+    { id: "04", name: "Ikut Lori", locs: ["04"], split5050: true, othersLine: true, jelly: true, jellyLabel: "Salary Salesman (Jelly)" },
+    { id: "06", name: "Jaga Boiler", locs: ["06"] },
+    { id: "07", name: "Mesin & Sangkut Mee", locs: ["07"] },
+    { id: "08", name: "Packing Mee", locs: ["08"] },
+    { id: "09", name: "Mesin & Sangkut Bihun", locs: ["09", "10"] },
+    { id: "11", name: "Packing Bihun", locs: ["11"] },
+    { id: "13", name: "Tukang Sapu", locs: ["13"] },
+    { id: "14", name: "Maintenance", locs: ["14"] },
+  ];
+  // Locations that belong to a JVSL department (everything else — 01 directors,
+  // 05/12/15, and the 16-24 commission buckets — is not part of the legacy JVSL).
+  const JVSL_DEPT_LOCS = new Set(JVSL_DEPARTMENTS.flatMap((d) => d.locs));
+
+  // Split an amount 50/50: MEE gets the floored half, BIHUN the remainder. Matches
+  // the legacy salesman split (12,787.05 -> 6,393.52 / 6,393.53).
+  const splitHalf = (amt) => {
+    const a = round2(amt);
+    const first = Math.floor((a / 2) * 100) / 100;
+    return [first, round2(a - first)];
+  };
+
+  // Aggregate the salary-report per-location totals into the department shape.
+  const aggregateDepartments = (locationsByIdTotals) => {
+    return JVSL_DEPARTMENTS.map((dept) => {
+      const t = {
+        gaji: 0, ot: 0, bonus: 0, comm: 0, cuti: 0, gaji_kasar: 0,
+        epf_er: 0, epf_ee: 0, socso_er: 0, socso_ee: 0, sip_er: 0, sip_ee: 0,
+        pcb: 0, gaji_bersih: 0, digenap: 0,
+      };
+      for (const locId of dept.locs) {
+        const lt = locationsByIdTotals[locId];
+        if (!lt) continue;
+        t.gaji += parseFloat(lt.gaji) || 0;
+        t.ot += parseFloat(lt.ot) || 0;
+        t.bonus += parseFloat(lt.bonus) || 0;
+        t.comm += parseFloat(lt.comm) || 0;
+        t.cuti += parseFloat(lt.cuti) || 0;
+        t.gaji_kasar += parseFloat(lt.gaji_kasar) || 0;
+        t.epf_er += parseFloat(lt.epf_majikan) || 0;
+        t.epf_ee += parseFloat(lt.epf_pekerja) || 0;
+        t.socso_er += parseFloat(lt.socso_majikan) || 0;
+        t.socso_ee += parseFloat(lt.socso_pekerja) || 0;
+        t.sip_er += parseFloat(lt.sip_majikan) || 0;
+        t.sip_ee += parseFloat(lt.sip_pekerja) || 0;
+        t.pcb += parseFloat(lt.pcb) || 0;
+        t.gaji_bersih += parseFloat(lt.gaji_bersih) || 0;
+        t.digenap += parseFloat(lt.digenapkan) || 0;
+      }
+      Object.keys(t).forEach((k) => (t[k] = round2(t[k])));
+      return { ...dept, totals: t };
+    });
+  };
+
+  // Jelly (Ice-Polly cup) SALES pay booked by the salesman/ikut-lori as ordinary Tien
+  // Hock payroll. In the legacy voucher it is carved OUT of the salesman/ikut-lori
+  // 50/50 commission split into its own line (Salesman -> "Commission Jelly" THJ_CK;
+  // Ikut Lori -> "Salary Salesman (Jelly)" THJ_SM). Identified by pay-code description:
+  // an Ice-Polly SALES code (excludes MUAT loading codes and the ME-Q mee/bihun/ramen
+  // codes). Returns { location_id: jelly_amount } using the SAME per-employee location
+  // grouping as the salary report, so the carve-out never double-counts.
+  const JELLY_SALES_DESC = "%ICE-POLLY%";
+  const computeJellyByLocation = async (db, year, month, salaryReport) => {
+    const staffLoc = {};
+    (salaryReport?.comprehensive?.locations || []).forEach((l) => {
+      (l.employees || []).forEach((e) => {
+        if (e.staff_id != null) staffLoc[e.staff_id] = l.location;
+      });
+    });
+    const r = await db.query(
+      `SELECT ep.employee_id, ROUND(SUM(pi.amount), 2) AS amt
+         FROM employee_payrolls ep
+         JOIN monthly_payrolls mp ON mp.id = ep.monthly_payroll_id
+         JOIN payroll_items pi ON pi.employee_payroll_id = ep.id
+         JOIN pay_codes pc ON pc.id = pi.pay_code_id
+        WHERE mp.year = $1 AND mp.month = $2
+          AND pc.description ILIKE $3
+          AND pc.description ILIKE '%SALES%'
+          AND pc.description NOT ILIKE '%MUAT%'
+        GROUP BY ep.employee_id`,
+      [year, month, JELLY_SALES_DESC]
+    );
+    const byLoc = {};
+    r.rows.forEach((row) => {
+      const loc = staffLoc[row.employee_id];
+      if (!loc) return;
+      byLoc[loc] = round2((byLoc[loc] || 0) + (parseFloat(row.amt) || 0));
+    });
+    return byLoc;
+  };
+
+  // Build the JVSL journal lines (and the per-department preview rows) from the
+  // salary report. mappingsByLocation is keyed `JVSL_<deptId>`; staffAccruals is the
+  // JVSL_00 accrual map. jellyByLocation carves Ice-Polly jelly sales out of the
+  // salesman/ikut-lori split. Returns lines, totals, unmapped, and preview `locations`.
+  const buildJvslFromSalaryReport = (salaryReport, mappingsByLocation, staffAccruals, jellyByLocation = {}) => {
+    const locTotals = {};
+    let commissionOnly = 0; // 16-24 amounts that fall outside the department model
+    (salaryReport?.comprehensive?.locations || []).forEach((l) => {
+      locTotals[l.location] = l.totals;
+      if (!JVSL_DEPT_LOCS.has(l.location) && l.location !== "01") {
+        commissionOnly += parseFloat(l.totals?.gaji_bersih) || 0;
+      }
+    });
+
+    const departments = aggregateDepartments(locTotals);
+    const unmapped = [];
+    const salaryLines = [];
+    const bonusLines = [];
+    const otLines = [];
+    const rndLines = [];
+    const epfLines = [];
+    const socsoLines = [];
+    const sipLines = [];
+    const previewLocations = [];
+
+    // Running credit-side staff totals (sum across departments).
+    let cGajiBersih = 0, cDigenap = 0, cEpfEr = 0, cEpfEe = 0, cSocsoEr = 0,
+      cSocsoEe = 0, cSipEr = 0, cSipEe = 0, cPcb = 0;
+
+    const need = (acct, amt, label) => {
+      if (round2(amt) > 0 && !acct) unmapped.push(`${label}: ${round2(amt).toFixed(2)}`);
+    };
+
+    for (const dept of departments) {
+      const t = dept.totals;
+      const m = mappingsByLocation[`JVSL_${dept.id}`] || {};
+      const salaryAcct = m.salary || null;
+      const bonusAcct = m.bonus || null; // dedicated bonus line only where mapped
+      const otAcct = m.overtime || salaryAcct;
+      const meeAcct = m.commission_mee || null;
+      const bhAcct = m.commission_bh || null;
+      const othersAcct = m.others || null;
+
+      cGajiBersih += t.gaji_bersih;
+      cDigenap += t.digenap;
+      cEpfEr += t.epf_er; cEpfEe += t.epf_ee;
+      cSocsoEr += t.socso_er; cSocsoEe += t.socso_ee;
+      cSipEr += t.sip_er; cSipEe += t.sip_ee;
+      cPcb += t.pcb;
+
+      // ----- Salary / Commission -----
+      let deptSalaryDebit = 0; // for the preview row
+      if (dept.split5050) {
+        // Carve Ice-Polly jelly sales out of the 50/50 split into its own line.
+        const jellyAmt = dept.jelly
+          ? round2(dept.locs.reduce((s, loc) => s + (jellyByLocation[loc] || 0), 0))
+          : 0;
+        const jellyAcct = m.commission_jelly || null;
+        const othersAmt = round2(t.comm);
+        // Anchor to actual gross_pay (gaji_kasar), NOT the salary report's re-rounded
+        // GAJI/COMM/CUTI columns — those can drift a few cents from real gross. The
+        // 50/50 base is the residual gross after carving OT (own lines), jelly and
+        // others, so each department ties out to the legacy voucher to the cent.
+        const splitBase = round2(t.gaji_kasar - t.ot - jellyAmt - othersAmt);
+        const [meeAmt, bhAmt] = splitHalf(splitBase);
+        need(meeAcct, meeAmt, `commission_mee @ ${dept.name}`);
+        need(bhAcct, bhAmt, `commission_bh @ ${dept.name}`);
+        if (meeAcct && meeAmt > 0)
+          salaryLines.push({ account_code: meeAcct, particulars: `${dept.name}-Commission Mee`, debit: meeAmt, credit: 0 });
+        if (bhAcct && bhAmt > 0)
+          salaryLines.push({ account_code: bhAcct, particulars: `${dept.name}-Commission Bihun`, debit: bhAmt, credit: 0 });
+        if (dept.jelly && jellyAmt > 0) {
+          need(jellyAcct, jellyAmt, `commission_jelly @ ${dept.name}`);
+          if (jellyAcct)
+            salaryLines.push({ account_code: jellyAcct, particulars: dept.jellyLabel, debit: jellyAmt, credit: 0 });
+        }
+        if (dept.othersLine && othersAmt > 0) {
+          need(othersAcct, othersAmt, `others @ ${dept.name}`);
+          if (othersAcct)
+            salaryLines.push({ account_code: othersAcct, particulars: `${dept.name}-Others`, debit: othersAmt, credit: 0 });
+        }
+        deptSalaryDebit = round2(splitBase + jellyAmt + othersAmt);
+
+        // ----- OT (split 50/50) -----
+        if (t.ot > 0) {
+          const [meeOt, bhOt] = splitHalf(t.ot);
+          if (meeAcct && meeOt > 0)
+            otLines.push({ account_code: meeAcct, particulars: `${dept.name}-Commission Mee (OT)`, debit: meeOt, credit: 0 });
+          if (bhAcct && bhOt > 0)
+            otLines.push({ account_code: bhAcct, particulars: `${dept.name}-Commission Bihun (OT)`, debit: bhOt, credit: 0 });
+        }
+        // ----- RND (split 50/50) -----
+        if (t.digenap > 0) {
+          const [meeR, bhR] = splitHalf(t.digenap);
+          if (meeAcct && meeR > 0)
+            rndLines.push({ account_code: meeAcct, particulars: `${dept.name}-Commission Mee (RND)`, debit: meeR, credit: 0 });
+          if (bhAcct && bhR > 0)
+            rndLines.push({ account_code: bhAcct, particulars: `${dept.name}-Commission Bihun (RND)`, debit: bhR, credit: 0 });
+        }
+      } else {
+        // Anchor to actual gross_pay (gaji_kasar), not the re-rounded GAJI/COMM/CUTI
+        // columns. Salary residual = gross − OT (own line) − bonus (own line, if a
+        // dedicated bonus account is mapped; otherwise bonus stays folded in).
+        const salaryAmt = round2(t.gaji_kasar - t.ot - (bonusAcct ? t.bonus : 0));
+        need(salaryAcct, salaryAmt, `salary @ ${dept.name}`);
+        if (salaryAcct && salaryAmt > 0)
+          salaryLines.push({ account_code: salaryAcct, particulars: dept.name, debit: salaryAmt, credit: 0 });
+        deptSalaryDebit = salaryAmt;
+
+        if (bonusAcct && t.bonus > 0) {
+          bonusLines.push({ account_code: bonusAcct, particulars: `${dept.name} (Bonus)`, debit: round2(t.bonus), credit: 0 });
+          deptSalaryDebit = round2(deptSalaryDebit + t.bonus);
+        }
+        if (t.ot > 0) {
+          need(otAcct, t.ot, `overtime @ ${dept.name}`);
+          if (otAcct)
+            otLines.push({ account_code: otAcct, particulars: `${dept.name} (OT)`, debit: round2(t.ot), credit: 0 });
+          deptSalaryDebit = round2(deptSalaryDebit + t.ot);
+        }
+        if (t.digenap > 0 && salaryAcct) {
+          rndLines.push({ account_code: salaryAcct, particulars: `${dept.name} (RND)`, debit: round2(t.digenap), credit: 0 });
+          deptSalaryDebit = round2(deptSalaryDebit + t.digenap);
+        }
+      }
+
+      // ----- Employer statutory -----
+      need(m.epf_employer, t.epf_er, `epf_employer @ ${dept.name}`);
+      need(m.socso_employer, t.socso_er, `socso_employer @ ${dept.name}`);
+      need(m.sip_employer, t.sip_er, `sip_employer @ ${dept.name}`);
+      if (m.epf_employer && t.epf_er > 0)
+        epfLines.push({ account_code: m.epf_employer, particulars: `${dept.name} (EPF)`, debit: t.epf_er, credit: 0 });
+      if (m.socso_employer && t.socso_er > 0)
+        socsoLines.push({ account_code: m.socso_employer, particulars: `${dept.name} (SOCSO)`, debit: t.socso_er, credit: 0 });
+      if (m.sip_employer && t.sip_er > 0)
+        sipLines.push({ account_code: m.sip_employer, particulars: `${dept.name} (SIP)`, debit: t.sip_er, credit: 0 });
+
+      previewLocations.push({
+        location_id: dept.id,
+        location_name: dept.name,
+        salary: deptSalaryDebit,
+        epf_employer: t.epf_er,
+        socso_employer: t.socso_er,
+        sip_employer: t.sip_er,
+        pcb: t.pcb,
+        net_salary: round2(t.gaji_bersih + t.digenap),
+        accounts: {
+          salary: salaryAcct,
+          epf_employer: m.epf_employer || null,
+          socso_employer: m.socso_employer || null,
+          sip_employer: m.sip_employer || null,
+        },
+      });
+    }
+
+    const debitLines = [
+      ...salaryLines, ...bonusLines, ...otLines, ...rndLines,
+      ...epfLines, ...socsoLines, ...sipLines,
+    ];
+    const totalDebit = round2(debitLines.reduce((s, l) => s + l.debit, 0));
+
+    // ----- Credit accruals (staff totals) -----
+    // The statutory accruals are the both-portion totals; ACW_SAL (net salary
+    // payable) is the balancing figure = total debit − the statutory accruals, so
+    // the voucher always ties out. This equals Σ(net + rounding) before advance/
+    // mid-month deductions and reproduces the legacy ACW_SAL (143,513.00) exactly.
+    const accEpf = round2(cEpfEr + cEpfEe);
+    const accSocso = round2(cSocsoEr + cSocsoEe);
+    const accSip = round2(cSipEr + cSipEe);
+    const accPcb = round2(cPcb);
+    const acwSal = round2(totalDebit - accEpf - accSocso - accSip - accPcb);
+    const creditCandidates = [
+      { account: staffAccruals.accrual_epf, amount: accEpf, desc: "Accrual (EPF)" },
+      { account: staffAccruals.accrual_socso, amount: accSocso, desc: "Accrual (SOCSO)" },
+      { account: staffAccruals.accrual_salary, amount: acwSal, desc: "Accrual (Salary Payables)" },
+      { account: staffAccruals.accrual_pcb, amount: accPcb, desc: "Accrual (PCB Payables)" },
+      { account: staffAccruals.accrual_sip, amount: accSip, desc: "Accrual (SIP)" },
+    ];
+    creditCandidates.forEach((c) => {
+      if (c.amount > 0 && !c.account) unmapped.push(`${c.desc} (accrual): ${c.amount.toFixed(2)}`);
+    });
+    const creditLines = creditCandidates
+      .filter((c) => c.account && c.amount > 0)
+      .map((c) => ({ account_code: c.account, particulars: c.desc, debit: 0, credit: round2(c.amount) }));
+
+    if (round2(commissionOnly) > 0) {
+      unmapped.push(`commission-only (loc 16-24) net not in any JVSL department: ${round2(commissionOnly).toFixed(2)}`);
+    }
+
+    const lines = [...debitLines, ...creditLines];
+
+    return {
+      lines,
+      locations: previewLocations,
+      totalDebit: round2(debitLines.reduce((s, l) => s + l.debit, 0)),
+      totalCredit: round2(creditLines.reduce((s, l) => s + l.credit, 0)),
+      unmapped,
+      totals: {
+        salary: round2(previewLocations.reduce((s, l) => s + l.salary, 0)),
+        epf_employer: round2(cEpfEr),
+        socso_employer: round2(cSocsoEr),
+        sip_employer: round2(cSipEr),
+        pcb: round2(cPcb),
+        accrual_salary: acwSal,
+        accrual_accounts: staffAccruals,
+      },
+    };
+  };
+
   // ==================== LOCATION ACCOUNT MAPPINGS CRUD ====================
 
   // GET /mappings - Get all location-account mappings
@@ -300,13 +622,18 @@ export default function (pool) {
       });
     }
 
-    // Validate mapping_type. JVSL debits fold all earnings (and the digenapkan
-    // rounding) into ONE Salary line per location, so only salary + employer
-    // EPF/SOCSO/SIP expense types are used (OT/bonus/commission/cuti/rounding are no
-    // longer separate mapping types). Accruals are configured at location 00.
+    // Validate mapping_type. JVSL follows the legacy voucher, which books each
+    // department by component: the Salary line (gaji+comm+cuti, plus bonus unless a
+    // dedicated bonus account is mapped), OT, and RND on the primary salary account;
+    // Salesman/Ikut Lori split their commission 50/50 into commission_mee /
+    // commission_bh (with Ikut Lori's "others" column on its own account). "overtime"
+    // and "bonus" are optional overrides (they default to the salary account).
+    // Accruals are configured at location 00.
     const validMappingTypes = [
       // Expense types
-      "salary", "epf_employer", "socso_employer", "sip_employer",
+      "salary", "overtime", "bonus",
+      "commission_mee", "commission_bh", "commission_jelly", "others",
+      "epf_employer", "socso_employer", "sip_employer",
       // Accrual types (location 00)
       "accrual_salary", "accrual_epf", "accrual_socso", "accrual_sip", "accrual_pcb",
     ];
@@ -943,27 +1270,19 @@ export default function (pool) {
       // Build the exact journal lines the generate endpoint would post (1:1), via
       // the shared builders — so the Voucher Generator can show the real voucher.
       const jvdrMappingsForLines = mappingsByLocation["JVDR_01"] || {};
-      const staffData = salaryResult.rows.filter(
-        (r) => r.location_id !== "01" && r.location_id !== "00"
-      );
-      const jvslRoundingByLoc = await computeJvslRoundingByLocation(pool, yearInt, monthInt);
-      // location_id -> display name: prefer the JVSL mapping's name, else the
-      // locations master table (used for the "Salary - <name>" line descriptions)
-      const previewLocationNames = {};
-      staffData.forEach((loc) => {
-        previewLocationNames[loc.location_id] =
-          locationNamesByMapping[`JVSL_${loc.location_id}`] ||
-          locationNames[loc.location_id] ||
-          `Location ${loc.location_id}`;
-      });
       const jvdrBuilt =
         directorResult.rows.length > 0
           ? buildJvdrLines(directorResult.rows, jvdrMappingsForLines)
           : { lines: [], totalDebit: 0, totalCredit: 0, unmapped: [] };
-      const jvslBuilt =
-        staffData.length > 0
-          ? buildJvslLines(staffData, mappingsByLocation, staffAccruals, jvslRoundingByLoc, previewLocationNames)
-          : { lines: [], totalDebit: 0, totalCredit: 0, unmapped: [] };
+      // JVSL is built 1:1 from the monthly Salary Report (single source of truth).
+      const salaryReport = await computeMonthlySalaryReport(pool, yearInt, monthInt);
+      const jellyByLoc = await computeJellyByLocation(pool, yearInt, monthInt, salaryReport);
+      const jvslBuilt = buildJvslFromSalaryReport(
+        salaryReport,
+        mappingsByLocation,
+        staffAccruals,
+        jellyByLoc
+      );
 
       res.json({
         year: yearInt,
@@ -985,8 +1304,8 @@ export default function (pool) {
           reference: jvslRef,
           exists: !!existingVouchersMap[jvslRef],
           entry_id: existingVouchersMap[jvslRef] || null,
-          locations: jvslData,
-          totals: jvslTotals,
+          locations: jvslBuilt.locations,
+          totals: jvslBuilt.totals,
           lines: jvslBuilt.lines,
           total_debit: jvslBuilt.totalDebit,
           total_credit: jvslBuilt.totalCredit,
@@ -1502,13 +1821,14 @@ export default function (pool) {
         if (existingJvsl.rows.length > 0) {
           results.jvsl = { skipped: true, message: "JVSL already exists for this month" };
         } else {
-          const staffData = salaryResult.rows.filter(r => r.location_id !== "01" && r.location_id !== "00");
+          // Build the exact posting lines with the shared builder (same output the
+          // preview shows) from the monthly Salary Report. Guard before inserting.
+          const salaryReport = await computeMonthlySalaryReport(pool, yearInt, monthInt);
+          const jellyByLoc = await computeJellyByLocation(pool, yearInt, monthInt, salaryReport);
+          const jvsl = buildJvslFromSalaryReport(salaryReport, mappingsByLocation, staffAccruals, jellyByLoc);
+          const hasStaff = jvsl.lines.length > 0;
 
-          if (staffData.length > 0) {
-            // Build the exact posting lines with the shared builder (same output the
-            // preview shows). Guard before inserting anything.
-            const jvslRoundingByLoc = await computeJvslRoundingByLocation(client, yearInt, monthInt);
-            const jvsl = buildJvslLines(staffData, mappingsByLocation, staffAccruals, jvslRoundingByLoc, genLocationNames);
+          if (hasStaff) {
             if (jvsl.unmapped.length > 0 || Math.abs(jvsl.totalDebit - jvsl.totalCredit) > 0.01) {
               await client.query("ROLLBACK");
               const detail = jvsl.unmapped.length > 0 ? ` Unmapped amounts: ${jvsl.unmapped.join("; ")}.` : "";

@@ -50,64 +50,69 @@ difference is debited back to the salary expense account (`MBDRS`) as a
 
 ## JVSL - Staff Salary Voucher
 
-### Debit Accounts (Expenses by Location)
+### The JVSL is the Salary Report, transposed into GL lines (7 Jul 2026)
 
-| Account Code Pattern | Description | Calculation | Source |
-|---------------------|-------------|-------------|--------|
-| **MBS_**** | Salary by location | **FULL gross per location** (since 6 Jul 2026, matching the legacy voucher): the location's entire `SUM(gross_pay)` — base, OT, commissions (incl. located 16-24), cuti/leave, bonus, product/packing pay and Others ALL fold into this one line. No separate OT/commission/cuti/bonus debit rows exist. | `employee_payrolls.gross_pay` summed per job location |
-| **MBE_**** | EPF Employer by location | Employer EPF | `payroll_deductions` where `deduction_type = 'epf'` |
-| **MBSC_**** | SOCSO Employer by location | Employer SOCSO | `payroll_deductions` where `deduction_type = 'socso'` |
-| **MBSIP_**** | SIP Employer by location | Employer SIP | `payroll_deductions` where `deduction_type = 'sip'` |
+The legacy JVSL is the monthly **Salary Report** rendered as journal lines. So the
+voucher is now built **directly from the salary report's per-location figures** — the
+single source of truth — via `computeMonthlySalaryReport()` (exported from
+`payroll/salary-report.js`) and `buildJvslFromSalaryReport()` in
+[journal-vouchers.js](../../src/routes/accounting/journal-vouchers.js). This replaces the
+6 Jul "fold everything into one Salary line" model and reproduces the legacy print 1:1.
 
-**Debit model (6 Jul 2026 — matches legacy 1:1):** the JVSL debit side is ONLY these four
-per-location rows — Salary, and employer EPF/SOCSO/SIP. There are **no** separate rows for
-OT, commissions, cuti/leave, bonus or product pay; those are all inside the Salary row. So
-the only JVSL mappings needed per location are `salary`, `epf_employer`, `socso_employer`,
-`sip_employer` (the old `overtime`/`bonus`/`commission_mee`/`commission_bh`/`cuti_tahunan`
-mapping types are retired).
+**Department model.** Each legacy department line aggregates one or more salary-report
+locations and is composed by component. Lines are ordered by component TYPE across all
+departments (all Salary/Commission, then Bonus, OT, RND, then employer EPF/SOCSO/SIP,
+then the `ACW_*` accrual credits) — matching the printed voucher.
 
-**Rounding (digenapkan) folds into salary — no separate line, no mapping.** Each location's
-Salary debit = its `SUM(gross_pay)` **+ that location's per-employee CEIL(net)−net rounding**,
-and `ACW_SAL` credits the rounded net of everyone. Balance:
-`Σ(gross + rounding) + Σemployer(EPF+SOCSO+SIP) = ACW_SAL(net + Σrounding) + ACW_EPF + ACW_SC + ACW_SIP + ACW_PCB`.
-Jun 2026: DR salary 162,019.90 (161,984.54 + 35.36) + employer 19,679.20 = **181,699.10**;
-ACW_SAL **143,513.00** (143,477.64 + 35.36) + accruals 38,186.10 = **181,699.10**. Computed by
-`computeJvslRoundingByLocation()`. (JVDR keeps its separate "Rounding Adjustment" line to
-`MBDRS` — the legacy JVDR prints one; JVSL does not.)
+| Legacy department | Salary-report loc(s) | Debit composition |
+|---|---|---|
+| Office | 02 | Salary = gaji+comm+cuti; **Bonus** own line (dedicated account); OT own line; RND own line |
+| Salesman | 03 | jelly carved out (→ `commission_jelly` = THJ_CK); rest (gaji+cuti+bonus−jelly) **split 50/50** → `commission_mee`/`commission_bh`; OT & RND split 50/50 |
+| Ikut Lori | 04 | jelly carved out (→ `commission_jelly` = THJ_SM); 50/50 like Salesman; salary-report **comm column → `others`**; OT & RND split 50/50 |
+| Jaga Boiler | 06 | Salary = gaji+comm+cuti+bonus; OT; RND |
+| Mesin & Sangkut Mee | 07 | Salary = gaji+comm+cuti; OT; RND |
+| Packing Mee | 08 | Salary = gaji+comm+cuti; OT; RND |
+| Mesin & Sangkut Bihun | **09 + 10** | Salary = gaji+comm+cuti+bonus; OT; RND |
+| Packing Bihun | 11 | Salary = gaji+comm+cuti; RND |
+| Tukang Sapu | 13 | Salary = gaji+comm+cuti; OT; RND |
+| Maintenance | 14 | Salary = gaji+comm+cuti; OT; RND |
+
+Rules: a department's **Salary** line = gaji + comm + cuti (+ bonus, **unless** a dedicated
+`bonus` account is mapped, e.g. Office). **OT** is always its own line (account =
+`overtime` mapping, else the salary account). **RND** = the department's per-employee
+`digenapkan` from the salary report, its own line on the primary salary account.
+**Jelly** (Ice-Polly cup) SALES pay is carved OUT of the salesman/ikut-lori 50/50 split
+into its own `commission_jelly` line — Salesman → "Commission Jelly" (THJ_CK), Ikut Lori →
+"Salary Salesman (Jelly)" (THJ_SM). Jelly is identified by pay-code description (an
+`ICE-POLLY` **SALES** code — excludes the `MUAT` loading codes and the ME-Q mee/bihun/
+ramen codes; `computeJellyByLocation()`), so newly-added Ice-Polly sales codes are picked
+up automatically. **Directors** (location 01) are excluded (→ JVDR).
+
+**Mapping types per department** (`location_account_mappings`, editable on the Account Code
+Mappings page): `salary`, `epf_employer`, `socso_employer`, `sip_employer`; optional
+`overtime`/`bonus` overrides; Salesman/Ikut Lori use `commission_mee` + `commission_bh` +
+`commission_jelly` (+ `others` for Ikut Lori). Accruals stay at location `00`.
 
 ### Credit Accounts (Aggregate Payables)
 
-| Account Code | Description | Calculation | Notes |
-|--------------|-------------|-------------|-------|
-| **ACW_SAL** | Salary Payable | Total net pay (+ rounding, see below) | Sum of all staff net pay |
-| **ACW_EPF** | EPF Payable | `totalEpf + totalEpfEmployee` | Total EPF (both portions) |
-| **ACW_SC** | SOCSO Payable | `totalSocso + totalSocsoEmployee` | Total SOCSO (both portions) |
-| **ACW_SIP** | SIP Payable | `totalSip + totalSipEmployee` | Total SIP (both portions) |
-| **ACW_PCB** | PCB Payable | `totalPcb` | Total employee tax withheld |
+| Account Code | Description | Calculation |
+|--------------|-------------|-------------|
+| **ACW_EPF** | EPF Payable | `Σ(epf_employer + epf_employee)` (staff) |
+| **ACW_SC** | SOCSO Payable | `Σ(socso_employer + socso_employee)` (staff) |
+| **ACW_SIP** | SIP Payable | `Σ(sip_employer + sip_employee)` (staff) |
+| **ACW_PCB** | PCB Payable | `Σ pcb` (staff) |
+| **ACW_SAL** | Salary Payable | **Balancing figure** = total debit − (ACW_EPF + ACW_SC + ACW_SIP + ACW_PCB) |
 
-### Rounding (digenapkan) — added 6 Jul 2026
-
-Legacy convention, now reproduced **when a `rounding` mapping exists** for
-`voucher_type='JVSL', location_id='00'` in `location_account_mappings`: per-employee
-net (`gross_pay − Σ employee statutory − PCB`, directors excluded) is rounded **up to
-the whole ringgit**; `ACW_SAL` is credited with the rounded total and the difference is
-debited to the mapped rounding account as a **"Rounding Adjustment"** line
-(Jun 2026: 143,477.64 → 143,513.00, rounding 35.36 — matches the legacy JVSL).
-Without the mapping the voucher is generated unrounded (still balanced) as before.
-Add the mapping with:
-
-```sql
-INSERT INTO location_account_mappings
-  (location_id, location_name, mapping_type, account_code, voucher_type, is_active)
-VALUES ('00', 'Accruals', 'rounding', '<EXPENSE_CODE_FROM_LEGACY_JVSL_PAGE_1>', 'JVSL', true);
-```
-
-Note: `ACW_SAL` accrues the **full** rounded net *before* advance deductions (advance
-commissions `commission_records.is_advance = true` and Others records are part of gross
-and payable) and *before* the mid-month advance — those channels each settle `ACW_SAL`
-when paid (bank monthly payment, half-month payment, cash PV entries). Jun 2026 proof:
-advance commissions 13,217.25 are inside the 143,513.00, and the payroll page's net
-figures that deduct them are payment-side numbers, not accrual-side.
+`ACW_SAL` is the net salary payable — computed as the balancing plug so the voucher always
+ties out (this is how the legacy guarantees balance; it equals Σ net + rounding before
+advance/mid-month deductions). Each department's Salary line is anchored to actual
+`gross_pay` (`gaji_kasar`) — **not** the salary report's re-rounded GAJI/COMM/CUTI columns,
+which can drift a few cents from real gross (Salary = gross − OT − any separate bonus/jelly/
+others lines). Jun 2026: total debit **181,699.10** (= staff gross 161,984.54 + rounding
+35.36 + employer statutory 19,679.20) → ACW_SAL **143,513.00** + accruals 38,186.10 =
+181,699.10 — matching the legacy print to the cent (RND total 35.36, Office RND 3.99,
+Mesin & Sangkut Bihun RND 6.98 = loc 09 + loc 10, Mesin & Sangkut Mee 14,608.92). (JVDR
+keeps its separate "Rounding Adjustment" line to `MBDRS`; JVSL does not.)
 
 ---
 
@@ -341,30 +346,38 @@ balanced. **Fix:** the salary line per location is now the residual of
 gross is Σ `gross_pay` directly — both sides equal full payroll gross by construction.
 The out-of-balance guard also lists the exact unmapped location/component amounts.
 
-### Shared line builders (6 Jul 2026)
+### Shared line builders
 
-Preview and generation now call ONE pair of pure builders — `buildJvdrLines()` /
-`buildJvslLines()` (+ `computeJvslRounding()`) in [journal-vouchers.js](../../src/routes/accounting/journal-vouchers.js).
-The `/preview` response carries the exact `lines` (account_code · particulars · debit ·
-credit), `total_debit`, `total_credit`, `balanced` and `unmapped` — identical to what
-`/generate` posts — so the Voucher Generator page renders the journal 1:1. Any future
-change to voucher composition must be made in the builders, not duplicated.
+JVDR is built by `buildJvdrLines()`. **JVSL** is built by `buildJvslFromSalaryReport()`
+(consuming `computeMonthlySalaryReport()`) in
+[journal-vouchers.js](../../src/routes/accounting/journal-vouchers.js). Both `/preview` and
+`/generate` call the same builders, so the `/preview` response's `lines` (account_code ·
+particulars · debit · credit), `total_debit`, `total_credit`, `balanced` and `unmapped`
+are identical to what `/generate` posts — the Voucher Generator renders the journal 1:1.
+Any future change to JVSL composition must be made in `buildJvslFromSalaryReport()` (and,
+where a component's source changes, in the salary report), never duplicated.
+(The old `buildJvslLines()`/`computeJvslRoundingByLocation()` are superseded.)
 
 ## Data Sources Summary
 
-### Sources of Gross Pay Components
-| Component | Source Table | Condition |
-|-----------|--------------|-----------|
-| Base Salary | `payroll_items` | `pay_type IN ('Base', 'Tambahan')` AND not product-linked |
-| Overtime | `payroll_items` | `pay_type = 'Overtime'` |
-| Product Commission | `payroll_items` | Linked to `product_pay_codes` |
-| Bonus | `commission_records` | `location_code IS NULL` |
-| Commission | `commission_records` | `location_code IS NOT NULL` |
+### JVSL per-location figures (from the Salary Report)
+Every JVSL number comes from `computeMonthlySalaryReport().comprehensive.locations[].totals`:
+`gaji`, `ot`, `bonus`, `comm`, `cuti`, `epf_majikan/pekerja`, `socso_majikan/pekerja`,
+`sip_majikan/pekerja`, `pcb`, `gaji_bersih`, `digenapkan`. See the Salary Report's own
+GAJI/OT/BONUS/COMM/CUTI bucketing rules for how each column is derived from
+`payroll_items` / `commission_records` / `others_records` / `leave_records`.
 
-### Account Mapping Types by Location
-| Location | salary | overtime | bonus | commission_mee | commission_bh |
-|----------|--------|----------|-------|----------------|---------------|
-| 02 (Office) | MBS_O | MBS_O | MBS_O | - | - |
-| 03 (Salesman) | MBS_SMO | MBS_SMO | MS_SM | (product) | (product) |
-| 04 (Ikut Lori) | MBS_ILO | MBS_ILO | - | (product) | (product) |
-| 16-24 (Commission) | MBS_M | - | - | - | - |
+### JVSL account mapping types by department (`location_account_mappings`, voucher `JVSL`)
+| Department (loc) | salary | bonus | overtime | commission_mee | commission_bh | commission_jelly | others | epf/socso/sip_employer |
+|---|---|---|---|---|---|---|---|---|
+| Office (02) | MBS_O | MBS_O | MBS_O | - | - | - | - | MBE_O / MBSC_O / MBSIP_O |
+| Salesman (03) | (unused) | - | - | MS_SM | BS_SM | THJ_CK | - | MBE_SM / MBSC_SM / MBSIP_SM |
+| Ikut Lori (04) | (unused) | - | - | MS_IL | BS_IL | THJ_SM | MBS_ILO | MBE_IL / MBSC_IL / MBSIP_IL |
+| Jaga Boiler (06) | MBS_JB | - | MBS_JB | - | - | - | MBE_JB / MBSC_JB / MBSIP_JB |
+| Mesin & Sangkut Mee (07) | MS_MM | - | MS_MM | - | - | - | ME_MM / MSC_MM / MBSIP_MM |
+| Packing Mee (08) | MS_PM | - | MS_PM | - | - | - | ME_PM / MSC_PM / MBSIP_PM |
+| Mesin & Sangkut Bihun (09+10) | BS_MB | - | BS_MB | - | - | - | BE_MB / BSC_MB / BSIP_MB |
+| Packing Bihun (11) | BS_PB | - | - | - | - | - | BE_PB / BSC_PB / BSIP_PB |
+| Tukang Sapu (13) | MBS_TS | - | MBS_TS | - | - | - | MBE_TS / MBSC_TS / MBSIP_TS |
+| Maintenance (14) | MBS_M | - | MBS_M | - | - | - | MBE_M / MBSC_M / MBSIP_M |
+| Accruals (00) | — | — | — | — | — | — | accrual_salary/epf/socso/sip/pcb → ACW_* |
