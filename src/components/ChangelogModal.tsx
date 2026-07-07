@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-08",
+    ms: "Halaman Daily Machine Plastic Jelly Polly kini menggunakan entri kod bayaran untuk setiap pekerja. Pilih kod yang dipetakan kepada kerja Plastic atau pekerja, masukkan kuantiti dan kadar, kemudian simpan atau kosongkan setiap pekerja secara berasingan. Pilihan shift Day/Night dan lajur tetap 30ml/70ml telah dibuang.",
+    en: "Jelly Polly Daily Machine Plastic now uses pay-code entry for each staff member. Select codes mapped to the Plastic job or the staff member, enter quantity and rate, then save or clear each staff member separately. The Day/Night shift option and fixed 30ml/70ml columns have been removed.",
+  },
+  {
+    date: "2026-07-08",
     ms: "Laporan Trial Balance, Income Statement, Balance Sheet dan CoGM kini menunjukkan angka sebenar daripada rekod jualan, belian, gaji dan bayaran. Butang Panduan (BM/EN) ditambah pada setiap laporan untuk menerangkan dari mana setiap angka datang. Tarikh laporan juga dibetulkan supaya hari terakhir bulan tidak tertinggal.",
     en: "The Trial Balance, Income Statement, Balance Sheet and CoGM reports now show real figures from sales, purchases, payroll and payment records. A Guide button (BM/EN) was added on each report explaining where every amount comes from. Report dates were also fixed so the last day of the month is no longer left out.",
   },

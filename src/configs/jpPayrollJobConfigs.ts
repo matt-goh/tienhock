@@ -58,7 +58,7 @@ export const JP_JOB_TYPES: JPJobTypeInfo[] = [
   {
     id: "PLASTIC",
     label: "Daily Machine Plastic",
-    description: "Daily plastic machine entry (30ml / 70ml cartons)",
+    description: "Daily plastic machine pay-code entry",
   },
   {
     id: "PRODUCTION",
