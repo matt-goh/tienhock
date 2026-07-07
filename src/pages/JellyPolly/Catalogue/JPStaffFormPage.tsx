@@ -151,21 +151,27 @@ const JPStaffFormPage: React.FC = () => {
     { id: "Cheque", name: "Cheque" },
   ];
 
-  const departmentOptions = [
-    { id: "GENERAL WORKER", name: "GENERAL WORKER" },
-    { id: "MAINTENANCE", name: "MAINTENANCE" },
-    { id: "MACHINE OPERATOR", name: "MACHINE OPERATOR" },
-    { id: "SALESMAN", name: "SALESMAN" },
-    { id: "MARKETING", name: "MARKETING" },
-    { id: "DIRECTOR", name: "DIRECTOR" },
-    { id: "LOGISTIC JUNIOR (STOCK)", name: "LOGISTIC JUNIOR (STOCK)" },
-    { id: "STOCK & DATA ENTRY CLERK", name: "STOCK & DATA ENTRY CLERK" },
-    { id: "BOILERMAN", name: "BOILERMAN" },
-    { id: "OPERATION EXECUTIVE", name: "OPERATION EXECUTIVE" },
-    { id: "GENERAL CLERK", name: "GENERAL CLERK" },
-    { id: "ADMIN", name: "ADMIN" },
-    { id: "EXECUTIVE DIRECTOR", name: "EXECUTIVE DIRECTOR" },
-  ];
+  const getDepartmentOptions = (
+    currentDepartment?: string
+  ): SelectOption[] => {
+    const baseOptions: SelectOption[] = options.departments || [];
+    const department: string | undefined = currentDepartment?.trim();
+    if (!department) return baseOptions;
+
+    const hasDepartment: boolean = baseOptions.some(
+      (option) =>
+        option.id === department ||
+        option.name.toLowerCase() === department.toLowerCase()
+    );
+
+    return hasDepartment
+      ? baseOptions
+      : [...baseOptions, { id: department, name: department }];
+  };
+
+  const departmentOptions: SelectOption[] = getDepartmentOptions(
+    formData.department
+  );
 
   // Utility function: Convert display name to option ID
   const mapDisplayNameToId = (
@@ -261,7 +267,10 @@ const JPStaffFormPage: React.FC = () => {
         maritalStatus: data.maritalStatus || "Single",
         spouseEmploymentStatus: data.spouseEmploymentStatus || "",
         numberOfChildren: data.numberOfChildren || 0,
-        department: data.department || "",
+        department: mapDisplayNameToId(
+          data.department,
+          getDepartmentOptions(data.department)
+        ),
         kwspNumber: data.kwspNumber || "",
         epfAgeOverride: data.epfAgeOverride || "auto",
         epfNationalityOverride: data.epfNationalityOverride || "auto",
@@ -313,6 +322,7 @@ const JPStaffFormPage: React.FC = () => {
     options.nationalities,
     options.races,
     options.agama,
+    options.departments,
   ]);
 
   useEffect(() => {
@@ -579,6 +589,7 @@ const JPStaffFormPage: React.FC = () => {
       ),
       race: mapIdToDisplayName(formData.race, options.races),
       agama: mapIdToDisplayName(formData.agama, options.agama),
+      department: mapIdToDisplayName(formData.department, departmentOptions),
       // Handle date fields
       birthdate: formData.birthdate || null,
       dateJoined: formData.dateJoined || null,
