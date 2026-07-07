@@ -16,6 +16,7 @@ import { useStaffFormOptions } from "../../../hooks/useStaffFormOptions";
 import SelectedTagsDisplay from "../../../components/Catalogue/SelectedTagsDisplay";
 import { useJPJobsCache } from "../../../utils/JellyPolly/useJPJobsCache";
 import { useJPStaffsCache } from "../../../utils/JellyPolly/useJPStaffsCache";
+import { useJPLocationMappingsCache } from "../../../utils/JellyPolly/useJPLocationMappingsCache";
 import StaffPayCodesSection from "../../../components/Catalogue/StaffPayCodesSection";
 import { IconUsers, IconUserPlus, IconCrown, IconExternalLink } from "@tabler/icons-react";
 
@@ -114,10 +115,12 @@ const JPStaffFormPage: React.FC = () => {
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [jobQuery, setJobQuery] = useState("");
+  const [locationQuery, setLocationQuery] = useState("");
   const [loading, setLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
   const { options } = useStaffFormOptions();
   const { jobs } = useJPJobsCache();
+  const { locations: jpLocations } = useJPLocationMappingsCache();
   const { refreshStaffs, staffs, loading: loadingStaffs } = useJPStaffsCache();
   const [modifiedFields, setModifiedFields] = useState<Set<string>>(new Set());
 
@@ -522,8 +525,16 @@ const JPStaffFormPage: React.FC = () => {
   };
 
   const handleComboboxChange = useCallback(
-    (name: "job", value: string[] | null) => {
-      if (value === null) return;
+    (name: "job" | "location", value: string[] | null) => {
+      if (value === null) {
+        // Location may be cleared to none; other fields keep their value when
+        // the search input is emptied.
+        if (name === "location") {
+          setFormData((prevData) => ({ ...prevData, location: [] }));
+          setModifiedFields((prev) => new Set(prev).add(name));
+        }
+        return;
+      }
 
       setFormData((prevData) => ({
         ...prevData,
@@ -710,7 +721,7 @@ const JPStaffFormPage: React.FC = () => {
   };
 
   const renderCombobox = (
-    name: "job",
+    name: "job" | "location",
     label: string,
     options: SelectOption[],
     query: string,
@@ -732,11 +743,21 @@ const JPStaffFormPage: React.FC = () => {
         query={query}
         setQuery={setQuery}
       />
-      <SelectedTagsDisplay
-        selectedItems={formData[name] as string[]}
-        label={label}
-        navigable={true}
-      />
+      {name === "location" ? (
+        <SelectedTagsDisplay
+          selectedItems={(formData[name] as string[]).map((locId) => {
+            const locationOption = options.find((opt) => opt.id === locId);
+            return locationOption ? locationOption.name : locId;
+          })}
+          label={label}
+        />
+      ) : (
+        <SelectedTagsDisplay
+          selectedItems={formData[name] as string[]}
+          label={label}
+          navigable={true}
+        />
+      )}
     </div>
   );
 
@@ -979,8 +1000,15 @@ const JPStaffFormPage: React.FC = () => {
                 )}
               </div>
               <div className="space-y-6 mt-5">
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                   {renderCombobox("job", "Job", jobs, jobQuery, setJobQuery)}
+                  {renderCombobox(
+                    "location",
+                    "Location",
+                    jpLocations.map((l) => ({ id: l.id, name: l.name })),
+                    locationQuery,
+                    setLocationQuery
+                  )}
                   {renderInput("dateJoined", "Date Joined", "date")}
                 </div>
                 <StaffPayCodesSection employee={formData} company="jellypolly" />

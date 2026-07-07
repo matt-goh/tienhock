@@ -251,7 +251,11 @@ const StaffAddPage: React.FC = () => {
   const handleComboboxChange = useCallback(
     (name: "job" | "location", value: string[] | null) => {
       if (value === null) {
-        // Do nothing when the input is cleared
+        // Location may be cleared to none; other fields keep their value when
+        // the search input is emptied.
+        if (name === "location") {
+          setFormData((prevData) => ({ ...prevData, location: [] }));
+        }
         return;
       }
       setFormData((prevData) => ({
