@@ -321,7 +321,7 @@ const AccountCodeListPage: React.FC = () => {
                   className="text-default-400 dark:text-gray-400 mr-2 flex-shrink-0"
                 />
               )}
-              <span className="font-mono text-sky-700 dark:text-sky-400 font-medium">
+              <span className="text-sky-700 dark:text-sky-400 font-medium">
                 {node.code}
               </span>
             </div>
@@ -408,7 +408,7 @@ const AccountCodeListPage: React.FC = () => {
         onClick={() => handleEditClick(account)}
       >
         <td className="px-4 py-2 text-sm">
-          <span className="font-mono text-sky-700 dark:text-sky-400 font-medium">
+          <span className="text-sky-700 dark:text-sky-400 font-medium">
             {account.code}
           </span>
         </td>
@@ -424,7 +424,7 @@ const AccountCodeListPage: React.FC = () => {
             "-"
           )}
         </td>
-        <td className="px-4 py-2 text-sm text-default-600 dark:text-gray-300 font-mono">
+        <td className="px-4 py-2 text-sm text-default-600 dark:text-gray-300">
           {account.parent_code || "-"}
         </td>
         <td className="px-4 py-2 text-sm" onClick={(e) => e.stopPropagation()}>

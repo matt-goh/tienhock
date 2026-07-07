@@ -324,7 +324,7 @@ const TrialBalancePage: React.FC = () => {
                       key={account.code}
                       className="hover:bg-gray-50 dark:hover:bg-gray-700/50"
                     >
-                      <td className="px-4 py-3 font-mono text-gray-900 dark:text-white">
+                      <td className="px-4 py-3 text-gray-900 dark:text-white">
                         {account.code}
                       </td>
                       <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
@@ -338,10 +338,10 @@ const TrialBalancePage: React.FC = () => {
                       <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400">
                         {account.fs_note || "-"}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono text-gray-900 dark:text-white">
+                      <td className="px-4 py-3 text-right text-gray-900 dark:text-white">
                         {account.debit > 0 ? formatCurrency(account.debit) : "-"}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono text-gray-900 dark:text-white">
+                      <td className="px-4 py-3 text-right text-gray-900 dark:text-white">
                         {account.credit > 0 ? formatCurrency(account.credit) : "-"}
                       </td>
                     </tr>
@@ -354,10 +354,10 @@ const TrialBalancePage: React.FC = () => {
                   <td colSpan={4} className="px-4 py-3 font-bold text-gray-900 dark:text-white text-right">
                     TOTALS:
                   </td>
-                  <td className="px-4 py-3 text-right font-mono font-bold text-gray-900 dark:text-white">
+                  <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">
                     {formatCurrency(trialBalance.totals.debit)}
                   </td>
-                  <td className="px-4 py-3 text-right font-mono font-bold text-gray-900 dark:text-white">
+                  <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">
                     {formatCurrency(trialBalance.totals.credit)}
                   </td>
                 </tr>
