@@ -271,7 +271,7 @@ const buildDocDefinition = (
     },
     pageSize: "A4",
     pageOrientation: "portrait",
-    pageMargins: [18, 28, 18, 40],
+    pageMargins: [18, 18, 18, 40],
     defaultStyle: { fontSize: 8, lineHeight: 1.15, color: colors.textPrimary },
     footer: (currentPage: number, pageCount: number) => ({
       columns: [
