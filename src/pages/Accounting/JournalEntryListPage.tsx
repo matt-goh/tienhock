@@ -168,7 +168,7 @@ const JournalEntryListPage: React.FC = () => {
 
   // Pagination
   const [page, setPage] = useState(1);
-  const [limit] = useState(20);
+  const [limit] = useState(50);
 
   // Delete dialog
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
