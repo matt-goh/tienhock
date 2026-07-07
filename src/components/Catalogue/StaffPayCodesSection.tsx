@@ -102,7 +102,6 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
   // Initialize with all groups collapsed except employee Base and Tambahan.
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     new Set([
-      "employee-Overtime",
       "job-Base",
       "job-Tambahan",
       "job-Overtime",
