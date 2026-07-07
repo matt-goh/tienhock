@@ -335,6 +335,7 @@ export default function (pool) {
             amount_paid: regularAmount,
             payment_method: payment_method,
             bank_account: bankAccountCode,
+            invoice_paymenttype: invoice.paymenttype,
             payment_reference: payment_reference,
             created_by: req.user?.id || null
           });
@@ -429,6 +430,7 @@ export default function (pool) {
             amount_paid: overpaidAmount,
             payment_method: payment_method,
             bank_account: bankAccountCode,
+            invoice_paymenttype: invoice.paymenttype,
             payment_reference: payment_reference,
             created_by: req.user?.id || null
           });
@@ -600,6 +602,7 @@ export default function (pool) {
             amount_paid: paidAmount,
             payment_method: confirmedPaymentData.payment_method,
             bank_account: confirmedPaymentData.bank_account || 'BANK_PBB',
+            invoice_paymenttype: paymenttype,
             payment_reference: confirmedPaymentData.payment_reference,
             created_by: req.user?.id || null
           });
@@ -622,6 +625,7 @@ export default function (pool) {
             amount_paid: paidAmount,
             payment_method: confirmedPaymentData.payment_method,
             bank_account: confirmedPaymentData.bank_account || 'BANK_PBB',
+            invoice_paymenttype: paymenttype,
             payment_reference: confirmedPaymentData.payment_reference,
             created_by: req.user?.id || null
           });

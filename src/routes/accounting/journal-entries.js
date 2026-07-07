@@ -571,7 +571,7 @@ export default function (pool) {
       // Manually-keyed entries stay editable while active. System-generated journals
       // (receipts, purchases, payroll vouchers/payments…) are owned by their source
       // record — correct those by cancelling/regenerating from the source screen.
-      const SYSTEM_ENTRY_TYPES = ["REC", "PUR", "GP", "PAY", "CN", "JVDR", "JVSL"];
+      const SYSTEM_ENTRY_TYPES = ["REC", "PUR", "GP", "PAY", "CN", "JVDR", "JVSL", "S"];
       const isSystemGenerated =
         SYSTEM_ENTRY_TYPES.includes(existing.entry_type) ||
         (existing.entry_type === "B" &&
