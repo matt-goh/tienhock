@@ -34,6 +34,7 @@ import jobRouter from "./catalogue/jobs.js";
 import nationalitiesRouter from "./catalogue/entities/nationalities.js";
 import locationsRouter from "./catalogue/entities/locations.js";
 import sectionsRouter from "./catalogue/entities/sections.js";
+import departmentsRouter from "./catalogue/entities/departments.js";
 import banksRouter from "./catalogue/entities/banks.js";
 import racesRouter from "./catalogue/entities/races.js";
 import agamaRouter from "./catalogue/entities/agama.js";
@@ -412,6 +413,7 @@ export default function setupRoutes(app, pool) {
 
   // Catalogue - Entity routes
   app.use("/api/sections", sectionsRouter(pool));
+  app.use("/api/departments", departmentsRouter(pool));
   app.use("/api/locations", locationsRouter(pool));
   app.use("/api/banks", banksRouter(pool));
   app.use("/api/nationalities", nationalitiesRouter(pool));

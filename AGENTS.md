@@ -60,7 +60,7 @@ This is a comprehensive ERP system supporting three companies:
 - Maintenance mode support for database operations
 - Environment variables for database configuration
 
-#### Database Schema (77 tables)
+#### Database Schema (78 tables)
 
 **Accounting & Finance:**
 
@@ -178,6 +178,7 @@ This is a comprehensive ERP system supporting three companies:
 
 - `agama` - id, name
 - `banks` - id, name
+- `departments` - id, name (shared staff department lookup used by Tien Hock and Jelly Polly staff forms)
 - `nationalities` - id, name
 - `races` - id, name
 

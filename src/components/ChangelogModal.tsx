@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-07",
+    ms: "Senarai jabatan pekerja kini boleh diurus dari Catalogue -> Others. Borang pekerja Tien Hock dan Jelly Polly menggunakan senarai jabatan yang sama, termasuk pilihan baharu DRIVER HABUK.",
+    en: "Staff departments can now be managed from Catalogue -> Others. Tien Hock and Jelly Polly staff forms use the same shared department list, including the new DRIVER HABUK option.",
+  },
+  {
+    date: "2026-07-07",
     ms: "Setiap bil jualan Tien Hock (bil tunai dan invois kredit) kini direkodkan secara automatik ke dalam sistem perakaunan. Anda boleh mencetak lejar akaun CASH SALES dan CREDIT SALES dari Perakaunan → Laporan → Account Ledger untuk melihat semua sumber jualan dalam satu dokumen, seperti lejar lama. Duit tunai yang diterima kini masuk ke akaun terima tunai yang betul (jualan tunai hari itu berbanding bayaran hutang lama). Apabila jumlah sesuatu bil tunai diubah, catatan perakaunannya turut dikemas kini automatik. Jualan lama dari 1 Jun 2026 telah dimasukkan.",
     en: "Every Tien Hock sales bill (cash bills and credit invoices) is now recorded automatically into the accounting system. You can print the CASH SALES and CREDIT SALES account ledgers from Accounting → Reports → Account Ledger to see all sources of sales in one document, just like the old ledger. Cash received now lands in the correct cash-received accounts (same-day cash sales vs. payment of old bills). When a cash bill's amount is edited, its accounting entry updates automatically too. Existing sales from 1 June 2026 have been backfilled.",
   },

@@ -9,6 +9,7 @@ interface FormOptions {
   locations: SelectOption[];
   banks: SelectOption[];
   sections?: SelectOption[];
+  departments: SelectOption[];
 }
 
 interface SelectOption {
@@ -17,9 +18,24 @@ interface SelectOption {
 }
 
 interface CacheData {
-  options: FormOptions;
+  options: Partial<FormOptions>;
   timestamp: number;
+  version?: number;
 }
+
+const CACHE_VERSION: number = 2;
+const CACHE_KEY: string = "staffFormOptionsData";
+const CACHE_DURATION: number = 24 * 60 * 60 * 1000; // 1 day in milliseconds
+
+const normalizeOptions = (data: Partial<FormOptions>): FormOptions => ({
+  nationalities: data.nationalities || [],
+  races: data.races || [],
+  agama: data.agama || [],
+  locations: data.locations || [],
+  banks: data.banks || [],
+  sections: data.sections || [],
+  departments: data.departments || [],
+});
 
 export const useStaffFormOptions = () => {
   const [options, setOptions] = useState<FormOptions>({
@@ -29,12 +45,10 @@ export const useStaffFormOptions = () => {
     locations: [],
     banks: [],
     sections: [],
+    departments: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-
-  const CACHE_KEY = "staffFormOptionsData";
-  const CACHE_DURATION = 24 * 60 * 60 * 1000; // 1 day in milliseconds
 
   const fetchOptions = useCallback(async (force = false) => {
     // Try to load from cache first
@@ -45,8 +59,11 @@ export const useStaffFormOptions = () => {
           const parsedData = JSON.parse(cachedData) as CacheData;
           const now = Date.now();
 
-          if (now - parsedData.timestamp < CACHE_DURATION) {
-            setOptions(parsedData.options);
+          if (
+            parsedData.version === CACHE_VERSION &&
+            now - parsedData.timestamp < CACHE_DURATION
+          ) {
+            setOptions(normalizeOptions(parsedData.options));
             setLoading(false);
             return;
           }
@@ -61,13 +78,15 @@ export const useStaffFormOptions = () => {
       const response = await api.get("/api/staff-options");
 
       if (response) {
-        setOptions(response);
+        const normalizedOptions = normalizeOptions(response);
+        setOptions(normalizedOptions);
 
         // Cache the data
         try {
           const cacheData: CacheData = {
-            options: response,
+            options: normalizedOptions,
             timestamp: Date.now(),
+            version: CACHE_VERSION,
           };
           localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
         } catch (err) {
