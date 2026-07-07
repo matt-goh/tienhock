@@ -208,7 +208,11 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
         />
         <button
           type="button"
-          onClick={() => !disabled && setIsOpen(!isOpen)}
+          onClick={() => {
+            if (disabled) return;
+            setIsOpen(!isOpen);
+            inputRef.current?.focus();
+          }}
           disabled={disabled}
           className="px-1 text-default-400 dark:text-gray-500 hover:text-default-600 dark:hover:text-gray-300 disabled:cursor-not-allowed"
         >
