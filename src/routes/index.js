@@ -131,6 +131,8 @@ import jellypollyPayRateSchedulesRouter from "./jellypolly/pay-rate-schedules.js
 import jellypollyProductPayCodesRouter from "./jellypolly/product-pay-codes.js";
 import jellypollyLeaveManagementRouter from "./jellypolly/leave-management.js";
 import jellypollyProductionEntriesRouter from "./jellypolly/production-entries.js";
+import jellypollyLocationsRouter from "./jellypolly/locations.js";
+import jellypollyJobLocationMappingsRouter from "./jellypolly/job-location-mappings.js";
 
 // Excel routes
 import paymentExportRouter from "./excel/payment-export.js";
@@ -373,6 +375,11 @@ export default function setupRoutes(app, pool) {
   app.use("/jellypolly/api/jobs", jellypollyJobsRouter(pool));
   app.use("/jellypolly/api/pay-codes", jellypollyPayCodesRouter(pool));
   app.use("/jellypolly/api/job-pay-codes", jellypollyJobPayCodesRouter(pool));
+  app.use("/jellypolly/api/locations", jellypollyLocationsRouter(pool));
+  app.use(
+    "/jellypolly/api/job-location-mappings",
+    jellypollyJobLocationMappingsRouter(pool)
+  );
   app.use(
     "/jellypolly/api/employee-pay-codes",
     jellypollyEmployeePayCodesRouter(pool)

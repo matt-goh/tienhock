@@ -1,4 +1,7 @@
-// src/pages/Catalogue/LocationPage.tsx
+// src/pages/JellyPolly/Catalogue/JPLocationPage.tsx
+// Jelly Polly clone of src/pages/Catalogue/LocationPage.tsx on the JP catalogue
+// (/jellypolly/api endpoints + JP cache hooks). JP has no journal vouchers, so
+// there are no account-mapping dependencies.
 import React, { useState, useMemo, useCallback } from "react";
 import {
   IconPlus,
@@ -9,17 +12,19 @@ import {
   IconHelp,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
-import { api } from "../../routes/utils/api";
+import { api } from "../../../routes/utils/api";
 import {
-  useLocationMappingsCache,
+  useJPLocationMappingsCache,
   Location,
-} from "../../utils/catalogue/useLocationMappingsCache";
-import LoadingSpinner from "../../components/LoadingSpinner";
-import Button from "../../components/Button";
-import ConfirmationDialog from "../../components/ConfirmationDialog";
-import LocationModal from "../../components/Catalogue/LocationModal";
-import { useJobsCache } from "../../utils/catalogue/useJobsCache";
-import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
+} from "../../../utils/JellyPolly/useJPLocationMappingsCache";
+import { useJPJobsCache } from "../../../utils/JellyPolly/useJPJobsCache";
+import { useJPStaffsCache } from "../../../utils/JellyPolly/useJPStaffsCache";
+import LoadingSpinner from "../../../components/LoadingSpinner";
+import Button from "../../../components/Button";
+import ConfirmationDialog from "../../../components/ConfirmationDialog";
+import LocationModal from "../../../components/Catalogue/LocationModal";
+
+const JP_API_BASE = "/jellypolly/api";
 
 interface JobMapping {
   job_id: string;
@@ -46,7 +51,7 @@ interface DependencyInfo {
   staffs: Array<{ id: string; name: string }>;
 }
 
-const LocationPage: React.FC = () => {
+const JPLocationPage: React.FC = () => {
   // Use cached location mappings
   const {
     locations,
@@ -55,10 +60,10 @@ const LocationPage: React.FC = () => {
     loading: isLoading,
     error,
     refreshData,
-  } = useLocationMappingsCache();
+  } = useJPLocationMappingsCache();
 
-  const { jobs } = useJobsCache();
-  const { staffs } = useStaffsCache();
+  const { jobs } = useJPJobsCache();
+  const { staffs } = useJPStaffsCache();
 
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -140,7 +145,9 @@ const LocationPage: React.FC = () => {
     setDependencyInfo(null);
 
     try {
-      const response = await api.get(`/api/locations/${location.id}/dependencies`);
+      const response = await api.get(
+        `${JP_API_BASE}/locations/${location.id}/dependencies`
+      );
       setDependencyInfo(response);
     } catch (err) {
       console.error("Error checking dependencies:", err);
@@ -167,14 +174,17 @@ const LocationPage: React.FC = () => {
 
       try {
         if (isEditing) {
-          await api.put(`/api/locations/${locationData.originalId}`, {
+          await api.put(`${JP_API_BASE}/locations/${locationData.originalId}`, {
             id: locationData.id,
             name: locationData.name,
-            newId: locationData.id !== locationData.originalId ? locationData.id : undefined,
+            newId:
+              locationData.id !== locationData.originalId
+                ? locationData.id
+                : undefined,
           });
           toast.success("Location updated successfully");
         } else {
-          await api.post("/api/locations", locationData);
+          await api.post(`${JP_API_BASE}/locations`, locationData);
           toast.success("Location created successfully");
         }
         // Don't refresh here - let onComplete handle it after modal closes
@@ -196,7 +206,7 @@ const LocationPage: React.FC = () => {
     }
 
     try {
-      await api.delete("/api/locations", [locationToDelete.id]);
+      await api.delete(`${JP_API_BASE}/locations`, [locationToDelete.id]);
       toast.success("Location deleted successfully");
       setShowDeleteDialog(false);
       setLocationToDelete(null);
@@ -247,7 +257,9 @@ const LocationPage: React.FC = () => {
             <div className="absolute left-0 top-full mt-2 w-72 p-3 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
               <p className="font-medium mb-1">Location Management</p>
               <p className="text-gray-300 dark:text-gray-200">
-                Locations organize payroll data in salary reports. Edit a location to assign jobs to it. Mapped jobs appear under the correct location in salary reports and journal vouchers.
+                Locations organize payroll data in salary reports. Edit a
+                location to assign jobs and employees to it. Mapped jobs and
+                employees appear under the correct location in salary reports.
               </p>
               <div className="absolute -top-1.5 left-2 w-3 h-3 bg-gray-900 dark:bg-gray-700 rotate-45"></div>
             </div>
@@ -429,11 +441,17 @@ const LocationPage: React.FC = () => {
         }}
         initialData={locationToEdit}
         existingLocations={locations}
-        initialJobMappings={locationToEdit ? (locationToEdit as LocationWithMappings).jobs : []}
-        initialEmployeeMappings={locationToEdit ? (locationToEdit as LocationWithMappings).employees : []}
+        initialJobMappings={
+          locationToEdit ? (locationToEdit as LocationWithMappings).jobs : []
+        }
+        initialEmployeeMappings={
+          locationToEdit
+            ? (locationToEdit as LocationWithMappings).employees
+            : []
+        }
         jobs={jobs.map((j) => ({ id: j.id, name: j.name }))}
         staffs={staffs.map((s) => ({ id: s.id, name: s.name }))}
-        apiBase="/api"
+        apiBase={JP_API_BASE}
       />
 
       {/* Delete Confirmation */}
@@ -453,7 +471,11 @@ const LocationPage: React.FC = () => {
               }
             : handleConfirmDelete
         }
-        title={dependencyInfo?.hasDependencies ? "Cannot Delete Location" : "Delete Location"}
+        title={
+          dependencyInfo?.hasDependencies
+            ? "Cannot Delete Location"
+            : "Delete Location"
+        }
         message={
           isCheckingDependencies ? (
             <div className="flex items-center gap-2">
@@ -471,8 +493,12 @@ const LocationPage: React.FC = () => {
                     Jobs ({dependencyInfo.jobs.length}):
                   </span>{" "}
                   <span className="text-default-600 dark:text-gray-400">
-                    {dependencyInfo.jobs.slice(0, 3).map(j => j.job_name).join(", ")}
-                    {dependencyInfo.jobs.length > 3 && ` +${dependencyInfo.jobs.length - 3} more`}
+                    {dependencyInfo.jobs
+                      .slice(0, 3)
+                      .map((j) => j.job_name)
+                      .join(", ")}
+                    {dependencyInfo.jobs.length > 3 &&
+                      ` +${dependencyInfo.jobs.length - 3} more`}
                   </span>
                 </div>
               )}
@@ -482,18 +508,12 @@ const LocationPage: React.FC = () => {
                     Staff ({dependencyInfo.staffs.length}):
                   </span>{" "}
                   <span className="text-default-600 dark:text-gray-400">
-                    {dependencyInfo.staffs.slice(0, 3).map(s => s.name).join(", ")}
-                    {dependencyInfo.staffs.length > 3 && ` +${dependencyInfo.staffs.length - 3} more`}
-                  </span>
-                </div>
-              )}
-              {dependencyInfo.accounts.length > 0 && (
-                <div className="text-sm">
-                  <span className="font-medium text-default-700 dark:text-gray-200">
-                    Account Mappings:
-                  </span>{" "}
-                  <span className="text-default-600 dark:text-gray-400">
-                    {dependencyInfo.accounts.length}
+                    {dependencyInfo.staffs
+                      .slice(0, 3)
+                      .map((s) => s.name)
+                      .join(", ")}
+                    {dependencyInfo.staffs.length > 3 &&
+                      ` +${dependencyInfo.staffs.length - 3} more`}
                   </span>
                 </div>
               )}
@@ -513,4 +533,4 @@ const LocationPage: React.FC = () => {
   );
 };
 
-export default LocationPage;
+export default JPLocationPage;
