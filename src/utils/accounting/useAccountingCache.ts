@@ -31,6 +31,24 @@ interface AccountCodesCache {
   timestamp: number;
 }
 
+interface PaginatedAccountCodesResponse {
+  data: AccountCode[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+type AccountCodesResponse = AccountCode[] | PaginatedAccountCodesResponse;
+
+const unwrapAccountCodesResponse = (
+  response: AccountCodesResponse
+): AccountCode[] => {
+  return Array.isArray(response) ? response : response.data;
+};
+
 /**
  * Refresh account codes cache globally
  */
@@ -38,7 +56,8 @@ export const refreshAccountCodesCache = async (): Promise<AccountCode[]> => {
   try {
     localStorage.removeItem(CACHE_KEYS.ACCOUNT_CODES);
 
-    const data = await api.get("/api/account-codes?flat=true") as AccountCode[];
+    const response = await api.get("/api/account-codes?flat=true") as AccountCodesResponse;
+    const data = unwrapAccountCodesResponse(response);
 
     const cacheData: AccountCodesCache = {
       data,
@@ -91,7 +110,8 @@ export const useAccountCodesCache = () => {
         }
       }
 
-      const data = await api.get("/api/account-codes?flat=true") as AccountCode[];
+      const response = await api.get("/api/account-codes?flat=true") as AccountCodesResponse;
+      const data = unwrapAccountCodesResponse(response);
 
       const cacheData: AccountCodesCache = {
         data,

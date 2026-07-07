@@ -5,6 +5,7 @@ import {
   IconPlus,
   IconPencil,
   IconTrash,
+  IconChevronLeft,
   IconChevronRight,
   IconChevronDown,
   IconCheck,
@@ -43,6 +44,15 @@ interface AccountTreeNode extends AccountCode {
   children: AccountTreeNode[];
   isExpanded?: boolean;
 }
+
+interface VisibleTreeRow {
+  node: AccountTreeNode;
+  depth: number;
+}
+
+type PaginationPageItem = number | "ellipsis";
+
+const ACCOUNT_CODES_PAGE_SIZE = 100;
 
 const AccountCodeListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -85,6 +95,7 @@ const AccountCodeListPage: React.FC = () => {
   const [selectedLedgerType, setSelectedLedgerType] = useState<string>("All");
   const [showInactive, setShowInactive] = useState(false);
   const [viewMode, setViewMode] = useState<"tree" | "flat">("tree");
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
   // Delete dialog
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -185,6 +196,100 @@ const AccountCodeListPage: React.FC = () => {
     return filterTree(accountCodes);
   }, [accountCodes, filteredAccounts, searchTerm, selectedLedgerType, showInactive]);
 
+  const visibleTreeRows = useMemo((): VisibleTreeRow[] => {
+    const rows: VisibleTreeRow[] = [];
+
+    const appendVisibleRows = (
+      nodes: AccountTreeNode[],
+      depth: number
+    ): void => {
+      nodes.forEach((node: AccountTreeNode) => {
+        rows.push({ node, depth });
+
+        if (node.children.length > 0 && expandedNodes.has(node.code)) {
+          appendVisibleRows(node.children, depth + 1);
+        }
+      });
+    };
+
+    appendVisibleRows(filteredTree, 0);
+    return rows;
+  }, [filteredTree, expandedNodes]);
+
+  const totalDisplayItems: number =
+    viewMode === "tree" ? visibleTreeRows.length : filteredAccounts.length;
+  const totalPages: number = Math.max(
+    1,
+    Math.ceil(totalDisplayItems / ACCOUNT_CODES_PAGE_SIZE)
+  );
+  const effectiveCurrentPage: number = Math.min(currentPage, totalPages);
+  const pageStartIndex: number =
+    (effectiveCurrentPage - 1) * ACCOUNT_CODES_PAGE_SIZE;
+  const pageEndIndex: number = Math.min(
+    pageStartIndex + ACCOUNT_CODES_PAGE_SIZE,
+    totalDisplayItems
+  );
+  const pageStartDisplay: number =
+    totalDisplayItems > 0 ? pageStartIndex + 1 : 0;
+
+  const paginatedTreeRows = useMemo((): VisibleTreeRow[] => {
+    return visibleTreeRows.slice(pageStartIndex, pageEndIndex);
+  }, [visibleTreeRows, pageStartIndex, pageEndIndex]);
+
+  const paginatedFlatAccounts = useMemo((): AccountCode[] => {
+    return filteredAccounts.slice(pageStartIndex, pageEndIndex);
+  }, [filteredAccounts, pageStartIndex, pageEndIndex]);
+
+  const paginationPageItems = useMemo((): PaginationPageItem[] => {
+    const maxVisiblePages: number = 5;
+    const pageItems: PaginationPageItem[] = [];
+
+    if (totalPages <= maxVisiblePages) {
+      for (let pageNumber = 1; pageNumber <= totalPages; pageNumber++) {
+        pageItems.push(pageNumber);
+      }
+      return pageItems;
+    }
+
+    pageItems.push(1);
+
+    const middleStart: number = Math.max(2, effectiveCurrentPage - 1);
+    const middleEnd: number = Math.min(
+      totalPages - 1,
+      effectiveCurrentPage + 1
+    );
+
+    if (middleStart > 2) {
+      pageItems.push("ellipsis");
+    }
+
+    for (let pageNumber = middleStart; pageNumber <= middleEnd; pageNumber++) {
+      pageItems.push(pageNumber);
+    }
+
+    if (middleEnd < totalPages - 1) {
+      pageItems.push("ellipsis");
+    }
+
+    pageItems.push(totalPages);
+    return pageItems;
+  }, [effectiveCurrentPage, totalPages]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedLedgerType, showInactive, viewMode]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const handlePageChange = (page: number): void => {
+    const nextPage: number = Math.min(Math.max(page, 1), totalPages);
+    setCurrentPage(nextPage);
+  };
+
   // Toggle node expansion
   const toggleExpand = (code: string) => {
     setExpandedNodes((prev) => {
@@ -264,136 +369,130 @@ const AccountCodeListPage: React.FC = () => {
     }
   };
 
-  // Render tree node
-  const renderTreeNode = (
+  // Render tree row
+  const renderTreeRow = (
     node: AccountTreeNode,
-    depth: number = 0
+    depth: number
   ): React.ReactNode => {
-    const hasChildren = node.children.length > 0;
-    const isExpanded = expandedNodes.has(node.code);
-    const paddingLeft = depth * 24 + 8;
+    const hasChildren: boolean = node.children.length > 0;
+    const isExpanded: boolean = expandedNodes.has(node.code);
+    const paddingLeft: number = depth * 24 + 8;
 
     return (
-      <React.Fragment key={node.code}>
-        <tr
-          className={`hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer ${
-            !node.is_active ? "opacity-50" : ""
-          }`}
-          onClick={() => handleEditClick(node)}
+      <tr
+        key={node.code}
+        className={`hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer ${
+          !node.is_active ? "opacity-50" : ""
+        }`}
+        onClick={() => handleEditClick(node)}
+      >
+        <td
+          className="px-2 py-2 text-sm"
+          style={{ paddingLeft: `${paddingLeft}px` }}
         >
-          <td
-            className="px-2 py-2 text-sm"
-            style={{ paddingLeft: `${paddingLeft}px` }}
-          >
-            <div className="flex items-center">
-              {hasChildren ? (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleExpand(node.code);
-                  }}
-                  className="p-1 hover:bg-default-200 dark:hover:bg-gray-600 rounded mr-1"
-                >
-                  {isExpanded ? (
-                    <IconChevronDown size={16} />
-                  ) : (
-                    <IconChevronRight size={16} />
-                  )}
-                </button>
-              ) : (
-                <span className="w-7" />
-              )}
-              {hasChildren ? (
-                isExpanded ? (
-                  <IconFolderOpen
-                    size={18}
-                    className="text-amber-500 dark:text-amber-400 mr-2 flex-shrink-0"
-                  />
-                ) : (
-                  <IconFolder
-                    size={18}
-                    className="text-amber-500 dark:text-amber-400 mr-2 flex-shrink-0"
-                  />
-                )
-              ) : (
-                <IconFile
-                  size={18}
-                  className="text-default-400 dark:text-gray-400 mr-2 flex-shrink-0"
-                />
-              )}
-              <span className="text-sky-700 dark:text-sky-400 font-medium">
-                {node.code}
-              </span>
-            </div>
-          </td>
-          <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-200">
-            {node.description}
-          </td>
-          <td className="px-4 py-2 text-sm text-default-600 dark:text-gray-300">
-            {node.ledger_type ? (
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-default-100 dark:bg-gray-700 text-default-700 dark:text-gray-200">
-                {node.ledger_type}
-              </span>
-            ) : (
-              "-"
-            )}
-          </td>
-          <td className="px-4 py-2 text-sm" onClick={(e) => e.stopPropagation()}>
-            <select
-              value={node.fs_note || ""}
-              onChange={(e) => handleFsNoteChange(node.code, e.target.value || null)}
-              className="w-full text-xs border border-default-200 dark:border-gray-600 rounded px-1.5 py-1 bg-white dark:bg-gray-700 text-default-700 dark:text-gray-200 focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
-              title={node.fs_note ? fsNotes.find(n => n.code === node.fs_note)?.name : "No note assigned"}
-            >
-              <option value="">-</option>
-              {fsNotes.map((note) => (
-                <option key={note.code} value={note.code}>
-                  {note.code} - {note.name.substring(0, 20)}{note.name.length > 20 ? "..." : ""}
-                </option>
-              ))}
-            </select>
-          </td>
-          <td className="px-4 py-2 text-center text-sm">
-            <span
-              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                node.is_active
-                  ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
-                  : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
-              }`}
-            >
-              {node.is_active ? "Active" : "Inactive"}
-            </span>
-          </td>
-          <td className="px-4 py-2 text-center text-sm">
-            <div className="flex items-center justify-center space-x-2">
+          <div className="flex items-center">
+            {hasChildren ? (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleEditClick(node);
+                  toggleExpand(node.code);
                 }}
-                className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
-                title="Edit"
+                className="p-1 hover:bg-default-200 dark:hover:bg-gray-600 rounded mr-1"
               >
-                <IconPencil size={18} />
+                {isExpanded ? (
+                  <IconChevronDown size={16} />
+                ) : (
+                  <IconChevronRight size={16} />
+                )}
               </button>
-              {!node.is_system && (
-                <button
-                  onClick={(e) => handleDeleteClick(node, e)}
-                  className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
-                  title="Delete"
-                >
-                  <IconTrash size={18} />
-                </button>
-              )}
-            </div>
-          </td>
-        </tr>
-        {hasChildren && isExpanded && (
-          <>
-            {node.children.map((child) => renderTreeNode(child, depth + 1))}
-          </>
-        )}
-      </React.Fragment>
+            ) : (
+              <span className="w-7" />
+            )}
+            {hasChildren ? (
+              isExpanded ? (
+                <IconFolderOpen
+                  size={18}
+                  className="text-amber-500 dark:text-amber-400 mr-2 flex-shrink-0"
+                />
+              ) : (
+                <IconFolder
+                  size={18}
+                  className="text-amber-500 dark:text-amber-400 mr-2 flex-shrink-0"
+                />
+              )
+            ) : (
+              <IconFile
+                size={18}
+                className="text-default-400 dark:text-gray-400 mr-2 flex-shrink-0"
+              />
+            )}
+            <span className="text-sky-700 dark:text-sky-400 font-medium">
+              {node.code}
+            </span>
+          </div>
+        </td>
+        <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-200">
+          {node.description}
+        </td>
+        <td className="px-4 py-2 text-sm text-default-600 dark:text-gray-300">
+          {node.ledger_type ? (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-default-100 dark:bg-gray-700 text-default-700 dark:text-gray-200">
+              {node.ledger_type}
+            </span>
+          ) : (
+            "-"
+          )}
+        </td>
+        <td className="px-4 py-2 text-sm" onClick={(e) => e.stopPropagation()}>
+          <select
+            value={node.fs_note || ""}
+            onChange={(e) => handleFsNoteChange(node.code, e.target.value || null)}
+            className="w-full text-xs border border-default-200 dark:border-gray-600 rounded px-1.5 py-1 bg-white dark:bg-gray-700 text-default-700 dark:text-gray-200 focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+            title={node.fs_note ? fsNotes.find(n => n.code === node.fs_note)?.name : "No note assigned"}
+          >
+            <option value="">-</option>
+            {fsNotes.map((note) => (
+              <option key={note.code} value={note.code}>
+                {note.code} - {note.name.substring(0, 20)}{note.name.length > 20 ? "..." : ""}
+              </option>
+            ))}
+          </select>
+        </td>
+        <td className="px-4 py-2 text-center text-sm">
+          <span
+            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+              node.is_active
+                ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
+            }`}
+          >
+            {node.is_active ? "Active" : "Inactive"}
+          </span>
+        </td>
+        <td className="px-4 py-2 text-center text-sm">
+          <div className="flex items-center justify-center space-x-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEditClick(node);
+              }}
+              className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
+              title="Edit"
+            >
+              <IconPencil size={18} />
+            </button>
+            {!node.is_system && (
+              <button
+                onClick={(e) => handleDeleteClick(node, e)}
+                className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
+                title="Delete"
+              >
+                <IconTrash size={18} />
+              </button>
+            )}
+          </div>
+        </td>
+      </tr>
     );
   };
 
@@ -692,43 +791,61 @@ const AccountCodeListPage: React.FC = () => {
           <LoadingSpinner />
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
-          <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
-            <thead className="bg-default-100 dark:bg-gray-800">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 min-w-[200px]">
-                  Code
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
-                  Description
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-28">
-                  Type
-                </th>
-                {viewMode === "flat" && (
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-32">
-                    Parent
+        <>
+          <div className="overflow-x-auto rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+            <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+              <thead className="bg-default-100 dark:bg-gray-800">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 min-w-[200px]">
+                    Code
                   </th>
-                )}
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-40">
-                  FS Note
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-24">
-                  Status
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-24">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-default-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
-              {viewMode === "tree" ? (
-                filteredTree.length > 0 ? (
-                  filteredTree.map((node) => renderTreeNode(node, 0))
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
+                    Description
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-28">
+                    Type
+                  </th>
+                  {viewMode === "flat" && (
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-32">
+                      Parent
+                    </th>
+                  )}
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-40">
+                    FS Note
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-24">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-24">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-default-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
+                {viewMode === "tree" ? (
+                  paginatedTreeRows.length > 0 ? (
+                    paginatedTreeRows.map(({ node, depth }) =>
+                      renderTreeRow(node, depth)
+                    )
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400"
+                      >
+                        No account codes found.{" "}
+                        {searchTerm || selectedLedgerType !== "All"
+                          ? "Try adjusting your filters."
+                          : "Create one to get started."}
+                      </td>
+                    </tr>
+                  )
+                ) : paginatedFlatAccounts.length > 0 ? (
+                  paginatedFlatAccounts.map((account) => renderFlatRow(account))
                 ) : (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                     >
                       No account codes found.{" "}
@@ -737,25 +854,84 @@ const AccountCodeListPage: React.FC = () => {
                         : "Create one to get started."}
                     </td>
                   </tr>
-                )
-              ) : filteredAccounts.length > 0 ? (
-                filteredAccounts.map((account) => renderFlatRow(account))
-              ) : (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400"
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {totalDisplayItems > 0 && (
+            <div className="flex flex-col items-start justify-between gap-3 text-sm text-default-600 dark:text-gray-400 md:flex-row md:items-center">
+              <p>
+                Showing{" "}
+                <span className="font-medium text-default-900 dark:text-gray-100">
+                  {pageStartDisplay}
+                </span>{" "}
+                to{" "}
+                <span className="font-medium text-default-900 dark:text-gray-100">
+                  {pageEndIndex}
+                </span>{" "}
+                of{" "}
+                <span className="font-medium text-default-900 dark:text-gray-100">
+                  {totalDisplayItems}
+                </span>{" "}
+                {viewMode === "tree" ? "visible rows" : "accounts"}
+              </p>
+
+              {totalPages > 1 && (
+                <nav
+                  className="flex items-center gap-1"
+                  aria-label="Account code pagination"
+                >
+                  <button
+                    onClick={() => handlePageChange(effectiveCurrentPage - 1)}
+                    disabled={effectiveCurrentPage === 1}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-default-300 bg-white text-default-700 transition-colors hover:bg-default-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                    title="Previous page"
+                    aria-label="Previous page"
                   >
-                    No account codes found.{" "}
-                    {searchTerm || selectedLedgerType !== "All"
-                      ? "Try adjusting your filters."
-                      : "Create one to get started."}
-                  </td>
-                </tr>
+                    <IconChevronLeft size={18} />
+                  </button>
+
+                  {paginationPageItems.map((pageItem, index) =>
+                    pageItem === "ellipsis" ? (
+                      <span
+                        key={`${pageItem}-${index}`}
+                        className="inline-flex h-9 w-9 items-center justify-center text-default-500 dark:text-gray-500"
+                      >
+                        ...
+                      </span>
+                    ) : (
+                      <button
+                        key={pageItem}
+                        onClick={() => handlePageChange(pageItem)}
+                        className={`inline-flex h-9 min-w-[2.25rem] items-center justify-center rounded-full px-3 text-sm font-medium transition-colors ${
+                          pageItem === effectiveCurrentPage
+                            ? "bg-sky-600 text-white"
+                            : "border border-default-300 bg-white text-default-700 hover:bg-default-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                        }`}
+                        aria-current={
+                          pageItem === effectiveCurrentPage ? "page" : undefined
+                        }
+                      >
+                        {pageItem}
+                      </button>
+                    )
+                  )}
+
+                  <button
+                    onClick={() => handlePageChange(effectiveCurrentPage + 1)}
+                    disabled={effectiveCurrentPage === totalPages}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-default-300 bg-white text-default-700 transition-colors hover:bg-default-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                    title="Next page"
+                    aria-label="Next page"
+                  >
+                    <IconChevronRight size={18} />
+                  </button>
+                </nav>
               )}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Delete Confirmation Dialog */}
