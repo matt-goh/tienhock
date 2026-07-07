@@ -1,6 +1,6 @@
 // src/pages/JellyPolly/Payroll/JPSalaryReportPage.tsx
-// Jelly Polly Salary Report. Monthly + annual views grouped by JP job type —
-// JP has no locations. Reuses the shared TH PDF generator.
+// Jelly Polly Salary Report. Monthly + annual views grouped by location
+// (jellypolly.locations). Reuses the shared TH PDF generator.
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { IconRefresh, IconPrinter, IconDownload } from "@tabler/icons-react";
 import Button from "../../../components/Button";
@@ -12,20 +12,12 @@ import { generateSalaryReportPDF } from "../../../utils/payroll/SalaryReportPDF"
 import toast from "react-hot-toast";
 
 const JP_COMPANY = "JELLY POLLY";
-const LOCATION_MAP: Record<string, string> = {
-  OFFICE: "Office",
-  MAINTENANCE: "Maintenance",
-  SALESMAN: "Salesman",
-  SALESMAN_IKUT: "Salesman Ikut",
-  ICE_POLLY: "Ice-Polly Machine",
-  JELLY_CUP: "Jelly Cup Machine",
-  PLASTIC: "Plastic Machine",
-  PRODUCTION: "Production",
-};
-const LOCATION_ORDER = Object.keys(LOCATION_MAP).map((id) => ({
-  type: "location" as const,
-  id,
-}));
+
+// Build the PDF's locationOrder from a location_map (codes sorted ascending).
+const buildLocationOrder = (map: Record<string, string>) =>
+  Object.keys(map)
+    .sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0))
+    .map((id) => ({ type: "location" as const, id }));
 
 interface Totals {
   gaji: number;
@@ -63,12 +55,14 @@ interface Comprehensive {
   month: number;
   locations: LocationData[];
   grand_totals: Totals;
+  location_map: Record<string, string>;
 }
 interface AnnualSummary {
   year: number;
   monthly: { month: number; totals: Totals }[];
   locations: { location: string; totals: Totals }[];
   grand_totals: Totals;
+  location_map: Record<string, string>;
 }
 interface AnnualBreakdown {
   year: number;
@@ -83,6 +77,7 @@ interface AnnualBreakdown {
     totals: Totals;
   }[];
   grand_totals: Totals;
+  location_map: Record<string, string>;
 }
 
 const COLUMNS: { key: keyof Totals; label: string }[] = [
@@ -127,6 +122,7 @@ const JPSalaryReportPage: React.FC = () => {
   const [monthly, setMonthly] = useState<Comprehensive | null>(null);
   const [annual, setAnnual] = useState<AnnualSummary | null>(null);
   const [breakdown, setBreakdown] = useState<AnnualBreakdown | null>(null);
+  const [locationMap, setLocationMap] = useState<Record<string, string>>({});
 
   const monthRange = useMemo<TimeRange>(
     () => ({
@@ -144,16 +140,19 @@ const JPSalaryReportPage: React.FC = () => {
           `/jellypolly/api/salary-report?year=${currentYear}&month=${currentMonth}`
         );
         setMonthly(res);
+        if (res?.location_map) setLocationMap(res.location_map);
       } else if (annualView === "summary") {
         const res = await api.get(
           `/jellypolly/api/salary-report/annual?year=${currentYear}`
         );
         setAnnual(res);
+        if (res?.location_map) setLocationMap(res.location_map);
       } else {
         const res = await api.get(
           `/jellypolly/api/salary-report/annual-breakdown?year=${currentYear}`
         );
         setBreakdown(res);
+        if (res?.location_map) setLocationMap(res.location_map);
       }
     } catch (error) {
       console.error("Error loading JP salary report:", error);
@@ -188,8 +187,8 @@ const JPSalaryReportPage: React.FC = () => {
             month: currentMonth,
             comprehensiveData: monthly as any,
             grandTotals: monthly.grand_totals as any,
-            locationMap: LOCATION_MAP,
-            locationOrder: LOCATION_ORDER,
+            locationMap: locationMap,
+            locationOrder: buildLocationOrder(locationMap),
             companyName: JP_COMPANY,
           },
           action
@@ -205,8 +204,8 @@ const JPSalaryReportPage: React.FC = () => {
             periodType: "yearly",
             year: currentYear,
             annualData: annual as any,
-            locationMap: LOCATION_MAP,
-            locationOrder: LOCATION_ORDER,
+            locationMap: locationMap,
+            locationOrder: buildLocationOrder(locationMap),
             companyName: JP_COMPANY,
           },
           action
@@ -222,8 +221,8 @@ const JPSalaryReportPage: React.FC = () => {
             periodType: "yearly",
             year: currentYear,
             annualBreakdownData: breakdown as any,
-            locationMap: LOCATION_MAP,
-            locationOrder: LOCATION_ORDER,
+            locationMap: locationMap,
+            locationOrder: buildLocationOrder(locationMap),
             companyName: JP_COMPANY,
           },
           action
@@ -387,7 +386,7 @@ const JPSalaryReportPage: React.FC = () => {
                           colSpan={COLUMNS.length + 1}
                           className="px-3 py-1.5 text-sm font-semibold text-sky-800 dark:text-sky-300"
                         >
-                          {LOCATION_MAP[loc.location] || loc.location}
+                          {locationMap[loc.location] || loc.location}
                         </td>
                       </tr>
                       <ColumnHeader />
@@ -404,7 +403,7 @@ const JPSalaryReportPage: React.FC = () => {
                       ))}
                       <tr className="border-t border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/40">
                         <td className="px-2 py-1 text-left text-xs font-semibold text-default-700 dark:text-gray-200">
-                          {LOCATION_MAP[loc.location] || loc.location} Total
+                          {locationMap[loc.location] || loc.location} Total
                         </td>
                         <TotalsCells t={loc.totals} bold />
                       </tr>
@@ -459,7 +458,7 @@ const JPSalaryReportPage: React.FC = () => {
                       className="border-t border-default-200 dark:border-gray-700 bg-sky-50 dark:bg-sky-900/20"
                     >
                       <td className="px-2 py-1 text-left text-xs font-semibold text-sky-800 dark:text-sky-300">
-                        {LOCATION_MAP[loc.location] || loc.location} (year)
+                        {locationMap[loc.location] || loc.location} (year)
                       </td>
                       <TotalsCells t={loc.totals} bold />
                     </tr>
@@ -491,7 +490,7 @@ const JPSalaryReportPage: React.FC = () => {
                           colSpan={COLUMNS.length + 1}
                           className="px-3 py-1.5 text-sm font-semibold text-sky-800 dark:text-sky-300"
                         >
-                          {LOCATION_MAP[loc.location] || loc.location}
+                          {locationMap[loc.location] || loc.location}
                         </td>
                       </tr>
                       {loc.employees.map((emp) => (
@@ -527,7 +526,7 @@ const JPSalaryReportPage: React.FC = () => {
                       ))}
                       <tr className="border-t border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-900/60">
                         <td className="px-2 py-1 text-left text-xs font-bold text-default-800 dark:text-gray-100">
-                          {LOCATION_MAP[loc.location] || loc.location} Total
+                          {locationMap[loc.location] || loc.location} Total
                         </td>
                         <TotalsCells t={loc.totals} bold />
                       </tr>

@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-08",
+    ms: "Jelly Polly kini mempunyai halaman Lokasi sendiri (Catalogue -> Location): cipta lokasi dan petakan kerja serta pekerja kepadanya, sama seperti Tien Hock. Lapan lokasi telah disediakan (Office, Maintenance, Salesman, Ikut Lori, Ice Polly Machine, Jelly Cup Machine, Plastic Machine, dan Ice Polly & Jelly Cup Packing). Laporan Gaji Jelly Polly kini dikumpulkan mengikut lokasi ini menggantikan kumpulan jenis kerja lama.",
+    en: "Jelly Polly now has its own Location page (Catalogue -> Location): create locations and map jobs and employees to them, just like Tien Hock. Eight locations are set up (Office, Maintenance, Salesman, Ikut Lori, Ice Polly Machine, Jelly Cup Machine, Plastic Machine, and Ice Polly & Jelly Cup Packing). The Jelly Polly Salary Report is now grouped by these locations instead of the old job-type groups.",
+  },
+  {
+    date: "2026-07-08",
     ms: "Halaman Daily Machine Plastic Jelly Polly kini menggunakan entri kod bayaran untuk setiap pekerja. Pilih kod yang dipetakan kepada kerja Plastic atau pekerja, masukkan kuantiti dan kadar, kemudian simpan atau kosongkan setiap pekerja secara berasingan. Pilihan shift Day/Night dan lajur tetap 30ml/70ml telah dibuang.",
     en: "Jelly Polly Daily Machine Plastic now uses pay-code entry for each staff member. Select codes mapped to the Plastic job or the staff member, enter quantity and rate, then save or clear each staff member separately. The Day/Night shift option and fixed 30ml/70ml columns have been removed.",
   },
