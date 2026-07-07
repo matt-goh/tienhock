@@ -130,6 +130,10 @@ const PAYROLL_DROPDOWN_COLUMNS = {
   addOns: { key: "payroll-add-ons", order: 3 },
 } as const;
 
+const CATALOGUE_DROPDOWN_COLUMNS = {
+  productsMaterials: { key: "catalogue-products-materials", order: 2 },
+} as const;
+
 // Function to generate payroll subitems for each job type
 const generatePayrollSubItems = (): SidebarItem[] => {
   const payrollSubItems: SidebarItem[] = [];
@@ -686,6 +690,8 @@ export const TienHockNavData: SidebarItem[] = [
         path: "/catalogue/product",
         component: ProductPage,
         group: "Products & Materials",
+        dropdownColumn: CATALOGUE_DROPDOWN_COLUMNS.productsMaterials.key,
+        dropdownColumnOrder: CATALOGUE_DROPDOWN_COLUMNS.productsMaterials.order,
       },
       {
         name: "Job",
@@ -716,6 +722,8 @@ export const TienHockNavData: SidebarItem[] = [
         path: "/materials",
         component: MaterialsListPage,
         group: "Products & Materials",
+        dropdownColumn: CATALOGUE_DROPDOWN_COLUMNS.productsMaterials.key,
+        dropdownColumnOrder: CATALOGUE_DROPDOWN_COLUMNS.productsMaterials.order,
         subItems: [
           {
             name: "New Material",
@@ -765,7 +773,9 @@ export const TienHockNavData: SidebarItem[] = [
         name: "Others",
         path: "/catalogue/others",
         component: OthersPage,
-        group: "Products & Materials",
+        group: "Other",
+        dropdownColumn: CATALOGUE_DROPDOWN_COLUMNS.productsMaterials.key,
+        dropdownColumnOrder: CATALOGUE_DROPDOWN_COLUMNS.productsMaterials.order,
       },
     ],
   },
