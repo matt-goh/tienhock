@@ -20,16 +20,61 @@ interface PayCodeModalProps {
   existingPayCodes: PayCode[]; // Still needed for ID duplicate check
 }
 
+type PayCodeRateField = "rate_biasa" | "rate_ahad" | "rate_umum";
+type PayCodeListboxField = "pay_type" | "rate_unit" | "report_column";
+type PayCodeFormData = Omit<
+  PayCode,
+  "code" | "rate_biasa" | "rate_ahad" | "rate_umum"
+> & {
+  rate_biasa: string;
+  rate_ahad: string;
+  rate_umum: string;
+};
+
+const RATE_FIELDS: PayCodeRateField[] = [
+  "rate_biasa",
+  "rate_ahad",
+  "rate_umum",
+];
+const RATE_UNITS_REQUIRING_UNITS_INPUT: RateUnit[] = [
+  "Percent",
+  "Trip",
+  "Day",
+  "Bag",
+  "Ctn",
+  "Kg",
+  "Karung",
+  "Bundle",
+  "Fixed",
+  "Tray",
+];
+
+const isRateField = (name: string): name is PayCodeRateField =>
+  RATE_FIELDS.includes(name as PayCodeRateField);
+
+const toRateInputValue = (value: number | string | null | undefined): string => {
+  const numericValue = Number(value ?? 0);
+  return Number.isFinite(numericValue) ? numericValue.toString() : "0";
+};
+
+const parseRateInput = (value: string): number =>
+  value.trim() === "" ? 0 : parseFloat(value);
+
+const getTimelineBaseRate = (value: string): number => {
+  const parsedValue = parseRateInput(value);
+  return Number.isFinite(parsedValue) ? parsedValue : 0;
+};
+
 // Default state without 'code'
-const defaultPayCode: Omit<PayCode, "code"> = {
+const defaultPayCode: PayCodeFormData = {
   // Use Omit if PayCode type still has 'code' temporarily
   id: "",
   description: "",
   pay_type: "Base",
   rate_unit: "Hour",
-  rate_biasa: 0,
-  rate_ahad: 0,
-  rate_umum: 0,
+  rate_biasa: "0",
+  rate_ahad: "0",
+  rate_umum: "0",
   is_active: true,
   requires_units_input: false,
   report_column: null,
@@ -43,8 +88,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
   existingPayCodes,
 }) => {
   // State type should match the structure without 'code'
-  const [formData, setFormData] =
-    useState<Omit<PayCode, "code">>(defaultPayCode);
+  const [formData, setFormData] = useState<PayCodeFormData>(defaultPayCode);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -92,10 +136,9 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
         const { code, ...restData } = initialData as any; // Cast temporarily if needed
         setFormData({
           ...restData, // Use data without code
-          // Ensure rates are numbers for state consistency (though input is text)
-          rate_biasa: Number(restData.rate_biasa || 0),
-          rate_ahad: Number(restData.rate_ahad || 0),
-          rate_umum: Number(restData.rate_umum || 0),
+          rate_biasa: toRateInputValue(restData.rate_biasa),
+          rate_ahad: toRateInputValue(restData.rate_ahad),
+          rate_umum: toRateInputValue(restData.rate_umum),
         });
       } else {
         setFormData(defaultPayCode); // Use default without code
@@ -108,17 +151,13 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
   // Handle input changes
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
+  ): void => {
     const { name, value, type } = e.target;
 
     if (type === "checkbox" && e.target instanceof HTMLInputElement) {
       const target = e.target as HTMLInputElement;
       setFormData((prev) => ({ ...prev, [name]: target.checked }));
-    } else if (
-      name === "rate_biasa" ||
-      name === "rate_ahad" ||
-      name === "rate_umum"
-    ) {
+    } else if (isRateField(name)) {
       // Allow empty string, numbers, and single decimal point for rate inputs
       if (value === "" || /^\d*\.?\d*$/.test(value)) {
         // For percentage rate unit, validate it doesn't exceed 100
@@ -149,23 +188,25 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
 
   // Handle listbox changes
   const handleListboxChange =
-    (name: keyof Omit<PayCode, "code">) => (value: string) => {
-      if (
-        name === "rate_unit" &&
-        ["Percent", "Trip", "Day", "Bag", "Ctn", "Kg", "Karung", "Bundle", "Fixed", "Tray"].includes(value)
-      ) {
-        // When rate unit is production-based, automatically set requires_units_input to true
+    (name: PayCodeListboxField): ((value: string) => void) =>
+    (value: string): void => {
+      if (name === "rate_unit") {
+        const rateUnit = value as RateUnit;
         setFormData((prev) => ({
           ...prev,
-          [name]: value as RateUnit,
-          requires_units_input: true,
+          rate_unit: rateUnit,
+          requires_units_input:
+            RATE_UNITS_REQUIRING_UNITS_INPUT.includes(rateUnit),
+        }));
+      } else if (name === "pay_type") {
+        setFormData((prev) => ({
+          ...prev,
+          pay_type: value as PayType,
         }));
       } else {
         setFormData((prev) => ({
           ...prev,
-          [name]: value as PayType | RateUnit,
-          // Reset requires_units_input to false for Hour and Bill
-          ...(name === "rate_unit" ? { requires_units_input: false } : {}),
+          report_column: value || null,
         }));
       }
     };
@@ -198,14 +239,9 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
     // No duplicate code check
 
     // --- Rate Validation ---
-    // Use optional chaining and nullish coalescing for safety when accessing formData values
-    const rateBiasaStr = formData.rate_biasa?.toString() ?? "";
-    const rateAhadStr = formData.rate_ahad?.toString() ?? "";
-    const rateUmumStr = formData.rate_umum?.toString() ?? "";
-
-    const rateBiasaNum = rateBiasaStr === "" ? 0 : parseFloat(rateBiasaStr); // Treat empty as 0 for validation
-    const rateAhadNum = rateAhadStr === "" ? 0 : parseFloat(rateAhadStr);
-    const rateUmumNum = rateUmumStr === "" ? 0 : parseFloat(rateUmumStr);
+    const rateBiasaNum = parseRateInput(formData.rate_biasa);
+    const rateAhadNum = parseRateInput(formData.rate_ahad);
+    const rateUmumNum = parseRateInput(formData.rate_umum);
 
     if (isNaN(rateBiasaNum) || isNaN(rateAhadNum) || isNaN(rateUmumNum)) {
       setError("Rates must be valid numbers or empty.");
@@ -229,7 +265,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
   };
 
   // Handle form submission
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
 
     if (!validateForm()) {
@@ -239,15 +275,10 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
     setIsSaving(true);
     setError(null);
 
-    // Prepare data for saving (ensure rates are numbers or null)
-    const rateBiasaStr = formData.rate_biasa?.toString() ?? "";
-    const rateAhadStr = formData.rate_ahad?.toString() ?? "";
-    const rateUmumStr = formData.rate_umum?.toString() ?? "";
-
     // Parse rate values
-    const rateBiasa = rateBiasaStr === "" ? 0 : parseFloat(rateBiasaStr);
-    const rateAhad = rateAhadStr === "" ? 0 : parseFloat(rateAhadStr);
-    const rateUmum = rateUmumStr === "" ? 0 : parseFloat(rateUmumStr);
+    const rateBiasa = parseRateInput(formData.rate_biasa);
+    const rateAhad = parseRateInput(formData.rate_ahad);
+    const rateUmum = parseRateInput(formData.rate_umum);
 
     // Auto-fill Sunday and holiday rates if they're zero and normal rate is non-zero
     const finalRateAhad =
@@ -509,9 +540,9 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                       scope="pay_code"
                       payCodeId={formData.id}
                       baseRates={{
-                        biasa: formData.rate_biasa,
-                        ahad: formData.rate_ahad,
-                        umum: formData.rate_umum,
+                        biasa: getTimelineBaseRate(formData.rate_biasa),
+                        ahad: getTimelineBaseRate(formData.rate_ahad),
+                        umum: getTimelineBaseRate(formData.rate_umum),
                       }}
                     />
                   )}
