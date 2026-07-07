@@ -165,11 +165,11 @@ const MiniSummaryCard: React.FC<MiniSummaryCardProps> = ({
         {icon && <span className={`${textClasses[color]} opacity-70`}>{icon}</span>}
         <span className={`text-xs font-medium ${textClasses[color]}`}>{label}</span>
       </div>
-      <div className={`text-lg font-semibold font-mono ${textClasses[color]}`}>
+      <div className={`text-lg font-semibold ${textClasses[color]}`}>
         {formatCurrency(value)}
       </div>
       {sublabel && (
-        <div className="text-[10px] text-default-500 dark:text-gray-400 mt-0.5 font-mono">
+        <div className="text-[10px] text-default-500 dark:text-gray-400 mt-0.5">
           {sublabel}
         </div>
       )}
@@ -260,7 +260,7 @@ const AccountCodeTooltip: React.FC<AccountCodeTooltipProps> = ({
   // If no account code, show plain amount
   if (!accountCode) {
     return (
-      <span className="font-mono text-default-700 dark:text-gray-200">
+      <span className="text-default-700 dark:text-gray-200">
         {formatCurrency(amount)}
       </span>
     );
@@ -269,7 +269,7 @@ const AccountCodeTooltip: React.FC<AccountCodeTooltipProps> = ({
   return (
     <span
       ref={triggerRef}
-      className="relative inline-block cursor-help border-b border-dashed border-default-400 dark:border-gray-500 font-mono text-default-700 dark:text-gray-200"
+      className="relative inline-block cursor-help border-b border-dashed border-default-400 dark:border-gray-500 text-default-700 dark:text-gray-200"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
@@ -295,7 +295,7 @@ const AccountCodeTooltip: React.FC<AccountCodeTooltipProps> = ({
             <div className="space-y-1.5">
               <div className="flex justify-between gap-2">
                 <span className="text-gray-400">Code:</span>
-                <span className="font-mono text-sky-400">{accountCode}</span>
+                <span className="text-sky-400">{accountCode}</span>
               </div>
               {accountDescription && (
                 <div className="flex justify-between gap-2">
@@ -389,7 +389,7 @@ const JournalPreviewTable: React.FC<JournalPreviewTableProps> = ({
             ) : (
               lines.map((line, i) => (
                 <tr key={i} className="hover:bg-default-50/50 dark:hover:bg-gray-700/30">
-                  <td className="px-3 py-2 font-mono text-default-800 dark:text-gray-200 whitespace-nowrap">
+                  <td className="px-3 py-2 text-default-800 dark:text-gray-200 whitespace-nowrap">
                     {line.account_code}
                   </td>
                   <td className="px-3 py-2 text-default-700 dark:text-gray-300">
@@ -400,10 +400,10 @@ const JournalPreviewTable: React.FC<JournalPreviewTableProps> = ({
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono text-default-900 dark:text-gray-100">
+                  <td className="px-3 py-2 text-right text-default-900 dark:text-gray-100">
                     {line.debit > 0 ? fmt(line.debit) : "-"}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono text-default-900 dark:text-gray-100">
+                  <td className="px-3 py-2 text-right text-default-900 dark:text-gray-100">
                     {line.credit > 0 ? fmt(line.credit) : "-"}
                   </td>
                 </tr>
@@ -415,10 +415,10 @@ const JournalPreviewTable: React.FC<JournalPreviewTableProps> = ({
               <td colSpan={2} className="px-3 py-2 text-right text-default-800 dark:text-gray-200">
                 Total
               </td>
-              <td className="px-3 py-2 text-right font-mono text-default-900 dark:text-gray-100">
+              <td className="px-3 py-2 text-right text-default-900 dark:text-gray-100">
                 {fmt(totalDebit)}
               </td>
-              <td className="px-3 py-2 text-right font-mono text-default-900 dark:text-gray-100">
+              <td className="px-3 py-2 text-right text-default-900 dark:text-gray-100">
                 {fmt(totalCredit)}
               </td>
             </tr>
@@ -808,7 +808,7 @@ const VoucherGeneratorPage: React.FC = () => {
                       {previewData.jvdr.locations.map((loc) => (
                         <tr key={loc.location_id} className="hover:bg-default-50 dark:hover:bg-gray-700">
                           <td className="px-4 py-2.5 text-sm font-medium text-default-800 dark:text-gray-200">
-                            <span className="font-mono text-purple-600 dark:text-purple-400">{loc.location_id}</span>
+                            <span className="text-purple-600 dark:text-purple-400">{loc.location_id}</span>
                             <span className="mx-1">-</span>
                             {loc.location_name || "Director"}
                           </td>
@@ -868,22 +868,22 @@ const VoucherGeneratorPage: React.FC = () => {
                         <td className="px-4 py-2.5 text-sm text-default-800 dark:text-gray-200">
                           Total
                         </td>
-                        <td className="px-4 py-2.5 text-sm text-right font-mono text-default-800 dark:text-gray-200 bg-blue-100/50 dark:bg-blue-900/20">
+                        <td className="px-4 py-2.5 text-sm text-right text-default-800 dark:text-gray-200 bg-blue-100/50 dark:bg-blue-900/20">
                           {formatCurrency(previewData.jvdr.locations.reduce((sum, loc) => sum + loc.salary, 0))}
                         </td>
-                        <td className="px-4 py-2.5 text-sm text-right font-mono text-default-800 dark:text-gray-200 bg-blue-100/50 dark:bg-blue-900/20">
+                        <td className="px-4 py-2.5 text-sm text-right text-default-800 dark:text-gray-200 bg-blue-100/50 dark:bg-blue-900/20">
                           {formatCurrency(previewData.jvdr.locations.reduce((sum, loc) => sum + loc.epf_employer, 0))}
                         </td>
-                        <td className="px-4 py-2.5 text-sm text-right font-mono text-default-800 dark:text-gray-200 bg-blue-100/50 dark:bg-blue-900/20">
+                        <td className="px-4 py-2.5 text-sm text-right text-default-800 dark:text-gray-200 bg-blue-100/50 dark:bg-blue-900/20">
                           {formatCurrency(previewData.jvdr.locations.reduce((sum, loc) => sum + loc.socso_employer, 0))}
                         </td>
-                        <td className="px-4 py-2.5 text-sm text-right font-mono text-default-800 dark:text-gray-200 bg-blue-100/50 dark:bg-blue-900/20">
+                        <td className="px-4 py-2.5 text-sm text-right text-default-800 dark:text-gray-200 bg-blue-100/50 dark:bg-blue-900/20">
                           {formatCurrency(previewData.jvdr.locations.reduce((sum, loc) => sum + loc.sip_employer, 0))}
                         </td>
-                        <td className="px-4 py-2.5 text-sm text-right font-mono text-default-800 dark:text-gray-200 bg-amber-100/50 dark:bg-amber-900/20">
+                        <td className="px-4 py-2.5 text-sm text-right text-default-800 dark:text-gray-200 bg-amber-100/50 dark:bg-amber-900/20">
                           {formatCurrency(previewData.jvdr.locations.reduce((sum, loc) => sum + loc.pcb, 0))}
                         </td>
-                        <td className="px-4 py-2.5 text-sm text-right font-mono text-default-800 dark:text-gray-200 bg-amber-100/50 dark:bg-amber-900/20">
+                        <td className="px-4 py-2.5 text-sm text-right text-default-800 dark:text-gray-200 bg-amber-100/50 dark:bg-amber-900/20">
                           {formatCurrency(previewData.jvdr.locations.reduce((sum, loc) => sum + loc.net_salary, 0))}
                         </td>
                       </tr>
@@ -964,19 +964,29 @@ const VoucherGeneratorPage: React.FC = () => {
 
             {previewData.jvsl.locations.length > 0 ? (
               <>
-                {/* Missing Mappings Warning */}
-                {hasAnyMissingMappings(previewData.jvsl.locations) && (
+                {/* Missing Mappings Warning — combine the per-location check with the
+                    backend's exact list of unmapped component amounts (e.g. a
+                    department's commission_mee/bh that has no account yet). */}
+                {(hasAnyMissingMappings(previewData.jvsl.locations) ||
+                  (previewData.jvsl.unmapped?.length ?? 0) > 0) && (
                   <div className="m-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
                     <div className="flex items-start gap-3">
                       <IconAlertTriangle className="text-amber-500 mt-0.5 flex-shrink-0" size={20} />
                       <div>
                         <h4 className="font-medium text-amber-800 dark:text-amber-300">
-                          Some locations are missing account mappings
+                          Some amounts are missing account mappings
                         </h4>
                         <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
                           Generation is blocked until every amount has an account —
                           an incomplete voucher would not balance.
                         </p>
+                        {(previewData.jvsl.unmapped?.length ?? 0) > 0 && (
+                          <ul className="mt-2 text-xs text-amber-700 dark:text-amber-400 list-disc list-inside space-y-0.5">
+                            {previewData.jvsl.unmapped!.map((u, i) => (
+                              <li key={i}>{u}</li>
+                            ))}
+                          </ul>
+                        )}
                         <Button
                           onClick={() => navigate("/accounting/location-account-mappings")}
                           variant="outline"
@@ -1078,7 +1088,7 @@ const VoucherGeneratorPage: React.FC = () => {
                         return (
                           <tr key={loc.location_id} className="hover:bg-default-50 dark:hover:bg-gray-700">
                             <td className="px-4 py-2.5 text-sm font-medium text-default-800 dark:text-gray-200">
-                              <span className="font-mono text-sky-600 dark:text-sky-400">{loc.location_id}</span>
+                              <span className="text-sky-600 dark:text-sky-400">{loc.location_id}</span>
                               <span className="mx-1">-</span>
                               <span className="truncate" title={loc.location_name}>{loc.location_name || loc.location_id}</span>
                             </td>
@@ -1114,7 +1124,7 @@ const VoucherGeneratorPage: React.FC = () => {
                                 type="expense"
                               />
                             </td>
-                            <td className="px-4 py-2.5 text-sm text-right font-mono font-medium text-default-800 dark:text-gray-200">
+                            <td className="px-4 py-2.5 text-sm text-right font-medium text-default-800 dark:text-gray-200">
                               {formatCurrency(locationTotal)}
                             </td>
                             <td className="px-4 py-2.5 text-sm text-center">
@@ -1136,19 +1146,19 @@ const VoucherGeneratorPage: React.FC = () => {
                         <td className="px-4 py-2.5 text-sm text-default-800 dark:text-gray-200">
                           Total ({previewData.jvsl.locations.length} locations)
                         </td>
-                        <td className="px-4 py-2.5 text-sm text-right font-mono text-default-800 dark:text-gray-200 bg-blue-100/50 dark:bg-blue-900/20">
+                        <td className="px-4 py-2.5 text-sm text-right text-default-800 dark:text-gray-200 bg-blue-100/50 dark:bg-blue-900/20">
                           {formatCurrency(calculateJVSLTotals(previewData.jvsl.locations).totalSalary)}
                         </td>
-                        <td className="px-4 py-2.5 text-sm text-right font-mono text-default-800 dark:text-gray-200 bg-blue-100/50 dark:bg-blue-900/20">
+                        <td className="px-4 py-2.5 text-sm text-right text-default-800 dark:text-gray-200 bg-blue-100/50 dark:bg-blue-900/20">
                           {formatCurrency(calculateJVSLTotals(previewData.jvsl.locations).totalEPF)}
                         </td>
-                        <td className="px-4 py-2.5 text-sm text-right font-mono text-default-800 dark:text-gray-200 bg-blue-100/50 dark:bg-blue-900/20">
+                        <td className="px-4 py-2.5 text-sm text-right text-default-800 dark:text-gray-200 bg-blue-100/50 dark:bg-blue-900/20">
                           {formatCurrency(calculateJVSLTotals(previewData.jvsl.locations).totalSOCSO)}
                         </td>
-                        <td className="px-4 py-2.5 text-sm text-right font-mono text-default-800 dark:text-gray-200 bg-blue-100/50 dark:bg-blue-900/20">
+                        <td className="px-4 py-2.5 text-sm text-right text-default-800 dark:text-gray-200 bg-blue-100/50 dark:bg-blue-900/20">
                           {formatCurrency(calculateJVSLTotals(previewData.jvsl.locations).totalSIP)}
                         </td>
-                        <td className="px-4 py-2.5 text-sm text-right font-mono text-default-800 dark:text-gray-200">
+                        <td className="px-4 py-2.5 text-sm text-right text-default-800 dark:text-gray-200">
                           {formatCurrency(
                             calculateJVSLTotals(previewData.jvsl.locations).totalSalary +
                             calculateJVSLTotals(previewData.jvsl.locations).totalEPF +

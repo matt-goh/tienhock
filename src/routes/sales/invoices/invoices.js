@@ -10,6 +10,7 @@ import {
   roundMoney,
 } from "../../utils/moneyUtils.js";
 import { createPaymentJournalEntry, cancelPaymentJournalEntry } from "../../accounting/payment-journal.js";
+import { syncSalesJournalEntry, cancelSalesJournalEntry } from "../../accounting/sales-journal.js";
 
 // Map to track pending invoices with their timeout handlers
 const pendingInvoiceTimeouts = new Map();
@@ -2373,6 +2374,9 @@ export default function (pool, config) {
       const invoiceResult = await client.query(insertInvoiceQuery, values);
       const createdInvoice = invoiceResult.rows[0];
 
+      // Post the sales journal (DR TR / CR CASH_SALES|CR_SALES). No-op for zero amount.
+      await syncSalesJournalEntry(client, createdInvoice, req.user?.id || null);
+
       // Insert products (order_details) - NO CHANGE HERE
       if (invoice.products && invoice.products.length > 0) {
         const productQuery = `
@@ -2436,6 +2440,7 @@ export default function (pool, config) {
           amount_paid: totalPayable,
           payment_method: paymentMethod,
           bank_account: bankAccountCode,
+          invoice_paymenttype: "CASH",
           payment_reference: paymentReference,
           created_by: req.user?.id || null
         });
@@ -2639,6 +2644,18 @@ export default function (pool, config) {
             }
           }
 
+          // Post the sales journal (DR TR / CR CASH_SALES|CR_SALES). Swallow errors so a
+          // mobile bill is never blocked by a journal failure — sync self-heals on later
+          // edits and the backfill is idempotent (mirrors the payment-error handling below).
+          try {
+            await syncSalesJournalEntry(client, savedInvoice, null);
+          } catch (salesJournalError) {
+            console.error(
+              `Failed to post sales journal for invoice ${savedInvoice.id}:`,
+              salesJournalError
+            );
+          }
+
           // If it's a CASH invoice, create automatic payment record
           if (isCash && totalPayable > 0) {
             try {
@@ -2669,6 +2686,7 @@ export default function (pool, config) {
                 amount_paid: totalPayable,
                 payment_method: "cash",
                 bank_account: "CASH",
+                invoice_paymenttype: "CASH",
                 payment_reference: null,
                 created_by: null // No user context in batch submission
               });
@@ -3148,7 +3166,7 @@ export default function (pool, config) {
 
       // 1. Get Invoice details for credit adjustment and e-invoice check
       const invoiceQuery = `
-        SELECT id, customerid, paymenttype, totalamountpayable, balance_due, uuid, einvoice_status, invoice_status
+        SELECT id, customerid, paymenttype, totalamountpayable, balance_due, uuid, einvoice_status, invoice_status, journal_entry_id
         FROM invoices
         WHERE id = $1 FOR UPDATE`; // Lock row
       const invoiceResult = await client.query(invoiceQuery, [id]);
@@ -3298,6 +3316,21 @@ export default function (pool, config) {
         WHERE id = $1
       `;
       await client.query(zeroInvoiceTotalsQuery, [id]);
+
+      // Cancel the sales journal. Fall back to a lookup by reference for invoices
+      // created before the journal_entry_id column existed.
+      if (invoice.journal_entry_id) {
+        await cancelSalesJournalEntry(client, invoice.journal_entry_id);
+      } else {
+        const legacyJournal = await client.query(
+          `SELECT id FROM journal_entries
+            WHERE reference_no = $1 AND entry_type = 'S' AND status = 'posted'`,
+          [String(id)]
+        );
+        if (legacyJournal.rows.length > 0) {
+          await cancelSalesJournalEntry(client, legacyJournal.rows[0].id);
+        }
+      }
 
       console.log(`Zeroed out financial data for cancelled invoice ${id}`);
 
@@ -3450,8 +3483,8 @@ export default function (pool, config) {
 
       // 1. Get the current invoice to check status
       const invoiceCheckQuery = `
-      SELECT id, einvoice_status, invoice_status, uuid, submission_uid, datetime_validated, customerid, paymenttype, totalamountpayable
-      FROM invoices 
+      SELECT id, einvoice_status, invoice_status, uuid, submission_uid, datetime_validated, customerid, paymenttype, totalamountpayable, createddate, is_consolidated, journal_entry_id
+      FROM invoices
       WHERE id = $1
     `;
       const invoiceResult = await client.query(invoiceCheckQuery, [id]);
@@ -3655,12 +3688,12 @@ export default function (pool, config) {
           // Cancel all existing active payments
           if (activeCount > 0) {
             const cancelActiveQuery = `
-            UPDATE payments 
-            SET status = 'cancelled', 
+            UPDATE payments
+            SET status = 'cancelled',
                 cancellation_date = NOW(),
                 cancellation_reason = $1
             WHERE invoice_id = $2 AND (status IS NULL OR status = 'active')
-            RETURNING payment_id, amount_paid
+            RETURNING payment_id, amount_paid, journal_entry_id
           `;
 
             const cancelledActive = await client.query(cancelActiveQuery, [
@@ -3671,27 +3704,66 @@ export default function (pool, config) {
             ]);
 
             cancelledActiveCount = cancelledActive.rows.length;
+
+            // Cancel each cancelled payment's REC journal
+            for (const cancelled of cancelledActive.rows) {
+              if (cancelled.journal_entry_id) {
+                await cancelPaymentJournalEntry(
+                  client,
+                  cancelled.journal_entry_id
+                );
+              }
+            }
           }
 
           // Create new payment for the updated amount (if amount > 0)
           if (newTotal > 0) {
+            // Use the invoice's own local date (not today-UTC) so the payment and
+            // its REC journal match the invoice date.
+            const invoiceDate = new Date(Number(invoice.createddate));
+            const paymentDateStr = `${invoiceDate.getFullYear()}-${String(
+              invoiceDate.getMonth() + 1
+            ).padStart(2, "0")}-${String(invoiceDate.getDate()).padStart(
+              2,
+              "0"
+            )}`;
+
             const insertNewPaymentQuery = `
             INSERT INTO payments (
               invoice_id, payment_date, amount_paid, payment_method,
-              payment_reference, notes, status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+              payment_reference, bank_account, notes, status
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING payment_id
           `;
 
             const newPaymentResult = await client.query(insertNewPaymentQuery, [
               id,
-              new Date().toISOString().split("T")[0], // Today's date
+              paymentDateStr,
               newTotal,
               "cash",
               null,
+              "CASH",
               "Automatic payment - order details updated",
               "active",
             ]);
+            const newPayment = newPaymentResult.rows[0];
+
+            // Post the REC journal for the re-created payment (DR CH_REV1 / CR TR)
+            const recJournalId = await createPaymentJournalEntry(client, {
+              payment_id: newPayment.payment_id,
+              invoice_id: id,
+              payment_date: paymentDateStr,
+              amount_paid: newTotal,
+              payment_method: "cash",
+              bank_account: "CASH",
+              invoice_paymenttype: "CASH",
+              payment_reference: null,
+              created_by: req.user?.id || null,
+            });
+            await client.query(
+              "UPDATE payments SET journal_entry_id = $1 WHERE payment_id = $2",
+              [recJournalId, newPayment.payment_id]
+            );
 
             newPaymentCreated = true;
             console.log(
@@ -3708,6 +3780,13 @@ export default function (pool, config) {
           );
         }
       }
+
+      // Sync the sales journal to the new total (updated in place).
+      await syncSalesJournalEntry(
+        client,
+        { ...invoice, totalamountpayable: newTotal },
+        req.user?.id || null
+      );
 
       // 12. Update customer credit if this is an INVOICE type
       if (invoice.paymenttype === "INVOICE") {
@@ -3990,7 +4069,7 @@ export default function (pool, config) {
 
       // Check if invoice exists and get current status (including customerid for credit adjustments)
       const invoiceCheck = await client.query(
-        "SELECT invoice_status, paymenttype, balance_due, totalamountpayable, createddate, customerid FROM invoices WHERE id = $1",
+        "SELECT invoice_status, paymenttype, balance_due, totalamountpayable, createddate, customerid, is_consolidated FROM invoices WHERE id = $1",
         [id]
       );
 
@@ -4043,6 +4122,7 @@ export default function (pool, config) {
             amount_paid: paymentAmount,
             payment_method: "cash",
             bank_account: "CASH",
+            invoice_paymenttype: "CASH",
             payment_reference: null,
             created_by: req.user?.id || null,
           });
@@ -4141,6 +4221,21 @@ export default function (pool, config) {
         ]);
       }
 
+      // Sync the sales journal to the new payment type (flips CASH_SALES <-> CR_SALES
+      // and rewrites particulars in place; amount is unchanged).
+      await syncSalesJournalEntry(
+        client,
+        {
+          id,
+          paymenttype, // the new value
+          totalamountpayable: currentInvoice.totalamountpayable,
+          createddate: currentInvoice.createddate,
+          customerid: currentInvoice.customerid,
+          is_consolidated: currentInvoice.is_consolidated,
+        },
+        req.user?.id || null
+      );
+
       await client.query("COMMIT");
 
       // Get updated invoice data for response
@@ -4185,12 +4280,16 @@ export default function (pool, config) {
 
     const client = await pool.connect();
 
+    // Track whether the e-invoice API cancellation succeeded (declared here so the
+    // catch/log branches below can assign it without a ReferenceError).
+    let apiCancellationSuccess = false;
+
     try {
       await client.query("BEGIN");
 
       // Check if invoice exists and get current status
       const invoiceCheck = await client.query(
-        "SELECT id, einvoice_status, invoice_status, uuid, submission_uid, datetime_validated FROM invoices WHERE id = $1",
+        "SELECT id, einvoice_status, invoice_status, uuid, submission_uid, datetime_validated, paymenttype, totalamountpayable, customerid, is_consolidated, journal_entry_id FROM invoices WHERE id = $1",
         [id]
       );
 
@@ -4267,18 +4366,24 @@ export default function (pool, config) {
         throw new Error("Failed to update invoice");
       }
 
+      // Compute the new local yyyy-MM-dd once (server runs Asia/Kuala_Lumpur).
+      // TO_TIMESTAMP in the DB session (UTC) would shift pre-8am dates back a day.
+      const newDate = new Date(timestamp);
+      const newDateStr = `${newDate.getFullYear()}-${String(
+        newDate.getMonth() + 1
+      ).padStart(2, "0")}-${String(newDate.getDate()).padStart(2, "0")}`;
+
       // Update associated payments' dates to match the new invoice date
-      // Convert epoch timestamp to PostgreSQL timestamp format
       const updatePaymentsQuery = `
-        UPDATE payments 
-        SET payment_date = TO_TIMESTAMP($1::bigint / 1000)::date
-        WHERE invoice_id = $2 
+        UPDATE payments
+        SET payment_date = $1
+        WHERE invoice_id = $2
           AND (status IS NULL OR status != 'cancelled')
         RETURNING payment_id, payment_date
       `;
 
       const paymentsResult = await client.query(updatePaymentsQuery, [
-        createddate,
+        newDateStr,
         id,
       ]);
 
@@ -4288,6 +4393,27 @@ export default function (pool, config) {
           `Updated ${paymentsResult.rows.length} payment(s) for invoice ${id} to new date`
         );
       }
+
+      // Re-date the sales journal (updated in place via sync).
+      await syncSalesJournalEntry(
+        client,
+        { ...invoice, createddate },
+        req.user?.id || null
+      );
+
+      // Re-date the payment receipt (REC) journals to the new invoice date.
+      await client.query(
+        `UPDATE journal_entries
+            SET entry_date = $1, updated_at = NOW()
+          WHERE status = 'posted'
+            AND id IN (
+              SELECT journal_entry_id FROM payments
+               WHERE invoice_id = $2
+                 AND journal_entry_id IS NOT NULL
+                 AND (status IS NULL OR status != 'cancelled')
+            )`,
+        [newDateStr, id]
+      );
 
       await client.query("COMMIT");
 

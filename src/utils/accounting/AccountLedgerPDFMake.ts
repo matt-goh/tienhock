@@ -1,5 +1,5 @@
-// src/utils/accounting/BankStatementPDFMake.ts
-// Bank statement from journal — PDF export (pdfMake). Mirrors the legacy report
+// src/utils/accounting/AccountLedgerPDFMake.ts
+// Account ledger from journal lines PDF export (pdfMake). Mirrors the legacy bank statement
 // layout: DATE · JOURNAL · PARTICULARS · CHEQUE · DEBIT · CREDIT · BALANCE (DR/CR),
 // opening balance brought forward, running balance per row, closing totals.
 // Styled after the shared report design language (see DebtorsReportPDF): slate
@@ -14,7 +14,7 @@ import { printPdfFrameWithFallback } from "../pdfPrintFallback";
 // Initialize pdfmake with the bundled fonts (same pattern as PaySlipPDFMake)
 (pdfMake as any).vfs = (pdfFonts as any).pdfMake?.vfs || pdfFonts;
 
-export interface BankStatementTransaction {
+export interface AccountLedgerTransaction {
   line_id: number;
   journal_entry_id: number;
   reference_no: string;
@@ -27,7 +27,7 @@ export interface BankStatementTransaction {
   balance: number;
 }
 
-export interface BankStatementData {
+export interface AccountLedgerData {
   account: {
     code: string;
     description: string;
@@ -43,7 +43,7 @@ export interface BankStatementData {
   opening_source?:
     | { type: "anchored"; as_of_date: string; amount: number }
     | { type: "derived" };
-  transactions: BankStatementTransaction[];
+  transactions: AccountLedgerTransaction[];
   closing_balance: number;
   totals: {
     debit: number;
@@ -102,14 +102,14 @@ const loadLogoDataUrl = async (): Promise<string | null> => {
       reader.readAsDataURL(blob);
     });
   } catch (err) {
-    console.warn("Bank statement PDF: could not load logo", err);
+    console.warn("Account ledger PDF: could not load logo", err);
     cachedLogoDataUrl = null;
   }
   return cachedLogoDataUrl;
 };
 
 const buildDocDefinition = (
-  data: BankStatementData,
+  data: AccountLedgerData,
   logoDataUrl: string | null,
   reportTitle: string
 ): TDocumentDefinitions => {
@@ -271,7 +271,7 @@ const buildDocDefinition = (
     },
     pageSize: "A4",
     pageOrientation: "portrait",
-    pageMargins: [18, 28, 18, 40],
+    pageMargins: [18, 18, 18, 40],
     defaultStyle: { fontSize: 8, lineHeight: 1.15, color: colors.textPrimary },
     footer: (currentPage: number, pageCount: number) => ({
       columns: [
@@ -348,16 +348,13 @@ const buildDocDefinition = (
 // Opens the browser print dialog for the statement via a hidden iframe blob.
 // If the iframe print is blocked (common on mobile browsers), the shared
 // fallback opens the blob URL in a new tab instead.
-export const generateBankStatementPDF = async (
-  data: BankStatementData,
+export const generateAccountLedgerPDF = async (
+  data: AccountLedgerData,
   options?: { title?: string }
 ): Promise<void> => {
   const logoDataUrl = await loadLogoDataUrl();
-  const docDefinition = buildDocDefinition(
-    data,
-    logoDataUrl,
-    options?.title || "Bank Statement"
-  );
+  const reportTitle: string = options?.title || "Bank Statement";
+  const docDefinition = buildDocDefinition(data, logoDataUrl, reportTitle);
 
   const pdfBlob: Blob = await new Promise<Blob>((resolve) => {
     pdfMake.createPdf(docDefinition).getBlob(resolve);
@@ -371,7 +368,7 @@ export const generateBankStatementPDF = async (
   printFrame.onload = () => {
     if (printFrame.contentWindow) {
       printPdfFrameWithFallback(printFrame, url, {
-        logLabel: "bank statement PDF",
+        logLabel: `${reportTitle.toLowerCase()} PDF`,
       });
       const cleanup = () => {
         if (document.body.contains(printFrame)) {

@@ -316,7 +316,7 @@ const MaterialCombobox: React.FC<MaterialComboboxProps> = ({
                               selected ? "font-medium" : "font-normal"
                             }`}
                           >
-                            <span className="text-default-500 dark:text-gray-400 font-mono">
+                            <span className="text-default-500 dark:text-gray-400">
                               {material.code}
                             </span>
                             <span className="mx-1.5">-</span>
@@ -450,7 +450,7 @@ const SupplierCombobox: React.FC<SupplierComboboxProps> = ({
                             selected ? "font-medium" : "font-normal"
                           }`}
                         >
-                          <span className="text-default-500 dark:text-gray-400 font-mono">
+                          <span className="text-default-500 dark:text-gray-400">
                             {supplier.code}
                           </span>
                           <span className="mx-1.5">-</span>
@@ -1134,7 +1134,7 @@ const MaterialPurchaseFormPage: React.FC = () => {
                       className="group hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors"
                     >
                       {/* Line Number */}
-                      <td className="px-3 py-1 text-sm text-default-500 dark:text-gray-400 font-mono">
+                      <td className="px-3 py-1 text-sm text-default-500 dark:text-gray-400">
                         {String(line.line_number).padStart(2, "0")}
                       </td>
 
@@ -1190,7 +1190,7 @@ const MaterialPurchaseFormPage: React.FC = () => {
                         placeholder="0.00"
                         step="0.01"
                         min="0"
-                        className="w-full px-2 py-1.5 text-sm text-right bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:bg-white dark:focus:bg-gray-700 rounded font-mono text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 disabled:cursor-not-allowed"
+                        className="w-full px-2 py-1.5 text-sm text-right bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:bg-white dark:focus:bg-gray-700 rounded text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 disabled:cursor-not-allowed"
                       />
                     </td>
 
@@ -1206,7 +1206,7 @@ const MaterialPurchaseFormPage: React.FC = () => {
                         placeholder="0.00"
                         step="0.01"
                         min="0"
-                        className="w-full px-2 py-1.5 text-sm text-right bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:bg-white dark:focus:bg-gray-700 rounded font-mono text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 disabled:cursor-not-allowed"
+                        className="w-full px-2 py-1.5 text-sm text-right bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:bg-white dark:focus:bg-gray-700 rounded text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 disabled:cursor-not-allowed"
                       />
                     </td>
 
@@ -1245,7 +1245,7 @@ const MaterialPurchaseFormPage: React.FC = () => {
                     Total:
                   </td>
                   <td className="px-3 py-2.5 text-right">
-                    <span className="text-sm font-semibold text-default-900 dark:text-gray-100 font-mono">
+                    <span className="text-sm font-semibold text-default-900 dark:text-gray-100">
                       {formatCurrency(total)}
                     </span>
                   </td>
@@ -1288,7 +1288,7 @@ const MaterialPurchaseFormPage: React.FC = () => {
               Journal Entry:{" "}
               <a
                 href={`/accounting/journal-entries/${existingInvoice.journal_entry_id}`}
-                className="font-mono underline hover:no-underline"
+                className="underline hover:no-underline"
               >
                 {existingInvoice.journal_reference}
               </a>

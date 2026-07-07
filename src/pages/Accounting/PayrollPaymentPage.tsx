@@ -67,7 +67,7 @@ const saveLastMonth = (date: Date): void => {
 
 const tableInputClassName: string =
   "h-9 w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 shadow-sm transition-colors placeholder:text-gray-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-500/70 dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-sky-400 dark:focus:ring-sky-400";
-const monoInputClassName: string = `${tableInputClassName} font-mono`;
+const monoInputClassName: string = `${tableInputClassName}`;
 const dateNavigatorTriggerClassName: string =
   "w-full !h-9 justify-between !rounded-md !border-gray-300 !bg-white !px-2.5 !font-normal !shadow-sm dark:!border-gray-500/70 dark:!bg-gray-900/50";
 
@@ -335,7 +335,7 @@ const PayrollPaymentPage: React.FC = () => {
                         )}
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">{r.basis}</div>
-                      <div className="text-xs text-gray-400 dark:text-gray-500 font-mono">{r.particulars}</div>
+                      <div className="text-xs text-gray-400 dark:text-gray-500">{r.particulars}</div>
                     </td>
                     <td className="px-3 py-2.5">
                       <input
@@ -376,7 +376,7 @@ const PayrollPaymentPage: React.FC = () => {
                         value={r.bank_account}
                         onChange={(v) => updateRow(i, { bank_account: v })}
                         className="w-full"
-                        buttonClassName="h-9 font-mono shadow-none"
+                        buttonClassName="h-9 shadow-none"
                         options={
                           bankAccounts.length === 0
                             ? [{ value: "BANK_PBB", label: "BANK_PBB" }]
@@ -405,7 +405,7 @@ const PayrollPaymentPage: React.FC = () => {
                 <td colSpan={7} className="px-3 py-3">
                   <div className="flex items-baseline justify-end gap-6 font-bold text-gray-900 dark:text-white">
                     <span>TOTAL TO BANK (included):</span>
-                    <span className="font-mono">{formatCurrency(includedTotal)}</span>
+                    <span>{formatCurrency(includedTotal)}</span>
                   </div>
                 </td>
               </tr>

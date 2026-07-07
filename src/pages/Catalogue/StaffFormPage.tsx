@@ -114,6 +114,7 @@ const StaffFormPage: React.FC = () => {
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [jobQuery, setJobQuery] = useState("");
+  const [locationQuery, setLocationQuery] = useState("");
   const [loading, setLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
   const { options } = useStaffFormOptions();
@@ -151,21 +152,27 @@ const StaffFormPage: React.FC = () => {
     { id: "Cheque", name: "Cheque" },
   ];
 
-  const departmentOptions = [
-    { id: "GENERAL WORKER", name: "GENERAL WORKER" },
-    { id: "MAINTENANCE", name: "MAINTENANCE" },
-    { id: "MACHINE OPERATOR", name: "MACHINE OPERATOR" },
-    { id: "SALESMAN", name: "SALESMAN" },
-    { id: "MARKETING", name: "MARKETING" },
-    { id: "DIRECTOR", name: "DIRECTOR" },
-    { id: "LOGISTIC JUNIOR (STOCK)", name: "LOGISTIC JUNIOR (STOCK)" },
-    { id: "STOCK & DATA ENTRY CLERK", name: "STOCK & DATA ENTRY CLERK" },
-    { id: "BOILERMAN", name: "BOILERMAN" },
-    { id: "OPERATION EXECUTIVE", name: "OPERATION EXECUTIVE" },
-    { id: "GENERAL CLERK", name: "GENERAL CLERK" },
-    { id: "ADMIN", name: "ADMIN" },
-    { id: "EXECUTIVE DIRECTOR", name: "EXECUTIVE DIRECTOR" },
-  ];
+  const getDepartmentOptions = (
+    currentDepartment?: string
+  ): SelectOption[] => {
+    const baseOptions: SelectOption[] = options.departments || [];
+    const department: string | undefined = currentDepartment?.trim();
+    if (!department) return baseOptions;
+
+    const hasDepartment: boolean = baseOptions.some(
+      (option) =>
+        option.id === department ||
+        option.name.toLowerCase() === department.toLowerCase()
+    );
+
+    return hasDepartment
+      ? baseOptions
+      : [...baseOptions, { id: department, name: department }];
+  };
+
+  const departmentOptions: SelectOption[] = getDepartmentOptions(
+    formData.department
+  );
 
   // Utility function: Convert display name to option ID
   const mapDisplayNameToId = (
@@ -261,7 +268,10 @@ const StaffFormPage: React.FC = () => {
         maritalStatus: data.maritalStatus || "Single",
         spouseEmploymentStatus: data.spouseEmploymentStatus || "",
         numberOfChildren: data.numberOfChildren || 0,
-        department: data.department || "",
+        department: mapDisplayNameToId(
+          data.department,
+          getDepartmentOptions(data.department)
+        ),
         kwspNumber: data.kwspNumber || "",
         epfAgeOverride: data.epfAgeOverride || "auto",
         epfNationalityOverride: data.epfNationalityOverride || "auto",
@@ -313,6 +323,7 @@ const StaffFormPage: React.FC = () => {
     options.nationalities,
     options.races,
     options.agama,
+    options.departments,
   ]);
 
   useEffect(() => {
@@ -512,8 +523,16 @@ const StaffFormPage: React.FC = () => {
   };
 
   const handleComboboxChange = useCallback(
-    (name: "job", value: string[] | null) => {
-      if (value === null) return;
+    (name: "job" | "location", value: string[] | null) => {
+      if (value === null) {
+        // Location may be cleared to none; other fields keep their value when
+        // the search input is emptied.
+        if (name === "location") {
+          setFormData((prevData) => ({ ...prevData, location: [] }));
+          setModifiedFields((prev) => new Set(prev).add(name));
+        }
+        return;
+      }
 
       setFormData((prevData) => ({
         ...prevData,
@@ -579,6 +598,7 @@ const StaffFormPage: React.FC = () => {
       ),
       race: mapIdToDisplayName(formData.race, options.races),
       agama: mapIdToDisplayName(formData.agama, options.agama),
+      department: mapIdToDisplayName(formData.department, departmentOptions),
       // Handle date fields
       birthdate: formData.birthdate || null,
       dateJoined: formData.dateJoined || null,
@@ -699,7 +719,7 @@ const StaffFormPage: React.FC = () => {
   };
 
   const renderCombobox = (
-    name: "job",
+    name: "job" | "location",
     label: string,
     options: SelectOption[],
     query: string,
@@ -721,11 +741,21 @@ const StaffFormPage: React.FC = () => {
         query={query}
         setQuery={setQuery}
       />
-      <SelectedTagsDisplay
-        selectedItems={formData[name] as string[]}
-        label={label}
-        navigable={true}
-      />
+      {name === "location" ? (
+        <SelectedTagsDisplay
+          selectedItems={(formData[name] as string[]).map((locId) => {
+            const locationOption = options.find((opt) => opt.id === locId);
+            return locationOption ? locationOption.name : locId;
+          })}
+          label={label}
+        />
+      ) : (
+        <SelectedTagsDisplay
+          selectedItems={formData[name] as string[]}
+          label={label}
+          navigable={true}
+        />
+      )}
     </div>
   );
 
@@ -968,8 +998,15 @@ const StaffFormPage: React.FC = () => {
                 )}
               </div>
               <div className="space-y-6 mt-5">
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                   {renderCombobox("job", "Job", jobs, jobQuery, setJobQuery)}
+                  {renderCombobox(
+                    "location",
+                    "Location",
+                    options.locations,
+                    locationQuery,
+                    setLocationQuery
+                  )}
                   {renderInput("dateJoined", "Date Joined", "date")}
                 </div>
                 <StaffPayCodesSection employee={formData} />

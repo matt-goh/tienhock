@@ -127,10 +127,12 @@ const JVDR_ACCOUNT_CODES: ExpectedAccountCode[] = [
 // JVSL Account Codes (Staff Salary - Multiple Locations)
 // Based on JVSL voucher: 73 line items matching the voucher exactly
 const JVSL_ACCOUNT_CODES: ExpectedAccountCode[] = [
-  // ========== SALARY/WAGES (one per department) ==========
-  // Each Salary account receives the department's FULL gross pay — base, OT,
-  // commissions, cuti/leave, bonus, product/packing pay and Others all fold in
-  // here, so the only mapping type needed is "salary".
+  // ========== SALARY / COMMISSION (per department) ==========
+  // Each department's Salary account receives its gaji + commission + cuti (+ bonus
+  // unless a dedicated Bonus account is mapped). OT and RND post to the same Salary
+  // account on their own lines. Salesman / Ikut Lori are the exception: their
+  // commission is booked 50/50 to a MEE and a BIHUN account (Ikut Lori's commission
+  // column is booked to "Others").
   {
     code: "MBS_O",
     description: "Office (Salary)",
@@ -138,16 +140,52 @@ const JVSL_ACCOUNT_CODES: ExpectedAccountCode[] = [
     mappingTypes: ["salary"],
   },
   {
-    code: "MBS_SMO",
-    description: "Salesman",
+    code: "MBS_O",
+    description: "Office (Bonus)",
     category: "salary",
-    mappingTypes: ["salary"],
+    mappingTypes: ["bonus"],
+  },
+  {
+    code: "MS_SM",
+    description: "Salesman-Commission Mee",
+    category: "salary",
+    mappingTypes: ["commission_mee"],
+  },
+  {
+    code: "BS_SM",
+    description: "Salesman-Commission Bihun",
+    category: "salary",
+    mappingTypes: ["commission_bh"],
+  },
+  {
+    code: "THJ_CK",
+    description: "Commission Jelly (Salesman)",
+    category: "salary",
+    mappingTypes: ["commission_jelly"],
+  },
+  {
+    code: "MS_IL",
+    description: "Ikut Lori-Commission Mee",
+    category: "salary",
+    mappingTypes: ["commission_mee"],
+  },
+  {
+    code: "BS_IL",
+    description: "Ikut Lori-Commission Bihun",
+    category: "salary",
+    mappingTypes: ["commission_bh"],
+  },
+  {
+    code: "THJ_SM",
+    description: "Salary Salesman (Jelly, Ikut Lori)",
+    category: "salary",
+    mappingTypes: ["commission_jelly"],
   },
   {
     code: "MBS_ILO",
-    description: "Ikut Lori",
+    description: "Ikut Lori-Others",
     category: "salary",
-    mappingTypes: ["salary"],
+    mappingTypes: ["others"],
   },
   {
     code: "MBS_JB",
@@ -639,6 +677,8 @@ const LocationAccountMappingsPage: React.FC = () => {
       commission: "Comm",
       commission_mee: "Comm-MEE",
       commission_bh: "Comm-BH",
+      commission_jelly: "Comm-Jelly",
+      others: "Others",
       cuti_tahunan: "CT",
       special_ot: "SOT",
       epf_employer: "EPF",
@@ -893,7 +933,7 @@ const LocationAccountMappingsPage: React.FC = () => {
                       >
                         {/* Account Code Info */}
                         <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
-                          <code className="font-mono text-xs sm:text-sm font-medium text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/30 px-1.5 sm:px-2 py-0.5 rounded shrink-0">
+                          <code className="text-xs sm:text-sm font-medium text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/30 px-1.5 sm:px-2 py-0.5 rounded shrink-0">
                             {ac.code}
                           </code>
                           <span className="text-xs sm:text-sm text-default-700 dark:text-gray-300 truncate">
@@ -924,7 +964,7 @@ const LocationAccountMappingsPage: React.FC = () => {
                                   onMouseEnter={(e) => handlePillMouseEnter(mapping, e)}
                                   onMouseLeave={handlePillMouseLeave}
                                 >
-                                  <span className="font-mono">
+                                  <span>
                                     {mapping.location_id}
                                   </span>
                                   <span className="text-green-600 dark:text-green-400 text-[9px] sm:text-[10px]">
@@ -1014,7 +1054,7 @@ const LocationAccountMappingsPage: React.FC = () => {
                     Account Code
                   </div>
                   <div className="font-medium text-sky-800 dark:text-sky-200">
-                    <code className="font-mono">
+                    <code>
                       {selectedAccountCode.code}
                     </code>
                     <span className="text-sky-600 dark:text-sky-400 ml-2">
@@ -1135,7 +1175,7 @@ const LocationAccountMappingsPage: React.FC = () => {
                                       selected ? "font-medium" : ""
                                     }`}
                                   >
-                                    <span className="font-mono text-sky-600 dark:text-sky-400">
+                                    <span className="text-sky-600 dark:text-sky-400">
                                       {loc.id}
                                     </span>
                                     <span className="ml-2">{loc.name}</span>
@@ -1353,7 +1393,7 @@ const LocationAccountMappingsPage: React.FC = () => {
                       </li>
                       <li className="flex items-start gap-2">
                         <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-xs mt-0.5 shrink-0">
-                          <span className="font-mono">02</span>
+                          <span>02</span>
                           <span className="text-green-600 dark:text-green-400 text-[10px]">
                             Gaji
                           </span>
@@ -1500,7 +1540,7 @@ const LocationAccountMappingsPage: React.FC = () => {
                       </li>
                       <li className="flex items-start gap-2">
                         <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-xs mt-0.5 shrink-0">
-                          <span className="font-mono">02</span>
+                          <span>02</span>
                           <span className="text-green-600 dark:text-green-400 text-[10px]">
                             Salary
                           </span>
@@ -1574,7 +1614,7 @@ const LocationAccountMappingsPage: React.FC = () => {
           >
             <div className="flex items-center justify-between gap-2">
               <div>
-                <span className="font-mono text-sm font-bold text-sky-600 dark:text-sky-400">
+                <span className="text-sm font-bold text-sky-600 dark:text-sky-400">
                   {hoveredMapping.location_id}
                 </span>
                 <span className="text-sm font-medium text-default-800 dark:text-gray-100 ml-2">

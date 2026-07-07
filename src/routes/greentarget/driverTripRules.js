@@ -44,10 +44,6 @@ export const evaluateCondition = (value, operator, targetValue) => {
 
 const round2 = (n) => Math.round(n * 100) / 100;
 
-// Trips that count toward the >6/day TRIP_LB6 bonus: any Trip-unit line.
-const TRIP_LB6_PAY_CODE = "TRIP_LB6";
-const TRIP_LB6_THRESHOLD = 6;
-
 /**
  * Build the suggested trip lines a driver earned on `date` from their rentals.
  *
@@ -180,36 +176,5 @@ export const buildPrefillLinesForDriverDate = (date, driverRentals, ctx) => {
     }
   }
 
-  // Derived >6-trips/day bonus (TRIP_LB6). Counts Trip-unit line quantities.
-  const derived = deriveTripLb6Line(lines, allPayCodesMap);
-  if (derived) lines.push(derived);
-
   return lines;
-};
-
-/**
- * Given a set of trip lines, return a TRIP_LB6 bonus line when the total
- * Trip-unit quantity exceeds the threshold and no TRIP_LB6 line is present.
- * Returns null otherwise. Exposed so the frontend rule can stay consistent.
- */
-export const deriveTripLb6Line = (lines, allPayCodesMap = {}) => {
-  const alreadyHas = lines.some((l) => l.pay_code_id === TRIP_LB6_PAY_CODE);
-  if (alreadyHas) return null;
-  const tripQty = lines.reduce(
-    (sum, l) => (l.rate_unit === "Trip" ? sum + (parseFloat(l.quantity) || 0) : sum),
-    0
-  );
-  if (tripQty <= TRIP_LB6_THRESHOLD) return null;
-  const payCode = allPayCodesMap[TRIP_LB6_PAY_CODE];
-  const rate = payCode ? parseFloat(payCode.rate_biasa) || 0 : 0;
-  return {
-    pay_code_id: TRIP_LB6_PAY_CODE,
-    description: payCode?.description || "> 6 TRIP SISA KAYU & HABUK",
-    rate_used: rate,
-    rate_unit: payCode?.rate_unit || "Day",
-    quantity: 1,
-    amount: round2(rate),
-    source_type: "DERIVED",
-    rental_id: null,
-  };
 };

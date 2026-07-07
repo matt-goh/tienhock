@@ -371,13 +371,13 @@ const MaterialPurchaseListPage: React.FC = () => {
                       {formatDate(invoice.invoice_date)}
                     </td>
                     <td className="px-4 py-2 text-sm">
-                      <span className="font-mono text-sky-700 dark:text-sky-400 font-medium">
+                      <span className="text-sky-700 dark:text-sky-400 font-medium">
                         {invoice.invoice_number}
                       </span>
                     </td>
                     <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-200">
                       <div>
-                        <span className="font-mono text-xs text-default-500 dark:text-gray-400">
+                        <span className="text-xs text-default-500 dark:text-gray-400">
                           {invoice.supplier_code}
                         </span>
                         <span className="ml-2">{invoice.supplier_name}</span>

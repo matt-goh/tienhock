@@ -9,55 +9,94 @@ export default function (pool) {
   // GET / - Get all account codes with optional filters
   router.get("/", async (req, res) => {
     try {
-      const { search, ledger_type, is_active, parent_code, flat } = req.query;
+      const { search, ledger_type, is_active, parent_code, flat, page, limit } =
+        req.query;
+      const shouldPaginate = flat === "true" && (page !== undefined || limit !== undefined);
+      const pageNumber = Math.max(parseInt(page || "1", 10) || 1, 1);
+      const pageLimit = Math.min(
+        Math.max(parseInt(limit || "100", 10) || 100, 1),
+        500
+      );
+      const offset = (pageNumber - 1) * pageLimit;
 
-      let query = `
-        SELECT
-          id, code, description, ledger_type, parent_code,
-          level, sort_order, is_active, is_system, notes, fs_note,
-          created_at, updated_at
-        FROM account_codes
-        WHERE 1=1
-      `;
+      const whereClauses = ["1=1"];
       const params = [];
       let paramIndex = 1;
 
       // Apply filters
       if (search) {
-        query += ` AND (code ILIKE $${paramIndex} OR description ILIKE $${paramIndex})`;
+        whereClauses.push(
+          `(code ILIKE $${paramIndex} OR description ILIKE $${paramIndex})`
+        );
         params.push(`%${search}%`);
         paramIndex++;
       }
 
       if (ledger_type) {
-        query += ` AND ledger_type = $${paramIndex}`;
+        whereClauses.push(`ledger_type = $${paramIndex}`);
         params.push(ledger_type);
         paramIndex++;
       }
 
       if (is_active !== undefined && is_active !== "") {
-        query += ` AND is_active = $${paramIndex}`;
+        whereClauses.push(`is_active = $${paramIndex}`);
         params.push(is_active === "true" || is_active === true);
         paramIndex++;
       }
 
       if (parent_code) {
         if (parent_code === "null" || parent_code === "root") {
-          query += ` AND parent_code IS NULL`;
+          whereClauses.push("parent_code IS NULL");
         } else {
-          query += ` AND parent_code = $${paramIndex}`;
+          whereClauses.push(`parent_code = $${paramIndex}`);
           params.push(parent_code);
           paramIndex++;
         }
       }
 
+      const whereSql = whereClauses.join(" AND ");
+      let query = `
+        SELECT
+          id, code, description, ledger_type, parent_code,
+          level, sort_order, is_active, is_system, notes, fs_note,
+          created_at, updated_at
+        FROM account_codes
+        WHERE ${whereSql}
+      `;
+
       query += ` ORDER BY ledger_type NULLS LAST, level, sort_order, code`;
+
+      let total = null;
+      if (shouldPaginate) {
+        const countQuery = `
+          SELECT COUNT(*) as total
+          FROM account_codes
+          WHERE ${whereSql}
+        `;
+        const countResult = await pool.query(countQuery, params);
+        total = parseInt(countResult.rows[0].total, 10);
+
+        query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+        params.push(pageLimit, offset);
+      }
 
       const result = await pool.query(query, params);
 
       // If flat=true, return flat list; otherwise build tree structure
       if (flat === "true") {
-        res.json(result.rows);
+        if (shouldPaginate) {
+          res.json({
+            data: result.rows,
+            pagination: {
+              page: pageNumber,
+              limit: pageLimit,
+              total,
+              totalPages: Math.max(1, Math.ceil(total / pageLimit)),
+            },
+          });
+        } else {
+          res.json(result.rows);
+        }
       } else {
         // Build tree structure
         const tree = buildAccountTree(result.rows);

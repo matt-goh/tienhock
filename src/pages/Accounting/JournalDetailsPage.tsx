@@ -424,7 +424,7 @@ const JournalDetailsPage: React.FC = () => {
                       key={line.id || index}
                       className="hover:bg-default-50/50 dark:hover:bg-gray-700/30"
                     >
-                      <td className="px-4 py-2.5 text-sm text-default-500 dark:text-gray-400 font-mono">
+                      <td className="px-4 py-2.5 text-sm text-default-500 dark:text-gray-400">
                         {String(line.line_number).padStart(2, "0")}
                       </td>
                       <td className="px-4 py-2.5">
@@ -438,12 +438,12 @@ const JournalDetailsPage: React.FC = () => {
                       <td className="px-4 py-2.5 text-sm text-default-600 dark:text-gray-300">
                         {line.particulars || "-"}
                       </td>
-                      <td className="px-4 py-2.5 text-sm text-right font-mono text-default-900 dark:text-gray-100">
+                      <td className="px-4 py-2.5 text-sm text-right text-default-900 dark:text-gray-100">
                         {line.debit_amount > 0
                           ? formatAmount(line.debit_amount)
                           : "-"}
                       </td>
-                      <td className="px-4 py-2.5 text-sm text-right font-mono text-default-900 dark:text-gray-100">
+                      <td className="px-4 py-2.5 text-sm text-right text-default-900 dark:text-gray-100">
                         {line.credit_amount > 0
                           ? formatAmount(line.credit_amount)
                           : "-"}
@@ -469,10 +469,10 @@ const JournalDetailsPage: React.FC = () => {
                   >
                     Total
                   </td>
-                  <td className="px-4 py-2.5 text-sm text-right font-mono text-default-900 dark:text-gray-100">
+                  <td className="px-4 py-2.5 text-sm text-right text-default-900 dark:text-gray-100">
                     {formatAmount(entry.total_debit)}
                   </td>
-                  <td className="px-4 py-2.5 text-sm text-right font-mono text-default-900 dark:text-gray-100">
+                  <td className="px-4 py-2.5 text-sm text-right text-default-900 dark:text-gray-100">
                     {formatAmount(entry.total_credit)}
                   </td>
                 </tr>

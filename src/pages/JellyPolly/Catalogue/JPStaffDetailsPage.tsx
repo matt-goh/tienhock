@@ -22,8 +22,10 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import { api } from "../../../routes/utils/api";
 import { useJPStaffsCache } from "../../../utils/JellyPolly/useJPStaffsCache";
 import { useJPJobsCache } from "../../../utils/JellyPolly/useJPJobsCache";
+import { useJPLocationMappingsCache } from "../../../utils/JellyPolly/useJPLocationMappingsCache";
 import { useStaffFormOptions } from "../../../hooks/useStaffFormOptions";
 import StaffPayCodesSection from "../../../components/Catalogue/StaffPayCodesSection";
+import StaffLocationsDisplay from "../../../components/Catalogue/StaffLocationsDisplay";
 
 interface SameNameStaff {
   id: string;
@@ -306,6 +308,7 @@ const JPStaffDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { allStaffs, loading: loadingStaffs } = useJPStaffsCache();
   const { jobs } = useJPJobsCache();
+  const { locations, jobMappings } = useJPLocationMappingsCache();
 
   const [staff, setStaff] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);
@@ -368,6 +371,23 @@ const JPStaffDetailsPage: React.FC = () => {
   const jobName = (jobId: string): string =>
     jobs.find((j) => j.id === jobId)?.name || jobId;
 
+  const locName = (code: string): string =>
+    locations.find((l) => l.id === code)?.name || code;
+
+  // Locations set directly on the staff (kept in sync with the Location page).
+  const directLocations = (
+    Array.isArray(staff.location) ? staff.location : []
+  ).map((code) => ({ code, name: locName(code) }));
+
+  // Locations inherited from the staff's jobs via job -> location mappings.
+  const jobLocations = (staff.job || [])
+    .map((jobId) => {
+      const code = jobMappings.byJob[jobId];
+      if (!code) return null;
+      return { jobId, jobName: jobName(jobId), code, name: locName(code) };
+    })
+    .filter((v): v is NonNullable<typeof v> => v !== null);
+
   return (
     <div className="space-y-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-default-200 dark:border-gray-700">
@@ -421,7 +441,7 @@ const JPStaffDetailsPage: React.FC = () => {
           </Section>
 
           <Section title="Work">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-5">
               <div className="space-y-1">
                 <p className="text-xs font-medium text-default-500 dark:text-gray-400">
                   Jobs
@@ -442,6 +462,10 @@ const JPStaffDetailsPage: React.FC = () => {
                   <p className="text-sm text-default-400 dark:text-gray-500">—</p>
                 )}
               </div>
+              <StaffLocationsDisplay
+                directLocations={directLocations}
+                jobLocations={jobLocations}
+              />
               <Field label="Date Joined" value={staff.dateJoined} />
             </div>
             {/* Editable pay codes (the only interactive part of this page) */}

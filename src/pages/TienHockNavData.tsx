@@ -25,7 +25,6 @@ import LocationAccountMappingsPage from "./Accounting/LocationAccountMappingsPag
 
 // Accounting - Financial Reports
 import TrialBalancePage from "./Accounting/Reports/TrialBalancePage";
-import BankStatementPage from "./Accounting/Reports/BankStatementPage";
 import AccountLedgerPage from "./Accounting/Reports/AccountLedgerPage";
 import IncomeStatementPage from "./Accounting/Reports/IncomeStatementPage";
 import BalanceSheetPage from "./Accounting/Reports/BalanceSheetPage";
@@ -128,6 +127,10 @@ const PAYROLL_DROPDOWN_COLUMNS = {
   main: { key: "payroll-main", order: 2 },
   dailyLogs: { key: "payroll-daily-logs", order: 1 },
   addOns: { key: "payroll-add-ons", order: 3 },
+} as const;
+
+const CATALOGUE_DROPDOWN_COLUMNS = {
+  productsMaterials: { key: "catalogue-products-materials", order: 2 },
 } as const;
 
 // Function to generate payroll subitems for each job type
@@ -411,12 +414,6 @@ export const TienHockNavData: SidebarItem[] = [
         ],
       },
       {
-        name: "Bank Statement",
-        path: "/accounting/reports/bank-statement",
-        component: BankStatementPage,
-        group: "Reports",
-      },
-      {
         name: "Account Ledger",
         path: "/accounting/reports/account-ledger",
         component: AccountLedgerPage,
@@ -686,6 +683,8 @@ export const TienHockNavData: SidebarItem[] = [
         path: "/catalogue/product",
         component: ProductPage,
         group: "Products & Materials",
+        dropdownColumn: CATALOGUE_DROPDOWN_COLUMNS.productsMaterials.key,
+        dropdownColumnOrder: CATALOGUE_DROPDOWN_COLUMNS.productsMaterials.order,
       },
       {
         name: "Job",
@@ -716,6 +715,8 @@ export const TienHockNavData: SidebarItem[] = [
         path: "/materials",
         component: MaterialsListPage,
         group: "Products & Materials",
+        dropdownColumn: CATALOGUE_DROPDOWN_COLUMNS.productsMaterials.key,
+        dropdownColumnOrder: CATALOGUE_DROPDOWN_COLUMNS.productsMaterials.order,
         subItems: [
           {
             name: "New Material",
@@ -765,7 +766,9 @@ export const TienHockNavData: SidebarItem[] = [
         name: "Others",
         path: "/catalogue/others",
         component: OthersPage,
-        group: "Products & Materials",
+        group: "Other",
+        dropdownColumn: CATALOGUE_DROPDOWN_COLUMNS.productsMaterials.key,
+        dropdownColumnOrder: CATALOGUE_DROPDOWN_COLUMNS.productsMaterials.order,
       },
     ],
   },

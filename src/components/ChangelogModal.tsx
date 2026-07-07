@@ -19,6 +19,41 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-07-08",
+    ms: "Halaman butiran kakitangan (Tien Hock dan Jelly Polly) kini menunjukkan lokasi kakitangan: lokasi yang diberikan terus kepada mereka (sama seperti di halaman Location) serta lokasi yang diwarisi daripada kerja mereka. Borang kakitangan kini membolehkan anda menetapkan lokasi, dan borang Jelly Polly menggunakan senarai lokasi Jelly Polly (bukan Tien Hock).",
+    en: "Staff details pages (Tien Hock and Jelly Polly) now show a staff member's locations: those assigned directly to them (in sync with the Location page) plus locations inherited from their jobs. Staff forms now let you set locations, and the Jelly Polly forms use the Jelly Polly location list (not Tien Hock's).",
+  },
+  {
+    date: "2026-07-08",
+    ms: "Jelly Polly kini mempunyai halaman Lokasi sendiri (Catalogue -> Location): cipta lokasi dan petakan kerja serta pekerja kepadanya, sama seperti Tien Hock. Lapan lokasi telah disediakan (Office, Maintenance, Salesman, Ikut Lori, Ice Polly Machine, Jelly Cup Machine, Plastic Machine, dan Ice Polly & Jelly Cup Packing). Laporan Gaji Jelly Polly kini dikumpulkan mengikut lokasi ini menggantikan kumpulan jenis kerja lama.",
+    en: "Jelly Polly now has its own Location page (Catalogue -> Location): create locations and map jobs and employees to them, just like Tien Hock. Eight locations are set up (Office, Maintenance, Salesman, Ikut Lori, Ice Polly Machine, Jelly Cup Machine, Plastic Machine, and Ice Polly & Jelly Cup Packing). The Jelly Polly Salary Report is now grouped by these locations instead of the old job-type groups.",
+  },
+  {
+    date: "2026-07-08",
+    ms: "Halaman Daily Machine Plastic Jelly Polly kini menggunakan entri kod bayaran untuk setiap pekerja. Pilih kod yang dipetakan kepada kerja Plastic atau pekerja, masukkan kuantiti dan kadar, kemudian simpan atau kosongkan setiap pekerja secara berasingan. Pilihan shift Day/Night dan lajur tetap 30ml/70ml telah dibuang.",
+    en: "Jelly Polly Daily Machine Plastic now uses pay-code entry for each staff member. Select codes mapped to the Plastic job or the staff member, enter quantity and rate, then save or clear each staff member separately. The Day/Night shift option and fixed 30ml/70ml columns have been removed.",
+  },
+  {
+    date: "2026-07-08",
+    ms: "Laporan Trial Balance, Income Statement, Balance Sheet dan CoGM kini menunjukkan angka sebenar daripada rekod jualan, belian, gaji dan bayaran. Butang Panduan (BM/EN) ditambah pada setiap laporan untuk menerangkan dari mana setiap angka datang. Tarikh laporan juga dibetulkan supaya hari terakhir bulan tidak tertinggal.",
+    en: "The Trial Balance, Income Statement, Balance Sheet and CoGM reports now show real figures from sales, purchases, payroll and payment records. A Guide button (BM/EN) was added on each report explaining where every amount comes from. Report dates were also fixed so the last day of the month is no longer left out.",
+  },
+  {
+    date: "2026-07-08",
+    ms: "Laporan Bank Statement kini disatukan di Account Ledger. Untuk akaun BANK_PBB, buka Accounting -> Reports -> Account Ledger dan pilih BANK_PBB; baki pembukaan, transaksi, baki berjalan dan cetakan PDF masih tersedia di sana.",
+    en: "Bank Statement is now folded into Account Ledger. For BANK_PBB, open Accounting -> Reports -> Account Ledger and select BANK_PBB; opening balance, transactions, running balance and PDF printing are still available there.",
+  },
+  {
+    date: "2026-07-07",
+    ms: "Senarai jabatan pekerja kini boleh diurus dari Catalogue -> Others. Borang pekerja Tien Hock dan Jelly Polly menggunakan senarai jabatan yang sama, termasuk pilihan baharu DRIVER HABUK.",
+    en: "Staff departments can now be managed from Catalogue -> Others. Tien Hock and Jelly Polly staff forms use the same shared department list, including the new DRIVER HABUK option.",
+  },
+  {
+    date: "2026-07-07",
+    ms: "Setiap bil jualan Tien Hock (bil tunai dan invois kredit) kini direkodkan secara automatik ke dalam sistem perakaunan. Anda boleh mencetak lejar akaun CASH SALES dan CREDIT SALES dari Perakaunan → Laporan → Account Ledger untuk melihat semua sumber jualan dalam satu dokumen, seperti lejar lama. Duit tunai yang diterima kini masuk ke akaun terima tunai yang betul (jualan tunai hari itu berbanding bayaran hutang lama). Apabila jumlah sesuatu bil tunai diubah, catatan perakaunannya turut dikemas kini automatik. Jualan lama dari 1 Jun 2026 telah dimasukkan.",
+    en: "Every Tien Hock sales bill (cash bills and credit invoices) is now recorded automatically into the accounting system. You can print the CASH SALES and CREDIT SALES account ledgers from Accounting → Reports → Account Ledger to see all sources of sales in one document, just like the old ledger. Cash received now lands in the correct cash-received accounts (same-day cash sales vs. payment of old bills). When a cash bill's amount is edited, its accounting entry updates automatically too. Existing sales from 1 June 2026 have been backfilled.",
+  },
+  {
     date: "2026-07-06",
     ms: "Baucar gaji JVSL kini dijana sepadan 100% dengan sistem lama: setiap jabatan mempunyai SATU baris Gaji yang merangkumi keseluruhan gaji kasar (gaji, OT, komisen, cuti/cuti tahunan, bonus, bayaran ikut produk dan Others semuanya dimasukkan di sini — termasuk pembundaran), diikuti caruman majikan EPF/SOCSO/SIP, dan satu baris Accrual (Salary Payables). Anda tidak perlu lagi memetakan akaun berasingan untuk OT/komisen/cuti/pembundaran — jadi ralat 'pemetaan tidak lengkap' yang menyekat penjanaan JVSL sebelum ini telah hilang. Pilihan pemetaan yang tidak diperlukan pada halaman Location Account Mappings juga telah dibuang.",
     en: "The JVSL payroll voucher now generates as a 100% match to the legacy system: each department has ONE Salary line covering its full gross pay (salary, OT, commission, cuti/annual leave, bonus, product-based pay and Others all fold in here — including the rounding), followed by the employer EPF/SOCSO/SIP contributions and one Accrual (Salary Payables) line. You no longer need to map separate accounts for OT/commission/cuti/rounding — so the 'incomplete mappings' error that previously blocked JVSL generation is gone. Unnecessary mapping options on the Location Account Mappings page have also been removed.",

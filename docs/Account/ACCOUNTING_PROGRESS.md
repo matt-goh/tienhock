@@ -1,6 +1,6 @@
 # Accounting System — Progress & Handoff
 
-**Status date: 2 Jul 2026.** Verified against the repo (`src/routes/accounting/`, `src/pages/Accounting/`) and the dev DB on this date. This is the single entry-point document for any agent continuing accounting work. Read this first, then [ACCOUNTING_GAP_ANALYSIS.md](ACCOUNTING_GAP_ANALYSIS.md) for the full gap catalogue and the bank-statement manual-entry mapping guide.
+**Status date: 8 Jul 2026.** Verified against the repo (`src/routes/accounting/`, `src/pages/Accounting/`) and the dev DB on this date. This is the single entry-point document for any agent continuing accounting work. Read this first, then [ACCOUNTING_GAP_ANALYSIS.md](ACCOUNTING_GAP_ANALYSIS.md) for the full gap catalogue and the bank-statement manual-entry mapping guide.
 
 ---
 
@@ -16,7 +16,8 @@
 
 | Type | What | Journal shape | Source code |
 |---|---|---|---|
-| `REC` | Customer payment receipts | DR `CASH`/`BANK_PBB`/`BANK_ABB` / CR `TR` (overpay → CR `CUST_DEP`); pending cheques defer journal until confirm; cancel = journal cancelled | [payment-journal.js](../../src/routes/accounting/payment-journal.js), [payments.js](../../src/routes/sales/invoices/payments.js), [payment-helpers.js](../../src/utils/payment-helpers.js) |
+| `S` | Sales journal per invoice (auto) | DR `TR` / CR `CASH_SALES` (cash bill) or `CR_SALES` (credit invoice), amount = totalamountpayable; `reference_no` = invoice id; updated in place on line/paymenttype/date edits, cancelled with the invoice; consolidated + zero-amount invoices skipped. Powers the CASH SALES / CREDIT SALES account ledgers. | [sales-journal.js](../../src/routes/accounting/sales-journal.js), [invoices.js](../../src/routes/sales/invoices/invoices.js) |
+| `REC` | Customer payment receipts | DR bank / CR `TR` (overpay → CR `CUST_DEP`); pending cheques defer journal until confirm; cancel = journal cancelled. **Cash-method** receipts debit `CH_REV1` (cash bill) / `CH_REV2` (payment of old credit bill) by invoice paymenttype instead of `CASH`; bank methods use `BANK_PBB`/`BANK_ABB` | [payment-journal.js](../../src/routes/accounting/payment-journal.js), [payments.js](../../src/routes/sales/invoices/payments.js), [payment-helpers.js](../../src/utils/payment-helpers.js) |
 | `PUR` | Material purchase invoices | DR purchase account by material category (`material_purchase_account_mappings`) / CR `TP` | [purchase-invoices.js](../../src/routes/accounting/purchase-invoices.js) |
 | `GP` | General Purchases (local + foreign self-billed) | DR invoice-level expense account (`self_billed_invoices.account_code`) / CR `TP` | [self-billed-invoices.js](../../src/routes/accounting/self-billed-invoices.js) (`createGPJournalEntry`) |
 | `PAY` | Supplier payments (settle `purchase_invoices` *or* `self_billed_invoices`) | DR `TP` / CR bank; auto PV reference `PV-YYYYMM-XXXX`; cancellation reverses journal + invoice balance | [supplier-payments.js](../../src/routes/accounting/supplier-payments.js), [supplier-payment-journal.js](../../src/routes/accounting/supplier-payment-journal.js) |
@@ -30,10 +31,10 @@
 
 | Report | Status | Files |
 |---|---|---|
-| **Bank Statement** (running ledger per bank/cash account) | ✅ built, content-parity with legacy verified against May 2026 PDFs | [bank-statement.js](../../src/routes/accounting/bank-statement.js), [BankStatementPage](../../src/pages/Accounting/Reports/BankStatementPage.tsx), [BankStatementPDFMake.ts](../../src/utils/accounting/BankStatementPDFMake.ts) |
-| **Account Ledger** (1B-2 — same running-ledger view for *any* account code: expenditure, supplier, director…) | ✅ built 6 Jul 2026; reuses the bank-statement API + PDF, searchable account picker, deep-linkable `?account=CODE` | [AccountLedgerPage](../../src/pages/Accounting/Reports/AccountLedgerPage.tsx) |
+| **Bank Statement** (running ledger per bank/cash account) | ✅ built, content-parity with legacy verified against May 2026 PDFs | [bank-statement.js](../../src/routes/accounting/bank-statement.js), [BankStatementPage](../../src/pages/Accounting/Reports/BankStatementPage.tsx), [AccountLedgerPDFMake.ts](../../src/utils/accounting/AccountLedgerPDFMake.ts) |
+| **Account Ledger** (1B-2 — same running-ledger view for *any* account code: expenditure, supplier, director…) | ✅ built 6 Jul 2026; reuses the bank-statement API + shared ledger PDF, searchable account picker, deep-linkable `?account=CODE` | [AccountLedgerPage](../../src/pages/Accounting/Reports/AccountLedgerPage.tsx) |
 | Opening-balance anchor (per account) | ✅ built — **read only by the Bank Statement** | `account_opening_balances`, [opening-balances.js](../../src/routes/accounting/opening-balances.js), [OpeningBalanceModal](../../src/components/Accounting/OpeningBalanceModal.tsx) |
-| Trial Balance / Income Statement / Balance Sheet / CoGM (+ PDFs) | 🟡 built, but single-period, **YTD from Jan 1 with no brought-forward — they do NOT read the opening anchor**; Note 22 & 7 computed live from `invoices` | [financial-reports.js](../../src/routes/accounting/financial-reports.js), [Reports/](../../src/pages/Accounting/Reports/) |
+| Trial Balance / Income Statement / Balance Sheet / CoGM (+ PDFs) | 🟡 **amounts flowing since 8 Jul 2026** (fs_note re-mapped — see §2b; period-boundary timezone bug fixed — month-end day was being dropped; BM/EN "Panduan/Guide" source-explanation button on all four pages via [ReportSourceGuide](../../src/components/Accounting/ReportSourceGuide.tsx)). Still single-period, **YTD from Jan 1 with no brought-forward — they do NOT read the opening anchor**, so the BS cannot balance yet; Note 22 & 7 computed live from `invoices` | [financial-reports.js](../../src/routes/accounting/financial-reports.js), [Reports/](../../src/pages/Accounting/Reports/) |
 | Debtors aging + PDF, Customer Statement PDF, Cash Receipt Voucher | ✅ | [DebtorsReportPage](../../src/pages/Accounting/DebtorsReportPage.tsx), [utils/accounting/](../../src/utils/accounting/) |
 
 ### Setup / master data
@@ -42,16 +43,13 @@ Chart of Accounts CRUD (2,749 active codes — legacy import, unpruned) · `fina
 
 ---
 
-## 2. Dev-DB reality check (2 Jul 2026) — read before trusting older docs
+## 2. Dev-DB reality check (refreshed 8 Jul 2026) — read before trusting older docs
 
-The dev DB was evidently **refreshed after 9 Jun 2026**, so the state described at the end of [ACCOUNTING_GAP_ANALYSIS.md](ACCOUNTING_GAP_ANALYSIS.md) no longer holds:
+Considerable data entry has happened since the 2 Jul snapshot. Posted journals by type (8 Jul): **REC 2,759 · S 473 · B 61 · GP 23 · CN 21 · PUR 12 · J 8 · C 3 · JVSL 1 · JVDR 1** — the sales journal, purchases, payroll vouchers, payroll bank payments and manual journals are all live now. `account_opening_balances` is still **empty** (the `BANK_PBB` = 166,035.80 @ 2026-05-01 anchor must be re-set if the May tie-out is still wanted).
 
-- Posted journals by type: **REC 2,619 · CN 20 · GP 5 — nothing else.** No JVDR/JVSL, no PBE settlement journals, no PUR, no PAY.
-- `account_opening_balances` is **empty** — the `BANK_PBB` = 166,035.80 @ 2026-05-01 anchor must be re-set (Bank Statement page → "Set opening balance").
-- `purchase_invoices`: 0 rows · `supplier_payments`: 0 rows (features built, unused).
-- May 2026 `BANK_PBB`: 151 REC debit lines (RM 395,669.93), **zero credit/outgoing lines** — the May tie-out walk-down was never entered.
+### 2b. fs_note wipe & re-map (8 Jul 2026)
 
-Implication: the **features** are all in place; the **May 2026 tie-out proof is pure data entry that still has to be (re)done.**
+The dev-DB refresh had also **wiped `account_codes.fs_note`** (2 of 2,750 codes tagged) — this is why the Income Statement / Balance Sheet / CoGM were showing zero amounts even though journals existed: every statement is a group-by of posted lines by `fs_note`. Re-applied 8 Jul via [`dev/migrations/fs_note_remap_2026-07.sql`](../../dev/migrations/fs_note_remap_2026-07.sql) (corrected rules — `MB*` → Note 5 not 5-1, `CASH_SALES` no longer clobbered, `CL_*` family, lean-GL codes `TP`/`PUR`/`OP`/`DEBTOR`; details in [FINANCIAL_STATEMENTS_MAPPING.md](FINANCIAL_STATEMENTS_MAPPING.md)). **This script must also be run in prod** whenever prod's fs_note is missing/stale. Two provisional calls to confirm with the user: `OP` (Overseas Purchases, GP journals) → Note 5, and `CH_REV1/2` → Note 6 (treated as cash-in-hand holding accounts).
 
 ## 3. Active goal — Bank Statement tie-out (item 1B-1)
 

@@ -4,6 +4,7 @@ import { IconPrinter, IconRefresh } from "@tabler/icons-react";
 import MonthNavigator from "../../../components/MonthNavigator";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import ReportSourceGuide from "../../../components/Accounting/ReportSourceGuide";
 import { api } from "../../../routes/utils/api";
 import { generateIncomeStatementPDF } from "../../../utils/accounting/IncomeStatementPDF";
 import toast from "react-hot-toast";
@@ -127,6 +128,8 @@ const IncomeStatementPage: React.FC = () => {
           />
 
           <div className="flex flex-wrap items-center gap-3">
+            <ReportSourceGuide report="income_statement" />
+
             <Button
               onClick={fetchData}
               variant="outline"
@@ -187,7 +190,7 @@ const IncomeStatementPage: React.FC = () => {
                     <span className="text-gray-700 dark:text-gray-300">
                       {item.name} (Note {item.note})
                     </span>
-                    <span className="font-mono text-gray-900 dark:text-white">
+                    <span className="text-gray-900 dark:text-white">
                       {formatCurrency(item.amount)}
                     </span>
                   </div>
@@ -195,7 +198,7 @@ const IncomeStatementPage: React.FC = () => {
               </div>
               <div className="flex justify-between text-sm font-bold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                 <span className="text-gray-900 dark:text-white">Total Revenue</span>
-                <span className="font-mono text-gray-900 dark:text-white">
+                <span className="text-gray-900 dark:text-white">
                   {formatCurrency(data.revenue.total)}
                 </span>
               </div>
@@ -212,7 +215,7 @@ const IncomeStatementPage: React.FC = () => {
                     <span className="text-gray-700 dark:text-gray-300">
                       {item.name} (Note {item.note})
                     </span>
-                    <span className="font-mono text-gray-900 dark:text-white">
+                    <span className="text-gray-900 dark:text-white">
                       {formatCurrency(item.amount)}
                     </span>
                   </div>
@@ -220,7 +223,7 @@ const IncomeStatementPage: React.FC = () => {
               </div>
               <div className="flex justify-between text-sm font-bold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                 <span className="text-gray-900 dark:text-white">Total Cost of Goods Sold</span>
-                <span className="font-mono text-gray-900 dark:text-white">
+                <span className="text-gray-900 dark:text-white">
                   ({formatCurrency(data.cost_of_goods_sold.total)})
                 </span>
               </div>
@@ -236,7 +239,7 @@ const IncomeStatementPage: React.FC = () => {
                   </span>
                 )}
               </div>
-              <span className={`font-mono ${data.gross_profit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+              <span className={`${data.gross_profit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                 {data.gross_profit >= 0 ? "" : "("}
                 {formatCurrency(data.gross_profit)}
                 {data.gross_profit >= 0 ? "" : ")"}
@@ -254,7 +257,7 @@ const IncomeStatementPage: React.FC = () => {
                     <span className="text-gray-700 dark:text-gray-300">
                       {item.name} (Note {item.note})
                     </span>
-                    <span className="font-mono text-gray-900 dark:text-white">
+                    <span className="text-gray-900 dark:text-white">
                       {formatCurrency(item.amount)}
                     </span>
                   </div>
@@ -262,7 +265,7 @@ const IncomeStatementPage: React.FC = () => {
               </div>
               <div className="flex justify-between text-sm font-bold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                 <span className="text-gray-900 dark:text-white">Total Operating Expenses</span>
-                <span className="font-mono text-gray-900 dark:text-white">
+                <span className="text-gray-900 dark:text-white">
                   ({formatCurrency(data.expenses.total)})
                 </span>
               </div>
@@ -278,7 +281,7 @@ const IncomeStatementPage: React.FC = () => {
                   </span>
                 )}
               </div>
-              <span className={`font-mono ${data.net_profit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+              <span className={`${data.net_profit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                 {data.net_profit >= 0 ? "" : "("}
                 RM {formatCurrency(data.net_profit)}
                 {data.net_profit >= 0 ? "" : ")"}
