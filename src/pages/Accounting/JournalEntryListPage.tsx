@@ -31,14 +31,16 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
 ];
 
 interface CachedListFilters {
+  search: string;
   dateRange: { start: Date; end: Date };
   types: string[];
   statuses: string[];
 }
 
-// Load cached filters (date range + type/status pill selections) from localStorage
+// Load cached filters (search, date range, and type/status pill selections) from localStorage
 const loadCachedFilters = (): CachedListFilters => {
   const fallback: CachedListFilters = {
+    search: "",
     dateRange: { start: new Date(), end: new Date() },
     types: [],
     statuses: [],
@@ -48,6 +50,7 @@ const loadCachedFilters = (): CachedListFilters => {
     if (cached) {
       const parsed = JSON.parse(cached);
       return {
+        search: typeof parsed.search === "string" ? parsed.search : "",
         dateRange: {
           start: new Date(parsed.start),
           end: new Date(parsed.end),
@@ -124,7 +127,7 @@ const getInitialStateFromParams = (params: URLSearchParams): {
   // Fall back to cached filters
   const cached = loadCachedFilters();
   return {
-    search: urlSearch || "",
+    search: urlSearch || cached.search,
     types: urlType ? [urlType] : cached.types,
     statuses: cached.statuses,
     dateRange: cached.dateRange,
@@ -144,8 +147,10 @@ const JournalEntryListPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
 
-  // Filters - load date range and pill selections from cache initially
-  const [searchTerm, setSearchTerm] = useState("");
+  // Filters - load search, date range, and pill selections from cache initially
+  const [searchTerm, setSearchTerm] = useState<string>(
+    () => loadCachedFilters().search
+  );
   const [selectedTypes, setSelectedTypes] = useState<string[]>(
     () => loadCachedFilters().types
   );
@@ -249,12 +254,13 @@ const JournalEntryListPage: React.FC = () => {
     setPage(1);
   }, [searchTerm, selectedTypes, selectedStatuses, dateRange]);
 
-  // Cache date range and pill selections to localStorage
+  // Cache search, date range, and pill selections to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(
         FILTERS_STORAGE_KEY,
         JSON.stringify({
+          search: searchTerm,
           start: dateRange.start.toISOString(),
           end: dateRange.end.toISOString(),
           types: selectedTypes,
@@ -264,7 +270,7 @@ const JournalEntryListPage: React.FC = () => {
     } catch (e) {
       console.error("Error caching filters:", e);
     }
-  }, [dateRange, selectedTypes, selectedStatuses]);
+  }, [searchTerm, dateRange, selectedTypes, selectedStatuses]);
 
   // Handlers
   const handleCreateNew = () => {
