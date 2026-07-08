@@ -46,6 +46,10 @@ interface MaterialWithVariants extends Material {
 
 type MaterialDeleteMode = "deactivate" | "permanent";
 
+interface HardDeleteResponse {
+  deleted_stock_entries?: number;
+}
+
 const MaterialsListPage: React.FC = () => {
   const navigate = useNavigate();
 
@@ -181,8 +185,15 @@ const MaterialsListPage: React.FC = () => {
 
     try {
       if (materialDeleteMode === "permanent") {
-        await api.delete(`/api/materials/${materialToDelete.id}?hard=true`);
-        toast.success(`Material "${materialToDelete.name}" deleted permanently`);
+        const response: HardDeleteResponse = await api.delete(
+          `/api/materials/${materialToDelete.id}?hard=true`
+        );
+        const deletedStockEntries: number = response.deleted_stock_entries || 0;
+        toast.success(
+          deletedStockEntries > 0
+            ? `Material "${materialToDelete.name}" deleted permanently (${deletedStockEntries} stock records removed)`
+            : `Material "${materialToDelete.name}" deleted permanently`
+        );
       } else {
         await api.delete(`/api/materials/${materialToDelete.id}`);
         toast.success(`Material "${materialToDelete.name}" deactivated`);
@@ -235,7 +246,7 @@ const MaterialsListPage: React.FC = () => {
     materialDeleteMode === "permanent" ? "Delete Material Permanently" : "Deactivate Material";
   const deleteDialogMessage: string =
     materialDeleteMode === "permanent"
-      ? `Permanently delete "${materialToDelete?.name}"? This only works after the material is inactive and has no stock adjustments or purchase lines. This action cannot be undone.`
+      ? `Permanently delete "${materialToDelete?.name}"? This only works after the material is inactive and not used in purchase invoices. Any stock records for it and its variants will be removed. This action cannot be undone.`
       : `Are you sure you want to deactivate "${materialToDelete?.name}"? This material will be hidden but not permanently deleted.`;
   const deleteDialogConfirmText: string =
     materialDeleteMode === "permanent" ? "Delete Permanently" : "Deactivate";

@@ -937,29 +937,40 @@ export default function (pool) {
         });
       }
 
-      // Check if variant has stock entries
-      const stockQuery = "SELECT COUNT(*) as count FROM material_stock_entries WHERE variant_id = $1";
-      const stockResult = await pool.query(stockQuery, [variantId]);
-      const stockCount = parseInt(stockResult.rows[0].count, 10);
-
-      const purchaseLineQuery = "SELECT COUNT(*) as count FROM purchase_invoice_lines WHERE variant_id = $1";
-      const purchaseLineResult = await pool.query(purchaseLineQuery, [variantId]);
-      const purchaseLineCount = parseInt(purchaseLineResult.rows[0].count, 10);
-
-      if ((stockCount > 0 || purchaseLineCount > 0) && isHardDelete) {
-        return res.status(400).json({
-          message: "Cannot permanently delete variant with stock adjustments or purchase lines.",
-        });
-      }
-
       if (isHardDelete) {
-        // Hard delete (only if inactive and no stock/purchase history)
-        const deleteQuery = "DELETE FROM material_variants WHERE id = $1 RETURNING id, variant_name";
-        const result = await pool.query(deleteQuery, [variantId]);
-        res.json({
-          message: "Variant deleted permanently",
-          variant: result.rows[0],
-        });
+        const purchaseLineQuery = "SELECT COUNT(*) as count FROM purchase_invoice_lines WHERE variant_id = $1";
+        const purchaseLineResult = await pool.query(purchaseLineQuery, [variantId]);
+        const purchaseLineCount = parseInt(purchaseLineResult.rows[0].count, 10);
+
+        if (purchaseLineCount > 0) {
+          return res.status(400).json({
+            message: "Cannot permanently delete variant because it is used in purchase invoices.",
+          });
+        }
+
+        // Hard delete variant and its manual stock rows. Purchase invoice lines remain protected.
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+          const stockDeleteResult = await client.query(
+            "DELETE FROM material_stock_entries WHERE variant_id = $1",
+            [variantId]
+          );
+          const deleteQuery = "DELETE FROM material_variants WHERE id = $1 RETURNING id, variant_name";
+          const result = await client.query(deleteQuery, [variantId]);
+          await client.query("COMMIT");
+
+          res.json({
+            message: "Variant deleted permanently",
+            variant: result.rows[0],
+            deleted_stock_entries: stockDeleteResult.rowCount,
+          });
+        } catch (error) {
+          await client.query("ROLLBACK");
+          throw error;
+        } finally {
+          client.release();
+        }
       } else {
         // Soft delete
         const updateQuery = `
@@ -1193,27 +1204,36 @@ export default function (pool) {
         });
       }
 
-      // Check if material has stock entries
-      const stockQuery = "SELECT COUNT(*) as count FROM material_stock_entries WHERE material_id = $1";
-      const stockResult = await pool.query(stockQuery, [id]);
-      const stockCount = parseInt(stockResult.rows[0].count, 10);
-
-      const purchaseLineQuery = "SELECT COUNT(*) as count FROM purchase_invoice_lines WHERE material_id = $1";
-      const purchaseLineResult = await pool.query(purchaseLineQuery, [id]);
-      const purchaseLineCount = parseInt(purchaseLineResult.rows[0].count, 10);
-
-      if ((stockCount > 0 || purchaseLineCount > 0) && isHardDelete) {
-        return res.status(400).json({
-          message: "Cannot permanently delete material with stock adjustments or purchase lines.",
-        });
-      }
-
       if (isHardDelete) {
-        // Hard delete (only if inactive and no stock/purchase history)
+        const purchaseLineQuery = `
+          SELECT COUNT(*) as count
+          FROM purchase_invoice_lines
+          WHERE material_id = $1
+             OR variant_id IN (
+               SELECT id FROM material_variants WHERE material_id = $1
+             )
+        `;
+        const purchaseLineResult = await pool.query(purchaseLineQuery, [id]);
+        const purchaseLineCount = parseInt(purchaseLineResult.rows[0].count, 10);
+
+        if (purchaseLineCount > 0) {
+          return res.status(400).json({
+            message: "Cannot permanently delete material because it is used in purchase invoices.",
+          });
+        }
+
+        // Hard delete material, variants, and manual stock rows. Purchase invoice lines remain protected.
         const client = await pool.connect();
         try {
           await client.query("BEGIN");
-          await client.query("DELETE FROM material_variants WHERE material_id = $1", [id]);
+          const stockDeleteResult = await client.query(
+            "DELETE FROM material_stock_entries WHERE material_id = $1",
+            [id]
+          );
+          const variantDeleteResult = await client.query(
+            "DELETE FROM material_variants WHERE material_id = $1",
+            [id]
+          );
           const deleteQuery = "DELETE FROM materials WHERE id = $1 RETURNING id, code";
           const result = await client.query(deleteQuery, [id]);
           await client.query("COMMIT");
@@ -1221,6 +1241,8 @@ export default function (pool) {
           res.json({
             message: "Material deleted permanently",
             material: result.rows[0],
+            deleted_stock_entries: stockDeleteResult.rowCount,
+            deleted_variants: variantDeleteResult.rowCount,
           });
         } catch (error) {
           await client.query("ROLLBACK");

@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-08",
+    ms: "Bahan dan varian yang sudah dinyahaktifkan kini boleh dipadam secara kekal walaupun mempunyai rekod stok; rekod stok berkaitan akan dibuang bersama. Jika bahan atau varian pernah digunakan dalam invois belian, pemadaman kekal masih disekat supaya sejarah belian kekal terpelihara.",
+    en: "Inactive materials and variants can now be permanently deleted even when they have stock records; the related stock records are removed together. Permanent deletion is still blocked when the material or variant has been used in purchase invoices, so purchase history stays intact.",
+  },
+  {
+    date: "2026-07-08",
     ms: "Halaman Kemasukan Pengeluaran Jelly Polly kini mempunyai satu lajur input bagi setiap kod bayaran yang dipetakan kepada produk. Setiap pekerja memasukkan kuantiti karton secara berasingan untuk setiap kod bayaran (contohnya dua konfigurasi karton), dan setiap kuantiti dibayar mengikut kadar kod berkenaan dalam gaji. Sebelum ini hanya satu kotak input dipaparkan dan hanya satu kod bayaran dibayar. Susunan kad pekerja (drag-and-drop) dikekalkan, dan jumlah karton semua kod bayaran dikira sebagai stok produk.",
     en: "The Jelly Polly Production Entry page now shows one input column per pay code mapped to the product. Each worker enters carton quantities separately for each pay code (e.g. two carton configurations), and each quantity is paid at that code's rate in payroll. Previously only a single input was shown and only one pay code was ever paid. Worker drag-and-drop ordering is kept, and the cartons across all pay codes add up to the product's stock.",
   },
