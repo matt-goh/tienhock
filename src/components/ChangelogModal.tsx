@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-07-09",
+    ms: "Pelarasan Stok Produk kini boleh disimpan mengikut tarikh pelarasan sebenar. Pilih tarikh di bahagian atas halaman sebelum Save; rujukan lama yang sebelum ini tersimpan pada hujung bulan dikemas kini mengikut tarikh ia dimasukkan.",
+    en: "Product Stock Adjustments can now be saved using the actual adjustment date. Pick the date at the top of the page before saving; older references that were previously stored at month-end have been updated to the date they were entered.",
+  },
+  {
     date: "2026-07-08",
     ms: "Senarai Trade Debtors dalam Account Ledger kini sentiasa ikut senarai pelanggan. Pelanggan baharu akan muncul automatik, nama pelanggan yang ditukar akan dikemas kini, dan pelanggan lama yang sebelum ini tiada dalam senarai telah ditambah.",
     en: "The Trade Debtors list in Account Ledger now stays in sync with the customer list. New customers appear automatically, renamed customers update there too, and older customers that were missing have been added.",
