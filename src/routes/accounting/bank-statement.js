@@ -5,7 +5,27 @@
 // net of all posted lines before the month, and returns one row per transaction
 // with a running balance. The account is treated as debit-normal (an asset), so
 // a debit increases the balance and a credit decreases it.
+//
+// Linked accounts: some ledgers surface posted lines from other accounts as
+// money-in (a bank DEBIT). BANK_PBB pulls in the cash-received accounts so the
+// bank book reads as a cash book. Only the cash-received accounts (CH_REV*) are
+// linked — NOT the CASH_SALES/CR_SALES revenue accounts, which are the accrual
+// counterpart of the same bills and would double-count the cash collected.
+// CH_REV* are already debit-normal, so their money-in DEBIT is kept as recorded.
+// See BANK_LINKED_ACCOUNTS below.
 import { Router } from "express";
+
+// Per-account link config. Keyed by the primary account being viewed.
+//   swap: linked codes that are credit-normal — their debit/credit columns are
+//         swapped so a revenue CREDIT shows as a bank DEBIT (money in).
+//   keep: linked codes that are already debit-normal — kept exactly as recorded.
+// Only applies to the listed primary accounts; every other account is unaffected.
+const BANK_LINKED_ACCOUNTS = {
+  BANK_PBB: {
+    swap: [],
+    keep: ["CH_REV1", "CH_REV2"],
+  },
+};
 
 export default function (pool) {
   const router = Router();
@@ -44,6 +64,15 @@ export default function (pool) {
       }
       const account = accountResult.rows[0];
 
+      // Resolve linked accounts surfaced inside this ledger (money-in view).
+      // allCodes = the codes whose lines appear; swapCodes = credit-normal codes
+      // whose debit/credit columns are swapped so their money-in reads as a debit.
+      const linkCfg = BANK_LINKED_ACCOUNTS[accountCode];
+      const swapCodes = linkCfg ? linkCfg.swap : [];
+      const allCodes = linkCfg
+        ? [accountCode, ...linkCfg.swap, ...linkCfg.keep]
+        : [accountCode];
+
       // Month boundaries as plain yyyy-MM-dd strings (TZ-safe, no Date round-trip).
       // Use a half-open range [startStr, nextMonthStr) so a Dec-31 entry with a
       // time component is still included.
@@ -75,14 +104,17 @@ export default function (pool) {
         const anchor = anchorResult.rows[0];
         const anchorAmount = parseFloat(anchor.amount) || 0;
         const sinceResult = await pool.query(
-          `SELECT COALESCE(SUM(jel.debit_amount - jel.credit_amount), 0) AS movement
+          `SELECT COALESCE(SUM(
+                (CASE WHEN jel.account_code = ANY($4::varchar[]) THEN jel.credit_amount ELSE jel.debit_amount END)
+              - (CASE WHEN jel.account_code = ANY($4::varchar[]) THEN jel.debit_amount ELSE jel.credit_amount END)
+             ), 0) AS movement
              FROM journal_entry_lines jel
              JOIN journal_entries je ON jel.journal_entry_id = je.id
             WHERE je.status = 'posted'
-              AND jel.account_code = $1
+              AND jel.account_code = ANY($1::varchar[])
               AND je.entry_date >= $2
               AND je.entry_date < $3`,
-          [accountCode, anchor.as_of_date, startStr]
+          [allCodes, anchor.as_of_date, startStr, swapCodes]
         );
         openingBalance =
           anchorAmount + (parseFloat(sinceResult.rows[0].movement) || 0);
@@ -93,13 +125,16 @@ export default function (pool) {
         };
       } else {
         const openingResult = await pool.query(
-          `SELECT COALESCE(SUM(jel.debit_amount - jel.credit_amount), 0) AS opening
+          `SELECT COALESCE(SUM(
+                (CASE WHEN jel.account_code = ANY($3::varchar[]) THEN jel.credit_amount ELSE jel.debit_amount END)
+              - (CASE WHEN jel.account_code = ANY($3::varchar[]) THEN jel.debit_amount ELSE jel.credit_amount END)
+             ), 0) AS opening
              FROM journal_entry_lines jel
              JOIN journal_entries je ON jel.journal_entry_id = je.id
             WHERE je.status = 'posted'
-              AND jel.account_code = $1
+              AND jel.account_code = ANY($1::varchar[])
               AND je.entry_date < $2`,
-          [accountCode, startStr]
+          [allCodes, startStr, swapCodes]
         );
         openingBalance = parseFloat(openingResult.rows[0].opening) || 0;
         openingSource = { type: "derived" };
@@ -117,16 +152,17 @@ export default function (pool) {
             jel.line_number    AS line_number,
             jel.reference      AS cheque_no,
             jel.particulars    AS particulars,
-            COALESCE(jel.debit_amount, 0)  AS debit_amount,
-            COALESCE(jel.credit_amount, 0) AS credit_amount
+            jel.account_code   AS account_code,
+            COALESCE(CASE WHEN jel.account_code = ANY($4::varchar[]) THEN jel.credit_amount ELSE jel.debit_amount END, 0)  AS debit_amount,
+            COALESCE(CASE WHEN jel.account_code = ANY($4::varchar[]) THEN jel.debit_amount ELSE jel.credit_amount END, 0) AS credit_amount
            FROM journal_entry_lines jel
            JOIN journal_entries je ON jel.journal_entry_id = je.id
           WHERE je.status = 'posted'
-            AND jel.account_code = $1
+            AND jel.account_code = ANY($1::varchar[])
             AND je.entry_date >= $2
             AND je.entry_date < $3
           ORDER BY je.entry_date ASC, je.id ASC, jel.line_number ASC`,
-        [accountCode, startStr, nextMonthStr]
+        [allCodes, startStr, nextMonthStr, swapCodes]
       );
 
       let running = openingBalance;
