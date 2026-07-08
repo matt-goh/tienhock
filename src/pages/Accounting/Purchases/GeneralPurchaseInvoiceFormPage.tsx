@@ -271,9 +271,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       )
   );
   const previousPayableAmountRef = useRef<number>(0);
-  const stockSearch = useGeneralStockSearch({
-    initialDateTo: formData.purchase_date,
-  });
+  const stockSearch = useGeneralStockSearch();
 
   const canEdit: boolean =
     existingInvoice?.invoice_status !== "cancelled" &&
@@ -1185,7 +1183,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               disabled={submitting || saving}
               onClick={submitInvoice}
             >
-              {submitting ? "Submitting..." : "Save & Submit"}
+              {submitting ? "Submitting..." : "Save & Submit e-Invoice"}
             </Button>
           )}
           {canEdit && (
@@ -1448,28 +1446,6 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
             )}
 
             <div className="space-y-3 p-3">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <FormInput
-                  name="stock_search_from"
-                  label="Stock Date From"
-                  value={stockSearch.dateFrom}
-                  type="date"
-                  onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                    stockSearch.setDateFrom(event.target.value)
-                  }
-                  disabled={!canEditRecords}
-                />
-                <FormInput
-                  name="stock_search_to"
-                  label="Stock Date To"
-                  value={stockSearch.dateTo}
-                  type="date"
-                  onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                    stockSearch.setDateTo(event.target.value)
-                  }
-                  disabled={!canEditRecords}
-                />
-              </div>
               {lines.map((line: SelfBilledInvoiceLine, index: number) => {
                 const selectedStockRow = getSelectedGeneralStockRow(line);
                 const isAppend = Boolean(line.stock_append_target_line_id);

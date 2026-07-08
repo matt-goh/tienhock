@@ -44,6 +44,8 @@ interface MaterialWithVariants extends Material {
   variantCount?: number;
 }
 
+type MaterialDeleteMode = "deactivate" | "permanent";
+
 const MaterialsListPage: React.FC = () => {
   const navigate = useNavigate();
 
@@ -58,6 +60,7 @@ const MaterialsListPage: React.FC = () => {
   // Delete dialog
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [materialToDelete, setMaterialToDelete] = useState<Material | null>(null);
+  const [materialDeleteMode, setMaterialDeleteMode] = useState<MaterialDeleteMode>("deactivate");
 
   // Reactivate dialog
   const [showReactivateDialog, setShowReactivateDialog] = useState(false);
@@ -83,10 +86,16 @@ const MaterialsListPage: React.FC = () => {
       let variantsByMaterial: Record<number, MaterialVariant[]> = {};
 
       if (materialIds.length > 0) {
-        variantsByMaterial = await api.post(`/api/materials/batch/variants`, {
-          material_ids: materialIds,
-          is_active: true,
-        });
+        const variantRequestBody: {
+          material_ids: number[];
+          is_active?: boolean;
+        } = { material_ids: materialIds };
+
+        if (!showInactive) {
+          variantRequestBody.is_active = true;
+        }
+
+        variantsByMaterial = await api.post(`/api/materials/batch/variants`, variantRequestBody);
       }
 
       // Attach variant counts and variants to materials
@@ -158,17 +167,26 @@ const MaterialsListPage: React.FC = () => {
   }, [materials]);
 
   // Handle delete
-  const handleDeleteClick = (material: Material) => {
+  const handleDeleteClick = (
+    material: Material,
+    mode: MaterialDeleteMode = "deactivate"
+  ): void => {
     setMaterialToDelete(material);
+    setMaterialDeleteMode(mode);
     setShowDeleteDialog(true);
   };
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmDelete = async (): Promise<void> => {
     if (!materialToDelete) return;
 
     try {
-      await api.delete(`/api/materials/${materialToDelete.id}`);
-      toast.success(`Material "${materialToDelete.name}" deactivated`);
+      if (materialDeleteMode === "permanent") {
+        await api.delete(`/api/materials/${materialToDelete.id}?hard=true`);
+        toast.success(`Material "${materialToDelete.name}" deleted permanently`);
+      } else {
+        await api.delete(`/api/materials/${materialToDelete.id}`);
+        toast.success(`Material "${materialToDelete.name}" deactivated`);
+      }
       fetchMaterials();
     } catch (error: any) {
       console.error("Error deleting material:", error);
@@ -176,6 +194,7 @@ const MaterialsListPage: React.FC = () => {
     } finally {
       setShowDeleteDialog(false);
       setMaterialToDelete(null);
+      setMaterialDeleteMode("deactivate");
     }
   };
 
@@ -211,6 +230,15 @@ const MaterialsListPage: React.FC = () => {
       </div>
     );
   }
+
+  const deleteDialogTitle: string =
+    materialDeleteMode === "permanent" ? "Delete Material Permanently" : "Deactivate Material";
+  const deleteDialogMessage: string =
+    materialDeleteMode === "permanent"
+      ? `Permanently delete "${materialToDelete?.name}"? This only works after the material is inactive and has no stock adjustments or purchase lines. This action cannot be undone.`
+      : `Are you sure you want to deactivate "${materialToDelete?.name}"? This material will be hidden but not permanently deleted.`;
+  const deleteDialogConfirmText: string =
+    materialDeleteMode === "permanent" ? "Delete Permanently" : "Deactivate";
 
   return (
     <div className="space-y-3">
@@ -354,6 +382,7 @@ const MaterialsListPage: React.FC = () => {
                         onToggleExpand={() => toggleMaterialExpansion(material.id)}
                         onEdit={() => navigate(`/materials/${material.id}`)}
                         onDelete={() => handleDeleteClick(material)}
+                        onPermanentDelete={() => handleDeleteClick(material, "permanent")}
                         onReactivate={() => handleReactivateClick(material)}
                       />
                     ))}
@@ -370,6 +399,7 @@ const MaterialsListPage: React.FC = () => {
                   onToggleExpand={() => toggleMaterialExpansion(material.id)}
                   onEdit={() => navigate(`/materials/${material.id}`)}
                   onDelete={() => handleDeleteClick(material)}
+                  onPermanentDelete={() => handleDeleteClick(material, "permanent")}
                   onReactivate={() => handleReactivateClick(material)}
                 />
               ))
@@ -392,11 +422,12 @@ const MaterialsListPage: React.FC = () => {
         onClose={() => {
           setShowDeleteDialog(false);
           setMaterialToDelete(null);
+          setMaterialDeleteMode("deactivate");
         }}
         onConfirm={handleConfirmDelete}
-        title="Deactivate Material"
-        message={`Are you sure you want to deactivate "${materialToDelete?.name}"? This material will be hidden but not permanently deleted.`}
-        confirmButtonText="Deactivate"
+        title={deleteDialogTitle}
+        message={deleteDialogMessage}
+        confirmButtonText={deleteDialogConfirmText}
         variant="danger"
       />
 
@@ -424,6 +455,7 @@ interface MaterialRowProps {
   onToggleExpand: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onPermanentDelete: () => void;
   onReactivate: () => void;
 }
 
@@ -433,6 +465,7 @@ const MaterialRow: React.FC<MaterialRowProps> = ({
   onToggleExpand,
   onEdit,
   onDelete,
+  onPermanentDelete,
   onReactivate,
 }) => {
   const formatCost = (cost: number | string) => Number(cost).toFixed(2);
@@ -533,13 +566,22 @@ const MaterialRow: React.FC<MaterialRowProps> = ({
                 <IconTrash className="w-4 h-4" />
               </button>
             ) : (
-              <button
-                onClick={onReactivate}
-                className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                title="Reactivate"
-              >
-                <IconRefresh className="w-4 h-4" />
-              </button>
+              <>
+                <button
+                  onClick={onReactivate}
+                  className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  title="Reactivate"
+                >
+                  <IconRefresh className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={onPermanentDelete}
+                  className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  title="Delete permanently"
+                >
+                  <IconTrash className="w-4 h-4" />
+                </button>
+              </>
             )}
           </div>
         </td>

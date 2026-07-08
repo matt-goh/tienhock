@@ -77,14 +77,22 @@ function getCurrentIssueDateTime() {
 function generateSupplierParty(supplier) {
   const addressLine1 = supplier.address_line_1 ? supplier.address_line_1 : "";
   const addressLine2 = supplier.address_line_2 ? supplier.address_line_2 : "";
+  // Foreign suppliers keep the fixed foreign values (they are stored that way);
+  // local self-billed suppliers carry their own TIN, MSIC and business activity.
+  const supplierTin = cleanValue(supplier.tin_number, FOREIGN_SUPPLIER_TIN);
+  const supplierMsic = cleanValue(supplier.msic_code, FOREIGN_SUPPLIER_MSIC_CODE);
+  const supplierActivity = cleanValue(
+    supplier.business_activity_description,
+    FOREIGN_SUPPLIER_MSIC_DESCRIPTION
+  );
 
   return `
   <cac:AccountingSupplierParty>
     <cbc:AdditionalAccountID schemeAgencyName="CertEX"></cbc:AdditionalAccountID>
     <cac:Party>
-      <cbc:IndustryClassificationCode name="${FOREIGN_SUPPLIER_MSIC_DESCRIPTION}">${FOREIGN_SUPPLIER_MSIC_CODE}</cbc:IndustryClassificationCode>
+      <cbc:IndustryClassificationCode name="${escapeXml(supplierActivity)}">${escapeXml(supplierMsic)}</cbc:IndustryClassificationCode>
       <cac:PartyIdentification>
-        <cbc:ID schemeID="TIN">${FOREIGN_SUPPLIER_TIN}</cbc:ID>
+        <cbc:ID schemeID="TIN">${escapeXml(supplierTin)}</cbc:ID>
       </cac:PartyIdentification>
       <cac:PartyIdentification>
         <cbc:ID schemeID="${escapeXml(cleanValue(supplier.id_type, "BRN"))}">${escapeXml(
@@ -269,7 +277,7 @@ function generateTaxSubtotal(totalTaxableAmount, totalTaxAmountMyr, taxType, cur
     </cac:TaxSubtotal>`;
 }
 
-function generateInvoiceLines(lines, currencyCode, fxRate) {
+function generateInvoiceLines(lines, currencyCode, fxRate, originCountry = "CHN") {
   return lines
     .map((line, index) => {
       const lineNumber = line.line_number || index + 1;
@@ -324,7 +332,7 @@ function generateInvoiceLines(lines, currencyCode, fxRate) {
     <cac:Item>
       <cbc:Description>${escapeXml(cleanValue(line.description, "NA"))}</cbc:Description>
       <cac:OriginCountry>
-        <cbc:IdentificationCode>CHN</cbc:IdentificationCode>
+        <cbc:IdentificationCode>${escapeXml(originCountry)}</cbc:IdentificationCode>
       </cac:OriginCountry>
       <cac:CommodityClassification>
         <cbc:ItemClassificationCode listID="CLASS">${escapeXml(
@@ -425,6 +433,7 @@ export async function SelfBilledInvoiceTemplate(invoiceData) {
       taxAmountMyr > 0 ? convertMyrToDocumentAmount(taxAmountMyr, fxRate) : 0;
     const totalIncludingTax = totalForeign + taxAmount;
     const firstTaxType = cleanValue(invoiceData.lines[0]?.tax_type, "06");
+    const originCountry = cleanValue(invoiceData.supplier?.country_code, "CHN");
     const summaryLine = buildSummaryInvoiceLine(invoiceData);
 
     let xml = TEMPLATE_HEADER;
@@ -486,7 +495,7 @@ export async function SelfBilledInvoiceTemplate(invoiceData) {
     <cbc:PayableAmount currencyID="${escapeXml(currencyCode)}">${formatAmount(totalIncludingTax)}</cbc:PayableAmount>
   </cac:LegalMonetaryTotal>`;
 
-    xml += generateInvoiceLines([summaryLine], escapeXml(currencyCode), fxRate);
+    xml += generateInvoiceLines([summaryLine], escapeXml(currencyCode), fxRate, originCountry);
     xml += TEMPLATE_FOOTER;
 
     return xml;

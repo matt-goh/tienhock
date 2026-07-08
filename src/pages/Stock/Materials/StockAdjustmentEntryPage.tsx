@@ -26,12 +26,14 @@ import {
   IconSearch,
   IconCategory2,
   IconSettings,
+  IconTrash,
 } from "@tabler/icons-react";
 import clsx from "clsx";
 import Button from "../../../components/Button";
 import Checkbox from "../../../components/Checkbox";
 import MonthNavigator from "../../../components/MonthNavigator";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import GeneralStockCategoryModal from "../../../components/Stock/GeneralStockCategoryModal";
 import { useProductsCache } from "../../../utils/invoice/useProductsCache";
 
@@ -59,6 +61,10 @@ interface StockAdjustmentEntryPageProps {
   mode: StockEntryMode;
   generalHeaderActions?: React.ReactNode;
 }
+
+type DeleteTarget =
+  | { type: "material"; material: MaterialWithStock }
+  | { type: "variant"; material: MaterialWithStock; variant: StockEntryRow };
 
 const categoryLabels: Record<MaterialCategory, string> = {
   ingredient: "Ingredients",
@@ -147,6 +153,14 @@ const makeNumber = (value: number | string | null | undefined): number => {
   return parseFloat(String(value ?? "")) || 0;
 };
 
+const getMaterialDisplayName = (material: MaterialWithStock): string => {
+  return material.custom_name || material.name;
+};
+
+const getVariantDisplayName = (variant: StockEntryRow): string => {
+  return variant.variant_name || variant.custom_description || "Unnamed variant";
+};
+
 const generalStockRowMatchesSearch = (row: GeneralStockRow, query: string): boolean => {
   if (!query) return true;
 
@@ -228,6 +242,8 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
   const [originalMaterials, setOriginalMaterials] = useState<MaterialWithStock[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [stockKilang, setStockKilang] = useState<StockKilangItem[]>([]);
   const [isLoadingStockKilang, setIsLoadingStockKilang] = useState(false);
   const [expandedMaterials, setExpandedMaterials] = useState<Set<number>>(new Set());
@@ -474,6 +490,57 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
       next.delete(materialId);
       return next;
     });
+  };
+
+  const handleDeleteMaterialClick = (
+    material: MaterialWithStock,
+    event?: React.MouseEvent<HTMLButtonElement>
+  ): void => {
+    event?.stopPropagation();
+    setDeleteTarget({ type: "material", material });
+  };
+
+  const handleDeleteVariantClick = (
+    material: MaterialWithStock,
+    variant: StockEntryRow,
+    event: React.MouseEvent<HTMLButtonElement>
+  ): void => {
+    event.stopPropagation();
+
+    if (!variant.variant_id) {
+      toast.error("Only registered variants can be deactivated from this page");
+      return;
+    }
+
+    setDeleteTarget({ type: "variant", material, variant });
+  };
+
+  const handleCloseDeleteDialog = (): void => {
+    if (isDeleting) return;
+    setDeleteTarget(null);
+  };
+
+  const handleConfirmDeleteTarget = async (): Promise<void> => {
+    if (!deleteTarget || isDeleting) return;
+
+    setIsDeleting(true);
+    try {
+      if (deleteTarget.type === "variant") {
+        await api.delete(`/api/materials/variants/${deleteTarget.variant.variant_id}`);
+        toast.success(`Variant "${getVariantDisplayName(deleteTarget.variant)}" deactivated`);
+      } else {
+        await api.delete(`/api/materials/${deleteTarget.material.id}`);
+        toast.success(`Material "${getMaterialDisplayName(deleteTarget.material)}" deactivated`);
+      }
+
+      setDeleteTarget(null);
+      await fetchData();
+    } catch (error: unknown) {
+      console.error("Error deactivating material stock item:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to deactivate item");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleVariantNameChange = (
@@ -977,6 +1044,22 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     />
   );
 
+  const deleteTargetName: string =
+    deleteTarget?.type === "variant"
+      ? getVariantDisplayName(deleteTarget.variant)
+      : deleteTarget
+        ? getMaterialDisplayName(deleteTarget.material)
+        : "";
+
+  const deleteDialogTitle: string =
+    deleteTarget?.type === "variant" ? "Deactivate Variant" : "Deactivate Material";
+
+  const deleteDialogMessage: string = deleteTarget
+    ? deleteTarget.type === "variant"
+      ? `Deactivate variant "${deleteTargetName}" from ${deleteTarget.material.name}? It will be hidden from stock entry and purchases, but existing stock history stays unchanged.${hasUnsavedChanges ? " Unsaved edits on this page will be discarded when it reloads." : ""}`
+      : `Deactivate material "${deleteTargetName}"? It will be hidden from stock entry and purchases, but existing stock history stays unchanged.${hasUnsavedChanges ? " Unsaved edits on this page will be discarded when it reloads." : ""}`
+    : "";
+
   return (
     <div className="space-y-3">
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm px-6 py-3">
@@ -1456,7 +1539,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                           <React.Fragment key={material.id}>
                             <tr
                               className={clsx(
-                                "bg-purple-50/70 dark:bg-gray-800 cursor-pointer hover:bg-purple-100/70 dark:hover:bg-gray-700/50 border-l-2 border-purple-400 dark:border-purple-700/60",
+                                "group bg-purple-50/70 dark:bg-gray-800 cursor-pointer hover:bg-purple-100/70 dark:hover:bg-gray-700/50 border-l-2 border-purple-400 dark:border-purple-700/60",
                                 isNegative && "bg-red-50/50 dark:bg-red-900/10 border-red-400 dark:border-red-700/60"
                               )}
                               onClick={() => toggleMaterialExpansion(material.id)}
@@ -1483,6 +1566,16 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                   {isNegative && (
                                     <IconAlertTriangle size={14} className="text-red-500" title="Negative closing stock" />
                                   )}
+                                  <button
+                                    type="button"
+                                    onClick={(event) => handleDeleteMaterialClick(material, event)}
+                                    disabled={isDeleting}
+                                    className="p-1 text-default-400 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:cursor-not-allowed disabled:opacity-50"
+                                    title="Deactivate material"
+                                    aria-label={`Deactivate material ${material.name}`}
+                                  >
+                                    <IconTrash size={14} />
+                                  </button>
                                 </div>
                               </td>
                               <td className="px-2 py-1.5 text-right font-mono text-sm text-default-500 dark:text-gray-400">
@@ -1513,7 +1606,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                 <tr
                                   key={`${material.id}-${variant.variant_id || variant.variant_name}`}
                                   className={clsx(
-                                    "bg-white dark:bg-gray-800 hover:bg-purple-50/50 dark:hover:bg-gray-700/30 border-l-2 border-purple-200 dark:border-purple-900/60",
+                                    "group bg-white dark:bg-gray-800 hover:bg-purple-50/50 dark:hover:bg-gray-700/30 border-l-2 border-purple-200 dark:border-purple-900/60",
                                     variantNegative && "bg-red-50/50 dark:bg-red-900/10 border-red-200 dark:border-red-900/60",
                                     !isLastVariant && "border-b border-dashed border-default-100 dark:border-gray-700"
                                   )}
@@ -1538,6 +1631,18 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                       />
                                       {variantNegative && (
                                         <IconAlertTriangle size={12} className="text-red-500" />
+                                      )}
+                                      {variant.variant_id && (
+                                        <button
+                                          type="button"
+                                          onClick={(event) => handleDeleteVariantClick(material, variant, event)}
+                                          disabled={isDeleting}
+                                          className="p-1 text-default-400 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:cursor-not-allowed disabled:opacity-50"
+                                          title="Deactivate variant"
+                                          aria-label={`Deactivate variant ${getVariantDisplayName(variant)}`}
+                                        >
+                                          <IconTrash size={13} />
+                                        </button>
                                       )}
                                     </div>
                                   </td>
@@ -1692,6 +1797,16 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                     <IconPlus size={14} />
                                   </button>
                                 )}
+                                <button
+                                  type="button"
+                                  onClick={(event) => handleDeleteMaterialClick(material, event)}
+                                  disabled={isDeleting}
+                                  className="p-1 text-default-400 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:cursor-not-allowed disabled:opacity-50"
+                                  title="Deactivate material"
+                                  aria-label={`Deactivate material ${getMaterialDisplayName(material)}`}
+                                >
+                                  <IconTrash size={14} />
+                                </button>
                               </div>
                             </td>
                             <td className="px-2 py-1.5 text-right">
@@ -1946,6 +2061,15 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
         onClose={() => setIsCategoryModalOpen(false)}
         categories={generalStockCategories}
         onChanged={fetchData}
+      />
+      <ConfirmationDialog
+        isOpen={deleteTarget !== null}
+        onClose={handleCloseDeleteDialog}
+        onConfirm={handleConfirmDeleteTarget}
+        title={deleteDialogTitle}
+        message={deleteDialogMessage}
+        confirmButtonText={isDeleting ? "Deactivating..." : "Deactivate"}
+        variant="danger"
       />
     </div>
   );

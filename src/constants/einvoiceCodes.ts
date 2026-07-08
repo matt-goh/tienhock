@@ -438,3 +438,25 @@ export const COUNTRY_OPTIONS: SelectOption[] = [
   { id: "ZMB", name: "ZMB - ZAMBIA" },
   { id: "ZWE", name: "ZWE - ZIMBABWE" },
 ];
+
+// Malaysian state / CountrySubentityCode values used by MyInvois for local
+// (self-billed) supplier addresses.
+export const MALAYSIAN_STATE_OPTIONS: SelectOption[] = [
+  { id: "01", name: "01 - Johor" },
+  { id: "02", name: "02 - Kedah" },
+  { id: "03", name: "03 - Kelantan" },
+  { id: "04", name: "04 - Melaka" },
+  { id: "05", name: "05 - Negeri Sembilan" },
+  { id: "06", name: "06 - Pahang" },
+  { id: "07", name: "07 - Pulau Pinang" },
+  { id: "08", name: "08 - Perak" },
+  { id: "09", name: "09 - Perlis" },
+  { id: "10", name: "10 - Selangor" },
+  { id: "11", name: "11 - Terengganu" },
+  { id: "12", name: "12 - Sabah" },
+  { id: "13", name: "13 - Sarawak" },
+  { id: "14", name: "14 - W.P. Kuala Lumpur" },
+  { id: "15", name: "15 - W.P. Labuan" },
+  { id: "16", name: "16 - W.P. Putrajaya" },
+  { id: "17", name: "17 - Not Applicable" },
+];

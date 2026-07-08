@@ -3,8 +3,13 @@ import { format } from "date-fns";
 import {
   IconArrowNarrowRight,
   IconDownload,
+  IconExternalLink,
   IconEye,
   IconFile,
+  IconHelpCircle,
+  IconInfoCircle,
+  IconRefresh,
+  IconSend,
   IconTrash,
   IconUpload,
   IconX,
@@ -13,7 +18,10 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import BackButton from "../../../components/BackButton";
 import Button from "../../../components/Button";
+import Checkbox from "../../../components/Checkbox";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
+import SelfBilledEligibilityDialog from "../../../components/Accounting/SelfBilledEligibilityDialog";
+import SellerTypeHelpDialog from "../../../components/Accounting/SellerTypeHelpDialog";
 import { FormInput, FormListbox } from "../../../components/FormComponents";
 import AccountCodeCombobox from "../../../components/Accounting/AccountCodeCombobox";
 import GeneralStockItemCombobox from "../../../components/Accounting/GeneralStockItemCombobox";
@@ -25,15 +33,18 @@ import SupplierPaymentInlineSection, {
   validateSupplierPaymentDraft,
 } from "../../../components/Accounting/SupplierPaymentInlineSection";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import { MALAYSIAN_STATE_OPTIONS } from "../../../constants/einvoiceCodes";
 import { useGeneralStockSearch } from "../../../hooks/useGeneralStockSearch";
 import { api } from "../../../routes/utils/api";
 import {
   GeneralStockCategory,
   GeneralStockRow,
+  SelfBilledEInvoiceStatus,
   SelfBilledForeignSupplier,
   SelfBilledInvoice,
   SelfBilledInvoiceInput,
   SelfBilledInvoiceLine,
+  SelfBilledInvoiceStatus,
 } from "../../../types/types";
 
 interface LocalGeneralPurchaseFormData {
@@ -58,6 +69,14 @@ interface SupplierPaymentSummary {
   status: "active" | "pending" | "cancelled";
 }
 
+// Seller categories that drive the self-billed TIN / identification rules
+// (IRBM e-Invoice Specific Guideline Tables 8.2 / 8.3).
+type LocalSellerType = "individual_mykad" | "individual_tin" | "business";
+
+// General TIN for a Malaysian individual who only provides MyKad/MyTentera.
+const LOCAL_INDIVIDUAL_TIN = "EI00000000010";
+const INDIVIDUAL_TIN_ONLY_ID = "000000000000";
+
 const today = format(new Date(), "yyyy-MM-dd");
 
 const toLocalDateInputValue = (value: string | null | undefined): string => {
@@ -68,11 +87,13 @@ const toLocalDateInputValue = (value: string | null | undefined): string => {
   return format(date, "yyyy-MM-dd");
 };
 
+// Supplier stub sent for plain (non-e-invoice) local purchases. The backend
+// ignores it because such purchases are not linked to a supplier record.
 const localSupplierStub: SelfBilledForeignSupplier = {
   supplier_name: "",
-  tin_number: "EI00000000030",
-  id_type: "BRN",
-  id_number: "NA",
+  tin_number: LOCAL_INDIVIDUAL_TIN,
+  id_type: "NRIC",
+  id_number: INDIVIDUAL_TIN_ONLY_ID,
   sst_number: "NA",
   ttx_number: "NA",
   msic_code: "00000",
@@ -89,6 +110,50 @@ const localSupplierStub: SelfBilledForeignSupplier = {
   notes: "",
   is_active: true,
 };
+
+const createDefaultLocalSupplier = (): SelfBilledForeignSupplier => ({
+  supplier_name: "",
+  tin_number: LOCAL_INDIVIDUAL_TIN,
+  id_type: "NRIC",
+  id_number: "",
+  sst_number: "NA",
+  ttx_number: "NA",
+  msic_code: "00000",
+  business_activity_description: "NA",
+  address_line_0: "",
+  address_line_1: "",
+  address_line_2: "",
+  city: "",
+  postcode: "",
+  state_code: "12",
+  country_code: "MYS",
+  contact_number: "NA",
+  email: "",
+  notes: "",
+  is_active: true,
+});
+
+const deriveSellerType = (
+  supplier: SelfBilledForeignSupplier | null | undefined
+): LocalSellerType => {
+  if (!supplier) return "individual_mykad";
+  if ((supplier.tin_number || "") === LOCAL_INDIVIDUAL_TIN) return "individual_mykad";
+  if ((supplier.id_number || "") === INDIVIDUAL_TIN_ONLY_ID) return "individual_tin";
+  return "business";
+};
+
+const sellerTypeOptions = [
+  { id: "individual_mykad", name: "Individual — MyKad/NRIC only" },
+  { id: "individual_tin", name: "Individual — own TIN" },
+  { id: "business", name: "Business / agent-dealer-distributor" },
+];
+
+const idTypeOptions = [
+  { id: "NRIC", name: "NRIC (MyKad)" },
+  { id: "BRN", name: "BRN (Business Reg. No.)" },
+  { id: "PASSPORT", name: "Passport" },
+  { id: "ARMY", name: "Army (MyTentera)" },
+];
 
 const toNumber = (value: string | number | null | undefined): number => {
   const parsed =
@@ -134,6 +199,34 @@ const formatQty = (amount: number): string => {
     maximumFractionDigits: 4,
   });
 };
+
+const getStatusLabel = (status: SelfBilledEInvoiceStatus): string => {
+  if (!status) return "Not Submitted";
+  return status.charAt(0).toUpperCase() + status.slice(1);
+};
+
+const getStatusClasses = (status: SelfBilledEInvoiceStatus): string => {
+  switch (status) {
+    case "valid":
+      return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
+    case "pending":
+      return "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300";
+    case "invalid":
+      return "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300";
+    case "cancelled":
+      return "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300";
+    default:
+      return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
+  }
+};
+
+const getInvoiceStatusLabel = (status: SelfBilledInvoiceStatus): string =>
+  status === "cancelled" ? "Cancelled" : "Active";
+
+const getInvoiceStatusClasses = (status: SelfBilledInvoiceStatus): string =>
+  status === "cancelled"
+    ? "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
+    : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
 
 const normalizeStockDescription = (value: string | null | undefined): string =>
   (value || "").trim().replace(/\s+/g, " ").toLowerCase();
@@ -187,20 +280,34 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
   const [categories, setCategories] = useState<GeneralStockCategory[]>([]);
   const [loading, setLoading] = useState<boolean>(isEditMode);
   const [saving, setSaving] = useState<boolean>(false);
+  const [submitting, setSubmitting] = useState<boolean>(false);
   const [s3Enabled, setS3Enabled] = useState<boolean>(true);
   const [supportingDocumentFile, setSupportingDocumentFile] = useState<File | null>(null);
   const [supportingDocumentUploading, setSupportingDocumentUploading] = useState<boolean>(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState<boolean>(false);
+  const [showCancelDialog, setShowCancelDialog] = useState<boolean>(false);
+  const [showEligibilityDialog, setShowEligibilityDialog] = useState<boolean>(false);
+  const [showSellerTypeHelp, setShowSellerTypeHelp] = useState<boolean>(false);
   const [showDocViewer, setShowDocViewer] = useState<boolean>(false);
   const [docViewerUrl, setDocViewerUrl] = useState<string | null>(null);
   const [supplierPayments, setSupplierPayments] = useState<SupplierPaymentSummary[]>([]);
   const [supplierPayment, setSupplierPayment] = useState<SupplierPaymentDraft>(
     () => createDefaultSupplierPaymentDraft(today, 0, !isEditMode)
   );
+
+  // Self-billed e-invoice (optional, off by default)
+  const [einvoiceEnabled, setEinvoiceEnabled] = useState<boolean>(false);
+  const [sellerType, setSellerType] = useState<LocalSellerType>("individual_mykad");
+  const [supplier, setSupplier] = useState<SelfBilledForeignSupplier>(
+    createDefaultLocalSupplier
+  );
+  const [supplierSuggestions, setSupplierSuggestions] = useState<
+    SelfBilledForeignSupplier[]
+  >([]);
+  const [supplierSearchFocused, setSupplierSearchFocused] = useState<boolean>(false);
+
   const previousPayableAmountRef = useRef<number>(0);
-  const stockSearch = useGeneralStockSearch({
-    initialDateTo: formData.purchase_date,
-  });
+  const stockSearch = useGeneralStockSearch();
 
   const categoryOptions = useMemo(
     () => [
@@ -242,13 +349,34 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
     Boolean(
       existingInvoice &&
         existingInvoice.invoice_status !== "cancelled" &&
-        existingInvoice.payment_status !== "paid"
+        existingInvoice.payment_status !== "paid" &&
+        existingInvoice.einvoice_status !== "pending" &&
+        existingInvoice.einvoice_status !== "valid" &&
+        existingInvoice.einvoice_status !== "cancelled"
     );
   const canEditRecords: boolean = canEdit;
   const canDelete: boolean =
     isEditMode &&
     existingInvoice?.invoice_status !== "cancelled" &&
-    existingInvoice?.payment_status === "unpaid";
+    existingInvoice?.payment_status === "unpaid" &&
+    (!existingInvoice?.einvoice_status ||
+      existingInvoice.einvoice_status === "invalid");
+  const canViewMyInvoisPortal =
+    isEditMode &&
+    Boolean(existingInvoice?.uuid) &&
+    Boolean(existingInvoice?.long_id) &&
+    (existingInvoice?.einvoice_status === "valid" ||
+      existingInvoice?.einvoice_status === "cancelled");
+  const myInvoisPortalUrl = canViewMyInvoisPortal
+    ? `https://myinvois.hasil.gov.my/${existingInvoice?.uuid}/share/${existingInvoice?.long_id}`
+    : null;
+  // Once an e-invoice document exists it can no longer be toggled off.
+  const einvoiceToggleLocked =
+    isEditMode &&
+    Boolean(
+      existingInvoice?.einvoice_status &&
+        existingInvoice.einvoice_status !== "invalid"
+    );
 
   useEffect(() => {
     setSupplierPayment((previous: SupplierPaymentDraft) =>
@@ -277,13 +405,24 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
       setCategories(fetchedCategories || []);
       setFormData({
         purchase_date: toLocalDateInputValue(invoice.purchase_date) || today,
-        supplier_name: invoice.local_supplier_name || "",
+        supplier_name: invoice.local_supplier_name || invoice.supplier?.supplier_name || "",
         order_no: invoice.order_no || "",
         payment_reference: invoice.payment_reference || "",
         amount_myr: String(toNumber(invoice.total_excluding_tax_myr || invoice.payable_amount_myr || line?.amount_myr)),
         account_code: invoice.account_code || line?.account_code || "",
         notes: invoice.notes || "",
       });
+
+      const hasEinvoiceSupplier = Boolean(invoice.foreign_supplier_id);
+      setEinvoiceEnabled(hasEinvoiceSupplier);
+      if (hasEinvoiceSupplier && invoice.supplier) {
+        setSupplier({ ...createDefaultLocalSupplier(), ...invoice.supplier });
+        setSellerType(deriveSellerType(invoice.supplier));
+      } else {
+        setSupplier(createDefaultLocalSupplier());
+        setSellerType("individual_mykad");
+      }
+
       setLines(
         invoice.lines.length > 0
           ? invoice.lines.map((invoiceLine: SelfBilledInvoiceLine) => ({
@@ -346,6 +485,31 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
       });
   }, [isEditMode]);
 
+  // Supplier autocomplete (shared self-billed supplier table)
+  useEffect(() => {
+    if (!einvoiceEnabled || !supplierSearchFocused) {
+      return;
+    }
+    const search = formData.supplier_name.trim();
+    if (search.length < 1) {
+      setSupplierSuggestions([]);
+      return;
+    }
+    const timer: number = window.setTimeout(async () => {
+      try {
+        const response = (await api.get(
+          `/api/general-purchases/foreign-suppliers?search=${encodeURIComponent(
+            search
+          )}&limit=8`
+        )) as SelfBilledForeignSupplier[];
+        setSupplierSuggestions(response || []);
+      } catch (error: unknown) {
+        console.error("Error fetching supplier suggestions:", error);
+      }
+    }, 200);
+    return () => window.clearTimeout(timer);
+  }, [formData.supplier_name, einvoiceEnabled, supplierSearchFocused]);
+
   const updateFormField = (
     field: keyof LocalGeneralPurchaseFormData,
     value: string
@@ -362,6 +526,59 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
           : previous
       );
     }
+  };
+
+  const updateSupplierField = (
+    field: keyof SelfBilledForeignSupplier,
+    value: string | boolean
+  ): void => {
+    setSupplier((previous: SelfBilledForeignSupplier) => ({
+      ...previous,
+      [field]: value as never,
+    }));
+  };
+
+  const applySellerType = (type: LocalSellerType): void => {
+    setSellerType(type);
+    setSupplier((previous: SelfBilledForeignSupplier) => {
+      if (type === "individual_mykad") {
+        return {
+          ...previous,
+          tin_number: LOCAL_INDIVIDUAL_TIN,
+          id_type: "NRIC",
+          id_number:
+            previous.id_number === INDIVIDUAL_TIN_ONLY_ID ? "" : previous.id_number,
+        };
+      }
+      if (type === "individual_tin") {
+        return {
+          ...previous,
+          tin_number:
+            previous.tin_number === LOCAL_INDIVIDUAL_TIN ? "" : previous.tin_number,
+          id_type: "NRIC",
+          id_number: INDIVIDUAL_TIN_ONLY_ID,
+        };
+      }
+      return {
+        ...previous,
+        tin_number:
+          previous.tin_number === LOCAL_INDIVIDUAL_TIN ? "" : previous.tin_number,
+        id_type: "BRN",
+        id_number:
+          previous.id_number === INDIVIDUAL_TIN_ONLY_ID ? "" : previous.id_number,
+      };
+    });
+  };
+
+  const applySupplierSuggestion = (suggestion: SelfBilledForeignSupplier): void => {
+    setSupplier({ ...createDefaultLocalSupplier(), ...suggestion, country_code: "MYS" });
+    setSellerType(deriveSellerType(suggestion));
+    setFormData((previous: LocalGeneralPurchaseFormData) => ({
+      ...previous,
+      supplier_name: suggestion.supplier_name || previous.supplier_name,
+    }));
+    setSupplierSearchFocused(false);
+    setSupplierSuggestions([]);
   };
 
   const updateLineField = (
@@ -457,6 +674,27 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
     );
   };
 
+  const validateEinvoiceSupplier = (): boolean => {
+    if (!einvoiceEnabled) return true;
+    if (!supplier.address_line_0.trim() || !supplier.city.trim()) {
+      toast.error("Supplier address and city are required for e-invoice");
+      return false;
+    }
+    if (sellerType !== "individual_mykad" && !supplier.tin_number.trim()) {
+      toast.error("Supplier TIN is required for this seller type");
+      return false;
+    }
+    if (sellerType !== "individual_tin" && !supplier.id_number.trim()) {
+      toast.error(
+        sellerType === "business"
+          ? "Business registration number is required"
+          : "MyKad / identification number is required"
+      );
+      return false;
+    }
+    return true;
+  };
+
   const validateBeforeSave = (): boolean => {
     if (!formData.supplier_name.trim()) {
       toast.error("Supplier name is required");
@@ -501,6 +739,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
       );
       return false;
     }
+    if (!validateEinvoiceSupplier()) return false;
     const paymentError: string | null = validateSupplierPaymentDraft(
       supplierPayment,
       outstandingPaymentAmount
@@ -512,7 +751,30 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
     return true;
   };
 
-  const buildPayload = (): SelfBilledInvoiceInput => {
+  const buildSupplierPayload = (): SelfBilledForeignSupplier => {
+    if (!einvoiceEnabled) return localSupplierStub;
+    return {
+      ...supplier,
+      supplier_name: formData.supplier_name.trim(),
+      tin_number:
+        sellerType === "individual_mykad"
+          ? LOCAL_INDIVIDUAL_TIN
+          : supplier.tin_number.trim() || LOCAL_INDIVIDUAL_TIN,
+      id_type: supplier.id_type || "NRIC",
+      id_number:
+        sellerType === "individual_tin"
+          ? INDIVIDUAL_TIN_ONLY_ID
+          : supplier.id_number.trim(),
+      sst_number: supplier.sst_number.trim() || "NA",
+      msic_code: supplier.msic_code.trim() || "00000",
+      business_activity_description:
+        supplier.business_activity_description.trim() || "NA",
+      contact_number: supplier.contact_number.trim() || "NA",
+      country_code: "MYS",
+    };
+  };
+
+  const buildPayload = (): SelfBilledInvoiceInput & { einvoice_enabled: boolean } => {
     const amountMyr = toNumber(formData.amount_myr);
     const linePayloads: SelfBilledInvoiceLine[] = lines.map(
       (line: SelfBilledInvoiceLine, index: number) => {
@@ -545,9 +807,12 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
 
     return {
       purchase_kind: "local",
-      foreign_supplier_id: null,
+      einvoice_enabled: einvoiceEnabled,
+      foreign_supplier_id: einvoiceEnabled
+        ? supplier.id || existingInvoice?.foreign_supplier_id || null
+        : null,
       local_supplier_name: formData.supplier_name.trim(),
-      supplier: localSupplierStub,
+      supplier: buildSupplierPayload(),
       purchase_date: formData.purchase_date,
       transaction_type: "Local general purchase",
       platform: null,
@@ -629,8 +894,8 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
     }
   };
 
-  const saveInvoice = async (): Promise<void> => {
-    if (!validateBeforeSave()) return;
+  const saveInvoice = async (): Promise<number | null> => {
+    if (!validateBeforeSave()) return null;
 
     setSaving(true);
     try {
@@ -648,7 +913,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
             : "Local general purchase updated"
         );
         await loadInvoice();
-        return;
+        return Number.parseInt(id, 10);
       }
 
       const response: { invoice: { id: number } } = await api.post(
@@ -667,11 +932,76 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
           : "Local general purchase created"
       );
       navigate(`/stock/general-purchases/local/${newId}`, { replace: true });
+      return newId;
     } catch (error: unknown) {
       console.error("Error saving local general purchase:", error);
       toast.error(error instanceof Error ? error.message : "Failed to save local general purchase");
+      return null;
     } finally {
       setSaving(false);
+    }
+  };
+
+  const submitEInvoice = async (): Promise<void> => {
+    setShowEligibilityDialog(false);
+    const invoiceId = await saveInvoice();
+    if (!invoiceId) return;
+
+    setSubmitting(true);
+    try {
+      await api.post(`/api/general-purchases/${invoiceId}/submit`, {});
+      toast.success("Submitted to MyInvois");
+      if (isEditMode) {
+        await loadInvoice();
+      } else {
+        navigate(`/stock/general-purchases/local/${invoiceId}`, { replace: true });
+      }
+    } catch (error: unknown) {
+      console.error("Error submitting local self-billed invoice:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to submit to MyInvois"
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const refreshStatus = async (): Promise<void> => {
+    if (!id) return;
+    try {
+      await api.put(`/api/general-purchases/${id}/refresh-status`, {});
+      toast.success("Status refreshed");
+      await loadInvoice();
+    } catch (error: unknown) {
+      console.error("Error refreshing local self-billed status:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to refresh status");
+    }
+  };
+
+  const clearStatus = async (): Promise<void> => {
+    if (!id) return;
+    try {
+      await api.post(`/api/general-purchases/${id}/clear-status`, {});
+      toast.success("E-invoice status cleared");
+      await loadInvoice();
+    } catch (error: unknown) {
+      console.error("Error clearing local self-billed status:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to clear status");
+    }
+  };
+
+  const cancelInvoice = async (): Promise<void> => {
+    if (!id) return;
+    try {
+      await api.post(`/api/general-purchases/${id}/cancel`, {
+        reason: "Cancelled via system",
+      });
+      toast.success("Local general purchase cancelled");
+      setShowCancelDialog(false);
+      await loadInvoice();
+    } catch (error: unknown) {
+      console.error("Error cancelling local self-billed invoice:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to cancel invoice");
     }
   };
 
@@ -750,7 +1080,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <BackButton onClick={() => navigate(backUrl)} />
           <span className="text-default-300 dark:text-gray-600">|</span>
@@ -759,13 +1089,80 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
               {isEditMode ? "Local General Purchase" : "New Local General Purchase"}
             </h1>
             {existingInvoice && (
-              <p className="text-sm text-default-500 dark:text-gray-400">
-                {existingInvoice.self_billed_no}
-              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-default-500 dark:text-gray-400">
+                  {existingInvoice.self_billed_no}
+                </span>
+                <span
+                  className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getInvoiceStatusClasses(
+                    existingInvoice.invoice_status
+                  )}`}
+                >
+                  {getInvoiceStatusLabel(existingInvoice.invoice_status)}
+                </span>
+                {(einvoiceEnabled || existingInvoice.einvoice_status) && (
+                  <span
+                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getStatusClasses(
+                      existingInvoice.einvoice_status
+                    )}`}
+                  >
+                    E-Invoice: {getStatusLabel(existingInvoice.einvoice_status)}
+                  </span>
+                )}
+              </div>
             )}
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {myInvoisPortalUrl && (
+            <a
+              href={myInvoisPortalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-8 items-center gap-2 rounded-lg border border-default-300 bg-white px-3 text-sm font-medium text-default-700 hover:bg-default-50 hover:text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 dark:hover:text-sky-300"
+              title="View in MyInvois Portal"
+            >
+              <IconExternalLink size={16} />
+              E-Invoice Details
+            </a>
+          )}
+          {isEditMode && existingInvoice?.uuid && (
+            <Button
+              type="button"
+              icon={IconRefresh}
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-lg"
+              onClick={refreshStatus}
+            >
+              Refresh E-Invoice
+            </Button>
+          )}
+          {isEditMode && existingInvoice?.einvoice_status && canEdit && (
+            <Button
+              type="button"
+              icon={IconX}
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-lg"
+              onClick={clearStatus}
+            >
+              Clear Status
+            </Button>
+          )}
+          {isEditMode && existingInvoice?.invoice_status !== "cancelled" && (
+            <Button
+              type="button"
+              icon={IconX}
+              color="rose"
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-lg"
+              onClick={() => setShowCancelDialog(true)}
+            >
+              Cancel
+            </Button>
+          )}
           {canDelete && (
             <Button
               type="button"
@@ -773,9 +1170,24 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
               variant="outline"
               size="sm"
               icon={IconTrash}
+              className="h-8 rounded-lg"
               onClick={() => setShowDeleteDialog(true)}
             >
               Delete
+            </Button>
+          )}
+          {einvoiceEnabled && canEdit && (
+            <Button
+              type="button"
+              icon={IconSend}
+              color="amber"
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-lg"
+              disabled={submitting || saving}
+              onClick={() => setShowEligibilityDialog(true)}
+            >
+              {submitting ? "Submitting..." : "Save & Submit e-Invoice"}
             </Button>
           )}
           <Button
@@ -783,7 +1195,8 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
             color="sky"
             variant="filled"
             size="sm"
-            disabled={!canEdit || saving || supportingDocumentUploading}
+            className="h-8 rounded-lg"
+            disabled={!canEdit || saving || submitting || supportingDocumentUploading}
             onClick={saveInvoice}
           >
             {saving ? "Saving..." : "Save"}
@@ -813,16 +1226,51 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
             disabled={!canEdit}
             required
           />
-          <FormInput
-            name="supplier_name"
-            label="Supplier Name"
-            value={formData.supplier_name}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-              updateFormField("supplier_name", event.target.value)
-            }
-            disabled={!canEdit}
-            required
-          />
+          <div className="relative">
+            <FormInput
+              name="supplier_name"
+              label="Supplier Name"
+              value={formData.supplier_name}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                if (einvoiceEnabled) setSupplierSearchFocused(true);
+                updateFormField("supplier_name", event.target.value);
+              }}
+              onBlur={() =>
+                window.setTimeout(() => setSupplierSearchFocused(false), 150)
+              }
+              disabled={!canEdit}
+              required
+            />
+            {einvoiceEnabled &&
+              canEdit &&
+              supplierSearchFocused &&
+              supplierSuggestions.length > 0 && (
+                <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-default-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800">
+                  {supplierSuggestions.map(
+                    (suggestion: SelfBilledForeignSupplier) => (
+                      <button
+                        key={suggestion.id}
+                        type="button"
+                        onMouseDown={(
+                          event: React.MouseEvent<HTMLButtonElement>
+                        ) => {
+                          event.preventDefault();
+                          applySupplierSuggestion(suggestion);
+                        }}
+                        className="block w-full px-3 py-2 text-left text-sm text-default-700 hover:bg-default-50 dark:text-gray-200 dark:hover:bg-gray-700"
+                      >
+                        <span className="block truncate font-medium">
+                          {suggestion.supplier_name}
+                        </span>
+                        <span className="block truncate text-xs text-default-500 dark:text-gray-400">
+                          {suggestion.city || "-"} / TIN {suggestion.tin_number}
+                        </span>
+                      </button>
+                    )
+                  )}
+                </div>
+              )}
+          </div>
           <FormInput
             name="order_no"
             label="Order No."
@@ -833,6 +1281,177 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
             disabled={!canEdit}
           />
         </div>
+      </section>
+
+      {/* ── Self-Billed e-Invoice (optional) ── */}
+      <section className="rounded-lg border border-default-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
+              Self-Billed e-Invoice
+            </h2>
+            <p className="mt-0.5 text-xs text-default-500 dark:text-gray-400">
+              Optional. Only enable when this local supplier qualifies for a
+              self-billed e-invoice (agents/dealers, individuals not in business,
+              interest, etc.).
+            </p>
+          </div>
+          <Checkbox
+            checked={einvoiceEnabled}
+            onChange={(checked: boolean) => setEinvoiceEnabled(checked)}
+            disabled={!canEdit || einvoiceToggleLocked}
+            label="Issue e-invoice"
+            labelPosition="left"
+          />
+        </div>
+
+        {einvoiceEnabled && (
+          <div className="mt-3 space-y-3 border-t border-default-200 pt-3 dark:border-gray-700">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-default-500 dark:text-gray-400">
+                Not sure which seller type applies to this supplier?
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowSellerTypeHelp(true)}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-sky-700 hover:bg-sky-50 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:text-sky-300 dark:hover:bg-sky-900/30"
+              >
+                <IconHelpCircle size={15} />
+                Which seller type?
+              </button>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              <FormListbox
+                name="seller_type"
+                label="Seller Type"
+                value={sellerType}
+                onChange={(value: string) =>
+                  applySellerType(value as LocalSellerType)
+                }
+                options={sellerTypeOptions}
+                disabled={!canEdit}
+              />
+              <FormListbox
+                name="id_type"
+                label="ID Type"
+                value={supplier.id_type}
+                onChange={(value: string) => updateSupplierField("id_type", value)}
+                options={idTypeOptions}
+                disabled={!canEdit}
+              />
+              <FormInput
+                name="tin_number"
+                label="Supplier TIN"
+                value={supplier.tin_number}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  updateSupplierField("tin_number", event.target.value)
+                }
+                disabled={!canEdit || sellerType === "individual_mykad"}
+              />
+              <FormInput
+                name="id_number"
+                label={
+                  sellerType === "business"
+                    ? "Business Reg. No. (BRN)"
+                    : "MyKad / ID Number"
+                }
+                value={supplier.id_number}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  updateSupplierField("id_number", event.target.value)
+                }
+                disabled={!canEdit || sellerType === "individual_tin"}
+              />
+              <FormInput
+                name="contact_number"
+                label="Contact No."
+                value={supplier.contact_number}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  updateSupplierField("contact_number", event.target.value)
+                }
+                disabled={!canEdit}
+              />
+              <FormInput
+                name="sst_number"
+                label="SST No."
+                value={supplier.sst_number}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  updateSupplierField("sst_number", event.target.value)
+                }
+                disabled={!canEdit}
+              />
+              <FormInput
+                name="address_line_0"
+                label="Address"
+                value={supplier.address_line_0}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  updateSupplierField("address_line_0", event.target.value)
+                }
+                disabled={!canEdit}
+                required
+              />
+              <FormInput
+                name="city"
+                label="City"
+                value={supplier.city}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  updateSupplierField("city", event.target.value)
+                }
+                disabled={!canEdit}
+                required
+              />
+              <FormInput
+                name="postcode"
+                label="Postcode"
+                value={supplier.postcode ?? ""}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  updateSupplierField("postcode", event.target.value)
+                }
+                disabled={!canEdit}
+              />
+              <FormListbox
+                name="state_code"
+                label="State"
+                value={supplier.state_code}
+                onChange={(value: string) =>
+                  updateSupplierField("state_code", value)
+                }
+                options={MALAYSIAN_STATE_OPTIONS}
+                disabled={!canEdit}
+              />
+              <FormInput
+                name="msic_code"
+                label="MSIC Code"
+                value={supplier.msic_code}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  updateSupplierField("msic_code", event.target.value)
+                }
+                disabled={!canEdit}
+              />
+              <FormInput
+                name="business_activity_description"
+                label="Business Activity"
+                value={supplier.business_activity_description}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  updateSupplierField(
+                    "business_activity_description",
+                    event.target.value
+                  )
+                }
+                disabled={!canEdit}
+              />
+            </div>
+            <p className="text-xs text-default-500 dark:text-gray-400">
+              TIN used: <span className="font-medium">{
+                sellerType === "individual_mykad"
+                  ? LOCAL_INDIVIDUAL_TIN
+                  : supplier.tin_number || "(enter TIN)"
+              }</span>
+              {sellerType === "individual_tin" && (
+                <> · ID set to {INDIVIDUAL_TIN_ONLY_ID} per guideline concession</>
+              )}
+            </p>
+          </div>
+        )}
       </section>
 
       <section className="rounded-lg border border-default-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
@@ -853,7 +1472,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
           )}
         </div>
         <div className="space-y-3">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2">
             <FormInput
               name="amount_myr"
               label="Amount (MYR)"
@@ -874,26 +1493,6 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
               onChange={(value: string) => updateFormField("account_code", value)}
               disabled={!canEdit}
               placeholder="Pick the expense account to debit"
-            />
-            <FormInput
-              name="stock_search_from"
-              label="Stock Date From"
-              value={stockSearch.dateFrom}
-              type="date"
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                stockSearch.setDateFrom(event.target.value)
-              }
-              disabled={!canEdit}
-            />
-            <FormInput
-              name="stock_search_to"
-              label="Stock Date To"
-              value={stockSearch.dateTo}
-              type="date"
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                stockSearch.setDateTo(event.target.value)
-              }
-              disabled={!canEdit}
             />
           </div>
           <div className="space-y-3">
@@ -974,6 +1573,18 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
                         </div>
                         <span className="ml-auto inline-flex shrink-0 items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold tabular-nums text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
                           +{formatQty(toNumber(line.balance_quantity))}
+                        </span>
+                      </div>
+                    )}
+                    {!selectedStockRow && (
+                      <div className="flex items-center gap-2 rounded-lg border border-sky-200/70 bg-sky-50/70 px-3 py-2 text-xs text-sky-700 dark:border-sky-900/60 dark:bg-sky-900/20 dark:text-sky-300">
+                        <IconInfoCircle size={16} className="shrink-0" />
+                        <span>
+                          New item — leave this empty and just type the{" "}
+                          <span className="font-semibold">Item Description</span>{" "}
+                          below to register a new General Stock item (set a{" "}
+                          <span className="font-semibold">Balance Qty</span> to
+                          stock it).
                         </span>
                       </div>
                     )}
@@ -1076,7 +1687,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
           draft={supplierPayment}
           outstandingAmount={outstandingPaymentAmount}
           onChange={setSupplierPayment}
-          disabled={saving || supportingDocumentUploading}
+          disabled={saving || submitting || supportingDocumentUploading}
         />
       )}
 
@@ -1263,6 +1874,18 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
         </div>
       )}
 
+      <SelfBilledEligibilityDialog
+        isOpen={showEligibilityDialog}
+        onClose={() => setShowEligibilityDialog(false)}
+        onConfirm={submitEInvoice}
+        submitting={submitting || saving}
+      />
+
+      <SellerTypeHelpDialog
+        isOpen={showSellerTypeHelp}
+        onClose={() => setShowSellerTypeHelp(false)}
+      />
+
       <ConfirmationDialog
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
@@ -1270,6 +1893,18 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
         title="Delete Local General Purchase"
         message={`Delete "${existingInvoice?.self_billed_no || "this draft"}"?`}
         confirmButtonText="Delete"
+        variant="danger"
+      />
+
+      <ConfirmationDialog
+        isOpen={showCancelDialog}
+        onClose={() => setShowCancelDialog(false)}
+        onConfirm={cancelInvoice}
+        title="Cancel Local General Purchase"
+        message={`Cancel "${
+          existingInvoice?.self_billed_no || "this draft"
+        }"? This marks the purchase as Cancelled and will also cancel the MyInvois document when one exists.`}
+        confirmButtonText="Cancel Invoice"
         variant="danger"
       />
     </div>
