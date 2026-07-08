@@ -19,6 +19,45 @@ export default function (pool) {
     return `${year}-${month}-${day}`;
   };
 
+  const normalizeDateString = (value) => {
+    const normalized = typeof value === "string" ? value.trim() : "";
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return null;
+
+    const [year, month, day] = normalized.split("-").map(Number);
+    const date = new Date(year, month - 1, day);
+    if (
+      date.getFullYear() !== year ||
+      date.getMonth() !== month - 1 ||
+      date.getDate() !== day
+    ) {
+      return null;
+    }
+
+    return normalized;
+  };
+
+  const getMonthRangeFromString = (monthValue) => {
+    if (typeof monthValue !== "string" || !/^\d{4}-\d{2}$/.test(monthValue)) {
+      return null;
+    }
+
+    const [year, monthNum] = monthValue.split("-").map(Number);
+    if (!Number.isInteger(year) || !Number.isInteger(monthNum) || monthNum < 1 || monthNum > 12) {
+      return null;
+    }
+
+    return {
+      year,
+      monthNum,
+      startDate: formatDateLocal(new Date(year, monthNum - 1, 1)),
+      endDate: formatDateLocal(new Date(year, monthNum, 0)),
+    };
+  };
+
+  const isDateInMonth = (dateString, monthRange) => {
+    return dateString >= monthRange.startDate && dateString <= monthRange.endDate;
+  };
+
   /**
    * Helper function to get date range based on view type
    */
@@ -935,14 +974,17 @@ export default function (pool) {
         });
       }
 
-      // Parse month to get date range
-      const [year, monthNum] = month.split("-").map(Number);
-      const startDate = new Date(year, monthNum - 1, 1);
-      const endDate = new Date(year, monthNum, 0); // Last day of month
+      const monthRange = getMonthRangeFromString(month);
+      if (!monthRange) {
+        return res.status(400).json({
+          message: "month parameter must be in YYYY-MM format",
+        });
+      }
 
       const query = `
         SELECT
           reference,
+          MIN(entry_date)::text as entry_date,
           COUNT(DISTINCT product_id) as product_count,
           SUM(CASE WHEN adjustment_type = 'ADJ_IN' THEN quantity ELSE 0 END) as total_adj_in,
           SUM(CASE WHEN adjustment_type IN ('ADJ_OUT', 'DEFECT') THEN quantity ELSE 0 END) as total_adj_out,
@@ -955,8 +997,8 @@ export default function (pool) {
       `;
 
       const result = await pool.query(query, [
-        startDate.toISOString().split("T")[0],
-        endDate.toISOString().split("T")[0],
+        monthRange.startDate,
+        monthRange.endDate,
       ]);
 
       res.json(result.rows);
@@ -984,15 +1026,17 @@ export default function (pool) {
         });
       }
 
-      // Parse month to get date range
-      const [year, monthNum] = month.split("-").map(Number);
-      const startDate = new Date(year, monthNum - 1, 1);
-      const endDate = new Date(year, monthNum, 0);
+      const monthRange = getMonthRangeFromString(month);
+      if (!monthRange) {
+        return res.status(400).json({
+          message: "month parameter must be in YYYY-MM format",
+        });
+      }
 
       const query = `
         SELECT
           sa.id,
-          sa.entry_date,
+          sa.entry_date::text as entry_date,
           sa.product_id,
           sa.adjustment_type,
           sa.quantity,
@@ -1009,8 +1053,8 @@ export default function (pool) {
       `;
 
       const result = await pool.query(query, [
-        startDate.toISOString().split("T")[0],
-        endDate.toISOString().split("T")[0],
+        monthRange.startDate,
+        monthRange.endDate,
         reference,
       ]);
 
@@ -1037,6 +1081,7 @@ export default function (pool) {
       res.json({
         reference,
         month,
+        entry_date: result.rows[0]?.entry_date || null,
         adjustments: Array.from(adjustmentsByProduct.values()),
       });
     } catch (error) {
@@ -1051,11 +1096,11 @@ export default function (pool) {
   /**
    * POST /api/stock/adjustments/batch
    * Batch save adjustments for a month with a reference
-   * Body: { month: "YYYY-MM", reference: "REF-123", adjustments: [{ product_id, adj_in, adj_out }] }
+   * Body: { month: "YYYY-MM", entry_date: "YYYY-MM-DD", reference: "REF-123", adjustments: [{ product_id, adj_in, adj_out }] }
    */
   router.post("/adjustments/batch", async (req, res) => {
     try {
-      const { month, reference, adjustments, created_by } = req.body;
+      const { month, reference, entry_date, adjustments, created_by } = req.body;
 
       if (!month || !reference || !Array.isArray(adjustments)) {
         return res.status(400).json({
@@ -1063,10 +1108,29 @@ export default function (pool) {
         });
       }
 
-      // Parse month to get last day
-      const [year, monthNum] = month.split("-").map(Number);
-      const lastDayOfMonth = new Date(year, monthNum, 0);
-      const entryDate = lastDayOfMonth.toISOString().split("T")[0];
+      const monthRange = getMonthRangeFromString(month);
+      if (!monthRange) {
+        return res.status(400).json({
+          message: "month must be in YYYY-MM format",
+        });
+      }
+
+      const entryDate =
+        entry_date === undefined || entry_date === null || entry_date === ""
+          ? monthRange.endDate
+          : normalizeDateString(entry_date);
+
+      if (!entryDate) {
+        return res.status(400).json({
+          message: "entry_date must be a valid date in YYYY-MM-DD format",
+        });
+      }
+
+      if (!isDateInMonth(entryDate, monthRange)) {
+        return res.status(400).json({
+          message: "entry_date must be within the submitted month",
+        });
+      }
 
       const client = await pool.connect();
 
@@ -1077,8 +1141,8 @@ export default function (pool) {
         await client.query(
           `DELETE FROM stock_adjustments
            WHERE reference = $1
-           AND entry_date = $2`,
-          [reference, entryDate]
+           AND entry_date BETWEEN $2 AND $3`,
+          [reference, monthRange.startDate, monthRange.endDate]
         );
 
         const savedEntries = [];
@@ -1159,10 +1223,12 @@ export default function (pool) {
         });
       }
 
-      // Parse month to get date range
-      const [year, monthNum] = month.split("-").map(Number);
-      const startDate = new Date(year, monthNum - 1, 1);
-      const endDate = new Date(year, monthNum, 0);
+      const monthRange = getMonthRangeFromString(month);
+      if (!monthRange) {
+        return res.status(400).json({
+          message: "month parameter must be in YYYY-MM format",
+        });
+      }
 
       const query = `
         DELETE FROM stock_adjustments
@@ -1172,8 +1238,8 @@ export default function (pool) {
       `;
 
       const result = await pool.query(query, [
-        startDate.toISOString().split("T")[0],
-        endDate.toISOString().split("T")[0],
+        monthRange.startDate,
+        monthRange.endDate,
         reference,
       ]);
 

@@ -52,6 +52,10 @@ interface VariantEditState {
 
 type DeleteMode = "deactivate" | "permanent";
 
+interface HardDeleteResponse {
+  deleted_stock_entries?: number;
+}
+
 // Category options
 const categoryOptions: SelectOption[] = [
   { id: "ingredient", name: "Ingredient" },
@@ -215,8 +219,15 @@ const MaterialFormPage: React.FC = () => {
 
     try {
       if (variantDeleteMode === "permanent") {
-        await api.delete(`/api/materials/variants/${variantToDelete.id}?hard=true`);
-        toast.success("Variant deleted permanently");
+        const response: HardDeleteResponse = await api.delete(
+          `/api/materials/variants/${variantToDelete.id}?hard=true`
+        );
+        const deletedStockEntries: number = response.deleted_stock_entries || 0;
+        toast.success(
+          deletedStockEntries > 0
+            ? `Variant deleted permanently (${deletedStockEntries} stock records removed)`
+            : "Variant deleted permanently"
+        );
       } else {
         await api.delete(`/api/materials/variants/${variantToDelete.id}`);
         toast.success("Variant deactivated");
@@ -337,8 +348,15 @@ const MaterialFormPage: React.FC = () => {
 
     try {
       if (materialDeleteMode === "permanent") {
-        await api.delete(`/api/materials/${id}?hard=true`);
-        toast.success("Material deleted permanently");
+        const response: HardDeleteResponse = await api.delete(
+          `/api/materials/${id}?hard=true`
+        );
+        const deletedStockEntries: number = response.deleted_stock_entries || 0;
+        toast.success(
+          deletedStockEntries > 0
+            ? `Material deleted permanently (${deletedStockEntries} stock records removed)`
+            : "Material deleted permanently"
+        );
       } else {
         await api.delete(`/api/materials/${id}`);
         toast.success("Material deactivated successfully");
@@ -386,7 +404,7 @@ const MaterialFormPage: React.FC = () => {
     materialDeleteMode === "permanent" ? "Delete Material Permanently" : "Deactivate Material";
   const materialDeleteDialogMessage: string =
     materialDeleteMode === "permanent"
-      ? `Permanently delete "${formData.name}"? This only works after the material is inactive and has no stock adjustments or purchase lines. This action cannot be undone.`
+      ? `Permanently delete "${formData.name}"? This only works after the material is inactive and not used in purchase invoices. Any stock records for it and its variants will be removed. This action cannot be undone.`
       : `Are you sure you want to deactivate "${formData.name}"? This material will be hidden but not permanently deleted.`;
   const materialDeleteConfirmText: string =
     materialDeleteMode === "permanent" ? "Delete Permanently" : "Deactivate";
@@ -394,7 +412,7 @@ const MaterialFormPage: React.FC = () => {
     variantDeleteMode === "permanent" ? "Delete Variant Permanently" : "Deactivate Variant";
   const variantDeleteDialogMessage: string =
     variantDeleteMode === "permanent"
-      ? `Permanently delete variant "${variantToDelete?.variant_name}"? This only works after the variant is inactive and has no stock adjustments or purchase lines. This action cannot be undone.`
+      ? `Permanently delete variant "${variantToDelete?.variant_name}"? This only works after the variant is inactive and not used in purchase invoices. Any stock records for this variant will be removed. This action cannot be undone.`
       : `Are you sure you want to deactivate variant "${variantToDelete?.variant_name}"? This variant will be hidden but not permanently deleted.`;
   const variantDeleteConfirmText: string =
     variantDeleteMode === "permanent" ? "Delete Permanently" : "Deactivate";

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
+import { format } from "date-fns";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import {
   StockAdjustmentReference,
@@ -18,10 +19,32 @@ import {
 } from "@tabler/icons-react";
 import clsx from "clsx";
 import Button from "../../components/Button";
-import MonthNavigator from "../../components/MonthNavigator";
+import TimeNavigator, { type TimeRange } from "../../components/TimeNavigator";
 import { OTH_PRODUCTION_IDS } from "../../config/othProductionProducts";
 
 type ProductTab = "BH" | "MEE" | "OTH";
+
+const parseLocalDate = (value: string): Date => {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+};
+
+const isSameLocalDate = (first: Date, second: Date): boolean => {
+  return (
+    first.getFullYear() === second.getFullYear() &&
+    first.getMonth() === second.getMonth() &&
+    first.getDate() === second.getDate()
+  );
+};
+
+const formatDisplayDate = (value: string): string => {
+  const date = parseLocalDate(value);
+  return date.toLocaleDateString("en-MY", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+};
 
 interface ProductStockAdjustmentEntryPageProps {
   // Restrict the page to specific product types (e.g. ["JP"] for the Jelly
@@ -32,8 +55,13 @@ interface ProductStockAdjustmentEntryPageProps {
 const ProductStockAdjustmentEntryPage: React.FC<
   ProductStockAdjustmentEntryPageProps
 > = ({ productTypes }) => {
-  // Month selection state
-  const [selectedMonth, setSelectedMonth] = useState<Date>(() => new Date());
+  // Adjustment date selection state
+  const [selectedAdjustmentDate, setSelectedAdjustmentDate] = useState<Date>(
+    () => new Date()
+  );
+  const [originalEntryDate, setOriginalEntryDate] = useState<string | null>(
+    null
+  );
 
   // References state
   const [references, setReferences] = useState<StockAdjustmentReference[]>([]);
@@ -96,15 +124,36 @@ const ProductStockAdjustmentEntryPage: React.FC<
       ? meeProducts
       : othProducts);
 
+  const adjustmentDateText = useMemo(
+    () => format(selectedAdjustmentDate, "yyyy-MM-dd"),
+    [selectedAdjustmentDate]
+  );
+
+  const adjustmentDateRange = useMemo<TimeRange>(
+    () => ({
+      start: selectedAdjustmentDate,
+      end: selectedAdjustmentDate,
+    }),
+    [selectedAdjustmentDate]
+  );
+
   // Format month for API calls (YYYY-MM)
   const monthString = useMemo(() => {
-    const year = selectedMonth.getFullYear();
-    const month = String(selectedMonth.getMonth() + 1).padStart(2, "0");
+    const year = selectedAdjustmentDate.getFullYear();
+    const month = String(selectedAdjustmentDate.getMonth() + 1).padStart(2, "0");
     return `${year}-${month}`;
-  }, [selectedMonth]);
+  }, [selectedAdjustmentDate]);
 
   // Calculate if there are unsaved changes
   const hasUnsavedChanges = useMemo(() => {
+    if (
+      (selectedReference || isCreatingNew) &&
+      originalEntryDate &&
+      adjustmentDateText !== originalEntryDate
+    ) {
+      return true;
+    }
+
     const currentKeys = Object.keys(entries);
     const originalKeys = Object.keys(originalEntries);
 
@@ -123,7 +172,14 @@ const ProductStockAdjustmentEntryPage: React.FC<
     }
 
     return false;
-  }, [entries, originalEntries]);
+  }, [
+    adjustmentDateText,
+    entries,
+    isCreatingNew,
+    originalEntries,
+    originalEntryDate,
+    selectedReference,
+  ]);
 
   // Fetch references for the selected month
   const fetchReferences = useCallback(async () => {
@@ -161,6 +217,11 @@ const ProductStockAdjustmentEntryPage: React.FC<
           };
         });
 
+        if (response.entry_date) {
+          setSelectedAdjustmentDate(parseLocalDate(response.entry_date));
+          setOriginalEntryDate(response.entry_date);
+        }
+
         setEntries(entriesMap);
         setOriginalEntries(entriesMap);
       } catch (error) {
@@ -182,6 +243,7 @@ const ProductStockAdjustmentEntryPage: React.FC<
     setIsCreatingNew(false);
     setEntries({});
     setOriginalEntries({});
+    setOriginalEntryDate(null);
   }, [fetchReferences]);
 
   // Fetch entries when reference is selected
@@ -191,18 +253,26 @@ const ProductStockAdjustmentEntryPage: React.FC<
     }
   }, [selectedReference, isCreatingNew, fetchEntriesByReference]);
 
-  // beforeChange callback for MonthNavigator - checks for unsaved changes
-  const handleBeforeMonthChange = useCallback(() => {
-    if (hasUnsavedChanges) {
-      return window.confirm(
-        "You have unsaved changes. Do you want to discard them?"
-      );
-    }
-    return true;
-  }, [hasUnsavedChanges]);
+  const handleAdjustmentDateChange = useCallback(
+    (range: TimeRange) => {
+      if (isSameLocalDate(range.start, selectedAdjustmentDate)) return;
+
+      if (
+        hasUnsavedChanges &&
+        !window.confirm(
+          "You have unsaved changes. Do you want to discard them?"
+        )
+      ) {
+        return;
+      }
+
+      setSelectedAdjustmentDate(range.start);
+    },
+    [hasUnsavedChanges, selectedAdjustmentDate]
+  );
 
   // Handle reference selection
-  const handleSelectReference = (reference: string) => {
+  const handleSelectReference = (reference: StockAdjustmentReference) => {
     if (hasUnsavedChanges) {
       if (
         !window.confirm(
@@ -213,7 +283,9 @@ const ProductStockAdjustmentEntryPage: React.FC<
       }
     }
     setIsCreatingNew(false);
-    setSelectedReference(reference);
+    setSelectedReference(reference.reference);
+    setOriginalEntryDate(reference.entry_date);
+    setSelectedAdjustmentDate(parseLocalDate(reference.entry_date));
   };
 
   // Handle create new reference
@@ -232,6 +304,7 @@ const ProductStockAdjustmentEntryPage: React.FC<
     setNewReferenceInput("");
     setEntries({});
     setOriginalEntries({});
+    setOriginalEntryDate(adjustmentDateText);
   };
 
   // Handle entry change
@@ -287,6 +360,7 @@ const ProductStockAdjustmentEntryPage: React.FC<
 
       const response = await api.post("/api/stock/adjustments/batch", {
         month: monthString,
+        entry_date: adjustmentDateText,
         reference: reference.trim(),
         adjustments,
       });
@@ -305,6 +379,7 @@ const ProductStockAdjustmentEntryPage: React.FC<
       }
 
       setOriginalEntries({ ...entries });
+      setOriginalEntryDate(adjustmentDateText);
     } catch (error) {
       console.error("Error saving adjustments:", error);
       toast.error("Failed to save adjustments");
@@ -316,6 +391,9 @@ const ProductStockAdjustmentEntryPage: React.FC<
   // Handle reset
   const handleReset = () => {
     setEntries({ ...originalEntries });
+    if (originalEntryDate) {
+      setSelectedAdjustmentDate(parseLocalDate(originalEntryDate));
+    }
     if (isCreatingNew) {
       setNewReferenceInput("");
     }
@@ -348,6 +426,7 @@ const ProductStockAdjustmentEntryPage: React.FC<
       setSelectedReference(null);
       setEntries({});
       setOriginalEntries({});
+      setOriginalEntryDate(null);
     } catch (error) {
       console.error("Error deleting adjustments:", error);
       toast.error("Failed to delete adjustments");
@@ -395,16 +474,18 @@ const ProductStockAdjustmentEntryPage: React.FC<
         </p>
       </div>
 
-      {/* Month Navigation */}
+      {/* Adjustment Date Navigation */}
       <div className="mb-4 rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
         <div className="flex items-center gap-4">
-          <label className="text-sm font-medium text-default-700 dark:text-gray-200">Month:</label>
-          <MonthNavigator
-            selectedMonth={selectedMonth}
-            onChange={setSelectedMonth}
-            beforeChange={handleBeforeMonthChange}
-            showGoToCurrentButton={false}
-            className="w-56"
+          <label className="text-sm font-medium text-default-700 dark:text-gray-200">
+            Adjustment Date:
+          </label>
+          <TimeNavigator
+            range={adjustmentDateRange}
+            onChange={handleAdjustmentDateChange}
+            modes={["day"]}
+            presets={false}
+            placeholder="Pick adjustment date"
           />
           {hasUnsavedChanges && (
             <span className="ml-auto rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700">
@@ -456,7 +537,7 @@ const ProductStockAdjustmentEntryPage: React.FC<
                 {references.map((ref) => (
                   <button
                     key={ref.reference}
-                    onClick={() => handleSelectReference(ref.reference)}
+                    onClick={() => handleSelectReference(ref)}
                     className={clsx(
                       "w-full rounded-lg border p-3 text-left transition-colors",
                       selectedReference === ref.reference && !isCreatingNew
@@ -477,11 +558,7 @@ const ProductStockAdjustmentEntryPage: React.FC<
                       </span>
                     </div>
                     <div className="mt-1 text-xs text-default-400 dark:text-gray-500">
-                      {new Date(ref.created_at).toLocaleDateString("en-MY", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
+                      {formatDisplayDate(ref.entry_date)}
                     </div>
                   </button>
                 ))}
@@ -531,7 +608,7 @@ const ProductStockAdjustmentEntryPage: React.FC<
                     <button
                       onClick={handleDelete}
                       disabled={isDeleting}
-                      className="flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-sm font-medium text-rose-600 transition-colors hover:bg-rose-100 disabled:opacity-50"
+                      className="flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-sm font-medium text-rose-600 transition-colors hover:bg-rose-100 disabled:opacity-50 dark:border-rose-700 dark:bg-rose-950/50 dark:text-rose-100 dark:hover:bg-rose-900/70"
                     >
                       <IconTrash size={16} />
                       {isDeleting ? "Deleting..." : "Delete"}

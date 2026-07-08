@@ -1,9 +1,10 @@
 // src/pages/JellyPolly/Stock/JPProductionEntryPage.tsx
-// Jelly Polly production entry. Clean JP-specific version of the TH
-// ProductionEntryPage: JP products only (products.type='JP' from the shared
-// catalogue), workers from the JP PRODUCTION assignments, shared
-// production_entries / machine-status backend, and the shared WorkerEntryGrid
-// (drag-and-drop worker ordering, scope JP_PRODUCTION).
+// Jelly Polly production entry. JP products only (products.type='JP' from the
+// shared catalogue), workers from the JP PRODUCTION assignments, shared
+// production_entries / machine-status backend. Each worker enters a quantity
+// per MAPPED pay code of the selected product (one input column per pay code);
+// each quantity flows into that specific pay code during JP payroll and all
+// columns sum to the product's total stock.
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { format } from "date-fns";
 import { IconLink, IconPackage } from "@tabler/icons-react";
@@ -11,14 +12,30 @@ import toast from "react-hot-toast";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import TimeNavigator from "../../../components/TimeNavigator";
-import WorkerEntryGrid from "../../../components/Stock/WorkerEntryGrid";
+import WorkerPayCodeEntryGrid, {
+  EntryPayCodeColumn,
+  PayCodeEntries,
+} from "../../../components/Stock/WorkerPayCodeEntryGrid";
 import ProductPayCodeMappingModal from "../../../components/Stock/ProductPayCodeMappingModal";
 import { api } from "../../../routes/utils/api";
 import { useProductsCache } from "../../../utils/invoice/useProductsCache";
+import { useJPJobPayCodeMappings } from "../../../utils/JellyPolly/useJPJobPayCodeMappings";
 import { ProductionWorker } from "../../../types/types";
+
+// Deep-clone the nested worker -> (payCode -> qty) map so edits don't mutate
+// the saved snapshot.
+const cloneEntries = (source: PayCodeEntries): PayCodeEntries =>
+  Object.fromEntries(
+    Object.entries(source).map(([workerId, byPayCode]) => [
+      workerId,
+      { ...byPayCode },
+    ])
+  );
 
 const JPProductionEntryPage: React.FC = () => {
   const { products } = useProductsCache("all");
+  const { productMappings, refreshData: refreshMappings } =
+    useJPJobPayCodeMappings();
 
   const [selectedDate, setSelectedDate] = useState<string>(
     format(new Date(), "yyyy-MM-dd")
@@ -27,10 +44,8 @@ const JPProductionEntryPage: React.FC = () => {
     null
   );
   const [workers, setWorkers] = useState<ProductionWorker[]>([]);
-  const [entries, setEntries] = useState<Record<string, number>>({});
-  const [originalEntries, setOriginalEntries] = useState<
-    Record<string, number>
-  >({});
+  const [entries, setEntries] = useState<PayCodeEntries>({});
+  const [originalEntries, setOriginalEntries] = useState<PayCodeEntries>({});
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isMachineBroken, setIsMachineBroken] = useState<boolean>(false);
@@ -45,6 +60,20 @@ const JPProductionEntryPage: React.FC = () => {
     () => jpProducts.find((product) => product.id === selectedProductId),
     [jpProducts, selectedProductId]
   );
+
+  // One input column per active mapped pay code of the selected product.
+  const payCodeColumns = useMemo<EntryPayCodeColumn[]>(() => {
+    if (!selectedProductId) return [];
+    return (productMappings[selectedProductId] || [])
+      .filter((mapping) => mapping.is_active !== false)
+      .map((mapping) => ({
+        pay_code_id: mapping.pay_code_id,
+        description: mapping.description,
+        rate_unit: mapping.rate_unit,
+        rate_biasa: Number(mapping.rate_biasa) || 0,
+      }))
+      .sort((a, b) => a.pay_code_id.localeCompare(b.pay_code_id));
+  }, [selectedProductId, productMappings]);
 
   // Load JP production workers once
   useEffect(() => {
@@ -80,16 +109,21 @@ const JPProductionEntryPage: React.FC = () => {
         ]);
         if (cancelled) return;
 
-        const entriesMap: Record<string, number> = {};
+        const entriesMap: PayCodeEntries = {};
         (entriesResponse || []).forEach(
-          (entry: { worker_id: string; bags_packed: number }) => {
-            if (entry.worker_id) {
-              entriesMap[entry.worker_id] = Number(entry.bags_packed) || 0;
-            }
+          (entry: {
+            worker_id: string | null;
+            pay_code_id: string | null;
+            bags_packed: number;
+          }) => {
+            if (!entry.worker_id || !entry.pay_code_id) return;
+            if (!entriesMap[entry.worker_id]) entriesMap[entry.worker_id] = {};
+            entriesMap[entry.worker_id][entry.pay_code_id] =
+              Number(entry.bags_packed) || 0;
           }
         );
         setEntries(entriesMap);
-        setOriginalEntries({ ...entriesMap });
+        setOriginalEntries(cloneEntries(entriesMap));
         setIsMachineBroken(machineResponse.machine_broken || false);
       } catch (error) {
         console.error("Error fetching JP production entries:", error);
@@ -105,18 +139,32 @@ const JPProductionEntryPage: React.FC = () => {
   }, [selectedDate, selectedProductId]);
 
   const hasUnsavedChanges = useMemo(() => {
-    const keys = new Set([
+    const workerIds = new Set([
       ...Object.keys(entries),
       ...Object.keys(originalEntries),
     ]);
-    return [...keys].some(
-      (key) => (entries[key] || 0) !== (originalEntries[key] || 0)
-    );
+    for (const workerId of workerIds) {
+      const current = entries[workerId] || {};
+      const original = originalEntries[workerId] || {};
+      const payCodeIds = new Set([
+        ...Object.keys(current),
+        ...Object.keys(original),
+      ]);
+      for (const payCodeId of payCodeIds) {
+        if ((current[payCodeId] || 0) !== (original[payCodeId] || 0)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }, [entries, originalEntries]);
 
   const handleEntryChange = useCallback(
-    (workerId: string, value: number): void => {
-      setEntries((prev) => ({ ...prev, [workerId]: value }));
+    (workerId: string, payCodeId: string, value: number): void => {
+      setEntries((prev) => ({
+        ...prev,
+        [workerId]: { ...(prev[workerId] || {}), [payCodeId]: value },
+      }));
     },
     []
   );
@@ -145,41 +193,53 @@ const JPProductionEntryPage: React.FC = () => {
       toast.error("Please select a date and product first");
       return;
     }
+    if (payCodeColumns.length === 0) {
+      toast.error("Map at least one pay code to this product first");
+      return;
+    }
 
     setIsSaving(true);
     try {
-      const entriesArray: { worker_id: string; bags_packed: number }[] =
-        Object.entries(entries).map(([worker_id, bags_packed]) => ({
-          worker_id,
-          bags_packed,
-        }));
-      // Include workers with 0 bags to clear their entries
+      // One row per (worker, pay code). Zeros are included so cleared inputs
+      // remove any existing row on the backend.
+      const entriesArray: {
+        worker_id: string;
+        pay_code_id: string;
+        bags_packed: number;
+      }[] = [];
       workers.forEach((worker) => {
-        if (!entries[worker.id]) {
-          entriesArray.push({ worker_id: worker.id, bags_packed: 0 });
-        }
+        payCodeColumns.forEach((column) => {
+          entriesArray.push({
+            worker_id: worker.id,
+            pay_code_id: column.pay_code_id,
+            bags_packed: entries[worker.id]?.[column.pay_code_id] || 0,
+          });
+        });
       });
 
-      const response = await api.post("/jellypolly/api/production-entries/batch", {
-        date: selectedDate,
-        product_id: selectedProductId,
-        entries: entriesArray,
-      });
+      const response = await api.post(
+        "/jellypolly/api/production-entries/batch",
+        {
+          date: selectedDate,
+          product_id: selectedProductId,
+          entries: entriesArray,
+        }
+      );
 
       toast.success(
-        `Production saved: ${response.total_bags} total bags from ${response.entry_count} workers`
+        `Production saved: ${response.total_bags} total ctn across ${response.entry_count} pay code entries`
       );
-      setOriginalEntries({ ...entries });
-    } catch (error) {
+      setOriginalEntries(cloneEntries(entries));
+    } catch (error: any) {
       console.error("Error saving JP production entries:", error);
-      toast.error("Failed to save production entries");
+      toast.error(error?.message || "Failed to save production entries");
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleReset = (): void => {
-    setEntries({ ...originalEntries });
+    setEntries(cloneEntries(originalEntries));
   };
 
   const selectedDateRange = useMemo(
@@ -209,7 +269,8 @@ const JPProductionEntryPage: React.FC = () => {
             JP Production Entry
           </h1>
           <p className="text-sm text-default-500 dark:text-gray-400">
-            Daily bags packed per worker for Jelly Polly products
+            Daily cartons packed per worker, per pay code, for Jelly Polly
+            products
           </p>
         </div>
         <div className="flex items-center flex-wrap gap-3">
@@ -271,48 +332,63 @@ const JPProductionEntryPage: React.FC = () => {
           </p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
-            {jpProducts.map((product) => (
-              <button
-                key={product.id}
-                type="button"
-                onClick={() => handleProductSelect(product.id)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-left text-sm transition-colors ${
-                  selectedProductId === product.id
-                    ? "border-sky-500 bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300"
-                    : "border-default-200 dark:border-gray-700 text-default-700 dark:text-gray-200 hover:bg-default-50 dark:hover:bg-gray-700"
-                }`}
-              >
-                <IconPackage size={18} className="flex-shrink-0" />
-                <span className="min-w-0">
-                  <span className="block font-medium truncate">
-                    {product.id}
+            {jpProducts.map((product) => {
+              const mappingCount = (productMappings[product.id] || []).filter(
+                (mapping) => mapping.is_active !== false
+              ).length;
+              return (
+                <button
+                  key={product.id}
+                  type="button"
+                  onClick={() => handleProductSelect(product.id)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-left text-sm transition-colors ${
+                    selectedProductId === product.id
+                      ? "border-sky-500 bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300"
+                      : "border-default-200 dark:border-gray-700 text-default-700 dark:text-gray-200 hover:bg-default-50 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  <IconPackage size={18} className="flex-shrink-0" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-medium truncate">
+                      {product.id}
+                    </span>
+                    <span className="block text-xs text-default-400 dark:text-gray-500 truncate">
+                      {product.description}
+                    </span>
                   </span>
-                  <span className="block text-xs text-default-400 dark:text-gray-500 truncate">
-                    {product.description}
+                  <span
+                    className={`flex-shrink-0 text-xs px-1.5 py-0.5 rounded ${
+                      mappingCount > 0
+                        ? "bg-default-100 text-default-600 dark:bg-gray-600 dark:text-gray-300"
+                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
+                    }`}
+                    title={`${mappingCount} pay code(s) mapped`}
+                  >
+                    {mappingCount}
                   </span>
-                </span>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* Worker entry grid (shared drag-and-drop ordering, JP scope) */}
+      {/* Per-pay-code worker entry grid (draggable rows, JP scope) */}
       {selectedProduct &&
         (isLoading ? (
           <div className="flex justify-center py-12">
             <LoadingSpinner />
           </div>
         ) : (
-          <WorkerEntryGrid
+          <WorkerPayCodeEntryGrid
             workers={workers}
+            payCodeColumns={payCodeColumns}
             entries={entries}
             onEntryChange={handleEntryChange}
             onSave={handleSave}
             onReset={handleReset}
             hasUnsavedChanges={hasUnsavedChanges}
             isSaving={isSaving}
-            unitLabel="bags"
             workerOrderScope="JP_PRODUCTION"
             workerOrderApiBase="/jellypolly/api/production-entries"
           />
@@ -322,6 +398,7 @@ const JPProductionEntryPage: React.FC = () => {
       <ProductPayCodeMappingModal
         isOpen={showMappingModal}
         onClose={() => setShowMappingModal(false)}
+        onMappingComplete={refreshMappings}
         productTypes={["JP"]}
         company="jellypolly"
       />

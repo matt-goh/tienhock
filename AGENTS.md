@@ -64,7 +64,7 @@ This is a comprehensive ERP system supporting three companies:
 
 **Accounting & Finance:**
 
-- `account_codes` - id, code, description, ledger_type, parent_code, level, sort_order, is_active, is_system, notes, created_at, updated_at, created_by, updated_by, fs_note (financial statement note reference)
+- `account_codes` - id, code, description, ledger_type, parent_code, level, sort_order, is_active, is_system, notes, created_at, updated_at, created_by, updated_by, fs_note (financial statement note reference). `DEBTOR` children are auto-maintained 1:1 from `customers` via `src/routes/accounting/debtorSync.js` (code = customer id, description = customer name, ledger_type = TD; uses `-D` suffix on account-code collisions)
 - `account_codes_hierarchy` - id, code, description, ledger_type, parent_code, level, sort_order, is_active, is_system, path, path_array, depth
 - `financial_statement_notes` - code (PK), name, description, category (asset/liability/equity/revenue/expense/cogs), report_section (balance_sheet/income_statement/cogm), normal_balance (debit/credit), sort_order, parent_note, is_active, created_at, updated_at
 - `journal_entries` - id, reference_no, entry_type, entry_date, description, total_debit, total_credit, status, cheque_no (sequential cheque number for Cash Payment / C-type entries only, e.g. PBB350779; nullable, customizable; seeded at PBB350779 and auto-incremented via GET /api/journal-entries/next-cheque-no), created_at, updated_at, created_by, updated_by, posted_at, posted_by
@@ -235,7 +235,7 @@ Payroll (per-employee auto-reprocess on every save via `src/routes/jellypolly/jp
 
 Production (products shared, workers are JP staff):
 
-- `jellypolly.production_entries` - entry_date, product_id (FK public.products), worker_id (FK jellypolly.staffs), bags_packed (unique date+product+worker). Feeds JP payroll via jellypolly.product_pay_codes (base per-bag/ctn pay; no TH threshold tiers). Machine-broken status stays in shared `public.production_machine_status` (product-keyed).
+- `jellypolly.production_entries` - entry_date, product_id (FK public.products), worker_id (FK jellypolly.staffs), pay_code_id (nullable FK jellypolly.pay_codes), bags_packed (unique date+product+worker+pay_code). One quantity row per worker per MAPPED pay code: the JP Production Entry page renders one input column per mapped pay code and each quantity feeds JP payroll at that specific code's rate (day-type aware) via jellypolly.product_pay_codes; no TH threshold tiers. Stock sums bags_packed across all a product's pay-code rows = total cartons. Legacy rows have pay_code_id NULL (payroll falls back to the product's first Base bag/ctn code). Machine-broken status stays in shared `public.production_machine_status` (product-keyed).
 - `jellypolly.production_worker_orders` - scope ('JP_PRODUCTION'), worker_id (FK jellypolly.staffs), sort_order (drag-and-drop worker card order on JP Production Entry).
 - `/api/stock/movements` + `/api/stock/closing-batch` branch by product type: JP products read jellypolly.production_entries and union sales from BOTH companies' invoices; TH products keep the original public-only sources.
 
