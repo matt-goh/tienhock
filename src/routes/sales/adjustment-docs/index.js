@@ -39,6 +39,40 @@ const DEFAULT_TABLES = {
   payments: "payments",
 };
 
+function resolveDocumentYear(value) {
+  if (value === undefined || value === null || value === "") {
+    return new Date().getFullYear();
+  }
+  const year = Number(value);
+  if (!Number.isInteger(year) || year < 1900 || year > 9999) {
+    throw new Error("year must be a valid four-digit year");
+  }
+  return year;
+}
+
+function normalizeCreatedDate(value) {
+  if (value === undefined || value === null || value === "") {
+    return Date.now().toString();
+  }
+
+  const timestamp =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && /^\d+$/.test(value.trim())
+      ? Number(value)
+      : new Date(value).getTime();
+
+  if (!Number.isFinite(timestamp)) {
+    throw new Error("createddate must be a valid timestamp or date");
+  }
+
+  if (isNaN(new Date(timestamp).getTime())) {
+    throw new Error("createddate must be a valid timestamp or date");
+  }
+
+  return String(timestamp);
+}
+
 // ============================================================================
 //                                 FACTORY
 // ============================================================================
@@ -591,10 +625,15 @@ async function resolveReferencedDocument(client, doc) {
     if (!VALID_TYPES.includes(type)) {
       return res.status(400).json({ message: "Invalid type" });
     }
+    let year;
+    try {
+      year = resolveDocumentYear(req.query.year);
+    } catch (error) {
+      return res.status(400).json({ message: error.message });
+    }
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      const year = new Date().getFullYear();
       const nextId = await generateNextDocId(client, type, year);
       await client.query("COMMIT");
       res.json({ next_id: nextId });
@@ -608,13 +647,13 @@ async function resolveReferencedDocument(client, doc) {
 
   // --- GET /api/adjustment-docs/id-availability?type=&display_id= ---
   router.get("/id-availability", async (req, res) => {
-    const { type, display_id } = req.query;
+    const { type, display_id, year: yearParam } = req.query;
     if (!VALID_TYPES.includes(type)) {
       return res.status(400).json({ message: "Invalid type" });
     }
     const client = await pool.connect();
     try {
-      const year = new Date().getFullYear();
+      const year = resolveDocumentYear(yearParam);
       const normalizedDisplayId = normalizeDisplayIdForType(
         display_id,
         type,
@@ -822,6 +861,13 @@ async function resolveReferencedDocument(client, doc) {
       return res.status(400).json({ message: "Refund Note cannot be both paired to a Credit Note and linked to an overpaid payment" });
     }
 
+    let docCreatedDate;
+    try {
+      docCreatedDate = normalizeCreatedDate(createddate);
+    } catch (error) {
+      return res.status(400).json({ message: error.message });
+    }
+
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -999,7 +1045,7 @@ async function resolveReferencedDocument(client, doc) {
         original_invoice_id
       );
 
-      const year = new Date().getFullYear();
+      const year = new Date(Number(docCreatedDate)).getFullYear();
       const requestedDisplayId = normalizeDisplayIdForType(
         display_id,
         type,
@@ -1012,7 +1058,6 @@ async function resolveReferencedDocument(client, doc) {
         requestedDisplayId
       );
       const docId = docIds.id;
-      const docCreatedDate = createddate || Date.now().toString();
 
       const doc = {
         id: docId,
