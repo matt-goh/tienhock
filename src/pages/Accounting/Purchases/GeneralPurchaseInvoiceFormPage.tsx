@@ -1183,7 +1183,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               disabled={submitting || saving}
               onClick={submitInvoice}
             >
-              {submitting ? "Submitting..." : "Save & Submit"}
+              {submitting ? "Submitting..." : "Save & Submit e-Invoice"}
             </Button>
           )}
           {canEdit && (
