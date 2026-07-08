@@ -9,6 +9,7 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import TimeNavigator from "../../components/TimeNavigator";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 import {
   IconPlus,
   IconSearch,
@@ -24,6 +25,7 @@ interface JournalEntryListItem extends JournalEntry {
 
 const LEGACY_STORAGE_KEY = "journalEntryListDateRange";
 const FILTERS_STORAGE_KEY = "journalEntryListFilters";
+const SCROLL_RESTORATION_KEY: string = "journal-entry-list";
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "active", label: "Active" },
@@ -248,6 +250,8 @@ const JournalEntryListPage: React.FC = () => {
   useEffect(() => {
     fetchEntries();
   }, [fetchEntries]);
+
+  useScrollRestoration(SCROLL_RESTORATION_KEY, initialized && !loading);
 
   // Reset pagination when filters change
   useEffect(() => {
