@@ -20,12 +20,12 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
-import TimeNavigator from "../../../components/TimeNavigator";
+import TimeNavigator, { TimeRange } from "../../../components/TimeNavigator";
 import SubmissionResultsModal from "../../../components/Invoice/SubmissionResultsModal";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import { FormListbox } from "../../../components/FormComponents";
 import { api } from "../../../routes/utils/api";
 import {
+  GeneralPurchaseKind,
   SelfBilledEInvoiceStatus,
   SelfBilledInvoiceStatus,
   SelfBilledInvoiceListItem,
@@ -80,20 +80,54 @@ interface ApiError extends Error {
   data?: SelfBilledSubmissionResult;
 }
 
-const invoiceStatusOptions = [
-  { id: "", name: "All Docs" },
-  { id: "active", name: "Active" },
-  { id: "cancelled", name: "Cancelled" },
-];
+interface CachedGeneralPurchaseFilters {
+  dateRange: TimeRange;
+  invoiceStatuses: SelfBilledInvoiceStatus[];
+  purchaseKinds: GeneralPurchaseKind[];
+}
 
-const eInvoiceStatusOptions = [
-  { id: "", name: "All E-Invoice" },
-  { id: "draft", name: "Not Submitted" },
-  { id: "pending", name: "Pending" },
-  { id: "valid", name: "Valid" },
-  { id: "invalid", name: "Invalid" },
-  { id: "cancelled", name: "Cancelled" },
-];
+interface StatusFilterOption<TValue extends string> {
+  value: TValue;
+  label: string;
+  activeClassName: string;
+}
+
+const FILTERS_STORAGE_KEY = "generalPurchaseInvoiceListFilters";
+
+const invoiceStatusFilterOptions: StatusFilterOption<SelfBilledInvoiceStatus>[] =
+  [
+    {
+      value: "active",
+      label: "Active",
+      activeClassName:
+        "border-emerald-500 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300",
+    },
+    {
+      value: "cancelled",
+      label: "Cancelled",
+      activeClassName:
+        "border-rose-500 bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300",
+    },
+  ];
+
+const purchaseKindFilterOptions: StatusFilterOption<GeneralPurchaseKind>[] =
+  [
+    {
+      value: "local",
+      label: "Local",
+      activeClassName:
+        "border-teal-500 bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300",
+    },
+    {
+      value: "foreign",
+      label: "Foreign",
+      activeClassName:
+        "border-amber-500 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300",
+    },
+  ];
+
+const inactiveFilterChipClass =
+  "border-default-300 dark:border-gray-600 text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700";
 
 const getStatusLabel = (status: SelfBilledEInvoiceStatus): string => {
   if (!status) return "Not Submitted";
@@ -159,6 +193,122 @@ const formatDateForApi = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
+const getMonthRange = (date: Date): TimeRange => ({
+  start: new Date(date.getFullYear(), date.getMonth(), 1),
+  end: new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999),
+});
+
+const getMonthParam = (date: Date): string =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+
+const parseDateParam = (
+  value: string | null,
+  endOfDay = false
+): Date | null => {
+  if (!value) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  const date = new Date(
+    year,
+    monthIndex,
+    day,
+    endOfDay ? 23 : 0,
+    endOfDay ? 59 : 0,
+    endOfDay ? 59 : 0,
+    endOfDay ? 999 : 0
+  );
+
+  return date.getFullYear() === year &&
+    date.getMonth() === monthIndex &&
+    date.getDate() === day
+    ? date
+    : null;
+};
+
+const isInvoiceStatusFilterValue = (
+  value: unknown
+): value is SelfBilledInvoiceStatus =>
+  value === "active" || value === "cancelled";
+
+const isPurchaseKindFilterValue = (
+  value: unknown
+): value is GeneralPurchaseKind => value === "local" || value === "foreign";
+
+const loadCachedFilters = (): CachedGeneralPurchaseFilters => {
+  const fallback: CachedGeneralPurchaseFilters = {
+    dateRange: getMonthRange(new Date()),
+    invoiceStatuses: [],
+    purchaseKinds: [],
+  };
+
+  try {
+    const cached = localStorage.getItem(FILTERS_STORAGE_KEY);
+    if (!cached) return fallback;
+
+    const parsed = JSON.parse(cached) as {
+      start?: unknown;
+      end?: unknown;
+      invoiceStatuses?: unknown;
+      purchaseKinds?: unknown;
+    };
+    const start =
+      typeof parsed.start === "string" ? parseDateParam(parsed.start) : null;
+    const end =
+      typeof parsed.end === "string" ? parseDateParam(parsed.end, true) : null;
+
+    return {
+      dateRange:
+        start && end && start.getTime() <= end.getTime()
+          ? { start, end }
+          : fallback.dateRange,
+      invoiceStatuses: Array.isArray(parsed.invoiceStatuses)
+        ? parsed.invoiceStatuses.filter(isInvoiceStatusFilterValue)
+        : [],
+      purchaseKinds: Array.isArray(parsed.purchaseKinds)
+        ? parsed.purchaseKinds.filter(isPurchaseKindFilterValue)
+        : [],
+    };
+  } catch (error) {
+    console.error("Error loading cached general purchase filters:", error);
+    return fallback;
+  }
+};
+
+const getInitialDateRange = (
+  searchParams: URLSearchParams,
+  cachedDateRange: TimeRange
+): TimeRange => {
+  const startParam = parseDateParam(searchParams.get("start_date"));
+  const endParam = parseDateParam(searchParams.get("end_date"), true);
+  if (startParam && endParam && startParam.getTime() <= endParam.getTime()) {
+    return { start: startParam, end: endParam };
+  }
+
+  const monthParam = searchParams.get("month");
+  if (monthParam) {
+    const [year, month] = monthParam.split("-").map(Number);
+    if (year && month >= 1 && month <= 12) {
+      return getMonthRange(new Date(year, month - 1, 1));
+    }
+  }
+
+  return cachedDateRange;
+};
+
+const isMonthRange = (range: TimeRange): boolean =>
+  range.start.getDate() === 1 &&
+  range.start.getHours() === 0 &&
+  range.start.getMinutes() === 0 &&
+  range.start.getSeconds() === 0 &&
+  range.end.getFullYear() === range.start.getFullYear() &&
+  range.end.getMonth() === range.start.getMonth() &&
+  range.end.getDate() ===
+    new Date(range.start.getFullYear(), range.start.getMonth() + 1, 0).getDate();
+
 const canSubmitInvoice = (invoice: SelfBilledInvoiceListItem): boolean => {
   return (
     invoice.purchase_kind !== "local" &&
@@ -182,8 +332,11 @@ const getMyInvoisPortalUrl = (
   return `https://myinvois.hasil.gov.my/${invoice.uuid}/share/${invoice.long_id}`;
 };
 
-const getInvoicePath = (invoice: SelfBilledInvoiceListItem, selectedMonth: Date): string => {
-  const month = `${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, "0")}`;
+const getInvoicePath = (
+  invoice: SelfBilledInvoiceListItem,
+  selectedMonth: Date
+): string => {
+  const month = getMonthParam(selectedMonth);
   return invoice.purchase_kind === "local"
     ? `/stock/general-purchases/local/${invoice.id}?month=${month}`
     : `/stock/general-purchases/${invoice.id}?month=${month}`;
@@ -192,12 +345,17 @@ const getInvoicePath = (invoice: SelfBilledInvoiceListItem, selectedMonth: Date)
 const GeneralPurchaseInvoiceListPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const cachedFilters = useMemo(() => loadCachedFilters(), []);
   const [invoices, setInvoices] = useState<SelfBilledInvoiceListItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [total, setTotal] = useState<number>(0);
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [selectedInvoiceStatus, setSelectedInvoiceStatus] = useState<string>("");
-  const [selectedEInvoiceStatus, setSelectedEInvoiceStatus] = useState<string>("");
+  const [selectedInvoiceStatuses, setSelectedInvoiceStatuses] = useState<
+    SelfBilledInvoiceStatus[]
+  >(() => cachedFilters.invoiceStatuses);
+  const [selectedPurchaseKinds, setSelectedPurchaseKinds] = useState<
+    GeneralPurchaseKind[]
+  >(() => cachedFilters.purchaseKinds);
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<Set<number>>(
     new Set()
   );
@@ -212,27 +370,29 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
     null
   );
 
-  const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
-    const param = searchParams.get("month");
-    if (param) {
-      const [year, month] = param.split("-").map(Number);
-      if (year && month >= 1 && month <= 12) {
-        return new Date(year, month - 1, 1);
-      }
+  const [dateRange, setDateRange] = useState<TimeRange>(() =>
+    getInitialDateRange(searchParams, cachedFilters.dateRange)
+  );
+
+  const selectedMonth = useMemo(
+    () => new Date(dateRange.start.getFullYear(), dateRange.start.getMonth(), 1),
+    [dateRange.start]
+  );
+
+  const handleTimeNavigatorChange = (range: TimeRange): void => {
+    setDateRange(range);
+    if (isMonthRange(range)) {
+      setSearchParams({ month: getMonthParam(range.start) }, { replace: true });
+      return;
     }
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
 
-  const dateRange = useMemo(() => ({
-    start: new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1),
-    end: new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0, 23, 59, 59, 999),
-  }), [selectedMonth]);
-
-  const handleTimeNavigatorChange = (range: { start: Date; end: Date }): void => {
-    const date = range.start;
-    setSelectedMonth(date);
-    setSearchParams({ month: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}` }, { replace: true });
+    setSearchParams(
+      {
+        start_date: formatDateForApi(range.start),
+        end_date: formatDateForApi(range.end),
+      },
+      { replace: true }
+    );
   };
 
   const fetchInvoices = async (): Promise<void> => {
@@ -241,11 +401,11 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
       const params = new URLSearchParams();
       params.append("limit", "100");
       if (searchTerm) params.append("search", searchTerm);
-      if (selectedInvoiceStatus) {
-        params.append("invoice_status", selectedInvoiceStatus);
+      if (selectedInvoiceStatuses.length > 0) {
+        params.append("invoice_status", selectedInvoiceStatuses.join(","));
       }
-      if (selectedEInvoiceStatus) {
-        params.append("einvoice_status", selectedEInvoiceStatus);
+      if (selectedPurchaseKinds.length === 1) {
+        params.append("purchase_kind", selectedPurchaseKinds[0]);
       }
       params.append("start_date", formatDateForApi(dateRange.start));
       params.append("end_date", formatDateForApi(dateRange.end));
@@ -270,7 +430,23 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
     );
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedInvoiceStatus, selectedEInvoiceStatus, dateRange, searchTerm]);
+  }, [selectedInvoiceStatuses, selectedPurchaseKinds, dateRange, searchTerm]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        FILTERS_STORAGE_KEY,
+        JSON.stringify({
+          start: formatDateForApi(dateRange.start),
+          end: formatDateForApi(dateRange.end),
+          invoiceStatuses: selectedInvoiceStatuses,
+          purchaseKinds: selectedPurchaseKinds,
+        })
+      );
+    } catch (error) {
+      console.error("Error caching general purchase filters:", error);
+    }
+  }, [dateRange, selectedInvoiceStatuses, selectedPurchaseKinds]);
 
   const totals = useMemo(() => {
     return invoices.reduce(
@@ -310,6 +486,30 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
 
   const clearSearch = (): void => {
     setSearchTerm("");
+  };
+
+  const toggleInvoiceStatusFilter = (
+    value: SelfBilledInvoiceStatus
+  ): void => {
+    setSelectedInvoiceStatuses((previous: SelfBilledInvoiceStatus[]) =>
+      previous.includes(value)
+        ? previous.filter(
+            (status: SelfBilledInvoiceStatus) => status !== value
+          )
+        : [...previous, value]
+    );
+  };
+
+  const togglePurchaseKindFilter = (
+    value: GeneralPurchaseKind
+  ): void => {
+    setSelectedPurchaseKinds((previous: GeneralPurchaseKind[]) =>
+      previous.includes(value)
+        ? previous.filter(
+            (purchaseKind: GeneralPurchaseKind) => purchaseKind !== value
+          )
+        : [...previous, value]
+    );
   };
 
   const toggleInvoiceSelection = (invoiceId: number): void => {
@@ -489,8 +689,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
           <TimeNavigator
             range={dateRange}
             onChange={handleTimeNavigatorChange}
-            modes={["month"]}
-            presets={false}
+            modes={["month", "range", "year"]}
             size="sm"
           />
           <span className="hidden text-default-300 dark:text-gray-600 sm:inline">
@@ -537,24 +736,50 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
             )}
           </div>
 
-          <div className="h-8 w-full sm:w-28">
-            <FormListbox
-              name="invoice_status"
-              value={selectedInvoiceStatus}
-              onChange={setSelectedInvoiceStatus}
-              options={invoiceStatusOptions}
-              className="[&_button]:h-8 [&_button]:py-1"
-            />
-          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {invoiceStatusFilterOptions.map(
+              (option: StatusFilterOption<SelfBilledInvoiceStatus>) => {
+                const active = selectedInvoiceStatuses.includes(option.value);
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => toggleInvoiceStatusFilter(option.value)}
+                    aria-pressed={active}
+                    className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors select-none ${
+                      active
+                        ? option.activeClassName
+                        : inactiveFilterChipClass
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              }
+            )}
 
-          <div className="h-8 w-full sm:w-32">
-            <FormListbox
-              name="einvoice_status"
-              value={selectedEInvoiceStatus}
-              onChange={setSelectedEInvoiceStatus}
-              options={eInvoiceStatusOptions}
-              className="[&_button]:h-8 [&_button]:py-1"
-            />
+            <span className="mx-1 h-5 w-px bg-default-300 dark:bg-gray-600" />
+
+            {purchaseKindFilterOptions.map(
+              (option: StatusFilterOption<GeneralPurchaseKind>) => {
+                const active = selectedPurchaseKinds.includes(option.value);
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => togglePurchaseKindFilter(option.value)}
+                    aria-pressed={active}
+                    className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors select-none ${
+                      active
+                        ? option.activeClassName
+                        : inactiveFilterChipClass
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              }
+            )}
           </div>
 
           <Button
@@ -582,7 +807,13 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
             variant="filled"
             size="sm"
             className="h-8 rounded-lg !px-3"
-            onClick={() => navigate(`/stock/general-purchases/new/local?month=${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, "0")}`)}
+            onClick={() =>
+              navigate(
+                `/stock/general-purchases/new/local?month=${getMonthParam(
+                  selectedMonth
+                )}`
+              )
+            }
           >
             Local
           </Button>
@@ -593,7 +824,13 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
             variant="outline"
             size="sm"
             className="h-8 rounded-lg !px-3"
-            onClick={() => navigate(`/stock/general-purchases/new/foreign?month=${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, "0")}`)}
+            onClick={() =>
+              navigate(
+                `/stock/general-purchases/new/foreign?month=${getMonthParam(
+                  selectedMonth
+                )}`
+              )
+            }
           >
             Foreign
           </Button>
