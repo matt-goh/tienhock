@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-08",
+    ms: "Lejar Akaun untuk Public Bank Berhad (BANK_PBB) kini turut memaparkan baris tunai diterima (CASH SALES RECEIVED, CASH RECEIVED/CR. SALES) sebagai wang masuk (lajur Debit), supaya lejar bank membaca seperti buku tunai. Baki pembukaan, berjalan dan penutup turut mengambil kira baris ini.",
+    en: "The Account Ledger for Public Bank Berhad (BANK_PBB) now also lists the cash-received rows (CASH SALES RECEIVED, CASH RECEIVED/CR. SALES) as money in (the Debit column), so the bank ledger reads like a cash book. The opening, running and closing balances include these rows too.",
+  },
+  {
+    date: "2026-07-08",
     ms: "Belian Am Tempatan kini boleh mengeluarkan e-Invois bil sendiri apabila perlu (dimatikan secara lalai). Hidupkan 'Issue e-invoice', pilih jenis penjual (individu dengan MyKad, individu dengan TIN sendiri, atau perniagaan), isi butiran pembekal, kemudian Save & Submit e-Invoice. Sebelum menghantar, satu pengesahan memaparkan jenis penjual yang layak untuk e-Invois bil sendiri (boleh tukar antara Bahasa Melayu dan Bahasa Inggeris). Nombor TIN dan pengenalan pembekal ditetapkan mengikut jenis penjual seperti kehendak LHDN.",
     en: "Local General Purchases can now issue a self-billed e-Invoice when needed (off by default). Turn on 'Issue e-invoice', pick the seller type (individual with MyKad, individual with their own TIN, or a business), fill in the supplier details, then Save & Submit e-Invoice. Before submitting, a confirmation shows the seller types allowed for self-billed e-invoices (switchable between Bahasa Melayu and English). The supplier's TIN and identification number are set automatically to match the seller type as required by LHDN.",
   },
