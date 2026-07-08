@@ -1,6 +1,11 @@
 // src/routes/catalogue/customers.js
 import { Router } from "express";
 import cache, { CACHE_TTL, CACHE_KEYS } from "../utils/memory-cache.js";
+import {
+  changeDebtorCode,
+  ensureDebtorAccount,
+  removeDebtorAccount,
+} from "../accounting/debtorSync.js";
 
 export default function (pool) {
   const router = Router();
@@ -397,7 +402,11 @@ export default function (pool) {
       credit_used || 0,
     ];
 
+    const client = await pool.connect();
+
     try {
+      await client.query("BEGIN");
+
       const query = `
         INSERT INTO customers (
           id, name, closeness, salesman, tin_number,
@@ -408,7 +417,13 @@ export default function (pool) {
         RETURNING *
       `;
 
-      const result = await pool.query(query, transformedValues);
+      const result = await client.query(query, transformedValues);
+      await ensureDebtorAccount(client, {
+        id: result.rows[0].id,
+        name: result.rows[0].name,
+      });
+
+      await client.query("COMMIT");
 
       // Invalidate cache
       cache.invalidate(CACHE_KEYS.CUSTOMERS);
@@ -418,6 +433,7 @@ export default function (pool) {
         customer: result.rows[0],
       });
     } catch (error) {
+      await client.query("ROLLBACK");
       if (error.code === "23505") {
         return res
           .status(400)
@@ -427,6 +443,8 @@ export default function (pool) {
       res
         .status(500)
         .json({ message: "Error creating customer", error: error.message });
+    } finally {
+      client.release();
     }
   });
 
@@ -514,6 +532,8 @@ export default function (pool) {
         await client.query("ROLLBACK");
         return res.status(404).json({ message: "Customer not found" });
       }
+
+      await removeDebtorAccount(client, id);
 
       await client.query("COMMIT");
 
@@ -646,6 +666,7 @@ export default function (pool) {
 
           // 4. Delete old customer record
           await client.query("DELETE FROM customers WHERE id = $1", [id]);
+          await changeDebtorCode(client, id, newId, insertResult.rows[0].name);
 
           await client.query("COMMIT");
 
@@ -701,6 +722,11 @@ export default function (pool) {
           if (result.rows.length === 0) {
             throw new Error("Customer not found");
           }
+
+          await ensureDebtorAccount(client, {
+            id: result.rows[0].id,
+            name: result.rows[0].name,
+          });
 
           if (tin_number !== null || id_number !== null || id_type !== null) {
             await syncEInvoiceFields(

@@ -64,7 +64,7 @@ This is a comprehensive ERP system supporting three companies:
 
 **Accounting & Finance:**
 
-- `account_codes` - id, code, description, ledger_type, parent_code, level, sort_order, is_active, is_system, notes, created_at, updated_at, created_by, updated_by, fs_note (financial statement note reference)
+- `account_codes` - id, code, description, ledger_type, parent_code, level, sort_order, is_active, is_system, notes, created_at, updated_at, created_by, updated_by, fs_note (financial statement note reference). `DEBTOR` children are auto-maintained 1:1 from `customers` via `src/routes/accounting/debtorSync.js` (code = customer id, description = customer name, ledger_type = TD; uses `-D` suffix on account-code collisions)
 - `account_codes_hierarchy` - id, code, description, ledger_type, parent_code, level, sort_order, is_active, is_system, path, path_array, depth
 - `financial_statement_notes` - code (PK), name, description, category (asset/liability/equity/revenue/expense/cogs), report_section (balance_sheet/income_statement/cogm), normal_balance (debit/credit), sort_order, parent_note, is_active, created_at, updated_at
 - `journal_entries` - id, reference_no, entry_type, entry_date, description, total_debit, total_credit, status, cheque_no (sequential cheque number for Cash Payment / C-type entries only, e.g. PBB350779; nullable, customizable; seeded at PBB350779 and auto-incremented via GET /api/journal-entries/next-cheque-no), created_at, updated_at, created_by, updated_by, posted_at, posted_by

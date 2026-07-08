@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-08",
+    ms: "Senarai Trade Debtors dalam Account Ledger kini sentiasa ikut senarai pelanggan. Pelanggan baharu akan muncul automatik, nama pelanggan yang ditukar akan dikemas kini, dan pelanggan lama yang sebelum ini tiada dalam senarai telah ditambah.",
+    en: "The Trade Debtors list in Account Ledger now stays in sync with the customer list. New customers appear automatically, renamed customers update there too, and older customers that were missing have been added.",
+  },
+  {
+    date: "2026-07-08",
     ms: "Bahan dan varian yang sudah dinyahaktifkan kini boleh dipadam secara kekal walaupun mempunyai rekod stok; rekod stok berkaitan akan dibuang bersama. Jika bahan atau varian pernah digunakan dalam invois belian, pemadaman kekal masih disekat supaya sejarah belian kekal terpelihara.",
     en: "Inactive materials and variants can now be permanently deleted even when they have stock records; the related stock records are removed together. Permanent deletion is still blocked when the material or variant has been used in purchase invoices, so purchase history stays intact.",
   },
