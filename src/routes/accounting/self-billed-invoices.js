@@ -12,6 +12,9 @@ import {
 import { NODE_ENV } from "../../configs/config.js";
 
 const FOREIGN_SUPPLIER_TIN = "EI00000000030";
+// General TIN for a Malaysian individual who only provides a MyKad/MyTentera
+// number (self-billed concession, IRBM e-Invoice Guideline Table 8.2 Option 2).
+const LOCAL_INDIVIDUAL_TIN = "EI00000000010";
 const DEFAULT_TRANSACTION_TYPE = "Importation of goods";
 const DEFAULT_CURRENCY = "CNY";
 const DEFAULT_CLASSIFICATION = "034";
@@ -50,6 +53,18 @@ function normalizeText(value, fallback = null) {
   if (value === undefined || value === null) return fallback;
   const trimmed = value.toString().trim();
   return trimmed.length > 0 ? trimmed : fallback;
+}
+
+function normalizeQueryList(value) {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => normalizeQueryList(item));
+  }
+  const normalized = normalizeText(value, "");
+  if (!normalized) return [];
+  return normalized
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function normalizeStockDescription(value) {
@@ -179,12 +194,21 @@ async function generateSelfBilledNo(client) {
   return generatePurchaseNo(client, PURCHASE_KIND_FOREIGN);
 }
 
-function sanitizeSupplierPayload(payload = {}) {
+function sanitizeSupplierPayload(payload = {}, purchaseKind = PURCHASE_KIND_FOREIGN) {
+  const isLocal = purchaseKind === PURCHASE_KIND_LOCAL;
+  // Foreign suppliers always use the fixed foreign TIN. Local self-billed
+  // suppliers use the TIN provided (their own IRBM TIN, or the individual
+  // MyKad-only general TIN EI00000000010 as computed by the caller).
+  const providedTin = normalizeText(payload.tin_number);
+  const tinNumber = isLocal
+    ? providedTin || LOCAL_INDIVIDUAL_TIN
+    : FOREIGN_SUPPLIER_TIN;
+
   return {
     supplier_name: normalizeText(payload.supplier_name || payload.name),
-    tin_number: FOREIGN_SUPPLIER_TIN,
-    id_type: normalizeUpper(payload.id_type, "BRN"),
-    id_number: normalizeText(payload.id_number, "NA"),
+    tin_number: tinNumber,
+    id_type: normalizeUpper(payload.id_type, isLocal ? "NRIC" : "BRN"),
+    id_number: normalizeText(payload.id_number, isLocal ? "000000000000" : "NA"),
     sst_number: normalizeText(payload.sst_number, "NA"),
     ttx_number: normalizeText(payload.ttx_number, "NA"),
     msic_code: normalizeText(payload.msic_code, "00000"),
@@ -197,8 +221,8 @@ function sanitizeSupplierPayload(payload = {}) {
     address_line_2: normalizeText(payload.address_line_2),
     city: normalizeText(payload.city),
     postcode: normalizeText(payload.postcode),
-    state_code: normalizeText(payload.state_code, "17"),
-    country_code: normalizeUpper(payload.country_code, "CHN"),
+    state_code: normalizeText(payload.state_code, isLocal ? "12" : "17"),
+    country_code: normalizeUpper(payload.country_code, isLocal ? "MYS" : "CHN"),
     contact_number: normalizeText(payload.contact_number, "NA"),
     email: normalizeText(payload.email),
     notes: normalizeText(payload.notes),
@@ -258,6 +282,8 @@ function sanitizeInvoicePayload(payload = {}) {
   const purchaseKind =
     payload.purchase_kind === PURCHASE_KIND_LOCAL ? PURCHASE_KIND_LOCAL : PURCHASE_KIND_FOREIGN;
   const fxRate = purchaseKind === PURCHASE_KIND_LOCAL ? 1 : parseDecimal(payload.fx_rate, 1);
+  const einvoiceEnabled =
+    purchaseKind === PURCHASE_KIND_LOCAL && Boolean(payload.einvoice_enabled);
   const lines = sanitizeLines(Array.isArray(payload.lines) ? payload.lines : [], fxRate, purchaseKind);
   const lineTotalForeignAmount = lines.reduce(
     (sum, line) => sum + line.amount_foreign,
@@ -286,10 +312,11 @@ function sanitizeInvoicePayload(payload = {}) {
 
   return {
     purchase_kind: purchaseKind,
+    einvoice_enabled: einvoiceEnabled,
     foreign_supplier_id: payload.foreign_supplier_id
       ? Number.parseInt(payload.foreign_supplier_id, 10)
       : null,
-    supplier: sanitizeSupplierPayload(payload.supplier || {}),
+    supplier: sanitizeSupplierPayload(payload.supplier || {}, purchaseKind),
     local_supplier_name: normalizeText(payload.local_supplier_name),
     self_billed_no: normalizeText(payload.self_billed_no),
     purchase_date: normalizeText(payload.purchase_date),
@@ -360,8 +387,18 @@ function validateInvoice(input) {
   return errors;
 }
 
-async function upsertSupplier(client, input) {
-  const supplier = sanitizeSupplierPayload(input);
+// Foreign purchases always link a supplier record; local purchases only link one
+// when the user opts into self-billed e-invoice (so plain local purchases stay
+// supplier-record-free as before).
+function needsSupplierLink(input) {
+  return (
+    input.purchase_kind === PURCHASE_KIND_FOREIGN ||
+    (input.purchase_kind === PURCHASE_KIND_LOCAL && input.einvoice_enabled)
+  );
+}
+
+async function upsertSupplier(client, input, purchaseKind = PURCHASE_KIND_FOREIGN) {
+  const supplier = sanitizeSupplierPayload(input, purchaseKind);
   const validationErrors = validateSupplier(supplier);
   if (validationErrors.length > 0) {
     const error = new Error(validationErrors.join("; "));
@@ -419,7 +456,11 @@ async function upsertSupplier(client, input) {
   );
 
   if (existingResult.rows.length > 0) {
-    return upsertSupplier(client, { ...supplier, id: existingResult.rows[0].id });
+    return upsertSupplier(
+      client,
+      { ...supplier, id: existingResult.rows[0].id },
+      purchaseKind
+    );
   }
 
   const result = await client.query(
@@ -1249,19 +1290,27 @@ export default function (pool, config) {
         query += ` AND COALESCE(sbi.purchase_kind, '${PURCHASE_KIND_FOREIGN}') = $${params.length}`;
       }
 
-      const invoiceStatusFilter = invoice_status;
-      const eInvoiceStatusFilter = einvoice_status || status;
+      const invoiceStatusFilters = normalizeQueryList(invoice_status);
+      const eInvoiceStatusFilters = normalizeQueryList(einvoice_status || status);
 
-      if (invoiceStatusFilter) {
-        params.push(invoiceStatusFilter);
-        query += ` AND COALESCE(sbi.invoice_status, '${LOCAL_STATUS_ACTIVE}') = $${params.length}`;
+      if (invoiceStatusFilters.length > 0) {
+        params.push(invoiceStatusFilters);
+        query += ` AND COALESCE(sbi.invoice_status, '${LOCAL_STATUS_ACTIVE}') = ANY($${params.length}::text[])`;
       }
 
-      if (eInvoiceStatusFilter === "draft") {
-        query += " AND sbi.einvoice_status IS NULL";
-      } else if (eInvoiceStatusFilter) {
-        params.push(eInvoiceStatusFilter);
-        query += ` AND sbi.einvoice_status = $${params.length}`;
+      if (eInvoiceStatusFilters.length > 0) {
+        const submittedStatuses = eInvoiceStatusFilters.filter(
+          (filter) => filter !== "draft"
+        );
+        if (eInvoiceStatusFilters.includes("draft") && submittedStatuses.length > 0) {
+          params.push(submittedStatuses);
+          query += ` AND (sbi.einvoice_status IS NULL OR sbi.einvoice_status = ANY($${params.length}::text[]))`;
+        } else if (eInvoiceStatusFilters.includes("draft")) {
+          query += " AND sbi.einvoice_status IS NULL";
+        } else {
+          params.push(submittedStatuses);
+          query += ` AND sbi.einvoice_status = ANY($${params.length}::text[])`;
+        }
       }
 
       if (supplier_id) {
@@ -2262,7 +2311,7 @@ export default function (pool, config) {
   router.post("/", async (req, res) => {
     const input = sanitizeInvoicePayload(req.body);
     const validationErrors = [
-      ...(input.purchase_kind === PURCHASE_KIND_FOREIGN ? validateSupplier(input.supplier) : []),
+      ...(needsSupplierLink(input) ? validateSupplier(input.supplier) : []),
       ...validateInvoice(input),
     ];
 
@@ -2273,15 +2322,20 @@ export default function (pool, config) {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      const supplier =
-        input.purchase_kind === PURCHASE_KIND_LOCAL
-          ? { id: null }
-          : input.foreign_supplier_id && !input.supplier.supplier_name
-          ? { id: input.foreign_supplier_id }
-          : await upsertSupplier(client, {
+      const supplier = !needsSupplierLink(input)
+        ? { id: null }
+        : input.purchase_kind === PURCHASE_KIND_FOREIGN &&
+          input.foreign_supplier_id &&
+          !input.supplier.supplier_name
+        ? { id: input.foreign_supplier_id }
+        : await upsertSupplier(
+            client,
+            {
               ...input.supplier,
               id: input.foreign_supplier_id || input.supplier.id,
-            });
+            },
+            input.purchase_kind
+          );
       const supplierId = supplier.id || input.foreign_supplier_id;
       const selfBilledNo = await generatePurchaseNo(client, input.purchase_kind);
 
@@ -2385,7 +2439,7 @@ export default function (pool, config) {
   router.put("/:id", async (req, res) => {
     const input = sanitizeInvoicePayload(req.body);
     const validationErrors = [
-      ...(input.purchase_kind === PURCHASE_KIND_FOREIGN ? validateSupplier(input.supplier) : []),
+      ...(needsSupplierLink(input) ? validateSupplier(input.supplier) : []),
       ...validateInvoice(input),
     ];
 
@@ -2409,13 +2463,19 @@ export default function (pool, config) {
         });
       }
 
-      const supplier =
-        input.purchase_kind === PURCHASE_KIND_LOCAL
-          ? { id: null }
-          : await upsertSupplier(client, {
+      const supplier = !needsSupplierLink(input)
+        ? { id: null }
+        : await upsertSupplier(
+            client,
+            {
               ...input.supplier,
-              id: input.foreign_supplier_id || input.supplier.id || existing.foreign_supplier_id,
-            });
+              id:
+                input.foreign_supplier_id ||
+                input.supplier.id ||
+                existing.foreign_supplier_id,
+            },
+            input.purchase_kind
+          );
 
       await client.query(
         `UPDATE self_billed_invoices
@@ -2573,9 +2633,10 @@ export default function (pool, config) {
       if (!invoice) {
         return res.status(404).json({ message: "Self-billed invoice not found" });
       }
-      if (invoice.purchase_kind === PURCHASE_KIND_LOCAL) {
+      if (invoice.purchase_kind === PURCHASE_KIND_LOCAL && !invoice.foreign_supplier_id) {
         return res.status(400).json({
-          message: "Local general purchases do not require e-invoice submission",
+          message:
+            "Add and save the supplier e-invoice details before submitting this local purchase.",
         });
       }
       if (isLockedInvoice(invoice)) {
@@ -2585,7 +2646,9 @@ export default function (pool, config) {
         });
       }
 
-      const supplierErrors = validateSupplier(sanitizeSupplierPayload(invoice.supplier));
+      const supplierErrors = validateSupplier(
+        sanitizeSupplierPayload(invoice.supplier, invoice.purchase_kind)
+      );
       const invoiceErrors = validateInvoice(
         sanitizeInvoicePayload({
           ...invoice,
