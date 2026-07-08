@@ -198,9 +198,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
     () => createDefaultSupplierPaymentDraft(today, 0, !isEditMode)
   );
   const previousPayableAmountRef = useRef<number>(0);
-  const stockSearch = useGeneralStockSearch({
-    initialDateTo: formData.purchase_date,
-  });
+  const stockSearch = useGeneralStockSearch();
 
   const categoryOptions = useMemo(
     () => [
@@ -853,7 +851,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
           )}
         </div>
         <div className="space-y-3">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2">
             <FormInput
               name="amount_myr"
               label="Amount (MYR)"
@@ -874,26 +872,6 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
               onChange={(value: string) => updateFormField("account_code", value)}
               disabled={!canEdit}
               placeholder="Pick the expense account to debit"
-            />
-            <FormInput
-              name="stock_search_from"
-              label="Stock Date From"
-              value={stockSearch.dateFrom}
-              type="date"
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                stockSearch.setDateFrom(event.target.value)
-              }
-              disabled={!canEdit}
-            />
-            <FormInput
-              name="stock_search_to"
-              label="Stock Date To"
-              value={stockSearch.dateTo}
-              type="date"
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                stockSearch.setDateTo(event.target.value)
-              }
-              disabled={!canEdit}
             />
           </div>
           <div className="space-y-3">
