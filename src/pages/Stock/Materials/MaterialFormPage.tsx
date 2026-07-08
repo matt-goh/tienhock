@@ -50,6 +50,8 @@ interface VariantEditState {
   is_active: boolean;
 }
 
+type DeleteMode = "deactivate" | "permanent";
+
 // Category options
 const categoryOptions: SelectOption[] = [
   { id: "ingredient", name: "Ingredient" },
@@ -79,6 +81,7 @@ const MaterialFormPage: React.FC = () => {
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [materialDeleteMode, setMaterialDeleteMode] = useState<DeleteMode>("deactivate");
   const [error, setError] = useState<string | null>(null);
 
   // Variants state
@@ -86,6 +89,7 @@ const MaterialFormPage: React.FC = () => {
   const [editingVariant, setEditingVariant] = useState<VariantEditState | null>(null);
   const [showDeleteVariantDialog, setShowDeleteVariantDialog] = useState(false);
   const [variantToDelete, setVariantToDelete] = useState<MaterialVariant | null>(null);
+  const [variantDeleteMode, setVariantDeleteMode] = useState<DeleteMode>("deactivate");
   const [isSavingVariant, setIsSavingVariant] = useState(false);
 
   // Fetch material data for editing
@@ -197,17 +201,26 @@ const MaterialFormPage: React.FC = () => {
     }
   };
 
-  const handleDeleteVariantClick = (variant: MaterialVariant) => {
+  const handleDeleteVariantClick = (
+    variant: MaterialVariant,
+    mode: DeleteMode = "deactivate"
+  ): void => {
     setVariantToDelete(variant);
+    setVariantDeleteMode(mode);
     setShowDeleteVariantDialog(true);
   };
 
-  const handleConfirmDeleteVariant = async () => {
+  const handleConfirmDeleteVariant = async (): Promise<void> => {
     if (!variantToDelete) return;
 
     try {
-      await api.delete(`/api/materials/variants/${variantToDelete.id}`);
-      toast.success("Variant deactivated");
+      if (variantDeleteMode === "permanent") {
+        await api.delete(`/api/materials/variants/${variantToDelete.id}?hard=true`);
+        toast.success("Variant deleted permanently");
+      } else {
+        await api.delete(`/api/materials/variants/${variantToDelete.id}`);
+        toast.success("Variant deactivated");
+      }
       fetchVariants();
     } catch (err: any) {
       console.error("Error deleting variant:", err);
@@ -215,6 +228,7 @@ const MaterialFormPage: React.FC = () => {
     } finally {
       setShowDeleteVariantDialog(false);
       setVariantToDelete(null);
+      setVariantDeleteMode("deactivate");
     }
   };
 
@@ -313,18 +327,29 @@ const MaterialFormPage: React.FC = () => {
   };
 
   // Delete
-  const handleDelete = async () => {
+  const handleDeleteClick = (mode: DeleteMode): void => {
+    setMaterialDeleteMode(mode);
+    setShowDeleteDialog(true);
+  };
+
+  const handleDelete = async (): Promise<void> => {
     if (!id) return;
 
     try {
-      await api.delete(`/api/materials/${id}`);
-      toast.success("Material deactivated successfully");
+      if (materialDeleteMode === "permanent") {
+        await api.delete(`/api/materials/${id}?hard=true`);
+        toast.success("Material deleted permanently");
+      } else {
+        await api.delete(`/api/materials/${id}`);
+        toast.success("Material deactivated successfully");
+      }
       navigate("/materials");
     } catch (err: any) {
       console.error("Error deleting material:", err);
       toast.error(err.message || "Failed to delete material");
     } finally {
       setShowDeleteDialog(false);
+      setMaterialDeleteMode("deactivate");
     }
   };
 
@@ -355,6 +380,25 @@ const MaterialFormPage: React.FC = () => {
     );
   }
 
+  const isMaterialPersistedInactive: boolean =
+    isEditMode && initialFormDataRef.current?.is_active === false && !formData.is_active;
+  const materialDeleteDialogTitle: string =
+    materialDeleteMode === "permanent" ? "Delete Material Permanently" : "Deactivate Material";
+  const materialDeleteDialogMessage: string =
+    materialDeleteMode === "permanent"
+      ? `Permanently delete "${formData.name}"? This only works after the material is inactive and has no stock adjustments or purchase lines. This action cannot be undone.`
+      : `Are you sure you want to deactivate "${formData.name}"? This material will be hidden but not permanently deleted.`;
+  const materialDeleteConfirmText: string =
+    materialDeleteMode === "permanent" ? "Delete Permanently" : "Deactivate";
+  const variantDeleteDialogTitle: string =
+    variantDeleteMode === "permanent" ? "Delete Variant Permanently" : "Deactivate Variant";
+  const variantDeleteDialogMessage: string =
+    variantDeleteMode === "permanent"
+      ? `Permanently delete variant "${variantToDelete?.variant_name}"? This only works after the variant is inactive and has no stock adjustments or purchase lines. This action cannot be undone.`
+      : `Are you sure you want to deactivate variant "${variantToDelete?.variant_name}"? This variant will be hidden but not permanently deleted.`;
+  const variantDeleteConfirmText: string =
+    variantDeleteMode === "permanent" ? "Delete Permanently" : "Deactivate";
+
   return (
     <div className="space-y-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm px-6 py-3">
@@ -373,9 +417,19 @@ const MaterialFormPage: React.FC = () => {
                 color="red"
                 variant="filled"
                 size="sm"
-                onClick={() => setShowDeleteDialog(true)}
+                onClick={() => handleDeleteClick("deactivate")}
               >
                 Deactivate
+              </Button>
+            )}
+            {isMaterialPersistedInactive && (
+              <Button
+                color="red"
+                variant="filled"
+                size="sm"
+                onClick={() => handleDeleteClick("permanent")}
+              >
+                Delete Permanently
               </Button>
             )}
             <Button
@@ -622,10 +676,20 @@ const MaterialFormPage: React.FC = () => {
                           </button>
                           {variant.is_active && (
                             <button
-                              onClick={() => handleDeleteVariantClick(variant)}
+                              onClick={() => handleDeleteVariantClick(variant, "deactivate")}
                               disabled={editingVariant !== null}
                               className="p-1 text-gray-500 hover:text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors disabled:opacity-50"
                               title="Deactivate"
+                            >
+                              <IconTrash className="w-4 h-4" />
+                            </button>
+                          )}
+                          {!variant.is_active && (
+                            <button
+                              onClick={() => handleDeleteVariantClick(variant, "permanent")}
+                              disabled={editingVariant !== null}
+                              className="p-1 text-gray-500 hover:text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors disabled:opacity-50"
+                              title="Delete permanently"
                             >
                               <IconTrash className="w-4 h-4" />
                             </button>
@@ -655,11 +719,14 @@ const MaterialFormPage: React.FC = () => {
       {/* Delete Confirmation */}
       <ConfirmationDialog
         isOpen={showDeleteDialog}
-        onClose={() => setShowDeleteDialog(false)}
+        onClose={() => {
+          setShowDeleteDialog(false);
+          setMaterialDeleteMode("deactivate");
+        }}
         onConfirm={handleDelete}
-        title="Deactivate Material"
-        message={`Are you sure you want to deactivate "${formData.name}"? This material will be hidden but not permanently deleted.`}
-        confirmButtonText="Deactivate"
+        title={materialDeleteDialogTitle}
+        message={materialDeleteDialogMessage}
+        confirmButtonText={materialDeleteConfirmText}
         variant="danger"
       />
 
@@ -669,11 +736,12 @@ const MaterialFormPage: React.FC = () => {
         onClose={() => {
           setShowDeleteVariantDialog(false);
           setVariantToDelete(null);
+          setVariantDeleteMode("deactivate");
         }}
         onConfirm={handleConfirmDeleteVariant}
-        title="Deactivate Variant"
-        message={`Are you sure you want to deactivate variant "${variantToDelete?.variant_name}"? This variant will be hidden but not permanently deleted.`}
-        confirmButtonText="Deactivate"
+        title={variantDeleteDialogTitle}
+        message={variantDeleteDialogMessage}
+        confirmButtonText={variantDeleteConfirmText}
         variant="danger"
       />
     </div>

@@ -919,29 +919,41 @@ export default function (pool) {
   router.delete("/variants/:variantId", async (req, res) => {
     const { variantId } = req.params;
     const { hard } = req.query;
+    const isHardDelete = hard === "true";
 
     try {
       // Check if variant exists
       const checkVariant = await pool.query(
-        "SELECT id, variant_name FROM material_variants WHERE id = $1",
+        "SELECT id, variant_name, is_active FROM material_variants WHERE id = $1",
         [variantId]
       );
       if (checkVariant.rows.length === 0) {
         return res.status(404).json({ message: "Variant not found" });
       }
 
-      // Check if variant has stock entries
-      const stockQuery = "SELECT COUNT(*) as count FROM material_stock_entries WHERE variant_id = $1";
-      const stockResult = await pool.query(stockQuery, [variantId]);
-
-      if (parseInt(stockResult.rows[0].count) > 0 && hard === "true") {
+      if (isHardDelete && checkVariant.rows[0].is_active) {
         return res.status(400).json({
-          message: "Cannot hard delete variant with stock entries. Use soft delete (deactivate) instead.",
+          message: "Deactivate this variant before deleting it permanently.",
         });
       }
 
-      if (hard === "true") {
-        // Hard delete (only if no stock entries)
+      // Check if variant has stock entries
+      const stockQuery = "SELECT COUNT(*) as count FROM material_stock_entries WHERE variant_id = $1";
+      const stockResult = await pool.query(stockQuery, [variantId]);
+      const stockCount = parseInt(stockResult.rows[0].count, 10);
+
+      const purchaseLineQuery = "SELECT COUNT(*) as count FROM purchase_invoice_lines WHERE variant_id = $1";
+      const purchaseLineResult = await pool.query(purchaseLineQuery, [variantId]);
+      const purchaseLineCount = parseInt(purchaseLineResult.rows[0].count, 10);
+
+      if ((stockCount > 0 || purchaseLineCount > 0) && isHardDelete) {
+        return res.status(400).json({
+          message: "Cannot permanently delete variant with stock adjustments or purchase lines.",
+        });
+      }
+
+      if (isHardDelete) {
+        // Hard delete (only if inactive and no stock/purchase history)
         const deleteQuery = "DELETE FROM material_variants WHERE id = $1 RETURNING id, variant_name";
         const result = await pool.query(deleteQuery, [variantId]);
         res.json({
@@ -1163,10 +1175,11 @@ export default function (pool) {
   router.delete("/:id", async (req, res) => {
     const { id } = req.params;
     const { hard } = req.query;
+    const isHardDelete = hard === "true";
 
     try {
       // Check if material exists
-      const checkQuery = "SELECT id, code FROM materials WHERE id = $1";
+      const checkQuery = "SELECT id, code, is_active FROM materials WHERE id = $1";
       const checkResult = await pool.query(checkQuery, [id]);
       if (checkResult.rows.length === 0) {
         return res.status(404).json({
@@ -1174,24 +1187,47 @@ export default function (pool) {
         });
       }
 
-      // Check if material has stock entries
-      const stockQuery = "SELECT COUNT(*) as count FROM material_stock_entries WHERE material_id = $1";
-      const stockResult = await pool.query(stockQuery, [id]);
-
-      if (parseInt(stockResult.rows[0].count) > 0 && hard === "true") {
+      if (isHardDelete && checkResult.rows[0].is_active) {
         return res.status(400).json({
-          message: "Cannot hard delete material with stock entries. Use soft delete (deactivate) instead.",
+          message: "Deactivate this material before deleting it permanently.",
         });
       }
 
-      if (hard === "true") {
-        // Hard delete (only if no stock entries)
-        const deleteQuery = "DELETE FROM materials WHERE id = $1 RETURNING id, code";
-        const result = await pool.query(deleteQuery, [id]);
-        res.json({
-          message: "Material deleted permanently",
-          material: result.rows[0],
+      // Check if material has stock entries
+      const stockQuery = "SELECT COUNT(*) as count FROM material_stock_entries WHERE material_id = $1";
+      const stockResult = await pool.query(stockQuery, [id]);
+      const stockCount = parseInt(stockResult.rows[0].count, 10);
+
+      const purchaseLineQuery = "SELECT COUNT(*) as count FROM purchase_invoice_lines WHERE material_id = $1";
+      const purchaseLineResult = await pool.query(purchaseLineQuery, [id]);
+      const purchaseLineCount = parseInt(purchaseLineResult.rows[0].count, 10);
+
+      if ((stockCount > 0 || purchaseLineCount > 0) && isHardDelete) {
+        return res.status(400).json({
+          message: "Cannot permanently delete material with stock adjustments or purchase lines.",
         });
+      }
+
+      if (isHardDelete) {
+        // Hard delete (only if inactive and no stock/purchase history)
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+          await client.query("DELETE FROM material_variants WHERE material_id = $1", [id]);
+          const deleteQuery = "DELETE FROM materials WHERE id = $1 RETURNING id, code";
+          const result = await client.query(deleteQuery, [id]);
+          await client.query("COMMIT");
+
+          res.json({
+            message: "Material deleted permanently",
+            material: result.rows[0],
+          });
+        } catch (error) {
+          await client.query("ROLLBACK");
+          throw error;
+        } finally {
+          client.release();
+        }
       } else {
         // Soft delete
         const updateQuery = `
