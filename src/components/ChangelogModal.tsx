@@ -19,6 +19,31 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-07-09",
+    ms: "Pelarasan Stok Produk kini boleh disimpan mengikut tarikh pelarasan sebenar. Pilih tarikh di bahagian atas halaman sebelum Save; rujukan lama yang sebelum ini tersimpan pada hujung bulan dikemas kini mengikut tarikh ia dimasukkan.",
+    en: "Product Stock Adjustments can now be saved using the actual adjustment date. Pick the date at the top of the page before saving; older references that were previously stored at month-end have been updated to the date they were entered.",
+  },
+  {
+    date: "2026-07-08",
+    ms: "Senarai Trade Debtors dalam Account Ledger kini sentiasa ikut senarai pelanggan. Pelanggan baharu akan muncul automatik, nama pelanggan yang ditukar akan dikemas kini, dan pelanggan lama yang sebelum ini tiada dalam senarai telah ditambah.",
+    en: "The Trade Debtors list in Account Ledger now stays in sync with the customer list. New customers appear automatically, renamed customers update there too, and older customers that were missing have been added.",
+  },
+  {
+    date: "2026-07-08",
+    ms: "Bahan dan varian yang sudah dinyahaktifkan kini boleh dipadam secara kekal walaupun mempunyai rekod stok; rekod stok berkaitan akan dibuang bersama. Jika bahan atau varian pernah digunakan dalam invois belian, pemadaman kekal masih disekat supaya sejarah belian kekal terpelihara.",
+    en: "Inactive materials and variants can now be permanently deleted even when they have stock records; the related stock records are removed together. Permanent deletion is still blocked when the material or variant has been used in purchase invoices, so purchase history stays intact.",
+  },
+  {
+    date: "2026-07-08",
+    ms: "Halaman Kemasukan Pengeluaran Jelly Polly kini mempunyai satu lajur input bagi setiap kod bayaran yang dipetakan kepada produk. Setiap pekerja memasukkan kuantiti karton secara berasingan untuk setiap kod bayaran (contohnya dua konfigurasi karton), dan setiap kuantiti dibayar mengikut kadar kod berkenaan dalam gaji. Sebelum ini hanya satu kotak input dipaparkan dan hanya satu kod bayaran dibayar. Susunan kad pekerja (drag-and-drop) dikekalkan, dan jumlah karton semua kod bayaran dikira sebagai stok produk.",
+    en: "The Jelly Polly Production Entry page now shows one input column per pay code mapped to the product. Each worker enters carton quantities separately for each pay code (e.g. two carton configurations), and each quantity is paid at that code's rate in payroll. Previously only a single input was shown and only one pay code was ever paid. Worker drag-and-drop ordering is kept, and the cartons across all pay codes add up to the product's stock.",
+  },
+  {
+    date: "2026-07-08",
+    ms: "Lejar Akaun untuk Public Bank Berhad (BANK_PBB) kini turut memaparkan baris tunai diterima (CASH SALES RECEIVED, CASH RECEIVED/CR. SALES) sebagai wang masuk (lajur Debit), supaya lejar bank membaca seperti buku tunai. Baki pembukaan, berjalan dan penutup turut mengambil kira baris ini.",
+    en: "The Account Ledger for Public Bank Berhad (BANK_PBB) now also lists the cash-received rows (CASH SALES RECEIVED, CASH RECEIVED/CR. SALES) as money in (the Debit column), so the bank ledger reads like a cash book. The opening, running and closing balances include these rows too.",
+  },
+  {
     date: "2026-07-08",
     ms: "Belian Am Tempatan kini boleh mengeluarkan e-Invois bil sendiri apabila perlu (dimatikan secara lalai). Hidupkan 'Issue e-invoice', pilih jenis penjual (individu dengan MyKad, individu dengan TIN sendiri, atau perniagaan), isi butiran pembekal, kemudian Save & Submit e-Invoice. Sebelum menghantar, satu pengesahan memaparkan jenis penjual yang layak untuk e-Invois bil sendiri (boleh tukar antara Bahasa Melayu dan Bahasa Inggeris). Nombor TIN dan pengenalan pembekal ditetapkan mengikut jenis penjual seperti kehendak LHDN.",
     en: "Local General Purchases can now issue a self-billed e-Invoice when needed (off by default). Turn on 'Issue e-invoice', pick the seller type (individual with MyKad, individual with their own TIN, or a business), fill in the supplier details, then Save & Submit e-Invoice. Before submitting, a confirmation shows the seller types allowed for self-billed e-invoices (switchable between Bahasa Melayu and English). The supplier's TIN and identification number are set automatically to match the seller type as required by LHDN.",

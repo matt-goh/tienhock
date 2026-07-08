@@ -1308,6 +1308,7 @@ export interface StockAdjustment {
 // Stock Adjustment Reference (for listing adjustment batches)
 export interface StockAdjustmentReference {
   reference: string;
+  entry_date: string;
   product_count: number;
   total_adj_in: number;
   total_adj_out: number;
