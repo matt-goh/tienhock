@@ -270,7 +270,7 @@ export const reprocessJPEmployees = async (
         // JP production entries (bags packed per worker per JP product)
         client.query(
           `SELECT pe.entry_date, to_char(pe.entry_date, 'YYYY-MM-DD') AS entry_date_str,
-                  pe.product_id, pe.worker_id, pe.bags_packed
+                  pe.product_id, pe.worker_id, pe.pay_code_id, pe.bags_packed
            FROM jellypolly.production_entries pe
            JOIN public.products p ON pe.product_id = p.id
            WHERE pe.entry_date BETWEEN $1 AND $2
@@ -341,9 +341,15 @@ export const reprocessJPEmployees = async (
         return new Date(y, m - 1, d).getDay() === 0 ? "Ahad" : "Biasa";
       };
 
-      // JP product -> Base production pay code (rate_unit Bag/Ctn)
+      // JP product -> Base production pay code (rate_unit Bag/Ctn). Used as the
+      // fallback rate for legacy production rows that predate per-pay-code entry
+      // (pay_code_id IS NULL).
       const productBaseCodeByProduct = new Map();
+      // (product_id | pay_code_id) -> mapped pay code row. Per-pay-code
+      // production quantities are paid at their own mapped code's rate.
+      const payCodeByProductCode = new Map();
       for (const row of productPayCodesResult.rows) {
+        payCodeByProductCode.set(`${row.product_id}|${row.pay_code_id}`, row);
         if (
           row.pay_type === "Base" &&
           (row.rate_unit === "Bag" || row.rate_unit === "Ctn") &&
@@ -472,31 +478,36 @@ export const reprocessJPEmployees = async (
           });
         }
 
-        // JP production pay: bags packed × the product's Base pay code rate
-        // (product_pay_codes mapping, day-type aware). Mirrors TH's base
-        // production pay; TH's BH/MEE threshold bonus tiers are TH-specific
-        // and not applied for JP.
+        // JP production pay: each row is a quantity for one mapped pay code
+        // (product_pay_codes mapping, day-type aware). The row's own pay code
+        // is paid; legacy rows without a pay code fall back to the product's
+        // Base code. Mirrors TH's base production pay; TH's BH/MEE threshold
+        // bonus tiers are TH-specific and not applied for JP.
         for (const entry of productionByCanonical.get(canonicalId) || []) {
-          const baseCode = productBaseCodeByProduct.get(entry.product_id);
-          if (!baseCode) continue;
+          const payCode = entry.pay_code_id
+            ? payCodeByProductCode.get(
+                `${entry.product_id}|${entry.pay_code_id}`
+              )
+            : productBaseCodeByProduct.get(entry.product_id);
+          if (!payCode) continue;
           const ymd = entry.entry_date_str;
           const dayType = dayTypeOf(ymd);
           let rate =
             dayType === "Ahad"
-              ? parseFloat(baseCode.rate_ahad) || 0
+              ? parseFloat(payCode.rate_ahad) || 0
               : dayType === "Umum"
-              ? parseFloat(baseCode.rate_umum) || 0
-              : parseFloat(baseCode.rate_biasa) || 0;
-          if (rate === 0) rate = parseFloat(baseCode.rate_biasa) || 0;
+              ? parseFloat(payCode.rate_umum) || 0
+              : parseFloat(payCode.rate_biasa) || 0;
+          if (rate === 0) rate = parseFloat(payCode.rate_biasa) || 0;
           if (rate <= 0) continue;
 
           const bags = parseFloat(entry.bags_packed) || 0;
           combinedItems.push({
-            pay_code_id: baseCode.pay_code_id,
-            description: `${baseCode.description} - ${entry.product_id}`,
-            pay_type: "Base",
+            pay_code_id: payCode.pay_code_id,
+            description: `${payCode.description} - ${entry.product_id}`,
+            pay_type: payCode.pay_type || "Base",
             rate,
-            rate_unit: baseCode.rate_unit,
+            rate_unit: payCode.rate_unit,
             quantity: bags,
             foc_units: 0,
             amount: Math.round(bags * rate * 100) / 100,

@@ -258,6 +258,7 @@ export default function (pool) {
           TO_CHAR(pe.entry_date, 'YYYY-MM-DD') as entry_date,
           pe.product_id,
           pe.worker_id,
+          pe.pay_code_id,
           pe.bags_packed,
           pe.created_at,
           pe.updated_at,
@@ -427,12 +428,13 @@ export default function (pool) {
   // POST /api/production-entries - Create single entry
   router.post("/", async (req, res) => {
     try {
-      const { entry_date, product_id, worker_id, bags_packed, created_by } =
+      const { entry_date, product_id, worker_id, pay_code_id, bags_packed, created_by } =
         req.body;
 
-      if (!entry_date || !product_id || !worker_id) {
+      if (!entry_date || !product_id || !worker_id || !pay_code_id) {
         return res.status(400).json({
-          message: "entry_date, product_id, and worker_id are required",
+          message:
+            "entry_date, product_id, worker_id, and pay_code_id are required",
         });
       }
 
@@ -456,9 +458,9 @@ export default function (pool) {
       }
 
       const query = `
-        INSERT INTO jellypolly.production_entries (entry_date, product_id, worker_id, bags_packed, created_by)
-        VALUES ($1, $2, $3, $4, $5)
-        ON CONFLICT (entry_date, product_id, worker_id)
+        INSERT INTO jellypolly.production_entries (entry_date, product_id, worker_id, pay_code_id, bags_packed, created_by)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (entry_date, product_id, worker_id, pay_code_id)
         DO UPDATE SET
           bags_packed = EXCLUDED.bags_packed,
           updated_at = CURRENT_TIMESTAMP
@@ -469,6 +471,7 @@ export default function (pool) {
         entry_date,
         product_id,
         worker_id,
+        pay_code_id,
         bags_packed || 0,
         created_by || null,
       ]);
@@ -551,9 +554,13 @@ export default function (pool) {
           });
         }
 
-        const positiveWorkerIds = entries
-          .filter((entry) => Number(entry.bags_packed) > 0)
-          .map((entry) => entry.worker_id);
+        const positiveWorkerIds = [
+          ...new Set(
+            entries
+              .filter((entry) => Number(entry.bags_packed) > 0)
+              .map((entry) => entry.worker_id)
+          ),
+        ];
         const conflictEmployeeIds = await getPackingCutiConflicts(
           client,
           date,
@@ -571,26 +578,43 @@ export default function (pool) {
           throw conflictError;
         }
 
+        // Each entry is one quantity for one worker's one mapped pay code.
+        // Clear any legacy rows for the touched workers that predate the
+        // per-pay-code model (pay_code_id IS NULL) so they don't linger and
+        // double-count stock alongside the new keyed rows.
+        const touchedWorkerIds = [
+          ...new Set(entries.map((entry) => entry.worker_id).filter(Boolean)),
+        ];
+        if (touchedWorkerIds.length > 0) {
+          await client.query(
+            `DELETE FROM jellypolly.production_entries
+             WHERE entry_date = $1 AND product_id = $2
+               AND worker_id = ANY($3::text[]) AND pay_code_id IS NULL`,
+            [date, product_id, touchedWorkerIds]
+          );
+        }
+
         for (const entry of entries) {
-          const { worker_id, bags_packed } = entry;
+          const { worker_id, pay_code_id, bags_packed } = entry;
 
-          if (!worker_id) continue;
+          if (!worker_id || !pay_code_id) continue;
 
-          // Skip entries with 0 bags - optionally delete them
-          if (!bags_packed || bags_packed === 0) {
-            // Delete existing entry if bags is 0
+          // Skip entries with 0 bags - delete any existing row for that
+          // (worker, pay code) so cleared inputs are removed.
+          if (!bags_packed || Number(bags_packed) === 0) {
             await client.query(
               `DELETE FROM jellypolly.production_entries
-               WHERE entry_date = $1 AND product_id = $2 AND worker_id = $3`,
-              [date, product_id, worker_id]
+               WHERE entry_date = $1 AND product_id = $2
+                 AND worker_id = $3 AND pay_code_id = $4`,
+              [date, product_id, worker_id, pay_code_id]
             );
             continue;
           }
 
           const query = `
-            INSERT INTO jellypolly.production_entries (entry_date, product_id, worker_id, bags_packed, created_by)
-            VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT (entry_date, product_id, worker_id)
+            INSERT INTO jellypolly.production_entries (entry_date, product_id, worker_id, pay_code_id, bags_packed, created_by)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (entry_date, product_id, worker_id, pay_code_id)
             DO UPDATE SET
               bags_packed = EXCLUDED.bags_packed,
               updated_at = CURRENT_TIMESTAMP
@@ -601,12 +625,13 @@ export default function (pool) {
             date,
             product_id,
             worker_id,
+            pay_code_id,
             bags_packed,
             created_by || null,
           ]);
 
           savedEntries.push(result.rows[0]);
-          totalBags += bags_packed;
+          totalBags += Number(bags_packed);
         }
 
         await client.query("COMMIT");
