@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-08",
+    ms: "Belian Am Tempatan kini boleh mengeluarkan e-Invois bil sendiri apabila perlu (dimatikan secara lalai). Hidupkan 'Issue e-invoice', pilih jenis penjual (individu dengan MyKad, individu dengan TIN sendiri, atau perniagaan), isi butiran pembekal, kemudian Save & Submit e-Invoice. Sebelum menghantar, satu pengesahan memaparkan jenis penjual yang layak untuk e-Invois bil sendiri (boleh tukar antara Bahasa Melayu dan Bahasa Inggeris). Nombor TIN dan pengenalan pembekal ditetapkan mengikut jenis penjual seperti kehendak LHDN.",
+    en: "Local General Purchases can now issue a self-billed e-Invoice when needed (off by default). Turn on 'Issue e-invoice', pick the seller type (individual with MyKad, individual with their own TIN, or a business), fill in the supplier details, then Save & Submit e-Invoice. Before submitting, a confirmation shows the seller types allowed for self-billed e-invoices (switchable between Bahasa Melayu and English). The supplier's TIN and identification number are set automatically to match the seller type as required by LHDN.",
+  },
+  {
+    date: "2026-07-08",
     ms: "Halaman butiran kakitangan (Tien Hock dan Jelly Polly) kini menunjukkan lokasi kakitangan: lokasi yang diberikan terus kepada mereka (sama seperti di halaman Location) serta lokasi yang diwarisi daripada kerja mereka. Borang kakitangan kini membolehkan anda menetapkan lokasi, dan borang Jelly Polly menggunakan senarai lokasi Jelly Polly (bukan Tien Hock).",
     en: "Staff details pages (Tien Hock and Jelly Polly) now show a staff member's locations: those assigned directly to them (in sync with the Location page) plus locations inherited from their jobs. Staff forms now let you set locations, and the Jelly Polly forms use the Jelly Polly location list (not Tien Hock's).",
   },
