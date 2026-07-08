@@ -488,7 +488,7 @@ const ProductStockAdjustmentEntryPage: React.FC<
             placeholder="Pick adjustment date"
           />
           {hasUnsavedChanges && (
-            <span className="ml-auto rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700">
+            <span className="ml-auto rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-200">
               Unsaved changes
             </span>
           )}

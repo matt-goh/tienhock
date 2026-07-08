@@ -253,21 +253,28 @@ function roundAmt(v) {
  * Date-parseable value into a YYYY-MM-DD string used by journal_entries.entry_date.
  */
 function toIsoDate(value) {
+  const formatDateLocal = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   if (value === null || value === undefined) {
-    return new Date().toISOString().split("T")[0];
+    return formatDateLocal(new Date());
   }
   if (typeof value === "string" && /^\d+$/.test(value)) {
-    return new Date(Number(value)).toISOString().split("T")[0];
+    return formatDateLocal(new Date(Number(value)));
   }
   if (typeof value === "number") {
-    return new Date(value).toISOString().split("T")[0];
+    return formatDateLocal(new Date(value));
   }
   if (value instanceof Date) {
-    return value.toISOString().split("T")[0];
+    return formatDateLocal(value);
   }
   const parsed = new Date(value);
   if (isNaN(parsed.getTime())) {
-    return new Date().toISOString().split("T")[0];
+    return formatDateLocal(new Date());
   }
-  return parsed.toISOString().split("T")[0];
+  return formatDateLocal(parsed);
 }
