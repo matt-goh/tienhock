@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-09",
+    ms: "Nota Kredit, Nota Debit dan Nota Bayaran Balik kini boleh disimpan mengikut tarikh dokumen sebenar. Pilih tarikh dokumen sebelum Create; halaman butiran juga memaparkan tarikh dokumen dan masa ia dimasukkan secara berasingan.",
+    en: "Credit Notes, Debit Notes and Refund Notes can now be saved using the actual document date. Pick the document date before Create; the details page now shows the document date separately from when it was keyed in.",
+  },
+  {
+    date: "2026-07-09",
     ms: "Pelarasan Stok Produk kini boleh disimpan mengikut tarikh pelarasan sebenar. Pilih tarikh di bahagian atas halaman sebelum Save; rujukan lama yang sebelum ini tersimpan pada hujung bulan dikemas kini mengikut tarikh ia dimasukkan.",
     en: "Product Stock Adjustments can now be saved using the actual adjustment date. Pick the date at the top of the page before saving; older references that were previously stored at month-end have been updated to the date they were entered.",
   },

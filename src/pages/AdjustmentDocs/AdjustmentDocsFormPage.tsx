@@ -15,6 +15,7 @@ import BackButton from "../../components/BackButton";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { FormInput, FormListbox } from "../../components/FormComponents";
+import TimeNavigator, { type TimeRange } from "../../components/TimeNavigator";
 import { api } from "../../routes/utils/api";
 import {
   buildAdjustmentDocId,
@@ -73,6 +74,32 @@ const BANK_ACCOUNT_OPTIONS = [
 ];
 
 const MONEY_TOLERANCE = 0.005;
+
+const startOfLocalDay = (date: Date): Date =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+
+const endOfLocalDay = (date: Date): Date =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+
+const isSameLocalDate = (first: Date, second: Date): boolean =>
+  first.getFullYear() === second.getFullYear() &&
+  first.getMonth() === second.getMonth() &&
+  first.getDate() === second.getDate();
+
+const buildLocalDocumentTimestamp = (documentDate: Date): string => {
+  const now = new Date();
+  return new Date(
+    documentDate.getFullYear(),
+    documentDate.getMonth(),
+    documentDate.getDate(),
+    now.getHours(),
+    now.getMinutes(),
+    now.getSeconds(),
+    now.getMilliseconds()
+  )
+    .getTime()
+    .toString();
+};
 
 const parseType = (s: string | null): AdjustmentDocType | null => {
   if (s === "credit" || s === "credit_note") return "credit_note";
@@ -188,6 +215,10 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
     useState<boolean>(false);
   const [docIdError, setDocIdError] = useState<string>("");
   const [isCheckingDocId, setIsCheckingDocId] = useState<boolean>(false);
+  const [initialDocumentDate] = useState<Date>(() => new Date());
+  const [selectedDocumentDate, setSelectedDocumentDate] = useState<Date>(
+    () => new Date()
+  );
 
   const [invoice, setInvoice] = useState<ExtendedInvoiceData | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -217,12 +248,18 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
   // CN-paired-RN
   const [issuePairedRefund, setIssuePairedRefund] = useState(false);
 
+  const selectedDocumentYear: number = selectedDocumentDate.getFullYear();
+  const selectedDocumentYearShort: string =
+    String(selectedDocumentYear).slice(-2);
+
   // Fetch the predicted next document id to preview in the header.
   useEffect(() => {
     if (!type) return;
     let cancelled = false;
+    const query = new URLSearchParams();
+    query.set("year", String(selectedDocumentYear));
     api
-      .get(`${paths.apiBase}/next-number/${type}`)
+      .get(`${paths.apiBase}/next-number/${type}?${query.toString()}`)
       .then((res: { next_id?: string }) => {
         if (!cancelled) setPreviewDocId(res?.next_id || "");
       })
@@ -232,7 +269,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
     return () => {
       cancelled = true;
     };
-  }, [paths.apiBase, type]);
+  }, [paths.apiBase, selectedDocumentYear, type]);
 
   useEffect(() => {
     if (hasCustomDocNumber || !previewDocId) return;
@@ -244,12 +281,24 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
   const isDN = type === "debit_note";
   const isRN = type === "refund_note";
   const isReplacementPairedRefund: boolean = isRN && Boolean(pairedCreditNoteId);
+  const documentDateRange = useMemo(
+    () => ({
+      start: startOfLocalDay(selectedDocumentDate),
+      end: endOfLocalDay(selectedDocumentDate),
+    }),
+    [selectedDocumentDate]
+  );
+  const handleDocumentDateChange = useCallback((range: TimeRange): void => {
+    setSelectedDocumentDate(range.start);
+  }, []);
   const previewDocParts = useMemo(
     () => parseAdjustmentDocId(previewDocId),
     [previewDocId]
   );
   const requestedDocId: string = useMemo(() => {
-    if (!previewDocParts) return "";
+    if (!previewDocParts || previewDocParts.year !== selectedDocumentYearShort) {
+      return "";
+    }
     const runningNumber = Number.parseInt(docRunningNumber, 10);
     if (!Number.isInteger(runningNumber) || runningNumber <= 0) return "";
     return buildAdjustmentDocId(
@@ -258,13 +307,18 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
       previewDocParts.year,
       runningNumber
     );
-  }, [docRunningNumber, previewDocParts]);
-  const docNumberPrefix: string = previewDocParts
-    ? `${previewDocParts.company}/${previewDocParts.type}/${previewDocParts.year}/`
-    : "";
+  }, [docRunningNumber, previewDocParts, selectedDocumentYearShort]);
+  const docNumberPrefix: string =
+    previewDocParts && previewDocParts.year === selectedDocumentYearShort
+      ? `${previewDocParts.company}/${previewDocParts.type}/${previewDocParts.year}/`
+      : "";
 
   useEffect(() => {
-    if (!type || !previewDocParts) {
+    if (
+      !type ||
+      !previewDocParts ||
+      previewDocParts.year !== selectedDocumentYearShort
+    ) {
       setDocIdError("");
       setIsCheckingDocId(false);
       return;
@@ -288,6 +342,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
         const query = new URLSearchParams();
         query.set("type", checkedType);
         query.set("display_id", requestedDocId);
+        query.set("year", String(selectedDocumentYear));
         const response = (await api.get(
           `${paths.apiBase}/id-availability?${query.toString()}`
         )) as { available?: boolean };
@@ -317,6 +372,8 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
     paths.apiBase,
     previewDocParts,
     requestedDocId,
+    selectedDocumentYearShort,
+    selectedDocumentYear,
     type,
   ]);
 
@@ -806,6 +863,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
         type,
         display_id: requestedDocId,
         original_invoice_id: invoice.id,
+        createddate: buildLocalDocumentTimestamp(selectedDocumentDate),
         reason: reason || null,
         lines: lines.map((l) => ({
           code: l.code,
@@ -869,6 +927,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
 
   const isFormDirty =
     hasCustomDocNumber ||
+    !isSameLocalDate(selectedDocumentDate, initialDocumentDate) ||
     reason.length > 0 ||
     lines.some((l) => l.code || l.description);
 
@@ -1054,14 +1113,14 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
 
         {/* Original invoice summary */}
         <div className="p-4 border-b border-default-200 dark:border-gray-700 bg-default-50/60 dark:bg-gray-900/30">
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-sm">
-            <div>
-              <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
+          <div className="grid grid-cols-1 items-start gap-x-6 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-[max-content_max-content_1px_repeat(5,minmax(110px,1fr))]">
+            <div className="min-w-0">
+              <div className="mb-1.5 text-xs uppercase tracking-wider text-default-500 dark:text-gray-400">
                 Document No.
               </div>
               <div title="Only the final running number can be changed">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-medium text-default-900 dark:text-gray-100 whitespace-nowrap">
+                <div className="flex min-h-[34px] items-center gap-1.5">
+                  <span className="whitespace-nowrap font-semibold text-default-900 dark:text-gray-100">
                     {docNumberPrefix || "—"}
                   </span>
                   {previewDocParts && (
@@ -1074,7 +1133,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
                         setHasCustomDocNumber(true);
                         setDocRunningNumber(e.target.value);
                       }}
-                      className="w-20 px-2 py-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 rounded text-sm font-medium"
+                      className="h-[30px] w-16 rounded-md border border-default-300 bg-white px-2 text-sm font-semibold text-default-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                       disabled={isSaving}
                       aria-label="Document number running number"
                     />
@@ -1093,12 +1152,29 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
                 )}
               </div>
             </div>
-            <div>
-              <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
+            <div className="min-w-0 sm:col-span-2 lg:col-span-2 xl:col-span-1">
+              <div className="mb-1.5 text-xs uppercase tracking-wider text-default-500 dark:text-gray-400">
+                Document Date
+              </div>
+              <TimeNavigator
+                range={documentDateRange}
+                onChange={handleDocumentDateChange}
+                modes={["day"]}
+                presets={false}
+                size="sm"
+                disabled={isSaving}
+                className="max-w-full"
+                triggerClassName="min-w-[150px] justify-between"
+              />
+            </div>
+            <div className="h-px bg-default-300 dark:bg-gray-600 sm:col-span-2 lg:col-span-4 xl:hidden" />
+            <div className="hidden h-[54px] w-px bg-default-300 dark:bg-gray-600 xl:block" />
+            <div className="min-w-0">
+              <div className="mb-1 text-xs uppercase tracking-wider text-default-500 dark:text-gray-400">
                 Original Invoice
               </div>
               <div
-                className="font-medium text-default-900 dark:text-gray-100 flex items-center gap-1 cursor-pointer hover:text-sky-600 dark:hover:text-sky-400 w-fit"
+                className="flex w-fit cursor-pointer items-center gap-1 font-semibold text-default-900 hover:text-sky-600 dark:text-gray-100 dark:hover:text-sky-400"
                 onClick={() => navigate(`${paths.invoiceUiBase}/${invoice.id}`)}
                 title="Open invoice"
               >
@@ -1106,32 +1182,35 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
                 <IconExternalLink size={14} className="text-sky-600 dark:text-sky-400" />
               </div>
             </div>
-            <div>
-              <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
+            <div className="min-w-0">
+              <div className="mb-1 text-xs uppercase tracking-wider text-default-500 dark:text-gray-400">
                 Customer
               </div>
-              <div className="font-medium text-default-900 dark:text-gray-100">
+              <div
+                className="truncate font-semibold text-default-900 dark:text-gray-100"
+                title={invoice.customerName || invoice.customerid}
+              >
                 {invoice.customerName || invoice.customerid}
               </div>
             </div>
-            <div>
-              <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
+            <div className="min-w-0">
+              <div className="mb-1 text-xs uppercase tracking-wider text-default-500 dark:text-gray-400">
                 Invoice Total
               </div>
-              <div className="font-medium text-default-900 dark:text-gray-100">
+              <div className="font-semibold text-default-900 dark:text-gray-100">
                 RM {Number(invoice.totalamountpayable).toFixed(2)}
               </div>
             </div>
-            <div>
-              <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
+            <div className="min-w-0">
+              <div className="mb-1 text-xs uppercase tracking-wider text-default-500 dark:text-gray-400">
                 Balance Due
               </div>
-              <div className="font-medium text-default-900 dark:text-gray-100">
+              <div className="font-semibold text-default-900 dark:text-gray-100">
                 RM {Number(invoice.balance_due).toFixed(2)}
               </div>
             </div>
-            <div>
-              <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider mb-0.5">
+            <div className="min-w-0">
+              <div className="mb-1 text-xs uppercase tracking-wider text-default-500 dark:text-gray-400">
                 Invoice e-Status
               </div>
               <div className="font-medium text-default-900 dark:text-gray-100">

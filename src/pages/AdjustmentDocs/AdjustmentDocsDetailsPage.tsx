@@ -44,6 +44,20 @@ const formatCurrency = (amount: number): string =>
     currency: "MYR",
   }).format(amount);
 
+const formatLocalDateTime = (value?: string | null): string => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return "—";
+  return date.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+};
+
 const AdjustmentDocsDetailsPage: React.FC<Props> = ({
   company = "tienhock",
 }) => {
@@ -433,10 +447,18 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
             </div>
             <div className="min-w-0">
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
-                Created
+                Document Date
               </div>
               <div className="font-medium text-default-900 dark:text-gray-100">
                 {date ? formatDisplayDate(date) : "—"}
+              </div>
+            </div>
+            <div className="min-w-0">
+              <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
+                Keyed In
+              </div>
+              <div className="font-medium text-default-900 dark:text-gray-100">
+                {formatLocalDateTime(doc.created_at)}
               </div>
             </div>
             <div className="min-w-0">
