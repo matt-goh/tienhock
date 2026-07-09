@@ -13,6 +13,7 @@ import {
 } from "../../components/FormComponents";
 import { api } from "../../routes/utils/api";
 import { validateCustomerIdentity } from "../../routes/catalogue/customerValidation";
+import { refreshAccountCodesCache } from "../../utils/accounting/useAccountingCache";
 import { refreshCustomersCache } from "../../utils/catalogue/useCustomerCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import CustomerProductsTab from "../../components/Catalogue/CustomerProductsTab";
@@ -305,7 +306,7 @@ const CustomerAddPage: React.FC = () => {
       }
 
       // --- Post-Save Actions ---
-      await refreshCustomersCache();
+      await Promise.all([refreshCustomersCache(), refreshAccountCodesCache()]);
       toast.success("Customer created successfully!");
       navigate("/catalogue/customer");
     } catch (error: any) {
