@@ -3,6 +3,7 @@ import { Router } from "express";
 import {
   recalculateAndUpdatePayroll,
   removeLeaveDayWorkItems,
+  calculateConsolidatedPayrollItemsCents,
 } from "./employee-payrolls.js";
 import {
   resolveContributionContext,
@@ -1528,43 +1529,11 @@ export default function (pool) {
           // they are only excluded from the gross/EPF totals.
           const grossItems = removeLeaveDayWorkItems(combinedItems, leaveDateSet);
 
-          // Calculate gross pay using CONSOLIDATED approach (matches frontend display)
-          // This groups items by pay_code+rate+rate_unit, sums quantities, then calculates once
-          // This ensures database gross_pay matches the consolidated view exactly
-          const consolidatedGroups = new Map();
-          grossItems.forEach((item) => {
-            const key = `${item.pay_code_id}_${item.rate}_${item.rate_unit}`;
-            if (consolidatedGroups.has(key)) {
-              const group = consolidatedGroups.get(key);
-              group.totalQuantity += item.quantity;
-              group.totalFocUnits += item.foc_units || 0;
-              group.originalAmountSum += item.amount; // Keep for Percent/Fixed
-            } else {
-              consolidatedGroups.set(key, {
-                rate: item.rate,
-                rate_unit: item.rate_unit,
-                totalQuantity: item.quantity,
-                totalFocUnits: item.foc_units || 0,
-                originalAmountSum: item.amount,
-              });
-            }
-          });
+          // Calculate gross pay using the shared consolidated cents helper.
+          // Salary Report mirrors this exact JS rounding in SQL.
+          const workGrossPayCents =
+            calculateConsolidatedPayrollItemsCents(grossItems);
 
-          // Calculate gross pay from consolidated groups
-          let workGrossPayCents = 0;
-          consolidatedGroups.forEach((group) => {
-            let amountCents;
-            if (group.rate_unit === "Percent" || group.rate_unit === "Fixed") {
-              // Keep original summed amount for special rate units
-              amountCents = Math.round(group.originalAmountSum * 100);
-            } else {
-              // Calculate from consolidated: roundedRate × (quantity + FOC)
-              const roundedRate = Math.round(group.rate * 100) / 100;
-              const totalUnits = group.totalQuantity + group.totalFocUnits;
-              amountCents = Math.round(roundedRate * totalUnits * 100);
-            }
-            workGrossPayCents += amountCents;
-          });
           const workGrossPay = workGrossPayCents / 100;
 
           const grossPay =
@@ -1604,12 +1573,13 @@ export default function (pool) {
 
           // EPF wage base excludes all overtime: Overtime work items are not in
           // Base/Tambahan, and overtime "Others" are removed via othersOvertimePay.
-          const epfGrossPay =
-            groupedItems.Base.reduce((s, i) => s + i.amount, 0) +
-            groupedItems.Tambahan.reduce((s, i) => s + i.amount, 0) +
-            leaveGrossPay +
-            commissionGrossPay +
-            (othersGrossPay - othersOvertimePay);
+          const epfGrossPayCents =
+            calculateConsolidatedPayrollItemsCents(groupedItems.Base || []) +
+            calculateConsolidatedPayrollItemsCents(groupedItems.Tambahan || []) +
+            Math.round(leaveGrossPay * 100) +
+            Math.round(commissionGrossPay * 100) +
+            Math.round((othersGrossPay - othersOvertimePay) * 100);
+          const epfGrossPay = epfGrossPayCents / 100;
 
           const deductions = [];
 
