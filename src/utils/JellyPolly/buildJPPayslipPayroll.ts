@@ -7,8 +7,8 @@
 // work_log_type. The payslip renders advances/bonus/others from dedicated
 // `commission_records` / `others_records` arrays (and derives the advance
 // deduction from the is_advance commission rows). So here we MOVE those tagged
-// items out of `items` into those arrays — leaving only real work items in
-// `items` — to avoid double counting and to surface the advance deduction.
+// items out of `items` into those arrays - leaving only real work items in
+// `items` - to avoid double counting and to surface the advance deduction.
 import {
   EmployeePayroll,
   CommissionRecord,
@@ -23,10 +23,14 @@ export interface JPPayslipItem {
   rate?: number;
   rate_unit?: string;
   quantity?: number;
+  foc_units?: number | null;
   amount?: number;
   is_manual?: boolean;
   pay_type?: string | null;
   job_type?: string | null;
+  source_employee_id?: string | null;
+  source_date?: string | null;
+  work_log_id?: number | null;
   work_log_type?: string | null;
 }
 
@@ -57,6 +61,9 @@ export interface JPPayslipInput {
   items?: JPPayslipItem[];
   deductions?: JPPayslipDeduction[];
   leave_records?: any[];
+  employee_job_mapping?: Record<string, string> | string[] | null;
+  job_sections?: Record<string, string>;
+  mid_month_payrolls_by_employee?: Record<string, number>;
 }
 
 export interface JPPayslipResult {
@@ -110,13 +117,22 @@ export const buildJPPayslipPayroll = (
         rate: Number(item.rate) || 0,
         rate_unit: item.rate_unit || "Fixed",
         quantity: Number(item.quantity) || 0,
+        foc_units: Number(item.foc_units) || 0,
         amount,
         is_manual: !!item.is_manual,
         pay_type: item.pay_type || "Base",
         job_type: item.job_type || undefined,
+        source_employee_id: item.source_employee_id || null,
+        source_date: item.source_date || null,
+        work_log_id: item.work_log_id || null,
+        work_log_type: item.work_log_type || null,
       });
     }
   }
+
+  const employeeJobMapping = Array.isArray(payroll.employee_job_mapping)
+    ? undefined
+    : payroll.employee_job_mapping || undefined;
 
   const pdfPayroll: EmployeePayroll = {
     id: payroll.id,
@@ -153,6 +169,9 @@ export const buildJPPayslipPayroll = (
       },
     })),
     leave_records: (payroll.leave_records || []) as EmployeePayroll["leave_records"],
+    employee_job_mapping: employeeJobMapping,
+    job_sections: payroll.job_sections,
+    mid_month_payrolls_by_employee: payroll.mid_month_payrolls_by_employee,
     commission_records,
     others_records,
   };

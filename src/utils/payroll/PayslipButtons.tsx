@@ -99,6 +99,7 @@ export const DownloadPayslipButton: React.FC<PayslipButtonProps> = ({
 
     await downloadPayslip(payroll, details, {
       companyName,
+      company,
       fileName,
       midMonthPayroll,
       onAfterDownload: () => {
@@ -172,6 +173,7 @@ export const DownloadBatchPayslipsButton: React.FC<BatchPayslipButtonProps> = ({
 
     await downloadBatchPayslips(payrolls, details, {
       companyName,
+      company,
       fileName,
       midMonthPayrollsMap,
       onAfterDownload: () => {
@@ -242,6 +244,7 @@ export const PrintPayslipButton: React.FC<PayslipButtonProps> = ({
 
     await printPayslip(payroll, details, {
       companyName,
+      company,
       midMonthPayroll,
       mode,
       onBeforePrint: () => {
@@ -329,6 +332,7 @@ export const PrintBatchPayslipsButton: React.FC<BatchPayslipButtonProps> = ({
 
     await printBatchPayslips(payrolls, details, {
       companyName,
+      company,
       midMonthPayrollsMap,
       onBeforePrint: () => {
         setShowOverlay(true);

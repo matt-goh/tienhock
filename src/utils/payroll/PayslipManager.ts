@@ -6,12 +6,16 @@ import {
   getEmployeePayrollDetails,
   getEmployeePayrollDetailsBatch,
 } from "./payrollUtils";
+import { api } from "../../routes/utils/api";
+import { buildJPPayslipPayroll } from "../JellyPolly/buildJPPayslipPayroll";
 import {
   getPaySlipPDFBlob,
   getBatchPaySlipPDFBlob,
   PayslipPrintMode,
 } from "./PaySlipPDFMake";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
+
+export type PayslipCompany = "tienhock" | "jellypolly";
 
 // Types
 export interface StaffDetails {
@@ -23,6 +27,7 @@ export interface StaffDetails {
 
 export interface PrintOptions {
   companyName?: string;
+  company?: PayslipCompany;
   midMonthPayroll?: MidMonthPayroll | null;
   // Which slip(s) to print. Print flows default to "individual" (per-job
   // breakdowns) since that's what HR prints most of the time.
@@ -35,6 +40,7 @@ export interface PrintOptions {
 
 export interface DownloadOptions {
   companyName?: string;
+  company?: PayslipCompany;
   fileName?: string;
   midMonthPayroll?: MidMonthPayroll | null;
   onBeforeDownload?: () => void;
@@ -57,6 +63,108 @@ const generatePayslipPDF = async (
     midMonthPayroll,
     mode,
   });
+};
+
+const toNumber = (value: number | string | null | undefined): number => {
+  const amount: number = Number(value ?? 0);
+  return Number.isFinite(amount) ? amount : 0;
+};
+
+const normalizeJPMidMonthPayroll = (
+  payroll: any
+): MidMonthPayroll | null => {
+  const midMonthPayroll = payroll.mid_month_payroll;
+  if (!midMonthPayroll) return null;
+
+  return {
+    id: Number(midMonthPayroll.id),
+    employee_id: midMonthPayroll.employee_id || payroll.employee_id,
+    employee_name: midMonthPayroll.employee_name || payroll.employee_name || "",
+    year: Number(midMonthPayroll.year ?? payroll.year),
+    month: Number(midMonthPayroll.month ?? payroll.month),
+    amount: toNumber(midMonthPayroll.amount),
+    payment_method: midMonthPayroll.payment_method || "Cash",
+    status: midMonthPayroll.status || "Pending",
+    created_at: midMonthPayroll.created_at || "",
+    updated_at: midMonthPayroll.updated_at || "",
+    paid_at: midMonthPayroll.paid_at,
+    notes: midMonthPayroll.notes,
+  };
+};
+
+const normalizeJPLeaveRecords = (leaveRecords: any[] | undefined): any[] => {
+  return (leaveRecords || []).map((record: any) => ({
+    ...record,
+    date: record.date || record.leave_date,
+    amount_paid: toNumber(record.amount_paid),
+  }));
+};
+
+const normalizeJPPayrollForPayslip = (rawPayroll: any): EmployeePayroll => {
+  const normalizedInput = {
+    ...rawPayroll,
+    gross_pay: toNumber(rawPayroll.gross_pay),
+    net_pay: toNumber(rawPayroll.net_pay),
+    digenapkan:
+      rawPayroll.digenapkan != null ? toNumber(rawPayroll.digenapkan) : undefined,
+    setelah_digenapkan:
+      rawPayroll.setelah_digenapkan != null
+        ? toNumber(rawPayroll.setelah_digenapkan)
+        : null,
+    year: rawPayroll.year != null ? Number(rawPayroll.year) : undefined,
+    month: rawPayroll.month != null ? Number(rawPayroll.month) : undefined,
+    items: rawPayroll.items || [],
+    deductions: rawPayroll.deductions || [],
+    leave_records: normalizeJPLeaveRecords(rawPayroll.leave_records),
+  };
+  const { pdfPayroll, commissionAdvanceTotal } =
+    buildJPPayslipPayroll(normalizedInput);
+
+  return {
+    ...pdfPayroll,
+    id: rawPayroll.id,
+    monthly_payroll_id: rawPayroll.monthly_payroll_id,
+    created_at: rawPayroll.created_at,
+    updated_at: rawPayroll.updated_at,
+    print_job_types: rawPayroll.print_job_types,
+    mid_month_payroll: normalizeJPMidMonthPayroll(rawPayroll),
+    mid_month_payrolls_by_employee:
+      rawPayroll.mid_month_payrolls_by_employee || {},
+    commission_advance: commissionAdvanceTotal,
+  };
+};
+
+const fetchCompanyEmployeePayrollDetails = async (
+  payrollId: number,
+  company: PayslipCompany
+): Promise<EmployeePayroll> => {
+  if (company === "jellypolly") {
+    const response = await api.get(`/jellypolly/api/employee-payrolls/${payrollId}`);
+    return normalizeJPPayrollForPayslip(response);
+  }
+
+  return getEmployeePayrollDetails(payrollId);
+};
+
+const fetchCompanyEmployeePayrollDetailsBatch = async (
+  payrollIds: number[],
+  company: PayslipCompany
+): Promise<EmployeePayroll[]> => {
+  if (payrollIds.length === 0) return [];
+
+  if (company === "jellypolly") {
+    const ids: string = payrollIds.join(",");
+    const response = await api.get(
+      `/jellypolly/api/employee-payrolls/batch?ids=${encodeURIComponent(ids)}`
+    );
+    return Array.isArray(response)
+      ? response.map((payroll: any): EmployeePayroll =>
+          normalizeJPPayrollForPayslip(payroll)
+        )
+      : [];
+  }
+
+  return getEmployeePayrollDetailsBatch(payrollIds);
 };
 
 const generateBatchPayslipPDF = async (
@@ -83,6 +191,7 @@ export const downloadPayslip = async (
 ): Promise<void> => {
   const {
     companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+    company = "tienhock",
     fileName,
     midMonthPayroll,
     onBeforeDownload,
@@ -93,13 +202,28 @@ export const downloadPayslip = async (
   try {
     if (onBeforeDownload) onBeforeDownload();
 
+    let completePayroll = payroll;
+    if (payroll.id) {
+      try {
+        completePayroll = await fetchCompanyEmployeePayrollDetails(
+          payroll.id,
+          company
+        );
+      } catch (error) {
+        console.warn("Error fetching complete payroll data:", error);
+      }
+    }
+
+    const effectiveMidMonthPayroll =
+      midMonthPayroll ?? completePayroll.mid_month_payroll;
+
     const blob = await generatePayslipPDF(
-      payroll,
+      completePayroll,
       staffDetails,
       companyName,
-      midMonthPayroll
+      effectiveMidMonthPayroll
     );
-    const defaultFileName = `PaySlip-${payroll.employee_id}-${payroll.year}-${payroll.month}.pdf`;
+    const defaultFileName = `PaySlip-${completePayroll.employee_id}-${completePayroll.year}-${completePayroll.month}.pdf`;
     const finalFileName = fileName || defaultFileName;
 
     // Create download link
@@ -134,6 +258,7 @@ export const downloadBatchPayslips = async (
 ): Promise<void> => {
   const {
     companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+    company = "tienhock",
     fileName,
     midMonthPayrollsMap,
     onBeforeDownload,
@@ -159,8 +284,9 @@ export const downloadBatchPayslips = async (
 
     if (payrollIdsToFetch.length > 0) {
       try {
-        const fetchedPayrolls = await getEmployeePayrollDetailsBatch(
-          payrollIdsToFetch
+        const fetchedPayrolls = await fetchCompanyEmployeePayrollDetailsBatch(
+          payrollIdsToFetch,
+          company
         );
 
         if (
@@ -237,7 +363,7 @@ export const downloadBatchPayslips = async (
 };
 
 // Tell the user what was actually sent to print. Only fires for multi-job
-// (grouped) payrolls — that's where combined vs per-job differs; single-job
+// (grouped) payrolls - that's where combined vs per-job differs; single-job
 // staff have one slip and the print dialog itself is feedback enough.
 const notifyPrintMode = (
   payroll: EmployeePayroll,
@@ -267,6 +393,7 @@ export const printPayslip = async (
 ): Promise<void> => {
   const {
     companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+    company = "tienhock",
     midMonthPayroll,
     mode = "individual",
     onBeforePrint,
@@ -287,18 +414,24 @@ export const printPayslip = async (
     let completePayroll = payroll;
     if (payroll.id) {
       try {
-        completePayroll = await getEmployeePayrollDetails(payroll.id);
+        completePayroll = await fetchCompanyEmployeePayrollDetails(
+          payroll.id,
+          company
+        );
       } catch (error) {
         console.warn("Error fetching complete payroll data:", error);
         // Continue with what we have
       }
     }
 
+    const effectiveMidMonthPayroll =
+      midMonthPayroll ?? completePayroll.mid_month_payroll;
+
     const blob = await generatePayslipPDF(
       completePayroll,
       staffDetails,
       companyName,
-      midMonthPayroll,
+      effectiveMidMonthPayroll,
       mode
     );
     notifyPrintMode(completePayroll, mode);
@@ -347,6 +480,7 @@ export const printBatchPayslips = async (
 ): Promise<void> => {
   const {
     companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+    company = "tienhock",
     midMonthPayrollsMap,
     mode = "individual",
     onBeforePrint,
@@ -378,8 +512,9 @@ export const printBatchPayslips = async (
 
     if (payrollIdsToFetch.length > 0) {
       try {
-        const fetchedPayrolls = await getEmployeePayrollDetailsBatch(
-          payrollIdsToFetch
+        const fetchedPayrolls = await fetchCompanyEmployeePayrollDetailsBatch(
+          payrollIdsToFetch,
+          company
         );
 
         if (
@@ -439,7 +574,7 @@ export const printBatchPayslips = async (
         );
       } else {
         toast.success(
-          `Printing ${completePayrolls.length} payslips — per-job slips for ${groupedCount} multi-job ${employeeWord}`
+          `Printing ${completePayrolls.length} payslips - per-job slips for ${groupedCount} multi-job ${employeeWord}`
         );
       }
     }
