@@ -372,6 +372,7 @@ export default function (pool) {
           entry_id: currentAdjustment?.id || null,
           variant_id: variant?.id || null,
           variant_name: variant?.variant_name || customDescription,
+          sort_order: variant?.sort_order ?? null,
           is_new_variant: false,
           opening_quantity: openingQuantity,
           opening_value: openingValue,
@@ -538,18 +539,28 @@ export default function (pool) {
 
         if (register_variant && finalCustomDescription && !finalVariantId) {
           const existingVariant = await client.query(
-            "SELECT id FROM material_variants WHERE material_id = $1 AND variant_name = $2",
+            "SELECT id, variant_name, sort_order FROM material_variants WHERE material_id = $1 AND variant_name = $2",
             [material_id, finalCustomDescription]
           );
 
           if (existingVariant.rows.length > 0) {
             finalVariantId = existingVariant.rows[0].id;
+            registeredVariants.push(existingVariant.rows[0]);
             finalCustomDescription = null;
           } else {
+            const nextSortOrder = await client.query(
+              "SELECT COALESCE(MAX(sort_order), 0) + 1 AS next_sort_order FROM material_variants WHERE material_id = $1",
+              [material_id]
+            );
             const newVariant = await client.query(
-              `INSERT INTO material_variants (material_id, variant_name, default_unit_cost)
-               VALUES ($1, $2, $3) RETURNING id, variant_name`,
-              [material_id, finalCustomDescription, cost]
+              `INSERT INTO material_variants (material_id, variant_name, default_unit_cost, sort_order)
+               VALUES ($1, $2, $3, $4) RETURNING id, variant_name, sort_order`,
+              [
+                material_id,
+                finalCustomDescription,
+                cost,
+                nextSortOrder.rows[0].next_sort_order,
+              ]
             );
             finalVariantId = newVariant.rows[0].id;
             registeredVariants.push(newVariant.rows[0]);
@@ -558,7 +569,7 @@ export default function (pool) {
         }
 
         const conflictKey = finalVariantId ? String(finalVariantId) : (finalCustomDescription || "default");
-        const shouldDelete = adjustmentQty === 0 && !custom_name && !finalCustomDescription;
+        const shouldDelete = adjustmentQty === 0 && !custom_name && !notes?.trim();
 
         if (shouldDelete) {
           const deleteResult = await client.query(
@@ -711,6 +722,64 @@ export default function (pool) {
 
   // ==================== MATERIAL VARIANTS CRUD ====================
 
+  // PUT /order - Persist material display order within one category
+  router.put("/order", async (req, res) => {
+    const { category, material_ids } = req.body;
+    const validCategories = ["ingredient", "raw_material", "packing_material"];
+
+    if (!validCategories.includes(category)) {
+      return res.status(400).json({
+        message: `category must be one of: ${validCategories.join(", ")}`,
+      });
+    }
+
+    if (!Array.isArray(material_ids)) {
+      return res.status(400).json({
+        message: "material_ids array is required",
+      });
+    }
+
+    const seen = new Set();
+    const normalizedMaterialIds = material_ids
+      .map((materialId) => parseInt(materialId, 10))
+      .filter((materialId) => Number.isInteger(materialId) && materialId > 0)
+      .filter((materialId) => {
+        if (seen.has(materialId)) return false;
+        seen.add(materialId);
+        return true;
+      });
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      for (const [index, materialId] of normalizedMaterialIds.entries()) {
+        await client.query(
+          `UPDATE materials
+           SET sort_order = $1, updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2 AND category = $3 AND is_active = true`,
+          [index + 1, materialId, category]
+        );
+      }
+
+      await client.query("COMMIT");
+      res.json({
+        message: "Material order saved",
+        category,
+        material_ids: normalizedMaterialIds,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error saving material order:", error);
+      res.status(500).json({
+        message: "Error saving material order",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
   // POST /batch/variants - Get variants for multiple materials (batch request)
   router.post("/batch/variants", async (req, res) => {
     try {
@@ -758,6 +827,58 @@ export default function (pool) {
         message: "Error fetching material variants",
         error: error.message,
       });
+    }
+  });
+
+  // PUT /:id/variants/order - Persist registered variant order for a material
+  router.put("/:id/variants/order", async (req, res) => {
+    const { id } = req.params;
+    const { variant_ids } = req.body;
+
+    if (!Array.isArray(variant_ids)) {
+      return res.status(400).json({
+        message: "variant_ids array is required",
+      });
+    }
+
+    const seen = new Set();
+    const normalizedVariantIds = variant_ids
+      .map((variantId) => parseInt(variantId, 10))
+      .filter((variantId) => Number.isInteger(variantId) && variantId > 0)
+      .filter((variantId) => {
+        if (seen.has(variantId)) return false;
+        seen.add(variantId);
+        return true;
+      });
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      for (const [index, variantId] of normalizedVariantIds.entries()) {
+        await client.query(
+          `UPDATE material_variants
+           SET sort_order = $1, updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2 AND material_id = $3 AND is_active = true`,
+          [index + 1, variantId, id]
+        );
+      }
+
+      await client.query("COMMIT");
+      res.json({
+        message: "Variant order saved",
+        material_id: parseInt(id, 10),
+        variant_ids: normalizedVariantIds,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error saving variant order:", error);
+      res.status(500).json({
+        message: "Error saving variant order",
+        error: error.message,
+      });
+    } finally {
+      client.release();
     }
   });
 
@@ -854,34 +975,48 @@ export default function (pool) {
     const { variantId } = req.params;
     const { variant_name, default_unit_cost, sort_order, is_active } = req.body;
 
-    if (!variant_name) {
-      return res.status(400).json({
-        message: "Variant name is required",
-      });
-    }
-
     try {
       // Check if variant exists
       const checkVariant = await pool.query(
-        "SELECT id, material_id FROM material_variants WHERE id = $1",
+        "SELECT id, material_id, variant_name, default_unit_cost, sort_order, is_active FROM material_variants WHERE id = $1",
         [variantId]
       );
       if (checkVariant.rows.length === 0) {
         return res.status(404).json({ message: "Variant not found" });
       }
 
-      const materialId = checkVariant.rows[0].material_id;
+      const existingVariant = checkVariant.rows[0];
+      const materialId = existingVariant.material_id;
+      const nextVariantName =
+        typeof variant_name === "string"
+          ? variant_name.trim()
+          : existingVariant.variant_name;
+
+      if (!nextVariantName) {
+        return res.status(400).json({
+          message: "Variant name is required",
+        });
+      }
 
       // Check for duplicate variant name (excluding current variant)
       const checkDup = await pool.query(
         "SELECT id FROM material_variants WHERE material_id = $1 AND variant_name = $2 AND id != $3",
-        [materialId, variant_name.trim(), variantId]
+        [materialId, nextVariantName, variantId]
       );
       if (checkDup.rows.length > 0) {
         return res.status(409).json({
-          message: `Variant '${variant_name}' already exists for this material`,
+          message: `Variant '${nextVariantName}' already exists for this material`,
         });
       }
+
+      const nextDefaultUnitCost =
+        default_unit_cost === undefined
+          ? existingVariant.default_unit_cost
+          : default_unit_cost || 0;
+      const nextSortOrder =
+        sort_order === undefined ? existingVariant.sort_order : sort_order || 0;
+      const nextIsActive =
+        is_active === undefined ? existingVariant.is_active : is_active !== false;
 
       const updateQuery = `
         UPDATE material_variants
@@ -895,10 +1030,10 @@ export default function (pool) {
       `;
 
       const result = await pool.query(updateQuery, [
-        variant_name.trim(),
-        default_unit_cost || 0,
-        sort_order || 0,
-        is_active !== false,
+        nextVariantName,
+        nextDefaultUnitCost,
+        nextSortOrder,
+        nextIsActive,
         variantId,
       ]);
 

@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-09",
+    ms: "Halaman Material Stock kini boleh menyimpan satu baris sahaja untuk bahan, varian dan Stock Kilang tanpa mengganggu perubahan lain yang belum disimpan. Tajuk halaman dan tajuk jadual juga kekal kelihatan semasa menatal, dan susunan bahan serta varian boleh diubah dengan drag-and-drop.",
+    en: "The Material Stock page can now save one material, variant or Stock Kilang row at a time without disturbing other unsaved changes. The page and table headers also stay visible while scrolling, and material and variant order can be changed with drag-and-drop.",
+  },
+  {
+    date: "2026-07-09",
     ms: "Stok Kilang dalam halaman Material Stock kini boleh dilaraskan terus. Masukkan kuantiti tambah atau tolak, kemudian Save; pelarasan itu disimpan dalam rekod stok produk dan jumlah penutup dikira semula.",
     en: "Stock Kilang on the Material Stock page can now be adjusted directly. Enter a plus or minus quantity, then Save; the adjustment is stored in product stock records and the closing total is recalculated.",
   },
