@@ -871,6 +871,7 @@ export interface PayrollItem {
   rate: number;
   rate_unit: string;
   quantity: number;
+  foc_units?: number | null;
   amount: number;
   is_manual: boolean;
   job_type?: string; // Job type for accurate splitting in combined payrolls
