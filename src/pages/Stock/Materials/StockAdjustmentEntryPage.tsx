@@ -41,8 +41,30 @@ interface StockKilangItem {
   product_id: string;
   name: string;
   price: number;
+  base_closing_quantity: number;
+  adjustment_quantity: number;
   closing_quantity: number;
   closing_value: number;
+}
+
+interface StockKilangAdjustmentRow {
+  product_id: string;
+  adj_in?: number;
+  adj_out?: number;
+}
+
+interface StockKilangAdjustmentResponse {
+  adjustments?: StockKilangAdjustmentRow[];
+}
+
+interface StockKilangClosingResponse {
+  closing_balances?: Record<string, number>;
+}
+
+interface StockKilangSaveAdjustment {
+  product_id: string;
+  adj_in: number;
+  adj_out: number;
 }
 
 interface StockResponse {
@@ -153,6 +175,10 @@ const makeNumber = (value: number | string | null | undefined): number => {
   return parseFloat(String(value ?? "")) || 0;
 };
 
+const getStockKilangReference = (tab: StockEntryTab): string => {
+  return `Material Stock Kilang - ${tab.toUpperCase()}`;
+};
+
 const getMaterialDisplayName = (material: MaterialWithStock): string => {
   return material.custom_name || material.name;
 };
@@ -245,6 +271,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [stockKilang, setStockKilang] = useState<StockKilangItem[]>([]);
+  const [originalStockKilang, setOriginalStockKilang] = useState<StockKilangItem[]>([]);
   const [isLoadingStockKilang, setIsLoadingStockKilang] = useState(false);
   const [expandedMaterials, setExpandedMaterials] = useState<Set<number>>(new Set());
   const [newVariantRows, setNewVariantRows] = useState<Map<number, StockEntryRow>>(new Map());
@@ -265,6 +292,13 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
 
   const year = selectedMonth.getFullYear();
   const month = selectedMonth.getMonth() + 1;
+  const selectedMonthString = useMemo<string>(() => {
+    return `${year}-${String(month).padStart(2, "0")}`;
+  }, [year, month]);
+  const selectedMonthEndDate = useMemo<string>(() => {
+    const endDate = new Date(year, month, 0);
+    return `${year}-${String(month).padStart(2, "0")}-${String(endDate.getDate()).padStart(2, "0")}`;
+  }, [year, month]);
 
   useEffect(() => {
     const tabParam: string | null = searchParams.get("tab");
@@ -342,45 +376,70 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     fetchData();
   }, [fetchData]);
 
-  useEffect(() => {
-    const fetchStockKilang = async (): Promise<void> => {
-      if (activeTab === "general" || activeTab === "shared" || products.length === 0 || isLoadingProducts) {
-        setStockKilang([]);
-        return;
-      }
+  const fetchStockKilang = useCallback(async (): Promise<void> => {
+    if (activeTab === "general" || activeTab === "shared" || products.length === 0 || isLoadingProducts) {
+      setStockKilang([]);
+      setOriginalStockKilang([]);
+      return;
+    }
 
-      setIsLoadingStockKilang(true);
-      try {
-        const productIds = products.map((product) => product.id).join(",");
-        const response = await api.get(
+    setIsLoadingStockKilang(true);
+    try {
+      const productIds: string = products.map((product) => product.id).join(",");
+      const reference: string = getStockKilangReference(activeTab);
+      const [closingResponse, adjustmentResponse] = await Promise.all([
+        api.get<StockKilangClosingResponse>(
           `/api/stock/closing-batch?product_ids=${productIds}&year=${year}&month=${month}`
+        ),
+        api.get<StockKilangAdjustmentResponse>(
+          `/api/stock/adjustments/by-reference?month=${selectedMonthString}&reference=${encodeURIComponent(reference)}`
+        ),
+      ]);
+
+      const closingBalances: Record<string, number> = closingResponse.closing_balances || {};
+      const adjustmentMap: Map<string, number> = new Map();
+      (adjustmentResponse.adjustments || []).forEach((adjustment: StockKilangAdjustmentRow) => {
+        adjustmentMap.set(
+          adjustment.product_id,
+          makeNumber(adjustment.adj_in) - makeNumber(adjustment.adj_out)
         );
-        const closingBalances: Record<string, number> = response.closing_balances || {};
+      });
 
-        const stockData: StockKilangItem[] = products.map((product) => {
-          const closingQty = closingBalances[product.id] || 0;
-          const price = makeNumber(product.price_per_unit);
+      const stockData: StockKilangItem[] = products.map((product) => {
+        const closingQuantity: number = makeNumber(closingBalances[product.id]);
+        const adjustmentQuantity: number = adjustmentMap.get(product.id) || 0;
+        const baseClosingQuantity: number = closingQuantity - adjustmentQuantity;
+        const price: number = makeNumber(product.price_per_unit);
 
-          return {
-            product_id: product.id,
-            name: product.description,
-            price,
-            closing_quantity: closingQty,
-            closing_value: closingQty * price,
-          };
-        });
+        return {
+          product_id: product.id,
+          name: product.description,
+          price,
+          base_closing_quantity: baseClosingQuantity,
+          adjustment_quantity: adjustmentQuantity,
+          closing_quantity: closingQuantity,
+          closing_value: closingQuantity * price,
+        };
+      });
+      const visibleStockData: StockKilangItem[] = stockData.filter(
+        (item: StockKilangItem) =>
+          item.closing_quantity > 0 || item.adjustment_quantity !== 0
+      );
 
-        setStockKilang(stockData.filter((item) => item.closing_quantity > 0));
-      } catch (error: unknown) {
-        console.error("Error fetching stock kilang:", error);
-        setStockKilang([]);
-      } finally {
-        setIsLoadingStockKilang(false);
-      }
-    };
+      setStockKilang(visibleStockData);
+      setOriginalStockKilang(visibleStockData.map((item: StockKilangItem) => ({ ...item })));
+    } catch (error: unknown) {
+      console.error("Error fetching stock kilang:", error);
+      setStockKilang([]);
+      setOriginalStockKilang([]);
+    } finally {
+      setIsLoadingStockKilang(false);
+    }
+  }, [activeTab, products, isLoadingProducts, year, month, selectedMonthString]);
 
+  useEffect(() => {
     fetchStockKilang();
-  }, [activeTab, products, isLoadingProducts, year, month]);
+  }, [fetchStockKilang]);
 
   const groupedMaterials = useMemo(() => {
     const groups: Record<MaterialCategory, MaterialWithStock[]> = {
@@ -398,12 +457,28 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     return groups;
   }, [materials]);
 
-  const hasUnsavedChanges = useMemo(() => {
+  const hasStockKilangUnsavedChanges = useMemo<boolean>(() => {
+    if (activeTab === "general" || activeTab === "shared") return false;
+    if (stockKilang.length !== originalStockKilang.length) return true;
+
+    const originalMap: Map<string, StockKilangItem> = new Map(
+      originalStockKilang.map((item: StockKilangItem) => [item.product_id, item])
+    );
+
+    return stockKilang.some((item: StockKilangItem) => {
+      const original: StockKilangItem | undefined = originalMap.get(item.product_id);
+      return !original || item.adjustment_quantity !== original.adjustment_quantity;
+    });
+  }, [activeTab, stockKilang, originalStockKilang]);
+
+  const hasUnsavedChanges = useMemo<boolean>(() => {
     if (activeTab === "general") {
       return Object.values(generalAdjustmentInputs).some(
         (value) => makeNumber(value) !== 0
       );
     }
+
+    if (hasStockKilangUnsavedChanges) return true;
 
     for (const row of newVariantRows.values()) {
       if (row.variant_name?.trim() || row.adjustment_quantity !== 0 || row.unit_cost !== 0) {
@@ -447,7 +522,14 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     }
 
     return false;
-  }, [activeTab, materials, originalMaterials, newVariantRows, generalAdjustmentInputs]);
+  }, [
+    activeTab,
+    materials,
+    originalMaterials,
+    newVariantRows,
+    generalAdjustmentInputs,
+    hasStockKilangUnsavedChanges,
+  ]);
 
   const toggleMaterialExpansion = (materialId: number): void => {
     setExpandedMaterials((prev) => {
@@ -647,6 +729,25 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     );
   };
 
+  const handleStockKilangAdjustmentChange = (productId: string, value: string): void => {
+    const adjustmentQuantity: number = makeNumber(value);
+
+    setStockKilang((prev: StockKilangItem[]) =>
+      prev.map((item: StockKilangItem) => {
+        if (item.product_id !== productId) return item;
+
+        const closingQuantity: number = item.base_closing_quantity + adjustmentQuantity;
+
+        return {
+          ...item,
+          adjustment_quantity: adjustmentQuantity,
+          closing_quantity: closingQuantity,
+          closing_value: closingQuantity * item.price,
+        };
+      })
+    );
+  };
+
   const handleBeforeMonthChange = useCallback(() => {
     if (hasUnsavedChanges) {
       return window.confirm("You have unsaved changes. Do you want to discard them?");
@@ -784,7 +885,9 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
       return;
     }
 
-    let negativeCount = 0;
+    let negativeCount = stockKilang.filter(
+      (item: StockKilangItem) => item.closing_quantity < 0
+    ).length;
     materials.forEach((material) => {
       if (material.has_variants && material.variants) {
         negativeCount += material.variants.filter((variant) => variant.closing_quantity < 0).length;
@@ -897,6 +1000,28 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
         product_line: activeTab,
         entries,
       });
+      let stockKilangSaved = false;
+
+      if (hasStockKilangUnsavedChanges) {
+        const stockKilangAdjustments: StockKilangSaveAdjustment[] = stockKilang
+          .map((item: StockKilangItem) => ({
+            product_id: item.product_id,
+            adj_in: item.adjustment_quantity > 0 ? item.adjustment_quantity : 0,
+            adj_out: item.adjustment_quantity < 0 ? Math.abs(item.adjustment_quantity) : 0,
+          }))
+          .filter(
+            (adjustment: StockKilangSaveAdjustment) =>
+              adjustment.adj_in > 0 || adjustment.adj_out > 0
+          );
+
+        await api.post("/api/stock/adjustments/batch", {
+          month: selectedMonthString,
+          entry_date: selectedMonthEndDate,
+          reference: getStockKilangReference(activeTab),
+          adjustments: stockKilangAdjustments,
+        });
+        stockKilangSaved = true;
+      }
 
       const messages: string[] = [];
       if (variantNameUpdates.length > 0) {
@@ -905,9 +1030,13 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
       if (response.registered_variants && response.registered_variants.length > 0) {
         messages.push(`${response.registered_variants.length} new variant(s) registered`);
       }
+      if (stockKilangSaved) {
+        messages.push("Stock Kilang updated");
+      }
 
       toast.success(messages.length > 0 ? `Saved. ${messages.join(", ")}.` : "Stock adjustments saved");
       await fetchData();
+      await fetchStockKilang();
     } catch (error: unknown) {
       console.error("Error saving stock entries:", error);
       const message = error instanceof Error ? error.message : "Failed to save stock adjustments";
@@ -959,13 +1088,23 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     };
   }, [materials]);
 
-  const stockKilangTotal = useMemo(() => {
-    return stockKilang.reduce((sum, item) => sum + item.closing_value, 0);
+  const stockKilangTotal = useMemo<number>(() => {
+    return stockKilang.reduce(
+      (sum: number, item: StockKilangItem) => sum + item.closing_value,
+      0
+    );
   }, [stockKilang]);
 
-  const negativeCount = useMemo(() => {
-    return materials.filter((material) => material.closing_quantity < 0).length;
-  }, [materials]);
+  const negativeCount = useMemo<number>(() => {
+    const materialNegativeCount: number = materials.filter(
+      (material: MaterialWithStock) => material.closing_quantity < 0
+    ).length;
+    const stockKilangNegativeCount: number = stockKilang.filter(
+      (item: StockKilangItem) => item.closing_quantity < 0
+    ).length;
+
+    return materialNegativeCount + stockKilangNegativeCount;
+  }, [materials, stockKilang]);
 
   const filteredGeneralStockRows = useMemo(() => {
     const query = generalSearchQuery.trim().toLowerCase();
@@ -1906,7 +2045,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
               {stockKilang.length > 0 && (
                 <React.Fragment>
                   <tr className="bg-emerald-100 dark:bg-emerald-900/30">
-                    <td colSpan={2} className="px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                    <td colSpan={3} className="px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
                       <div className="flex items-center gap-2">
                         <IconBuildingFactory2 size={14} className="text-emerald-600 dark:text-emerald-400" />
                         Stock Kilang
@@ -1916,9 +2055,8 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                       </div>
                     </td>
                     <td className="px-2 py-1.5 text-xs text-center text-emerald-600 dark:text-emerald-400">
-                      Read-only
+                      Adjustable
                     </td>
-                    <td></td>
                     <td></td>
                     <td></td>
                     <td className="px-2 py-1.5 text-xs text-right">
@@ -1939,7 +2077,12 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                       </td>
                       <td className="px-2 py-1.5 text-right font-mono text-sm text-default-400 dark:text-gray-500">-</td>
                       <td className="px-2 py-1.5 text-right font-mono text-sm text-default-400 dark:text-gray-500">-</td>
-                      <td className="px-2 py-1.5 text-right font-mono text-sm text-default-400 dark:text-gray-500">-</td>
+                      <td className="px-1 py-1 bg-sky-50/20 dark:bg-sky-900/5">
+                        {renderAdjustmentInput(
+                          item.adjustment_quantity,
+                          (value) => handleStockKilangAdjustmentChange(item.product_id, value)
+                        )}
+                      </td>
                       <td className="px-2 py-1.5 text-right font-mono text-sm text-default-500 dark:text-gray-400">
                         {formatNumber(item.price)}
                       </td>

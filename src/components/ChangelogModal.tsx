@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-09",
+    ms: "Stok Kilang dalam halaman Material Stock kini boleh dilaraskan terus. Masukkan kuantiti tambah atau tolak, kemudian Save; pelarasan itu disimpan dalam rekod stok produk dan jumlah penutup dikira semula.",
+    en: "Stock Kilang on the Material Stock page can now be adjusted directly. Enter a plus or minus quantity, then Save; the adjustment is stored in product stock records and the closing total is recalculated.",
+  },
+  {
+    date: "2026-07-09",
     ms: "Pembetulan pelanggan dan Account Codes: selepas pelanggan disimpan atau dipadam, senarai akaun Trade Debtors kini dikemas kini serta-merta tanpa perlu muat semula halaman.",
     en: "Customer and Account Codes fix: after a customer is saved or deleted, the Trade Debtors account list now refreshes immediately without needing a page reload.",
   },
