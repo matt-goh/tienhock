@@ -20,6 +20,16 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-09",
+    ms: "Pembetulan Payroll dan laporan Pinjam: jumlah Gaji/Genap kini menolak komisen/bonus yang sudah dibayar tanpa dibundarkan sekali lagi, supaya pecahan jumlah bawa pulang dan advance tambah tepat.",
+    en: "Payroll and Pinjam report fix: the Gaji/Genap total now subtracts already-paid commission/bonus advances without rounding it a second time, so the take-home and advance breakdown adds up correctly.",
+  },
+  {
+    date: "2026-07-09",
+    ms: "Pembetulan Salary Report: kiraan lajur GAJI kini menggunakan kaedah pembundaran sen yang sama seperti proses gaji, supaya GAJI dan G. KASAR sepadan tanpa perbezaan 1-4 sen.",
+    en: "Salary Report fix: the GAJI column now uses the same cent-rounding method as payroll processing, so GAJI and G. KASAR match without 1-4 sen differences.",
+  },
+  {
+    date: "2026-07-09",
     ms: "Nota Kredit, Nota Debit dan Nota Bayaran Balik kini boleh disimpan mengikut tarikh dokumen sebenar. Pilih tarikh dokumen sebelum Create; halaman butiran juga memaparkan tarikh dokumen dan masa ia dimasukkan secara berasingan.",
     en: "Credit Notes, Debit Notes and Refund Notes can now be saved using the actual document date. Pick the document date before Create; the details page now shows the document date separately from when it was keyed in.",
   },
