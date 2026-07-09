@@ -19,6 +19,41 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-07-10",
+    ms: "Halaman Payroll dan Salary Report Jelly Polly kini menggunakan susun atur yang lebih kemas seperti Tien Hock, termasuk ringkasan gaji, jadual laporan gaji, pemilih tahun yang lebih mudah, butiran potongan dalam Deductions & Final Pay, ringkasan Pinjam, menu cetak slip mengikut bahagian, dan cetakan slip gaji yang menggunakan data Jelly Polly dengan betul.",
+    en: "Jelly Polly Payroll and Salary Report now use a cleaner layout like Tien Hock, including payroll summaries, salary report tables, an easier year picker, deduction details in Deductions & Final Pay, the Pinjam summary, section-based payslip printing, and payslips that correctly use Jelly Polly data.",
+  },
+  {
+    date: "2026-07-10",
+    ms: "Semasa mengisi Journal Entry, Account Code baharu kini boleh ditambah terus dari pilihan Account. Selepas disimpan, akaun baharu itu terus dipilih pada baris journal yang sedang diisi.",
+    en: "While entering a Journal Entry, a new Account Code can now be added directly from the Account picker. After saving, the new account is selected immediately on the journal line you were filling in.",
+  },
+  {
+    date: "2026-07-09",
+    ms: "Halaman Material Stock kini boleh menyimpan satu baris sahaja untuk bahan, varian dan Stock Kilang tanpa mengganggu perubahan lain yang belum disimpan. Tajuk halaman dan tajuk jadual juga kekal kelihatan semasa menatal, dan susunan bahan serta varian boleh diubah dengan drag-and-drop.",
+    en: "The Material Stock page can now save one material, variant or Stock Kilang row at a time without disturbing other unsaved changes. The page and table headers also stay visible while scrolling, and material and variant order can be changed with drag-and-drop.",
+  },
+  {
+    date: "2026-07-09",
+    ms: "Stok Kilang dalam halaman Material Stock kini boleh dilaraskan terus. Masukkan kuantiti tambah atau tolak, kemudian Save; pelarasan itu disimpan dalam rekod stok produk dan jumlah penutup dikira semula.",
+    en: "Stock Kilang on the Material Stock page can now be adjusted directly. Enter a plus or minus quantity, then Save; the adjustment is stored in product stock records and the closing total is recalculated.",
+  },
+  {
+    date: "2026-07-09",
+    ms: "Pembetulan pelanggan dan Account Codes: selepas pelanggan disimpan atau dipadam, senarai akaun Trade Debtors kini dikemas kini serta-merta tanpa perlu muat semula halaman.",
+    en: "Customer and Account Codes fix: after a customer is saved or deleted, the Trade Debtors account list now refreshes immediately without needing a page reload.",
+  },
+  {
+    date: "2026-07-09",
+    ms: "Pembetulan Payroll dan laporan Pinjam: jumlah Gaji/Genap kini menolak komisen/bonus yang sudah dibayar tanpa dibundarkan sekali lagi, supaya pecahan jumlah bawa pulang dan advance tambah tepat.",
+    en: "Payroll and Pinjam report fix: the Gaji/Genap total now subtracts already-paid commission/bonus advances without rounding it a second time, so the take-home and advance breakdown adds up correctly.",
+  },
+  {
+    date: "2026-07-09",
+    ms: "Pembetulan Salary Report: kiraan lajur GAJI kini menggunakan kaedah pembundaran sen yang sama seperti proses gaji, supaya GAJI dan G. KASAR sepadan tanpa perbezaan 1-4 sen.",
+    en: "Salary Report fix: the GAJI column now uses the same cent-rounding method as payroll processing, so GAJI and G. KASAR match without 1-4 sen differences.",
+  },
+  {
     date: "2026-07-09",
     ms: "Nota Kredit, Nota Debit dan Nota Bayaran Balik kini boleh disimpan mengikut tarikh dokumen sebenar. Pilih tarikh dokumen sebelum Create; halaman butiran juga memaparkan tarikh dokumen dan masa ia dimasukkan secara berasingan.",
     en: "Credit Notes, Debit Notes and Refund Notes can now be saved using the actual document date. Pick the document date before Create; the details page now shows the document date separately from when it was keyed in.",

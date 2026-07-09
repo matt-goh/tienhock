@@ -5,15 +5,20 @@ import { IconPrinter } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Checkbox from "../Checkbox";
 import LoadingOverlay from "./LoadingOverlay";
-import { EmployeePayroll } from "../../types/types";
+import { EmployeePayroll, Employee, Job } from "../../types/types";
 import {
   printBatchPayslips,
   createStaffDetailsMap,
 } from "../../utils/payroll/PayslipManager";
-import type { StaffDetails } from "../../utils/payroll/PayslipManager";
+import type {
+  PayslipCompany,
+  StaffDetails,
+} from "../../utils/payroll/PayslipManager";
 import { MidMonthPayroll } from "../../utils/payroll/midMonthPayrollUtils";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
+import { useJPStaffsCache } from "../../utils/JellyPolly/useJPStaffsCache";
+import { useJPJobsCache } from "../../utils/JellyPolly/useJPJobsCache";
 import { JOB_CONFIGS } from "../../configs/payrollJobConfigs";
 
 interface PayrollSectionPrintMenuProps {
@@ -23,6 +28,14 @@ interface PayrollSectionPrintMenuProps {
   size?: "sm" | "md";
   disabled?: boolean;
   buttonLabel?: string;
+  company?: PayslipCompany;
+}
+
+interface PayrollSectionPrintMenuContentProps
+  extends Omit<PayrollSectionPrintMenuProps, "company"> {
+  company: PayslipCompany;
+  staffs: Employee[];
+  jobs: Job[];
 }
 
 interface PayrollPrintGroup {
@@ -80,13 +93,18 @@ const createScopedPayroll = (
   };
 };
 
-const PayrollSectionPrintMenu: React.FC<PayrollSectionPrintMenuProps> = ({
+const PayrollSectionPrintMenuContent: React.FC<
+  PayrollSectionPrintMenuContentProps
+> = ({
   payrolls,
   midMonthPayrollsMap,
   companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
   size = "sm",
   disabled = false,
   buttonLabel = "Print Payslips",
+  company,
+  staffs,
+  jobs,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState<{ top: number; left: number }>({
@@ -102,9 +120,6 @@ const PayrollSectionPrintMenu: React.FC<PayrollSectionPrintMenuProps> = ({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const { staffs } = useStaffsCache();
-  const { jobs } = useJobsCache();
 
   const jobNameById = useMemo<Map<string, string>>(() => {
     return new Map<string, string>(
@@ -260,9 +275,10 @@ const PayrollSectionPrintMenu: React.FC<PayrollSectionPrintMenuProps> = ({
 
     // The mid-month advance is resolved inside printBatchPayslips from the
     // /batch payroll fetch, so the (selection-scoped) parent map is only a
-    // fallback here — whole-section employees still get their advance line.
+    // fallback here - whole-section employees still get their advance line.
     await printBatchPayslips(filtered, details, {
       companyName,
+      company,
       midMonthPayrollsMap,
       onBeforePrint: (): void => {
         setShowOverlay(true);
@@ -434,6 +450,58 @@ const PayrollSectionPrintMenu: React.FC<PayrollSectionPrintMenuProps> = ({
       )}
     </>
   );
+};
+
+const TienHockPayrollSectionPrintMenu: React.FC<
+  PayrollSectionPrintMenuProps
+> = (props) => {
+  const { staffs } = useStaffsCache();
+  const { jobs } = useJobsCache();
+
+  return (
+    <PayrollSectionPrintMenuContent
+      payrolls={props.payrolls}
+      midMonthPayrollsMap={props.midMonthPayrollsMap}
+      companyName={props.companyName}
+      size={props.size}
+      disabled={props.disabled}
+      buttonLabel={props.buttonLabel}
+      company="tienhock"
+      staffs={staffs}
+      jobs={jobs}
+    />
+  );
+};
+
+const JellyPollyPayrollSectionPrintMenu: React.FC<
+  PayrollSectionPrintMenuProps
+> = (props) => {
+  const { staffs } = useJPStaffsCache();
+  const { jobs } = useJPJobsCache();
+
+  return (
+    <PayrollSectionPrintMenuContent
+      payrolls={props.payrolls}
+      midMonthPayrollsMap={props.midMonthPayrollsMap}
+      companyName={props.companyName}
+      size={props.size}
+      disabled={props.disabled}
+      buttonLabel={props.buttonLabel}
+      company="jellypolly"
+      staffs={staffs}
+      jobs={jobs}
+    />
+  );
+};
+
+const PayrollSectionPrintMenu: React.FC<PayrollSectionPrintMenuProps> = (
+  props
+) => {
+  if (props.company === "jellypolly") {
+    return <JellyPollyPayrollSectionPrintMenu {...props} />;
+  }
+
+  return <TienHockPayrollSectionPrintMenu {...props} />;
 };
 
 export default PayrollSectionPrintMenu;

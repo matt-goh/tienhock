@@ -16,6 +16,26 @@ export function computeMonthlySalaryReport(pool, yearInt, monthInt) {
   return _computeMonthlySalaryReport(pool, yearInt, monthInt);
 }
 
+/**
+ * @param {string | number | null | undefined} value
+ * @returns {number}
+ */
+const toMoneyNumber = (value) => {
+  const numericValue = Number.parseFloat(value || 0);
+  if (Number.isNaN(numericValue)) return 0;
+  return Math.round((numericValue + Number.EPSILON) * 100) / 100;
+};
+
+/**
+ * @param {number} earnedSetelahDigenapkan
+ * @param {number} advancePaid
+ * @returns {number}
+ */
+const deriveGajiGenapAfterAdvances = (
+  earnedSetelahDigenapkan,
+  advancePaid,
+) => toMoneyNumber(earnedSetelahDigenapkan - advancePaid);
+
 export default function (pool) {
   const router = Router();
   // Expose the inner computer to the module-level wrapper above (see note there).
@@ -144,16 +164,18 @@ export default function (pool) {
               WHEN lower(btrim(coalesce(pi.description, ''))) = 'cuti tahunan' THEN 'cuti tahunan'
               ELSE NULL
             END as description,
-            -- Match Payroll Details: calculate each pay code/rate/unit from its
-            -- total units, rather than adding individually rounded daily amounts.
+            -- Match Payroll processing exactly: JS Math.round cent rounding
+            -- differs from PostgreSQL ROUND() on exact .005 values.
             CASE
               WHEN COALESCE(pi.rate_unit, pc.rate_unit) IN ('Percent', 'Fixed')
-                THEN ROUND(SUM(pi.amount), 2)
-              ELSE ROUND(
-                ROUND(COALESCE(pi.rate, 0), 2) *
-                SUM(COALESCE(pi.quantity, 0) + COALESCE(pi.foc_units, 0)),
-                2
-              )
+                THEN FLOOR((SUM(pi.amount)::double precision * 100) + 0.5)::numeric / 100
+              ELSE FLOOR((
+                (
+                  FLOOR((COALESCE(pi.rate, 0)::double precision * 100) + 0.5) / 100
+                ) *
+                SUM(COALESCE(pi.quantity, 0) + COALESCE(pi.foc_units, 0))::double precision *
+                100
+              ) + 0.5)::numeric / 100
             END as amount,
             pc.pay_type,
             pc.report_column,
@@ -476,9 +498,21 @@ export default function (pool) {
 
       // Process the data for different views
       const processedData = result.rows.map((row, index) => {
-        // GAJI = regular wage (non-OT Hour/Day work from payroll + Kerja Luar).
-        const gaji = parseFloat(row.gaji_pay || 0);
-        const gajiKasar = parseFloat(row.gross_pay || 0);
+        const gajiKasar = toMoneyNumber(row.gross_pay);
+        const ot = toMoneyNumber(
+          toMoneyNumber(row.overtime_pay) + toMoneyNumber(row.others_overtime),
+        );
+        const bonus = toMoneyNumber(row.bonus_total);
+        const comm = toMoneyNumber(
+          toMoneyNumber(row.commission_total) +
+            toMoneyNumber(row.piece_insentif_pay),
+        );
+        const cuti = toMoneyNumber(
+          toMoneyNumber(row.leave_total) +
+            toMoneyNumber(row.cuti_tahunan_commission_total) +
+            toMoneyNumber(row.cuti_tahunan_other_total),
+        );
+        const gaji = toMoneyNumber(row.gaji_pay);
         // Only advance commission/bonus records are already deducted from net_pay in DB.
         // Others (Kerja Luar OT) is a regular earning, NOT an advance, so it is NOT added back here.
         const commissionAdvance =
@@ -494,14 +528,13 @@ export default function (pool) {
           gajiBersih - parseFloat(row.mid_month_amount || 0);
         const setelah_digenapkan = Math.ceil(jumlah);
         const digenapkan = setelah_digenapkan - jumlah;
-        // Actual take-home (advance already deducted) for the Bank/Pinjam tabs - prefer the
-        // stored payroll rounding so they match the Payroll Details page and payslip.
-        const takeHomeJumlah =
-          parseFloat(row.net_pay || 0) - parseFloat(row.mid_month_amount || 0);
-        const takeHomeSetelah =
-          row.setelah_digenapkan == null
-            ? Math.ceil(takeHomeJumlah)
-            : parseFloat(row.setelah_digenapkan);
+        // Bank/Pinjam tabs show the remaining gaji/genap after commission/bonus
+        // advances. It must reconcile with the earned Salary Report total above:
+        // gaji_genap + advances = setelah_digenapkan.
+        const gajiGenap = deriveGajiGenapAfterAdvances(
+          setelah_digenapkan,
+          commissionAdvance,
+        );
         const totalPinjam = parseFloat(row.total_pinjam || 0);
 
         return {
@@ -519,22 +552,15 @@ export default function (pool) {
           // Salary tab data
           gaji: gaji,
           // OT = all overtime (payroll + Kerja Luar). It is shown only here.
-          ot:
-            parseFloat(row.overtime_pay || 0) +
-            parseFloat(row.others_overtime || 0),
+          ot: ot,
           // BONUS = real bonuses only (BONUS paycode + loc-null commission). OT is NOT folded in.
-          bonus: parseFloat(row.bonus_total || 0),
+          bonus: bonus,
           // COMM/INS/LAIN = location commission (excl. Cuti Tahunan loc 23)
           // + piece-rate work (Bag/Bundle/Kg/Trip/Bill/Percent) + Fixed insentif (IXT), from payroll + Kerja Luar
-          comm:
-            parseFloat(row.commission_total || 0) +
-            parseFloat(row.piece_insentif_pay || 0),
+          comm: comm,
           // CUTI = all 4 leave types + Cuti Tahunan recorded as commission (loc 23).
           // Display-only: does not feed gaji_bersih/jumlah (same as comm).
-          cuti:
-            parseFloat(row.leave_total || 0) +
-            parseFloat(row.cuti_tahunan_commission_total || 0) +
-            parseFloat(row.cuti_tahunan_other_total || 0),
+          cuti: cuti,
           gaji_kasar: gajiKasar,
           epf_majikan: parseFloat(row.epf_employer || 0),
           epf_pekerja: parseFloat(row.epf_employee || 0),
@@ -548,11 +574,12 @@ export default function (pool) {
           jumlah: jumlah,
           digenapkan: digenapkan,
           setelah_digenapkan: setelah_digenapkan,
-          // Bank/Pinjam tab data (actual take-home: advance already deducted)
-          gaji_genap: takeHomeSetelah,
+          // Bank/Pinjam tab data (remaining take-home after advances)
+          advance_paid: commissionAdvance,
+          gaji_genap: gajiGenap,
           total_pinjam: totalPinjam,
           pinjam_details: row.pinjam_details || [],
-          final_total: takeHomeSetelah - totalPinjam,
+          final_total: toMoneyNumber(gajiGenap - totalPinjam),
           net_pay: parseFloat(row.net_pay || 0),
           mid_month_amount: parseFloat(row.mid_month_amount || 0),
         };
@@ -1266,16 +1293,18 @@ export default function (pool) {
               WHEN lower(btrim(coalesce(pi.description, ''))) = 'cuti tahunan' THEN 'cuti tahunan'
               ELSE NULL
             END as description,
-            -- Keep the yearly report as the sum of the monthly consolidated
-            -- amounts, including when a pay rate changes between months.
+            -- Match Payroll processing exactly: JS Math.round cent rounding
+            -- differs from PostgreSQL ROUND() on exact .005 values.
             CASE
               WHEN COALESCE(pi.rate_unit, pc.rate_unit) IN ('Percent', 'Fixed')
-                THEN ROUND(SUM(pi.amount), 2)
-              ELSE ROUND(
-                ROUND(COALESCE(pi.rate, 0), 2) *
-                SUM(COALESCE(pi.quantity, 0) + COALESCE(pi.foc_units, 0)),
-                2
-              )
+                THEN FLOOR((SUM(pi.amount)::double precision * 100) + 0.5)::numeric / 100
+              ELSE FLOOR((
+                (
+                  FLOOR((COALESCE(pi.rate, 0)::double precision * 100) + 0.5) / 100
+                ) *
+                SUM(COALESCE(pi.quantity, 0) + COALESCE(pi.foc_units, 0))::double precision *
+                100
+              ) + 0.5)::numeric / 100
             END as amount,
             pc.pay_type,
             pc.report_column,
@@ -1604,9 +1633,21 @@ export default function (pool) {
 
       // Process the data for different views
       const processedData = result.rows.map((row, index) => {
-        // GAJI = regular wage (non-OT Hour/Day work from payroll + Kerja Luar).
-        const gaji = parseFloat(row.gaji_pay || 0);
-        const gajiKasar = parseFloat(row.gross_pay || 0);
+        const gajiKasar = toMoneyNumber(row.gross_pay);
+        const ot = toMoneyNumber(
+          toMoneyNumber(row.overtime_pay) + toMoneyNumber(row.others_overtime),
+        );
+        const bonus = toMoneyNumber(row.bonus_total);
+        const comm = toMoneyNumber(
+          toMoneyNumber(row.commission_total) +
+            toMoneyNumber(row.piece_insentif_pay),
+        );
+        const cuti = toMoneyNumber(
+          toMoneyNumber(row.leave_total) +
+            toMoneyNumber(row.cuti_tahunan_commission_total) +
+            toMoneyNumber(row.cuti_tahunan_other_total),
+        );
+        const gaji = toMoneyNumber(row.gaji_pay);
         // Only advance commission/bonus records are already deducted from net_pay in DB.
         // Others (Kerja Luar OT) is a regular earning, NOT an advance, so it is NOT added back here.
         const commissionAdvance =
@@ -1623,8 +1664,13 @@ export default function (pool) {
           gajiBersih - parseFloat(row.mid_month_amount || 0);
         const setelah_digenapkan = Math.ceil(jumlah);
         const digenapkan = setelah_digenapkan - jumlah;
-        // Actual take-home (advance already deducted), summed from stored monthly rounding.
-        const takeHomeSetelah = parseFloat(row.total_setelah_digenapkan || 0);
+        // Bank/Pinjam tabs show the remaining gaji/genap after commission/bonus
+        // advances. The annual value is recalculated again after monthly
+        // rounding is applied below.
+        const gajiGenap = deriveGajiGenapAfterAdvances(
+          setelah_digenapkan,
+          commissionAdvance,
+        );
         const totalPinjam = parseFloat(row.total_pinjam || 0);
 
         return {
@@ -1642,22 +1688,15 @@ export default function (pool) {
           // Salary tab data
           gaji: gaji,
           // OT = all overtime (payroll + Kerja Luar). It is shown only here.
-          ot:
-            parseFloat(row.overtime_pay || 0) +
-            parseFloat(row.others_overtime || 0),
+          ot: ot,
           // BONUS = real bonuses only (BONUS paycode + loc-null commission). OT is NOT folded in.
-          bonus: parseFloat(row.bonus_total || 0),
+          bonus: bonus,
           // COMM/INS/LAIN = location commission (excl. Cuti Tahunan loc 23)
           // + piece-rate work (Bag/Bundle/Kg/Trip/Bill/Percent) + Fixed insentif (IXT), from payroll + Kerja Luar
-          comm:
-            parseFloat(row.commission_total || 0) +
-            parseFloat(row.piece_insentif_pay || 0),
+          comm: comm,
           // CUTI = all 4 leave types + Cuti Tahunan recorded as commission (loc 23).
           // Display-only: does not feed gaji_bersih/jumlah (same as comm).
-          cuti:
-            parseFloat(row.leave_total || 0) +
-            parseFloat(row.cuti_tahunan_commission_total || 0) +
-            parseFloat(row.cuti_tahunan_other_total || 0),
+          cuti: cuti,
           gaji_kasar: gajiKasar,
           epf_majikan: parseFloat(row.epf_employer || 0),
           epf_pekerja: parseFloat(row.epf_employee || 0),
@@ -1671,11 +1710,12 @@ export default function (pool) {
           jumlah: jumlah,
           digenapkan: digenapkan,
           setelah_digenapkan: setelah_digenapkan,
-          // Bank/Pinjam tab data (actual take-home: advance already deducted)
-          gaji_genap: takeHomeSetelah,
+          // Bank/Pinjam tab data (remaining take-home after advances)
+          advance_paid: commissionAdvance,
+          gaji_genap: gajiGenap,
           total_pinjam: totalPinjam,
           pinjam_details: row.pinjam_details || [],
-          final_total: takeHomeSetelah - totalPinjam,
+          final_total: toMoneyNumber(gajiGenap - totalPinjam),
           net_pay: parseFloat(row.net_pay || 0),
           mid_month_amount: parseFloat(row.mid_month_amount || 0),
         };
@@ -1973,6 +2013,15 @@ export default function (pool) {
         if (summed == null) return; // keep annual-ceil fallback if no monthly rows
         emp.setelah_digenapkan = summed;
         emp.digenapkan = summed - emp.jumlah;
+        if (emp.advance_paid != null) {
+          emp.gaji_genap = deriveGajiGenapAfterAdvances(
+            emp.setelah_digenapkan,
+            emp.advance_paid,
+          );
+          emp.final_total = toMoneyNumber(
+            emp.gaji_genap - (emp.total_pinjam || 0),
+          );
+        }
       };
       processedData.forEach(applyMonthlyRounding);
       commissionOnlyEmployees.forEach(applyMonthlyRounding);

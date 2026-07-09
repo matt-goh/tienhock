@@ -871,6 +871,7 @@ export interface PayrollItem {
   rate: number;
   rate_unit: string;
   quantity: number;
+  foc_units?: number | null;
   amount: number;
   is_manual: boolean;
   job_type?: string; // Job type for accurate splitting in combined payrolls
@@ -1427,6 +1428,7 @@ export interface StockEntryRow {
   variant_id: number | null;  // null for single-entry materials or ad-hoc variants
   variant_name: string | null;  // From variant table or custom_description for ad-hoc
   custom_description?: string | null;
+  sort_order?: number | null;
   is_new_variant: boolean;  // True if this is a newly added ad-hoc variant
 
   // Stock quantities

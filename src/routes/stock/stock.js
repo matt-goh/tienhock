@@ -1209,6 +1209,115 @@ export default function (pool) {
   });
 
   /**
+   * PUT /api/stock/adjustments/by-reference/product
+   * Save one product adjustment for a month/reference without replacing other products.
+   * Body: { month: "YYYY-MM", entry_date: "YYYY-MM-DD", reference: "REF-123", product_id, adj_in, adj_out }
+   */
+  router.put("/adjustments/by-reference/product", async (req, res) => {
+    try {
+      const {
+        month,
+        reference,
+        entry_date,
+        product_id,
+        adj_in = 0,
+        adj_out = 0,
+        created_by,
+      } = req.body;
+
+      if (!month || !reference || !product_id) {
+        return res.status(400).json({
+          message: "month, reference, and product_id are required",
+        });
+      }
+
+      const monthRange = getMonthRangeFromString(month);
+      if (!monthRange) {
+        return res.status(400).json({
+          message: "month must be in YYYY-MM format",
+        });
+      }
+
+      const entryDate =
+        entry_date === undefined || entry_date === null || entry_date === ""
+          ? monthRange.endDate
+          : normalizeDateString(entry_date);
+
+      if (!entryDate) {
+        return res.status(400).json({
+          message: "entry_date must be a valid date in YYYY-MM-DD format",
+        });
+      }
+
+      if (!isDateInMonth(entryDate, monthRange)) {
+        return res.status(400).json({
+          message: "entry_date must be within the submitted month",
+        });
+      }
+
+      const adjInQuantity = parseFloat(adj_in) || 0;
+      const adjOutQuantity = parseFloat(adj_out) || 0;
+      const savedEntries = [];
+      const client = await pool.connect();
+
+      try {
+        await client.query("BEGIN");
+
+        await client.query(
+          `DELETE FROM stock_adjustments
+           WHERE reference = $1
+             AND product_id = $2
+             AND entry_date BETWEEN $3 AND $4`,
+          [reference, product_id, monthRange.startDate, monthRange.endDate]
+        );
+
+        if (adjInQuantity > 0) {
+          const result = await client.query(
+            `INSERT INTO stock_adjustments (entry_date, product_id, adjustment_type, quantity, reference, created_by)
+             VALUES ($1, $2, 'ADJ_IN', $3, $4, $5)
+             RETURNING *`,
+            [entryDate, product_id, adjInQuantity, reference, created_by || null]
+          );
+          savedEntries.push(result.rows[0]);
+        }
+
+        if (adjOutQuantity > 0) {
+          const result = await client.query(
+            `INSERT INTO stock_adjustments (entry_date, product_id, adjustment_type, quantity, reference, created_by)
+             VALUES ($1, $2, 'ADJ_OUT', $3, $4, $5)
+             RETURNING *`,
+            [entryDate, product_id, adjOutQuantity, reference, created_by || null]
+          );
+          savedEntries.push(result.rows[0]);
+        }
+
+        await client.query("COMMIT");
+
+        res.json({
+          message: "Stock adjustment saved successfully",
+          reference,
+          product_id,
+          entry_date: entryDate,
+          entry_count: savedEntries.length,
+          total_adj_in: adjInQuantity,
+          total_adj_out: adjOutQuantity,
+        });
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      console.error("Error saving product stock adjustment:", error);
+      res.status(500).json({
+        message: "Error saving product stock adjustment",
+        error: error.message,
+      });
+    }
+  });
+
+  /**
    * DELETE /api/stock/adjustments/by-reference
    * Delete all adjustments for a specific reference in a month
    * Query params: month=YYYY-MM, reference=REF-123

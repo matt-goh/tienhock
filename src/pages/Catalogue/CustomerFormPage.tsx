@@ -15,6 +15,7 @@ import {
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { validateCustomerIdentity } from "../../routes/catalogue/customerValidation";
+import { refreshAccountCodesCache } from "../../utils/accounting/useAccountingCache";
 import {
   EnhancedCustomerList,
   refreshCustomersCache,
@@ -345,7 +346,7 @@ const CustomerFormPage: React.FC = () => {
     setIsSaving(true); // Show saving indicator during delete
     try {
       await api.delete(`/api/customers/${id}`);
-      await refreshCustomersCache(); // Refresh cache
+      await Promise.all([refreshCustomersCache(), refreshAccountCodesCache()]);
       setIsDeleteDialogOpen(false);
       toast.success("Customer deleted successfully");
       navigate("/catalogue/customer");
@@ -567,7 +568,7 @@ const CustomerFormPage: React.FC = () => {
       }
 
       // --- Post-Save Actions ---
-      await refreshCustomersCache(); // Refresh cache regardless of product save outcome
+      await Promise.all([refreshCustomersCache(), refreshAccountCodesCache()]);
       toast.success(successMessage);
       navigate("/catalogue/customer");
     } catch (error: any) {
