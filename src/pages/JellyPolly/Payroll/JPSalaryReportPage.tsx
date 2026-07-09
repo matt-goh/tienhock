@@ -101,6 +101,8 @@ const COLUMNS: { key: keyof Totals; label: string }[] = [
   { key: "setelah_digenapkan", label: "Setelah" },
 ];
 
+const TABLE_COLUMN_COUNT = COLUMNS.length + 2;
+
 const fmt = (n: number): string =>
   (Number(n) || 0).toLocaleString("en-MY", {
     minimumFractionDigits: 2,
@@ -130,6 +132,14 @@ const JPSalaryReportPage: React.FC = () => {
       end: new Date(currentYear, currentMonth, 0, 23, 59, 59, 999),
     }),
     [currentYear, currentMonth]
+  );
+
+  const yearRange = useMemo<TimeRange>(
+    () => ({
+      start: new Date(currentYear, 0, 1),
+      end: new Date(currentYear, 11, 31, 23, 59, 59, 999),
+    }),
+    [currentYear]
   );
 
   const fetchData = useCallback(async () => {
@@ -166,9 +176,13 @@ const JPSalaryReportPage: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
-  const handleTimeChange = (range: TimeRange) => {
+  const handleTimeChange = (range: TimeRange): void => {
     setCurrentYear(range.start.getFullYear());
     setCurrentMonth(range.start.getMonth() + 1);
+  };
+
+  const handleYearChange = (range: TimeRange): void => {
+    setCurrentYear(range.start.getFullYear());
   };
 
   const handleGenerate = async (action: "download" | "print") => {
@@ -237,32 +251,156 @@ const JPSalaryReportPage: React.FC = () => {
     }
   };
 
-  const headCellCls =
-    "px-2 py-1.5 text-right text-[10px] font-semibold text-default-600 dark:text-gray-300 whitespace-nowrap";
-  const cellCls =
-    "px-2 py-1 text-right text-xs text-default-800 dark:text-gray-200 whitespace-nowrap";
+  const narrowAmountColumns: (keyof Totals)[] = [
+    "epf_majikan",
+    "epf_pekerja",
+    "socso_majikan",
+    "socso_pekerja",
+    "sip_majikan",
+    "sip_pekerja",
+  ];
+  const groupedStartColumns: (keyof Totals)[] = [
+    "epf_majikan",
+    "socso_majikan",
+    "sip_majikan",
+    "pcb",
+  ];
+  const headCellClass =
+    "px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700";
+  const headGroupClass =
+    "px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900";
+  const headSubClass =
+    "px-1 py-1 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700";
+  const headBlankClass =
+    "bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700";
+  const bodyNameCellClass =
+    "px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-left max-w-[140px]";
 
-  const TotalsCells: React.FC<{ t: Totals; bold?: boolean }> = ({ t, bold }) => (
-    <>
-      {COLUMNS.map((c) => (
-        <td key={c.key} className={`${cellCls} ${bold ? "font-semibold" : ""}`}>
-          {fmt(t[c.key])}
-        </td>
-      ))}
-    </>
+  const amountCellClass = (key: keyof Totals, bold: boolean = false): string => {
+    const horizontalPadding: string = narrowAmountColumns.includes(key)
+      ? "px-1"
+      : "px-2";
+    const groupBorder: string = groupedStartColumns.includes(key)
+      ? " border-l border-default-300 dark:border-gray-600"
+      : "";
+    const emphasis: string = bold
+      ? "font-bold text-default-900 dark:text-gray-100 bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600"
+      : "text-default-600 dark:text-gray-300";
+
+    return `${horizontalPadding} py-2 text-xs ${emphasis} text-center${groupBorder}`;
+  };
+
+  const renderTableColGroup = (): React.ReactElement => (
+    <colgroup>
+      <col className="w-[40px]" />
+      <col className="w-[140px]" />
+      <col className="w-[80px]" />
+      <col className="w-[80px]" />
+      <col className="w-[80px]" />
+      <col className="w-[80px]" />
+      <col className="w-[80px]" />
+      <col className="w-[90px]" />
+      <col className="w-[70px]" />
+      <col className="w-[70px]" />
+      <col className="w-[70px]" />
+      <col className="w-[70px]" />
+      <col className="w-[70px]" />
+      <col className="w-[70px]" />
+      <col className="w-[70px]" />
+      <col className="w-[90px]" />
+      <col className="w-[80px]" />
+      <col className="w-[80px]" />
+      <col className="w-[80px]" />
+      <col className="w-[110px]" />
+    </colgroup>
   );
 
-  const ColumnHeader = () => (
-    <tr className="bg-default-100 dark:bg-gray-900/60">
-      <th className="px-2 py-1.5 text-left text-[10px] font-semibold text-default-600 dark:text-gray-300">
-        Name
-      </th>
-      {COLUMNS.map((c) => (
-        <th key={c.key} className={headCellCls}>
-          {c.label}
+  const renderAmountCells = (
+    totals: Totals,
+    bold: boolean = false
+  ): React.ReactElement[] =>
+    COLUMNS.map((column: { key: keyof Totals; label: string }) => (
+      <td key={column.key} className={amountCellClass(column.key, bold)}>
+        {fmt(totals[column.key])}
+      </td>
+    ));
+
+  const renderSalaryHeader = (firstLabel: string): React.ReactElement => (
+    <thead className="sticky top-0 z-20 bg-default-50 dark:bg-gray-900">
+      <tr>
+        <th className={headCellClass} title="Bilangan">
+          BIL
         </th>
-      ))}
-    </tr>
+        <th
+          className={`${headCellClass} text-left max-w-[140px] truncate`}
+          title={firstLabel}
+        >
+          {firstLabel}
+        </th>
+        <th className={headCellClass} title="Gaji">
+          GAJI
+        </th>
+        <th className={headCellClass} title="Overtime">
+          OT
+        </th>
+        <th className={headCellClass} title="Bonus">
+          BONUS
+        </th>
+        <th className={headCellClass} title="Commission / Insentif / Lain-lain">
+          C/I/O
+        </th>
+        <th className={headCellClass} title="Cuti">
+          CUTI
+        </th>
+        <th className={headCellClass} title="Gaji Kasar">
+          GAJI KASAR
+        </th>
+        <th className={headGroupClass} colSpan={2} title="EPF">
+          EPF
+        </th>
+        <th className={headGroupClass} colSpan={2} title="SOCSO">
+          SOCSO
+        </th>
+        <th className={headGroupClass} colSpan={2} title="SIP">
+          SIP
+        </th>
+        <th
+          className={`${headCellClass} border-l border-default-300 dark:border-gray-600`}
+          title="PCB"
+        >
+          PCB
+        </th>
+        <th className={headCellClass} title="Gaji Bersih">
+          GAJI BERSIH
+        </th>
+        <th className={headCellClass} title="Setengah Bulan">
+          1/2 BULAN
+        </th>
+        <th className={headCellClass} title="Jumlah">
+          JUMLAH
+        </th>
+        <th className={headCellClass} title="Digenapkan">
+          DIGENAPKAN
+        </th>
+        <th className={headCellClass} title="Setelah Digenapkan">
+          SETELAH DIGENAPKAN
+        </th>
+      </tr>
+      <tr>
+        {Array.from({ length: 8 }).map((_, index: number) => (
+          <th key={`blank-leading-${index}`} className={headBlankClass} />
+        ))}
+        <th className={headSubClass}>MAJ</th>
+        <th className={headSubClass}>PKJ</th>
+        <th className={headSubClass}>MAJ</th>
+        <th className={headSubClass}>PKJ</th>
+        <th className={headSubClass}>MAJ</th>
+        <th className={headSubClass}>PKJ</th>
+        {Array.from({ length: 6 }).map((_, index: number) => (
+          <th key={`blank-trailing-${index}`} className={headBlankClass} />
+        ))}
+      </tr>
+    </thead>
   );
 
   return (
@@ -272,7 +410,7 @@ const JPSalaryReportPage: React.FC = () => {
           <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
             Salary Report (Jelly Polly)
           </h1>
-          <div className="flex items-center bg-default-100 dark:bg-gray-800 rounded-full p-0.5">
+          <div className="flex items-center rounded-full border border-default-200 bg-default-100 p-0.5 dark:border-gray-700 dark:bg-gray-900">
             {(["monthly", "annual"] as TabType[]).map((tab) => (
               <button
                 key={tab}
@@ -280,7 +418,7 @@ const JPSalaryReportPage: React.FC = () => {
                 className={`px-3 py-1 rounded-full text-xs font-medium capitalize transition-colors ${
                   activeTab === tab
                     ? "bg-sky-500 text-white shadow-sm"
-                    : "text-default-600 dark:text-gray-400 hover:text-default-800 dark:hover:text-gray-200"
+                    : "text-default-600 hover:bg-white hover:text-default-800 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
                 }`}
               >
                 {tab}
@@ -327,24 +465,14 @@ const JPSalaryReportPage: React.FC = () => {
           />
         ) : (
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setCurrentYear((y) => y - 1)}
-                className="px-2 py-1 rounded border border-default-300 dark:border-gray-600 text-sm hover:bg-default-50 dark:hover:bg-gray-700"
-              >
-                ‹
-              </button>
-              <span className="px-3 text-lg font-semibold text-default-800 dark:text-gray-100">
-                {currentYear}
-              </span>
-              <button
-                onClick={() => setCurrentYear((y) => y + 1)}
-                className="px-2 py-1 rounded border border-default-300 dark:border-gray-600 text-sm hover:bg-default-50 dark:hover:bg-gray-700"
-              >
-                ›
-              </button>
-            </div>
-            <div className="flex items-center bg-default-100 dark:bg-gray-800 rounded-full p-0.5">
+            <TimeNavigator
+              range={yearRange}
+              onChange={handleYearChange}
+              modes={["year"]}
+              presets={false}
+              allowFuture
+            />
+            <div className="flex items-center rounded-full border border-default-200 bg-default-100 p-0.5 dark:border-gray-700 dark:bg-gray-900">
               {(["summary", "breakdown"] as AnnualView[]).map((v) => (
                 <button
                   key={v}
@@ -352,7 +480,7 @@ const JPSalaryReportPage: React.FC = () => {
                   className={`px-3 py-1 rounded-full text-xs font-medium capitalize transition-colors ${
                     annualView === v
                       ? "bg-sky-500 text-white shadow-sm"
-                      : "text-default-600 dark:text-gray-400 hover:text-default-800 dark:hover:text-gray-200"
+                      : "text-default-600 hover:bg-white hover:text-default-800 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
                   }`}
                 >
                   {v}
@@ -369,7 +497,7 @@ const JPSalaryReportPage: React.FC = () => {
           <LoadingSpinner />
         </div>
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm overflow-x-auto">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm overflow-auto max-h-[75vh]">
           {/* MONTHLY */}
           {activeTab === "monthly" &&
             (!monthly || monthly.locations.length === 0 ? (
@@ -377,45 +505,68 @@ const JPSalaryReportPage: React.FC = () => {
                 No processed payroll for {getMonthName(currentMonth)} {currentYear}.
               </div>
             ) : (
-              <table className="min-w-full">
-                <tbody>
+              <table className="w-full table-fixed">
+                {renderTableColGroup()}
+                {renderSalaryHeader("NAMA PEKERJA")}
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                   {monthly.locations.map((loc) => (
                     <React.Fragment key={loc.location}>
                       <tr className="bg-sky-50 dark:bg-sky-900/20">
                         <td
-                          colSpan={COLUMNS.length + 1}
-                          className="px-3 py-1.5 text-sm font-semibold text-sky-800 dark:text-sky-300"
+                          colSpan={TABLE_COLUMN_COUNT}
+                          className="px-4 py-2 text-sm font-semibold text-sky-800 dark:text-sky-300 border-y border-default-200 dark:border-gray-700"
                         >
-                          {locationMap[loc.location] || loc.location}
+                          {loc.location} -{" "}
+                          {(locationMap[loc.location] || loc.location).toUpperCase()}
                         </td>
                       </tr>
-                      <ColumnHeader />
-                      {loc.employees.map((emp) => (
+                      {loc.employees.map((emp, index: number) => (
                         <tr
                           key={emp.employee_payroll_id}
-                          className="border-t border-default-100 dark:border-gray-700/70"
+                          className={
+                            index % 2 === 0
+                              ? "bg-white dark:bg-gray-800"
+                              : "bg-default-25 dark:bg-gray-750"
+                          }
                         >
-                          <td className="px-2 py-1 text-left text-xs text-default-800 dark:text-gray-200 whitespace-nowrap">
-                            {emp.staff_name}
+                          <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 text-center">
+                            {index + 1}
                           </td>
-                          <TotalsCells t={emp} />
+                          <td className={bodyNameCellClass}>
+                            <span
+                              className="block truncate"
+                              title={`${emp.staff_id.toUpperCase()} - ${emp.staff_name.toUpperCase()}`}
+                            >
+                              {emp.staff_id.toUpperCase()} -{" "}
+                              {emp.staff_name.toUpperCase()}
+                            </span>
+                          </td>
+                          {renderAmountCells(emp)}
                         </tr>
                       ))}
-                      <tr className="border-t border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/40">
-                        <td className="px-2 py-1 text-left text-xs font-semibold text-default-700 dark:text-gray-200">
-                          {locationMap[loc.location] || loc.location} Total
+                      <tr>
+                        <td
+                          colSpan={2}
+                          className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600"
+                        >
+                          SUBTOTAL
                         </td>
-                        <TotalsCells t={loc.totals} bold />
+                        {renderAmountCells(loc.totals, true)}
                       </tr>
                     </React.Fragment>
                   ))}
-                  <tr className="border-t-2 border-default-300 dark:border-gray-600 bg-emerald-50 dark:bg-emerald-900/20">
-                    <td className="px-2 py-1.5 text-left text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                </tbody>
+                <tfoot className="sticky bottom-0 z-20">
+                  <tr>
+                    <td
+                      colSpan={2}
+                      className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600"
+                    >
                       GRAND TOTAL
                     </td>
-                    <TotalsCells t={monthly.grand_totals} bold />
+                    {renderAmountCells(monthly.grand_totals, true)}
                   </tr>
-                </tbody>
+                </tfoot>
               </table>
             ))}
 
@@ -427,49 +578,55 @@ const JPSalaryReportPage: React.FC = () => {
                 No processed payroll in {currentYear}.
               </div>
             ) : (
-              <table className="min-w-full">
-                <thead>
-                  <tr className="bg-default-100 dark:bg-gray-900/60">
-                    <th className="px-2 py-1.5 text-left text-[10px] font-semibold text-default-600 dark:text-gray-300">
-                      Month
-                    </th>
-                    {COLUMNS.map((c) => (
-                      <th key={c.key} className={headCellCls}>
-                        {c.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {annual.monthly.map((m) => (
+              <table className="w-full table-fixed">
+                {renderTableColGroup()}
+                {renderSalaryHeader("MONTH / LOCATION")}
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
+                  {annual.monthly.map((m, index: number) => (
                     <tr
                       key={m.month}
-                      className="border-t border-default-100 dark:border-gray-700/70"
+                      className={
+                        index % 2 === 0
+                          ? "bg-white dark:bg-gray-800"
+                          : "bg-default-25 dark:bg-gray-750"
+                      }
                     >
-                      <td className="px-2 py-1 text-left text-xs text-default-800 dark:text-gray-200 whitespace-nowrap">
+                      <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 text-center">
+                        {m.month}
+                      </td>
+                      <td className={bodyNameCellClass}>
                         {getMonthName(m.month)}
                       </td>
-                      <TotalsCells t={m.totals} />
+                      {renderAmountCells(m.totals)}
                     </tr>
                   ))}
                   {annual.locations.map((loc) => (
                     <tr
                       key={loc.location}
-                      className="border-t border-default-200 dark:border-gray-700 bg-sky-50 dark:bg-sky-900/20"
+                      className="bg-sky-50 dark:bg-sky-900/20"
                     >
-                      <td className="px-2 py-1 text-left text-xs font-semibold text-sky-800 dark:text-sky-300">
-                        {locationMap[loc.location] || loc.location} (year)
+                      <td className="px-2 py-2 text-xs font-semibold text-sky-800 dark:text-sky-300 text-center">
+                        {loc.location}
                       </td>
-                      <TotalsCells t={loc.totals} bold />
+                      <td className="px-2 py-2 text-xs font-semibold text-sky-800 dark:text-sky-300 text-left">
+                        {(locationMap[loc.location] || loc.location).toUpperCase()}{" "}
+                        (YEAR)
+                      </td>
+                      {renderAmountCells(loc.totals, true)}
                     </tr>
                   ))}
-                  <tr className="border-t-2 border-default-300 dark:border-gray-600 bg-emerald-50 dark:bg-emerald-900/20">
-                    <td className="px-2 py-1.5 text-left text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                </tbody>
+                <tfoot className="sticky bottom-0 z-20">
+                  <tr>
+                    <td
+                      colSpan={2}
+                      className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600"
+                    >
                       GRAND TOTAL
                     </td>
-                    <TotalsCells t={annual.grand_totals} bold />
+                    {renderAmountCells(annual.grand_totals, true)}
                   </tr>
-                </tbody>
+                </tfoot>
               </table>
             ))}
 
@@ -481,64 +638,84 @@ const JPSalaryReportPage: React.FC = () => {
                 No processed payroll in {currentYear}.
               </div>
             ) : (
-              <table className="min-w-full">
-                <tbody>
+              <table className="w-full table-fixed">
+                {renderTableColGroup()}
+                {renderSalaryHeader("NAMA PEKERJA / MONTH")}
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                   {breakdown.locations.map((loc) => (
                     <React.Fragment key={loc.location}>
                       <tr className="bg-sky-50 dark:bg-sky-900/20">
                         <td
-                          colSpan={COLUMNS.length + 1}
-                          className="px-3 py-1.5 text-sm font-semibold text-sky-800 dark:text-sky-300"
+                          colSpan={TABLE_COLUMN_COUNT}
+                          className="px-4 py-2 text-sm font-semibold text-sky-800 dark:text-sky-300 border-y border-default-200 dark:border-gray-700"
                         >
-                          {locationMap[loc.location] || loc.location}
+                          {loc.location} -{" "}
+                          {(locationMap[loc.location] || loc.location).toUpperCase()}
                         </td>
                       </tr>
                       {loc.employees.map((emp) => (
                         <React.Fragment key={emp.staff_id}>
                           <tr className="bg-default-50 dark:bg-gray-900/40">
-                            <td className="px-2 py-1 text-left text-xs font-semibold text-default-700 dark:text-gray-200">
-                              {emp.staff_name}
+                            <td
+                              colSpan={TABLE_COLUMN_COUNT}
+                              className="px-3 py-2 text-xs font-semibold text-default-700 dark:text-gray-200 uppercase tracking-wide"
+                            >
+                              {emp.staff_id.toUpperCase()} -{" "}
+                              {emp.staff_name.toUpperCase()}
                             </td>
-                            {COLUMNS.map((c) => (
-                              <th key={c.key} className={headCellCls}>
-                                {c.label}
-                              </th>
-                            ))}
                           </tr>
-                          {emp.months.map((m) => (
+                          {emp.months.map((m, index: number) => (
                             <tr
                               key={m.month}
-                              className="border-t border-default-100 dark:border-gray-700/70"
+                              className={
+                                index % 2 === 0
+                                  ? "bg-white dark:bg-gray-800"
+                                  : "bg-default-25 dark:bg-gray-750"
+                              }
                             >
-                              <td className="px-2 py-1 text-left text-xs text-default-600 dark:text-gray-400 whitespace-nowrap pl-4">
+                              <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 text-center">
+                                {m.month}
+                              </td>
+                              <td className={bodyNameCellClass}>
                                 {getMonthName(m.month)}
                               </td>
-                              <TotalsCells t={m} />
+                              {renderAmountCells(m)}
                             </tr>
                           ))}
-                          <tr className="border-t border-default-200 dark:border-gray-700">
-                            <td className="px-2 py-1 text-left text-xs font-semibold text-default-700 dark:text-gray-200 pl-4">
+                          <tr>
+                            <td
+                              colSpan={2}
+                              className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600"
+                            >
                               {emp.staff_name} Total
                             </td>
-                            <TotalsCells t={emp.total} bold />
+                            {renderAmountCells(emp.total, true)}
                           </tr>
                         </React.Fragment>
                       ))}
-                      <tr className="border-t border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-900/60">
-                        <td className="px-2 py-1 text-left text-xs font-bold text-default-800 dark:text-gray-100">
+                      <tr>
+                        <td
+                          colSpan={2}
+                          className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600"
+                        >
                           {locationMap[loc.location] || loc.location} Total
                         </td>
-                        <TotalsCells t={loc.totals} bold />
+                        {renderAmountCells(loc.totals, true)}
                       </tr>
                     </React.Fragment>
                   ))}
-                  <tr className="border-t-2 border-default-300 dark:border-gray-600 bg-emerald-50 dark:bg-emerald-900/20">
-                    <td className="px-2 py-1.5 text-left text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                </tbody>
+                <tfoot className="sticky bottom-0 z-20">
+                  <tr>
+                    <td
+                      colSpan={2}
+                      className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600"
+                    >
                       GRAND TOTAL
                     </td>
-                    <TotalsCells t={breakdown.grand_totals} bold />
+                    {renderAmountCells(breakdown.grand_totals, true)}
                   </tr>
-                </tbody>
+                </tfoot>
               </table>
             ))}
         </div>
