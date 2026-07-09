@@ -28,6 +28,45 @@ export default function (pool) {
     });
   };
 
+  const roundMoney = (value) =>
+    Math.round((parseFloat(value) || 0) * 100) / 100;
+
+  const buildMidMonthAggregateMap = (rows) => {
+    return rows.reduce((acc, row) => {
+      const sourceEmployeeId = row.source_employee_id || row.employee_id;
+      const key = `${sourceEmployeeId}:${row.year}:${row.month}`;
+      const amount = roundMoney(row.amount);
+
+      if (!acc[key]) {
+        acc[key] = {
+          primary: row,
+          total: 0,
+          byEmployee: {},
+        };
+      }
+
+      if (row.employee_id === sourceEmployeeId) {
+        acc[key].primary = row;
+      }
+
+      acc[key].total = roundMoney(acc[key].total + amount);
+      acc[key].byEmployee[row.employee_id] = roundMoney(
+        (acc[key].byEmployee[row.employee_id] || 0) + amount
+      );
+      return acc;
+    }, {});
+  };
+
+  const serializeMidMonthAggregate = (aggregate, employeeId) => {
+    if (!aggregate) return null;
+    const { source_employee_id, ...primary } = aggregate.primary;
+    return {
+      ...primary,
+      employee_id: employeeId,
+      amount: aggregate.total,
+    };
+  };
+
   // Cross-company take-home summary for a staff member's name-sibling group.
   // Returns Tien Hock + Jelly Polly pay for the month so both Details pages can
   // render a combined take-home card for dual-company staff.
@@ -163,7 +202,19 @@ export default function (pool) {
     }
 
     try {
-      const payrollIds = ids.split(",").map((id) => parseInt(id));
+      const idsText = Array.isArray(ids) ? ids.join(",") : ids;
+      const idParts = String(idsText)
+        .split(",")
+        .map((id) => id.trim())
+        .filter((id) => id.length > 0);
+
+      if (idParts.length === 0 || idParts.some((id) => !/^\d+$/.test(id))) {
+        return res.status(400).json({
+          message: "Valid employee payroll IDs are required",
+        });
+      }
+
+      const payrollIds = idParts.map((id) => parseInt(id, 10));
 
       const payrollsResult = await pool.query(
         `SELECT ep.*, mp.year, mp.month,
@@ -175,25 +226,77 @@ export default function (pool) {
         [payrollIds]
       );
 
-      const itemsResult = await pool.query(
-        `SELECT pi.employee_payroll_id, pi.id, pi.pay_code_id, pi.description,
-                pi.rate, pi.rate_unit, pi.quantity, pi.foc_units, pi.amount,
-                pi.is_manual, pi.work_log_type, pc.pay_type
-         FROM jellypolly.payroll_items pi
-         LEFT JOIN jellypolly.pay_codes pc ON pi.pay_code_id = pc.id
-         WHERE pi.employee_payroll_id = ANY($1)
-         ORDER BY pi.id`,
-        [payrollIds]
-      );
+      if (payrollsResult.rows.length === 0) {
+        return res.json([]);
+      }
 
-      const deductionsResult = await pool.query(
-        `SELECT pd.employee_payroll_id, pd.deduction_type, pd.employee_amount,
-                pd.employer_amount, pd.wage_amount, pd.rate_info
-         FROM jellypolly.payroll_deductions pd
-         WHERE pd.employee_payroll_id = ANY($1)
-         ORDER BY pd.employee_payroll_id, pd.deduction_type`,
-        [payrollIds]
-      );
+      const employeeIds = payrollsResult.rows.map((payroll) => payroll.employee_id);
+      const years = [...new Set(payrollsResult.rows.map((payroll) => payroll.year))];
+      const months = [...new Set(payrollsResult.rows.map((payroll) => payroll.month))];
+
+      const [itemsResult, deductionsResult, midMonthResult, leaveResult] =
+        await Promise.all([
+          pool.query(
+            `SELECT pi.employee_payroll_id, pi.id, pi.pay_code_id, pi.description,
+                    pi.rate, pi.rate_unit, pi.quantity, pi.foc_units, pi.amount,
+                    pi.is_manual, pi.job_type, pi.source_employee_id,
+                    pi.source_date, pi.work_log_id, pi.work_log_type, pc.pay_type
+             FROM jellypolly.payroll_items pi
+             LEFT JOIN jellypolly.pay_codes pc ON pi.pay_code_id = pc.id
+             WHERE pi.employee_payroll_id = ANY($1)
+             ORDER BY pi.id`,
+            [payrollIds]
+          ),
+          pool.query(
+            `SELECT pd.employee_payroll_id, pd.deduction_type, pd.employee_amount,
+                    pd.employer_amount, pd.wage_amount, pd.rate_info
+             FROM jellypolly.payroll_deductions pd
+             WHERE pd.employee_payroll_id = ANY($1)
+             ORDER BY pd.employee_payroll_id, pd.deduction_type`,
+            [payrollIds]
+          ),
+          pool.query(
+            `WITH source_siblings AS (
+               SELECT source.id AS source_employee_id, sibling.id AS sibling_id
+               FROM jellypolly.staffs source
+               JOIN jellypolly.staffs sibling
+                 ON COALESCE(NULLIF(sibling.head_staff_id, ''), sibling.id) =
+                    COALESCE(NULLIF(source.head_staff_id, ''), source.id)
+               WHERE source.id = ANY($1)
+             )
+             SELECT ss.source_employee_id, mmp.id, mmp.employee_id, mmp.year,
+                    mmp.month, mmp.amount, mmp.payment_method, mmp.status,
+                    mmp.created_at, mmp.updated_at, mmp.paid_at, mmp.notes
+             FROM source_siblings ss
+             JOIN jellypolly.mid_month_payrolls mmp ON mmp.employee_id = ss.sibling_id
+             WHERE mmp.year = ANY($2)
+               AND mmp.month = ANY($3)
+               AND mmp.status <> 'Cancelled'`,
+            [employeeIds, years, months]
+          ),
+          pool.query(
+            `WITH source_siblings AS (
+               SELECT source.id AS source_employee_id, sibling.id AS sibling_id
+               FROM jellypolly.staffs source
+               JOIN jellypolly.staffs sibling
+                 ON COALESCE(NULLIF(sibling.head_staff_id, ''), sibling.id) =
+                    COALESCE(NULLIF(source.head_staff_id, ''), source.id)
+               WHERE source.id = ANY($1)
+             )
+             SELECT ss.source_employee_id, lr.id, lr.employee_id,
+                    to_char(lr.leave_date, 'YYYY-MM-DD') AS leave_date,
+                    lr.leave_type, lr.days_taken,
+                    CAST(lr.amount_paid AS NUMERIC(10,2)) AS amount_paid,
+                    lr.status
+             FROM source_siblings ss
+             JOIN jellypolly.leave_records lr ON lr.employee_id = ss.sibling_id
+             WHERE CAST(EXTRACT(YEAR FROM lr.leave_date) AS INTEGER) = ANY($2)
+               AND CAST(EXTRACT(MONTH FROM lr.leave_date) AS INTEGER) = ANY($3)
+               AND lr.status = 'approved'
+             ORDER BY lr.leave_date`,
+            [employeeIds, years, months]
+          ),
+        ]);
 
       const itemsByPayrollId = itemsResult.rows.reduce((acc, item) => {
         if (!acc[item.employee_payroll_id]) acc[item.employee_payroll_id] = [];
@@ -218,6 +321,23 @@ export default function (pool) {
         return acc;
       }, {});
 
+      const midMonthByEmployeePeriod = buildMidMonthAggregateMap(
+        midMonthResult.rows
+      );
+
+      const leaveRecordsByEmployeePeriod = leaveResult.rows.reduce((acc, row) => {
+        const year = parseInt(row.leave_date.slice(0, 4));
+        const month = parseInt(row.leave_date.slice(5, 7));
+        const key = `${row.source_employee_id}:${year}:${month}`;
+        const { source_employee_id, ...leaveRecord } = row;
+        if (!acc[key]) acc[key] = [];
+        acc[key].push({
+          ...leaveRecord,
+          amount_paid: parseFloat(leaveRecord.amount_paid),
+        });
+        return acc;
+      }, {});
+
       const response = payrollsResult.rows.map((payroll) => ({
         ...payroll,
         gross_pay: parseFloat(payroll.gross_pay),
@@ -229,6 +349,20 @@ export default function (pool) {
             : null,
         items: itemsByPayrollId[payroll.id] || [],
         deductions: deductionsByPayrollId[payroll.id] || [],
+        leave_records:
+          leaveRecordsByEmployeePeriod[
+            `${payroll.employee_id}:${payroll.year}:${payroll.month}`
+          ] || [],
+        mid_month_payroll: serializeMidMonthAggregate(
+          midMonthByEmployeePeriod[
+            `${payroll.employee_id}:${payroll.year}:${payroll.month}`
+          ],
+          payroll.employee_id
+        ),
+        mid_month_payrolls_by_employee:
+          midMonthByEmployeePeriod[
+            `${payroll.employee_id}:${payroll.year}:${payroll.month}`
+          ]?.byEmployee || {},
       }));
 
       res.json(response);
@@ -278,7 +412,8 @@ export default function (pool) {
           pool.query(
             `SELECT pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit,
                     pi.quantity, pi.foc_units, pi.amount, pi.is_manual, pi.job_type,
-                    pi.source_employee_id, pi.source_date, pi.work_log_type,
+                    pi.source_employee_id, pi.source_date, pi.work_log_id,
+                    pi.work_log_type,
                     pc.pay_type
              FROM jellypolly.payroll_items pi
              LEFT JOIN jellypolly.pay_codes pc ON pi.pay_code_id = pc.id
@@ -299,15 +434,30 @@ export default function (pool) {
           pool.query(
             `SELECT id, employee_id, year, month, amount, description, pinjam_type
              FROM jellypolly.pinjam_records
-             WHERE employee_id = $1 AND year = $2 AND month = $3
+             WHERE employee_id = ANY($1) AND year = $2 AND month = $3
              ORDER BY pinjam_type, description`,
-            [payrollData.employee_id, payrollData.year, payrollData.month]
+            [
+              siblingIds.length > 0 ? siblingIds : [payrollData.employee_id],
+              payrollData.year,
+              payrollData.month,
+            ]
           ),
           pool.query(
-            `SELECT id, employee_id, year, month, amount, payment_method, status
+            `SELECT $4::varchar AS source_employee_id, id, employee_id, year,
+                    month, amount, payment_method, status, created_at,
+                    updated_at, paid_at, notes
              FROM jellypolly.mid_month_payrolls
-             WHERE employee_id = $1 AND year = $2 AND month = $3`,
-            [payrollData.employee_id, payrollData.year, payrollData.month]
+             WHERE employee_id = ANY($1)
+               AND year = $2
+               AND month = $3
+               AND status <> 'Cancelled'
+             ORDER BY CASE WHEN employee_id = $4 THEN 0 ELSE 1 END, employee_id`,
+            [
+              siblingIds.length > 0 ? siblingIds : [payrollData.employee_id],
+              payrollData.year,
+              payrollData.month,
+              payrollData.employee_id,
+            ]
           ),
           pool.query(
             `SELECT id, employee_id, to_char(leave_date, 'YYYY-MM-DD') AS leave_date,
@@ -335,7 +485,9 @@ export default function (pool) {
         is_manual: !!item.is_manual,
       }));
 
-      const midMonthRow = midMonthResult.rows[0] || null;
+      const midMonthKey = `${payrollData.employee_id}:${payrollData.year}:${payrollData.month}`;
+      const midMonthAggregate =
+        buildMidMonthAggregateMap(midMonthResult.rows)[midMonthKey];
 
       res.json({
         ...payrollData,
@@ -362,9 +514,11 @@ export default function (pool) {
           ...record,
           amount_paid: parseFloat(record.amount_paid),
         })),
-        mid_month_payroll: midMonthRow
-          ? { ...midMonthRow, amount: parseFloat(midMonthRow.amount) }
-          : null,
+        mid_month_payroll: serializeMidMonthAggregate(
+          midMonthAggregate,
+          payrollData.employee_id
+        ),
+        mid_month_payrolls_by_employee: midMonthAggregate?.byEmployee || {},
       });
     } catch (error) {
       console.error("Error fetching JP employee payroll details:", error);

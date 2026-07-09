@@ -1,5 +1,6 @@
 // src/pages/Accounting/JournalEntryPage.tsx
 import React, {
+  Fragment,
   useState,
   useEffect,
   useRef,
@@ -11,20 +12,35 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import {
+  AccountCode,
   JournalEntry,
   JournalEntryType,
   JournalEntryLineInput,
+  LedgerType,
 } from "../../types/types";
 import {
   useAccountCodesCache,
   useJournalEntryTypesCache,
+  useLedgerTypesCache,
+  refreshAccountCodesCache,
 } from "../../utils/accounting/useAccountingCache";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
-import { FormListbox, SelectOption } from "../../components/FormComponents";
+import {
+  FormInput,
+  FormListbox,
+  SelectOption,
+} from "../../components/FormComponents";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import TimeNavigator, { type TimeRange } from "../../components/TimeNavigator";
+import {
+  Dialog,
+  DialogPanel,
+  DialogTitle,
+  Transition,
+  TransitionChild,
+} from "@headlessui/react";
 import {
   IconPlus,
   IconTrash,
@@ -60,6 +76,7 @@ const HEADER_LISTBOX_CLASSNAME: string =
   "[&>div>button]:h-[38px] [&>div>button]:bg-white dark:[&>div>button]:bg-gray-900/50 [&>div>button]:shadow-none";
 const HEADER_TIME_NAVIGATOR_TRIGGER_CLASSNAME: string =
   "w-full !h-[38px] justify-between !bg-white dark:!bg-gray-900/50 !font-normal disabled:!bg-gray-50 dark:disabled:!bg-gray-800";
+const ACCOUNT_CODE_PATTERN: RegExp = /^[A-Za-z0-9\-_.]+$/;
 
 // Load the last journal type the user selected (shared cache with the list page session)
 const loadLastEntryType = (): JournalEntryType => {
@@ -101,7 +118,9 @@ interface AccountCodeCellProps {
   value: string;
   options: SelectOption[];
   onChange: (value: string) => void;
+  onAddAccount?: (query: string) => void;
   disabled?: boolean;
+  placeholder?: string;
 }
 
 const ACCOUNT_LOAD_INCREMENT = 50;
@@ -110,11 +129,14 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
   value,
   options,
   onChange,
+  onAddAccount,
   disabled = false,
+  placeholder = "Search account...",
 }: AccountCodeCellProps) => {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [loadedCount, setLoadedCount] = useState(50);
+  const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -135,8 +157,11 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
 
   const hasMoreOptions = displayedOptions.length < filteredOptions.length;
   const remainingCount = filteredOptions.length - displayedOptions.length;
+  const trimmedQuery: string = query.trim();
 
-  const selectedOption = options.find((opt: SelectOption) => opt.id === value);
+  const selectedOption = options.find(
+    (opt: SelectOption) => opt.id.toString() === value
+  );
   const displayValue = selectedOption?.name || "";
 
   // Reset loaded count when query changes
@@ -147,12 +172,7 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
   // Handle click outside to close dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node) &&
-        inputRef.current &&
-        !inputRef.current.contains(event.target as Node)
-      ) {
+      if (!containerRef.current?.contains(event.target as Node)) {
         setIsOpen(false);
         setQuery("");
       }
@@ -192,8 +212,18 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
     setLoadedCount((prev) => prev + ACCOUNT_LOAD_INCREMENT);
   };
 
+  const handleAddAccount = (
+    e: React.MouseEvent<HTMLButtonElement>
+  ): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsOpen(false);
+    onAddAccount?.(trimmedQuery);
+    setQuery("");
+  };
+
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       <div className="flex">
         <input
           ref={inputRef}
@@ -203,7 +233,7 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
           onFocus={handleFocus}
           onKeyDown={handleKeyDown}
           disabled={disabled}
-          placeholder="Search account..."
+          placeholder={placeholder}
           className="w-full px-2 py-1.5 text-sm bg-transparent border-0 focus:ring-1 focus:ring-sky-500 focus:bg-white dark:focus:bg-gray-700 rounded placeholder:text-gray-400 dark:placeholder:text-gray-500 text-default-900 dark:text-gray-100 disabled:cursor-not-allowed"
         />
         <button
@@ -218,6 +248,18 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
         >
           <IconChevronDown size={16} />
         </button>
+        {onAddAccount && (
+          <button
+            type="button"
+            onClick={handleAddAccount}
+            disabled={disabled}
+            title="Add account code"
+            aria-label="Add account code"
+            className="px-1 text-default-400 dark:text-gray-500 hover:text-sky-600 dark:hover:text-sky-400 disabled:cursor-not-allowed"
+          >
+            <IconPlus size={16} />
+          </button>
+        )}
       </div>
       {isOpen && !disabled && (
         <div
@@ -234,11 +276,11 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
                 key={opt.id}
                 onClick={() => handleSelect(opt.id.toString())}
                 className={`px-3 py-2 text-sm cursor-pointer hover:bg-sky-50 dark:hover:bg-sky-900/50 flex items-center justify-between gap-2 ${
-                  opt.id === value ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-200" : "text-default-900 dark:text-gray-100"
+                  opt.id.toString() === value ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-200" : "text-default-900 dark:text-gray-100"
                 }`}
               >
                 <span>{opt.name}</span>
-                {opt.id === value && (
+                {opt.id.toString() === value && (
                   <IconCheck size={16} className="text-sky-600 dark:text-sky-400 flex-shrink-0" />
                 )}
               </div>
@@ -270,6 +312,408 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
   );
 };
 
+interface QuickAddAccountCodeFormData {
+  code: string;
+  description: string;
+  ledger_type: string;
+  parent_code: string;
+  sort_order: number;
+  notes: string;
+}
+
+interface QuickAddAccountCodeResponse {
+  message: string;
+  accountCode: AccountCode;
+}
+
+interface QuickAddAccountCodeModalProps {
+  isOpen: boolean;
+  initialQuery: string;
+  existingAccountCodes: AccountCode[];
+  activeAccountCodes: AccountCode[];
+  ledgerTypes: LedgerType[];
+  ledgerTypesLoading: boolean;
+  onClose: () => void;
+  onCreated: (accountCode: AccountCode) => void;
+}
+
+interface ApiErrorLike extends Error {
+  status?: number;
+}
+
+const getInitialQuickAddAccountData = (
+  initialQuery: string
+): QuickAddAccountCodeFormData => {
+  const trimmedQuery: string = initialQuery.trim();
+  const shouldPrefillCode: boolean =
+    trimmedQuery.length > 0 && ACCOUNT_CODE_PATTERN.test(trimmedQuery);
+
+  return {
+    code: shouldPrefillCode ? trimmedQuery.toUpperCase() : "",
+    description: shouldPrefillCode ? "" : trimmedQuery,
+    ledger_type: "",
+    parent_code: "",
+    sort_order: 0,
+    notes: "",
+  };
+};
+
+const QuickAddAccountCodeModal: React.FC<QuickAddAccountCodeModalProps> = ({
+  isOpen,
+  initialQuery,
+  existingAccountCodes,
+  activeAccountCodes,
+  ledgerTypes,
+  ledgerTypesLoading,
+  onClose,
+  onCreated,
+}: QuickAddAccountCodeModalProps) => {
+  const [formData, setFormData] = useState<QuickAddAccountCodeFormData>(
+    getInitialQuickAddAccountData(initialQuery)
+  );
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect((): void => {
+    if (!isOpen) return;
+
+    setFormData(getInitialQuickAddAccountData(initialQuery));
+    setError(null);
+  }, [initialQuery, isOpen]);
+
+  const ledgerTypeOptions: SelectOption[] = useMemo(
+    (): SelectOption[] => [
+      { id: "", name: "None" },
+      ...ledgerTypes.map(
+        (ledgerType: LedgerType): SelectOption => ({
+          id: ledgerType.code,
+          name: `${ledgerType.code} - ${ledgerType.name}`,
+        })
+      ),
+    ],
+    [ledgerTypes]
+  );
+
+  const parentAccountOptions: SelectOption[] = useMemo((): SelectOption[] => {
+    const normalizedCode: string = formData.code.trim().toUpperCase();
+
+    return [
+      { id: "", name: "None (Top Level)" },
+      ...activeAccountCodes
+        .filter(
+          (accountCode: AccountCode): boolean =>
+            accountCode.code.toUpperCase() !== normalizedCode
+        )
+        .map(
+          (accountCode: AccountCode): SelectOption => ({
+            id: accountCode.code,
+            name: `${accountCode.code} - ${accountCode.description}`,
+          })
+        ),
+    ];
+  }, [activeAccountCodes, formData.code]);
+
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ): void => {
+    const { name, value } = e.target;
+
+    if (name === "sort_order") {
+      setFormData(
+        (prev: QuickAddAccountCodeFormData): QuickAddAccountCodeFormData => ({
+          ...prev,
+          sort_order: parseInt(value, 10) || 0,
+        })
+      );
+      return;
+    }
+
+    if (name === "code" || name === "description") {
+      setFormData(
+        (prev: QuickAddAccountCodeFormData): QuickAddAccountCodeFormData => ({
+          ...prev,
+          [name]: value,
+        })
+      );
+    }
+  };
+
+  const handleNotesChange = (
+    e: React.ChangeEvent<HTMLTextAreaElement>
+  ): void => {
+    setFormData(
+      (prev: QuickAddAccountCodeFormData): QuickAddAccountCodeFormData => ({
+        ...prev,
+        notes: e.target.value,
+      })
+    );
+  };
+
+  const handleLedgerTypeChange = (value: string): void => {
+    setFormData(
+      (prev: QuickAddAccountCodeFormData): QuickAddAccountCodeFormData => ({
+        ...prev,
+        ledger_type: value,
+      })
+    );
+  };
+
+  const handleParentAccountChange = (value: string): void => {
+    setFormData(
+      (prev: QuickAddAccountCodeFormData): QuickAddAccountCodeFormData => ({
+        ...prev,
+        parent_code: value,
+      })
+    );
+  };
+
+  const validateForm = (): string | null => {
+    const normalizedCode: string = formData.code.trim().toUpperCase();
+    const trimmedDescription: string = formData.description.trim();
+    const normalizedParentCode: string = formData.parent_code
+      .trim()
+      .toUpperCase();
+
+    if (!normalizedCode) {
+      return "Account code is required";
+    }
+
+    if (!trimmedDescription) {
+      return "Description is required";
+    }
+
+    if (!ACCOUNT_CODE_PATTERN.test(normalizedCode)) {
+      return "Account code can only contain letters, numbers, hyphens, underscores, and periods";
+    }
+
+    if (normalizedParentCode && normalizedParentCode === normalizedCode) {
+      return "An account cannot be its own parent";
+    }
+
+    const duplicateAccount: boolean = existingAccountCodes.some(
+      (accountCode: AccountCode): boolean =>
+        accountCode.code.toUpperCase() === normalizedCode
+    );
+
+    if (duplicateAccount) {
+      return `Account code "${normalizedCode}" already exists`;
+    }
+
+    return null;
+  };
+
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault();
+    setError(null);
+
+    const validationError: string | null = validateForm();
+    if (validationError) {
+      setError(validationError);
+      toast.error(validationError);
+      return;
+    }
+
+    const normalizedCode: string = formData.code.trim().toUpperCase();
+
+    setIsSaving(true);
+
+    try {
+      const response = await api.post<QuickAddAccountCodeResponse>(
+        "/api/account-codes",
+        {
+          code: normalizedCode,
+          description: formData.description.trim(),
+          ledger_type: formData.ledger_type || null,
+          parent_code: formData.parent_code || null,
+          sort_order: formData.sort_order,
+          is_active: true,
+          notes: formData.notes.trim() || null,
+        }
+      );
+
+      const createdAccountCode: AccountCode = response.accountCode;
+
+      try {
+        await refreshAccountCodesCache();
+      } catch (cacheError: unknown) {
+        console.error("Error refreshing account codes cache:", cacheError);
+        toast.error("Account code created, but the account list could not refresh");
+      }
+
+      toast.success("Account code created successfully");
+      onCreated(createdAccountCode);
+      onClose();
+    } catch (err: unknown) {
+      console.error("Error creating account code:", err);
+      const apiError: ApiErrorLike | null =
+        err instanceof Error ? (err as ApiErrorLike) : null;
+      const errorMessage: string =
+        apiError?.status === 409
+          ? `Account code "${normalizedCode}" already exists`
+          : apiError?.message || "Failed to create account code";
+
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleClose = (): void => {
+    if (isSaving) return;
+    onClose();
+  };
+
+  return (
+    <Transition appear show={isOpen} as={Fragment}>
+      <Dialog as="div" className="relative z-50" onClose={handleClose}>
+        <TransitionChild
+          as={Fragment}
+          enter="ease-out duration-300"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-200"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <div className="fixed inset-0 bg-black/50 dark:bg-black/70" aria-hidden="true" />
+        </TransitionChild>
+
+        <div className="fixed inset-0 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <TransitionChild
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 scale-95"
+              enterTo="opacity-100 scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 scale-100"
+              leaveTo="opacity-0 scale-95"
+            >
+              <DialogPanel className="w-full max-w-3xl transform overflow-visible rounded-2xl bg-white dark:bg-gray-800 p-6 text-left align-middle shadow-xl transition-all">
+                <DialogTitle
+                  as="h3"
+                  className="text-lg font-semibold text-default-900 dark:text-gray-100"
+                >
+                  Add Account Code
+                </DialogTitle>
+
+                <form onSubmit={handleSubmit} className="mt-5 space-y-5" noValidate>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <FormInput
+                      name="code"
+                      label="Account Code"
+                      value={formData.code}
+                      onChange={handleInputChange}
+                      placeholder="e.g., SALES-001"
+                      required
+                      disabled={isSaving}
+                    />
+
+                    <FormInput
+                      name="description"
+                      label="Description"
+                      value={formData.description}
+                      onChange={handleInputChange}
+                      placeholder="e.g., Sales Account"
+                      required
+                      disabled={isSaving}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <FormListbox
+                      name="ledger_type"
+                      label="Ledger Type"
+                      value={formData.ledger_type}
+                      onChange={handleLedgerTypeChange}
+                      options={ledgerTypeOptions}
+                      disabled={isSaving || ledgerTypesLoading}
+                      placeholder={ledgerTypesLoading ? "Loading..." : "Select ledger type..."}
+                    />
+
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
+                        Parent Account
+                      </label>
+                      <div className="rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50">
+                        <AccountCodeCell
+                          value={formData.parent_code}
+                          options={parentAccountOptions}
+                          onChange={handleParentAccountChange}
+                          disabled={isSaving}
+                          placeholder="Search parent account..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <FormInput
+                      name="sort_order"
+                      label="Sort Order"
+                      value={formData.sort_order}
+                      onChange={handleInputChange}
+                      type="number"
+                      min={0}
+                      placeholder="0"
+                      disabled={isSaving}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="quick-add-account-notes"
+                      className="block text-sm font-medium text-default-700 dark:text-gray-200"
+                    >
+                      Notes
+                    </label>
+                    <textarea
+                      id="quick-add-account-notes"
+                      name="notes"
+                      rows={3}
+                      value={formData.notes}
+                      onChange={handleNotesChange}
+                      disabled={isSaving}
+                      placeholder="Optional notes about this account..."
+                      className="block w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 placeholder:text-gray-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder:text-gray-500 dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
+                    />
+                  </div>
+
+                  {error && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
+                      {error}
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-3 border-t border-default-200 pt-5 dark:border-gray-700">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleClose}
+                      disabled={isSaving}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      color="sky"
+                      variant="filled"
+                      disabled={isSaving}
+                    >
+                      {isSaving ? "Saving..." : "Create Account"}
+                    </Button>
+                  </div>
+                </form>
+              </DialogPanel>
+            </TransitionChild>
+          </div>
+        </div>
+      </Dialog>
+    </Transition>
+  );
+};
+
 const JournalEntryPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -281,12 +725,37 @@ const JournalEntryPage: React.FC = () => {
 
   // Cached reference data
   const { entryTypes, isLoading: entryTypesLoading } = useJournalEntryTypesCache();
-  const { accountCodes: allAccountCodes, isLoading: accountCodesLoading } = useAccountCodesCache();
+  const { accountCodes: cachedAccountCodes, isLoading: accountCodesLoading } = useAccountCodesCache();
+  const { ledgerTypes: allLedgerTypes, isLoading: ledgerTypesLoading } = useLedgerTypesCache();
+  const [optimisticAccountCodes, setOptimisticAccountCodes] = useState<AccountCode[]>([]);
+
+  const allAccountCodes = useMemo((): AccountCode[] => {
+    if (optimisticAccountCodes.length === 0) return cachedAccountCodes;
+
+    const cachedCodes: Set<string> = new Set(
+      cachedAccountCodes.map((accountCode: AccountCode): string =>
+        accountCode.code.toUpperCase()
+      )
+    );
+
+    return [
+      ...optimisticAccountCodes.filter(
+        (accountCode: AccountCode): boolean =>
+          !cachedCodes.has(accountCode.code.toUpperCase())
+      ),
+      ...cachedAccountCodes,
+    ];
+  }, [cachedAccountCodes, optimisticAccountCodes]);
 
   // Filter to only active account codes
   const accountCodes = useMemo(
     () => allAccountCodes.filter((a) => a.is_active),
     [allAccountCodes]
+  );
+
+  const ledgerTypes = useMemo(
+    () => allLedgerTypes.filter((lt: LedgerType) => lt.is_active),
+    [allLedgerTypes]
   );
 
   // Form state - new entries default to the last journal type used
@@ -311,6 +780,8 @@ const JournalEntryPage: React.FC = () => {
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [quickAddTargetLineIndex, setQuickAddTargetLineIndex] = useState<number | null>(null);
+  const [quickAddInitialQuery, setQuickAddInitialQuery] = useState<string>("");
   const [focusedCell, setFocusedCell] = useState<{ row: number; col: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -503,6 +974,48 @@ const JournalEntryPage: React.FC = () => {
       } else if (field === "credit_amount" && value && parseFloat(value) > 0) {
         newLines[index].debit_amount = "";
       }
+
+      return { ...prev, lines: newLines };
+    });
+  };
+
+  const handleOpenQuickAddAccount = (
+    lineIndex: number,
+    query: string
+  ): void => {
+    setQuickAddTargetLineIndex(lineIndex);
+    setQuickAddInitialQuery(query);
+  };
+
+  const handleCloseQuickAddAccount = (): void => {
+    setQuickAddTargetLineIndex(null);
+    setQuickAddInitialQuery("");
+  };
+
+  const handleQuickAddAccountCreated = (accountCode: AccountCode): void => {
+    setOptimisticAccountCodes(
+      (prev: AccountCode[]): AccountCode[] => [
+        accountCode,
+        ...prev.filter(
+          (existing: AccountCode): boolean =>
+            existing.code.toUpperCase() !== accountCode.code.toUpperCase()
+        ),
+      ]
+    );
+
+    setFormData((prev: JournalEntryFormData): JournalEntryFormData => {
+      if (
+        quickAddTargetLineIndex === null ||
+        !prev.lines[quickAddTargetLineIndex]
+      ) {
+        return prev;
+      }
+
+      const newLines: JournalLineFormData[] = [...prev.lines];
+      newLines[quickAddTargetLineIndex] = {
+        ...newLines[quickAddTargetLineIndex],
+        account_code: accountCode.code,
+      };
 
       return { ...prev, lines: newLines };
     });
@@ -920,6 +1433,9 @@ const JournalEntryPage: React.FC = () => {
                             onChange={(value: string) =>
                               handleLineChange(index, "account_code", value)
                             }
+                            onAddAccount={(query: string) =>
+                              handleOpenQuickAddAccount(index, query)
+                            }
                             disabled={isSaving}
                           />
                         </td>
@@ -1119,6 +1635,17 @@ const JournalEntryPage: React.FC = () => {
       </div>
 
       {/* Dialogs */}
+      <QuickAddAccountCodeModal
+        isOpen={quickAddTargetLineIndex !== null}
+        initialQuery={quickAddInitialQuery}
+        existingAccountCodes={allAccountCodes}
+        activeAccountCodes={accountCodes}
+        ledgerTypes={ledgerTypes}
+        ledgerTypesLoading={ledgerTypesLoading}
+        onClose={handleCloseQuickAddAccount}
+        onCreated={handleQuickAddAccountCreated}
+      />
+
       <ConfirmationDialog
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}

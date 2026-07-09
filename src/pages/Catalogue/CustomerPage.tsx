@@ -28,6 +28,7 @@ import {
   refreshCustomersCache,
   useCustomersCache,
 } from "../../utils/catalogue/useCustomerCache";
+import { refreshAccountCodesCache } from "../../utils/accounting/useAccountingCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import BranchLinkageModal from "../../components/Catalogue/BranchLinkageModal";
 
@@ -80,7 +81,7 @@ const CustomerPage: React.FC = () => {
         await api.delete(`/api/customers/${customerToDelete.id}`);
 
         // Refresh the cache after deletion
-        await refreshCustomersCache();
+        await Promise.all([refreshCustomersCache(), refreshAccountCodesCache()]);
 
         setIsDeleteDialogOpen(false);
         setCustomerToDelete(null);

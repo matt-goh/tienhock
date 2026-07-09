@@ -63,6 +63,25 @@ type PayrollViewMode = "groups" | "recent";
 // "recently accessed" ordering; falls back to the processed/created time.
 const OPEN_RECENCY_STORAGE_PREFIX: string = "payroll-open-recency:";
 
+type PayrollSummaryTotals = {
+  grossPay: number;
+  netPay: number;
+  takeHome: number;
+  advances: number;
+  setelahDigenapkan: number;
+};
+
+const parsePayrollAmount = (
+  value: number | string | null | undefined
+): number => {
+  const amount: number = Number.parseFloat(`${value ?? 0}`);
+  return Number.isFinite(amount) ? amount : 0;
+};
+
+const roundPayrollAmount = (amount: number): number => {
+  return Math.round((amount + Number.EPSILON) * 100) / 100;
+};
+
 const readViewModeFromStorage = (): PayrollViewMode => {
   try {
     const stored: string | null = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
@@ -706,31 +725,39 @@ const PayrollPage: React.FC = () => {
     setExpandedJobs(newExpanded);
   };
 
-  const calculateTotals = (employeePayrolls: EmployeePayroll[]) => {
+  const calculateTotals = (
+    employeePayrolls: EmployeePayroll[]
+  ): PayrollSummaryTotals => {
     return employeePayrolls.reduce(
-      (acc, curr) => {
-        const netPay = parseFloat(curr.net_pay.toString());
+      (
+        acc: PayrollSummaryTotals,
+        curr: EmployeePayroll
+      ): PayrollSummaryTotals => {
+        const netPay: number = parsePayrollAmount(curr.net_pay);
         // Stored "Setelah Digenapkan" = take-home, with commission/bonus advances
         // already deducted (same as the Net column below).
-        const takeHome =
+        const storedTakeHome: number =
           curr.setelah_digenapkan != null
-            ? parseFloat(curr.setelah_digenapkan.toString())
+            ? parsePayrollAmount(curr.setelah_digenapkan)
             : Math.ceil(netPay);
-        const digenapkan =
-          curr.digenapkan != null ? parseFloat(curr.digenapkan.toString()) : 0;
-        const advance =
-          curr.commission_advance != null
-            ? parseFloat(curr.commission_advance.toString())
-            : 0;
+        const digenapkan: number = parsePayrollAmount(curr.digenapkan);
+        const advance: number = parsePayrollAmount(curr.commission_advance);
         // Salary Report "Setelah Digenapkan": add the advances back so the figure
         // reflects total earned salary. (takeHome - digenapkan) recovers the
         // pre-rounding jumlah (net - mid-month); re-round after adding advances.
-        const setelahDigenapkan = Math.ceil(takeHome - digenapkan + advance);
+        const setelahDigenapkan: number = Math.ceil(
+          storedTakeHome - digenapkan + advance
+        );
+        // Remaining take-home after advances should reconcile exactly with the
+        // earned total above, even when the advance itself has cents.
+        const takeHome: number = roundPayrollAmount(
+          setelahDigenapkan - advance
+        );
         return {
-          grossPay: acc.grossPay + parseFloat(curr.gross_pay.toString()),
+          grossPay: acc.grossPay + parsePayrollAmount(curr.gross_pay),
           netPay: acc.netPay + netPay,
-          takeHome: acc.takeHome + takeHome,
-          advances: acc.advances + advance,
+          takeHome: roundPayrollAmount(acc.takeHome + takeHome),
+          advances: roundPayrollAmount(acc.advances + advance),
           setelahDigenapkan: acc.setelahDigenapkan + setelahDigenapkan,
         };
       },
@@ -1188,11 +1215,11 @@ const PayrollPage: React.FC = () => {
                   className="font-semibold text-emerald-700 dark:text-emerald-300"
                   title={`Setelah Digenapkan (${formatCurrency(
                     totals.setelahDigenapkan
-                  )}) = total earned salary. The Net column below shows take-home (${formatCurrency(
+                  )}) = total earned salary. Remaining take-home after commission/bonus advances is ${formatCurrency(
                     totals.takeHome
-                  )}), which has ${formatCurrency(
+                  )}; ${formatCurrency(
                     totals.advances
-                  )} of commission/bonus advances already paid out deducted.`}
+                  )} was already paid out as commission/bonus advances.`}
                 >
                   {formatAmount(totals.setelahDigenapkan)}
                 </span>

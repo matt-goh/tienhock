@@ -27,6 +27,7 @@ import {
   IconCategory2,
   IconSettings,
   IconTrash,
+  IconGripVertical,
 } from "@tabler/icons-react";
 import clsx from "clsx";
 import Button from "../../../components/Button";
@@ -41,8 +42,30 @@ interface StockKilangItem {
   product_id: string;
   name: string;
   price: number;
+  base_closing_quantity: number;
+  adjustment_quantity: number;
   closing_quantity: number;
   closing_value: number;
+}
+
+interface StockKilangAdjustmentRow {
+  product_id: string;
+  adj_in?: number;
+  adj_out?: number;
+}
+
+interface StockKilangAdjustmentResponse {
+  adjustments?: StockKilangAdjustmentRow[];
+}
+
+interface StockKilangClosingResponse {
+  closing_balances?: Record<string, number>;
+}
+
+interface StockKilangSaveAdjustment {
+  product_id: string;
+  adj_in: number;
+  adj_out: number;
 }
 
 interface StockResponse {
@@ -52,10 +75,57 @@ interface StockResponse {
   materials: MaterialWithStock[];
 }
 
+interface MaterialStockBatchResponse {
+  registered_variants?: Array<{
+    id: number;
+    variant_name: string;
+    sort_order?: number | null;
+  }>;
+}
+
 type EditableStockField = "adjustment_quantity" | "unit_cost";
 type NewVariantField = "variant_name" | EditableStockField;
 type StockEntryTab = ProductLine | "general";
 type StockEntryMode = "general" | "material";
+type RowSaveKey = string;
+
+type DragState =
+  | {
+      type: "material";
+      materialId: number;
+      category: MaterialCategory;
+      pointerId: number;
+      previousOrderIds: number[];
+      currentOrderIds: number[];
+      lastTargetId: number | null;
+      offsetX: number;
+      offsetY: number;
+      initialLeft: number;
+      initialTop: number;
+    }
+  | {
+      type: "variant";
+      materialId: number;
+      variantId: number;
+      pointerId: number;
+      previousOrderIds: number[];
+      currentOrderIds: number[];
+      lastTargetId: number | null;
+      offsetX: number;
+      offsetY: number;
+      initialLeft: number;
+      initialTop: number;
+    };
+
+interface DragOverlayState {
+  label: string;
+  sublabel: string;
+  index: number;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
 
 interface StockAdjustmentEntryPageProps {
   mode: StockEntryMode;
@@ -153,6 +223,10 @@ const makeNumber = (value: number | string | null | undefined): number => {
   return parseFloat(String(value ?? "")) || 0;
 };
 
+const getStockKilangReference = (tab: StockEntryTab): string => {
+  return `Material Stock Kilang - ${tab.toUpperCase()}`;
+};
+
 const getMaterialDisplayName = (material: MaterialWithStock): string => {
   return material.custom_name || material.name;
 };
@@ -220,6 +294,297 @@ const makeNewVariantRow = (defaultUnitCost: number): StockEntryRow => ({
   notes: null,
 });
 
+const materialRowSaveKey = (materialId: number): RowSaveKey => `material:${materialId}`;
+
+const variantRowSaveKey = (
+  materialId: number,
+  variant: StockEntryRow
+): RowSaveKey =>
+  `variant:${materialId}:${
+    variant.variant_id ?? variant.custom_description ?? variant.variant_name ?? "default"
+  }`;
+
+const newVariantRowSaveKey = (materialId: number): RowSaveKey =>
+  `new-variant:${materialId}`;
+
+const stockKilangRowSaveKey = (productId: string): RowSaveKey =>
+  `stock-kilang:${productId}`;
+
+const moveId = (ids: number[], activeId: number, targetId: number): number[] => {
+  const fromIndex: number = ids.indexOf(activeId);
+  const toIndex: number = ids.indexOf(targetId);
+
+  if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) {
+    return ids;
+  }
+
+  const nextIds: number[] = [...ids];
+  const [movedId] = nextIds.splice(fromIndex, 1);
+  nextIds.splice(toIndex, 0, movedId);
+  return nextIds;
+};
+
+const areIdsEqual = (firstIds: number[], secondIds: number[]): boolean =>
+  firstIds.length === secondIds.length &&
+  firstIds.every((id: number, index: number): boolean => id === secondIds[index]);
+
+const recalculateMaterialTotalsFromVariants = (
+  material: MaterialWithStock,
+  variants: StockEntryRow[]
+): MaterialWithStock => ({
+  ...material,
+  has_variants: variants.length > 0,
+  variants,
+  opening_quantity: variants.reduce((sum, variant) => sum + variant.opening_quantity, 0),
+  opening_value: variants.reduce((sum, variant) => sum + variant.opening_value, 0),
+  purchase_quantity: variants.reduce((sum, variant) => sum + variant.purchase_quantity, 0),
+  purchase_value: variants.reduce((sum, variant) => sum + variant.purchase_value, 0),
+  adjustment_quantity: variants.reduce((sum, variant) => sum + variant.adjustment_quantity, 0),
+  adjustment_value: variants.reduce((sum, variant) => sum + variant.adjustment_value, 0),
+  closing_quantity: variants.reduce((sum, variant) => sum + variant.closing_quantity, 0),
+  closing_value: variants.reduce((sum, variant) => sum + variant.closing_value, 0),
+  quantity: variants.reduce((sum, variant) => sum + variant.adjustment_quantity, 0),
+  value: variants.reduce((sum, variant) => sum + variant.closing_value, 0),
+  unit_cost: variants.length > 0 ? 0 : material.unit_cost,
+  entry_id: variants.length > 0 ? null : material.entry_id,
+  notes: variants.length > 0 ? null : material.notes,
+});
+
+const makeDefaultVariantFromMaterial = (material: MaterialWithStock): StockEntryRow => ({
+  entry_id: material.entry_id,
+  variant_id: null,
+  variant_name: "Default",
+  custom_description: null,
+  sort_order: null,
+  is_new_variant: false,
+  opening_quantity: material.opening_quantity,
+  opening_value: material.opening_value,
+  purchase_quantity: material.purchase_quantity,
+  purchase_value: material.purchase_value,
+  adjustment_quantity: material.adjustment_quantity,
+  adjustment_value: material.adjustment_value,
+  closing_quantity: material.closing_quantity,
+  closing_value: material.closing_value,
+  quantity: material.adjustment_quantity,
+  value: material.closing_value,
+  unit_cost: material.unit_cost,
+  notes: material.notes || null,
+});
+
+const hasMaterialStockActivity = (material: MaterialWithStock): boolean =>
+  material.opening_quantity !== 0 ||
+  material.purchase_quantity !== 0 ||
+  material.adjustment_quantity !== 0 ||
+  material.closing_quantity !== 0;
+
+const getVariantCustomDescription = (variant: StockEntryRow): string | null => {
+  if (variant.variant_id) return null;
+  const variantName: string = variant.variant_name?.trim() || "";
+  if (!variantName || variantName === "Default") return null;
+  return variantName;
+};
+
+const makeMaterialStockEntry = (
+  material: MaterialWithStock
+): MaterialStockEntryInput => ({
+  material_id: material.id,
+  variant_id: null,
+  adjustment_quantity: material.adjustment_quantity,
+  unit_cost: material.unit_cost,
+  custom_name: material.custom_name || null,
+  custom_description: null,
+  notes: material.notes || null,
+});
+
+const makeVariantStockEntries = (
+  materialId: number,
+  variant: StockEntryRow,
+  originalVariant?: StockEntryRow | null
+): MaterialStockEntryInput[] => {
+  const customDescription: string | null = getVariantCustomDescription(variant);
+  const entries: MaterialStockEntryInput[] = [
+    {
+      material_id: materialId,
+      variant_id: variant.variant_id,
+      adjustment_quantity: variant.adjustment_quantity,
+      unit_cost: variant.unit_cost,
+      custom_name: null,
+      custom_description: customDescription,
+      notes: variant.notes || null,
+    },
+  ];
+
+  if (
+    !variant.variant_id &&
+    originalVariant?.custom_description &&
+    originalVariant.custom_description !== customDescription
+  ) {
+    entries.push({
+      material_id: materialId,
+      variant_id: null,
+      adjustment_quantity: 0,
+      unit_cost: 0,
+      custom_name: null,
+      custom_description: originalVariant.custom_description,
+      notes: null,
+    });
+  }
+
+  return entries;
+};
+
+const makeNewVariantStockEntry = (
+  materialId: number,
+  variant: StockEntryRow
+): MaterialStockEntryInput => ({
+  material_id: materialId,
+  variant_id: null,
+  adjustment_quantity: variant.adjustment_quantity,
+  unit_cost: variant.unit_cost,
+  custom_name: null,
+  custom_description: variant.variant_name?.trim() || null,
+  notes: null,
+  register_variant: true,
+});
+
+const getVariantIdentity = (variant: StockEntryRow): string =>
+  variant.variant_id
+    ? `id:${variant.variant_id}`
+    : `custom:${variant.custom_description ?? variant.variant_name ?? "default"}`;
+
+const replaceVariantInMaterial = (
+  material: MaterialWithStock,
+  targetVariant: StockEntryRow,
+  nextVariant: StockEntryRow
+): MaterialWithStock => {
+  const targetIdentity: string = getVariantIdentity(targetVariant);
+  const variants: StockEntryRow[] = (material.variants || []).map(
+    (variant: StockEntryRow): StockEntryRow =>
+      getVariantIdentity(variant) === targetIdentity ? nextVariant : variant
+  );
+
+  return recalculateMaterialTotalsFromVariants(material, variants);
+};
+
+const addVariantToMaterial = (
+  material: MaterialWithStock,
+  savedVariant: StockEntryRow
+): MaterialWithStock => {
+  const variants: StockEntryRow[] = material.has_variants
+    ? [...(material.variants || []), savedVariant]
+    : [
+        ...(hasMaterialStockActivity(material)
+          ? [makeDefaultVariantFromMaterial(material)]
+          : []),
+        savedVariant,
+      ];
+
+  return recalculateMaterialTotalsFromVariants(material, variants);
+};
+
+const orderMaterialsWithinCategory = (
+  materials: MaterialWithStock[],
+  category: MaterialCategory,
+  materialIds: number[]
+): MaterialWithStock[] => {
+  const orderedIdSet = new Set(materialIds);
+  const materialsById = new Map<number, MaterialWithStock>(
+    materials
+      .filter((material: MaterialWithStock): boolean => material.category === category)
+      .map(
+        (material: MaterialWithStock): [number, MaterialWithStock] => [
+          material.id,
+          material,
+        ]
+      )
+  );
+  const orderedCategoryMaterials: MaterialWithStock[] = materialIds
+    .map((materialId: number): MaterialWithStock | undefined =>
+      materialsById.get(materialId)
+    )
+    .filter((material): material is MaterialWithStock => Boolean(material))
+    .map((material: MaterialWithStock, index: number): MaterialWithStock => ({
+      ...material,
+      sort_order: index + 1,
+    }));
+  const unorderedCategoryMaterials: MaterialWithStock[] = materials
+    .filter(
+      (material: MaterialWithStock): boolean =>
+        material.category === category && !orderedIdSet.has(material.id)
+    )
+    .map((material: MaterialWithStock, index: number): MaterialWithStock => ({
+      ...material,
+      sort_order: orderedCategoryMaterials.length + index + 1,
+    }));
+
+  return categoryOrder.flatMap((currentCategory: MaterialCategory) =>
+    currentCategory === category
+      ? [...orderedCategoryMaterials, ...unorderedCategoryMaterials]
+      : materials.filter(
+          (material: MaterialWithStock): boolean =>
+            material.category === currentCategory
+        )
+  );
+};
+
+const orderVariantsWithinMaterial = (
+  materials: MaterialWithStock[],
+  materialId: number,
+  variantIds: number[]
+): MaterialWithStock[] => {
+  const orderedIdSet = new Set(variantIds);
+
+  return materials.map((material: MaterialWithStock): MaterialWithStock => {
+    if (material.id !== materialId || !material.variants) return material;
+
+    const variantsById = new Map<number, StockEntryRow>(
+      material.variants
+        .filter((variant: StockEntryRow): boolean => Boolean(variant.variant_id))
+        .map(
+          (variant: StockEntryRow): [number, StockEntryRow] => [
+            variant.variant_id as number,
+            variant,
+          ]
+        )
+    );
+    const orderedVariants: StockEntryRow[] = variantIds
+      .map((variantId: number): StockEntryRow | undefined =>
+        variantsById.get(variantId)
+      )
+      .filter((variant): variant is StockEntryRow => Boolean(variant))
+      .map((variant: StockEntryRow, index: number): StockEntryRow => ({
+        ...variant,
+        sort_order: index + 1,
+      }));
+    const remainingRegisteredVariants: StockEntryRow[] = material.variants
+      .filter(
+        (variant: StockEntryRow): boolean =>
+          Boolean(variant.variant_id) &&
+          !orderedIdSet.has(variant.variant_id as number)
+      )
+      .map((variant: StockEntryRow, index: number): StockEntryRow => ({
+        ...variant,
+        sort_order: orderedVariants.length + index + 1,
+      }));
+    const nextRegisteredVariants: StockEntryRow[] = [
+      ...orderedVariants,
+      ...remainingRegisteredVariants,
+    ];
+    let registeredIndex = 0;
+    const nextVariants: StockEntryRow[] = material.variants.map(
+      (variant: StockEntryRow): StockEntryRow => {
+        if (!variant.variant_id) return variant;
+        const nextVariant: StockEntryRow | undefined =
+          nextRegisteredVariants[registeredIndex];
+        registeredIndex += 1;
+        return nextVariant || variant;
+      }
+    );
+
+    return recalculateMaterialTotalsFromVariants(material, nextVariants);
+  });
+};
+
 const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
   mode,
   generalHeaderActions,
@@ -245,6 +610,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [stockKilang, setStockKilang] = useState<StockKilangItem[]>([]);
+  const [originalStockKilang, setOriginalStockKilang] = useState<StockKilangItem[]>([]);
   const [isLoadingStockKilang, setIsLoadingStockKilang] = useState(false);
   const [expandedMaterials, setExpandedMaterials] = useState<Set<number>>(new Set());
   const [newVariantRows, setNewVariantRows] = useState<Map<number, StockEntryRow>>(new Map());
@@ -258,13 +624,62 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState<boolean>(false);
   const [revertingAdjustmentId, setRevertingAdjustmentId] = useState<number | null>(null);
   const [tooltipState, setTooltipState] = useState<{ lineId: number; x: number; y: number } | null>(null);
+  const [savingRowKeys, setSavingRowKeys] = useState<Set<RowSaveKey>>(new Set());
+  const [pageHeaderHeight, setPageHeaderHeight] = useState<number>(0);
+  const [draggedRowKey, setDraggedRowKey] = useState<string | null>(null);
+  const [dragOverlay, setDragOverlay] = useState<DragOverlayState | null>(null);
+  const pageHeaderRef = useRef<HTMLDivElement | null>(null);
   const tooltipTimeoutRef = useRef<number | null>(null);
+  const dragStateRef = useRef<DragState | null>(null);
+  const dragOverlayRef = useRef<HTMLDivElement | null>(null);
+  const dragFrameRef = useRef<number | null>(null);
+  const pendingDragPointRef = useRef<{
+    pointerId: number;
+    clientX: number;
+    clientY: number;
+  } | null>(null);
 
   const productType = activeTab === "bihun" ? "bh" : "mee";
   const { products, isLoading: isLoadingProducts } = useProductsCache(productType);
 
   const year = selectedMonth.getFullYear();
   const month = selectedMonth.getMonth() + 1;
+  const selectedMonthString = useMemo<string>(() => {
+    return `${year}-${String(month).padStart(2, "0")}`;
+  }, [year, month]);
+  const selectedMonthEndDate = useMemo<string>(() => {
+    const endDate = new Date(year, month, 0);
+    return `${year}-${String(month).padStart(2, "0")}-${String(endDate.getDate()).padStart(2, "0")}`;
+  }, [year, month]);
+
+  useEffect(() => {
+    const headerElement = pageHeaderRef.current;
+    if (!headerElement) return;
+
+    const updateHeaderHeight = (): void => {
+      setPageHeaderHeight(headerElement.getBoundingClientRect().height);
+    };
+
+    updateHeaderHeight();
+
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateHeaderHeight);
+      return (): void => window.removeEventListener("resize", updateHeaderHeight);
+    }
+
+    const resizeObserver = new ResizeObserver(updateHeaderHeight);
+    resizeObserver.observe(headerElement);
+
+    return (): void => resizeObserver.disconnect();
+  }, []);
+
+  useEffect(() => {
+    return (): void => {
+      if (dragFrameRef.current !== null) {
+        window.cancelAnimationFrame(dragFrameRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const tabParam: string | null = searchParams.get("tab");
@@ -342,45 +757,70 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     fetchData();
   }, [fetchData]);
 
-  useEffect(() => {
-    const fetchStockKilang = async (): Promise<void> => {
-      if (activeTab === "general" || activeTab === "shared" || products.length === 0 || isLoadingProducts) {
-        setStockKilang([]);
-        return;
-      }
+  const fetchStockKilang = useCallback(async (): Promise<void> => {
+    if (activeTab === "general" || activeTab === "shared" || products.length === 0 || isLoadingProducts) {
+      setStockKilang([]);
+      setOriginalStockKilang([]);
+      return;
+    }
 
-      setIsLoadingStockKilang(true);
-      try {
-        const productIds = products.map((product) => product.id).join(",");
-        const response = await api.get(
+    setIsLoadingStockKilang(true);
+    try {
+      const productIds: string = products.map((product) => product.id).join(",");
+      const reference: string = getStockKilangReference(activeTab);
+      const [closingResponse, adjustmentResponse] = await Promise.all([
+        api.get<StockKilangClosingResponse>(
           `/api/stock/closing-batch?product_ids=${productIds}&year=${year}&month=${month}`
+        ),
+        api.get<StockKilangAdjustmentResponse>(
+          `/api/stock/adjustments/by-reference?month=${selectedMonthString}&reference=${encodeURIComponent(reference)}`
+        ),
+      ]);
+
+      const closingBalances: Record<string, number> = closingResponse.closing_balances || {};
+      const adjustmentMap: Map<string, number> = new Map();
+      (adjustmentResponse.adjustments || []).forEach((adjustment: StockKilangAdjustmentRow) => {
+        adjustmentMap.set(
+          adjustment.product_id,
+          makeNumber(adjustment.adj_in) - makeNumber(adjustment.adj_out)
         );
-        const closingBalances: Record<string, number> = response.closing_balances || {};
+      });
 
-        const stockData: StockKilangItem[] = products.map((product) => {
-          const closingQty = closingBalances[product.id] || 0;
-          const price = makeNumber(product.price_per_unit);
+      const stockData: StockKilangItem[] = products.map((product) => {
+        const closingQuantity: number = makeNumber(closingBalances[product.id]);
+        const adjustmentQuantity: number = adjustmentMap.get(product.id) || 0;
+        const baseClosingQuantity: number = closingQuantity - adjustmentQuantity;
+        const price: number = makeNumber(product.price_per_unit);
 
-          return {
-            product_id: product.id,
-            name: product.description,
-            price,
-            closing_quantity: closingQty,
-            closing_value: closingQty * price,
-          };
-        });
+        return {
+          product_id: product.id,
+          name: product.description,
+          price,
+          base_closing_quantity: baseClosingQuantity,
+          adjustment_quantity: adjustmentQuantity,
+          closing_quantity: closingQuantity,
+          closing_value: closingQuantity * price,
+        };
+      });
+      const visibleStockData: StockKilangItem[] = stockData.filter(
+        (item: StockKilangItem) =>
+          item.closing_quantity > 0 || item.adjustment_quantity !== 0
+      );
 
-        setStockKilang(stockData.filter((item) => item.closing_quantity > 0));
-      } catch (error: unknown) {
-        console.error("Error fetching stock kilang:", error);
-        setStockKilang([]);
-      } finally {
-        setIsLoadingStockKilang(false);
-      }
-    };
+      setStockKilang(visibleStockData);
+      setOriginalStockKilang(visibleStockData.map((item: StockKilangItem) => ({ ...item })));
+    } catch (error: unknown) {
+      console.error("Error fetching stock kilang:", error);
+      setStockKilang([]);
+      setOriginalStockKilang([]);
+    } finally {
+      setIsLoadingStockKilang(false);
+    }
+  }, [activeTab, products, isLoadingProducts, year, month, selectedMonthString]);
 
+  useEffect(() => {
     fetchStockKilang();
-  }, [activeTab, products, isLoadingProducts, year, month]);
+  }, [fetchStockKilang]);
 
   const groupedMaterials = useMemo(() => {
     const groups: Record<MaterialCategory, MaterialWithStock[]> = {
@@ -398,12 +838,160 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     return groups;
   }, [materials]);
 
-  const hasUnsavedChanges = useMemo(() => {
+  const originalMaterialMap = useMemo<Map<number, MaterialWithStock>>(
+    () =>
+      new Map(
+        originalMaterials.map(
+          (material: MaterialWithStock): [number, MaterialWithStock] => [
+            material.id,
+            material,
+          ]
+        )
+      ),
+    [originalMaterials]
+  );
+
+  const originalStockKilangMap = useMemo<Map<string, StockKilangItem>>(
+    () =>
+      new Map(
+        originalStockKilang.map(
+          (item: StockKilangItem): [string, StockKilangItem] => [
+            item.product_id,
+            item,
+          ]
+        )
+      ),
+    [originalStockKilang]
+  );
+
+  const findOriginalVariant = useCallback(
+    (
+      materialId: number,
+      variant: StockEntryRow
+    ): StockEntryRow | null => {
+      const originalMaterial: MaterialWithStock | undefined =
+        originalMaterialMap.get(materialId);
+      const originalVariants: StockEntryRow[] = originalMaterial?.variants || [];
+
+      if (variant.variant_id) {
+        return (
+          originalVariants.find(
+            (originalVariant: StockEntryRow): boolean =>
+              originalVariant.variant_id === variant.variant_id
+          ) || null
+        );
+      }
+
+      if (variant.custom_description) {
+        return (
+          originalVariants.find(
+            (originalVariant: StockEntryRow): boolean =>
+              originalVariant.variant_id === null &&
+              originalVariant.custom_description === variant.custom_description
+          ) || null
+        );
+      }
+
+      return (
+        originalVariants.find(
+          (originalVariant: StockEntryRow): boolean =>
+            originalVariant.variant_id === null &&
+            originalVariant.variant_name === variant.variant_name
+        ) || null
+      );
+    },
+    [originalMaterialMap]
+  );
+
+  const isMaterialRowDirty = useCallback(
+    (material: MaterialWithStock): boolean => {
+      if (material.has_variants) return false;
+      const original: MaterialWithStock | undefined = originalMaterialMap.get(material.id);
+      if (!original) return true;
+
+      return (
+        material.adjustment_quantity !== original.adjustment_quantity ||
+        material.unit_cost !== original.unit_cost
+      );
+    },
+    [originalMaterialMap]
+  );
+
+  const isVariantRowDirty = useCallback(
+    (materialId: number, variant: StockEntryRow): boolean => {
+      const originalVariant: StockEntryRow | null = findOriginalVariant(
+        materialId,
+        variant
+      );
+      if (!originalVariant) return true;
+
+      return (
+        variant.variant_name !== originalVariant.variant_name ||
+        variant.adjustment_quantity !== originalVariant.adjustment_quantity ||
+        variant.unit_cost !== originalVariant.unit_cost
+      );
+    },
+    [findOriginalVariant]
+  );
+
+  const isNewVariantRowDirty = useCallback(
+    (materialId: number): boolean => {
+      const row: StockEntryRow | undefined = newVariantRows.get(materialId);
+      if (!row) return false;
+
+      return Boolean(
+        row.variant_name?.trim() ||
+          row.adjustment_quantity !== 0 ||
+          row.unit_cost !== 0
+      );
+    },
+    [newVariantRows]
+  );
+
+  const isStockKilangRowDirty = useCallback(
+    (item: StockKilangItem): boolean => {
+      const original: StockKilangItem | undefined = originalStockKilangMap.get(
+        item.product_id
+      );
+      return !original || item.adjustment_quantity !== original.adjustment_quantity;
+    },
+    [originalStockKilangMap]
+  );
+
+  const setRowSaving = (rowKey: RowSaveKey, saving: boolean): void => {
+    setSavingRowKeys((previous: Set<RowSaveKey>) => {
+      const next = new Set(previous);
+      if (saving) {
+        next.add(rowKey);
+      } else {
+        next.delete(rowKey);
+      }
+      return next;
+    });
+  };
+
+  const hasStockKilangUnsavedChanges = useMemo<boolean>(() => {
+    if (activeTab === "general" || activeTab === "shared") return false;
+    if (stockKilang.length !== originalStockKilang.length) return true;
+
+    const originalMap: Map<string, StockKilangItem> = new Map(
+      originalStockKilang.map((item: StockKilangItem) => [item.product_id, item])
+    );
+
+    return stockKilang.some((item: StockKilangItem) => {
+      const original: StockKilangItem | undefined = originalMap.get(item.product_id);
+      return !original || item.adjustment_quantity !== original.adjustment_quantity;
+    });
+  }, [activeTab, stockKilang, originalStockKilang]);
+
+  const hasUnsavedChanges = useMemo<boolean>(() => {
     if (activeTab === "general") {
       return Object.values(generalAdjustmentInputs).some(
         (value) => makeNumber(value) !== 0
       );
     }
+
+    if (hasStockKilangUnsavedChanges) return true;
 
     for (const row of newVariantRows.values()) {
       if (row.variant_name?.trim() || row.adjustment_quantity !== 0 || row.unit_cost !== 0) {
@@ -447,7 +1035,14 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     }
 
     return false;
-  }, [activeTab, materials, originalMaterials, newVariantRows, generalAdjustmentInputs]);
+  }, [
+    activeTab,
+    materials,
+    originalMaterials,
+    newVariantRows,
+    generalAdjustmentInputs,
+    hasStockKilangUnsavedChanges,
+  ]);
 
   const toggleMaterialExpansion = (materialId: number): void => {
     setExpandedMaterials((prev) => {
@@ -647,6 +1242,25 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     );
   };
 
+  const handleStockKilangAdjustmentChange = (productId: string, value: string): void => {
+    const adjustmentQuantity: number = makeNumber(value);
+
+    setStockKilang((prev: StockKilangItem[]) =>
+      prev.map((item: StockKilangItem) => {
+        if (item.product_id !== productId) return item;
+
+        const closingQuantity: number = item.base_closing_quantity + adjustmentQuantity;
+
+        return {
+          ...item,
+          adjustment_quantity: adjustmentQuantity,
+          closing_quantity: closingQuantity,
+          closing_value: closingQuantity * item.price,
+        };
+      })
+    );
+  };
+
   const handleBeforeMonthChange = useCallback(() => {
     if (hasUnsavedChanges) {
       return window.confirm("You have unsaved changes. Do you want to discard them?");
@@ -778,13 +1392,285 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     }
   };
 
+  const saveMaterialStockEntries = async (
+    entries: MaterialStockEntryInput[]
+  ): Promise<MaterialStockBatchResponse> => {
+    return api.post("/api/materials/stock/batch", {
+      year,
+      month,
+      product_line: activeTab,
+      entries,
+    });
+  };
+
+  const updateOriginalMaterial = (material: MaterialWithStock): void => {
+    setOriginalMaterials((previous: MaterialWithStock[]) =>
+      previous.map((item: MaterialWithStock): MaterialWithStock =>
+        item.id === material.id
+          ? (JSON.parse(JSON.stringify(material)) as MaterialWithStock)
+          : item
+      )
+    );
+  };
+
+  const updateVariantInMaterialStates = (
+    materialId: number,
+    targetVariant: StockEntryRow,
+    nextVariant: StockEntryRow
+  ): void => {
+    setMaterials((previous: MaterialWithStock[]) =>
+      previous.map((material: MaterialWithStock): MaterialWithStock =>
+        material.id === materialId
+          ? replaceVariantInMaterial(material, targetVariant, nextVariant)
+          : material
+      )
+    );
+    setOriginalMaterials((previous: MaterialWithStock[]) =>
+      previous.map((material: MaterialWithStock): MaterialWithStock =>
+        material.id === materialId
+          ? replaceVariantInMaterial(material, targetVariant, nextVariant)
+          : material
+      )
+    );
+  };
+
+  const addSavedVariantToMaterialStates = (
+    materialId: number,
+    savedVariant: StockEntryRow
+  ): void => {
+    setMaterials((previous: MaterialWithStock[]) =>
+      previous.map((material: MaterialWithStock): MaterialWithStock =>
+        material.id === materialId
+          ? addVariantToMaterial(material, savedVariant)
+          : material
+      )
+    );
+    setOriginalMaterials((previous: MaterialWithStock[]) =>
+      previous.map((material: MaterialWithStock): MaterialWithStock =>
+        material.id === materialId
+          ? addVariantToMaterial(material, savedVariant)
+          : material
+      )
+    );
+  };
+
+  const confirmNegativeSave = (label: string, closingQuantity: number): boolean => {
+    if (closingQuantity >= 0) return true;
+
+    return window.confirm(
+      `Warning: ${label} has negative calculated closing stock. Do you want to save anyway?`
+    );
+  };
+
+  const handleSaveMaterialRow = async (
+    material: MaterialWithStock,
+    event?: React.MouseEvent<HTMLButtonElement>
+  ): Promise<void> => {
+    event?.stopPropagation();
+    if (activeTab === "general" || !isMaterialRowDirty(material)) return;
+    if (!confirmNegativeSave(material.name, material.closing_quantity)) return;
+
+    const rowKey: RowSaveKey = materialRowSaveKey(material.id);
+    setRowSaving(rowKey, true);
+    try {
+      await saveMaterialStockEntries([makeMaterialStockEntry(material)]);
+      updateOriginalMaterial(material);
+      toast.success(`${material.name} saved`);
+    } catch (error: unknown) {
+      console.error("Error saving material row:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to save material");
+    } finally {
+      setRowSaving(rowKey, false);
+    }
+  };
+
+  const handleSaveVariantRow = async (
+    material: MaterialWithStock,
+    variant: StockEntryRow,
+    event?: React.MouseEvent<HTMLButtonElement>
+  ): Promise<void> => {
+    event?.stopPropagation();
+    if (activeTab === "general" || !isVariantRowDirty(material.id, variant)) return;
+    if (
+      !confirmNegativeSave(
+        `${material.name} ${getVariantDisplayName(variant)}`,
+        variant.closing_quantity
+      )
+    ) {
+      return;
+    }
+
+    const rowKey: RowSaveKey = variantRowSaveKey(material.id, variant);
+    const originalVariant: StockEntryRow | null = findOriginalVariant(
+      material.id,
+      variant
+    );
+    const nextVariantName: string | null = variant.variant_name?.trim() || null;
+    const nextVariant: StockEntryRow = {
+      ...variant,
+      variant_name: variant.variant_id
+        ? nextVariantName
+        : nextVariantName || variant.variant_name,
+      custom_description: variant.variant_id
+        ? null
+        : getVariantCustomDescription({
+            ...variant,
+            variant_name: nextVariantName || variant.variant_name,
+          }),
+    };
+
+    setRowSaving(rowKey, true);
+    try {
+      if (
+        variant.variant_id &&
+        nextVariantName &&
+        originalVariant &&
+        nextVariantName !== originalVariant.variant_name
+      ) {
+        await api.put(`/api/materials/variants/${variant.variant_id}`, {
+          variant_name: nextVariantName,
+          default_unit_cost: variant.unit_cost,
+        });
+      }
+
+      await saveMaterialStockEntries(
+        makeVariantStockEntries(material.id, nextVariant, originalVariant)
+      );
+      updateVariantInMaterialStates(material.id, variant, nextVariant);
+      toast.success(`${getVariantDisplayName(nextVariant)} saved`);
+    } catch (error: unknown) {
+      console.error("Error saving variant row:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to save variant");
+    } finally {
+      setRowSaving(rowKey, false);
+    }
+  };
+
+  const handleSaveNewVariantRow = async (
+    material: MaterialWithStock,
+    event?: React.MouseEvent<HTMLButtonElement>
+  ): Promise<void> => {
+    event?.stopPropagation();
+    const newVariant: StockEntryRow | undefined = newVariantRows.get(material.id);
+    if (!newVariant || !isNewVariantRowDirty(material.id)) return;
+
+    const variantName: string = newVariant.variant_name?.trim() || "";
+    if (!variantName) {
+      toast.error(`Please enter a name for the new variant in ${material.name}`);
+      return;
+    }
+
+    if (
+      material.variants?.some(
+        (variant: StockEntryRow): boolean =>
+          variant.variant_name?.trim().toLowerCase() === variantName.toLowerCase()
+      )
+    ) {
+      toast.error(`Variant "${variantName}" already exists for ${material.name}`);
+      return;
+    }
+
+    if (
+      !confirmNegativeSave(
+        `${material.name} ${variantName}`,
+        newVariant.closing_quantity
+      )
+    ) {
+      return;
+    }
+
+    const rowKey: RowSaveKey = newVariantRowSaveKey(material.id);
+    setRowSaving(rowKey, true);
+    try {
+      const response: MaterialStockBatchResponse = await saveMaterialStockEntries([
+        makeNewVariantStockEntry(material.id, {
+          ...newVariant,
+          variant_name: variantName,
+        }),
+      ]);
+      const registeredVariant = response.registered_variants?.[0];
+
+      if (!registeredVariant) {
+        throw new Error("Variant was saved but the saved variant id was not returned");
+      }
+
+      const savedVariant: StockEntryRow = {
+        ...newVariant,
+        variant_id: registeredVariant.id,
+        variant_name: registeredVariant.variant_name,
+        custom_description: null,
+        sort_order: registeredVariant.sort_order ?? null,
+        is_new_variant: false,
+      };
+
+      addSavedVariantToMaterialStates(material.id, savedVariant);
+      setNewVariantRows((previous: Map<number, StockEntryRow>) => {
+        const next = new Map(previous);
+        next.delete(material.id);
+        return next;
+      });
+      setExpandedMaterials((previous: Set<number>) => new Set(previous).add(material.id));
+      toast.success(`Variant "${registeredVariant.variant_name}" saved`);
+    } catch (error: unknown) {
+      console.error("Error saving new variant row:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to save new variant");
+    } finally {
+      setRowSaving(rowKey, false);
+    }
+  };
+
+  const handleSaveStockKilangRow = async (
+    item: StockKilangItem,
+    event?: React.MouseEvent<HTMLButtonElement>
+  ): Promise<void> => {
+    event?.stopPropagation();
+    if (!isStockKilangRowDirty(item)) return;
+    if (!confirmNegativeSave(item.name, item.closing_quantity)) return;
+
+    const rowKey: RowSaveKey = stockKilangRowSaveKey(item.product_id);
+    setRowSaving(rowKey, true);
+    try {
+      await api.put("/api/stock/adjustments/by-reference/product", {
+        month: selectedMonthString,
+        entry_date: selectedMonthEndDate,
+        reference: getStockKilangReference(activeTab),
+        product_id: item.product_id,
+        adj_in: item.adjustment_quantity > 0 ? item.adjustment_quantity : 0,
+        adj_out:
+          item.adjustment_quantity < 0 ? Math.abs(item.adjustment_quantity) : 0,
+      });
+      setOriginalStockKilang((previous: StockKilangItem[]) =>
+        previous.some(
+          (originalItem: StockKilangItem): boolean =>
+            originalItem.product_id === item.product_id
+        )
+          ? previous.map((originalItem: StockKilangItem): StockKilangItem =>
+              originalItem.product_id === item.product_id
+                ? { ...item }
+                : originalItem
+            )
+          : [...previous, { ...item }]
+      );
+      toast.success(`${item.name} saved`);
+    } catch (error: unknown) {
+      console.error("Error saving Stock Kilang row:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to save Stock Kilang row"
+      );
+    } finally {
+      setRowSaving(rowKey, false);
+    }
+  };
+
   const handleSave = async (): Promise<void> => {
     if (activeTab === "general") {
       await saveGeneralStockAdjustments();
       return;
     }
 
-    let negativeCount = 0;
+    let negativeCount = stockKilang.filter(
+      (item: StockKilangItem) => item.closing_quantity < 0
+    ).length;
     materials.forEach((material) => {
       if (material.has_variants && material.variants) {
         negativeCount += material.variants.filter((variant) => variant.closing_quantity < 0).length;
@@ -802,7 +1688,10 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
 
     const incompleteNewVariants: string[] = [];
     newVariantRows.forEach((row, materialId) => {
-      if (row.adjustment_quantity !== 0 && !row.variant_name?.trim()) {
+      if (
+        (row.adjustment_quantity !== 0 || row.unit_cost !== 0) &&
+        !row.variant_name?.trim()
+      ) {
         const material = materials.find((item) => item.id === materialId);
         incompleteNewVariants.push(material?.name || `Material ${materialId}`);
       }
@@ -834,8 +1723,6 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
               api.put(`/api/materials/variants/${variant.variant_id}`, {
                 variant_name: variant.variant_name.trim(),
                 default_unit_cost: variant.unit_cost,
-              }).catch((error: unknown) => {
-                console.error(`Failed to update variant ${variant.variant_id}:`, error);
               })
             );
           }
@@ -851,52 +1738,53 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
       materials.forEach((material) => {
         if (material.has_variants && material.variants && material.variants.length > 0) {
           material.variants.forEach((variant) => {
-            entries.push({
-              material_id: material.id,
-              variant_id: variant.variant_id,
-              adjustment_quantity: variant.adjustment_quantity,
-              unit_cost: variant.unit_cost,
-              custom_name: null,
-              custom_description: variant.variant_id
-                ? null
-                : variant.custom_description || (variant.variant_name === "Default" ? null : variant.variant_name),
-              notes: variant.notes || null,
-            });
+            const originalVariant: StockEntryRow | null = findOriginalVariant(
+              material.id,
+              variant
+            );
+            entries.push(
+              ...makeVariantStockEntries(material.id, variant, originalVariant)
+            );
           });
         } else {
-          entries.push({
-            material_id: material.id,
-            variant_id: null,
-            adjustment_quantity: material.adjustment_quantity,
-            unit_cost: material.unit_cost,
-            custom_name: material.custom_name || null,
-            custom_description: null,
-            notes: material.notes || null,
-          });
+          entries.push(makeMaterialStockEntry(material));
         }
       });
 
       newVariantRows.forEach((row, materialId) => {
-        if (row.variant_name?.trim() && (row.adjustment_quantity !== 0 || row.unit_cost > 0)) {
-          entries.push({
-            material_id: materialId,
-            variant_id: null,
-            adjustment_quantity: row.adjustment_quantity,
-            unit_cost: row.unit_cost,
-            custom_name: null,
-            custom_description: row.variant_name.trim(),
-            notes: null,
-            register_variant: true,
-          });
+        if (row.variant_name?.trim()) {
+          entries.push(
+            makeNewVariantStockEntry(materialId, {
+              ...row,
+              variant_name: row.variant_name.trim(),
+            })
+          );
         }
       });
 
-      const response = await api.post("/api/materials/stock/batch", {
-        year,
-        month,
-        product_line: activeTab,
-        entries,
-      });
+      const response = await saveMaterialStockEntries(entries);
+      let stockKilangSaved = false;
+
+      if (hasStockKilangUnsavedChanges) {
+        const stockKilangAdjustments: StockKilangSaveAdjustment[] = stockKilang
+          .map((item: StockKilangItem) => ({
+            product_id: item.product_id,
+            adj_in: item.adjustment_quantity > 0 ? item.adjustment_quantity : 0,
+            adj_out: item.adjustment_quantity < 0 ? Math.abs(item.adjustment_quantity) : 0,
+          }))
+          .filter(
+            (adjustment: StockKilangSaveAdjustment) =>
+              adjustment.adj_in > 0 || adjustment.adj_out > 0
+          );
+
+        await api.post("/api/stock/adjustments/batch", {
+          month: selectedMonthString,
+          entry_date: selectedMonthEndDate,
+          reference: getStockKilangReference(activeTab),
+          adjustments: stockKilangAdjustments,
+        });
+        stockKilangSaved = true;
+      }
 
       const messages: string[] = [];
       if (variantNameUpdates.length > 0) {
@@ -905,9 +1793,13 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
       if (response.registered_variants && response.registered_variants.length > 0) {
         messages.push(`${response.registered_variants.length} new variant(s) registered`);
       }
+      if (stockKilangSaved) {
+        messages.push("Stock Kilang updated");
+      }
 
       toast.success(messages.length > 0 ? `Saved. ${messages.join(", ")}.` : "Stock adjustments saved");
       await fetchData();
+      await fetchStockKilang();
     } catch (error: unknown) {
       console.error("Error saving stock entries:", error);
       const message = error instanceof Error ? error.message : "Failed to save stock adjustments";
@@ -915,6 +1807,295 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const isAnyRowSaving: boolean = savingRowKeys.size > 0;
+  const tableHeaderStyle: React.CSSProperties = {
+    top: pageHeaderHeight + 8,
+  };
+
+  const applyMaterialOrder = (
+    category: MaterialCategory,
+    materialIds: number[]
+  ): void => {
+    setMaterials((previous: MaterialWithStock[]) =>
+      orderMaterialsWithinCategory(previous, category, materialIds)
+    );
+    setOriginalMaterials((previous: MaterialWithStock[]) =>
+      orderMaterialsWithinCategory(previous, category, materialIds)
+    );
+  };
+
+  const applyVariantOrder = (materialId: number, variantIds: number[]): void => {
+    setMaterials((previous: MaterialWithStock[]) =>
+      orderVariantsWithinMaterial(previous, materialId, variantIds)
+    );
+    setOriginalMaterials((previous: MaterialWithStock[]) =>
+      orderVariantsWithinMaterial(previous, materialId, variantIds)
+    );
+  };
+
+  const clearDragOverlayFrame = (): void => {
+    if (dragFrameRef.current !== null) {
+      window.cancelAnimationFrame(dragFrameRef.current);
+      dragFrameRef.current = null;
+    }
+    pendingDragPointRef.current = null;
+  };
+
+  const scheduleDragMove = (
+    pointerId: number,
+    clientX: number,
+    clientY: number
+  ): void => {
+    pendingDragPointRef.current = { pointerId, clientX, clientY };
+
+    if (dragFrameRef.current !== null) return;
+
+    dragFrameRef.current = window.requestAnimationFrame((): void => {
+      const dragPoint = pendingDragPointRef.current;
+      const dragState: DragState | null = dragStateRef.current;
+      dragFrameRef.current = null;
+
+      if (!dragPoint || !dragState || dragPoint.pointerId !== dragState.pointerId) {
+        return;
+      }
+
+      if (dragOverlayRef.current) {
+        const nextX: number =
+          dragPoint.clientX - dragState.offsetX - dragState.initialLeft;
+        const nextY: number =
+          dragPoint.clientY - dragState.offsetY - dragState.initialTop;
+        dragOverlayRef.current.style.transform = `translate3d(${nextX}px, ${nextY}px, 0)`;
+      }
+
+      const targetElement: Element | null = document.elementFromPoint(
+        dragPoint.clientX,
+        dragPoint.clientY
+      );
+
+      if (dragState.type === "material") {
+        const targetRow = targetElement?.closest("[data-material-row-id]") as
+          | HTMLElement
+          | null;
+        const targetMaterialId: number = Number(targetRow?.dataset.materialRowId);
+        const targetCategory = targetRow?.dataset.materialCategory as
+          | MaterialCategory
+          | undefined;
+
+        if (
+          !targetMaterialId ||
+          targetMaterialId === dragState.materialId ||
+          targetCategory !== dragState.category
+        ) {
+          dragState.lastTargetId = null;
+          return;
+        }
+
+        dragState.lastTargetId = targetMaterialId;
+        return;
+      }
+
+      const targetRow = targetElement?.closest("[data-variant-row-id]") as
+        | HTMLElement
+        | null;
+      const targetVariantId: number = Number(targetRow?.dataset.variantRowId);
+      const targetMaterialId: number = Number(targetRow?.dataset.variantMaterialId);
+
+      if (
+        !targetVariantId ||
+        targetVariantId === dragState.variantId ||
+        targetMaterialId !== dragState.materialId
+      ) {
+        dragState.lastTargetId = null;
+        return;
+      }
+
+      dragState.lastTargetId = targetVariantId;
+    });
+  };
+
+  const handleMaterialDragPointerDown = (
+    event: React.PointerEvent<HTMLButtonElement>,
+    material: MaterialWithStock,
+    category: MaterialCategory,
+    index: number
+  ): void => {
+    if (isSaving || isAnyRowSaving || isDeleting || event.button !== 0) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const currentOrderIds: number[] = groupedMaterials[category].map(
+      (item: MaterialWithStock): number => item.id
+    );
+    const rowElement = event.currentTarget.closest("[data-material-row-id]") as
+      | HTMLElement
+      | null;
+    if (!rowElement) return;
+
+    const rowRect: DOMRect = rowElement.getBoundingClientRect();
+    dragStateRef.current = {
+      type: "material",
+      materialId: material.id,
+      category,
+      pointerId: event.pointerId,
+      previousOrderIds: currentOrderIds,
+      currentOrderIds,
+      lastTargetId: null,
+      offsetX: event.clientX - rowRect.left,
+      offsetY: event.clientY - rowRect.top,
+      initialLeft: rowRect.left,
+      initialTop: rowRect.top,
+    };
+    setDraggedRowKey(`material:${material.id}`);
+    setDragOverlay({
+      label: material.name,
+      sublabel: material.code,
+      index,
+      left: rowRect.left,
+      top: rowRect.top,
+      width: rowRect.width,
+      height: rowRect.height,
+    });
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleVariantDragPointerDown = (
+    event: React.PointerEvent<HTMLButtonElement>,
+    material: MaterialWithStock,
+    variant: StockEntryRow,
+    index: number
+  ): void => {
+    if (
+      isSaving ||
+      isAnyRowSaving ||
+      isDeleting ||
+      event.button !== 0 ||
+      !variant.variant_id
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const currentOrderIds: number[] = (material.variants || [])
+      .filter((item: StockEntryRow): boolean => Boolean(item.variant_id))
+      .map((item: StockEntryRow): number => item.variant_id as number);
+    const rowElement = event.currentTarget.closest("[data-variant-row-id]") as
+      | HTMLElement
+      | null;
+    if (!rowElement) return;
+
+    const rowRect: DOMRect = rowElement.getBoundingClientRect();
+    dragStateRef.current = {
+      type: "variant",
+      materialId: material.id,
+      variantId: variant.variant_id,
+      pointerId: event.pointerId,
+      previousOrderIds: currentOrderIds,
+      currentOrderIds,
+      lastTargetId: null,
+      offsetX: event.clientX - rowRect.left,
+      offsetY: event.clientY - rowRect.top,
+      initialLeft: rowRect.left,
+      initialTop: rowRect.top,
+    };
+    setDraggedRowKey(`variant:${material.id}:${variant.variant_id}`);
+    setDragOverlay({
+      label: getVariantDisplayName(variant),
+      sublabel: material.name,
+      index,
+      left: rowRect.left,
+      top: rowRect.top,
+      width: rowRect.width,
+      height: rowRect.height,
+    });
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleDragPointerMove = (
+    event: React.PointerEvent<HTMLButtonElement>
+  ): void => {
+    const dragState: DragState | null = dragStateRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+
+    event.preventDefault();
+    scheduleDragMove(event.pointerId, event.clientX, event.clientY);
+  };
+
+  const handleDragPointerUp = async (
+    event: React.PointerEvent<HTMLButtonElement>
+  ): Promise<void> => {
+    const dragState: DragState | null = dragStateRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    dragStateRef.current = null;
+    setDraggedRowKey(null);
+    setDragOverlay(null);
+    clearDragOverlayFrame();
+
+    const nextOrderIds: number[] = dragState.lastTargetId
+      ? moveId(
+          dragState.currentOrderIds,
+          dragState.type === "material"
+            ? dragState.materialId
+            : dragState.variantId,
+          dragState.lastTargetId
+        )
+      : dragState.currentOrderIds;
+
+    if (areIdsEqual(nextOrderIds, dragState.previousOrderIds)) return;
+
+    if (dragState.type === "material") {
+      applyMaterialOrder(dragState.category, nextOrderIds);
+      try {
+        await api.put("/api/materials/order", {
+          category: dragState.category,
+          material_ids: nextOrderIds,
+        });
+      } catch (error: unknown) {
+        console.error("Error saving material order:", error);
+        applyMaterialOrder(dragState.category, dragState.previousOrderIds);
+        toast.error("Failed to save material order");
+      }
+      return;
+    }
+
+    applyVariantOrder(dragState.materialId, nextOrderIds);
+    try {
+      await api.put(`/api/materials/${dragState.materialId}/variants/order`, {
+        variant_ids: nextOrderIds,
+      });
+    } catch (error: unknown) {
+      console.error("Error saving variant order:", error);
+      applyVariantOrder(dragState.materialId, dragState.previousOrderIds);
+      toast.error("Failed to save variant order");
+    }
+  };
+
+  const handleDragPointerCancel = (
+    event: React.PointerEvent<HTMLButtonElement>
+  ): void => {
+    const dragState: DragState | null = dragStateRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    dragStateRef.current = null;
+    setDraggedRowKey(null);
+    setDragOverlay(null);
+    clearDragOverlayFrame();
   };
 
   const formatNumber = (value: number): string => {
@@ -959,13 +2140,23 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     };
   }, [materials]);
 
-  const stockKilangTotal = useMemo(() => {
-    return stockKilang.reduce((sum, item) => sum + item.closing_value, 0);
+  const stockKilangTotal = useMemo<number>(() => {
+    return stockKilang.reduce(
+      (sum: number, item: StockKilangItem) => sum + item.closing_value,
+      0
+    );
   }, [stockKilang]);
 
-  const negativeCount = useMemo(() => {
-    return materials.filter((material) => material.closing_quantity < 0).length;
-  }, [materials]);
+  const negativeCount = useMemo<number>(() => {
+    const materialNegativeCount: number = materials.filter(
+      (material: MaterialWithStock) => material.closing_quantity < 0
+    ).length;
+    const stockKilangNegativeCount: number = stockKilang.filter(
+      (item: StockKilangItem) => item.closing_quantity < 0
+    ).length;
+
+    return materialNegativeCount + stockKilangNegativeCount;
+  }, [materials, stockKilang]);
 
   const filteredGeneralStockRows = useMemo(() => {
     const query = generalSearchQuery.trim().toLowerCase();
@@ -1010,6 +2201,36 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
   const tooltipRow = tooltipState
     ? generalStockRows.find((r) => r.line_id === tooltipState.lineId) ?? null
     : null;
+
+  const renderRowSaveButton = (
+    rowKey: RowSaveKey,
+    isDirty: boolean,
+    onSave: (event: React.MouseEvent<HTMLButtonElement>) => void,
+    label: string
+  ): React.ReactNode => {
+    const isSavingRow: boolean = savingRowKeys.has(rowKey);
+    const disabled: boolean =
+      !isDirty || isSaving || isDeleting || (isAnyRowSaving && !isSavingRow);
+
+    return (
+      <button
+        type="button"
+        onClick={onSave}
+        disabled={disabled}
+        className={clsx(
+          "inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded transition-colors",
+          isDirty
+            ? "text-sky-600 hover:bg-sky-100 hover:text-sky-700 dark:text-sky-300 dark:hover:bg-sky-900/40"
+            : "text-default-300 dark:text-gray-600",
+          disabled && "cursor-not-allowed opacity-50"
+        )}
+        title={isSavingRow ? "Saving..." : label}
+        aria-label={label}
+      >
+        <IconDeviceFloppy size={14} />
+      </button>
+    );
+  };
 
   const renderAdjustmentInput = (
     value: number,
@@ -1062,53 +2283,56 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
 
   return (
     <div className="space-y-3">
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm px-6 py-3">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
+      <div
+        ref={pageHeaderRef}
+        className="sticky top-0 z-40 isolate rounded-lg border border-default-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:shadow-black/20 sm:px-5 lg:px-6"
+      >
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex min-w-0 flex-col gap-2 md:flex-row md:items-center md:gap-3">
+            <div className="flex shrink-0 items-center gap-2">
               <IconBox size={22} className="text-default-500 dark:text-gray-400" />
-              <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">
+              <h1 className="whitespace-nowrap text-lg font-semibold text-default-800 dark:text-gray-100">
                 {pageTitle}
               </h1>
             </div>
-            <span className="text-default-300 dark:text-gray-600">|</span>
-            <div className="flex items-center gap-3 text-sm">
-              <span className="text-default-500 dark:text-gray-400">
+            <span className="hidden text-default-300 dark:text-gray-600 md:inline">|</span>
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+              <span className="whitespace-nowrap text-default-500 dark:text-gray-400">
                 {activeTab === "general"
                   ? `${filteredGeneralStockRows.length} general items`
                   : `${materials.length} materials`}
               </span>
               {activeTab === "general" ? (
                 <>
-                  <span className="text-default-300 dark:text-gray-600">|</span>
-                  <span className="text-default-500 dark:text-gray-400">
+                  <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
+                  <span className="whitespace-nowrap text-default-500 dark:text-gray-400">
                     Stock: <span className="font-medium text-indigo-600 dark:text-indigo-400">{formatQty(generalStockTotal)}</span>
                   </span>
                 </>
               ) : (
                 <>
-                  <span className="text-default-300 dark:text-gray-600">|</span>
-                  <span className="text-default-500 dark:text-gray-400">
+                  <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
+                  <span className="whitespace-nowrap text-default-500 dark:text-gray-400">
                     Purchases: <span className="font-medium text-blue-600 dark:text-blue-400">RM {formatNumber(grandTotal.purchases)}</span>
                   </span>
-                  <span className="text-default-300 dark:text-gray-600">|</span>
-                  <span className="text-default-500 dark:text-gray-400">
+                  <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
+                  <span className="whitespace-nowrap text-default-500 dark:text-gray-400">
                     Closing: <span className="font-medium text-green-600 dark:text-green-400">RM {formatNumber(grandTotal.closing)}</span>
                   </span>
                 </>
               )}
               {stockKilang.length > 0 && (
                 <>
-                  <span className="text-default-300 dark:text-gray-600">|</span>
-                  <span className="text-default-500 dark:text-gray-400">
+                  <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
+                  <span className="whitespace-nowrap text-default-500 dark:text-gray-400">
                     FG: <span className="font-medium text-emerald-600 dark:text-emerald-400">RM {formatNumber(stockKilangTotal)}</span>
                   </span>
                 </>
               )}
               {negativeCount > 0 && (
                 <>
-                  <span className="text-default-300 dark:text-gray-600">|</span>
-                  <span className="text-red-500 flex items-center gap-1">
+                  <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
+                  <span className="flex items-center gap-1 whitespace-nowrap text-red-500">
                     <IconAlertTriangle size={14} />
                     {negativeCount} negative
                   </span>
@@ -1117,16 +2341,16 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 xl:justify-end">
             {visibleStockTabs.length > 1 && (
               <>
-                <div className="flex items-center bg-default-100 dark:bg-gray-700 rounded-full p-0.5">
+                <div className="flex shrink-0 items-center rounded-full bg-default-100 p-0.5 dark:bg-gray-700">
                   {visibleStockTabs.map((tab) => (
                     <button
                       key={tab.id}
                       onClick={() => handleTabChange(tab.id)}
                       className={clsx(
-                        "px-4 py-1 rounded-full text-sm font-medium transition-colors",
+                        "rounded-full px-3 py-1 text-sm font-medium transition-colors sm:px-4",
                         activeTab === tab.id
                           ? tab.activeClass
                           : "text-default-600 dark:text-gray-400 hover:text-default-800 dark:hover:text-gray-200"
@@ -1137,15 +2361,17 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                   ))}
                 </div>
 
-                <span className="text-default-300 dark:text-gray-600">|</span>
+                <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
               </>
             )}
-            <MonthNavigator
-              selectedMonth={selectedMonth}
-              onChange={setSelectedMonth}
-              beforeChange={handleBeforeMonthChange}
-            />
-            <span className="text-default-300 dark:text-gray-600">|</span>
+            <div className="shrink-0">
+              <MonthNavigator
+                selectedMonth={selectedMonth}
+                onChange={setSelectedMonth}
+                beforeChange={handleBeforeMonthChange}
+              />
+            </div>
+            <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
 
             <Button
               color="sky"
@@ -1314,9 +2540,12 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-lg border border-default-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="rounded-lg border border-default-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
             <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
-              <thead className="bg-default-50 dark:bg-gray-900/50">
+              <thead
+                className="sticky z-30 bg-default-50 shadow-sm dark:bg-gray-900"
+                style={tableHeaderStyle}
+              >
                 <tr>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
                     Purchase
@@ -1456,9 +2685,12 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
           </div>
         </div>
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
           <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
-            <thead className="bg-default-50 dark:bg-gray-900/50">
+            <thead
+              className="sticky z-30 bg-default-50 shadow-sm dark:bg-gray-900"
+              style={tableHeaderStyle}
+            >
               <tr>
                 <th className="px-3 py-2 text-left text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wider">
                   <div className="flex items-center gap-2">
@@ -1528,7 +2760,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                       </td>
                     </tr>
 
-                    {items.map((material) => {
+                    {items.map((material, materialIndex) => {
                       const isNegative = material.closing_quantity < 0;
                       const hasVariants = material.has_variants && material.variants && material.variants.length > 0;
                       const isExpanded = expandedMaterials.has(material.id);
@@ -1538,14 +2770,44 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                         return (
                           <React.Fragment key={material.id}>
                             <tr
+                              data-material-row-id={material.id}
+                              data-material-category={category}
                               className={clsx(
                                 "group bg-purple-50/70 dark:bg-gray-800 cursor-pointer hover:bg-purple-100/70 dark:hover:bg-gray-700/50 border-l-2 border-purple-400 dark:border-purple-700/60",
-                                isNegative && "bg-red-50/50 dark:bg-red-900/10 border-red-400 dark:border-red-700/60"
+                                isNegative && "bg-red-50/50 dark:bg-red-900/10 border-red-400 dark:border-red-700/60",
+                                draggedRowKey === `material:${material.id}` &&
+                                  "opacity-40 ring-1 ring-dashed ring-sky-300 dark:ring-sky-700"
                               )}
                               onClick={() => toggleMaterialExpansion(material.id)}
                             >
                               <td className="px-3 py-1.5">
                                 <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    aria-label={`Move ${material.name}`}
+                                    title="Drag to reorder material"
+                                    disabled={isSaving || isAnyRowSaving || isDeleting}
+                                    onPointerDown={(event) =>
+                                      handleMaterialDragPointerDown(
+                                        event,
+                                        material,
+                                        category,
+                                        materialIndex
+                                      )
+                                    }
+                                    onPointerMove={handleDragPointerMove}
+                                    onPointerUp={handleDragPointerUp}
+                                    onPointerCancel={handleDragPointerCancel}
+                                    className={clsx(
+                                      "flex h-7 w-4 flex-shrink-0 items-center justify-center rounded text-default-400 dark:text-gray-500",
+                                      "focus:outline-none focus:ring-1 focus:ring-sky-500",
+                                      isSaving || isAnyRowSaving || isDeleting
+                                        ? "cursor-not-allowed opacity-40"
+                                        : "cursor-grab touch-none hover:bg-purple-100 hover:text-purple-700 active:cursor-grabbing dark:hover:bg-gray-700 dark:hover:text-gray-300"
+                                    )}
+                                  >
+                                    <IconGripVertical size={14} />
+                                  </button>
                                   <div className="p-0.5 rounded bg-purple-100 dark:bg-gray-700">
                                     {isExpanded ? (
                                       <IconChevronDown size={14} className="text-purple-600 dark:text-gray-300" />
@@ -1604,16 +2866,53 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
 
                               return (
                                 <tr
+                                  data-variant-row-id={variant.variant_id || undefined}
+                                  data-variant-material-id={
+                                    variant.variant_id ? material.id : undefined
+                                  }
                                   key={`${material.id}-${variant.variant_id || variant.variant_name}`}
                                   className={clsx(
                                     "group bg-white dark:bg-gray-800 hover:bg-purple-50/50 dark:hover:bg-gray-700/30 border-l-2 border-purple-200 dark:border-purple-900/60",
                                     variantNegative && "bg-red-50/50 dark:bg-red-900/10 border-red-200 dark:border-red-900/60",
-                                    !isLastVariant && "border-b border-dashed border-default-100 dark:border-gray-700"
+                                    !isLastVariant && "border-b border-dashed border-default-100 dark:border-gray-700",
+                                    draggedRowKey === `variant:${material.id}:${variant.variant_id}` &&
+                                      "opacity-40 ring-1 ring-dashed ring-sky-300 dark:ring-sky-700"
                                   )}
                                 >
                                   <td className="px-3 py-1.5 pl-12">
                                     <div className="flex items-center gap-1.5">
-                                      <span className="text-purple-300 dark:text-gray-600">-</span>
+                                      {variant.variant_id ? (
+                                        <button
+                                          type="button"
+                                          aria-label={`Move ${getVariantDisplayName(variant)}`}
+                                          title="Drag to reorder variant"
+                                          disabled={isSaving || isAnyRowSaving || isDeleting}
+                                          onPointerDown={(event) =>
+                                            handleVariantDragPointerDown(
+                                              event,
+                                              material,
+                                              variant,
+                                              index
+                                            )
+                                          }
+                                          onPointerMove={handleDragPointerMove}
+                                          onPointerUp={handleDragPointerUp}
+                                          onPointerCancel={handleDragPointerCancel}
+                                          className={clsx(
+                                            "flex h-7 w-4 flex-shrink-0 items-center justify-center rounded text-purple-300 dark:text-gray-500",
+                                            "focus:outline-none focus:ring-1 focus:ring-sky-500",
+                                            isSaving || isAnyRowSaving || isDeleting
+                                              ? "cursor-not-allowed opacity-40"
+                                              : "cursor-grab touch-none hover:bg-purple-100 hover:text-purple-700 active:cursor-grabbing dark:hover:bg-gray-700 dark:hover:text-gray-300"
+                                          )}
+                                        >
+                                          <IconGripVertical size={14} />
+                                        </button>
+                                      ) : (
+                                        <span className="flex h-7 w-4 items-center justify-center text-purple-300 dark:text-gray-600">
+                                          -
+                                        </span>
+                                      )}
                                       <input
                                         type="text"
                                         value={variant.variant_name || ""}
@@ -1631,6 +2930,12 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                       />
                                       {variantNegative && (
                                         <IconAlertTriangle size={12} className="text-red-500" />
+                                      )}
+                                      {renderRowSaveButton(
+                                        variantRowSaveKey(material.id, variant),
+                                        isVariantRowDirty(material.id, variant),
+                                        (event) => handleSaveVariantRow(material, variant, event),
+                                        `Save ${getVariantDisplayName(variant)}`
                                       )}
                                       {variant.variant_id && (
                                         <button
@@ -1710,6 +3015,12 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                       placeholder="Enter variant name..."
                                       autoFocus
                                     />
+                                    {renderRowSaveButton(
+                                      newVariantRowSaveKey(material.id),
+                                      isNewVariantRowDirty(material.id),
+                                      (event) => handleSaveNewVariantRow(material, event),
+                                      `Save new variant for ${material.name}`
+                                    )}
                                     <button
                                       onClick={() => handleCancelNewVariant(material.id)}
                                       className="p-1 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
@@ -1765,13 +3076,43 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                       return (
                         <React.Fragment key={material.id}>
                           <tr
+                            data-material-row-id={material.id}
+                            data-material-category={category}
                             className={clsx(
                               "group hover:bg-default-50 dark:hover:bg-gray-700/30 transition-colors",
-                              isNegative && "bg-red-50/50 dark:bg-red-900/10"
+                              isNegative && "bg-red-50/50 dark:bg-red-900/10",
+                              draggedRowKey === `material:${material.id}` &&
+                                "opacity-40 ring-1 ring-dashed ring-sky-300 dark:ring-sky-700"
                             )}
                           >
                             <td className="px-3 py-1.5">
                               <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  aria-label={`Move ${getMaterialDisplayName(material)}`}
+                                  title="Drag to reorder material"
+                                  disabled={isSaving || isAnyRowSaving || isDeleting}
+                                  onPointerDown={(event) =>
+                                    handleMaterialDragPointerDown(
+                                      event,
+                                      material,
+                                      category,
+                                      materialIndex
+                                    )
+                                  }
+                                  onPointerMove={handleDragPointerMove}
+                                  onPointerUp={handleDragPointerUp}
+                                  onPointerCancel={handleDragPointerCancel}
+                                  className={clsx(
+                                    "flex h-7 w-4 flex-shrink-0 items-center justify-center rounded text-default-400 dark:text-gray-500",
+                                    "focus:outline-none focus:ring-1 focus:ring-sky-500",
+                                    isSaving || isAnyRowSaving || isDeleting
+                                      ? "cursor-not-allowed opacity-40"
+                                      : "cursor-grab touch-none hover:bg-default-100 hover:text-default-600 active:cursor-grabbing dark:hover:bg-gray-700 dark:hover:text-gray-300"
+                                  )}
+                                >
+                                  <IconGripVertical size={14} />
+                                </button>
                                 <Link
                                   to={`/materials/${material.id}`}
                                   className="text-sm font-medium text-default-800 dark:text-gray-200 hover:text-purple-600 dark:hover:text-purple-400 hover:underline"
@@ -1796,6 +3137,12 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                   >
                                     <IconPlus size={14} />
                                   </button>
+                                )}
+                                {renderRowSaveButton(
+                                  materialRowSaveKey(material.id),
+                                  isMaterialRowDirty(material),
+                                  (event) => handleSaveMaterialRow(material, event),
+                                  `Save ${getMaterialDisplayName(material)}`
                                 )}
                                 <button
                                   type="button"
@@ -1865,6 +3212,12 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                     placeholder="Enter variant name..."
                                     autoFocus
                                   />
+                                  {renderRowSaveButton(
+                                    newVariantRowSaveKey(material.id),
+                                    isNewVariantRowDirty(material.id),
+                                    (event) => handleSaveNewVariantRow(material, event),
+                                    `Save new variant for ${getMaterialDisplayName(material)}`
+                                  )}
                                   <button
                                     onClick={() => handleCancelNewVariant(material.id)}
                                     className="p-1 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
@@ -1906,7 +3259,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
               {stockKilang.length > 0 && (
                 <React.Fragment>
                   <tr className="bg-emerald-100 dark:bg-emerald-900/30">
-                    <td colSpan={2} className="px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                    <td colSpan={3} className="px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
                       <div className="flex items-center gap-2">
                         <IconBuildingFactory2 size={14} className="text-emerald-600 dark:text-emerald-400" />
                         Stock Kilang
@@ -1916,9 +3269,8 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                       </div>
                     </td>
                     <td className="px-2 py-1.5 text-xs text-center text-emerald-600 dark:text-emerald-400">
-                      Read-only
+                      Adjustable
                     </td>
-                    <td></td>
                     <td></td>
                     <td></td>
                     <td className="px-2 py-1.5 text-xs text-right">
@@ -1933,13 +3285,26 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                       className="bg-emerald-50/50 dark:bg-emerald-900/10 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                     >
                       <td className="px-3 py-1.5">
-                        <span className="text-sm text-default-700 dark:text-gray-300">
-                          {item.name}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-default-700 dark:text-gray-300">
+                            {item.name}
+                          </span>
+                          {renderRowSaveButton(
+                            stockKilangRowSaveKey(item.product_id),
+                            isStockKilangRowDirty(item),
+                            (event) => handleSaveStockKilangRow(item, event),
+                            `Save ${item.name}`
+                          )}
+                        </div>
                       </td>
                       <td className="px-2 py-1.5 text-right font-mono text-sm text-default-400 dark:text-gray-500">-</td>
                       <td className="px-2 py-1.5 text-right font-mono text-sm text-default-400 dark:text-gray-500">-</td>
-                      <td className="px-2 py-1.5 text-right font-mono text-sm text-default-400 dark:text-gray-500">-</td>
+                      <td className="px-1 py-1 bg-sky-50/20 dark:bg-sky-900/5">
+                        {renderAdjustmentInput(
+                          item.adjustment_quantity,
+                          (value) => handleStockKilangAdjustmentChange(item.product_id, value)
+                        )}
+                      </td>
                       <td className="px-2 py-1.5 text-right font-mono text-sm text-default-500 dark:text-gray-400">
                         {formatNumber(item.price)}
                       </td>
@@ -2020,6 +3385,35 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
               </tfoot>
             )}
           </table>
+        </div>
+      )}
+
+      {dragOverlay && (
+        <div
+          ref={dragOverlayRef}
+          className="fixed z-[1000] flex items-center gap-2 rounded-lg border border-sky-300 bg-white px-3 py-2 text-sm pointer-events-none shadow-2xl ring-2 ring-sky-200 will-change-transform dark:border-sky-700 dark:bg-gray-800 dark:ring-sky-800"
+          style={{
+            left: dragOverlay.left,
+            top: dragOverlay.top,
+            width: dragOverlay.width,
+            minHeight: dragOverlay.height,
+            transform: "translate3d(0, 0, 0)",
+          }}
+        >
+          <div className="flex h-7 w-4 flex-shrink-0 items-center justify-center rounded bg-default-100 text-default-600 dark:bg-gray-700 dark:text-gray-300">
+            <IconGripVertical size={14} />
+          </div>
+          <span className="w-6 flex-shrink-0 text-right text-xs tabular-nums text-default-400 dark:text-gray-500">
+            {dragOverlay.index + 1}
+          </span>
+          <div className="min-w-0">
+            <div className="truncate font-medium text-default-900 dark:text-gray-100">
+              {dragOverlay.label}
+            </div>
+            <div className="truncate text-xs text-default-500 dark:text-gray-400">
+              {dragOverlay.sublabel}
+            </div>
+          </div>
         </div>
       )}
 

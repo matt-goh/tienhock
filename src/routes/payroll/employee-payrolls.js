@@ -71,6 +71,71 @@ const buildLeaveDateSet = (leaveRecords) =>
       .filter(Boolean),
   );
 
+/**
+ * Mirrors the payroll processor's historical JS cent rounding.
+ * PostgreSQL ROUND() can differ on exact .005 values, so salary reports must
+ * emulate this rather than recomputing with database-native numeric rounding.
+ * @param {Array<{
+ *   pay_code_id?: string | null,
+ *   rate?: string | number | null,
+ *   rate_unit?: string | null,
+ *   quantity?: string | number | null,
+ *   foc_units?: string | number | null,
+ *   amount?: string | number | null,
+ * }>} items
+ * @returns {number}
+ */
+const calculateConsolidatedPayrollItemsCents = (items) => {
+  if (!Array.isArray(items) || items.length === 0) return 0;
+
+  const groups = new Map();
+  items.forEach((item) => {
+    const rate = parseFloat(item.rate);
+    const quantity = parseFloat(item.quantity);
+    const focUnits = parseFloat(item.foc_units || 0);
+    const amount = parseFloat(item.amount);
+
+    if (
+      Number.isNaN(rate) ||
+      Number.isNaN(quantity) ||
+      Number.isNaN(focUnits) ||
+      Number.isNaN(amount)
+    ) {
+      console.error("Invalid numeric values in payroll item:", item);
+      return;
+    }
+
+    const key = `${item.pay_code_id}_${rate}_${item.rate_unit}`;
+    if (groups.has(key)) {
+      const group = groups.get(key);
+      group.totalQuantity += quantity;
+      group.totalFocUnits += focUnits;
+      group.originalAmountSum += amount;
+    } else {
+      groups.set(key, {
+        rate,
+        rate_unit: item.rate_unit,
+        totalQuantity: quantity,
+        totalFocUnits: focUnits,
+        originalAmountSum: amount,
+      });
+    }
+  });
+
+  let totalCents = 0;
+  groups.forEach((group) => {
+    if (group.rate_unit === "Percent" || group.rate_unit === "Fixed") {
+      totalCents += Math.round(group.originalAmountSum * 100);
+    } else {
+      const roundedRate = Math.round(group.rate * 100) / 100;
+      const totalUnits = group.totalQuantity + group.totalFocUnits;
+      totalCents += Math.round(roundedRate * totalUnits * 100);
+    }
+  });
+
+  return totalCents;
+};
+
 // Moved to top-level to be reusable
 const saveDeductions = async (pool, employeePayrollId, deductions) => {
   if (!deductions || deductions.length === 0) {
@@ -329,63 +394,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     };
 
     // --- Main Calculation Logic ---
-    // Calculate gross pay using CONSOLIDATED approach (matches frontend display)
-    // This groups items by pay_code+rate+rate_unit, sums quantities, then calculates once
-    const consolidateItems = (items) => {
-      // Defensive: Validate and clean input
-      if (!items || !Array.isArray(items) || items.length === 0) {
-        return 0;
-      }
-
-      const groups = new Map();
-      items.forEach((item) => {
-        // Defensive: Validate numeric fields
-        const rate = parseFloat(item.rate);
-        const quantity = parseFloat(item.quantity);
-        const focUnits = parseFloat(item.foc_units || 0);
-        const amount = parseFloat(item.amount);
-
-        // Defensive: Skip invalid items
-        if (
-          isNaN(rate) ||
-          isNaN(quantity) ||
-          isNaN(focUnits) ||
-          isNaN(amount)
-        ) {
-          console.error("Invalid numeric values in payroll item:", item);
-          return; // Skip this item
-        }
-
-        const key = `${item.pay_code_id}_${rate}_${item.rate_unit}`;
-        if (groups.has(key)) {
-          const group = groups.get(key);
-          group.totalQuantity += quantity; // Now guaranteed to be number
-          group.totalFocUnits += focUnits; // Now guaranteed to be number
-          group.originalAmountSum += amount; // Now guaranteed to be number
-        } else {
-          groups.set(key, {
-            rate: rate,
-            rate_unit: item.rate_unit,
-            totalQuantity: quantity,
-            totalFocUnits: focUnits,
-            originalAmountSum: amount,
-          });
-        }
-      });
-      let totalCents = 0;
-      groups.forEach((group) => {
-        if (group.rate_unit === "Percent" || group.rate_unit === "Fixed") {
-          totalCents += Math.round(group.originalAmountSum * 100);
-        } else {
-          const roundedRate = Math.round(group.rate * 100) / 100;
-          const totalUnits = group.totalQuantity + group.totalFocUnits;
-          totalCents += Math.round(roundedRate * totalUnits * 100);
-        }
-      });
-      return totalCents;
-    };
-
-    const workGrossPayCents = consolidateItems(workItems);
+    const workGrossPayCents = calculateConsolidatedPayrollItemsCents(workItems);
     const workGrossPay = workGrossPayCents / 100;
     const leaveGrossPayCents = leaveRecords.reduce(
       (sum, record) => sum + Math.round(record.amount_paid * 100),
@@ -430,8 +439,8 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     // Overtime work items aren't in Base/Tambahan, and overtime "Others" are
     // removed via othersOvertimeGrossPay (OT is not part of the EPF wage base).
     const epfGrossPayCents =
-      consolidateItems(groupedItems.Base || []) +
-      consolidateItems(groupedItems.Tambahan || []) +
+      calculateConsolidatedPayrollItemsCents(groupedItems.Base || []) +
+      calculateConsolidatedPayrollItemsCents(groupedItems.Tambahan || []) +
       Math.round(leaveGrossPay * 100) +
       Math.round(commissionGrossPay * 100) +
       Math.round((othersGrossPay - othersOvertimeGrossPay) * 100);
@@ -665,7 +674,12 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
   }
 };
 
-export { recalculateAndUpdatePayroll, removeLeaveDayWorkItems, buildLeaveDateSet };
+export {
+  recalculateAndUpdatePayroll,
+  removeLeaveDayWorkItems,
+  buildLeaveDateSet,
+  calculateConsolidatedPayrollItemsCents,
+};
 
 export default function (pool) {
   const router = Router();
@@ -966,38 +980,6 @@ export default function (pool) {
       // commission advances are shown as a separate advance deduction on the
       // payslip, so they must NOT be pre-subtracted from net_pay (the raw stored
       // net_pay already excludes them, which would double-count on the slip).
-      const consolidateItemsAPI = (itemsList) => {
-        const groups = new Map();
-        itemsList.forEach((item) => {
-          const key = `${item.pay_code_id}_${item.rate}_${item.rate_unit}`;
-          if (groups.has(key)) {
-            const group = groups.get(key);
-            group.totalQuantity += item.quantity;
-            group.totalFocUnits += item.foc_units || 0;
-            group.originalAmountSum += item.amount;
-          } else {
-            groups.set(key, {
-              rate: item.rate,
-              rate_unit: item.rate_unit,
-              totalQuantity: item.quantity,
-              totalFocUnits: item.foc_units || 0,
-              originalAmountSum: item.amount,
-            });
-          }
-        });
-        let totalCents = 0;
-        groups.forEach((group) => {
-          if (group.rate_unit === "Percent" || group.rate_unit === "Fixed") {
-            totalCents += Math.round(group.originalAmountSum * 100);
-          } else {
-            const roundedRate = Math.round(group.rate * 100) / 100;
-            const totalUnits = group.totalQuantity + group.totalFocUnits;
-            totalCents += Math.round(roundedRate * totalUnits * 100);
-          }
-        });
-        return totalCents;
-      };
-
       // Merge payrolls with their items, deductions, leave records, mid-month payrolls, commission, and others records
       const response = payrollsResult.rows.map((payroll) => {
         const midMonth = midMonthByPayrollId[payroll.id];
@@ -1012,7 +994,7 @@ export default function (pool) {
         const payrollOthers = othersByPayrollId[payroll.id] || [];
         const payrollDeductions = deductionsByPayrollId[payroll.id] || [];
 
-        const workGrossPayCents = consolidateItemsAPI(
+        const workGrossPayCents = calculateConsolidatedPayrollItemsCents(
           removeLeaveDayWorkItems(payrollItems, buildLeaveDateSet(payrollLeave)),
         );
         const leaveGrossPayCents = payrollLeave.reduce(
@@ -1393,42 +1375,9 @@ export default function (pool) {
         amount: parseFloat(record.amount),
       }));
 
-      // Recalculate gross_pay using CONSOLIDATED approach (matches frontend display)
-      const consolidateItemsAPI = (itemsList) => {
-        const groups = new Map();
-        itemsList.forEach((item) => {
-          const key = `${item.pay_code_id}_${item.rate}_${item.rate_unit}`;
-          if (groups.has(key)) {
-            const group = groups.get(key);
-            group.totalQuantity += item.quantity;
-            group.totalFocUnits += item.foc_units || 0;
-            group.originalAmountSum += item.amount;
-          } else {
-            groups.set(key, {
-              rate: item.rate,
-              rate_unit: item.rate_unit,
-              totalQuantity: item.quantity,
-              totalFocUnits: item.foc_units || 0,
-              originalAmountSum: item.amount,
-            });
-          }
-        });
-        let totalCents = 0;
-        groups.forEach((group) => {
-          if (group.rate_unit === "Percent" || group.rate_unit === "Fixed") {
-            totalCents += Math.round(group.originalAmountSum * 100);
-          } else {
-            const roundedRate = Math.round(group.rate * 100) / 100;
-            const totalUnits = group.totalQuantity + group.totalFocUnits;
-            totalCents += Math.round(roundedRate * totalUnits * 100);
-          }
-        });
-        return totalCents;
-      };
-
       // Exclude leave-day daily items so the recalculated gross matches the
       // payslip display (which already filters them via filterOutLeaveDayItems).
-      const workGrossPayCents = consolidateItemsAPI(
+      const workGrossPayCents = calculateConsolidatedPayrollItemsCents(
         removeLeaveDayWorkItems(items, buildLeaveDateSet(leaveRecords)),
       );
       const leaveGrossPayCents = leaveRecords.reduce(
@@ -1792,42 +1741,9 @@ export default function (pool) {
         quantity: parseFloat(record.quantity),
       }));
 
-      // Recalculate gross_pay using CONSOLIDATED approach (matches frontend display)
-      const consolidateItemsAPI = (itemsList) => {
-        const groups = new Map();
-        itemsList.forEach((item) => {
-          const key = `${item.pay_code_id}_${item.rate}_${item.rate_unit}`;
-          if (groups.has(key)) {
-            const group = groups.get(key);
-            group.totalQuantity += item.quantity;
-            group.totalFocUnits += item.foc_units || 0;
-            group.originalAmountSum += item.amount;
-          } else {
-            groups.set(key, {
-              rate: item.rate,
-              rate_unit: item.rate_unit,
-              totalQuantity: item.quantity,
-              totalFocUnits: item.foc_units || 0,
-              originalAmountSum: item.amount,
-            });
-          }
-        });
-        let totalCents = 0;
-        groups.forEach((group) => {
-          if (group.rate_unit === "Percent" || group.rate_unit === "Fixed") {
-            totalCents += Math.round(group.originalAmountSum * 100);
-          } else {
-            const roundedRate = Math.round(group.rate * 100) / 100;
-            const totalUnits = group.totalQuantity + group.totalFocUnits;
-            totalCents += Math.round(roundedRate * totalUnits * 100);
-          }
-        });
-        return totalCents;
-      };
-
       // Exclude leave-day daily items so the recalculated gross matches the
       // payslip display (which already filters them via filterOutLeaveDayItems).
-      const workGrossPayCents = consolidateItemsAPI(
+      const workGrossPayCents = calculateConsolidatedPayrollItemsCents(
         removeLeaveDayWorkItems(items, buildLeaveDateSet(leaveRecords)),
       );
       const leaveGrossPayCents = leaveRecords.reduce(
