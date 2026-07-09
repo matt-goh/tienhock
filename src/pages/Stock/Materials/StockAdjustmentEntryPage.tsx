@@ -1811,7 +1811,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
 
   const isAnyRowSaving: boolean = savingRowKeys.size > 0;
   const tableHeaderStyle: React.CSSProperties = {
-    top: pageHeaderHeight,
+    top: pageHeaderHeight + 8,
   };
 
   const applyMaterialOrder = (
@@ -2285,54 +2285,54 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     <div className="space-y-3">
       <div
         ref={pageHeaderRef}
-        className="sticky top-0 z-40 bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm px-6 py-3"
+        className="sticky top-0 z-40 isolate rounded-lg border border-default-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:shadow-black/20 sm:px-5 lg:px-6"
       >
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex min-w-0 flex-col gap-2 md:flex-row md:items-center md:gap-3">
+            <div className="flex shrink-0 items-center gap-2">
               <IconBox size={22} className="text-default-500 dark:text-gray-400" />
-              <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">
+              <h1 className="whitespace-nowrap text-lg font-semibold text-default-800 dark:text-gray-100">
                 {pageTitle}
               </h1>
             </div>
-            <span className="text-default-300 dark:text-gray-600">|</span>
-            <div className="flex items-center gap-3 text-sm">
-              <span className="text-default-500 dark:text-gray-400">
+            <span className="hidden text-default-300 dark:text-gray-600 md:inline">|</span>
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+              <span className="whitespace-nowrap text-default-500 dark:text-gray-400">
                 {activeTab === "general"
                   ? `${filteredGeneralStockRows.length} general items`
                   : `${materials.length} materials`}
               </span>
               {activeTab === "general" ? (
                 <>
-                  <span className="text-default-300 dark:text-gray-600">|</span>
-                  <span className="text-default-500 dark:text-gray-400">
+                  <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
+                  <span className="whitespace-nowrap text-default-500 dark:text-gray-400">
                     Stock: <span className="font-medium text-indigo-600 dark:text-indigo-400">{formatQty(generalStockTotal)}</span>
                   </span>
                 </>
               ) : (
                 <>
-                  <span className="text-default-300 dark:text-gray-600">|</span>
-                  <span className="text-default-500 dark:text-gray-400">
+                  <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
+                  <span className="whitespace-nowrap text-default-500 dark:text-gray-400">
                     Purchases: <span className="font-medium text-blue-600 dark:text-blue-400">RM {formatNumber(grandTotal.purchases)}</span>
                   </span>
-                  <span className="text-default-300 dark:text-gray-600">|</span>
-                  <span className="text-default-500 dark:text-gray-400">
+                  <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
+                  <span className="whitespace-nowrap text-default-500 dark:text-gray-400">
                     Closing: <span className="font-medium text-green-600 dark:text-green-400">RM {formatNumber(grandTotal.closing)}</span>
                   </span>
                 </>
               )}
               {stockKilang.length > 0 && (
                 <>
-                  <span className="text-default-300 dark:text-gray-600">|</span>
-                  <span className="text-default-500 dark:text-gray-400">
+                  <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
+                  <span className="whitespace-nowrap text-default-500 dark:text-gray-400">
                     FG: <span className="font-medium text-emerald-600 dark:text-emerald-400">RM {formatNumber(stockKilangTotal)}</span>
                   </span>
                 </>
               )}
               {negativeCount > 0 && (
                 <>
-                  <span className="text-default-300 dark:text-gray-600">|</span>
-                  <span className="text-red-500 flex items-center gap-1">
+                  <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
+                  <span className="flex items-center gap-1 whitespace-nowrap text-red-500">
                     <IconAlertTriangle size={14} />
                     {negativeCount} negative
                   </span>
@@ -2341,16 +2341,16 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 xl:justify-end">
             {visibleStockTabs.length > 1 && (
               <>
-                <div className="flex items-center bg-default-100 dark:bg-gray-700 rounded-full p-0.5">
+                <div className="flex shrink-0 items-center rounded-full bg-default-100 p-0.5 dark:bg-gray-700">
                   {visibleStockTabs.map((tab) => (
                     <button
                       key={tab.id}
                       onClick={() => handleTabChange(tab.id)}
                       className={clsx(
-                        "px-4 py-1 rounded-full text-sm font-medium transition-colors",
+                        "rounded-full px-3 py-1 text-sm font-medium transition-colors sm:px-4",
                         activeTab === tab.id
                           ? tab.activeClass
                           : "text-default-600 dark:text-gray-400 hover:text-default-800 dark:hover:text-gray-200"
@@ -2361,15 +2361,17 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                   ))}
                 </div>
 
-                <span className="text-default-300 dark:text-gray-600">|</span>
+                <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
               </>
             )}
-            <MonthNavigator
-              selectedMonth={selectedMonth}
-              onChange={setSelectedMonth}
-              beforeChange={handleBeforeMonthChange}
-            />
-            <span className="text-default-300 dark:text-gray-600">|</span>
+            <div className="shrink-0">
+              <MonthNavigator
+                selectedMonth={selectedMonth}
+                onChange={setSelectedMonth}
+                beforeChange={handleBeforeMonthChange}
+              />
+            </div>
+            <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
 
             <Button
               color="sky"
@@ -2541,7 +2543,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
           <div className="rounded-lg border border-default-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
             <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
               <thead
-                className="sticky z-30 bg-default-50 dark:bg-gray-900/50"
+                className="sticky z-30 bg-default-50 shadow-sm dark:bg-gray-900"
                 style={tableHeaderStyle}
               >
                 <tr>
@@ -2686,7 +2688,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
           <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
             <thead
-              className="sticky z-30 bg-default-50 dark:bg-gray-900/50"
+              className="sticky z-30 bg-default-50 shadow-sm dark:bg-gray-900"
               style={tableHeaderStyle}
             >
               <tr>
