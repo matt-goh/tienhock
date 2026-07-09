@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
   },
   viewSubtitle: {
     fontSize: 9,
-    marginBottom: 8,
+    marginBottom: 3,
   },
   table: {
     width: "100%",
