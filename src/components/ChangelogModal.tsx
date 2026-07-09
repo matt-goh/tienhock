@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-07-10",
+    ms: "Semasa mengisi Journal Entry, Account Code baharu kini boleh ditambah terus dari pilihan Account. Selepas disimpan, akaun baharu itu terus dipilih pada baris journal yang sedang diisi.",
+    en: "While entering a Journal Entry, a new Account Code can now be added directly from the Account picker. After saving, the new account is selected immediately on the journal line you were filling in.",
+  },
+  {
     date: "2026-07-09",
     ms: "Halaman Material Stock kini boleh menyimpan satu baris sahaja untuk bahan, varian dan Stock Kilang tanpa mengganggu perubahan lain yang belum disimpan. Tajuk halaman dan tajuk jadual juga kekal kelihatan semasa menatal, dan susunan bahan serta varian boleh diubah dengan drag-and-drop.",
     en: "The Material Stock page can now save one material, variant or Stock Kilang row at a time without disturbing other unsaved changes. The page and table headers also stay visible while scrolling, and material and variant order can be changed with drag-and-drop.",
