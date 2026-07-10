@@ -58,6 +58,7 @@ import supplierPaymentsRouter from "./accounting/supplier-payments.js";
 // Sales routes
 import invoiceRouter from "./sales/invoices/invoices.js";
 import paymentsRouter from "./sales/invoices/payments.js";
+import receiptsRouter from "./sales/receipts.js";
 import eInvoiceRouter from "./sales/invoices/e-invoices.js";
 import adjustmentDocsRouter from "./sales/adjustment-docs/index.js";
 
@@ -226,6 +227,7 @@ export default function setupRoutes(app, pool) {
   // Sales routes
   app.use("/api/invoices", invoiceRouter(pool, myInvoisConfig));
   app.use("/api/payments", paymentsRouter(pool));
+  app.use("/api/receipts", receiptsRouter(pool));
   app.use("/api/einvoice", eInvoiceRouter(pool, myInvoisConfig));
   app.use("/api/adjustment-docs", adjustmentDocsRouter(pool, myInvoisConfig));
 
