@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-10",
+    ms: "Rekod bayaran pelanggan Tien Hock kini disimpan sebagai satu resit berkumpulan: satu bayaran boleh meliputi beberapa invois dan pelanggan sekaligus, dengan satu catatan perakaunan yang lengkap. Tunai yang diterima untuk invois kredit kini kekal dalam akaun tunai belum bank sehingga dibankkan, cek berstatus tertunda tidak lagi mengubah baki sehingga ia tunai, dan bil tunai membawa catatan perakaunan pada tarikh bil itu sendiri. Lejar CASH SALES, CH.REV dan bank kini sepadan dengan buku lama untuk bulan Jun.",
+    en: "Tien Hock customer payments are now saved as one grouped receipt: a single payment can cover several invoices and customers at once, with one complete accounting entry. Cash received for credit invoices now stays in the undeposited-cash account until it is banked in, pending cheques no longer change balances until they clear, and cash bills carry their accounting entry on the bill's own date. The CASH SALES, CH.REV and bank ledgers now match the legacy books for June.",
+  },
+  {
+    date: "2026-07-10",
     ms: "Halaman Payroll dan Salary Report Jelly Polly kini menggunakan susun atur yang lebih kemas seperti Tien Hock, termasuk ringkasan gaji, jadual laporan gaji, pemilih tahun yang lebih mudah, butiran potongan dalam Deductions & Final Pay, ringkasan Pinjam, menu cetak slip mengikut bahagian, dan cetakan slip gaji yang menggunakan data Jelly Polly dengan betul.",
     en: "Jelly Polly Payroll and Salary Report now use a cleaner layout like Tien Hock, including payroll summaries, salary report tables, an easier year picker, deduction details in Deductions & Final Pay, the Pinjam summary, section-based payslip printing, and payslips that correctly use Jelly Polly data.",
   },

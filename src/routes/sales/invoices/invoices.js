@@ -9,8 +9,13 @@ import {
   sumMoneyBy,
   roundMoney,
 } from "../../utils/moneyUtils.js";
-import { createPaymentJournalEntry, cancelPaymentJournalEntry } from "../../accounting/payment-journal.js";
-import { syncSalesJournalEntry, cancelSalesJournalEntry } from "../../accounting/sales-journal.js";
+import { cancelPaymentJournalEntry } from "../../accounting/payment-journal.js";
+import {
+  syncSalesJournalEntry,
+  cancelSalesJournalEntry,
+  invoiceLocalDateString,
+} from "../../accounting/sales-journal.js";
+import { createReceipt } from "../../accounting/receipt-service.js";
 
 // Map to track pending invoices with their timeout handlers
 const pendingInvoiceTimeouts = new Map();
@@ -2341,11 +2346,18 @@ export default function (pool, config) {
           .json({ message: `Invoice with ID ${invoice.id} already exists` });
       }
 
-      // Initial balance and status - Check for CASH type
+      // Initial balance and status - Check for CASH type.
+      // A cash-method CASH bill is auto-collected (balance 0 / paid). A CASH
+      // bill settled by transfer/online/cheque at sale time starts with its
+      // full balance and is settled by a genuine receipt below (a pending
+      // cheque keeps the balance open until it clears).
       const totalPayable = parseFloat(invoice.totalamountpayable || 0);
       const isCash = invoice.paymenttype === "CASH";
-      const balance_due = isCash ? 0 : totalPayable; // Zero balance for CASH
-      const invoice_status = isCash || totalPayable === 0 ? "paid" : "Unpaid"; // "paid" for CASH or zero amount
+      const saleMethod = isCash ? invoice.payment_method || "cash" : null;
+      const autoCollected = isCash && saleMethod === "cash";
+      const balance_due = autoCollected ? 0 : totalPayable;
+      const invoice_status =
+        autoCollected || totalPayable === 0 ? "paid" : "Unpaid";
 
       // Insert invoice
       const insertInvoiceQuery = `
@@ -2374,9 +2386,6 @@ export default function (pool, config) {
       const invoiceResult = await client.query(insertInvoiceQuery, values);
       const createdInvoice = invoiceResult.rows[0];
 
-      // Post the sales journal (DR TR / CR CASH_SALES|CR_SALES). No-op for zero amount.
-      await syncSalesJournalEntry(client, createdInvoice, req.user?.id || null);
-
       // Insert products (order_details) - NO CHANGE HERE
       if (invoice.products && invoice.products.length > 0) {
         const productQuery = `
@@ -2402,55 +2411,28 @@ export default function (pool, config) {
         }
       }
 
-      // If it's a CASH invoice, create automatic payment record
-      if (isCash && totalPayable > 0) {
-        // Check if payment details were provided in the request
-        const paymentDate = new Date(
-          parseInt(invoice.createddate, 10)
-        ).toISOString();
-        const paymentMethod = invoice.payment_method || "cash";
-        const paymentReference = invoice.payment_reference || null;
-        const paymentNotes =
-          invoice.payment_notes || "Automatic payment for CASH invoice";
-        const bankAccountCode = paymentMethod === "cash" ? "CASH" : (invoice.bank_account || "BANK_PBB");
-
-        const paymentQuery = `
-          INSERT INTO payments (
-            invoice_id, payment_date, amount_paid, payment_method,
-            payment_reference, bank_account, notes
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-          RETURNING payment_id
-        `;
-        const paymentResult = await client.query(paymentQuery, [
-          createdInvoice.id,
-          paymentDate,
-          totalPayable,
-          paymentMethod,
-          paymentReference,
-          bankAccountCode,
-          paymentNotes,
-        ]);
-        const createdPayment = paymentResult.rows[0];
-
-        // Create journal entry for the payment (DR Bank/Cash, CR Trade Receivables)
-        const journalEntryId = await createPaymentJournalEntry(client, {
-          payment_id: createdPayment.payment_id,
-          invoice_id: createdInvoice.id,
-          payment_date: paymentDate,
-          amount_paid: totalPayable,
-          payment_method: paymentMethod,
-          bank_account: bankAccountCode,
-          invoice_paymenttype: "CASH",
-          payment_reference: paymentReference,
-          created_by: req.user?.id || null
-        });
-
-        // Update payment with journal_entry_id
-        await client.query(
-          'UPDATE payments SET journal_entry_id = $1 WHERE payment_id = $2',
-          [journalEntryId, createdPayment.payment_id]
+      // CASH bill settled by a non-cash method at sale time: record a genuine
+      // receipt (DR bank / CR TR; a cheque stays pending until cleared). The
+      // cash-method auto-collection is handled by syncSalesJournalEntry below.
+      if (isCash && totalPayable > 0 && saleMethod !== "cash") {
+        await createReceipt(
+          client,
+          {
+            payment_method: saleMethod,
+            bank_account: invoice.bank_account || "BANK_PBB",
+            display_reference: invoice.payment_reference || null,
+            received_date: invoiceLocalDateString(createdInvoice.createddate),
+            allocations: [
+              { type: "invoice", invoice_id: createdInvoice.id, amount: totalPayable },
+            ],
+          },
+          req.user?.id || null
         );
       }
+
+      // Post the invoice-owned journal (CASH: DR CH_REV1 / CR CASH_SALES with
+      // the auto-collection payment row; INVOICE: DR TR / CR CR_SALES).
+      await syncSalesJournalEntry(client, createdInvoice, req.user?.id || null);
 
       // Update customer credit if INVOICE type - NO CHANGE HERE
       if (createdInvoice.paymenttype === "INVOICE") {
@@ -2644,9 +2626,11 @@ export default function (pool, config) {
             }
           }
 
-          // Post the sales journal (DR TR / CR CASH_SALES|CR_SALES). Swallow errors so a
-          // mobile bill is never blocked by a journal failure — sync self-heals on later
-          // edits and the backfill is idempotent (mirrors the payment-error handling below).
+          // Post the invoice-owned journal (CASH bills: DR CH_REV1 / CR CASH_SALES
+          // plus the auto-collection payment row dated to the invoice's LOCAL date —
+          // never the submission time). Swallow errors so a mobile bill is never
+          // blocked by a journal failure — sync self-heals on later edits and the
+          // backfill is idempotent.
           try {
             await syncSalesJournalEntry(client, savedInvoice, null);
           } catch (salesJournalError) {
@@ -2654,55 +2638,6 @@ export default function (pool, config) {
               `Failed to post sales journal for invoice ${savedInvoice.id}:`,
               salesJournalError
             );
-          }
-
-          // If it's a CASH invoice, create automatic payment record
-          if (isCash && totalPayable > 0) {
-            try {
-              const paymentDate = new Date().toISOString();
-              const paymentQuery = `
-                INSERT INTO payments (
-                  invoice_id, payment_date, amount_paid, payment_method,
-                  payment_reference, bank_account, notes
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-                RETURNING payment_id
-              `;
-              const paymentResult = await client.query(paymentQuery, [
-                savedInvoice.id,
-                paymentDate,
-                totalPayable,
-                "cash",
-                null,
-                "CASH",
-                "Automatic payment for CASH invoice",
-              ]);
-              const createdPayment = paymentResult.rows[0];
-
-              // Create journal entry for the payment (DR Cash, CR Trade Receivables)
-              const journalEntryId = await createPaymentJournalEntry(client, {
-                payment_id: createdPayment.payment_id,
-                invoice_id: savedInvoice.id,
-                payment_date: paymentDate,
-                amount_paid: totalPayable,
-                payment_method: "cash",
-                bank_account: "CASH",
-                invoice_paymenttype: "CASH",
-                payment_reference: null,
-                created_by: null // No user context in batch submission
-              });
-
-              // Update payment with journal_entry_id
-              await client.query(
-                'UPDATE payments SET journal_entry_id = $1 WHERE payment_id = $2',
-                [journalEntryId, createdPayment.payment_id]
-              );
-            } catch (paymentError) {
-              console.error(
-                `Failed to create automatic payment/journal for CASH invoice ${savedInvoice.id}:`,
-                paymentError
-              );
-              // Continue processing - the invoice is still marked as paid even if payment record fails
-            }
           }
 
           // Update customer credit if INVOICE type - NO CHANGE HERE
@@ -3206,6 +3141,25 @@ export default function (pool, config) {
         });
       }
 
+      // 1b. Block cancellation while a live receipt still allocates this
+      // invoice — the receipt owns the journal and balance effects, so it must
+      // be cancelled first through the receipt workflow.
+      const receiptCheck = await client.query(
+        `SELECT r.id, r.status
+           FROM receipt_allocations ra
+           JOIN receipts r ON r.id = ra.receipt_id
+          WHERE ra.invoice_id = $1 AND r.status IN ('pending', 'posted')
+          LIMIT 3`,
+        [id]
+      );
+      if (receiptCheck.rows.length > 0) {
+        await client.query("ROLLBACK");
+        const refs = receiptCheck.rows.map((r) => `#${r.id} (${r.status})`).join(", ");
+        return res.status(400).json({
+          message: `Cannot cancel invoice ${id}: receipt(s) ${refs} still allocate it. Cancel those receipts first.`,
+        });
+      }
+
       // 2. Find and cancel ACTIVE payments associated with this invoice
       const activePaymentsQuery = `
         SELECT payment_id, amount_paid, journal_entry_id
@@ -3594,14 +3548,18 @@ export default function (pool, config) {
       const totalPayable = addMoney(subtotal, taxTotal);
       const newTotal = roundMoney(totalPayable);
 
-      // Get current payments breakdown
+      // Get current payments breakdown. Genuine figures exclude the automatic
+      // CASH-bill collection rows (those follow the invoice total via the
+      // journal sync below and never count as independent receipts).
       const paymentsBreakdownQuery = `
-      SELECT 
+      SELECT
         COALESCE(SUM(CASE WHEN (status IS NULL OR status = 'active') THEN amount_paid ELSE 0 END), 0) as active_paid,
         COALESCE(SUM(CASE WHEN status = 'pending' THEN amount_paid ELSE 0 END), 0) as pending_amount,
         COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_count,
-        COUNT(CASE WHEN (status IS NULL OR status = 'active') THEN 1 END) as active_count
-      FROM payments 
+        COUNT(CASE WHEN (status IS NULL OR status = 'active') THEN 1 END) as active_count,
+        COALESCE(SUM(CASE WHEN (status IS NULL OR status = 'active') AND is_auto_collection = false THEN amount_paid ELSE 0 END), 0) as genuine_active_paid,
+        COUNT(CASE WHEN status = 'pending' AND is_auto_collection = false THEN 1 END) as genuine_pending_count
+      FROM payments
       WHERE invoice_id = $1 AND status != 'cancelled'
     `;
       const paymentsBreakdownResult = await client.query(
@@ -3613,20 +3571,28 @@ export default function (pool, config) {
         pending_amount: pendingAmount,
         pending_count: pendingCount,
         active_count: activeCount,
+        genuine_active_paid: genuineActivePaidRaw,
+        genuine_pending_count: genuinePendingCountRaw,
       } = paymentsBreakdownResult.rows[0];
 
       const totalActivePaid = parseFloat(activePaid || 0);
       const totalPendingAmount = parseFloat(pendingAmount || 0);
+      const genuineActivePaid = parseFloat(genuineActivePaidRaw || 0);
+      const genuinePendingCount = parseInt(genuinePendingCountRaw, 10) || 0;
 
-      // 8. Cancel ALL pending payments when order details change (regardless of payment type)
+      // 8. Cancel LEGACY pending payments when order details change. Pending
+      // rows owned by a receipt (uncleared cheques) are left alone — the
+      // receipt confirm re-validates against the new balance and fails loudly
+      // if the allocation no longer fits.
       let cancelledPendingCount = 0;
       if (pendingCount > 0) {
         const cancelPendingQuery = `
-        UPDATE payments 
-        SET status = 'cancelled', 
+        UPDATE payments
+        SET status = 'cancelled',
             cancellation_date = NOW(),
             cancellation_reason = $1
         WHERE invoice_id = $2 AND status = 'pending'
+          AND receipt_allocation_id IS NULL
         RETURNING payment_id, amount_paid
       `;
 
@@ -3636,16 +3602,23 @@ export default function (pool, config) {
         ]);
 
         cancelledPendingCount = cancelledPending.rows.length;
-        console.log(
-          `Cancelled ${cancelledPendingCount} pending payments for invoice ${id} due to order details update`
-        );
+        if (cancelledPendingCount > 0) {
+          console.log(
+            `Cancelled ${cancelledPendingCount} pending payments for invoice ${id} due to order details update`
+          );
+        }
       }
 
       // 9. Calculate new balance_due based on payment type
       let newBalanceDue;
       if (invoice.paymenttype === "CASH") {
-        // CASH invoices should always have zero balance
-        newBalanceDue = 0;
+        // Auto-collected CASH bills carry zero balance. If a genuine pending
+        // cheque exists, auto-collection is suppressed and the uncollected
+        // remainder stays due until the cheque clears.
+        newBalanceDue =
+          genuinePendingCount > 0
+            ? Math.max(0, newTotal - genuineActivePaid)
+            : 0;
       } else {
         // For INVOICE types, calculate: new_total - active_paid (excluding pending)
         newBalanceDue = Math.max(0, newTotal - totalActivePaid);
@@ -3678,110 +3651,12 @@ export default function (pool, config) {
         id,
       ]);
 
-      // 11. Handle CASH invoice payment adjustments
-      let cancelledActiveCount = 0;
-      let newPaymentCreated = false;
-      if (invoice.paymenttype === "CASH") {
-        // For CASH invoices, adjust active payments to match the new total
-        if (Math.abs(newTotal - totalActivePaid) > 0.001) {
-          // Only if there's a meaningful difference
-          // Cancel all existing active payments
-          if (activeCount > 0) {
-            const cancelActiveQuery = `
-            UPDATE payments
-            SET status = 'cancelled',
-                cancellation_date = NOW(),
-                cancellation_reason = $1
-            WHERE invoice_id = $2 AND (status IS NULL OR status = 'active')
-            RETURNING payment_id, amount_paid, journal_entry_id
-          `;
-
-            const cancelledActive = await client.query(cancelActiveQuery, [
-              `Order details updated - amount changed from ${totalActivePaid.toFixed(
-                2
-              )} to ${newTotal.toFixed(2)}`,
-              id,
-            ]);
-
-            cancelledActiveCount = cancelledActive.rows.length;
-
-            // Cancel each cancelled payment's REC journal
-            for (const cancelled of cancelledActive.rows) {
-              if (cancelled.journal_entry_id) {
-                await cancelPaymentJournalEntry(
-                  client,
-                  cancelled.journal_entry_id
-                );
-              }
-            }
-          }
-
-          // Create new payment for the updated amount (if amount > 0)
-          if (newTotal > 0) {
-            // Use the invoice's own local date (not today-UTC) so the payment and
-            // its REC journal match the invoice date.
-            const invoiceDate = new Date(Number(invoice.createddate));
-            const paymentDateStr = `${invoiceDate.getFullYear()}-${String(
-              invoiceDate.getMonth() + 1
-            ).padStart(2, "0")}-${String(invoiceDate.getDate()).padStart(
-              2,
-              "0"
-            )}`;
-
-            const insertNewPaymentQuery = `
-            INSERT INTO payments (
-              invoice_id, payment_date, amount_paid, payment_method,
-              payment_reference, bank_account, notes, status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            RETURNING payment_id
-          `;
-
-            const newPaymentResult = await client.query(insertNewPaymentQuery, [
-              id,
-              paymentDateStr,
-              newTotal,
-              "cash",
-              null,
-              "CASH",
-              "Automatic payment - order details updated",
-              "active",
-            ]);
-            const newPayment = newPaymentResult.rows[0];
-
-            // Post the REC journal for the re-created payment (DR CH_REV1 / CR TR)
-            const recJournalId = await createPaymentJournalEntry(client, {
-              payment_id: newPayment.payment_id,
-              invoice_id: id,
-              payment_date: paymentDateStr,
-              amount_paid: newTotal,
-              payment_method: "cash",
-              bank_account: "CASH",
-              invoice_paymenttype: "CASH",
-              payment_reference: null,
-              created_by: req.user?.id || null,
-            });
-            await client.query(
-              "UPDATE payments SET journal_entry_id = $1 WHERE payment_id = $2",
-              [recJournalId, newPayment.payment_id]
-            );
-
-            newPaymentCreated = true;
-            console.log(
-              `Created new payment of ${newTotal.toFixed(
-                2
-              )} for CASH invoice ${id} after order details update`
-            );
-          }
-
-          console.log(
-            `Adjusted payments for CASH invoice ${id}: cancelled ${cancelledActiveCount} active payments, created new payment for ${newTotal.toFixed(
-              2
-            )}`
-          );
-        }
-      }
-
-      // Sync the sales journal to the new total (updated in place).
+      // 11. Sync the invoice-owned journal to the new total. For CASH bills
+      // this also adjusts the automatic collection payment row to the new
+      // uncollected remainder (genuine receipts are preserved untouched) and
+      // rejects the edit if recorded receipts would exceed the new total.
+      const cancelledActiveCount = 0; // auto rows are superseded inside the sync
+      const newPaymentCreated = false;
       await syncSalesJournalEntry(
         client,
         { ...invoice, totalamountpayable: newTotal },
@@ -4090,49 +3965,31 @@ export default function (pool, config) {
         });
       }
 
+      // A pending cheque receipt must be resolved before converting either way —
+      // its allocation is validated against the invoice's balance semantics.
+      const pendingReceiptCheck = await client.query(
+        `SELECT COUNT(*) AS n
+           FROM payments
+          WHERE invoice_id = $1 AND status = 'pending' AND is_auto_collection = false`,
+        [id]
+      );
+      if (parseInt(pendingReceiptCheck.rows[0].n, 10) > 0) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: `Invoice ${id} has pending cheque payment(s). Confirm or cancel them before changing the payment type.`,
+        });
+      }
+
       // Handle INVOICE to CASH conversion
       if (currentPaymentType === "INVOICE" && paymenttype === "CASH") {
-        // Create automatic payment for the outstanding balance only —
-        // any real payments already recorded keep counting toward the total
+        // The outstanding balance becomes the automatic cash collection —
+        // any real receipts already recorded keep counting toward the total.
+        // The auto-collection payment row and the CH_REV1 journal lines are
+        // maintained by syncSalesJournalEntry below.
         const paymentAmount = parseFloat(currentInvoice.balance_due || 0);
-        const paymentDate = new Date(Number(currentInvoice.createddate))
-          .toISOString()
-          .split("T")[0]; // YYYY-MM-DD format
 
         if (paymentAmount > 0) {
-          const insertPaymentQuery = `
-        INSERT INTO payments (invoice_id, payment_date, payment_method, amount_paid, bank_account, notes, status)
-        VALUES ($1, $2, 'cash', $3, 'CASH', 'Automatic payment - converted from INVOICE to CASH', 'active')
-        RETURNING payment_id
-      `;
-
-          const insertPaymentResult = await client.query(insertPaymentQuery, [
-            id,
-            paymentDate,
-            paymentAmount,
-          ]);
-          const autoPaymentId = insertPaymentResult.rows[0].payment_id;
-
-          // Post the cash receipt journal (DR Cash / CR Trade Receivables),
-          // matching the auto-payment created at CASH invoice creation
-          const journalEntryId = await createPaymentJournalEntry(client, {
-            payment_id: autoPaymentId,
-            invoice_id: id,
-            payment_date: paymentDate,
-            amount_paid: paymentAmount,
-            payment_method: "cash",
-            bank_account: "CASH",
-            invoice_paymenttype: "CASH",
-            payment_reference: null,
-            created_by: req.user?.id || null,
-          });
-
-          await client.query(
-            "UPDATE payments SET journal_entry_id = $1 WHERE payment_id = $2",
-            [journalEntryId, autoPaymentId]
-          );
-
-          // Reduce customer credit usage by the settled outstanding amount
+          // Reduce customer credit usage by the auto-settled outstanding amount
           await updateCustomerCredit(
             client,
             currentInvoice.customerid,
@@ -4142,7 +3999,7 @@ export default function (pool, config) {
 
         // Update invoice to CASH type with zero balance and paid status
         const updateInvoiceQuery = `
-        UPDATE invoices 
+        UPDATE invoices
         SET paymenttype = $1, balance_due = 0, invoice_status = $2
         WHERE id = $3
         RETURNING id
@@ -4152,13 +4009,12 @@ export default function (pool, config) {
       }
       // Handle CASH to INVOICE conversion
       else if (currentPaymentType === "CASH" && paymenttype === "INVOICE") {
-        // Cancel ALL active automatic payments. Two note texts exist in the data:
-        // "Automatic payment ..." (backend default / conversions) and
-        // "Payment automatically recorded for CASH invoices" (sent by the invoice form)
+        // Cancel the active automatic collection rows (explicit flag — never
+        // note-text inference). Genuine receipts stay counted.
         const findPaymentQuery = `
         SELECT payment_id, journal_entry_id FROM payments
         WHERE invoice_id = $1
-        AND (notes LIKE 'Automatic payment%' OR notes LIKE 'Payment automatically recorded%')
+        AND is_auto_collection = true
         AND (status IS NULL OR status = 'active')
       `;
 
@@ -4176,7 +4032,7 @@ export default function (pool, config) {
 
           await client.query(cancelPaymentQuery, [payment.payment_id]);
 
-          // Reverse the payment's journal entry (auto-payments post DR Cash / CR AR)
+          // Cancel a legacy journal still attached to the auto row (pre-refactor data)
           if (payment.journal_entry_id) {
             await cancelPaymentJournalEntry(client, payment.journal_entry_id);
           }
@@ -4366,53 +4222,15 @@ export default function (pool, config) {
         throw new Error("Failed to update invoice");
       }
 
-      // Compute the new local yyyy-MM-dd once (server runs Asia/Kuala_Lumpur).
-      // TO_TIMESTAMP in the DB session (UTC) would shift pre-8am dates back a day.
-      const newDate = new Date(timestamp);
-      const newDateStr = `${newDate.getFullYear()}-${String(
-        newDate.getMonth() + 1
-      ).padStart(2, "0")}-${String(newDate.getDate()).padStart(2, "0")}`;
-
-      // Update associated payments' dates to match the new invoice date
-      const updatePaymentsQuery = `
-        UPDATE payments
-        SET payment_date = $1
-        WHERE invoice_id = $2
-          AND (status IS NULL OR status != 'cancelled')
-        RETURNING payment_id, payment_date
-      `;
-
-      const paymentsResult = await client.query(updatePaymentsQuery, [
-        newDateStr,
-        id,
-      ]);
-
-      // Log the updated payments for debugging
-      if (paymentsResult.rows.length > 0) {
-        console.log(
-          `Updated ${paymentsResult.rows.length} payment(s) for invoice ${id} to new date`
-        );
-      }
-
-      // Re-date the sales journal (updated in place via sync).
+      // Re-date the invoice-owned journal and the automatic collection row via
+      // the sync (only the auto-collection follows the invoice date). GENUINE
+      // receipts keep their own real receipt dates and journals — a later
+      // payment's date is a fact about when the money arrived, not about the
+      // invoice.
       await syncSalesJournalEntry(
         client,
         { ...invoice, createddate },
         req.user?.id || null
-      );
-
-      // Re-date the payment receipt (REC) journals to the new invoice date.
-      await client.query(
-        `UPDATE journal_entries
-            SET entry_date = $1, updated_at = NOW()
-          WHERE status = 'posted'
-            AND id IN (
-              SELECT journal_entry_id FROM payments
-               WHERE invoice_id = $2
-                 AND journal_entry_id IS NOT NULL
-                 AND (status IS NULL OR status != 'cancelled')
-            )`,
-        [newDateStr, id]
       );
 
       await client.query("COMMIT");
