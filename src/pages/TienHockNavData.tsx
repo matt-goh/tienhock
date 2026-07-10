@@ -524,6 +524,20 @@ export const TienHockNavData: SidebarItem[] = [
             name: "New Adjustment Document",
             path: "/sales/adjustment-docs/new",
             component: AdjustmentDocsFormPage,
+          },
+          {
+            name: "New Credit Note",
+            path: "/sales/adjustment-docs/new?type=credit",
+            showInPopover: true,
+          },
+          {
+            name: "New Debit Note",
+            path: "/sales/adjustment-docs/new?type=debit",
+            showInPopover: true,
+          },
+          {
+            name: "New Refund Note",
+            path: "/sales/adjustment-docs/new?type=refund",
             showInPopover: true,
           },
           {

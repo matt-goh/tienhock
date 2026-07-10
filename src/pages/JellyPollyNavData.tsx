@@ -331,6 +331,20 @@ export const JellyPollyNavData: SidebarItem[] = [
             name: "New Adjustment Document",
             path: "/sales/adjustment-docs/new",
             component: JPAdjustmentDocsFormPage,
+          },
+          {
+            name: "New Credit Note",
+            path: "/sales/adjustment-docs/new?type=credit",
+            showInPopover: true,
+          },
+          {
+            name: "New Debit Note",
+            path: "/sales/adjustment-docs/new?type=debit",
+            showInPopover: true,
+          },
+          {
+            name: "New Refund Note",
+            path: "/sales/adjustment-docs/new?type=refund",
             showInPopover: true,
           },
           {
