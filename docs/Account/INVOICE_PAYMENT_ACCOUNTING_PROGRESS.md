@@ -145,7 +145,7 @@ Defaults (editable at the owning source; override persisted; resync never erases
 | Phase | Content | Status |
 |---|---|---|
 | 0 | Evidence gate, DB re-query, code audit, frozen contracts, this doc | ✅ complete 10 Jul 2026 |
-| 1 | Receipt header/allocation + bank-in source schema, reference/description/idempotency fields, dry-run + idempotent migrations, schema docs | ⬜ |
+| 1 | Receipt header/allocation + bank-in source schema, reference/description/idempotency fields, dry-run + idempotent migrations, schema docs | ✅ complete 10 Jul 2026 (see §5a) |
 | 2 | Invoice + receipt posting across all lifecycle paths; atomic grouped receipt API/UI; backfill stale REC journals | ⬜ |
 | 3 | RV bank-in UI/backend; real DR bank / CR holding journals; cutover isolation of BANK_LINKED_ACCOUNTS; manual cheque fallback | ⬜ |
 | 4 | CN/DN/RN accounts/references/dates/descriptions/reports; migrate existing CN journals; DN/RN tests | ⬜ |
@@ -155,6 +155,35 @@ Defaults (editable at the owning source; override persisted; resync never erases
 | 8 | CashReceiptVoucher print cleanup, connected reports, changelog (BM+EN), doc refresh, final bug-scan offer | ⬜ |
 
 Per-phase "files changed" and "verification queries/results" sections get appended here as phases execute.
+
+### 5a. Phase 1 — executed 10 Jul 2026
+
+**Files:**
+- `dev/migrations/2026-07-10_receipts_bankins_foundation.sql` — new tables `receipts`, `receipt_allocations`, `rv_registry`, `bank_ins`, `bank_in_groups`, `bank_in_allocations`; new columns `journal_entries.display_reference/posting_sequence/source_type/source_id`, `journal_entry_lines.cheque_reference/display_order`, `invoices.accounting_description`; journal source-link backfill; partial unique index = one posted journal per (source_type, source_id).
+- `dev/migrations/2026-07-10_receipts_bankins_dryrun.sql` — read-only report of every §6 dry-run category (sections A–Q).
+- `CLAUDE.md` + `AGENTS.md` — schema docs updated (78 → 84 tables).
+
+**Execution order (dev applied; prod pending):** dry-run (before) → foundation → foundation again (idempotency) → dry-run (after).
+
+**Verification results (dev DB, 10 Jul 2026):**
+- Migration applied cleanly; backfill linked 525 invoice + 2,890 payment + 21 adjustment + 28 self-billed journals (`purchase_invoices`/`supplier_payments` empty → 0; B/C/J/JVDR/PUR journals correctly stay unlinked = manual).
+- Rerun: all seven backfill UPDATEs = 0 rows; every CREATE skipped; COMMIT — **idempotent**.
+- Balance-invariant snapshot (posted DR/CR per CH_REV1/CH_REV2/CASH_SALES/CR_SALES/BANK_PBB/TR) **byte-identical before/after** — no financial change.
+- Duplicate-source guard found no duplicates; no journal is referenced by more than one payment (dry-run K = 0 rows).
+
+**Dry-run findings (full output regenerable any time; data entry is ongoing so numbers move):**
+- A: 4,959 active payments (2,574 with journals — the ~2,385 without are almost all pre-cutover 2025 rows, superseded by the 1 June anchors), 623 cancelled, 21 pending cheques (no journals ✓).
+- B/N: the June cash×INVOICE population shrank from 56 rows / 178,230.20 (morning) to **13 rows / 10,082.70** — data entry actively reclassifying. **12 of the 13 match the legacy CH_REV2 June debits exactly (7,202.70, refs C63740/C015333…C015373)**; the sole anomaly is payment 5229: invoice `015361`/YESOKEY 2,880.00 on 13/06 — legacy books the credit sale in CR_SALES but shows **no settlement anywhere in June** (open question §8-9).
+- C/C2: multi-invoice grouped receipts are pervasive year-round (e.g. cheque PBB676010 = 13 invoices / 79,952.50). `TF040626-2` = payments 5202+5203 (729.00+900.00 = 1,629.00 ✓ plan fixture 6); TF040626-4/-5 similarly split (1,472.60+256.50; 1,453.50+1,098.00) matching the bank fixture exactly.
+- D: only 2 blank-reference non-cash payments (707.00).
+- E: 0 overpaid rows — deliberate overpayment/DN/RN tests required later (plan Phase 4).
+- F: cash payments on CASH invoices: 2,495 same-day (auto cash-bill candidates) vs 468 different-day / 580,700.70 (mostly keying-date noise; Phase 2 must re-date automatic collections to the invoice local date and flag genuine ones).
+- H: 247 cancelled payments still holding POSTED journals = 886,011.20 (Jan–Jul 2026) — Phase 2 cancels these journals.
+- I: 4 payment_reference values reused across dates — grouping keys on (reference, date, account), never reference alone.
+- L: all 21 CNs debit `RETURN` and are dated 23/06 / 26/06 / 01/07. Numbering aligns 1:1 with legacy THCN/26/n. **THCN/26/1–16 belong to pre-June legacy dates** (their invoices are Jan–May), so Phase 4 re-dating moves them before the cutover where the CR_SALES anchor supersedes them; only 17–19 (10/06) and 20–21 (30/06) land in June = legacy's 158.35. Legacy dates for 1–16 must come from the user/legacy CN listing (§8-10).
+- M: REC journals: 2,297 posted pre-cutover (4.0M; superseded by anchors), 509 posted in-window, 15 posted dated ≥ today (10/07–07/08; the >10/07 ones are keying typos, §8-7).
+- O: no manual journals use an RV-pattern reference — the registry namespace is clean.
+- P: June CH_REV1 pools by CASH-invoice local date: **04/06 = 17,747.60 exactly** (plan fixture 5: 13,280.00 banked 04/06 + 4,467.60 banked 10/06); 22 pool dates total, ready for Phase 3 pool availability.
 
 ---
 
@@ -202,16 +231,18 @@ One reconciliation script (read-only SQL through the dev docker psql) reporting,
 
 **Still open:**
 
-5. **Payment-method misclassification cleanup:** 56 June payments keyed "cash" against credit invoices (178,230.20) are mostly direct bank transfers per legacy. The dry-run will propose per-payment reclassification by matching legacy bank rows; confirm the matching output before the rebuild. Same pass will enumerate the CH_REV1 June debit gap (~3,429.00); genuine ERP-only receipts get named in the reconciliation output like 015375.
-6. **Non-sales RVs** (drawing-worker repayments, vendor refunds): manual RV journal with user-confirmed contra is assumed; confirm contras when they recur.
-7. Future-dated REC journal(s) up to 2026-08-07 — data-entry typo(s) to fix by hand.
+5. **Payment-method misclassification cleanup — nearly resolved by data entry:** as of the 10 Jul dry-run only 13 June cash×INVOICE payments remain, of which 12 = the legacy CH_REV2 population exactly (7,202.70). Regenerate worksheet N at Phase 2 execution time (data entry ongoing).
+6. **Non-sales RVs** (drawing-worker repayments, vendor refunds): manual RV journal with user-confirmed contra is assumed; they reserve numbers in `rv_registry` (source_type manual_journal); confirm contras when they recur.
+7. Future-dated posted REC journals (after 10 Jul, up to 2026-08-07; dry-run M) — data-entry typos for the user to fix by hand.
 8. Per instructions, no build/typecheck/lint will be run unless requested.
+9. **Invoice `015361` / YESOKEY 2,880.00 cash receipt dated 13/06 (payment 5229):** legacy CR_SALES has the credit sale on 13/06 but shows NO settlement in CH_REV2, CH_REV1, or BANK_PBB through 30/06. Ask the user: was this actually received in July (re-date), keyed in error (cancel), or a genuine unrecorded-by-legacy receipt (named difference like 015375)?
+10. **Legacy dates for THCN/26/1–16:** the 16 pre-June CNs (ERP docs CN-2026-0001…0016, all keyed 23/06–26/06) need their real legacy document dates before Phase 4 re-dating; source: user / legacy CN listing (not in the six OCR'd PDFs).
 
 ---
 
 ## 9. Exact next action
 
-**Start Phase 1** (user to switch the session to high effort first): design the receipt header/allocation + bank-in schema and write the read-only dry-run script of §6 against the dev DB. §8 decisions 1–4 are locked; decision 5 (payment reclassification matching) is produced *by* the dry-run and confirmed before any rebuild.
+**Start Phase 2 — invoice and receipt posting.** Order of work: (1) one accounting service for invoice journals across create/edit/resync/convert/cancel paths incl. invoice-owned cash-bill collection (DR CH_REV1 / CR CASH_SALES), zero-bill informational lines, `accounting_description` override, and re-dating automatic collections to the invoice local date; (2) atomic grouped receipt API (header+allocations) + Tien Hock UI replacing the PaymentForm per-invoice POST loop (keep the `/api/payments` endpoints JP-compatible); (3) Phase 2 data migration with dry-run: group existing payments into receipts (worksheet C), cancel the 247 posted journals of cancelled payments (H), backfill the missing June journals (G, in-window only), rebuild June REC journals to the frozen contract, regenerate worksheet N and apply the §8-5/§8-9 decisions. Pre-cutover payments stay as-is (anchors supersede).
 
 ---
 
