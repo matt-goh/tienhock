@@ -149,7 +149,7 @@ Defaults (editable at the owning source; override persisted; resync never erases
 | 2 | Invoice + receipt posting across all lifecycle paths; atomic grouped receipt API/UI; backfill stale REC journals | ✅ complete 10 Jul 2026 (see §5b) |
 | 3 | RV bank-in UI/backend; real DR bank / CR holding journals; cutover isolation of BANK_LINKED_ACCOUNTS; manual cheque fallback | ✅ complete 10 Jul 2026 (see §5c) |
 | 4 | CN/DN/RN accounts/references/dates/descriptions/reports; migrate existing CN journals; DN/RN tests | ✅ complete 10 Jul 2026 (see §5d) |
-| 5 | Full five-ledger row-by-row June reconciliation vs fixtures (gate for Phase 6) | ⬜ |
+| 5 | Full five-ledger row-by-row June reconciliation vs fixtures (gate for Phase 6) | ✅ complete 10 Jul 2026 (see §5e) — gate PASSED; residuals are user entries/July timing |
 | 6 | Customer debtor child postings + historical rewrite (per debtor handover doc) | ⬜ |
 | 7 | Account Ledger TimeNavigator ranges; debtor anchors → General Statement BAL B/F; Customer Statement corrections; C-CARE validation | ⬜ |
 | 8 | CashReceiptVoucher print cleanup, connected reports, changelog (BM+EN), doc refresh, final bug-scan offer | ⬜ |
@@ -266,6 +266,28 @@ Per-phase "files changed" and "verification queries/results" sections get append
 
 **Known numbering note:** the ERP's own CN document numbering restarted at TH-CN-26-1 while legacy had reached THCN/26/21; the two July-created docs map to legacy 20/21 (handled), but FUTURE CNs will print TH/CN/26/N with N continuing from the ERP sequence, not the legacy one. Renumbering documents is out of scope (document numbers may be on e-Invoices).
 
+### 5e. Phase 5 — executed 10 Jul 2026 — **RECONCILIATION GATE PASSED**
+
+**Tooling (dev): ** `dev/migrations/2026-07-10_phase5_recon_tool.sql` — loads the five fixture CSVs into `recon.fixture_rows` (loader commands in the header), matches every ERP posted line against every fixture row on (ledger, date, side, amount, normalized visible reference) with duplicate-safe row numbering, and checks within-day print order by comparing matched-row ranks. Re-runnable any time.
+
+**Data corrections applied (all idempotent, dev applied):**
+- `dev/migrations/2026-07-10_phase5_bank_receipts_migration.sql` — (A) the 14 legacy June cheque-clear rows rebuilt as receipts posted on their clear dates, matched by INVOICE LIST (references were keyed inconsistently); three source cases handled: active payments (link only), PENDING cheques (this was their clearance — balances/credit applied now, e.g. the TETAPJAYA MBB932037 family and ALB001088/MORE 20,668.60), and SEVEN never-keyed receipts created from the bank statement as source document (TF030626, TF090626-1/-2, TR090626, TT090626, TT180626-1, PBB152961, PIB437391 — invoice balances settled). (B) four date-shifted clears re-dated + reference typos fixed (ALB00106→ALB000106, MBB000757→MIB000757). (C) PBB678670 62,543.40 re-split into the four legacy per-customer receipts (-/-1/-2/-3).
+- `dev/migrations/2026-07-10_phase5_reference_fixes.sql` — deterministic 1:1 visible-reference fixes: TT040626-6/-7→TF040626-6/-7, the TT190626↔TT190626-3 suffix swap, TF190626-2→TR190626-2, manual PCE001..008/06 journals display as PV001..008/06, manual PBE001/06 re-dated 01/06→04/06.
+- `src/routes/accounting/bank-statement.js` — within-day ordering now sorts by the resolved visible Journal reference (legacy's own print order, proven by the fixtures) with posting_sequence as an optional override; **future months order themselves automatically**.
+
+**Final recon results (10 Jul 2026):**
+| Ledger | Matched | Legacy-only | ERP-only | Within-day order mismatches |
+|---|---|---|---|---|
+| CH_REV2 | 20 | 0 | 0 | **0** |
+| CH_REV1 | 279 | 4 zero rows | 27 zero rows + 015375 (+34.00 approved) | **0** |
+| CASH_SALES | 210 | 4 zero rows | 27 zero rows | **0** |
+| CR_SALES | 183 | 015359 @ 08/06 | 015359 @ 09/06 + 6 zero rows | **0** |
+| BANK_PBB | 271 | 7 rows = 32,918.40 (5 manual RVs 6,454.00 + PBE037/06 14,700.00 + PV008/06 11,764.40) | 5 rows = 40,517.50 (July clears 39,090.10 + PCE008/06 credit 1,427.40) | **0** |
+
+Every monetary difference is a named bridge: user manual entries pending, July-clearing cheques, the approved 015375, one invoice-date question (015359), and zero-value informational rows (legacy prints 4 F-series zero bills the ERP lacks; the ERP prints 27 zero bills legacy didn't). **The Phase 6 debtor gate is open.**
+
+**Frontend forward-path (user requirement: future months must be generatable from the app — VERIFIED):** invoices post their journals on save/edit/convert (all UI paths); PaymentForm + InvoiceDetailsPage post receipts through `/api/receipts`/`/api/payments`; Accounting → Cash Bank-In (RV) posts RVs with auto-numbering and live pool balances; the CN/DN/RN forms post contract-correct journals with the document date picker; Account Ledger (+PDF) reads the resolved Journal/Cheque columns and legacy ordering for ANY month with no further backfills. The only recurring manual work is what was always manual: PBE/PV/JV bank outflows and non-sales RVs via Journal Entries.
+
 ---
 
 ## 6. Migration dry-run design (Phase 1 deliverable; read-only)
@@ -323,7 +345,14 @@ One reconciliation script (read-only SQL through the dev docker psql) reporting,
 
 ## 9. Exact next action
 
-**Start Phase 5 — full five-ledger row-by-row June reconciliation (the gate for Phase 6 debtor work).** Build the reconciliation tool: load the six fixture CSVs into scratch tables, match ERP posted lines per ledger on (date, visible Journal ref, side, amount, within-day ordinal) with normalization (whitespace/colons in particulars; ref variants like ALB00106→ALB000106), and emit matched/legacy-only/ERP-only reports. Then work the §5c bank worklist: (1) re-date/rebuild the ~64.5k pre-cutover-received cheques cleared in June as receipts on their legacy clear dates; (2) apply the four date-shift fixes; (3) re-split PBB678670 into its four per-customer receipts (display refs PBB678670/-1/-2/-3); (4) decide the two July-cleared ERP-only groups (re-date to clear dates vs bridge); (5) USER keys the five manual RVs (contras needed: RV021/022 drawing workers, RV048, RV082 CTOS refund, RV083 Puncak Niaga refund) + TJ050626 594.10; (6) backfill `posting_sequence` from the fixture day ordinals for reconciled June rows; (7) produce the final bridge report (015375 +34.00 CH_REV1; unbanked-cash notes) and record Phase 5 sign-off here before any Phase 6 debtor posting.
+**USER worklist (June close-out — all remaining bridges):**
+1. Key the five manual RVs via Journal Entries (numbers reserved in `rv_registry`; each = DR BANK_PBB / CR your confirmed contra): RV021/06 3,054.90 + RV022/06 1,750.00 (FROM DRAWING WORKERS, 10/06), RV048/06 1,500.00 (24/06), RV082/06 143.70 (CTOS refund, 30/06), RV083/06 5.40 (Puncak Niaga refund, 30/06).
+2. Key manual PBE037/06 (JOHOR BAHRU FLOUR MILL, 14,700.00 credit, 15/06).
+3. Check PCE008/06: keyed as 1,427.40 credit on 30/06, but legacy PV008/06 is 11,764.40 (CLAIM BILLS/DRAWING WORKERS/SALARY 06/2026) — correct the amount or key the difference.
+4. Invoice 015359 (6,365.00): ERP dated 09/06, legacy CR_SALES prints 08/06 — re-date the invoice if desired (touches the invoice document; e-Invoice caution).
+5. July: when the July bank statement arrives, reconcile CIMBI008054 11,920.60 and the MBB932202 family 27,169.50 (June-keyed cheques that cleared in July).
+
+**Then start Phase 6 — customer debtor child postings** (gate passed): follow `CUSTOMER_DEBTOR_SUBLEDGER_JOURNALS_HANDOVER.md` — extend `debtorSync.js` with `getCustomerDebtorAccountCode` + safe customer-ID-change handling; post new S/receipt/CN/DN/paired-RN receivable lines to the customer debtor child instead of TR (invoice journal service, receipt service, adjustment accounting — all now single-owner services, so each needs one change); idempotent historical rewrite of mappable posted TR lines through the source links (invoices/receipts/adjustments); keep aggregate `DEBTOR`/`TR` views and concise Trial Balance grouping; verify the C-CARE(1) June bridge (8,748.00 → 11,788.00) against the fixture.
 
 ---
 

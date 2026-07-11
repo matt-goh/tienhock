@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-10",
+    ms: "Laporan Account Ledger kini memaparkan rujukan Journal sebenar (nombor bil, nombor RV, THCN, rujukan pindahan seperti TF040626-2) dan lajur Cheque yang berasingan, dengan susunan baris dalam setiap hari mengikut cetakan buku lama. Lejar Jun 2026 telah disemak baris demi baris dengan buku lama untuk kelima-lima akaun utama.",
+    en: "The Account Ledger report now shows the real Journal references (bill numbers, RV numbers, THCN, transfer references like TF040626-2) and a separate Cheque column, with rows within each day ordered exactly like the legacy book's printout. The June 2026 ledgers have been verified row-by-row against the legacy books for all five core accounts.",
+  },
+  {
+    date: "2026-07-10",
     ms: "Nota Kredit kini mengurangkan lejar jualan asal (CREDIT SALES atau CASH SALES) dan bukannya akaun pulangan berasingan, dan Nota Debit menambah kepada lejar jualan yang sama. Catatan perakaunan nota pelarasan kini memaparkan nombor dokumen sebenar (contoh THCN/26/17) pada tarikh dokumen itu sendiri; nota kredit lama telah diselaraskan dengan buku lama supaya lejar CREDIT SALES Jun sepadan.",
     en: "Credit Notes now reduce the original sales ledger (CREDIT SALES or CASH SALES) instead of a separate returns account, and Debit Notes add to the same sales ledger. Adjustment note accounting entries now show the real document number (e.g. THCN/26/17) on the document's own date; the older credit notes have been aligned with the legacy book so the June CREDIT SALES ledger matches.",
   },

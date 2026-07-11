@@ -178,6 +178,7 @@ export default function (pool) {
             AND je.entry_date < $3
           ORDER BY je.entry_date ASC,
                    je.posting_sequence ASC NULLS LAST,
+                   COALESCE(jel.display_reference, je.display_reference, je.reference_no) ASC,
                    je.id ASC,
                    jel.display_order ASC NULLS LAST,
                    jel.line_number ASC`,
