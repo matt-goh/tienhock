@@ -147,7 +147,7 @@ Defaults (editable at the owning source; override persisted; resync never erases
 | 0 | Evidence gate, DB re-query, code audit, frozen contracts, this doc | ✅ complete 10 Jul 2026 |
 | 1 | Receipt header/allocation + bank-in source schema, reference/description/idempotency fields, dry-run + idempotent migrations, schema docs | ✅ complete 10 Jul 2026 (see §5a) |
 | 2 | Invoice + receipt posting across all lifecycle paths; atomic grouped receipt API/UI; backfill stale REC journals | ✅ complete 10 Jul 2026 (see §5b) |
-| 3 | RV bank-in UI/backend; real DR bank / CR holding journals; cutover isolation of BANK_LINKED_ACCOUNTS; manual cheque fallback | ⬜ |
+| 3 | RV bank-in UI/backend; real DR bank / CR holding journals; cutover isolation of BANK_LINKED_ACCOUNTS; manual cheque fallback | ✅ complete 10 Jul 2026 (see §5c) |
 | 4 | CN/DN/RN accounts/references/dates/descriptions/reports; migrate existing CN journals; DN/RN tests | ⬜ |
 | 5 | Full five-ledger row-by-row June reconciliation vs fixtures (gate for Phase 6) | ⬜ |
 | 6 | Customer debtor child postings + historical rewrite (per debtor handover doc) | ⬜ |
@@ -216,6 +216,36 @@ Per-phase "files changed" and "verification queries/results" sections get append
 - Cancelling one payment of a multi-invoice receipt is blocked with a message naming the receipt; cancel the receipt to reverse all its invoices together.
 - Editing an invoice's order details no longer cancels genuine receipts; it only adjusts the automatic collection.
 
+### 5c. Phase 3 — executed 10 Jul 2026
+
+**Code (files changed):**
+- `src/routes/accounting/bank-in-service.js` — NEW: shared RV registry (`getNextRvNumber`/`reserveRvNumber`, race-safe via the unique constraints, month-scoped `RV###/MM`, cancelled numbers stay reserved); CH_REV1 pool availability (per-date for dates ≥ cutover from posted S-journal CH_REV1 debits; ONE aggregate anchor-seeded pool for pre-cutover dates); CH_REV2 unbanked-receipt availability; `createBankIn` (advisory locks per pool date + receipt row locks; over-banking blocked; one DR bank line PER group + ONE aggregated CR per holding account; editable per-group descriptions with contract default `SALES CASH FROM {date} BANK IN`); `cancelBankIn` (journal cancelled, registry stays reserved, amounts return to pools).
+- `src/routes/accounting/bank-ins.js` + mount — `/api/bank-ins` (next-rv, pools, list/detail, POST, cancel). Journal `entry_type='RV'` (added to `journal_entry_types`), internal ref `BI-{registry_id}`, `display_reference` = RV number, source_type `bank_in`.
+- `src/routes/accounting/bank-statement.js` — cutover isolation: `BANK_LINKED_ACCOUNTS` synthetic CH_REV* projection now applies ONLY to lines dated before `2026-06-01` in every path (anchor movement, derived opening, month rows/totals); Journal column resolves `COALESCE(jel.display_reference, je.display_reference, reference_no)`; Cheque column resolves `COALESCE(jel.cheque_reference, je.cheque_no)` (never the Journal ref); ordering honours `posting_sequence`/`display_order`.
+- `src/pages/Accounting/BankInPage.tsx` + nav (Accounting → Generation → "Cash Bank-In (RV)") — pools table (collected/banked/remaining, partial amount input, pre-June opening row), CH_REV2 receipt selection with customer grouping (auto one group per customer, RV052/074 pattern), editable RV number + group descriptions at preview, post + cancel.
+
+**Migration (dev applied; prod pending, after the Phase 1+2 files):** `dev/migrations/2026-07-10_bankins_phase3_import.sql` — 'RV' journal type; ONE `import_opening` CH_REV2 receipt (34869 530.00 + 34891 530.00 TEO; the 0.05 anchor residual stays unanalysed); RV001–RV081/06 imported as real bank_ins/groups/allocations/journals with exact legacy particulars (`SALES DD/MM/YYYY`; CH_REV2 RVs use the legacy INV/NO texts, split bank rows for RV052/RV074, aggregated holding credit); RV021/022/048/082/083 reserved as `import` (manual, no journal). Idempotent (rerun skips: "June 2026 RVs already imported").
+
+**Verification (dev DB, June 2026, vs fixtures):**
+| Check | Result |
+|---|---|
+| CH_REV1 credits | **214,784.90 — legacy exact** |
+| CH_REV2 credits | **8,145.20 — legacy exact** |
+| CH_REV1 closing | 34,224.55 = legacy 34,190.55 + 34.00 (015375 only) |
+| CH_REV2 closing | **117.55 — legacy exact** |
+| 04/06 pool (fixture 5) | collected 17,747.60, banked 17,747.60, remaining **0.00** |
+| RV registry June | 83 numbers: 78 bank-ins + 5 manual reservations; gaps/sequence intact |
+| BANK_PBB June DR | 653,556.89 vs legacy 685,388.69 — every missing/extra row NAMED (worklist below) |
+
+**Phase 5 bank worklist (row-by-row diff of BANK_PBB June debits; arithmetic closes exactly: 653,556.89 + 141,846.40 − 110,014.60 = 685,388.69):**
+1. Manual non-sales RVs for the USER to key (numbers reserved): RV021/06 3,054.90 + RV022/06 1,750.00 (FROM DRAWING WORKERS), RV048/06 1,500.00, RV082/06 143.70 (CTOS refund), RV083/06 5.40 (Puncak Niaga refund) — contra accounts to confirm.
+2. TJ050626 594.10 (Jelly Polly invoice 004697/JP) — manual journal or account-type receipt against debtor `JP` (§8-4).
+3. **Pre-cutover-received cheques cleared in June (~64.5k)**: TF030626 206.40; PIB439770 2,088.00; RHB022790 9,604.90; TF090626/-1/-2 + TR090626 + TT090626 block 8,091.00 (09/06); ALB001088 20,668.60; TT180626-1 1,325.00; MBB932037-J/-P 17,881.50; PBB152961 2,460.00; PIB437391 2,142.50 — their ERP payments are pre-June with old May-dated REC journals sitting behind the anchor; Phase 5 re-dates/rebuilds them as receipts posted on the legacy clear dates.
+4. Date-shifted clears (ERP keyed received date, legacy posts clear date): PBB023159 13→15/06, MBB000750 20→22/06, ALB00106 (ref typo, legacy ALB000106) 23→24/06, MBB000757 (legacy MIB000757) 27→29/06 — re-date + ref fixes.
+5. PBB678670 62,543.40: ERP one aggregated receipt vs legacy FOUR per-customer rows (PBB678670/-1/-2/-3) — re-split into per-customer-group receipts with suffixed display refs.
+6. ERP-only June rows whose legacy clears fall in July (timing bridges or re-date to clear dates): CIMBI008054 11,920.60 (13/06), MBB932202/-I/-N 27,169.50 (30/06).
+7. Credit side (619,901.48 vs 644,938.48): user still keying PBE/PV/JV manual outflows — outside this refactor's scope except the Cheque display contract.
+
 ---
 
 ## 6. Migration dry-run design (Phase 1 deliverable; read-only)
@@ -244,9 +274,9 @@ One reconciliation script (read-only SQL through the dev docker psql) reporting,
 |---|---|---|---|
 | CASH_SALES | 214 tx (incl. 7 zero rows) | ✅ CR 213,365.10 exact; zero informational rows posted | row-by-row diff in Phase 5 |
 | CR_SALES | 184 tx | ✅ credits 513,062.80 exact; THCN debits still in RETURN (wrong date/ref) | Phase 4 |
-| CH_REV1 | 283 tx | ✅ debits 213,365.10 = legacy + 34.00 (015375, approved); credits await RVs | Phase 3 |
-| CH_REV2 | 20 tx | ✅ debits 7,202.70 exact (12 rows, C-refs); credits await RVs | Phase 3 |
-| BANK_PBB | 278 tx | DR 430,626.79 vs 685,388.69 (RV debits pending); CR 619,901.48 vs 644,938.48 | Phase 3 (RVs) + manual-entry completion |
+| CH_REV1 | 283 tx | ✅ debits 213,365.10 (= legacy + approved 34.00) AND credits 214,784.90 exact; closing 34,224.55 | Phase 5 row diff only |
+| CH_REV2 | 20 tx | ✅ debits 7,202.70 AND credits 8,145.20 exact; **closing 117.55 = legacy exact** | Phase 5 row diff only |
+| BANK_PBB | 278 tx | DR 653,556.89 vs 685,388.69 — all remaining rows named in §5c worklist; CR 619,901.48 vs 644,938.48 (user manual entries) | Phase 5 worklist |
 | C-CARE(1) | 31 rows (Jan–Jun) | anchor ✅ 8,748.00; no child postings yet | Phase 6–7 |
 
 ---
@@ -273,7 +303,7 @@ One reconciliation script (read-only SQL through the dev docker psql) reporting,
 
 ## 9. Exact next action
 
-**Start Phase 3 — RV cash bank-in and the true bank ledger.** Order of work: (1) RV registry service (shared `RV###/MM` prefill/validate/reserve, race-safe, month-scoped); (2) bank-in service + `/api/bank-ins` (groups, CH_REV1 date-pool availability incl. anchor-seeded pre-cutover pools and partial amounts, CH_REV2 unbanked-receipt selection incl. the import_opening seeds for 34869/34891 TEO, over-banking locks, editable group descriptions, cancellation returning amounts to the pool); (3) posting DR bank / CR holding per group; (4) Tien Hock RV bank-in page; (5) cutover isolation of `BANK_LINKED_ACCOUNTS` in `bank-statement.js` (synthetic projection only for dates < 2026-06-01 in EVERY calculation path) + Cheque column fallback `COALESCE(jel.cheque_reference, je.cheque_no)`; (6) seed `receipts.origin='import_opening'` rows / opening pools per §4e; (7) verify June BANK_PBB debits reach 685,388.69 − manual-entry gaps, and CH_REV1/CH_REV2 credits match fixtures (214,784.90 / 8,145.20).
+**Start Phase 4 — CN/DN/RN accounting.** Order of work: (1) rewrite `src/routes/sales/adjustment-docs/accounting.js` to the frozen contract — CN: DR original revenue ledger (CR_SALES / CASH_SALES per the invoice's paymenttype) + proven output-tax reversal / CR TR; DN: DR TR / CR original revenue; RN unchanged (paired DR TR / standalone DR CUST_DEP); visible accounting reference = the document display number (THCN/26/n style via `formatAdjustmentDocId`), accounting date = the document date, descriptions from entered reason; source_type='adjustment' links; (2) Phase 4 migration: rewrite the 21 existing CN journals (RETURN→revenue account, JCN refs→THCN/26/n display refs, dates: 0017–0019→2026-06-10, TH-CN-26-1/2→2026-06-30, 0001–0016→**2026-05-31** per §8-10), idempotent + dry-run listing; (3) June CR_SALES verification: THCN debits 158.35 land 10/06+30/06, closing 2,809,873.38 CR against the imported anchor; (4) deliberate DN/RN test scenarios (none exist in dev); (5) verify `credit_used`/balance cascades unchanged; changelog + docs. Note: `jellypolly` shares the adjustment accounting module — confirm JP compatibility before editing.
 
 ---
 

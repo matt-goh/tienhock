@@ -6,13 +6,16 @@
 // with a running balance. The account is treated as debit-normal (an asset), so
 // a debit increases the balance and a credit decreases it.
 //
-// Linked accounts: some ledgers surface posted lines from other accounts as
-// money-in (a bank DEBIT). BANK_PBB pulls in the cash-received accounts so the
-// bank book reads as a cash book. Only the cash-received accounts (CH_REV*) are
-// linked — NOT the CASH_SALES/CR_SALES revenue accounts, which are the accrual
-// counterpart of the same bills and would double-count the cash collected.
-// CH_REV* are already debit-normal, so their money-in DEBIT is kept as recorded.
-// See BANK_LINKED_ACCOUNTS below.
+// Linked accounts (PRE-CUTOVER ONLY): before the 1 June 2026 accounting
+// cutover, no real RV bank-in journals exist, so the BANK_PBB ledger surfaces
+// the cash-received holding accounts (CH_REV*) as synthetic money-in rows to
+// keep the historical May proof intact. From the cutover onward, cash reaches
+// the bank ONLY through real RV bank-in journals (DR bank / CR CH_REV*), and
+// the synthetic projection is excluded from EVERY calculation path (anchor
+// movement, derived opening, month rows, totals). No date can ever produce
+// both a synthetic row and a real bank line: synthetic rows come from S/REC
+// journals dated before the cutover, real bank lines from RV journals dated on
+// or after it.
 import { Router } from "express";
 
 // Per-account link config. Keyed by the primary account being viewed.
@@ -20,12 +23,14 @@ import { Router } from "express";
 //         swapped so a revenue CREDIT shows as a bank DEBIT (money in).
 //   keep: linked codes that are already debit-normal — kept exactly as recorded.
 // Only applies to the listed primary accounts; every other account is unaffected.
+// Linked lines are only included when je.entry_date < LINKED_ACCOUNTS_CUTOFF.
 const BANK_LINKED_ACCOUNTS = {
   BANK_PBB: {
     swap: [],
     keep: ["CH_REV1", "CH_REV2"],
   },
 };
+const LINKED_ACCOUNTS_CUTOFF = "2026-06-01";
 
 export default function (pool) {
   const router = Router();
@@ -65,13 +70,12 @@ export default function (pool) {
       const account = accountResult.rows[0];
 
       // Resolve linked accounts surfaced inside this ledger (money-in view).
-      // allCodes = the codes whose lines appear; swapCodes = credit-normal codes
-      // whose debit/credit columns are swapped so their money-in reads as a debit.
+      // linkedCodes only contribute lines dated BEFORE the cutover (see the
+      // header comment); swapCodes = credit-normal linked codes whose columns
+      // are swapped so their money-in reads as a debit.
       const linkCfg = BANK_LINKED_ACCOUNTS[accountCode];
       const swapCodes = linkCfg ? linkCfg.swap : [];
-      const allCodes = linkCfg
-        ? [accountCode, ...linkCfg.swap, ...linkCfg.keep]
-        : [accountCode];
+      const linkedCodes = linkCfg ? [...linkCfg.swap, ...linkCfg.keep] : [];
 
       // Month boundaries as plain yyyy-MM-dd strings (TZ-safe, no Date round-trip).
       // Use a half-open range [startStr, nextMonthStr) so a Dec-31 entry with a
@@ -98,6 +102,12 @@ export default function (pool) {
         [accountCode, startStr]
       );
 
+      // Line-inclusion predicate shared by every calculation path: the primary
+      // account always; linked codes only before the cutover.
+      const lineFilter = (p1, p2, p3) => `
+              (jel.account_code = $${p1}
+               OR (jel.account_code = ANY($${p2}::varchar[]) AND je.entry_date < $${p3}))`;
+
       let openingBalance;
       let openingSource;
       if (anchorResult.rows.length > 0) {
@@ -111,10 +121,10 @@ export default function (pool) {
              FROM journal_entry_lines jel
              JOIN journal_entries je ON jel.journal_entry_id = je.id
             WHERE je.status = 'posted'
-              AND jel.account_code = ANY($1::varchar[])
+              AND ${lineFilter(1, 5, 6)}
               AND je.entry_date >= $2
               AND je.entry_date < $3`,
-          [allCodes, anchor.as_of_date, startStr, swapCodes]
+          [accountCode, anchor.as_of_date, startStr, swapCodes, linkedCodes, LINKED_ACCOUNTS_CUTOFF]
         );
         openingBalance =
           anchorAmount + (parseFloat(sinceResult.rows[0].movement) || 0);
@@ -132,25 +142,30 @@ export default function (pool) {
              FROM journal_entry_lines jel
              JOIN journal_entries je ON jel.journal_entry_id = je.id
             WHERE je.status = 'posted'
-              AND jel.account_code = ANY($1::varchar[])
+              AND ${lineFilter(1, 4, 5)}
               AND je.entry_date < $2`,
-          [allCodes, startStr, swapCodes]
+          [accountCode, startStr, swapCodes, linkedCodes, LINKED_ACCOUNTS_CUTOFF]
         );
         openingBalance = parseFloat(openingResult.rows[0].opening) || 0;
         openingSource = { type: "derived" };
       }
 
-      // Transactions within the month, ordered for a stable running balance
+      // Transactions within the month. Journal column = the legacy-visible
+      // reference (line override, then header display, then reference_no);
+      // Cheque column = the persisted cheque contract with the header fallback
+      // (never the Journal reference). Ordered by accounting date, persisted
+      // posting sequence, journal id, then line display order.
       const txResult = await pool.query(
         `SELECT
             je.id              AS journal_entry_id,
-            je.reference_no    AS reference_no,
+            COALESCE(jel.display_reference, je.display_reference, je.reference_no) AS reference_no,
+            je.reference_no    AS internal_reference,
             je.entry_type      AS entry_type,
             je.entry_date      AS entry_date,
             je.description     AS entry_description,
             jel.id             AS line_id,
             jel.line_number    AS line_number,
-            jel.reference      AS cheque_no,
+            COALESCE(jel.cheque_reference, je.cheque_no) AS cheque_no,
             jel.particulars    AS particulars,
             jel.account_code   AS account_code,
             COALESCE(CASE WHEN jel.account_code = ANY($4::varchar[]) THEN jel.credit_amount ELSE jel.debit_amount END, 0)  AS debit_amount,
@@ -158,11 +173,15 @@ export default function (pool) {
            FROM journal_entry_lines jel
            JOIN journal_entries je ON jel.journal_entry_id = je.id
           WHERE je.status = 'posted'
-            AND jel.account_code = ANY($1::varchar[])
+            AND ${lineFilter(1, 5, 6)}
             AND je.entry_date >= $2
             AND je.entry_date < $3
-          ORDER BY je.entry_date ASC, je.id ASC, jel.line_number ASC`,
-        [allCodes, startStr, nextMonthStr, swapCodes]
+          ORDER BY je.entry_date ASC,
+                   je.posting_sequence ASC NULLS LAST,
+                   je.id ASC,
+                   jel.display_order ASC NULLS LAST,
+                   jel.line_number ASC`,
+        [accountCode, startStr, nextMonthStr, swapCodes, linkedCodes, LINKED_ACCOUNTS_CUTOFF]
       );
 
       let running = openingBalance;
