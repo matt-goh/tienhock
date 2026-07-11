@@ -21,6 +21,12 @@
 // reference_no = the invoice id (unique, never reused), so the ledger JOURNAL
 // column shows the bill number. display_reference mirrors it; the description
 // honours the persisted override `invoices.accounting_description`.
+//
+// Phase 6: the receivable side posts to the CUSTOMER's debtor child account
+// (resolved/ensured via debtorSync; TR only as a warned fallback), so each
+// customer's Account Ledger shows the invoice and its immediate settlement.
+
+import { getCustomerDebtorAccountCode } from "./debtorSync.js";
 
 /**
  * Convert a unix-ms timestamp (invoices.createddate) to a local yyyy-MM-dd date string.
@@ -146,27 +152,35 @@ export async function syncSalesJournalEntry(client, invoice, createdBy = null) {
   const autoAmount =
     isCash && pendingCount === 0 ? round2(Math.max(0, amount - genuinePaid)) : 0;
 
+  // Receivable side = the customer's own debtor child account (Phase 6).
+  const debtor = await getCustomerDebtorAccountCode(client, inv.customerid);
+
   // ----- Build the line set -----
   // [account, debit, credit]
+  // CASH bills post the full four-line contract: DR debtor for the sale,
+  // CR CASH_SALES, then DR CH_REV1 / CR debtor for the automatic collection —
+  // the customer ledger shows the invoice AND its immediate settlement while
+  // CH_REV1/CASH_SALES keep exactly one row each. Zero bills stay as the
+  // two informational 0.00 lines.
   let lines;
   if (!isCash) {
     lines = [
-      ["TR", amount, 0],
+      [debtor, amount, 0],
       ["CR_SALES", 0, amount],
     ];
-  } else if ((genuinePaid > 0 || pendingCount > 0) && amount > 0) {
+  } else if (amount > 0) {
     lines = [
-      ["TR", amount, 0],
+      [debtor, amount, 0],
       ["CASH_SALES", 0, amount],
     ];
     if (autoAmount > 0) {
       lines.push(["CH_REV1", autoAmount, 0]);
-      lines.push(["TR", 0, autoAmount]);
+      lines.push([debtor, 0, autoAmount]);
     }
   } else {
     lines = [
-      ["CH_REV1", amount, 0],
-      ["CASH_SALES", 0, amount],
+      ["CH_REV1", 0, 0],
+      ["CASH_SALES", 0, 0],
     ];
   }
 

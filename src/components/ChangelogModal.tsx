@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-10",
+    ms: "Setiap pelanggan kini mempunyai lejar penghutang sendiri dalam Account Ledger: invois, bayaran, nota kredit/debit dan nota bayaran balik pelanggan itu dipaparkan dengan baki berjalan — sejarah lama turut dipindahkan. Trial Balance kekal ringkas dengan satu baris Trade Debtors (tapis jenis lejar TD untuk melihat setiap pelanggan).",
+    en: "Every customer now has their own debtor ledger in Account Ledger: that customer's invoices, payments, credit/debit notes and refund notes appear with a running balance — historical activity has been migrated in too. The Trial Balance stays concise with a single Trade Debtors row (filter by ledger type TD to see each customer).",
+  },
+  {
+    date: "2026-07-10",
     ms: "Laporan Account Ledger kini memaparkan rujukan Journal sebenar (nombor bil, nombor RV, THCN, rujukan pindahan seperti TF040626-2) dan lajur Cheque yang berasingan, dengan susunan baris dalam setiap hari mengikut cetakan buku lama. Lejar Jun 2026 telah disemak baris demi baris dengan buku lama untuk kelima-lima akaun utama.",
     en: "The Account Ledger report now shows the real Journal references (bill numbers, RV numbers, THCN, transfer references like TF040626-2) and a separate Cheque column, with rows within each day ordered exactly like the legacy book's printout. The June 2026 ledgers have been verified row-by-row against the legacy books for all five core accounts.",
   },

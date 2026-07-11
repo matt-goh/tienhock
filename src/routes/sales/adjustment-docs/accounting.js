@@ -24,6 +24,7 @@
 
 import { determineBankAccount } from "../../../utils/payment-helpers.js";
 import { formatAdjustmentDocDisplayId } from "../../../utils/adjustments/formatDocId.js";
+import { getCustomerDebtorAccountCode } from "../../accounting/debtorSync.js";
 
 const ENTRY_TYPE = {
   credit_note: "CN",
@@ -170,6 +171,17 @@ function docContext(doc, opts, type) {
 }
 
 /**
+ * Receivable-side account: the customer's debtor child for Tien Hock docs
+ * (Phase 6); Jelly Polly documents keep the TR control account — JP invoices
+ * live outside the TH sales-journal model, so a one-sided child posting would
+ * misstate the customer ledger.
+ */
+async function receivableAccount(client, doc, sourceType) {
+  if (sourceType === "jp_adjustment") return "TR";
+  return getCustomerDebtorAccountCode(client, doc.customerid);
+}
+
+/**
  * Create journal entry for a Credit Note.
  * Dr original revenue (+ Dr OUTPUT_TAX) / Cr TR.
  * opts: { paymenttype: original invoice's CASH|INVOICE, sourceType }
@@ -177,8 +189,9 @@ function docContext(doc, opts, type) {
 export async function createCreditNoteJournalEntry(client, doc, opts = {}) {
   const { net, tax, total } = splitAmounts(doc);
   const { description, revenueAccount, sourceType } = docContext(doc, opts, "credit_note");
+  const debtor = await receivableAccount(client, doc, sourceType);
 
-  const accounts = [revenueAccount, "TR"];
+  const accounts = [revenueAccount, debtor];
   if (tax > 0) accounts.push("OUTPUT_TAX");
   await ensureAccountsExist(client, accounts);
 
@@ -187,7 +200,7 @@ export async function createCreditNoteJournalEntry(client, doc, opts = {}) {
 
   const lines = [[revenueAccount, net, 0, description]];
   if (tax > 0) lines.push(["OUTPUT_TAX", tax, 0, description]);
-  lines.push(["TR", 0, total, description]);
+  lines.push([debtor, 0, total, description]);
 
   return insertEntry(client, {
     reference_no,
@@ -209,15 +222,16 @@ export async function createCreditNoteJournalEntry(client, doc, opts = {}) {
 export async function createDebitNoteJournalEntry(client, doc, opts = {}) {
   const { net, tax, total } = splitAmounts(doc);
   const { description, revenueAccount, sourceType } = docContext(doc, opts, "debit_note");
+  const debtor = await receivableAccount(client, doc, sourceType);
 
-  const accounts = [revenueAccount, "TR"];
+  const accounts = [revenueAccount, debtor];
   if (tax > 0) accounts.push("OUTPUT_TAX");
   await ensureAccountsExist(client, accounts);
 
   const postingDate = toIsoDate(doc.createddate);
   const reference_no = await generateAdjustmentReference(client, "debit_note", postingDate);
 
-  const lines = [["TR", total, 0, description], [revenueAccount, 0, net, description]];
+  const lines = [[debtor, total, 0, description], [revenueAccount, 0, net, description]];
   if (tax > 0) lines.push(["OUTPUT_TAX", 0, tax, description]);
 
   return insertEntry(client, {
@@ -241,11 +255,13 @@ export async function createDebitNoteJournalEntry(client, doc, opts = {}) {
  */
 export async function createRefundNoteJournalEntry(client, doc, opts = {}) {
   const bankAccount = determineBankAccount(doc.refund_method, doc.bank_account);
-  const debitAccount = doc.paired_with_id ? "TR" : "CUST_DEP";
+  const { description, sourceType } = docContext(doc, opts, "refund_note");
+  const debitAccount = doc.paired_with_id
+    ? await receivableAccount(client, doc, sourceType)
+    : "CUST_DEP";
   await ensureAccountsExist(client, [debitAccount, bankAccount]);
 
   const total = roundAmt(doc.totalamountpayable);
-  const { description, sourceType } = docContext(doc, opts, "refund_note");
   const refundContext = doc.paired_with_id
     ? ` (paired with ${formatAdjustmentDocDisplayId({ id: doc.paired_with_id })})`
     : doc.linked_payment_id

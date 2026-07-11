@@ -398,6 +398,10 @@ export default function (pool) {
         ledgerFilter = ` AND ac.ledger_type = $${baseParams.length}`;
       }
 
+      // TD customer debtor children collapse into ONE "Trade Debtors" row so
+      // the trial balance stays concise; filtering ledger_type=TD itemizes
+      // every customer child instead.
+      const groupTd = ledger_type !== "TD";
       const baseCte = `
         WITH account_balances AS (
           SELECT
@@ -411,7 +415,7 @@ export default function (pool) {
             AND je.entry_date <= $2
           GROUP BY jel.account_code
         ),
-        active_accounts AS (
+        raw_accounts AS (
           SELECT
             ac.code,
             ac.description,
@@ -431,6 +435,25 @@ export default function (pool) {
           JOIN account_balances ab ON ac.code = ab.account_code
           LEFT JOIN financial_statement_notes fsn ON ac.fs_note = fsn.code
           WHERE ac.is_active = true${ledgerFilter}
+        ),
+        active_accounts AS (
+          ${
+            groupTd
+              ? `SELECT * FROM raw_accounts WHERE ledger_type IS DISTINCT FROM 'TD'
+                 UNION ALL
+                 SELECT 'DEBTOR' as code,
+                        'TRADE DEBTORS (per-customer subledger)' as description,
+                        'TD' as ledger_type,
+                        MIN(fs_note) as fs_note,
+                        MIN(note_name) as note_name,
+                        SUM(total_debit) as total_debit,
+                        SUM(total_credit) as total_credit,
+                        SUM(balance) as balance,
+                        SUM(net) as net
+                   FROM raw_accounts WHERE ledger_type = 'TD'
+                 HAVING COUNT(*) > 0`
+              : `SELECT * FROM raw_accounts`
+          }
         )
       `;
 
