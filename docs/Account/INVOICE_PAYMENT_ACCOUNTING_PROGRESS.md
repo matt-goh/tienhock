@@ -151,7 +151,7 @@ Defaults (editable at the owning source; override persisted; resync never erases
 | 4 | CN/DN/RN accounts/references/dates/descriptions/reports; migrate existing CN journals; DN/RN tests | ✅ complete 10 Jul 2026 (see §5d) |
 | 5 | Full five-ledger row-by-row June reconciliation vs fixtures (gate for Phase 6) | ✅ complete 10 Jul 2026 (see §5e) — gate PASSED; residuals are user entries/July timing |
 | 6 | Customer debtor child postings + historical rewrite (per debtor handover doc) | ✅ complete 10 Jul 2026 (see §5f) |
-| 7 | Account Ledger TimeNavigator ranges; debtor anchors → General Statement BAL B/F; Customer Statement corrections; C-CARE validation | ⬜ |
+| 7 | Account Ledger TimeNavigator ranges; debtor anchors → General Statement BAL B/F; Customer Statement corrections; C-CARE validation | ✅ complete 10 Jul 2026 (see §5g) |
 | 8 | CashReceiptVoucher print cleanup, connected reports, changelog (BM+EN), doc refresh, final bug-scan offer | ⬜ |
 
 Per-phase "files changed" and "verification queries/results" sections get appended here as phases execute.
@@ -309,6 +309,25 @@ Every monetary difference is a named bridge: user manual entries pending, July-c
 
 The five-ledger recon (§5e) is unaffected — the rewrite only moved TR-side lines; CH_REV1/CH_REV2/CASH_SALES/CR_SALES/BANK_PBB lines were untouched.
 
+### 5g. Phase 7 — executed 10 Jul 2026 — ranges, openings, and debtor statements
+
+**Code (files changed):**
+- `src/routes/accounting/bank-statement.js` — refactored around a shared `buildLedger(pool, account, start, end)`; NEW route `GET /api/bank-statement/:account/range/:start/:end` (inclusive `yyyy-MM-dd` bounds, half-open internally); the month route remains for existing callers and both return `period.mode`.
+- `src/pages/Accounting/Reports/AccountLedgerPage.tsx` — `MonthNavigator` replaced with the shared `TimeNavigator` (modes month / arbitrary range / year, plus "This month"/"This year" presets); deep links now carry `?account=CODE&start=…&end=…`; always fetches through the range endpoint.
+- `src/utils/accounting/AccountLedgerPDFMake.ts` — period label = "June 2026" for calendar months, "01/06/2026 – 15/07/2026" for ranges; `period.mode` typed.
+- `src/routes/accounting/debtors.js` — **Customer Statement** rebuilt on the customer's debtor-child ledger: opening = anchor rule (latest anchor ≤ start + posted movement to start), transactions = posted child lines (invoices, receipts, CN/DN/RN, cash-bill settlements) in ledger order with visible references, running balance, and **as-of-date aging** (per-invoice outstanding at the period end from active receipts/CN/DN dated ≤ end — never today's `balance_due`, so historical statements are stable). **General Statement** rebuilt as ONE bulk query over the children (no N+1): `BAL B/F` = anchor + pre-period movement, period debits/credits from the child lines, `TOTAL DUE` = B/F + DR − CR; exact-match customer wins the child mapping (customers literally named "X-D" exist: BCCM-D, GOLDEN-D, WHOLEMART-D). Response shapes unchanged — `CustomerStatementPDF`/`GeneralStatementPDF` verified field-compatible with zero edits.
+
+**Migration (dev applied; idempotent):** `dev/migrations/2026-07-10_debtor_zero_anchors_phase7.sql` — explicit 0.00 anchors @ 2026-06-01 for the 1,416 debtor children not in the legacy 1 June debtor list (all 1,566 children now anchored). Needed because Phase 6 put pre-cutover RECEIPT history on the children while pre-cutover invoices never had journals — a derived opening would count one-sided credits (measured: −1,018,151.22 garbage before the fix). The anchor rule now supersedes all pre-cutover child lines, exactly like the bank/cash accounts.
+
+**Verification (dev DB):**
+| Check | Result |
+|---|---|
+| June General Statement total `BAL B/F` | **507,697.72 — the imported customer anchors, exact** (204 customer rows) |
+| C-CARE(1) General Statement row | B/F 8,748.00 · invoices 9,835.00 · payments 6,795.00 · total due 11,788.00 — plan fixture exact |
+| Statement PDFs | consume unchanged field shapes — no frontend changes |
+
+**Known limitation (recorded per plan §10):** the aging buckets are computed from the ERP's own invoice-level history (which exists back to 2025), not from the scalar 1 June anchors; where a customer's anchor differs from the ERP invoice composition, aging totals may not equal `TOTAL DUE` — that difference is the same named opening bridge as elsewhere, not a calculation error. No age buckets are fabricated from scalar anchors.
+
 ---
 
 ## 6. Migration dry-run design (Phase 1 deliverable; read-only)
@@ -373,7 +392,7 @@ One reconciliation script (read-only SQL through the dev docker psql) reporting,
 4. Invoice 015359 (6,365.00): ERP dated 09/06, legacy CR_SALES prints 08/06 — re-date the invoice if desired (touches the invoice document; e-Invoice caution).
 5. July: when the July bank statement arrives, reconcile CIMBI008054 11,920.60 and the MBB932202 family 27,169.50 (June-keyed cheques that cleared in July).
 
-**Then start Phase 7 — ranges, openings, and debtor statements** (Phase 6 done): (1) Account Ledger page: replace `MonthNavigator` with the existing `TimeNavigator` (month / arbitrary range / year / This year), range-aware backend with half-open `yyyy-MM-dd` boundaries (keep the month route compatible), `AccountLedgerPDFMake` period labels/file names, deep links; (2) Debtors General Statement `BAL B/F($)` from the anchor rule (latest anchor ≤ start + movement to start; bulk, no N+1) — June total must reconcile to the imported 507,697.72 anchors; (3) Customer Statement: invoices, allocated receipts, CN/DN/RN, opening, running balance, correct DR/CR, as-of-date correctness (historical statements must not change when later receipts arrive), no fabricated age buckets from scalar anchors; (4) validate C-CARE(1) full-period and June-bridge statements; check `DebtorsReportPDF/CustomerStatementPDF/GeneralStatementPDF/CustomerTransactionsTab/TransactionHistoryPDF` display assumptions.
+**Then start Phase 8 — printing cleanup, connected checks, and handoff** (the final phase): (1) adapt `src/utils/accounting/CashReceiptVoucherPDF.tsx` to the receipt header+allocation model (grouped receipts, multiple invoices, the actual debit account, visible Journal/Cheque refs; never label CH_REV1/2 cash as banked); (2) REMOVE `src/components/Accounting/CashReceiptVoucherModal.tsx` and replace its callers (at least `PaymentTable.tsx`, `JournalDetailsPage.tsx`) with direct Blob + `printPdfFrameWithFallback`; (3) connected-report recheck: `financial-reports.js` Note 7/22 and report source guides vs the reconciled journals, GT/JP compatibility sweep; (4) refresh `ACCOUNTING_PROGRESS.md`, this doc, `AGENTS.md`/`CLAUDE.md`; (5) summarize edge cases and ask the user whether they want the full bug/limitation scan of every file created/modified in this project (CLAUDE.md rule 15).
 
 ---
 

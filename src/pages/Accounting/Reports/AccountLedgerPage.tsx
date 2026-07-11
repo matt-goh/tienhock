@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { IconPrinter, IconRefresh, IconAnchor, IconSearch } from "@tabler/icons-react";
 import { useSearchParams } from "react-router-dom";
-import MonthNavigator from "../../../components/MonthNavigator";
+import TimeNavigator, { TimeRange } from "../../../components/TimeNavigator";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import AccountCodeCombobox from "../../../components/Accounting/AccountCodeCombobox";
@@ -40,7 +40,7 @@ const AccountLedgerPage: React.FC = () => {
   const { accountCodes, isLoading: accountsLoading } = useAccountCodesCache();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Deep-linkable: /accounting/reports/account-ledger?account=MGT
+  // Deep-linkable: /accounting/reports/account-ledger?account=MGT&start=2026-06-01&end=2026-06-30
   const [selectedAccount, setSelectedAccount] = useState<string>(
     () => searchParams.get("account") || ""
   );
@@ -49,9 +49,26 @@ const AccountLedgerPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState<boolean>(false);
 
-  const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
+  const toLocalIso = (d: Date): string =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate()
+    ).padStart(2, "0")}`;
+  const parseIso = (s: string | null): Date | null => {
+    if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+    const [y, m, d] = s.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  };
+
+  // Month / arbitrary range / year selection (defaults to the current month)
+  const [range, setRange] = useState<{ start: Date | null; end: Date | null }>(() => {
+    const urlStart = parseIso(searchParams.get("start"));
+    const urlEnd = parseIso(searchParams.get("end"));
+    if (urlStart && urlEnd) return { start: urlStart, end: urlEnd };
     const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
+    return {
+      start: new Date(now.getFullYear(), now.getMonth(), 1),
+      end: new Date(now.getFullYear(), now.getMonth() + 1, 0),
+    };
   });
 
   const [showOpeningModal, setShowOpeningModal] = useState<boolean>(false);
@@ -61,24 +78,36 @@ const AccountLedgerPage: React.FC = () => {
     notes?: string | null;
   } | null>(null);
 
+  const syncUrl = (code: string, r: { start: Date | null; end: Date | null }): void => {
+    const params: Record<string, string> = {};
+    if (code) params.account = code;
+    if (r.start && r.end) {
+      params.start = toLocalIso(r.start);
+      params.end = toLocalIso(r.end);
+    }
+    setSearchParams(params, { replace: true });
+  };
+
   const handleAccountChange = (code: string): void => {
     setSelectedAccount(code);
-    setSearchParams(code ? { account: code } : {}, { replace: true });
+    syncUrl(code, range);
+  };
+
+  const handleRangeChange = (next: TimeRange): void => {
+    setRange(next);
+    syncUrl(selectedAccount, next);
   };
 
   const fetchStatement = useCallback(async (): Promise<void> => {
-    if (!selectedAccount) {
+    if (!selectedAccount || !range.start || !range.end) {
       setStatement(null);
       return;
     }
-    const year = selectedMonth.getFullYear();
-    const month = selectedMonth.getMonth() + 1;
-
     try {
       setLoading(true);
       setError(null);
       const response = await api.get(
-        `/api/bank-statement/${selectedAccount}/${year}/${month}`
+        `/api/bank-statement/${selectedAccount}/range/${toLocalIso(range.start)}/${toLocalIso(range.end)}`
       );
       setStatement(response);
     } catch (err) {
@@ -87,7 +116,8 @@ const AccountLedgerPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedAccount, selectedMonth]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAccount, range.start?.getTime(), range.end?.getTime()]);
 
   useEffect(() => {
     fetchStatement();
@@ -148,8 +178,36 @@ const AccountLedgerPage: React.FC = () => {
               className="w-80"
             />
 
-            {/* Month Navigator */}
-            <MonthNavigator selectedMonth={selectedMonth} onChange={setSelectedMonth} />
+            {/* Period: calendar month, arbitrary range, or whole year */}
+            <TimeNavigator
+              range={range}
+              onChange={handleRangeChange}
+              modes={["month", "range", "year"]}
+              presets={[
+                {
+                  key: "thisMonth",
+                  label: "This month",
+                  getRange: () => {
+                    const now = new Date();
+                    return {
+                      start: new Date(now.getFullYear(), now.getMonth(), 1),
+                      end: new Date(now.getFullYear(), now.getMonth() + 1, 0),
+                    };
+                  },
+                },
+                {
+                  key: "thisYear",
+                  label: "This year",
+                  getRange: () => {
+                    const now = new Date();
+                    return {
+                      start: new Date(now.getFullYear(), 0, 1),
+                      end: new Date(now.getFullYear(), 11, 31),
+                    };
+                  },
+                },
+              ]}
+            />
 
             {/* Set opening balance */}
             <Button
