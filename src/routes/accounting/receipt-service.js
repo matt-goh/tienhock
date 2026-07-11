@@ -25,6 +25,7 @@
 
 import { generateReceiptReference } from "./payment-journal.js";
 import { determineBankAccount } from "../../utils/payment-helpers.js";
+import { getCustomerDebtorAccountCode } from "./debtorSync.js";
 
 const round2 = (v) => Math.round(parseFloat(v || 0) * 100) / 100;
 
@@ -164,7 +165,18 @@ async function postReceiptJournal(client, receipt, allocs, invoiceMap, userId) {
   const debitAccount = receipt.debit_account;
   const total = round2(allocs.reduce((s, a) => s + a.amount, 0));
 
-  const accounts = [debitAccount, "TR"];
+  // Phase 6: each invoice allocation credits the CUSTOMER's debtor child.
+  const debtorByAlloc = {};
+  for (const a of allocs) {
+    if (a.type !== "invoice") continue;
+    const cust = a.customer_id || invoiceMap[a.invoice_id]?.customerid || null;
+    debtorByAlloc[a.allocation_id ?? `${a.invoice_id}:${a.amount}`] =
+      await getCustomerDebtorAccountCode(client, cust);
+  }
+  const debtorFor = (a) =>
+    debtorByAlloc[a.allocation_id ?? `${a.invoice_id}:${a.amount}`] || "TR";
+
+  const accounts = [debitAccount, ...Object.values(debtorByAlloc)];
   if (allocs.some((a) => a.type === "excess")) accounts.push("CUST_DEP");
   for (const a of allocs) if (a.type === "account") accounts.push(a.target_account);
   await ensureAccountsExist(client, accounts);
@@ -193,7 +205,7 @@ async function postReceiptJournal(client, receipt, allocs, invoiceMap, userId) {
   }
   for (const a of allocs) {
     const creditAccount =
-      a.type === "invoice" ? "TR" : a.type === "excess" ? "CUST_DEP" : a.target_account;
+      a.type === "invoice" ? debtorFor(a) : a.type === "excess" ? "CUST_DEP" : a.target_account;
     lines.push([creditAccount, 0, a.amount, isCash ? cashLineRef(a) : null, null, lineParticulars(a)]);
   }
 

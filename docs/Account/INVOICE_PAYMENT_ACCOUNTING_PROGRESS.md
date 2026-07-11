@@ -150,7 +150,7 @@ Defaults (editable at the owning source; override persisted; resync never erases
 | 3 | RV bank-in UI/backend; real DR bank / CR holding journals; cutover isolation of BANK_LINKED_ACCOUNTS; manual cheque fallback | ✅ complete 10 Jul 2026 (see §5c) |
 | 4 | CN/DN/RN accounts/references/dates/descriptions/reports; migrate existing CN journals; DN/RN tests | ✅ complete 10 Jul 2026 (see §5d) |
 | 5 | Full five-ledger row-by-row June reconciliation vs fixtures (gate for Phase 6) | ✅ complete 10 Jul 2026 (see §5e) — gate PASSED; residuals are user entries/July timing |
-| 6 | Customer debtor child postings + historical rewrite (per debtor handover doc) | ⬜ |
+| 6 | Customer debtor child postings + historical rewrite (per debtor handover doc) | ✅ complete 10 Jul 2026 (see §5f) |
 | 7 | Account Ledger TimeNavigator ranges; debtor anchors → General Statement BAL B/F; Customer Statement corrections; C-CARE validation | ⬜ |
 | 8 | CashReceiptVoucher print cleanup, connected reports, changelog (BM+EN), doc refresh, final bug-scan offer | ⬜ |
 
@@ -288,6 +288,27 @@ Every monetary difference is a named bridge: user manual entries pending, July-c
 
 **Frontend forward-path (user requirement: future months must be generatable from the app — VERIFIED):** invoices post their journals on save/edit/convert (all UI paths); PaymentForm + InvoiceDetailsPage post receipts through `/api/receipts`/`/api/payments`; Accounting → Cash Bank-In (RV) posts RVs with auto-numbering and live pool balances; the CN/DN/RN forms post contract-correct journals with the document date picker; Account Ledger (+PDF) reads the resolved Journal/Cheque columns and legacy ordering for ANY month with no further backfills. The only recurring manual work is what was always manual: PBE/PV/JV bank outflows and non-sales RVs via Journal Entries.
 
+### 5f. Phase 6 — executed 10 Jul 2026 — customer debtor child postings LIVE
+
+**Code (files changed):**
+- `src/routes/accounting/debtorSync.js` — `getCustomerDebtorAccountCode` (resolve+ensure the child for posting; deleted/unknown customers get a child named by id; TR only as a warned last resort) and `changeDebtorCode` rebuilt to be FK-safe: create the new child, MOVE `journal_entry_lines` + `account_opening_balances` references, then delete the old code (the previous in-place rename would have hit the no-cascade FK once children carried journals).
+- `src/routes/accounting/sales-journal.js` — receivable side posts to the customer child; **every nonzero CASH bill is now the full 4-line contract** (DR child / CR CASH_SALES / DR CH_REV1 / CR child) so the customer ledger shows the invoice AND its immediate settlement while CH_REV1/CASH_SALES keep exactly one row each.
+- `src/routes/accounting/receipt-service.js` — each invoice allocation credits its own customer's child (mixed-customer receipts hit multiple children under one journal).
+- `src/routes/sales/adjustment-docs/accounting.js` — TH CN/DN/paired-RN receivable lines post to the child; standalone RN stays on CUST_DEP; **Jelly Polly documents keep TR** (JP invoices live outside the TH sales-journal model).
+- `src/routes/accounting/financial-reports.js` — Trial Balance collapses all TD children into ONE "TRADE DEBTORS (per-customer subledger)" row (code DEBTOR); filtering `ledger_type=TD` itemizes every customer. Totals computed over the displayed set.
+
+**Migration (dev applied twice — rerun all UPDATE 0):** `dev/migrations/2026-07-10_debtor_children_phase6_migration.sql` — ensures children for every referenced customer id (same candidate rule as debtorSync), then rewrites historical TR lines through the journal source links: 246 invoice lines + 224 receipt lines (credit lines paired to invoice allocations by rank) + 2,890 legacy payment lines + 21 adjustment lines. Cancelled journals included for consistency.
+
+**Verification (dev DB):**
+| Check | Result |
+|---|---|
+| Remaining TR lines (any source, any status) | **0** — every receivable line now sits on a customer child |
+| C-CARE(1) June bridge (plan fixture) | anchor 8,748.00 + DR **9,835.00** − CR **6,795.00** = closing **11,788.00 — exact** |
+| Posted journal balance invariant | 0 unbalanced |
+| Adjustment shape tests (rerun with child assertions) | 19/19 passed (CN credits child C-CARE(1); DN debits it; paired RN debits it; standalone RN stays CUST_DEP) |
+
+The five-ledger recon (§5e) is unaffected — the rewrite only moved TR-side lines; CH_REV1/CH_REV2/CASH_SALES/CR_SALES/BANK_PBB lines were untouched.
+
 ---
 
 ## 6. Migration dry-run design (Phase 1 deliverable; read-only)
@@ -319,7 +340,7 @@ One reconciliation script (read-only SQL through the dev docker psql) reporting,
 | CH_REV1 | 283 tx | ✅ debits 213,365.10 (= legacy + approved 34.00) AND credits 214,784.90 exact; closing 34,224.55 | Phase 5 row diff only |
 | CH_REV2 | 20 tx | ✅ debits 7,202.70 AND credits 8,145.20 exact; **closing 117.55 = legacy exact** | Phase 5 row diff only |
 | BANK_PBB | 278 tx | DR 653,556.89 vs 685,388.69 — all remaining rows named in §5c worklist; CR 619,901.48 vs 644,938.48 (user manual entries) | Phase 5 worklist |
-| C-CARE(1) | 31 rows (Jan–Jun) | anchor ✅ 8,748.00; no child postings yet | Phase 6–7 |
+| C-CARE(1) | 31 rows (Jan–Jun) | ✅ anchor 8,748.00 + June DR 9,835.00 − CR 6,795.00 = **closing 11,788.00 exact**; full history on the child | Phase 7 statements |
 
 ---
 
@@ -352,7 +373,7 @@ One reconciliation script (read-only SQL through the dev docker psql) reporting,
 4. Invoice 015359 (6,365.00): ERP dated 09/06, legacy CR_SALES prints 08/06 — re-date the invoice if desired (touches the invoice document; e-Invoice caution).
 5. July: when the July bank statement arrives, reconcile CIMBI008054 11,920.60 and the MBB932202 family 27,169.50 (June-keyed cheques that cleared in July).
 
-**Then start Phase 6 — customer debtor child postings** (gate passed): follow `CUSTOMER_DEBTOR_SUBLEDGER_JOURNALS_HANDOVER.md` — extend `debtorSync.js` with `getCustomerDebtorAccountCode` + safe customer-ID-change handling; post new S/receipt/CN/DN/paired-RN receivable lines to the customer debtor child instead of TR (invoice journal service, receipt service, adjustment accounting — all now single-owner services, so each needs one change); idempotent historical rewrite of mappable posted TR lines through the source links (invoices/receipts/adjustments); keep aggregate `DEBTOR`/`TR` views and concise Trial Balance grouping; verify the C-CARE(1) June bridge (8,748.00 → 11,788.00) against the fixture.
+**Then start Phase 7 — ranges, openings, and debtor statements** (Phase 6 done): (1) Account Ledger page: replace `MonthNavigator` with the existing `TimeNavigator` (month / arbitrary range / year / This year), range-aware backend with half-open `yyyy-MM-dd` boundaries (keep the month route compatible), `AccountLedgerPDFMake` period labels/file names, deep links; (2) Debtors General Statement `BAL B/F($)` from the anchor rule (latest anchor ≤ start + movement to start; bulk, no N+1) — June total must reconcile to the imported 507,697.72 anchors; (3) Customer Statement: invoices, allocated receipts, CN/DN/RN, opening, running balance, correct DR/CR, as-of-date correctness (historical statements must not change when later receipts arrive), no fabricated age buckets from scalar anchors; (4) validate C-CARE(1) full-period and June-bridge statements; check `DebtorsReportPDF/CustomerStatementPDF/GeneralStatementPDF/CustomerTransactionsTab/TransactionHistoryPDF` display assumptions.
 
 ---
 
