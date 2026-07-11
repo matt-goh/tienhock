@@ -148,7 +148,7 @@ Defaults (editable at the owning source; override persisted; resync never erases
 | 1 | Receipt header/allocation + bank-in source schema, reference/description/idempotency fields, dry-run + idempotent migrations, schema docs | ✅ complete 10 Jul 2026 (see §5a) |
 | 2 | Invoice + receipt posting across all lifecycle paths; atomic grouped receipt API/UI; backfill stale REC journals | ✅ complete 10 Jul 2026 (see §5b) |
 | 3 | RV bank-in UI/backend; real DR bank / CR holding journals; cutover isolation of BANK_LINKED_ACCOUNTS; manual cheque fallback | ✅ complete 10 Jul 2026 (see §5c) |
-| 4 | CN/DN/RN accounts/references/dates/descriptions/reports; migrate existing CN journals; DN/RN tests | ⬜ |
+| 4 | CN/DN/RN accounts/references/dates/descriptions/reports; migrate existing CN journals; DN/RN tests | ✅ complete 10 Jul 2026 (see §5d) |
 | 5 | Full five-ledger row-by-row June reconciliation vs fixtures (gate for Phase 6) | ⬜ |
 | 6 | Customer debtor child postings + historical rewrite (per debtor handover doc) | ⬜ |
 | 7 | Account Ledger TimeNavigator ranges; debtor anchors → General Statement BAL B/F; Customer Statement corrections; C-CARE validation | ⬜ |
@@ -246,6 +246,26 @@ Per-phase "files changed" and "verification queries/results" sections get append
 6. ERP-only June rows whose legacy clears fall in July (timing bridges or re-date to clear dates): CIMBI008054 11,920.60 (13/06), MBB932202/-I/-N 27,169.50 (30/06).
 7. Credit side (619,901.48 vs 644,938.48): user still keying PBE/PV/JV manual outflows — outside this refactor's scope except the Cheque display contract.
 
+### 5d. Phase 4 — executed 10 Jul 2026
+
+**Code (files changed):**
+- `src/routes/sales/adjustment-docs/accounting.js` — REWRITTEN to the frozen contract: CN = DR original revenue ledger (CR_SALES / CASH_SALES per the invoice's paymenttype) for net+rounding + DR OUTPUT_TAX when tax > 0 / CR TR total; DN = exact inverse; RN unchanged accounts (paired DR TR, standalone DR CUST_DEP — settlement only, never revenue). The symmetric identity `total_excluding_tax + rounding + tax = totalamountpayable` is asserted — a document that breaks it is REJECTED, not posted asymmetrically. Journals carry `display_reference` = the formatted document number (TH/CN/26/n), `entry_date` = the document's own date, descriptions from the entered reason (no fabricated prompt-payment text), and `source_type`/`source_id` links. Helpers take `opts { paymenttype, sourceType }` so the Jelly Polly wrapper stays compatible (`jp_adjustment` source tag).
+- `src/routes/sales/adjustment-docs/index.js` — passes the original invoice's paymenttype + company source tag into the helpers; a standalone RN against an overpaid payment now consumes the owning receipt's excess allocation (`refunded_amount += total`, TH only, capped at remaining) and cancellation returns it.
+
+**Migration (dev applied twice — idempotent):** `dev/migrations/2026-07-10_cn_journals_phase4_migration.sql`
+- Imported the approved revenue anchors: CASH_SALES −1,037,680.40 and CR_SALES −2,296,968.93 @ 2026-06-01 (signed DR-positive convention).
+- Rewrote all 21 CN journals: RETURN→CR_SALES, internal JCN refs kept, `display_reference` = THCN/26/1…21 (TH-CN-26-2 = THCN/26/20, TH-CN-26-1 = THCN/26/21), documents AND journals re-dated (1–16 → 2026-05-31 behind the anchor; 17–19 → 2026-06-10; 20–21 → 2026-06-30), descriptions rebuilt from doc number + entered reason.
+
+**Verification (dev DB):**
+| Check | Result |
+|---|---|
+| June THCN debits in CR_SALES | **158.35** (113.70 @ 10/06 + 44.65 @ 30/06) — legacy exact |
+| Pre-cutover CNs | 16 rows / 1,834.92 @ 31/05, superseded by the anchor (double-count eliminated) |
+| June CR_SALES closing (signed) | **−2,809,873.38 = 2,809,873.38 CR — legacy exact** |
+| DN/RN deliberate tests | 19/19 assertions passed via the real service in a rolled-back transaction (CN 3-line tax split; identity violation rejected; DN credits CASH_SALES for a cash original; paired RN = DR TR / CR bank; standalone RN = DR CUST_DEP; RN never touches revenue/OUTPUT_TAX) |
+
+**Known numbering note:** the ERP's own CN document numbering restarted at TH-CN-26-1 while legacy had reached THCN/26/21; the two July-created docs map to legacy 20/21 (handled), but FUTURE CNs will print TH/CN/26/N with N continuing from the ERP sequence, not the legacy one. Renumbering documents is out of scope (document numbers may be on e-Invoices).
+
 ---
 
 ## 6. Migration dry-run design (Phase 1 deliverable; read-only)
@@ -273,7 +293,7 @@ One reconciliation script (read-only SQL through the dev docker psql) reporting,
 | Ledger | Fixture rows | ERP now (post-Phase 2) | Status |
 |---|---|---|---|
 | CASH_SALES | 214 tx (incl. 7 zero rows) | ✅ CR 213,365.10 exact; zero informational rows posted | row-by-row diff in Phase 5 |
-| CR_SALES | 184 tx | ✅ credits 513,062.80 exact; THCN debits still in RETURN (wrong date/ref) | Phase 4 |
+| CR_SALES | 184 tx | ✅ credits 513,062.80 AND THCN debits 158.35 exact (10/06 + 30/06, THCN/26/n refs); **closing 2,809,873.38 CR = legacy exact** (anchored) | Phase 5 row diff only |
 | CH_REV1 | 283 tx | ✅ debits 213,365.10 (= legacy + approved 34.00) AND credits 214,784.90 exact; closing 34,224.55 | Phase 5 row diff only |
 | CH_REV2 | 20 tx | ✅ debits 7,202.70 AND credits 8,145.20 exact; **closing 117.55 = legacy exact** | Phase 5 row diff only |
 | BANK_PBB | 278 tx | DR 653,556.89 vs 685,388.69 — all remaining rows named in §5c worklist; CR 619,901.48 vs 644,938.48 (user manual entries) | Phase 5 worklist |
@@ -303,7 +323,7 @@ One reconciliation script (read-only SQL through the dev docker psql) reporting,
 
 ## 9. Exact next action
 
-**Start Phase 4 — CN/DN/RN accounting.** Order of work: (1) rewrite `src/routes/sales/adjustment-docs/accounting.js` to the frozen contract — CN: DR original revenue ledger (CR_SALES / CASH_SALES per the invoice's paymenttype) + proven output-tax reversal / CR TR; DN: DR TR / CR original revenue; RN unchanged (paired DR TR / standalone DR CUST_DEP); visible accounting reference = the document display number (THCN/26/n style via `formatAdjustmentDocId`), accounting date = the document date, descriptions from entered reason; source_type='adjustment' links; (2) Phase 4 migration: rewrite the 21 existing CN journals (RETURN→revenue account, JCN refs→THCN/26/n display refs, dates: 0017–0019→2026-06-10, TH-CN-26-1/2→2026-06-30, 0001–0016→**2026-05-31** per §8-10), idempotent + dry-run listing; (3) June CR_SALES verification: THCN debits 158.35 land 10/06+30/06, closing 2,809,873.38 CR against the imported anchor; (4) deliberate DN/RN test scenarios (none exist in dev); (5) verify `credit_used`/balance cascades unchanged; changelog + docs. Note: `jellypolly` shares the adjustment accounting module — confirm JP compatibility before editing.
+**Start Phase 5 — full five-ledger row-by-row June reconciliation (the gate for Phase 6 debtor work).** Build the reconciliation tool: load the six fixture CSVs into scratch tables, match ERP posted lines per ledger on (date, visible Journal ref, side, amount, within-day ordinal) with normalization (whitespace/colons in particulars; ref variants like ALB00106→ALB000106), and emit matched/legacy-only/ERP-only reports. Then work the §5c bank worklist: (1) re-date/rebuild the ~64.5k pre-cutover-received cheques cleared in June as receipts on their legacy clear dates; (2) apply the four date-shift fixes; (3) re-split PBB678670 into its four per-customer receipts (display refs PBB678670/-1/-2/-3); (4) decide the two July-cleared ERP-only groups (re-date to clear dates vs bridge); (5) USER keys the five manual RVs (contras needed: RV021/022 drawing workers, RV048, RV082 CTOS refund, RV083 Puncak Niaga refund) + TJ050626 594.10; (6) backfill `posting_sequence` from the fixture day ordinals for reconciled June rows; (7) produce the final bridge report (015375 +34.00 CH_REV1; unbanked-cash notes) and record Phase 5 sign-off here before any Phase 6 debtor posting.
 
 ---
 

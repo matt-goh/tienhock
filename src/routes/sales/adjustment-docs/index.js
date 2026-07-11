@@ -444,6 +444,12 @@ async function applyAccountingForCreate(client, doc, invoice) {
   // Compute signed balance/credit deltas + post journal entry.
   const totalAmt = parseFloat(doc.totalamountpayable);
   const isInvoiceCreditType = invoice.paymenttype === "INVOICE";
+  // CN debits / DN credits the ORIGINAL sale's revenue ledger; JP documents
+  // post with their own source tag so one posted journal per source holds.
+  const journalOpts = {
+    paymenttype: invoice.paymenttype,
+    sourceType: T.docs.startsWith("jellypolly") ? "jp_adjustment" : "adjustment",
+  };
 
   let journalEntryId = null;
 
@@ -453,7 +459,7 @@ async function applyAccountingForCreate(client, doc, invoice) {
       if (isInvoiceCreditType) {
         await updateCustomerCredit(client, doc.customerid, -totalAmt);
       }
-      journalEntryId = await createCreditNoteJournalEntry(client, doc);
+      journalEntryId = await createCreditNoteJournalEntry(client, doc, journalOpts);
       break;
     }
     case "debit_note": {
@@ -461,7 +467,7 @@ async function applyAccountingForCreate(client, doc, invoice) {
       if (isInvoiceCreditType) {
         await updateCustomerCredit(client, doc.customerid, totalAmt);
       }
-      journalEntryId = await createDebitNoteJournalEntry(client, doc);
+      journalEntryId = await createDebitNoteJournalEntry(client, doc, journalOpts);
       break;
     }
     case "refund_note": {
@@ -470,7 +476,28 @@ async function applyAccountingForCreate(client, doc, invoice) {
       if (doc.paired_with_id) {
         await applyBalanceDelta(client, doc.original_invoice_id, totalAmt);
       }
-      journalEntryId = await createRefundNoteJournalEntry(client, doc);
+      journalEntryId = await createRefundNoteJournalEntry(client, doc, journalOpts);
+
+      // A standalone RN against an overpaid payment consumes the customer-owned
+      // excess allocation of the owning receipt (remaining = amount − applied −
+      // refunded). TH only — JP payments carry no receipt allocations. Legacy
+      // payments without an allocation are unaffected.
+      if (
+        !doc.paired_with_id &&
+        doc.linked_payment_id &&
+        journalOpts.sourceType === "adjustment"
+      ) {
+        await client.query(
+          `UPDATE receipt_allocations ra
+              SET refunded_amount = ra.refunded_amount + $2
+             FROM payments p
+            WHERE p.payment_id = $1
+              AND ra.id = p.receipt_allocation_id
+              AND ra.allocation_type = 'excess'
+              AND ra.amount - ra.applied_amount - ra.refunded_amount + 0.005 >= $2`,
+          [doc.linked_payment_id, totalAmt]
+        );
+      }
       break;
     }
   }
@@ -1325,6 +1352,21 @@ async function resolveReferencedDocument(client, doc) {
           // so cancellation must restore the temporary CN credit balance.
           if (doc.paired_with_id) {
             await applyBalanceDelta(client, doc.original_invoice_id, -totalAmt);
+          } else if (
+            doc.linked_payment_id &&
+            !T.docs.startsWith("jellypolly")
+          ) {
+            // Return the refunded amount to the customer-owned excess
+            // allocation (mirror of the create-side consumption; TH only).
+            await client.query(
+              `UPDATE receipt_allocations ra
+                  SET refunded_amount = GREATEST(0, ra.refunded_amount - $2)
+                 FROM payments p
+                WHERE p.payment_id = $1
+                  AND ra.id = p.receipt_allocation_id
+                  AND ra.allocation_type = 'excess'`,
+              [doc.linked_payment_id, totalAmt]
+            );
           }
           break;
         }

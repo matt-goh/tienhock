@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-10",
+    ms: "Nota Kredit kini mengurangkan lejar jualan asal (CREDIT SALES atau CASH SALES) dan bukannya akaun pulangan berasingan, dan Nota Debit menambah kepada lejar jualan yang sama. Catatan perakaunan nota pelarasan kini memaparkan nombor dokumen sebenar (contoh THCN/26/17) pada tarikh dokumen itu sendiri; nota kredit lama telah diselaraskan dengan buku lama supaya lejar CREDIT SALES Jun sepadan.",
+    en: "Credit Notes now reduce the original sales ledger (CREDIT SALES or CASH SALES) instead of a separate returns account, and Debit Notes add to the same sales ledger. Adjustment note accounting entries now show the real document number (e.g. THCN/26/17) on the document's own date; the older credit notes have been aligned with the legacy book so the June CREDIT SALES ledger matches.",
+  },
+  {
+    date: "2026-07-10",
     ms: "Halaman baharu Accounting > Cash Bank-In (RV): pilih tunai belum bank daripada kutipan jualan tunai harian (CH.REV 1) atau resit tunai invois kredit (CH.REV 2), masukkan jumlah separa jika perlu, dan sistem menjana nombor RV bulanan secara automatik (boleh diubah) serta catatan bank yang lengkap. Bank-in Jun 2026 daripada buku lama (RV001/06 hingga RV081/06) telah diimport, jadi lejar CH.REV dan bank kini sepadan dengan cetakan lama.",
     en: "New page Accounting > Cash Bank-In (RV): pick undeposited cash from daily cash-sales collections (CH.REV 1) or credit-invoice cash receipts (CH.REV 2), enter partial amounts when needed, and the system generates the monthly RV number automatically (editable) with the complete bank entry. The June 2026 bank-ins from the legacy book (RV001/06 to RV081/06) have been imported, so the CH.REV and bank ledgers now match the old printouts.",
   },
