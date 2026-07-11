@@ -1,24 +1,29 @@
 // src/routes/sales/adjustment-docs/accounting.js
 // Journal entry helpers for Adjustment Documents (Credit / Debit / Refund Notes).
 //
-// Accounting model:
-//   Credit Note  (sales return / overcharge correction)
-//     Dr Sales Returns (RETURN)
-//     Cr Trade Receivables (TR)
-//
-//   Debit Note   (additional charge, e.g. late fee)
-//     Dr Trade Receivables (TR)
-//     Cr Sales (SLS)
-//
+// Accounting model (frozen contract, docs/Account/INVOICE_PAYMENT_ACCOUNTING_PROGRESS.md §4a):
+//   Credit Note  (return / overcharge / prompt-payment discount)
+//     Dr original sale revenue (CR_SALES for a credit invoice, CASH_SALES for
+//     a cash bill) for total_excluding_tax + rounding
+//     Dr OUTPUT_TAX for tax_amount (only when non-zero)
+//     Cr Trade Receivables (TR) for the total
+//   Debit Note   (additional charge)
+//     exact inverse: Dr TR total / Cr original revenue + Cr OUTPUT_TAX
 //   Refund Note (standalone, against an overpaid Payment)
-//     Dr Customer Deposits (CUST_DEP)
-//     Cr Bank / Cash (per refund_method + bank_account)
-//
+//     Dr Customer Deposits (CUST_DEP) / Cr Bank/Cash — settlement only
 //   Refund Note (paired with a Credit Note for a previously-paid invoice)
-//     Dr Trade Receivables (TR)   -- balances the CN's credit to TR
-//     Cr Bank / Cash
+//     Dr Trade Receivables (TR) / Cr Bank/Cash — settlement only
+//
+// The symmetric field identity total_excluding_tax + rounding + tax_amount =
+// totalamountpayable is asserted; an adjustment that breaks it is rejected
+// rather than posted asymmetrically. RN never touches revenue or output tax.
+//
+// Visible accounting reference = the document number (e.g. TH/CN/26/1),
+// stored in journal display_reference; reference_no keeps the internal
+// JCN/JDN/JRN sequence. The accounting date is the document's own date.
 
 import { determineBankAccount } from "../../../utils/payment-helpers.js";
+import { formatAdjustmentDocDisplayId } from "../../../utils/adjustments/formatDocId.js";
 
 const ENTRY_TYPE = {
   credit_note: "CN",
@@ -30,6 +35,12 @@ const REFERENCE_PREFIX = {
   credit_note: "JCN",
   debit_note: "JDN",
   refund_note: "JRN",
+};
+
+const TYPE_LABEL = {
+  credit_note: "Credit Note",
+  debit_note: "Debit Note",
+  refund_note: "Refund Note",
 };
 
 /**
@@ -83,141 +94,179 @@ async function ensureAccountsExist(client, codes) {
   }
 }
 
+/**
+ * Splits the document amounts per the symmetric sale/adjustment contract and
+ * asserts the field identity. Throws instead of posting asymmetrically.
+ */
+function splitAmounts(doc) {
+  const net = roundAmt(parseFloat(doc.total_excluding_tax || 0) + parseFloat(doc.rounding || 0));
+  const tax = roundAmt(doc.tax_amount);
+  const total = roundAmt(doc.totalamountpayable);
+  if (Math.abs(net + tax - total) > 0.005) {
+    throw new Error(
+      `Adjustment ${doc.id}: net+rounding (${net.toFixed(2)}) + tax (${tax.toFixed(2)}) does not equal the total (${total.toFixed(2)}). Fix the document amounts before posting.`
+    );
+  }
+  return { net, tax, total };
+}
+
 async function insertEntry(client, {
   reference_no,
   entry_type,
   entry_date,
   description,
-  amount,
-  debit_account,
-  credit_account,
-  debit_particulars,
-  credit_particulars,
+  display_reference,
+  source_type,
+  source_id,
+  lines, // [account, debit, credit, particulars]
   created_by,
 }) {
+  const totalDebit = roundAmt(lines.reduce((s, l) => s + l[1], 0));
+  const totalCredit = roundAmt(lines.reduce((s, l) => s + l[2], 0));
+
   const headerResult = await client.query(
     `INSERT INTO journal_entries (
        reference_no, entry_type, entry_date, description,
-       total_debit, total_credit, status,
-       created_at, created_by
-     ) VALUES ($1, $2, $3, $4, $5, $6, 'posted', NOW(), $7)
+       total_debit, total_credit, status, display_reference,
+       source_type, source_id, created_at, created_by
+     ) VALUES ($1, $2, $3, $4, $5, $6, 'posted', $7, $8, $9, NOW(), $10)
      RETURNING id`,
-    [reference_no, entry_type, entry_date, description, amount, amount, created_by || null]
+    [
+      reference_no,
+      entry_type,
+      entry_date,
+      description,
+      totalDebit,
+      totalCredit,
+      display_reference,
+      source_type,
+      source_id,
+      created_by || null,
+    ]
   );
   const journalEntryId = headerResult.rows[0].id;
 
-  await client.query(
-    `INSERT INTO journal_entry_lines (
-       journal_entry_id, line_number, account_code,
-       debit_amount, credit_amount, reference, particulars, created_at
-     ) VALUES
-       ($1, 1, $2, $3, 0, $4, $5, NOW()),
-       ($1, 2, $6, 0, $3, $4, $7, NOW())`,
-    [
-      journalEntryId,
-      debit_account,
-      amount,
-      reference_no,
-      debit_particulars,
-      credit_account,
-      credit_particulars,
-    ]
-  );
+  for (let i = 0; i < lines.length; i++) {
+    const [account, debit, credit, particulars] = lines[i];
+    await client.query(
+      `INSERT INTO journal_entry_lines (
+         journal_entry_id, line_number, account_code,
+         debit_amount, credit_amount, reference, particulars, display_order, created_at
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $2, NOW())`,
+      [journalEntryId, i + 1, account, debit, credit, reference_no, particulars]
+    );
+  }
 
   return journalEntryId;
 }
 
+function docContext(doc, opts, type) {
+  const displayRef = formatAdjustmentDocDisplayId(doc);
+  const reason = (doc.reason || "").trim();
+  const description = `${displayRef}: ${reason || TYPE_LABEL[type]} - INV/NO: ${doc.original_invoice_id}`;
+  const revenueAccount = opts.paymenttype === "CASH" ? "CASH_SALES" : "CR_SALES";
+  const sourceType = opts.sourceType || "adjustment";
+  return { displayRef, description, revenueAccount, sourceType };
+}
+
 /**
  * Create journal entry for a Credit Note.
- * Dr RETURN / Cr TR.
+ * Dr original revenue (+ Dr OUTPUT_TAX) / Cr TR.
+ * opts: { paymenttype: original invoice's CASH|INVOICE, sourceType }
  */
-export async function createCreditNoteJournalEntry(client, doc) {
-  const debitAccount = "RETURN";
-  const creditAccount = "TR";
-  await ensureAccountsExist(client, [debitAccount, creditAccount]);
+export async function createCreditNoteJournalEntry(client, doc, opts = {}) {
+  const { net, tax, total } = splitAmounts(doc);
+  const { description, revenueAccount, sourceType } = docContext(doc, opts, "credit_note");
 
-  const amount = roundAmt(doc.totalamountpayable);
+  const accounts = [revenueAccount, "TR"];
+  if (tax > 0) accounts.push("OUTPUT_TAX");
+  await ensureAccountsExist(client, accounts);
+
   const postingDate = toIsoDate(doc.createddate);
   const reference_no = await generateAdjustmentReference(client, "credit_note", postingDate);
+
+  const lines = [[revenueAccount, net, 0, description]];
+  if (tax > 0) lines.push(["OUTPUT_TAX", tax, 0, description]);
+  lines.push(["TR", 0, total, description]);
 
   return insertEntry(client, {
     reference_no,
     entry_type: ENTRY_TYPE.credit_note,
     entry_date: postingDate,
-    description: `Credit Note ${doc.id} - Invoice #${doc.original_invoice_id}${
-      doc.reason ? ` (${doc.reason.slice(0, 100)})` : ""
-    }`,
-    amount,
-    debit_account: debitAccount,
-    credit_account: creditAccount,
-    debit_particulars: `Sales return - Invoice #${doc.original_invoice_id}`,
-    credit_particulars: `A/R reduction via ${doc.id}`,
+    description,
+    display_reference: formatAdjustmentDocDisplayId(doc),
+    source_type: sourceType,
+    source_id: String(doc.id),
+    lines,
     created_by: doc.created_by,
   });
 }
 
 /**
  * Create journal entry for a Debit Note.
- * Dr TR / Cr SLS.
+ * Dr TR / Cr original revenue (+ Cr OUTPUT_TAX).
  */
-export async function createDebitNoteJournalEntry(client, doc) {
-  const debitAccount = "TR";
-  const creditAccount = "SLS";
-  await ensureAccountsExist(client, [debitAccount, creditAccount]);
+export async function createDebitNoteJournalEntry(client, doc, opts = {}) {
+  const { net, tax, total } = splitAmounts(doc);
+  const { description, revenueAccount, sourceType } = docContext(doc, opts, "debit_note");
 
-  const amount = roundAmt(doc.totalamountpayable);
+  const accounts = [revenueAccount, "TR"];
+  if (tax > 0) accounts.push("OUTPUT_TAX");
+  await ensureAccountsExist(client, accounts);
+
   const postingDate = toIsoDate(doc.createddate);
   const reference_no = await generateAdjustmentReference(client, "debit_note", postingDate);
+
+  const lines = [["TR", total, 0, description], [revenueAccount, 0, net, description]];
+  if (tax > 0) lines.push(["OUTPUT_TAX", 0, tax, description]);
 
   return insertEntry(client, {
     reference_no,
     entry_type: ENTRY_TYPE.debit_note,
     entry_date: postingDate,
-    description: `Debit Note ${doc.id} - Invoice #${doc.original_invoice_id}${
-      doc.reason ? ` (${doc.reason.slice(0, 100)})` : ""
-    }`,
-    amount,
-    debit_account: debitAccount,
-    credit_account: creditAccount,
-    debit_particulars: `A/R increase via ${doc.id}`,
-    credit_particulars: `Additional charge - Invoice #${doc.original_invoice_id}`,
+    description,
+    display_reference: formatAdjustmentDocDisplayId(doc),
+    source_type: sourceType,
+    source_id: String(doc.id),
+    lines,
     created_by: doc.created_by,
   });
 }
 
 /**
- * Create journal entry for a Refund Note.
+ * Create journal entry for a Refund Note — settlement only; never touches
+ * revenue or output tax.
  * - Standalone (linked to an overpaid payment): Dr CUST_DEP / Cr Bank.
  * - Paired with a Credit Note (paid invoice scenario): Dr TR / Cr Bank.
  */
-export async function createRefundNoteJournalEntry(client, doc) {
+export async function createRefundNoteJournalEntry(client, doc, opts = {}) {
   const bankAccount = determineBankAccount(doc.refund_method, doc.bank_account);
   const debitAccount = doc.paired_with_id ? "TR" : "CUST_DEP";
-  const creditAccount = bankAccount;
-  await ensureAccountsExist(client, [debitAccount, creditAccount]);
+  await ensureAccountsExist(client, [debitAccount, bankAccount]);
 
-  const amount = roundAmt(doc.totalamountpayable);
+  const total = roundAmt(doc.totalamountpayable);
+  const { description, sourceType } = docContext(doc, opts, "refund_note");
+  const refundContext = doc.paired_with_id
+    ? ` (paired with ${formatAdjustmentDocDisplayId({ id: doc.paired_with_id })})`
+    : doc.linked_payment_id
+    ? ` (refunds overpayment #${doc.linked_payment_id})`
+    : "";
+
   const postingDate = toIsoDate(doc.createddate);
   const reference_no = await generateAdjustmentReference(client, "refund_note", postingDate);
-
-  const refundContext = doc.paired_with_id
-    ? `paired with ${doc.paired_with_id}`
-    : doc.linked_payment_id
-    ? `for overpayment on Payment #${doc.linked_payment_id}`
-    : "standalone refund";
 
   return insertEntry(client, {
     reference_no,
     entry_type: ENTRY_TYPE.refund_note,
     entry_date: postingDate,
-    description: `Refund Note ${doc.id} - Invoice #${doc.original_invoice_id} (${refundContext})`,
-    amount,
-    debit_account: debitAccount,
-    credit_account: creditAccount,
-    debit_particulars: doc.paired_with_id
-      ? `A/R clearance via refund ${doc.id}`
-      : `Customer deposit released via ${doc.id}`,
-    credit_particulars: `Refund paid to customer - Invoice #${doc.original_invoice_id}`,
+    description: description + refundContext,
+    display_reference: formatAdjustmentDocDisplayId(doc),
+    source_type: sourceType,
+    source_id: String(doc.id),
+    lines: [
+      [debitAccount, total, 0, description + refundContext],
+      [bankAccount, 0, total, description + refundContext],
+    ],
     created_by: doc.created_by,
   });
 }
