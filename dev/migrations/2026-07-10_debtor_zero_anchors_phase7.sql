@@ -15,6 +15,36 @@
 -- new customers need no anchor. Idempotent (ON CONFLICT DO NOTHING).
 -- =============================================================================
 
+BEGIN;
+
+DO $$
+DECLARE
+  v_children INTEGER;
+  v_anchored INTEGER;
+  v_total NUMERIC(14,2);
+BEGIN
+  SELECT COUNT(*) INTO v_children
+    FROM account_codes WHERE parent_code = 'DEBTOR';
+
+  WITH latest AS (
+    SELECT DISTINCT ON (aob.account_code) aob.account_code, aob.amount
+      FROM account_opening_balances aob
+      JOIN account_codes ac ON ac.code = aob.account_code
+     WHERE ac.parent_code = 'DEBTOR'
+       AND aob.as_of_date <= DATE '2026-06-01'
+     ORDER BY aob.account_code, aob.as_of_date DESC
+  )
+  SELECT COUNT(*), COALESCE(SUM(amount), 0)::numeric(14,2)
+    INTO v_anchored, v_total
+    FROM latest;
+
+  IF v_total <> 507697.72 OR v_anchored < 150 OR v_anchored > v_children THEN
+    RAISE EXCEPTION
+      'Unexpected debtor cutover anchors: % of % children totaling % (expected at least 150 and no more than all children, total 507697.72)',
+      v_anchored, v_children, v_total;
+  END IF;
+END $$;
+
 INSERT INTO account_opening_balances (account_code, as_of_date, amount, notes, created_by)
 SELECT ac.code, DATE '2026-06-01', 0,
        'Zero debtor opening at cutover (customer not in the legacy 1 June debtor list)',
@@ -26,6 +56,34 @@ SELECT ac.code, DATE '2026-06-01', 0,
       WHERE aob.account_code = ac.code AND aob.as_of_date <= DATE '2026-06-01'
    )
 ON CONFLICT (account_code, as_of_date) DO NOTHING;
+
+DO $$
+DECLARE
+  v_children INTEGER;
+  v_anchored INTEGER;
+  v_total NUMERIC(14,2);
+BEGIN
+  SELECT COUNT(*) INTO v_children
+    FROM account_codes WHERE parent_code = 'DEBTOR';
+  WITH latest AS (
+    SELECT DISTINCT ON (aob.account_code) aob.account_code, aob.amount
+      FROM account_opening_balances aob
+      JOIN account_codes ac ON ac.code = aob.account_code
+     WHERE ac.parent_code = 'DEBTOR'
+       AND aob.as_of_date <= DATE '2026-06-01'
+     ORDER BY aob.account_code, aob.as_of_date DESC
+  )
+  SELECT COUNT(*), COALESCE(SUM(amount), 0)::numeric(14,2)
+    INTO v_anchored, v_total
+    FROM latest;
+  IF v_anchored <> v_children OR v_total <> 507697.72 THEN
+    RAISE EXCEPTION
+      'Debtor zero-anchor result invalid: % of % children totaling %',
+      v_anchored, v_children, v_total;
+  END IF;
+END $$;
+
+COMMIT;
 
 SELECT COUNT(*) AS debtor_children,
        COUNT(*) FILTER (WHERE EXISTS (

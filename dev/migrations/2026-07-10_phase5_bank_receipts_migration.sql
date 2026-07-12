@@ -83,14 +83,14 @@ BEGIN
       INTO v_sum, v_found, v_received
       FROM payments p
      WHERE p.invoice_id = ANY(rec.invoice_ids)
+       AND p.payment_date < DATE '2026-06-01'
        AND p.receipt_allocation_id IS NULL
        AND p.is_auto_collection = false
        AND (p.status IS NULL OR p.status IN ('active', 'pending'));
 
     IF v_found > 0 AND ABS(v_sum - rec.amount) > 0.005 THEN
-      RAISE WARNING 'Phase5A %/%: ERP payments sum % <> legacy % — skipped (resolve manually)',
+      RAISE EXCEPTION 'Phase5A %/%: ERP payments sum % <> legacy % — resolve before migration',
         rec.display_ref, rec.customer, v_sum, rec.amount;
-      CONTINUE;
     END IF;
 
     IF v_found = 0 THEN
@@ -98,9 +98,8 @@ BEGIN
       SELECT COALESCE(SUM(i.balance_due), 0)::numeric(12,2) INTO v_sum
         FROM invoices i WHERE i.id = ANY(rec.invoice_ids) AND i.invoice_status <> 'cancelled';
       IF ABS(v_sum - rec.amount) > 0.005 THEN
-        RAISE WARNING 'Phase5A %/%: no payments and invoice balances % <> legacy % — skipped (resolve manually)',
+        RAISE EXCEPTION 'Phase5A %/%: no payments and invoice balances % <> legacy % — resolve before migration',
           rec.display_ref, rec.customer, v_sum, rec.amount;
-        CONTINUE;
       END IF;
       v_received := rec.clear_date;
     END IF;
@@ -135,6 +134,7 @@ BEGIN
                p.journal_entry_id, p.status, i.customerid, i.paymenttype
           FROM payments p JOIN invoices i ON i.id = p.invoice_id
          WHERE p.invoice_id = ANY(rec.invoice_ids)
+           AND p.payment_date < DATE '2026-06-01'
            AND p.receipt_allocation_id IS NULL AND p.is_auto_collection = false
            AND (p.status IS NULL OR p.status IN ('active', 'pending'))
          ORDER BY p.payment_id
@@ -207,6 +207,131 @@ BEGIN
   END LOOP;
 END $$;
 
+-- Every Phase 5A legacy-clear row must now exist exactly once. This converts
+-- the former warning/continue behavior into an atomic production gate.
+DO $$
+DECLARE
+  rec RECORD;
+  v_count INTEGER;
+  v_receipt_id INTEGER;
+  v_journal_id INTEGER;
+  v_allocation_count INTEGER;
+  v_allocation_total NUMERIC(12,2);
+BEGIN
+  FOR rec IN
+    SELECT * FROM (VALUES
+      (DATE '2026-06-03', 'TF030626',    'TF030626', 'DESSERT',       ARRAY['63810'],          206.40),
+      (DATE '2026-06-06', 'PIB439770',   '439770',   'ZENITH',        ARRAY['34530'],         2088.00),
+      (DATE '2026-06-06', 'RHB022790',   '022790',   'SD',            ARRAY['63801','63844'], 9604.90),
+      (DATE '2026-06-09', 'TF090626-1',  'TF090626', 'NEW FRESHMART', ARRAY['63760','63846'], 2285.00),
+      (DATE '2026-06-09', 'TF090626-2',  'TF090626', 'ONESTOP',       ARRAY['63913'],          870.00),
+      (DATE '2026-06-09', 'TR090626',    'TR090626', 'KIM(1)',        ARRAY['2004892'],       3431.00),
+      (DATE '2026-06-09', 'TT090626',    'TT090626', 'HOCKSENG',      ARRAY['34922'],         1505.00),
+      (DATE '2026-06-11', 'ALB001088',   '001088',   'MORE',          ARRAY['63702'],        20668.60),
+      (DATE '2026-06-18', 'TT180626-1',  'TT180626', 'SKY',           ARRAY['34985'],         1325.00),
+      (DATE '2026-06-22', 'MBB932037-J', '932037-J', 'TETAPJAYA(M)',  ARRAY['63574','63649'],15128.40),
+      (DATE '2026-06-22', 'MBB932037-P', '932037-P', 'TETAPJAYA(I)',  ARRAY['34680','34768'], 1983.60),
+      (DATE '2026-06-22', 'MBB932037-P', '932037-P', 'TETAPJAYA(N)',  ARRAY['34709'],          769.50),
+      (DATE '2026-06-22', 'PBB152961',   '152961',   'SHAJAHAN',      ARRAY['2004879'],       2460.00),
+      (DATE '2026-06-23', 'PIB437391',   '437391',   'TSEN',          ARRAY['63592','63685'], 2142.50)
+    ) AS t(clear_date, display_ref, cheque_ref, customer, invoice_ids, amount)
+  LOOP
+    SELECT COUNT(*), MIN(r.id), MIN(r.journal_entry_id)
+      INTO v_count, v_receipt_id, v_journal_id
+      FROM receipts r
+      JOIN journal_entries je ON je.id = r.journal_entry_id
+     WHERE r.display_reference = rec.display_ref
+       AND r.posting_date = rec.clear_date
+       AND r.total_amount = rec.amount
+       AND r.payment_method = 'cheque'
+       AND r.debit_account = 'BANK_PBB'
+       AND r.cheque_reference = rec.cheque_ref
+       AND r.status = 'posted'
+       AND r.origin = 'erp'
+       AND je.entry_type = 'REC'
+       AND je.entry_date = rec.clear_date
+       AND je.display_reference = rec.display_ref
+       AND je.status = 'posted'
+       AND je.total_debit = rec.amount
+       AND je.total_credit = rec.amount
+       AND je.source_type = 'receipt'
+       AND je.source_id = r.id::text;
+    IF v_count <> 1 THEN
+      RAISE EXCEPTION 'Phase5A expected one exact posted receipt %/%/%, found %',
+        rec.display_ref, rec.clear_date, rec.amount, v_count;
+    END IF;
+
+    SELECT COUNT(*), COALESCE(SUM(ra.amount), 0)::numeric(12,2)
+      INTO v_allocation_count, v_allocation_total
+      FROM receipt_allocations ra
+     WHERE ra.receipt_id = v_receipt_id;
+    IF v_allocation_count = 0 OR ABS(v_allocation_total - rec.amount) > 0.005
+       OR EXISTS (
+         SELECT 1
+           FROM receipt_allocations ra
+           LEFT JOIN invoices i ON i.id = ra.invoice_id
+          WHERE ra.receipt_id = v_receipt_id
+            AND (ra.allocation_type <> 'invoice'
+              OR i.id IS NULL
+              OR ra.customer_id IS DISTINCT FROM i.customerid)
+       ) OR EXISTS (
+         SELECT expected.invoice_id
+           FROM unnest(rec.invoice_ids) AS expected(invoice_id)
+         EXCEPT
+         SELECT ra.invoice_id
+           FROM receipt_allocations ra
+          WHERE ra.receipt_id = v_receipt_id
+       ) OR EXISTS (
+         SELECT ra.invoice_id
+           FROM receipt_allocations ra
+          WHERE ra.receipt_id = v_receipt_id
+         EXCEPT
+         SELECT expected.invoice_id
+           FROM unnest(rec.invoice_ids) AS expected(invoice_id)
+       ) THEN
+      RAISE EXCEPTION 'Phase5A receipt % has the wrong allocation set or total', rec.display_ref;
+    END IF;
+
+    IF EXISTS (
+      SELECT 1
+        FROM receipt_allocations ra
+       WHERE ra.receipt_id = v_receipt_id
+         AND (SELECT COUNT(*)
+                FROM payments p
+               WHERE p.receipt_allocation_id = ra.id
+                 AND p.invoice_id = ra.invoice_id
+                 AND p.amount_paid = ra.amount
+                 AND p.status = 'active'
+                 AND p.payment_reference = rec.display_ref
+                 AND p.is_auto_collection = false
+                 AND p.journal_entry_id IS NULL) <> 1
+    ) THEN
+      RAISE EXCEPTION 'Phase5A receipt % does not have one exact payment projection per allocation', rec.display_ref;
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1
+        FROM journal_entry_lines jel
+       WHERE jel.journal_entry_id = v_journal_id
+       GROUP BY jel.journal_entry_id
+      HAVING COUNT(*) = v_allocation_count + 1
+         AND SUM(jel.debit_amount) = rec.amount
+         AND SUM(jel.credit_amount) = rec.amount
+         AND COUNT(*) FILTER (
+               WHERE jel.account_code = 'BANK_PBB'
+                 AND jel.debit_amount = rec.amount
+                 AND jel.credit_amount = 0
+                 AND jel.cheque_reference = rec.cheque_ref
+             ) = 1
+         AND COUNT(*) FILTER (
+               WHERE jel.debit_amount = 0 AND jel.credit_amount > 0
+             ) = v_allocation_count
+    ) THEN
+      RAISE EXCEPTION 'Phase5A receipt % journal lines do not match its allocations', rec.display_ref;
+    END IF;
+  END LOOP;
+END $$;
+
 -- -----------------------------------------------------------------------------
 -- B. Date-shifted clears + reference typo fixes on existing receipts.
 -- -----------------------------------------------------------------------------
@@ -214,6 +339,7 @@ DO $$
 DECLARE
   rec RECORD;
   r RECORD;
+  v_candidate_count INTEGER;
 BEGIN
   FOR rec IN
     SELECT * FROM (VALUES
@@ -223,11 +349,21 @@ BEGIN
       ('MBB000757', 2735.60, DATE '2026-06-29', 'MIB000757', '000757')
     ) AS t(old_ref, amount, clear_date, new_ref, cheque_ref)
   LOOP
+    SELECT COUNT(*) INTO v_candidate_count
+      FROM receipts
+     WHERE display_reference IN (rec.old_ref, rec.new_ref)
+       AND total_amount = rec.amount
+       AND status = 'posted';
+    IF v_candidate_count <> 1 THEN
+      RAISE EXCEPTION 'Phase5B expected one source/corrected receipt % -> % for %, found %',
+        rec.old_ref, rec.new_ref, rec.amount, v_candidate_count;
+    END IF;
+
     SELECT * INTO r FROM receipts
      WHERE display_reference = rec.old_ref AND total_amount = rec.amount AND status = 'posted'
      LIMIT 1;
-    IF r.id IS NULL THEN
-      -- already corrected (rerun) or missing
+    IF NOT FOUND THEN
+      -- Already corrected on a verified rerun.
       CONTINUE;
     END IF;
     UPDATE receipts
@@ -245,6 +381,96 @@ BEGIN
       FROM receipt_allocations ra
      WHERE ra.receipt_id = r.id AND p.receipt_allocation_id = ra.id
        AND p.payment_reference = rec.old_ref;
+  END LOOP;
+END $$;
+
+DO $$
+DECLARE
+  rec RECORD;
+  v_count INTEGER;
+  v_receipt_id INTEGER;
+  v_journal_id INTEGER;
+  v_allocation_count INTEGER;
+  v_allocation_total NUMERIC(12,2);
+BEGIN
+  FOR rec IN
+    SELECT * FROM (VALUES
+      ('PBB023159', 'PBB023159', 1392.00, DATE '2026-06-15', '023159'),
+      ('MBB000750', 'MBB000750', 2183.50, DATE '2026-06-22', '000750'),
+      ('ALB00106',  'ALB000106', 2070.00, DATE '2026-06-24', '000106'),
+      ('MBB000757', 'MIB000757', 2735.60, DATE '2026-06-29', '000757')
+    ) AS t(old_ref, display_ref, amount, clear_date, cheque_ref)
+  LOOP
+    SELECT COUNT(*), MIN(r.id), MIN(r.journal_entry_id)
+      INTO v_count, v_receipt_id, v_journal_id
+      FROM receipts r
+      JOIN journal_entries je ON je.id = r.journal_entry_id
+     WHERE r.display_reference = rec.display_ref
+       AND r.total_amount = rec.amount
+       AND r.posting_date = rec.clear_date
+       AND r.debit_account = 'BANK_PBB'
+       AND r.cheque_reference = rec.cheque_ref
+       AND r.status = 'posted'
+       AND je.entry_type = 'REC'
+       AND je.entry_date = rec.clear_date
+       AND je.display_reference = rec.display_ref
+       AND je.status = 'posted'
+       AND je.total_debit = rec.amount
+       AND je.total_credit = rec.amount
+       AND je.source_type = 'receipt'
+       AND je.source_id = r.id::text;
+    IF v_count <> 1 THEN
+      RAISE EXCEPTION 'Phase5B expected one exact corrected receipt %/%/%, found %',
+        rec.display_ref, rec.clear_date, rec.amount, v_count;
+    END IF;
+
+    IF rec.old_ref <> rec.display_ref AND EXISTS (
+      SELECT 1 FROM receipts
+       WHERE display_reference = rec.old_ref
+         AND total_amount = rec.amount
+         AND status = 'posted'
+    ) THEN
+      RAISE EXCEPTION 'Phase5B obsolete source reference % still has a posted receipt', rec.old_ref;
+    END IF;
+
+    SELECT COUNT(*), COALESCE(SUM(amount), 0)::numeric(12,2)
+      INTO v_allocation_count, v_allocation_total
+      FROM receipt_allocations
+     WHERE receipt_id = v_receipt_id;
+    IF v_allocation_count = 0 OR ABS(v_allocation_total - rec.amount) > 0.005 THEN
+      RAISE EXCEPTION 'Phase5B receipt % allocation total is invalid', rec.display_ref;
+    END IF;
+
+    IF EXISTS (
+      SELECT 1
+        FROM receipt_allocations ra
+       WHERE ra.receipt_id = v_receipt_id
+         AND (SELECT COUNT(*)
+                FROM payments p
+               WHERE p.receipt_allocation_id = ra.id
+                 AND p.invoice_id = ra.invoice_id
+                 AND p.amount_paid = ra.amount
+                 AND p.payment_reference = rec.display_ref) <> 1
+    ) THEN
+      RAISE EXCEPTION 'Phase5B receipt % has a missing or incorrect linked payment reference', rec.display_ref;
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1
+        FROM journal_entry_lines jel
+       WHERE jel.journal_entry_id = v_journal_id
+       GROUP BY jel.journal_entry_id
+      HAVING SUM(jel.debit_amount) = rec.amount
+         AND SUM(jel.credit_amount) = rec.amount
+         AND COUNT(*) FILTER (
+               WHERE jel.account_code = 'BANK_PBB'
+                 AND jel.debit_amount = rec.amount
+                 AND jel.credit_amount = 0
+                 AND jel.cheque_reference = rec.cheque_ref
+             ) = 1
+    ) THEN
+      RAISE EXCEPTION 'Phase5B receipt % journal/cheque line is invalid', rec.display_ref;
+    END IF;
   END LOOP;
 END $$;
 
@@ -356,6 +582,124 @@ BEGIN
     UPDATE receipts SET journal_entry_id = v_journal_id, status = 'posted', posting_date = DATE '2026-06-29'
      WHERE id = v_receipt_id;
   END LOOP;
+END $$;
+
+DO $$
+DECLARE
+  rec RECORD;
+  v_count INTEGER;
+  v_total NUMERIC(12,2);
+  v_receipt_id INTEGER;
+  v_journal_id INTEGER;
+  v_allocation_count INTEGER;
+  v_allocation_total NUMERIC(12,2);
+BEGIN
+  FOR rec IN
+    SELECT * FROM (VALUES
+      ('PBB678670',   'GUI',    27242.00, '678670'),
+      ('PBB678670-1', 'GUI(2)', 10999.00, '678670-1'),
+      ('PBB678670-2', 'GUI(3)',  8248.00, '678670-2'),
+      ('PBB678670-3', 'GUI(5)', 16054.40, '678670-3')
+    ) AS t(display_ref, customer, amount, cheque_ref)
+  LOOP
+    SELECT COUNT(*), MIN(r.id), MIN(r.journal_entry_id)
+      INTO v_count, v_receipt_id, v_journal_id
+      FROM receipts r
+      JOIN journal_entries je ON je.id = r.journal_entry_id
+     WHERE r.display_reference = rec.display_ref
+       AND r.total_amount = rec.amount
+       AND r.posting_date = DATE '2026-06-29'
+       AND r.payment_method = 'cheque'
+       AND r.debit_account = 'BANK_PBB'
+       AND r.cheque_reference = rec.cheque_ref
+       AND r.status = 'posted'
+       AND r.origin = 'erp'
+       AND je.entry_type = 'REC'
+       AND je.entry_date = DATE '2026-06-29'
+       AND je.display_reference = rec.display_ref
+       AND je.status = 'posted'
+       AND je.total_debit = rec.amount
+       AND je.total_credit = rec.amount
+       AND je.source_type = 'receipt'
+       AND je.source_id = r.id::text;
+    IF v_count <> 1 THEN
+      RAISE EXCEPTION 'PBB678670 split group %/% expected one exact receipt, found %',
+        rec.display_ref, rec.customer, v_count;
+    END IF;
+
+    SELECT COUNT(*), COALESCE(SUM(ra.amount), 0)::numeric(12,2)
+      INTO v_allocation_count, v_allocation_total
+      FROM receipt_allocations ra
+     WHERE ra.receipt_id = v_receipt_id;
+    IF v_allocation_count = 0 OR ABS(v_allocation_total - rec.amount) > 0.005
+       OR EXISTS (
+         SELECT 1 FROM receipt_allocations ra
+          WHERE ra.receipt_id = v_receipt_id
+            AND (ra.allocation_type <> 'invoice'
+              OR ra.customer_id IS DISTINCT FROM rec.customer)
+       ) THEN
+      RAISE EXCEPTION 'PBB678670 split group % has the wrong customer allocations or total', rec.display_ref;
+    END IF;
+
+    IF EXISTS (
+      SELECT 1
+        FROM receipt_allocations ra
+       WHERE ra.receipt_id = v_receipt_id
+         AND (SELECT COUNT(*)
+                FROM payments p
+               WHERE p.receipt_allocation_id = ra.id
+                 AND p.invoice_id = ra.invoice_id
+                 AND p.amount_paid = ra.amount
+                 AND p.status = 'active'
+                 AND p.payment_reference = rec.display_ref
+                 AND p.is_auto_collection = false) <> 1
+    ) THEN
+      RAISE EXCEPTION 'PBB678670 split group % has an invalid linked payment projection', rec.display_ref;
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1
+        FROM journal_entry_lines jel
+       WHERE jel.journal_entry_id = v_journal_id
+       GROUP BY jel.journal_entry_id
+      HAVING COUNT(*) = v_allocation_count + 1
+         AND SUM(jel.debit_amount) = rec.amount
+         AND SUM(jel.credit_amount) = rec.amount
+         AND COUNT(*) FILTER (
+               WHERE jel.account_code = 'BANK_PBB'
+                 AND jel.debit_amount = rec.amount
+                 AND jel.credit_amount = 0
+                 AND jel.cheque_reference = rec.cheque_ref
+             ) = 1
+         AND COUNT(*) FILTER (
+               WHERE jel.debit_amount = 0 AND jel.credit_amount > 0
+             ) = v_allocation_count
+    ) THEN
+      RAISE EXCEPTION 'PBB678670 split group % journal lines are invalid', rec.display_ref;
+    END IF;
+  END LOOP;
+
+  SELECT COUNT(*), COALESCE(SUM(total_amount), 0)::numeric(12,2)
+    INTO v_count, v_total
+    FROM receipts
+   WHERE display_reference IN ('PBB678670', 'PBB678670-1', 'PBB678670-2', 'PBB678670-3')
+     AND posting_date = DATE '2026-06-29'
+     AND debit_account = 'BANK_PBB'
+     AND status = 'posted';
+  IF v_count <> 4 OR ABS(v_total - 62543.40) > 0.005 THEN
+    RAISE EXCEPTION 'PBB678670 split incomplete: % posted rows totaling %', v_count, v_total;
+  END IF;
+
+  SELECT COUNT(*) INTO v_count
+    FROM receipts r
+    JOIN journal_entries je ON je.id = r.journal_entry_id
+   WHERE r.display_reference = 'PBB678670'
+     AND r.total_amount = 62543.40
+     AND r.status = 'cancelled'
+     AND je.status = 'cancelled';
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'Expected one cancelled original PBB678670 RM62543.40 receipt/journal, found %', v_count;
+  END IF;
 END $$;
 
 COMMIT;

@@ -34,10 +34,28 @@ CREATE INDEX IF NOT EXISTS payments_invoice_idx
   ON payments (invoice_id);
 
 -- Seed the auto-collection flag from the two known historical note texts,
--- restricted to cash-method rows (the only kind the auto paths ever created).
+-- restricted to cash-method rows whose invoice is STILL a CASH bill. Old
+-- CASH -> INVOICE conversions can retain the automatic-note text even when
+-- the payment is now a genuine credit-invoice receipt (e.g. 015361).
+UPDATE payments p
+   SET is_auto_collection = false
+  FROM invoices i
+ WHERE p.payment_id = 5229
+   AND p.invoice_id = '015361'
+   AND p.amount_paid = 2880.00
+   AND p.payment_method = 'cash'
+   AND p.status = 'active'
+   AND i.id = p.invoice_id
+   AND i.customerid = 'YESOKEY'
+   AND i.paymenttype = 'INVOICE'
+   AND p.is_auto_collection = true;
+
 UPDATE payments p
    SET is_auto_collection = true
+  FROM invoices i
  WHERE p.is_auto_collection = false
+   AND i.id = p.invoice_id
+   AND i.paymenttype = 'CASH'
    AND p.payment_method = 'cash'
    AND (p.notes LIKE 'Automatic payment%'
      OR p.notes LIKE 'Payment automatically recorded%');
