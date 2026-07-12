@@ -17,10 +17,20 @@ SET invoice_status = 'paid'
 WHERE balance_due <= 0
   AND invoice_status IN ('Unpaid', 'Overdue');
 
+UPDATE jellypolly.invoices
+SET invoice_status = 'paid'
+WHERE balance_due <= 0
+  AND invoice_status IN ('Unpaid', 'Overdue');
+
 COMMIT;
 
--- Verification: expect 0 rows.
-SELECT id, paymenttype, totalamountpayable, balance_due, invoice_status
+-- Verification: expect 0 rows from both.
+SELECT 'TH' AS company, id, paymenttype, totalamountpayable, balance_due, invoice_status
 FROM invoices
+WHERE balance_due <= 0
+  AND invoice_status IN ('Unpaid', 'Overdue')
+UNION ALL
+SELECT 'JP', id, paymenttype, totalamountpayable, balance_due, invoice_status
+FROM jellypolly.invoices
 WHERE balance_due <= 0
   AND invoice_status IN ('Unpaid', 'Overdue');
