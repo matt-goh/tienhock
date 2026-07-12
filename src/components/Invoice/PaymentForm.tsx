@@ -598,6 +598,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                         (Will be marked as pending until confirmed)
                       </span>
                     )}
+                    {formData.payment_method === "cash" && (
+                      <span className="ml-2 text-amber-600 dark:text-amber-400">
+                        (Held as undeposited cash in CH_REV2 until banked in via
+                        Accounting → Cash Bank-In)
+                      </span>
+                    )}
                   </>
                 )}
               </div>

@@ -5,7 +5,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
+import { IconBuildingBank, IconPlus } from "@tabler/icons-react";
 import Button from "../../components/Button";
+import Checkbox from "../../components/Checkbox";
 import { FormInput, FormListbox } from "../../components/FormComponents";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
@@ -270,26 +272,27 @@ const BankInPage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="w-full space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+            <IconBuildingBank size={28} className="text-gray-700 dark:text-gray-200" />
             Cash Bank-In (RV)
           </h1>
-          <p className="text-sm text-default-500 dark:text-gray-400">
-            Bank undeposited cash from daily cash-sales pools (CH.REV 1) and
-            credit-invoice cash receipts (CH.REV 2)
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Bank undeposited cash from daily cash-sales pools (CH_REV1) and
+            credit-invoice cash receipts (CH_REV2)
           </p>
         </div>
         {!showForm && (
-          <Button color="sky" onClick={() => setShowForm(true)}>
+          <Button color="sky" icon={IconPlus} onClick={() => setShowForm(true)}>
             New Bank-In
           </Button>
         )}
       </div>
 
       {showForm && (
-        <div className="border border-default-200 dark:border-gray-700 rounded-lg p-4 space-y-4 bg-white dark:bg-gray-900">
+        <div className="w-full bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <FormInput
               name="posting_date"
@@ -328,10 +331,10 @@ const BankInPage: React.FC = () => {
             <>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div>
-                  <h2 className="text-sm font-medium text-default-700 dark:text-gray-300 mb-2">
-                    Cash-sales pools (CH.REV 1)
+                  <h2 className="text-sm font-semibold text-default-700 dark:text-gray-300 mb-2 pl-1">
+                    Cash-sales pools (CH_REV1)
                   </h2>
-                  <div className="border border-default-200 dark:border-gray-700 rounded-md overflow-x-auto max-h-80 overflow-y-auto">
+                  <div className="border border-default-200 dark:border-gray-700 rounded-lg overflow-x-auto max-h-96 overflow-y-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-default-50 dark:bg-gray-800 sticky top-0">
                         <tr className="text-left text-default-600 dark:text-gray-400">
@@ -400,10 +403,10 @@ const BankInPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <h2 className="text-sm font-medium text-default-700 dark:text-gray-300 mb-2">
-                    Unbanked cash receipts (CH.REV 2)
+                  <h2 className="text-sm font-semibold text-default-700 dark:text-gray-300 mb-2 pl-1">
+                    Unbanked cash receipts (CH_REV2)
                   </h2>
-                  <div className="border border-default-200 dark:border-gray-700 rounded-md overflow-x-auto max-h-80 overflow-y-auto">
+                  <div className="border border-default-200 dark:border-gray-700 rounded-lg overflow-x-auto max-h-96 overflow-y-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-default-50 dark:bg-gray-800 sticky top-0">
                         <tr className="text-left text-default-600 dark:text-gray-400">
@@ -418,12 +421,13 @@ const BankInPage: React.FC = () => {
                         {receipts.map((r) => (
                           <tr key={r.id} className="border-t border-default-100 dark:border-gray-800">
                             <td className="px-3 py-1.5">
-                              <input
-                                type="checkbox"
+                              <Checkbox
                                 checked={Boolean(receiptChecked[r.id])}
-                                onChange={(e) =>
-                                  setReceiptChecked({ ...receiptChecked, [r.id]: e.target.checked })
+                                onChange={(checked) =>
+                                  setReceiptChecked({ ...receiptChecked, [r.id]: checked })
                                 }
+                                size={18}
+                                ariaLabel={`Select receipt ${r.display_reference || r.id}`}
                               />
                             </td>
                             <td className="px-3 py-1.5" title={r.description || undefined}>
@@ -498,9 +502,9 @@ const BankInPage: React.FC = () => {
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-default-500 dark:text-gray-400">
-                Posts {rvNumber || "RV—"}: one bank debit per group above, with the CH.REV credit
-                aggregated per holding account. Descriptions are editable.
+              <p className="text-xs text-default-500 dark:text-gray-400 pl-1">
+                Posts {rvNumber || "RV—"}: one bank debit per group above, with the CH_REV1/CH_REV2
+                credit aggregated per holding account. Descriptions are editable.
               </p>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setStep("select")} disabled={isSubmitting}>
@@ -515,41 +519,44 @@ const BankInPage: React.FC = () => {
         </div>
       )}
 
-      <div className="border border-default-200 dark:border-gray-700 rounded-lg overflow-x-auto bg-white dark:bg-gray-900">
+      <div className="w-full bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-default-50 dark:bg-gray-800">
-            <tr className="text-left text-default-600 dark:text-gray-400">
-              <th className="px-4 py-2">Date</th>
-              <th className="px-4 py-2">RV No.</th>
-              <th className="px-4 py-2">Bank</th>
-              <th className="px-4 py-2">Groups</th>
-              <th className="px-4 py-2 text-right">Amount</th>
-              <th className="px-4 py-2">Status</th>
-              <th className="px-4 py-2"></th>
+          <thead className="bg-gray-50 dark:bg-gray-900/50">
+            <tr className="text-left text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">
+              <th className="px-4 py-3">Date</th>
+              <th className="px-4 py-3">RV No.</th>
+              <th className="px-4 py-3">Bank</th>
+              <th className="px-4 py-3">Groups</th>
+              <th className="px-4 py-3 text-right">Amount</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
             {bankIns.map((b) => (
-              <tr key={b.id} className="border-t border-default-100 dark:border-gray-800">
-                <td className="px-4 py-2 whitespace-nowrap">{fmtDMY(String(b.posting_date).slice(0, 10))}</td>
-                <td className="px-4 py-2 font-mono">{b.rv_number}</td>
-                <td className="px-4 py-2">{b.bank_account}</td>
-                <td className="px-4 py-2 text-default-600 dark:text-gray-400">
+              <tr
+                key={b.id}
+                className="border-t border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/40"
+              >
+                <td className="px-4 py-2.5 whitespace-nowrap">{fmtDMY(String(b.posting_date).slice(0, 10))}</td>
+                <td className="px-4 py-2.5 font-mono">{b.rv_number}</td>
+                <td className="px-4 py-2.5">{b.bank_account}</td>
+                <td className="px-4 py-2.5 text-default-600 dark:text-gray-400">
                   {(b.groups || []).map((g) => g.description).join(" & ") || "-"}
                 </td>
-                <td className="px-4 py-2 text-right font-medium">{fmtAmt(b.total_amount)}</td>
-                <td className="px-4 py-2">
+                <td className="px-4 py-2.5 text-right font-medium">{fmtAmt(b.total_amount)}</td>
+                <td className="px-4 py-2.5">
                   <span
                     className={
                       b.status === "posted"
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : "text-rose-500 line-through"
+                        ? "inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400"
+                        : "inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-400 line-through"
                     }
                   >
                     {b.status}
                   </span>
                 </td>
-                <td className="px-4 py-2 text-right">
+                <td className="px-4 py-2.5 text-right">
                   {b.status === "posted" && (
                     <Button size="sm" variant="outline" color="rose" onClick={() => setCancelTarget(b)}>
                       Cancel
@@ -560,7 +567,7 @@ const BankInPage: React.FC = () => {
             ))}
             {bankIns.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-default-400">
+                <td colSpan={7} className="px-4 py-8 text-center text-default-400">
                   No bank-ins yet
                 </td>
               </tr>
