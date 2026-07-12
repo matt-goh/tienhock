@@ -66,6 +66,23 @@ export const greenTargetApi = {
     return response;
   },
 
+  // Customer signup (public form review queue) endpoints
+  getCustomerSignups: (status?: string) =>
+    api.get(
+      `/greentarget/api/customer-signups${status ? `?status=${status}` : ""}`
+    ),
+  convertCustomerSignup: async (id: number, staffId?: string) => {
+    const response = await api.post(
+      `/greentarget/api/customer-signups/${id}/convert`,
+      { staffId }
+    );
+    // A new customer was created
+    invalidateCache(CACHE_KEYS.CUSTOMERS);
+    return response;
+  },
+  updateCustomerSignupStatus: (id: number, status: "pending" | "rejected") =>
+    api.patch(`/greentarget/api/customer-signups/${id}`, { status }),
+
   // Dumpster endpoints
   getDumpsters: () => api.get("/greentarget/api/dumpsters"),
   getDumpster: (id: any) => api.get(`/greentarget/api/dumpsters/${id}`),
