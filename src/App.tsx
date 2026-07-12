@@ -18,6 +18,7 @@ import "./index.css";
 import LoadingSpinner from "./components/LoadingSpinner";
 import HomePage from "./pages/HomePage";
 import GreenTargetDashboardPage from "./pages/GreenTarget/GreenTargetDashboardPage";
+import CustomerSignupPage from "./pages/GreenTarget/PublicForm/CustomerSignupPage";
 
 const Layout: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -25,6 +26,7 @@ const Layout: React.FC = () => {
   const location = useLocation();
   const isPDFRoute = location.pathname === "/pdf-viewer";
   const isLoginRoute = location.pathname === "/login";
+  const isPublicFormRoute = location.pathname === "/greentarget-form";
 
   if (isLoading) {
     return (
@@ -34,7 +36,7 @@ const Layout: React.FC = () => {
     );
   }
 
-  const showNavbar = isAuthenticated && !isPDFRoute;
+  const showNavbar = isAuthenticated && !isPDFRoute && !isPublicFormRoute;
 
   return (
     <div className="h-screen flex flex-col overflow-hidden dark:bg-gray-950">
@@ -57,12 +59,15 @@ const Layout: React.FC = () => {
       <main className="flex-1 overflow-y-auto dark:bg-gray-950">
         <div
           className={
-            !isPDFRoute && !isLoginRoute
+            !isPDFRoute && !isLoginRoute && !isPublicFormRoute
               ? "w-full max-w-8xl mx-auto px-4 my-3"
               : ""
           }
         >
           <Routes>
+            {/* Public Green Target customer registration form (no auth) */}
+            <Route path="/greentarget-form" element={<CustomerSignupPage />} />
+
             {/* Login route */}
             <Route
               path="/login"
@@ -118,6 +123,15 @@ const Layout: React.FC = () => {
 };
 
 const App: React.FC = () => {
+  // On the public Green Target subdomain, render only the standalone signup form
+  // (no Router/auth/company providers) so any path shows the form.
+  if (
+    typeof window !== "undefined" &&
+    window.location.hostname === "greentarget.tienhock.com"
+  ) {
+    return <CustomerSignupPage />;
+  }
+
   return (
     <ThemeProvider>
       <AuthProvider>
