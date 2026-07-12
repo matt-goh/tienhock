@@ -107,7 +107,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       );
 
       const filteredInvoices = invoices.filter(
-        (invoice) => !invoicesWithPendingPayments.has(invoice.id)
+        (invoice) =>
+          !invoicesWithPendingPayments.has(invoice.id) &&
+          Number(invoice.balance_due) > 0
       );
 
       setAvailableInvoices(filteredInvoices);
@@ -169,16 +171,54 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     await processPayments();
   };
 
+  // Tien Hock uses the atomic grouped-receipt endpoint (one request = one
+  // receipt covering every selected invoice = one journal). Other companies
+  // keep the per-invoice payments endpoint.
+  const useGroupedReceipt = apiEndpoint === "/api/payments";
+
   const processPayments = async () => {
     setIsSubmitting(true);
     const toastId = toast.loading("Processing payment...");
 
     try {
-      // Create payment for each selected invoice
       const results = [];
 
-      for (const { invoice, amountToPay } of selectedInvoices) {
-        try {
+      if (useGroupedReceipt) {
+        // One atomic receipt: invoice allocations up to each balance due,
+        // plus a customer-owned excess allocation for any overpayment.
+        const allocations: Record<string, unknown>[] = [];
+        for (const { invoice, amountToPay } of selectedInvoices) {
+          const balance = invoice.balance_due;
+          const regular = Math.min(amountToPay, balance);
+          if (regular > 0) {
+            allocations.push({
+              type: "invoice",
+              invoice_id: invoice.id,
+              amount: parseFloat(regular.toFixed(2)),
+            });
+          }
+          if (amountToPay > balance) {
+            allocations.push({
+              type: "excess",
+              customer_id: invoice.customerid,
+              amount: parseFloat((amountToPay - balance).toFixed(2)),
+            });
+          }
+        }
+
+        const result = await api.post("/api/receipts", {
+          payment_method: formData.payment_method,
+          bank_account:
+            formData.payment_method === "cash" ? undefined : formData.bank_account,
+          display_reference: formData.payment_reference || undefined,
+          received_date: formData.payment_date,
+          notes: formData.notes || undefined,
+          allocations,
+        });
+        results.push(result);
+      } else {
+        // Create payment for each selected invoice
+        for (const { invoice, amountToPay } of selectedInvoices) {
           const result = await api.post(apiEndpoint, {
             invoice_id: invoice.id,
             payment_date: formData.payment_date,
@@ -189,16 +229,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             notes: formData.notes || undefined,
           });
           results.push(result);
-        } catch (error: any) {
-          // If any payment fails, throw with the specific error message
-          throw error;
         }
       }
 
       // Count overpayments
-      const overpaymentCount = results.filter(
-        (result) => result.isOverpayment
-      ).length;
+      const overpaymentCount = useGroupedReceipt
+        ? overpaymentDetails?.length || 0
+        : results.filter((result) => result.isOverpayment).length;
 
       let successMessage;
       if (overpaymentCount > 0) {
@@ -561,6 +598,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                     {formData.payment_method === "cheque" && (
                       <span className="ml-2 text-amber-600 dark:text-amber-400">
                         (Will be marked as pending until confirmed)
+                      </span>
+                    )}
+                    {formData.payment_method === "cash" && (
+                      <span className="ml-2 text-amber-600 dark:text-amber-400">
+                        (Held as undeposited cash in CH_REV2 until banked in via
+                        Accounting → Cash Bank-In)
                       </span>
                     )}
                   </>

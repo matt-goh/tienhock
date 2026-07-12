@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Payment, CashReceiptVoucherData } from "../../types/types";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
-import CashReceiptVoucherModal from "../../components/Accounting/CashReceiptVoucherModal";
+import { printCashReceiptVoucherPDF } from "../../utils/accounting/CashReceiptVoucherPDF";
 import { FormListbox } from "../../components/FormComponents";
 import { IconCircleCheck, IconBan, IconReceipt, IconPrinter } from "@tabler/icons-react";
 import {
@@ -36,8 +36,6 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [selectedBankAccount, setSelectedBankAccount] = useState<string>("BANK_PBB"); // Default to Public Bank
-  const [showVoucherModal, setShowVoucherModal] = useState(false);
-  const [voucherData, setVoucherData] = useState<CashReceiptVoucherData | null>(null);
   const [loadingVoucherId, setLoadingVoucherId] = useState<number | null>(null);
   const { customers } = useCustomersCache();
 
@@ -107,19 +105,23 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
   };
 
   const handlePrintVoucher = async (payment: Payment) => {
-    if (!payment.journal_entry_id) {
+    // Receipt-backed rows print through the owning receipt's journal;
+    // legacy rows fall back to their own journal.
+    const journalId = payment.voucher_journal_id ?? payment.journal_entry_id;
+    if (!journalId) {
       toast.error("No journal entry linked to this payment");
       return;
     }
 
-    setLoadingVoucherId(payment.journal_entry_id);
+    setLoadingVoucherId(journalId);
     try {
-      const data = await api.get(`/api/journal-entries/${payment.journal_entry_id}/receipt-voucher`);
-      setVoucherData(data);
-      setShowVoucherModal(true);
+      const data: CashReceiptVoucherData = await api.get(
+        `/api/journal-entries/${journalId}/receipt-voucher`
+      );
+      await printCashReceiptVoucherPDF(data);
     } catch (error) {
-      console.error("Error fetching voucher data:", error);
-      toast.error("Failed to load voucher data");
+      console.error("Error printing voucher:", error);
+      toast.error("Failed to print voucher");
     } finally {
       setLoadingVoucherId(null);
     }
@@ -329,7 +331,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                                   variant="outline"
                                   color="default"
                                   onClick={() => handlePrintVoucher(payment)}
-                                  disabled={loadingVoucherId === payment.journal_entry_id}
+                                  disabled={loadingVoucherId === (payment.voucher_journal_id ?? payment.journal_entry_id)}
                                   title="Print Voucher"
                                 >
                                   <IconPrinter size={16} />
@@ -438,7 +440,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                               variant="outline"
                               color="default"
                               onClick={() => handlePrintVoucher(payment)}
-                              disabled={loadingVoucherId === payment.journal_entry_id}
+                              disabled={loadingVoucherId === (payment.voucher_journal_id ?? payment.journal_entry_id)}
                               title="Print Voucher"
                             >
                               <IconPrinter size={16} />
@@ -559,15 +561,6 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
         variant="danger"
       />
 
-      {/* Cash Receipt Voucher Modal */}
-      <CashReceiptVoucherModal
-        isOpen={showVoucherModal}
-        onClose={() => {
-          setShowVoucherModal(false);
-          setVoucherData(null);
-        }}
-        voucherData={voucherData}
-      />
     </>
   );
 };

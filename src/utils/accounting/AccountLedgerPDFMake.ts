@@ -34,6 +34,7 @@ export interface AccountLedgerData {
     ledger_type: string;
   };
   period: {
+    mode?: "month" | "range";
     year: number;
     month: number;
     start_date: string;
@@ -113,7 +114,11 @@ const buildDocDefinition = (
   logoDataUrl: string | null,
   reportTitle: string
 ): TDocumentDefinitions => {
-  const periodLabel = `${MONTH_NAMES[data.period.month - 1]} ${data.period.year}`;
+  // Calendar months keep the "June 2026" label; arbitrary ranges show the dates.
+  const periodLabel =
+    data.period.mode === "range"
+      ? `${fmtDate(data.period.start_date)} – ${fmtDate(data.period.end_date)}`
+      : `${MONTH_NAMES[data.period.month - 1]} ${data.period.year}`;
 
   const headerRow: TableCell[] = [
     { text: "DATE", style: "th" },

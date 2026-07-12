@@ -1,11 +1,12 @@
 // src/routes/sales/invoices/payments.js
 import { Router } from "express";
+import { cancelPaymentJournalEntry } from "../../accounting/payment-journal.js";
 import {
-  createPaymentJournalEntry,
-  createOverpaidJournalEntry,
-  cancelPaymentJournalEntry,
-} from "../../accounting/payment-journal.js";
-import { determineBankAccount } from "../../../utils/payment-helpers.js";
+  createReceipt,
+  confirmReceipt,
+  cancelReceipt,
+  toLocalDateString,
+} from "../../accounting/receipt-service.js";
 
 // Helper function (can be moved to a shared util if used elsewhere)
 const updateCustomerCredit = async (client, customerId, amount) => {
@@ -54,11 +55,15 @@ export default function (pool) {
         SELECT
           p.payment_id, p.invoice_id, p.payment_date, p.amount_paid,
           p.payment_method, p.payment_reference, p.internal_reference,
-          p.bank_account, p.journal_entry_id,
+          p.bank_account, p.journal_entry_id, p.is_auto_collection,
+          p.receipt_allocation_id, ra.receipt_id,
+          COALESCE(r.journal_entry_id, p.journal_entry_id) as voucher_journal_id,
           p.notes, p.created_at, p.status, p.cancellation_date,
           je.reference_no as journal_reference_no
         FROM payments p
         LEFT JOIN journal_entries je ON p.journal_entry_id = je.id
+        LEFT JOIN receipt_allocations ra ON ra.id = p.receipt_allocation_id
+        LEFT JOIN receipts r ON r.id = ra.receipt_id
         WHERE 1=1
       `;
       const queryParams = [];
@@ -109,7 +114,9 @@ export default function (pool) {
       SELECT
         p.payment_id, p.invoice_id, p.payment_date, p.amount_paid,
         p.payment_method, p.payment_reference, p.internal_reference,
-        p.bank_account, p.journal_entry_id,
+        p.bank_account, p.journal_entry_id, p.is_auto_collection,
+        p.receipt_allocation_id, ra.receipt_id,
+        COALESCE(r.journal_entry_id, p.journal_entry_id) as voucher_journal_id,
         p.notes, p.created_at, p.status, p.cancellation_date,
         i.customerid, i.salespersonid, c.name as customer_name,
         je.reference_no as journal_reference_no
@@ -117,6 +124,8 @@ export default function (pool) {
       JOIN invoices i ON p.invoice_id = i.id
       LEFT JOIN customers c ON i.customerid = c.id
       LEFT JOIN journal_entries je ON p.journal_entry_id = je.id
+      LEFT JOIN receipt_allocations ra ON ra.id = p.receipt_allocation_id
+      LEFT JOIN receipts r ON r.id = ra.receipt_id
       WHERE 1=1
     `;
 
@@ -287,170 +296,48 @@ export default function (pool) {
         );
       }
 
-      // 3. Determine if this is an overpayment
+      // 3. Split into an invoice allocation (up to balance due) plus a
+      // customer-owned excess allocation for any overpayment.
       const isOverpayment = paymentAmount > currentBalance;
       const regularAmount = isOverpayment ? currentBalance : paymentAmount;
-      const overpaidAmount = isOverpayment ? paymentAmount - currentBalance : 0;
+      const overpaidAmount = isOverpayment
+        ? parseFloat((paymentAmount - currentBalance).toFixed(2))
+        : 0;
 
-      const createdPayments = [];
-
-      // 4. Create the regular payment (up to balance due)
+      const allocations = [];
       if (regularAmount > 0) {
-        const initialStatus =
-          payment_method === "cheque" ? "pending" : "active";
-
-        // Determine bank account (cash payments go to CASH, others to selected bank)
-        const bankAccountCode = determineBankAccount(payment_method, bank_account);
-
-        const insertPaymentQuery = `
-        INSERT INTO payments (
-          invoice_id, payment_date, amount_paid, payment_method,
-          payment_reference, bank_account, notes, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        RETURNING *
-      `;
-
-        const paymentValues = [
+        allocations.push({
+          type: "invoice",
           invoice_id,
-          payment_date,
-          regularAmount,
-          payment_method,
-          payment_reference || null,
-          bankAccountCode,
-          notes || null,
-          initialStatus,
-        ];
-        const paymentResult = await client.query(
-          insertPaymentQuery,
-          paymentValues
-        );
-        const createdPayment = paymentResult.rows[0];
-
-        // Create journal entry for active payments (not for pending cheques)
-        if (initialStatus === "active") {
-          const journalEntryId = await createPaymentJournalEntry(client, {
-            payment_id: createdPayment.payment_id,
-            invoice_id: invoice_id,
-            payment_date: payment_date,
-            amount_paid: regularAmount,
-            payment_method: payment_method,
-            bank_account: bankAccountCode,
-            invoice_paymenttype: invoice.paymenttype,
-            payment_reference: payment_reference,
-            created_by: req.user?.id || null
-          });
-
-          // Update payment with journal_entry_id
-          await client.query(
-            'UPDATE payments SET journal_entry_id = $1 WHERE payment_id = $2',
-            [journalEntryId, createdPayment.payment_id]
-          );
-
-          createdPayment.journal_entry_id = journalEntryId;
-        }
-
-        createdPayments.push(createdPayment);
-
-        // Update invoice balance and status only for active payments
-        if (initialStatus === "active") {
-          const newBalance = Math.max(0, currentBalance - regularAmount);
-          const finalNewBalance = parseFloat(newBalance.toFixed(2));
-
-          let newStatus;
-          if (finalNewBalance <= 0) {
-            newStatus = "paid";
-          } else {
-            if (invoice.invoice_status === "Overdue") {
-              newStatus = "Overdue";
-            } else {
-              newStatus = "Unpaid";
-            }
-          }
-
-          const updateInvoiceQuery = `
-          UPDATE invoices
-          SET balance_due = $1, invoice_status = $2
-          WHERE id = $3
-        `;
-          await client.query(updateInvoiceQuery, [
-            finalNewBalance,
-            newStatus,
-            invoice_id,
-          ]);
-
-          // Update Customer Credit if it was an INVOICE payment
-          if (invoice.paymenttype === "INVOICE") {
-            await updateCustomerCredit(
-              client,
-              invoice.customerid,
-              -regularAmount
-            );
-          }
-        }
+          amount: regularAmount,
+        });
       }
-
-      // 5. Create overpaid payment record if there's excess
       if (overpaidAmount > 0) {
-        const overpaidStatus =
-          payment_method === "cheque" ? "pending" : "overpaid";
-
-        // Use same bank account as regular payment
-        const bankAccountCode = determineBankAccount(payment_method, bank_account);
-
-        const insertOverpaidQuery = `
-        INSERT INTO payments (
-          invoice_id, payment_date, amount_paid, payment_method,
-          payment_reference, bank_account, notes, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        RETURNING *
-      `;
-
-        const overpaidValues = [
-          invoice_id,
-          payment_date,
-          overpaidAmount,
-          payment_method,
-          payment_reference || null,
-          bankAccountCode,
-          (notes || "") + (notes ? " - " : "") + "Overpaid amount",
-          overpaidStatus,
-        ];
-        const overpaidResult = await client.query(
-          insertOverpaidQuery,
-          overpaidValues
-        );
-        const overpaidPayment = overpaidResult.rows[0];
-
-        // Create journal entry for overpaid payments (not for pending cheques)
-        if (overpaidStatus === "overpaid") {
-          const overpaidJournalId = await createOverpaidJournalEntry(client, {
-            payment_id: overpaidPayment.payment_id,
-            invoice_id: invoice_id,
-            payment_date: payment_date,
-            amount_paid: overpaidAmount,
-            payment_method: payment_method,
-            bank_account: bankAccountCode,
-            invoice_paymenttype: invoice.paymenttype,
-            payment_reference: payment_reference,
-            created_by: req.user?.id || null
-          });
-
-          // Update payment with journal_entry_id
-          await client.query(
-            'UPDATE payments SET journal_entry_id = $1 WHERE payment_id = $2',
-            [overpaidJournalId, overpaidPayment.payment_id]
-          );
-
-          overpaidPayment.journal_entry_id = overpaidJournalId;
-        }
-
-        createdPayments.push(overpaidPayment);
+        allocations.push({
+          type: "excess",
+          customer_id: invoice.customerid,
+          amount: overpaidAmount,
+        });
       }
+
+      // 4. One atomic receipt owns the journal, balances, and compat payment
+      // rows (cheques stay pending with no posting until confirmed).
+      const result = await createReceipt(
+        client,
+        {
+          payment_method,
+          bank_account,
+          display_reference: (payment_reference || "").trim() || null,
+          received_date: payment_date,
+          notes: notes || null,
+          allocations,
+        },
+        req.user?.id || null
+      );
 
       await client.query("COMMIT");
 
-      // Format response
-      const formattedPayments = createdPayments.map((payment) => ({
+      const formattedPayments = result.payments.map((payment) => ({
         ...payment,
         amount_paid: parseFloat(payment.amount_paid || 0),
       }));
@@ -460,6 +347,7 @@ export default function (pool) {
           ? "Payment created successfully. Overpaid amount recorded separately."
           : "Payment created successfully",
         payments: formattedPayments,
+        receipt_id: result.receipt.id,
         isOverpayment,
         regularAmount: regularAmount,
         overpaidAmount: overpaidAmount,
@@ -494,217 +382,130 @@ export default function (pool) {
     try {
       await client.query("BEGIN");
 
-      // 1. Get the initial payment to find its reference
-      const initialPaymentQuery = `SELECT payment_reference FROM payments WHERE payment_id = $1 AND status = 'pending'`;
-      const initialPaymentResult = await client.query(initialPaymentQuery, [
-        paymentIdNum,
-      ]);
-
-      if (initialPaymentResult.rows.length === 0) {
-        // Check if it was already confirmed to provide a better message
-        const alreadyConfirmedCheck = await client.query(
-          "SELECT payment_reference FROM payments WHERE payment_id = $1 AND (status = 'active' OR status = 'overpaid')",
-          [paymentIdNum]
-        );
-        if (alreadyConfirmedCheck.rows.length > 0) {
-          throw new Error(
-            `Payment ${paymentIdNum} has already been confirmed.`
-          );
-        }
-        throw new Error(
-          `Payment ${paymentIdNum} not found or not in pending status.`
-        );
+      // 1. Load the payment and its owning receipt (if any)
+      const rowResult = await client.query(
+        `SELECT p.*, ra.receipt_id
+           FROM payments p
+           LEFT JOIN receipt_allocations ra ON ra.id = p.receipt_allocation_id
+          WHERE p.payment_id = $1`,
+        [paymentIdNum]
+      );
+      if (rowResult.rows.length === 0) {
+        throw new Error(`Payment ${paymentIdNum} not found.`);
       }
-      const { payment_reference } = initialPaymentResult.rows[0];
+      const row = rowResult.rows[0];
+      if (row.status !== "pending") {
+        if (row.status === "active" || row.status === "overpaid") {
+          throw new Error(`Payment ${paymentIdNum} has already been confirmed.`);
+        }
+        throw new Error(`Payment ${paymentIdNum} is ${row.status}, not pending.`);
+      }
 
-      let paymentsToConfirm = [];
+      let confirmedReceiptId;
 
-      // 2. Find all payments to confirm (single or batch)
-      if (payment_reference) {
-        // Batch confirmation
-        const batchPaymentQuery = `
-        SELECT p.*, i.customerid, i.paymenttype, i.invoice_status, i.balance_due
-        FROM payments p
-        JOIN invoices i ON p.invoice_id = i.id
-        WHERE p.payment_reference = $1 AND p.status = 'pending'
-        FOR UPDATE OF i, p -- Lock both associated invoice and payment rows
-      `;
-        const batchResult = await client.query(batchPaymentQuery, [
-          payment_reference,
-        ]);
-        paymentsToConfirm = batchResult.rows;
+      if (row.receipt_id) {
+        // 2a. Receipt-backed pending cheque: confirm the exact receipt (all of
+        // its allocations clear together — never matched by reference text).
+        const confirmResult = await confirmReceipt(
+          client,
+          row.receipt_id,
+          {
+            posting_date: req.body?.posting_date || undefined,
+            cheque_reference: req.body?.cheque_reference || undefined,
+          },
+          req.user?.id || null
+        );
+        confirmedReceiptId = confirmResult.receipt.id;
       } else {
-        // Single confirmation
-        const singlePaymentQuery = `
-        SELECT p.*, i.customerid, i.paymenttype, i.invoice_status, i.balance_due
-        FROM payments p
-        JOIN invoices i ON p.invoice_id = i.id
-        WHERE p.payment_id = $1 AND p.status = 'pending'
-        FOR UPDATE OF i, p
-      `;
-        const singleResult = await client.query(singlePaymentQuery, [
-          paymentIdNum,
-        ]);
-        paymentsToConfirm = singleResult.rows;
-      }
-
-      if (paymentsToConfirm.length === 0) {
-        throw new Error(`No pending payments found to confirm.`);
-      }
-
-      const confirmedPayments = [];
-
-      // 3. Process each payment
-      for (const payment of paymentsToConfirm) {
-        const {
-          payment_id: currentPaymentId,
-          invoice_id,
-          amount_paid,
-          customerid,
-          paymenttype,
-          invoice_status,
-          notes,
-        } = payment;
-        const paidAmount = parseFloat(amount_paid || 0);
-
-        if (invoice_status === "cancelled") {
-          console.warn(
-            `Skipping confirmation for payment ${currentPaymentId} as its invoice ${invoice_id} is cancelled.`
+        // 2b. Legacy pending cheque row(s): wrap them into one posted receipt
+        // (grouped by the shared reference like the old batch confirm), then
+        // supersede the legacy rows. The receipt validates against CURRENT
+        // balances and posts the journal on the clearance date.
+        let legacyRows;
+        if (row.payment_reference) {
+          const batch = await client.query(
+            `SELECT p.*, i.customerid, i.invoice_status
+               FROM payments p JOIN invoices i ON i.id = p.invoice_id
+              WHERE p.payment_reference = $1 AND p.status = 'pending'
+                AND p.receipt_allocation_id IS NULL
+              ORDER BY p.payment_id
+              FOR UPDATE OF p`,
+            [row.payment_reference]
           );
-          continue;
-        }
-
-        // 4. Determine the appropriate status for this payment
-        // Check if this is an overpaid payment by looking at the notes
-        const isOverpaidPayment = notes && notes.includes("Overpaid amount");
-        const newStatus = isOverpaidPayment ? "overpaid" : "active";
-
-        // 5. Update payment status and bank_account
-        const updatePaymentQuery = `
-        UPDATE payments
-        SET status = $1, bank_account = COALESCE($2, bank_account, 'BANK_PBB')
-        WHERE payment_id = $3
-        RETURNING *
-      `;
-        const updateResult = await client.query(updatePaymentQuery, [
-          newStatus,
-          bank_account || null, // Use provided bank_account or fall back to existing or default
-          currentPaymentId,
-        ]);
-        const confirmedPaymentData = updateResult.rows[0];
-
-        // 5a. Create journal entry for confirmed payments (cheques that were pending)
-        if (newStatus === "active" && !confirmedPaymentData.journal_entry_id) {
-          const journalEntryId = await createPaymentJournalEntry(client, {
-            payment_id: confirmedPaymentData.payment_id,
-            invoice_id: invoice_id,
-            payment_date: confirmedPaymentData.payment_date,
-            amount_paid: paidAmount,
-            payment_method: confirmedPaymentData.payment_method,
-            bank_account: confirmedPaymentData.bank_account || 'BANK_PBB',
-            invoice_paymenttype: paymenttype,
-            payment_reference: confirmedPaymentData.payment_reference,
-            created_by: req.user?.id || null
-          });
-
-          // Update payment with journal_entry_id
-          await client.query(
-            'UPDATE payments SET journal_entry_id = $1 WHERE payment_id = $2',
-            [journalEntryId, confirmedPaymentData.payment_id]
+          legacyRows = batch.rows;
+        } else {
+          const single = await client.query(
+            `SELECT p.*, i.customerid, i.invoice_status
+               FROM payments p JOIN invoices i ON i.id = p.invoice_id
+              WHERE p.payment_id = $1
+              FOR UPDATE OF p`,
+            [paymentIdNum]
           );
-
-          confirmedPaymentData.journal_entry_id = journalEntryId;
+          legacyRows = single.rows;
+        }
+        const usable = legacyRows.filter((r) => r.invoice_status !== "cancelled");
+        if (usable.length === 0) {
+          throw new Error("No confirmable pending payments found (invoice cancelled?).");
         }
 
-        // 5b. Create journal entry for confirmed overpaid payments
-        if (newStatus === "overpaid" && !confirmedPaymentData.journal_entry_id) {
-          const journalEntryId = await createOverpaidJournalEntry(client, {
-            payment_id: confirmedPaymentData.payment_id,
-            invoice_id: invoice_id,
-            payment_date: confirmedPaymentData.payment_date,
-            amount_paid: paidAmount,
-            payment_method: confirmedPaymentData.payment_method,
-            bank_account: confirmedPaymentData.bank_account || 'BANK_PBB',
-            invoice_paymenttype: paymenttype,
-            payment_reference: confirmedPaymentData.payment_reference,
-            created_by: req.user?.id || null
-          });
-
-          // Update payment with journal_entry_id
-          await client.query(
-            'UPDATE payments SET journal_entry_id = $1 WHERE payment_id = $2',
-            [journalEntryId, confirmedPaymentData.payment_id]
-          );
-
-          confirmedPaymentData.journal_entry_id = journalEntryId;
-        }
-
-        // 6. Update Invoice balance and status (only for non-overpaid payments)
-        if (newStatus === "active") {
-          const currentBalance = parseFloat(payment.balance_due || 0);
-          const newBalance = Math.max(0, currentBalance - paidAmount);
-          const finalNewBalance = parseFloat(newBalance.toFixed(2));
-
-          let invoiceNewStatus;
-          if (finalNewBalance <= 0) {
-            invoiceNewStatus = "paid";
-          } else {
-            invoiceNewStatus =
-              invoice_status === "Overdue" ? "Overdue" : "Unpaid";
-          }
-
-          const updateInvoiceQuery = `
-          UPDATE invoices
-          SET balance_due = $1, invoice_status = $2
-          WHERE id = $3
-        `;
-          await client.query(updateInvoiceQuery, [
-            finalNewBalance,
-            invoiceNewStatus,
-            invoice_id,
-          ]);
-
-          // 7. Update Customer Credit if it was an INVOICE payment (only for active payments)
-          if (paymenttype === "INVOICE") {
-            await updateCustomerCredit(
-              client,
-              customerid,
-              -paidAmount // Reduce credit used
-            );
-          }
-        }
-
-        confirmedPayments.push({
-          ...confirmedPaymentData,
-          amount_paid: parseFloat(confirmedPaymentData.amount_paid || 0),
+        const allocations = usable.map((r) => {
+          const isOverpaid = r.notes && r.notes.includes("Overpaid amount");
+          return isOverpaid
+            ? { type: "excess", customer_id: r.customerid, amount: parseFloat(r.amount_paid) }
+            : { type: "invoice", invoice_id: r.invoice_id, amount: parseFloat(r.amount_paid) };
         });
+
+        const result = await createReceipt(
+          client,
+          {
+            payment_method: "cheque",
+            post_immediately: true,
+            bank_account: bank_account || "BANK_PBB",
+            display_reference: row.payment_reference || null,
+            cheque_reference: req.body?.cheque_reference || null,
+            received_date: toLocalDateString(usable[0].payment_date),
+            posting_date: req.body?.posting_date || toLocalDateString(new Date()),
+            notes: usable[0].notes || null,
+            allocations,
+          },
+          req.user?.id || null
+        );
+        confirmedReceiptId = result.receipt.id;
+
+        await client.query(
+          `UPDATE payments
+              SET status = 'cancelled', cancellation_date = NOW(),
+                  cancellation_reason = $2
+            WHERE payment_id = ANY($1::int[])`,
+          [usable.map((r) => r.payment_id), `Superseded by receipt #${confirmedReceiptId} on confirmation`]
+        );
       }
+
+      // 3. Return the confirmed compat rows of the receipt
+      const confirmedRows = await client.query(
+        `SELECT p.* FROM payments p
+           JOIN receipt_allocations ra ON ra.id = p.receipt_allocation_id
+          WHERE ra.receipt_id = $1
+          ORDER BY p.payment_id`,
+        [confirmedReceiptId]
+      );
 
       await client.query("COMMIT");
 
-      const regularPayments = confirmedPayments.filter(
-        (p) => p.status === "active"
-      );
-      const overpaidPayments = confirmedPayments.filter(
-        (p) => p.status === "overpaid"
-      );
-
-      let message;
-      if (overpaidPayments.length > 0 && regularPayments.length > 0) {
-        message = `${regularPayments.length} payment(s) confirmed as active, ${overpaidPayments.length} payment(s) confirmed as overpaid.`;
-      } else if (overpaidPayments.length > 0) {
-        message = `${overpaidPayments.length} overpaid payment(s) confirmed.`;
-      } else {
-        message =
-          confirmedPayments.length > 1
-            ? `${confirmedPayments.length} payments confirmed successfully.`
-            : "Payment confirmed successfully.";
-      }
+      const confirmedPayments = confirmedRows.rows.map((p) => ({
+        ...p,
+        amount_paid: parseFloat(p.amount_paid || 0),
+      }));
+      const overpaidCount = confirmedPayments.filter((p) => p.status === "overpaid").length;
 
       res.json({
-        message,
+        message:
+          confirmedPayments.length > 1
+            ? `${confirmedPayments.length} payments confirmed successfully.`
+            : "Payment confirmed successfully.",
         payments: confirmedPayments,
-        hasOverpaidPayments: overpaidPayments.length > 0,
+        receipt_id: confirmedReceiptId,
+        hasOverpaidPayments: overpaidCount > 0,
       });
     } catch (error) {
       await client.query("ROLLBACK");
@@ -764,6 +565,14 @@ export default function (pool) {
         );
       }
 
+      // Automatic CASH-bill collection rows are owned by the invoice — they
+      // are adjusted/cancelled only through invoice edits and conversions.
+      if (payment.is_auto_collection) {
+        throw new Error(
+          `Payment ${paymentIdNum} is the automatic collection of CASH invoice ${invoice_id}. Edit or convert the invoice instead.`
+        );
+      }
+
       const existingAdjustment = await fetchActiveAdjustmentForInvoice(
         client,
         invoice_id
@@ -772,6 +581,41 @@ export default function (pool) {
         throw new Error(
           `Cannot cancel payment for invoice ${invoice_id} because active adjustment document ${existingAdjustment.id} exists. Cancel the adjustment document first.`
         );
+      }
+
+      // Receipt-backed rows are cancelled through the receipt so the shared
+      // journal and every sibling allocation stay consistent. A single-
+      // allocation receipt cancels transparently right here; a grouped one
+      // must be cancelled explicitly (never silently affect other invoices).
+      if (payment.receipt_allocation_id) {
+        const allocInfo = await client.query(
+          `SELECT ra.receipt_id,
+                  (SELECT COUNT(*) FROM receipt_allocations x WHERE x.receipt_id = ra.receipt_id) AS alloc_count
+             FROM receipt_allocations ra WHERE ra.id = $1`,
+          [payment.receipt_allocation_id]
+        );
+        if (allocInfo.rows.length > 0) {
+          const { receipt_id: receiptId, alloc_count } = allocInfo.rows[0];
+          if (parseInt(alloc_count, 10) > 1) {
+            throw new Error(
+              `Payment ${paymentIdNum} belongs to grouped receipt #${receiptId} covering ${alloc_count} allocations. Cancel receipt #${receiptId} instead so all its invoices are reversed together.`
+            );
+          }
+          await cancelReceipt(client, receiptId, reason || null, req.user?.id || null);
+          const refreshed = await client.query(
+            `SELECT * FROM payments WHERE payment_id = $1`,
+            [paymentIdNum]
+          );
+          await client.query("COMMIT");
+          return res.json({
+            message: "Payment cancelled successfully",
+            payment: {
+              ...refreshed.rows[0],
+              amount_paid: parseFloat(refreshed.rows[0].amount_paid || 0),
+            },
+            receipt_id: receiptId,
+          });
+        }
       }
 
       // 2. Update payment status to cancelled

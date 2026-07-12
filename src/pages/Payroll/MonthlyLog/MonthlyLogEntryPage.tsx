@@ -81,6 +81,10 @@ type EmployeeHourField =
 type LeaveType = "cuti_sakit" | "cuti_tahunan" | "cuti_umum" | "cuti_rawatan";
 const DEFAULT_LEAVE_AMOUNT: number = 65;
 const DEFAULT_LEAVE_AMOUNT_INPUT: string = String(DEFAULT_LEAVE_AMOUNT);
+const DUAL_COMPANY_PAYROLL_EMPLOYEE_IDS: ReadonlySet<string> = new Set<string>([
+  "GOH",
+  "WONG",
+]);
 
 const getActivityIdentity = (
   activity: Pick<
@@ -199,7 +203,8 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   const [isRefreshingCache, setIsRefreshingCache] = useState(false);
 
   // Staff on the Green Target payroll (OFFICE and DRIVER) are paid through
-  // the GT system, so they are excluded from Tien Hock monthly entries.
+  // the GT system, so they are excluded from Tien Hock monthly entries unless
+  // they are explicitly approved for payroll from both companies.
   const [gtPayrollEmployeeIds, setGtPayrollEmployeeIds] = useState<Set<string>>(
     new Set(),
   );
@@ -292,11 +297,14 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     });
   };
 
-  // Filter employees by job type, excluding staff on the GT payroll
+  // Filter employees by job type, excluding GT-only payroll staff
   const eligibleEmployees = useMemo(() => {
     if (!allStaffs || loadingStaffs) return [];
     return allStaffs.filter((staff: Employee) => {
-      if (gtPayrollEmployeeIds.has(staff.id)) return false;
+      const isExcludedGtPayrollEmployee: boolean =
+        gtPayrollEmployeeIds.has(staff.id) &&
+        !DUAL_COMPANY_PAYROLL_EMPLOYEE_IDS.has(staff.id);
+      if (isExcludedGtPayrollEmployee) return false;
       const employeeJobs = staff.job || [];
       return employeeJobs.some((job: string) => JOB_IDS.includes(job));
     });

@@ -145,6 +145,41 @@ export async function ensureDebtorAccount(client, customer) {
 }
 
 /**
+ * Resolves (and ensures) the customer's debtor child account for POSTING.
+ * Falls back to the TR control account with a warning when the customer id is
+ * missing/unknown, so a sale or receipt is never blocked by a sync gap.
+ *
+ * @param {QueryClient} client
+ * @param {string | null | undefined} customerId
+ * @returns {Promise<string>} account code to post the receivable side to
+ */
+export async function getCustomerDebtorAccountCode(client, customerId) {
+  if (!customerId) {
+    console.warn("getCustomerDebtorAccountCode: no customer id — posting to TR");
+    return "TR";
+  }
+
+  const existingCode = await resolveDebtorChildCode(client, customerId);
+  if (existingCode) return existingCode;
+
+  const customerResult = await client.query(
+    "SELECT id, name FROM customers WHERE id = $1",
+    [customerId]
+  );
+  const customer =
+    customerResult.rows.length > 0
+      ? { id: String(customerResult.rows[0].id), name: String(customerResult.rows[0].name || customerId) }
+      : { id: String(customerId), name: String(customerId) }; // historical/deleted customer
+
+  return ensureDebtorAccount(client, customer);
+}
+
+/**
+ * Renames a customer's debtor child when the customer id changes.
+ * `journal_entry_lines.account_code` and `account_opening_balances.account_code`
+ * reference `account_codes.code` WITHOUT cascade, so the rename creates the new
+ * code first, moves every reference, then removes (or deactivates) the old one.
+ *
  * @param {QueryClient} client
  * @param {string} oldId
  * @param {string} newId
@@ -158,31 +193,30 @@ export async function changeDebtorCode(client, oldId, newId, name) {
     return ensureDebtorAccount(client, { id: newId, name });
   }
 
-  const debtorCode = await computeDebtorCode(client, newId);
+  const debtorCode = await ensureDebtorAccount(client, { id: newId, name });
+  if (debtorCode === existingCode) {
+    return debtorCode;
+  }
+
+  // Move every reference from the old child to the new one.
+  await client.query(
+    "UPDATE journal_entry_lines SET account_code = $1 WHERE account_code = $2",
+    [debtorCode, existingCode]
+  );
+  await client.query(
+    `UPDATE account_opening_balances aob
+        SET account_code = $1
+      WHERE account_code = $2
+        AND NOT EXISTS (
+          SELECT 1 FROM account_opening_balances x
+           WHERE x.account_code = $1 AND x.as_of_date = aob.as_of_date
+        )`,
+    [debtorCode, existingCode]
+  );
 
   await client.query(
-    `
-      UPDATE account_codes
-      SET code = $1,
-          description = $2,
-          ledger_type = $3,
-          parent_code = $4,
-          level = $5,
-          is_active = TRUE,
-          fs_note = $6,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE code = $7
-        AND parent_code = $4
-    `,
-    [
-      debtorCode,
-      name,
-      DEBTOR_LEDGER_TYPE,
-      DEBTOR_PARENT_CODE,
-      DEBTOR_LEVEL,
-      DEBTOR_FS_NOTE,
-      existingCode,
-    ]
+    "DELETE FROM account_codes WHERE code = $1 AND parent_code = $2",
+    [existingCode, DEBTOR_PARENT_CODE]
   );
 
   return debtorCode;

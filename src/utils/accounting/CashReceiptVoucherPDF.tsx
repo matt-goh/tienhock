@@ -11,6 +11,7 @@ import {
 import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { CashReceiptVoucherData } from "../../types/types";
+import { printPdfFrameWithFallback } from "../pdfPrintFallback";
 
 const colors = {
   textPrimary: "#0f172a",
@@ -423,11 +424,31 @@ const CashReceiptVoucherDocument: React.FC<CashReceiptVoucherDocumentProps> = ({
             <Text style={styles.contentValue}>{data.customer_name}</Text>
           </View>
 
-          {/* Being Payment For */}
-          <View style={styles.contentRow}>
-            <Text style={styles.contentLabel}>Being Payment For:</Text>
-            <Text style={styles.contentValue}>Invoice #{data.invoice_id}</Text>
-          </View>
+          {/* Being Payment For — itemized allocations for a grouped receipt */}
+          {data.allocations && data.allocations.length > 0 ? (
+            <View style={styles.contentRow}>
+              <Text style={styles.contentLabel}>Being Payment For:</Text>
+              <View style={{ width: "70%" }}>
+                {data.allocations.map((alloc, idx) => (
+                  <Text key={idx} style={{ fontSize: 9, marginBottom: 2 }}>
+                    {alloc.allocation_type === "invoice"
+                      ? `Invoice #${alloc.invoice_id}`
+                      : alloc.allocation_type === "excess"
+                      ? "Overpayment (customer deposit)"
+                      : `Ref: ${alloc.external_reference || "-"}`}
+                    {alloc.customer_name ? ` — ${alloc.customer_name}` : ""}
+                    {"  RM "}
+                    {formatCurrency(alloc.amount)}
+                  </Text>
+                ))}
+              </View>
+            </View>
+          ) : (
+            <View style={styles.contentRow}>
+              <Text style={styles.contentLabel}>Being Payment For:</Text>
+              <Text style={styles.contentValue}>Invoice #{data.invoice_id}</Text>
+            </View>
+          )}
 
           {/* Payment Method */}
           <View style={styles.contentRow}>
@@ -437,19 +458,29 @@ const CashReceiptVoucherDocument: React.FC<CashReceiptVoucherDocumentProps> = ({
             </Text>
           </View>
 
-          {/* Payment Reference (if any) */}
+          {/* Journal / Cheque references */}
           {data.payment_reference && (
             <View style={styles.contentRow}>
               <Text style={styles.contentLabel}>Reference:</Text>
               <Text style={styles.contentValue}>{data.payment_reference}</Text>
             </View>
           )}
+          {data.cheque_reference && (
+            <View style={styles.contentRow}>
+              <Text style={styles.contentLabel}>Cheque / Transfer No:</Text>
+              <Text style={styles.contentValue}>{data.cheque_reference}</Text>
+            </View>
+          )}
 
-          {/* Deposited To */}
+          {/* Where the money sits: a bank deposit OR undeposited cash awaiting
+              a bank-in — never claim CH_REV cash is already in the bank */}
           <View style={[styles.contentRow, styles.contentRowLast]}>
-            <Text style={styles.contentLabel}>Deposited To:</Text>
+            <Text style={styles.contentLabel}>
+              {data.is_undeposited_cash ? "Held In (undeposited):" : "Deposited To:"}
+            </Text>
             <Text style={styles.contentValue}>
               {data.bank_account_description} ({data.bank_account})
+              {data.is_undeposited_cash ? " — pending bank-in" : ""}
             </Text>
           </View>
         </View>
@@ -515,7 +546,9 @@ const CashReceiptVoucherDocument: React.FC<CashReceiptVoucherDocumentProps> = ({
             Generated: {new Date().toLocaleString("en-MY")}
             {data.created_by && ` | Created by: ${data.created_by}`}
           </Text>
-          <Text>Payment ID: {data.payment_id}</Text>
+          <Text>
+            {data.payment_id ? `Payment ID: ${data.payment_id}` : `Journal #${data.journal_entry_id}`}
+          </Text>
         </View>
       </Page>
     </Document>
@@ -538,12 +571,41 @@ export const downloadCashReceiptVoucherPDF = async (
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `Receipt_Voucher_${data.voucher_number.replace("/", "_")}.pdf`;
+  link.download = `Receipt_Voucher_${data.voucher_number.replace(/\//g, "_")}.pdf`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 };
 
-// Export the document component for BlobProvider usage in modal
+// Direct print: generates the Blob and opens the browser print dialog through
+// a hidden iframe, falling back to a new tab on mobile browsers (shared
+// printPdfFrameWithFallback contract; replaces the removed preview modal).
+export const printCashReceiptVoucherPDF = async (
+  data: CashReceiptVoucherData
+): Promise<void> => {
+  const blob = await generateCashReceiptVoucherPDF(data);
+  const url = URL.createObjectURL(blob);
+  const printFrame = document.createElement("iframe");
+  printFrame.style.display = "none";
+  document.body.appendChild(printFrame);
+
+  printFrame.onload = () => {
+    if (printFrame.contentWindow) {
+      printPdfFrameWithFallback(printFrame, url, {
+        logLabel: "cash receipt voucher PDF",
+      });
+      const cleanup = () => {
+        if (document.body.contains(printFrame)) {
+          document.body.removeChild(printFrame);
+        }
+        URL.revokeObjectURL(url);
+        window.removeEventListener("focus", cleanup);
+      };
+      window.addEventListener("focus", cleanup, { once: true });
+    }
+  };
+  printFrame.src = url;
+};
+
 export { CashReceiptVoucherDocument };

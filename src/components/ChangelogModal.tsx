@@ -19,6 +19,61 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-07-12",
+    ms: "Halaman Material Purchases (senarai dan borang) telah dibuang — belian bahan kini direkodkan terus sebagai catatan jurnal jenis PUR. Halaman Material Stock kini mengambil nilai Purchases daripada jurnal yang diposkan: gunakan butang 'Mappings' baharu di halaman itu untuk memautkan kod akaun belian (contoh PU_BBER, PU_MTEP, PM_BPMS) kepada rekod stok bahan. Jumlah belian ini juga kini mengalir ke Income Statement dan laporan COGM di bawah nota Purchase of Raw Material / Purchases (Packing Material) / Purchase of Chemical.",
+    en: "The Material Purchases pages (list and form) have been removed — material purchases are now keyed directly as PUR journal entries. The Material Stock page now takes its Purchases values from posted journals: use the new 'Mappings' button on that page to link purchase account codes (e.g. PU_BBER, PU_MTEP, PM_BPMS) to material stock records. These purchase amounts now also flow into the Income Statement and COGM reports under the Purchase of Raw Material / Purchases (Packing Material) / Purchase of Chemical notes.",
+  },
+  {
+    date: "2026-07-12",
+    ms: "Halaman Account Ledger kini lebih padat dan kemas: ia dibuka dengan senarai lejar yang baru dilihat untuk akses pantas, kotak carian kecil menapis transaksi lejar yang dibuka, setiap rujukan Journal boleh diklik untuk membuka catatan jurnal berkenaan, dan kedudukan skrol serta akaun dan tempoh yang dipilih diingati apabila anda kembali daripada halaman jurnal.",
+    en: "The Account Ledger page is now more compact and cleaner: it opens with a list of your recently viewed ledgers for quick access, a small search box filters the transactions of an opened ledger, each Journal reference is clickable to open that journal entry, and your scroll position plus the selected account and period are remembered when you return from a journal page.",
+  },
+  {
+    date: "2026-07-12",
+    ms: "Pengarah GOH dan WONG kini kekal dipaparkan dalam kemasukan jam bulanan Office Tien Hock walaupun mereka turut berada dalam senarai gaji Green Target, supaya gaji kedua-dua syarikat boleh direkodkan. Pekerja Green Target yang lain masih dikecualikan daripada kemasukan bulanan Tien Hock untuk mengelakkan gaji berganda.",
+    en: "Directors GOH and WONG now remain available in Tien Hock's monthly Office entry even while they are also on the Green Target payroll, allowing their pay from both companies to be recorded. Other Green Target employees remain excluded from Tien Hock monthly entries to prevent accidental double payroll.",
+  },
+  {
+    date: "2026-07-12",
+    ms: "Invois yang bakinya sudah RM0 (contohnya bil bernilai sifar atau invois yang diedit sehingga jumlahnya sifar) tidak lagi muncul dalam senarai 'Available Unpaid Invoices' pada borang bayaran, dan status invois kini bertukar kepada 'paid' secara automatik apabila baki mencapai sifar selepas invois diedit.",
+    en: "Invoices with a RM0 balance (e.g. zero-value bills or invoices edited down to zero) no longer appear in the payment form's 'Available Unpaid Invoices' list, and an invoice's status now automatically switches to 'paid' when its balance reaches zero after an edit.",
+  },
+  {
+    date: "2026-07-12",
+    ms: "Baucar Resit Tunai kini dicetak terus (tanpa tetingkap pratonton) dan menyokong resit berkumpulan: semua invois dalam satu resit disenaraikan, rujukan Journal dan No. Cek/Pindahan dipaparkan berasingan, dan tunai yang belum dibankkan dilabel 'pending bank-in' dan bukannya didakwa sudah masuk bank.",
+    en: "The Cash Receipt Voucher now prints directly (no preview window) and supports grouped receipts: every invoice in one receipt is listed, the Journal reference and Cheque/Transfer number are shown separately, and undeposited cash is labelled 'pending bank-in' instead of being claimed as already deposited.",
+  },
+  {
+    date: "2026-07-10",
+    ms: "Account Ledger kini menyokong sebarang julat tarikh, bulan penuh atau tahun penuh (termasuk pintasan 'This year'), dengan pautan yang boleh dikongsi dan PDF yang melabel tempoh dengan betul. Penyata Am penghutang dan Penyata Pelanggan kini dikira daripada lejar penghutang pelanggan: baki bawa ke hadapan (BAL B/F) mengikut baki pembukaan 1 Jun, transaksi merangkumi nota kredit/debit/bayaran balik, dan penyata bulan lepas tidak lagi berubah apabila bayaran kemudian diterima. Susunan umur hutang dikira pada tarikh akhir penyata.",
+    en: "The Account Ledger now supports any date range, full month, or full year (including a 'This year' shortcut), with shareable links and PDFs that label the period correctly. The debtor General Statement and Customer Statement are now calculated from each customer's debtor ledger: the balance brought forward (BAL B/F) follows the 1 June opening balances, transactions include credit/debit/refund notes, and last month's statement no longer changes when later payments come in. Aging is calculated as at the statement end date.",
+  },
+  {
+    date: "2026-07-10",
+    ms: "Setiap pelanggan kini mempunyai lejar penghutang sendiri dalam Account Ledger: invois, bayaran, nota kredit/debit dan nota bayaran balik pelanggan itu dipaparkan dengan baki berjalan — sejarah lama turut dipindahkan. Trial Balance kekal ringkas dengan satu baris Trade Debtors (tapis jenis lejar TD untuk melihat setiap pelanggan).",
+    en: "Every customer now has their own debtor ledger in Account Ledger: that customer's invoices, payments, credit/debit notes and refund notes appear with a running balance — historical activity has been migrated in too. The Trial Balance stays concise with a single Trade Debtors row (filter by ledger type TD to see each customer).",
+  },
+  {
+    date: "2026-07-10",
+    ms: "Laporan Account Ledger kini memaparkan rujukan Journal sebenar (nombor bil, nombor RV, THCN, rujukan pindahan seperti TF040626-2) dan lajur Cheque yang berasingan, dengan susunan baris dalam setiap hari mengikut cetakan buku lama. Lejar Jun 2026 telah disemak baris demi baris dengan buku lama untuk kelima-lima akaun utama.",
+    en: "The Account Ledger report now shows the real Journal references (bill numbers, RV numbers, THCN, transfer references like TF040626-2) and a separate Cheque column, with rows within each day ordered exactly like the legacy book's printout. The June 2026 ledgers have been verified row-by-row against the legacy books for all five core accounts.",
+  },
+  {
+    date: "2026-07-10",
+    ms: "Nota Kredit kini mengurangkan lejar jualan asal (CREDIT SALES atau CASH SALES) dan bukannya akaun pulangan berasingan, dan Nota Debit menambah kepada lejar jualan yang sama. Catatan perakaunan nota pelarasan kini memaparkan nombor dokumen sebenar (contoh THCN/26/17) pada tarikh dokumen itu sendiri; nota kredit lama telah diselaraskan dengan buku lama supaya lejar CREDIT SALES Jun sepadan.",
+    en: "Credit Notes now reduce the original sales ledger (CREDIT SALES or CASH SALES) instead of a separate returns account, and Debit Notes add to the same sales ledger. Adjustment note accounting entries now show the real document number (e.g. THCN/26/17) on the document's own date; the older credit notes have been aligned with the legacy book so the June CREDIT SALES ledger matches.",
+  },
+  {
+    date: "2026-07-10",
+    ms: "Halaman baharu Accounting > Cash Bank-In (RV): pilih tunai belum bank daripada kutipan jualan tunai harian (CH.REV 1) atau resit tunai invois kredit (CH.REV 2), masukkan jumlah separa jika perlu, dan sistem menjana nombor RV bulanan secara automatik (boleh diubah) serta catatan bank yang lengkap. Bank-in Jun 2026 daripada buku lama (RV001/06 hingga RV081/06) telah diimport, jadi lejar CH.REV dan bank kini sepadan dengan cetakan lama.",
+    en: "New page Accounting > Cash Bank-In (RV): pick undeposited cash from daily cash-sales collections (CH.REV 1) or credit-invoice cash receipts (CH.REV 2), enter partial amounts when needed, and the system generates the monthly RV number automatically (editable) with the complete bank entry. The June 2026 bank-ins from the legacy book (RV001/06 to RV081/06) have been imported, so the CH.REV and bank ledgers now match the old printouts.",
+  },
+  {
+    date: "2026-07-10",
+    ms: "Rekod bayaran pelanggan Tien Hock kini disimpan sebagai satu resit berkumpulan: satu bayaran boleh meliputi beberapa invois dan pelanggan sekaligus, dengan satu catatan perakaunan yang lengkap. Tunai yang diterima untuk invois kredit kini kekal dalam akaun tunai belum bank sehingga dibankkan, cek berstatus tertunda tidak lagi mengubah baki sehingga ia tunai, dan bil tunai membawa catatan perakaunan pada tarikh bil itu sendiri. Lejar CASH SALES, CH.REV dan bank kini sepadan dengan buku lama untuk bulan Jun.",
+    en: "Tien Hock customer payments are now saved as one grouped receipt: a single payment can cover several invoices and customers at once, with one complete accounting entry. Cash received for credit invoices now stays in the undeposited-cash account until it is banked in, pending cheques no longer change balances until they clear, and cash bills carry their accounting entry on the bill's own date. The CASH SALES, CH.REV and bank ledgers now match the legacy books for June.",
+  },
+  {
     date: "2026-07-10",
     ms: "Halaman Payroll dan Salary Report Jelly Polly kini menggunakan susun atur yang lebih kemas seperti Tien Hock, termasuk ringkasan gaji, jadual laporan gaji, pemilih tahun yang lebih mudah, butiran potongan dalam Deductions & Final Pay, ringkasan Pinjam, menu cetak slip mengikut bahagian, dan cetakan slip gaji yang menggunakan data Jelly Polly dengan betul.",
     en: "Jelly Polly Payroll and Salary Report now use a cleaner layout like Tien Hock, including payroll summaries, salary report tables, an easier year picker, deduction details in Deductions & Final Pay, the Pinjam summary, section-based payslip printing, and payslips that correctly use Jelly Polly data.",

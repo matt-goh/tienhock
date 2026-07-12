@@ -19,6 +19,7 @@ import JournalEntryPage from "./Accounting/JournalEntryPage";
 import JournalDetailsPage from "./Accounting/JournalDetailsPage";
 import VoucherGeneratorPage from "./Accounting/VoucherGeneratorPage";
 import PayrollPaymentPage from "./Accounting/PayrollPaymentPage";
+import BankInPage from "./Accounting/BankInPage";
 
 // Accounting - Location Mappings
 import LocationAccountMappingsPage from "./Accounting/LocationAccountMappingsPage";
@@ -33,8 +34,6 @@ import CogmPage from "./Accounting/Reports/CogmPage";
 // Accounting - Purchases
 import SuppliersListPage from "./Accounting/Purchases/SuppliersListPage";
 import SupplierFormPage from "./Accounting/Purchases/SupplierFormPage";
-import MaterialPurchaseListPage from "./Accounting/Purchases/MaterialPurchaseListPage";
-import MaterialPurchaseFormPage from "./Accounting/Purchases/MaterialPurchaseFormPage";
 import GeneralPurchaseInvoiceListPage from "./Accounting/Purchases/GeneralPurchaseInvoiceListPage";
 import GeneralPurchaseInvoiceFormPage from "./Accounting/Purchases/GeneralPurchaseInvoiceFormPage";
 import LocalGeneralPurchaseFormPage from "./Accounting/Purchases/LocalGeneralPurchaseFormPage";
@@ -401,6 +400,12 @@ export const TienHockNavData: SidebarItem[] = [
         group: "Generation",
       },
       {
+        name: "Cash Bank-In (RV)",
+        path: "/accounting/bank-in",
+        component: BankInPage,
+        group: "Generation",
+      },
+      {
         name: "Supplier Payments",
         path: "/accounting/supplier-payments",
         component: SupplierPaymentListPage,
@@ -524,6 +529,20 @@ export const TienHockNavData: SidebarItem[] = [
             name: "New Adjustment Document",
             path: "/sales/adjustment-docs/new",
             component: AdjustmentDocsFormPage,
+          },
+          {
+            name: "New Credit Note",
+            path: "/sales/adjustment-docs/new?type=credit",
+            showInPopover: true,
+          },
+          {
+            name: "New Debit Note",
+            path: "/sales/adjustment-docs/new?type=debit",
+            showInPopover: true,
+          },
+          {
+            name: "New Refund Note",
+            path: "/sales/adjustment-docs/new?type=refund",
             showInPopover: true,
           },
           {
@@ -568,25 +587,6 @@ export const TienHockNavData: SidebarItem[] = [
         path: "/stock/material-stock",
         component: MaterialStockPage,
         group: "Materials & Purchases",
-      },
-      {
-        name: "Material Purchases",
-        path: "/stock/material-purchases",
-        component: MaterialPurchaseListPage,
-        group: "Materials & Purchases",
-        subItems: [
-          {
-            name: "New Purchase",
-            path: "/stock/material-purchases/new",
-            component: MaterialPurchaseFormPage,
-            showInPopover: true,
-          },
-          {
-            name: "Edit Purchase",
-            path: "/stock/material-purchases/:id",
-            component: MaterialPurchaseFormPage,
-          },
-        ],
       },
       {
         name: "General Stock",

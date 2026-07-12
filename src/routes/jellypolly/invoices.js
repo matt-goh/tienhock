@@ -853,7 +853,8 @@ export default function (pool, config) {
       const totalPayable = parseFloat(invoice.totalamountpayable || 0);
       const isCash = invoice.paymenttype === "CASH";
       const balance_due = isCash ? 0 : totalPayable; // Zero balance for CASH
-      const invoice_status = isCash ? "paid" : "Unpaid"; // "paid" for CASH, "Unpaid" for others
+      const invoice_status =
+        isCash || totalPayable === 0 ? "paid" : "Unpaid"; // CASH and zero-value bills have nothing left to collect
 
       // Insert invoice
       const insertInvoiceQuery = `
@@ -1545,11 +1546,16 @@ export default function (pool, config) {
 
       // 10. Update invoice totals
       const updateInvoiceQuery = `
-      UPDATE jellypolly.invoices 
+      UPDATE jellypolly.invoices
       SET total_excluding_tax = $1,
           tax_amount = $2,
           totalamountpayable = $3,
-          balance_due = $4
+          balance_due = $4,
+          invoice_status = CASE
+            WHEN $4::numeric <= 0 THEN 'paid'
+            WHEN invoice_status = 'paid' THEN 'Unpaid'
+            ELSE invoice_status
+          END
       WHERE id = $5
       RETURNING *
     `;

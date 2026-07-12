@@ -105,6 +105,20 @@ export const GreenTargetNavData: SidebarItem[] = [
         name: "Create Adjustment Document",
         path: "/adjustment-docs/new",
         component: GTAdjustmentDocsFormPage,
+      },
+      {
+        name: "New Credit Note",
+        path: "/adjustment-docs/new?type=credit",
+        showInPopover: true,
+      },
+      {
+        name: "New Debit Note",
+        path: "/adjustment-docs/new?type=debit",
+        showInPopover: true,
+      },
+      {
+        name: "New Refund Note",
+        path: "/adjustment-docs/new?type=refund",
         showInPopover: true,
       },
       {

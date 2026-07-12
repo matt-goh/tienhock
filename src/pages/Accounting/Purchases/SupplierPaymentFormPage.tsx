@@ -269,7 +269,8 @@ const SupplierPaymentFormPage: React.FC = () => {
   const invoiceUrl = useMemo((): string | null => {
     if (!source || !invoiceId) return null;
     if (source === "purchase_invoices") {
-      return `/stock/material-purchases/${invoiceId}`;
+      // Material purchase pages were removed; purchases live in the journal system now.
+      return null;
     }
     return invoice?.purchase_kind === "local"
       ? `/stock/general-purchases/local/${invoiceId}`
