@@ -13,6 +13,7 @@ import { SidebarItem } from "./pagesRoute";
 
 import GreenTargetCustomerListPage from "./GreenTarget/Customers/CustomerListPage";
 import GreenTargetCustomerFormPage from "./GreenTarget/Customers/CustomerFormPage";
+import GreenTargetSignupListPage from "./GreenTarget/Signups/SignupListPage";
 import GreenTargetDumpsterListPage from "./GreenTarget/Dumpsters/DumpsterListPage";
 import GreenTargetDumpsterFormPage from "./GreenTarget/Dumpsters/DumpsterFormPage";
 import GreenTargetRentalListPage from "./GreenTarget/Rentals/RentalListPage";
@@ -229,6 +230,12 @@ export const GreenTargetNavData: SidebarItem[] = [
         name: "Add Customer",
         path: "/customers/new",
         component: GreenTargetCustomerFormPage,
+        showInPopover: true,
+      },
+      {
+        name: "Signup Requests",
+        path: "/customers/signups",
+        component: GreenTargetSignupListPage,
         showInPopover: true,
       },
       {
