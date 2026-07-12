@@ -224,6 +224,31 @@ export default function (pool) {
     return { valid: true, year: yearNum, month: monthNum };
   };
 
+  // GET /usage-counts — number of posted journal lines per account code, for
+  // ranking the Account Ledger "browse all accounts" list by most-used first.
+  router.get("/usage-counts", async (req, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT jel.account_code AS code, COUNT(*)::int AS count
+           FROM journal_entry_lines jel
+           JOIN journal_entries je ON jel.journal_entry_id = je.id
+          WHERE je.status = 'posted'
+          GROUP BY jel.account_code`
+      );
+      const counts = {};
+      result.rows.forEach((row) => {
+        counts[row.code] = row.count;
+      });
+      res.json(counts);
+    } catch (error) {
+      console.error("Error fetching account usage counts:", error);
+      res.status(500).json({
+        message: "Error fetching account usage counts",
+        error: error.message,
+      });
+    }
+  });
+
   // GET /:accountCode/range/:start/:end — arbitrary inclusive date range
   router.get("/:accountCode/range/:start/:end", async (req, res) => {
     try {

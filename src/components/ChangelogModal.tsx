@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-12",
+    ms: "Halaman Account Ledger kini lebih padat dan kemas: ia dibuka dengan senarai lejar yang baru dilihat untuk akses pantas, kotak carian kecil menapis transaksi lejar yang dibuka, setiap rujukan Journal boleh diklik untuk membuka catatan jurnal berkenaan, dan kedudukan skrol serta akaun dan tempoh yang dipilih diingati apabila anda kembali daripada halaman jurnal.",
+    en: "The Account Ledger page is now more compact and cleaner: it opens with a list of your recently viewed ledgers for quick access, a small search box filters the transactions of an opened ledger, each Journal reference is clickable to open that journal entry, and your scroll position plus the selected account and period are remembered when you return from a journal page.",
+  },
+  {
+    date: "2026-07-12",
     ms: "Pengarah GOH dan WONG kini kekal dipaparkan dalam kemasukan jam bulanan Office Tien Hock walaupun mereka turut berada dalam senarai gaji Green Target, supaya gaji kedua-dua syarikat boleh direkodkan. Pekerja Green Target yang lain masih dikecualikan daripada kemasukan bulanan Tien Hock untuk mengelakkan gaji berganda.",
     en: "Directors GOH and WONG now remain available in Tien Hock's monthly Office entry even while they are also on the Green Target payroll, allowing their pay from both companies to be recorded. Other Green Target employees remain excluded from Tien Hock monthly entries to prevent accidental double payroll.",
   },
