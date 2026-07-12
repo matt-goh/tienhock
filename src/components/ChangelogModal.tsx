@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-12",
+    ms: "Invois yang bakinya sudah RM0 (contohnya bil bernilai sifar atau invois yang diedit sehingga jumlahnya sifar) tidak lagi muncul dalam senarai 'Available Unpaid Invoices' pada borang bayaran, dan status invois kini bertukar kepada 'paid' secara automatik apabila baki mencapai sifar selepas invois diedit.",
+    en: "Invoices with a RM0 balance (e.g. zero-value bills or invoices edited down to zero) no longer appear in the payment form's 'Available Unpaid Invoices' list, and an invoice's status now automatically switches to 'paid' when its balance reaches zero after an edit.",
+  },
+  {
+    date: "2026-07-12",
     ms: "Baucar Resit Tunai kini dicetak terus (tanpa tetingkap pratonton) dan menyokong resit berkumpulan: semua invois dalam satu resit disenaraikan, rujukan Journal dan No. Cek/Pindahan dipaparkan berasingan, dan tunai yang belum dibankkan dilabel 'pending bank-in' dan bukannya didakwa sudah masuk bank.",
     en: "The Cash Receipt Voucher now prints directly (no preview window) and supports grouped receipts: every invoice in one receipt is listed, the Journal reference and Cheque/Transfer number are shown separately, and undeposited cash is labelled 'pending bank-in' instead of being claimed as already deposited.",
   },

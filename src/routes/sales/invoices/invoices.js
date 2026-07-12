@@ -2510,7 +2510,8 @@ export default function (pool, config) {
           tax_amount: 0, // <<< Hardcoded to 0 as per requirement
           rounding: Number(invoice.rounding || 0),
           totalamountpayable: Number(invoice.totalAmountPayable || 0),
-          invoice_status: isCash ? "paid" : "Unpaid", // Mark CASH as paid immediately
+          invoice_status:
+            isCash || totalPayable === 0 ? "paid" : "Unpaid", // CASH and zero-value bills have nothing left to collect
           balance_due: isCash ? 0 : totalPayable, // Zero balance for CASH
           // Initialize e-invoice fields as null
           uuid: null,
@@ -3634,11 +3635,16 @@ export default function (pool, config) {
 
       // 10. Update invoice totals
       const updateInvoiceQuery = `
-      UPDATE invoices 
+      UPDATE invoices
       SET total_excluding_tax = $1,
           tax_amount = $2,
           totalamountpayable = $3,
-          balance_due = $4
+          balance_due = $4,
+          invoice_status = CASE
+            WHEN $4::numeric <= 0 THEN 'paid'
+            WHEN invoice_status = 'paid' THEN 'Unpaid'
+            ELSE invoice_status
+          END
       WHERE id = $5
       RETURNING *
     `;

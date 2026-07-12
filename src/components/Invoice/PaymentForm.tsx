@@ -107,7 +107,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       );
 
       const filteredInvoices = invoices.filter(
-        (invoice) => !invoicesWithPendingPayments.has(invoice.id)
+        (invoice) =>
+          !invoicesWithPendingPayments.has(invoice.id) &&
+          Number(invoice.balance_due) > 0
       );
 
       setAvailableInvoices(filteredInvoices);
