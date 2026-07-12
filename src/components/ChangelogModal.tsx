@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-12",
+    ms: "Pengarah GOH dan WONG kini kekal dipaparkan dalam kemasukan jam bulanan Office Tien Hock walaupun mereka turut berada dalam senarai gaji Green Target, supaya gaji kedua-dua syarikat boleh direkodkan. Pekerja Green Target yang lain masih dikecualikan daripada kemasukan bulanan Tien Hock untuk mengelakkan gaji berganda.",
+    en: "Directors GOH and WONG now remain available in Tien Hock's monthly Office entry even while they are also on the Green Target payroll, allowing their pay from both companies to be recorded. Other Green Target employees remain excluded from Tien Hock monthly entries to prevent accidental double payroll.",
+  },
+  {
+    date: "2026-07-12",
     ms: "Invois yang bakinya sudah RM0 (contohnya bil bernilai sifar atau invois yang diedit sehingga jumlahnya sifar) tidak lagi muncul dalam senarai 'Available Unpaid Invoices' pada borang bayaran, dan status invois kini bertukar kepada 'paid' secara automatik apabila baki mencapai sifar selepas invois diedit.",
     en: "Invoices with a RM0 balance (e.g. zero-value bills or invoices edited down to zero) no longer appear in the payment form's 'Available Unpaid Invoices' list, and an invoice's status now automatically switches to 'paid' when its balance reaches zero after an edit.",
   },
