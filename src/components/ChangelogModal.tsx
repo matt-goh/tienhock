@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-12",
+    ms: "Halaman Material Purchases (senarai dan borang) telah dibuang — belian bahan kini direkodkan terus sebagai catatan jurnal jenis PUR. Halaman Material Stock kini mengambil nilai Purchases daripada jurnal yang diposkan: gunakan butang 'Mappings' baharu di halaman itu untuk memautkan kod akaun belian (contoh PU_BBER, PU_MTEP, PM_BPMS) kepada rekod stok bahan. Jumlah belian ini juga kini mengalir ke Income Statement dan laporan COGM di bawah nota Purchase of Raw Material / Purchases (Packing Material) / Purchase of Chemical.",
+    en: "The Material Purchases pages (list and form) have been removed — material purchases are now keyed directly as PUR journal entries. The Material Stock page now takes its Purchases values from posted journals: use the new 'Mappings' button on that page to link purchase account codes (e.g. PU_BBER, PU_MTEP, PM_BPMS) to material stock records. These purchase amounts now also flow into the Income Statement and COGM reports under the Purchase of Raw Material / Purchases (Packing Material) / Purchase of Chemical notes.",
+  },
+  {
+    date: "2026-07-12",
     ms: "Halaman Account Ledger kini lebih padat dan kemas: ia dibuka dengan senarai lejar yang baru dilihat untuk akses pantas, kotak carian kecil menapis transaksi lejar yang dibuka, setiap rujukan Journal boleh diklik untuk membuka catatan jurnal berkenaan, dan kedudukan skrol serta akaun dan tempoh yang dipilih diingati apabila anda kembali daripada halaman jurnal.",
     en: "The Account Ledger page is now more compact and cleaner: it opens with a list of your recently viewed ledgers for quick access, a small search box filters the transactions of an opened ledger, each Journal reference is clickable to open that journal entry, and your scroll position plus the selected account and period are remembered when you return from a journal page.",
   },

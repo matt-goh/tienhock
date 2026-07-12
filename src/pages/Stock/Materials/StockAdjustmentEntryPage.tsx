@@ -36,6 +36,7 @@ import MonthNavigator from "../../../components/MonthNavigator";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import GeneralStockCategoryModal from "../../../components/Stock/GeneralStockCategoryModal";
+import MaterialAccountMappingModal from "../../../components/Stock/MaterialAccountMappingModal";
 import { useProductsCache } from "../../../utils/invoice/useProductsCache";
 
 interface StockKilangItem {
@@ -622,6 +623,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
   const [showZeroBalanceGeneralStock, setShowZeroBalanceGeneralStock] = useState<boolean>(false);
   const [newGeneralCategoryName, setNewGeneralCategoryName] = useState<string>("");
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState<boolean>(false);
+  const [isAccountMappingModalOpen, setIsAccountMappingModalOpen] = useState<boolean>(false);
   const [revertingAdjustmentId, setRevertingAdjustmentId] = useState<number | null>(null);
   const [tooltipState, setTooltipState] = useState<{ lineId: number; x: number; y: number } | null>(null);
   const [savingRowKeys, setSavingRowKeys] = useState<Set<RowSaveKey>>(new Set());
@@ -2373,6 +2375,18 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
             </div>
             <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
 
+            {mode === "material" && (
+              <Button
+                color="default"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsAccountMappingModalOpen(true)}
+                icon={IconSettings}
+              >
+                Mappings
+              </Button>
+            )}
+
             <Button
               color="sky"
               size="sm"
@@ -3456,6 +3470,13 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
         categories={generalStockCategories}
         onChanged={fetchData}
       />
+      {mode === "material" && (
+        <MaterialAccountMappingModal
+          isOpen={isAccountMappingModalOpen}
+          onClose={() => setIsAccountMappingModalOpen(false)}
+          onMappingComplete={fetchData}
+        />
+      )}
       <ConfirmationDialog
         isOpen={deleteTarget !== null}
         onClose={handleCloseDeleteDialog}

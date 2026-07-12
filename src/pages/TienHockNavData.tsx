@@ -34,8 +34,6 @@ import CogmPage from "./Accounting/Reports/CogmPage";
 // Accounting - Purchases
 import SuppliersListPage from "./Accounting/Purchases/SuppliersListPage";
 import SupplierFormPage from "./Accounting/Purchases/SupplierFormPage";
-import MaterialPurchaseListPage from "./Accounting/Purchases/MaterialPurchaseListPage";
-import MaterialPurchaseFormPage from "./Accounting/Purchases/MaterialPurchaseFormPage";
 import GeneralPurchaseInvoiceListPage from "./Accounting/Purchases/GeneralPurchaseInvoiceListPage";
 import GeneralPurchaseInvoiceFormPage from "./Accounting/Purchases/GeneralPurchaseInvoiceFormPage";
 import LocalGeneralPurchaseFormPage from "./Accounting/Purchases/LocalGeneralPurchaseFormPage";
@@ -589,25 +587,6 @@ export const TienHockNavData: SidebarItem[] = [
         path: "/stock/material-stock",
         component: MaterialStockPage,
         group: "Materials & Purchases",
-      },
-      {
-        name: "Material Purchases",
-        path: "/stock/material-purchases",
-        component: MaterialPurchaseListPage,
-        group: "Materials & Purchases",
-        subItems: [
-          {
-            name: "New Purchase",
-            path: "/stock/material-purchases/new",
-            component: MaterialPurchaseFormPage,
-            showInPopover: true,
-          },
-          {
-            name: "Edit Purchase",
-            path: "/stock/material-purchases/:id",
-            component: MaterialPurchaseFormPage,
-          },
-        ],
       },
       {
         name: "General Stock",
