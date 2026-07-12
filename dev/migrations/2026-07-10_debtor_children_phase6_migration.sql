@@ -30,6 +30,26 @@ BEGIN;
 -- -----------------------------------------------------------------------------
 -- 1. Ensure debtor children for every referenced customer id.
 -- -----------------------------------------------------------------------------
+CREATE TEMP TABLE referenced_customer_ids ON COMMIT DROP AS
+SELECT DISTINCT cid
+  FROM (
+    SELECT i.customerid AS cid FROM invoices i
+     WHERE i.journal_entry_id IS NOT NULL AND i.customerid IS NOT NULL
+    UNION
+    SELECT ra.customer_id FROM receipt_allocations ra WHERE ra.customer_id IS NOT NULL
+    UNION
+    SELECT i2.customerid
+      FROM payments p2
+      JOIN invoices i2 ON i2.id = p2.invoice_id
+     WHERE p2.journal_entry_id IS NOT NULL AND i2.customerid IS NOT NULL
+    UNION
+    SELECT ad.customerid FROM adjustment_documents ad WHERE ad.customerid IS NOT NULL
+ ) refs
+ WHERE cid IS NOT NULL;
+
+CREATE UNIQUE INDEX referenced_customer_ids_cid_uq
+  ON referenced_customer_ids (cid);
+
 DO $$
 DECLARE
   cust RECORD;
@@ -38,29 +58,28 @@ DECLARE
   v_n INTEGER;
 BEGIN
   FOR cust IN
-    SELECT DISTINCT cid, COALESCE(c.name, cid) AS cname
-      FROM (
-        SELECT i.customerid AS cid FROM invoices i
-         WHERE i.journal_entry_id IS NOT NULL AND i.customerid IS NOT NULL
-        UNION
-        SELECT ra.customer_id FROM receipt_allocations ra WHERE ra.customer_id IS NOT NULL
-        UNION
-        SELECT p.invoice_id_customer FROM (
-          SELECT i2.customerid AS invoice_id_customer
-            FROM payments p2 JOIN invoices i2 ON i2.id = p2.invoice_id
-           WHERE p2.journal_entry_id IS NOT NULL
-        ) p
-        UNION
-        SELECT ad.customerid FROM adjustment_documents ad WHERE ad.customerid IS NOT NULL
-      ) refs
+    SELECT refs.cid, COALESCE(c.name, refs.cid) AS cname
+      FROM pg_temp.referenced_customer_ids refs
       LEFT JOIN customers c ON c.id = refs.cid
-     WHERE refs.cid IS NOT NULL
   LOOP
     -- resolve existing child (code = id / -D / -Dn under DEBTOR)
-    SELECT code INTO v_code FROM account_codes
-     WHERE parent_code = 'DEBTOR'
-       AND (code = cust.cid OR code LIKE cust.cid || '-D%')
-     ORDER BY (code = cust.cid) DESC, code
+    SELECT ac.code INTO v_code FROM account_codes ac
+     WHERE ac.parent_code = 'DEBTOR'
+       AND (ac.code = cust.cid
+         OR ((ac.code = cust.cid || '-D'
+              OR (LEFT(ac.code, LENGTH(cust.cid) + 2) = cust.cid || '-D'
+                  AND SUBSTRING(ac.code FROM LENGTH(cust.cid) + 3) ~ '^([2-9]|[1-4][0-9]|50)$'))
+           AND NOT EXISTS (
+             SELECT 1 FROM pg_temp.referenced_customer_ids other
+              WHERE other.cid = ac.code AND other.cid <> cust.cid
+           )))
+     ORDER BY (ac.code = cust.cid) DESC,
+              CASE
+                WHEN ac.code = cust.cid || '-D' THEN 1
+                WHEN SUBSTRING(ac.code FROM LENGTH(cust.cid) + 3) ~ '^([2-9]|[1-4][0-9]|50)$'
+                  THEN SUBSTRING(ac.code FROM LENGTH(cust.cid) + 3)::int
+                ELSE 0
+              END
      LIMIT 1;
     IF v_code IS NOT NULL THEN
       UPDATE account_codes SET is_active = TRUE, updated_at = NOW()
@@ -71,7 +90,11 @@ BEGIN
     -- create: first free candidate
     v_candidate := cust.cid;
     v_n := 0;
-    WHILE EXISTS (SELECT 1 FROM account_codes WHERE code = v_candidate) LOOP
+    WHILE EXISTS (SELECT 1 FROM account_codes WHERE code = v_candidate)
+       OR EXISTS (
+         SELECT 1 FROM pg_temp.referenced_customer_ids other
+          WHERE other.cid = v_candidate AND other.cid <> cust.cid
+       ) LOOP
       v_n := v_n + 1;
       v_candidate := cust.cid || CASE WHEN v_n = 1 THEN '-D' ELSE '-D' || v_n END;
       IF v_n > 50 THEN
@@ -88,13 +111,48 @@ END $$;
 -- Helper mapping: customer id -> debtor child code (session temp view).
 CREATE OR REPLACE VIEW pg_temp.debtor_map AS
 SELECT DISTINCT ON (refs.cid) refs.cid AS customer_id, ac.code AS debtor_code
-  FROM (SELECT DISTINCT customerid AS cid FROM invoices WHERE customerid IS NOT NULL
-        UNION SELECT DISTINCT customer_id FROM receipt_allocations WHERE customer_id IS NOT NULL
-        UNION SELECT DISTINCT customerid FROM adjustment_documents WHERE customerid IS NOT NULL) refs
+  FROM pg_temp.referenced_customer_ids refs
   JOIN account_codes ac
     ON ac.parent_code = 'DEBTOR'
-   AND (ac.code = refs.cid OR ac.code LIKE refs.cid || '-D%')
- ORDER BY refs.cid, (ac.code = refs.cid) DESC, ac.code;
+   AND (ac.code = refs.cid
+     OR ((ac.code = refs.cid || '-D'
+          OR (LEFT(ac.code, LENGTH(refs.cid) + 2) = refs.cid || '-D'
+              AND SUBSTRING(ac.code FROM LENGTH(refs.cid) + 3) ~ '^([2-9]|[1-4][0-9]|50)$'))
+       AND NOT EXISTS (
+         SELECT 1 FROM pg_temp.referenced_customer_ids other
+          WHERE other.cid = ac.code AND other.cid <> refs.cid
+       )))
+ ORDER BY refs.cid, (ac.code = refs.cid) DESC,
+          CASE
+            WHEN ac.code = refs.cid || '-D' THEN 1
+            WHEN SUBSTRING(ac.code FROM LENGTH(refs.cid) + 3) ~ '^([2-9]|[1-4][0-9]|50)$'
+              THEN SUBSTRING(ac.code FROM LENGTH(refs.cid) + 3)::int
+            ELSE 0
+          END;
+
+DO $$
+DECLARE
+  v_customer_id TEXT;
+  v_debtor_code TEXT;
+BEGIN
+  SELECT refs.cid INTO v_customer_id
+    FROM pg_temp.referenced_customer_ids refs
+    LEFT JOIN pg_temp.debtor_map dm ON dm.customer_id = refs.cid
+   WHERE dm.customer_id IS NULL
+   LIMIT 1;
+  IF FOUND THEN
+    RAISE EXCEPTION 'Referenced customer % has no debtor-child mapping', v_customer_id;
+  END IF;
+
+  SELECT dm.debtor_code INTO v_debtor_code
+    FROM pg_temp.debtor_map dm
+   GROUP BY dm.debtor_code
+  HAVING COUNT(*) > 1
+   LIMIT 1;
+  IF FOUND THEN
+    RAISE EXCEPTION 'Debtor child % maps to more than one referenced customer', v_debtor_code;
+  END IF;
+END $$;
 
 -- -----------------------------------------------------------------------------
 -- 2a. Invoice-owned S journals: every TR line -> the invoice's customer child.
@@ -111,6 +169,20 @@ UPDATE journal_entry_lines jel
 -- 2b. Receipt journals: TR credit lines paired to invoice-type allocations by
 --     rank within each journal (both were written in allocation order).
 -- -----------------------------------------------------------------------------
+DO $$
+DECLARE
+  v_bad_source TEXT;
+BEGIN
+  SELECT source_id INTO v_bad_source
+    FROM journal_entries
+   WHERE source_type = 'receipt'
+     AND (source_id IS NULL OR source_id !~ '^[0-9]+$')
+   LIMIT 1;
+  IF FOUND THEN
+    RAISE EXCEPTION 'Receipt journal has non-numeric source_id %', v_bad_source;
+  END IF;
+END $$;
+
 WITH tr_lines AS (
   SELECT jel.id AS line_id, je.source_id::int AS receipt_id,
          ROW_NUMBER() OVER (PARTITION BY je.id ORDER BY jel.line_number) AS rn
@@ -154,6 +226,34 @@ UPDATE journal_entry_lines jel
    AND jel.account_code = 'TR'
    AND je.source_type = 'adjustment' AND je.source_id = ad.id
    AND dm.customer_id = ad.customerid;
+
+DO $$
+DECLARE
+  v_remaining INTEGER;
+  v_unbalanced INTEGER;
+BEGIN
+  SELECT COUNT(*) INTO v_remaining
+    FROM journal_entry_lines jel
+    JOIN journal_entries je ON je.id = jel.journal_entry_id
+   WHERE jel.account_code = 'TR'
+     AND je.source_type IN ('invoice', 'receipt', 'payment', 'adjustment');
+  IF v_remaining <> 0 THEN
+    RAISE EXCEPTION '% mappable TR journal lines remain after debtor rewrite', v_remaining;
+  END IF;
+
+  SELECT COUNT(*) INTO v_unbalanced
+    FROM (
+      SELECT jel.journal_entry_id
+        FROM journal_entry_lines jel
+        JOIN journal_entries je ON je.id = jel.journal_entry_id
+       WHERE je.status = 'posted'
+       GROUP BY jel.journal_entry_id
+      HAVING ABS(SUM(jel.debit_amount) - SUM(jel.credit_amount)) > 0.005
+    ) x;
+  IF v_unbalanced <> 0 THEN
+    RAISE EXCEPTION '% posted journals are unbalanced after debtor rewrite', v_unbalanced;
+  END IF;
+END $$;
 
 COMMIT;
 

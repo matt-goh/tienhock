@@ -196,20 +196,20 @@ Per-phase "files changed" and "verification queries/results" sections get append
 - `src/components/Invoice/PaymentForm.tsx` — TH submits ONE grouped receipt via `/api/receipts` (invoice allocations + excess); JP keeps its per-invoice endpoint unchanged (`jellypolly.payments` has no journal linkage — verified).
 
 **Migrations (dev applied; prod pending, run in this order after the Phase 1 pair):**
-1. `dev/migrations/2026-07-10_receipts_phase2_columns.sql` — `payments.is_auto_collection` (seeded 3,497 rows from the two historical note texts) + `payments.receipt_allocation_id` + `journal_entry_lines.display_reference`. Idempotent (rerun UPDATE 0).
-2. `dev/migrations/2026-07-10_receipts_phase2_migration.sql` — June+ data rebuild: (A) cash-on-CASH payments → auto flag; (B) auto rows unlinked from journals + re-dated to invoice local date; (C) 161 receipts built from June+ genuine payments (151 posted RM522,995.29 + 10 pending cheques RM23,165.20), old REC journals cancelled, new-contract journals posted (`REC-M{id}` internal refs, visible Journal/Cheque split via T-family/external-bank heuristics), NO balance/credit re-mutation; (D) June+ invoice journals rebuilt to contract shapes incl. informational zero bills; (E) every posted journal of a cancelled payment cancelled (247+ cleared). Idempotent (rerun: all UPDATE 0, loops no-op).
+1. `dev/migrations/2026-07-10_receipts_phase2_columns.sql` — `payments.is_auto_collection` (seeded from the two historical note texts only while the invoice's current type is still `CASH`) + `payments.receipt_allocation_id` + `journal_entry_lines.display_reference`. The current-type guard preserves approved genuine receipt 5229 / invoice 015361 despite its stale automatic-note text. Idempotent (rerun UPDATE 0).
+2. `dev/migrations/2026-07-10_receipts_phase2_migration.sql` — June+ data rebuild: (A) cash-on-CASH payments → auto flag; (B) auto rows unlinked from journals + re-dated to invoice local date; (C) genuine payments become grouped receipt headers/allocations and new-contract journals (`REC-M{id}` internal refs, visible Journal/Cheque split via T-family/external-bank heuristics), with no general balance/credit re-mutation; (C2) the one approved exception, payment 5229 / invoice 015361, is proved against its exact production state and applies the RM2,880 settlement that its old CASH→INVOICE conversion had restored; (D) June+ invoice journals rebuilt to contract shapes incl. informational zero bills; (E) every posted journal of a cancelled payment cancelled. Idempotent after the guarded repair.
 
 **Verification (dev DB, June 2026 posted lines vs fixtures):**
 | Ledger | ERP after Phase 2 | Legacy fixture | Δ explained |
 |---|---|---|---|
 | CH_REV1 DR | **213,365.10** | 213,331.10 | +34.00 = cash bill 015375 (legacy omission, approved §8-1) |
 | CASH_SALES CR | **213,365.10** | 213,365.10 | exact (zero bills now included as 0.00 rows) |
-| CH_REV2 DR | **7,202.70** | 7,202.70 | exact — all 12 legacy rows, C-refs matching |
+| CH_REV2 DR | **10,082.70** | 7,202.70 | +2,880.00 = genuine cash receipt for invoice 015361 that legacy had not recorded/banked by month-end (approved §8-9); the other 12 rows match exactly |
 | CR_SALES CR | **513,062.80** | 513,062.80 | exact (THCN debits move here in Phase 4) |
 | BANK_PBB DR | 430,626.79 | 685,388.69 | RVs are Phase 3 (254,761.90 of bank-in debits pending) |
 - Fixture spot checks: `TF040626-2` = one receipt, Journal TF040626-2 / Cheque TF040626 / 1,629.00 / 2 allocations ✓ (fixture 6); `C63740` = DR CH_REV2 1,590 / CR TR with line display ref C63740, particulars `INV/NO: 63740 - YEEBEE` ✓ (fixture 3).
 - Invariants: 0 unbalanced posted journals (headers + lines), 0 pending receipts with journals, 0 cancelled payments retaining posted journals, source-uniqueness index holding.
-- **015361 resolved (supersedes §8-9's premise):** payment 5229 was never a real receipt — it was a stray auto-collection row left by an old CASH→INVOICE conversion (note-text matching missed it). Invoice 015361 is Unpaid RM2,880 in BOTH systems; the stray row is cancelled. **If the RM2,880 cash was in fact received, key a real receipt for it** — otherwise nothing to do.
+- **015361 final decision (user, 10 Jul; supersedes the earlier stray-row conclusion):** payment 5229 is a genuine RM2,880 cash receipt that legacy had not recorded/banked by month-end. It remains in CH_REV2 as unbanked cash. The production migration must not infer `is_auto_collection` from its stale automatic-note text now that the invoice is `INVOICE`; the Phase 2 column seed therefore requires the invoice's current type to be `CASH`.
 
 **Behaviour notes for the user:**
 - A CASH bill "paid" by cheque at sale time now stays Unpaid until the cheque is confirmed cleared (correct contract; previously it showed paid immediately).
@@ -232,7 +232,7 @@ Per-phase "files changed" and "verification queries/results" sections get append
 | CH_REV1 credits | **214,784.90 — legacy exact** |
 | CH_REV2 credits | **8,145.20 — legacy exact** |
 | CH_REV1 closing | 34,224.55 = legacy 34,190.55 + 34.00 (015375 only) |
-| CH_REV2 closing | **117.55 — legacy exact** |
+| CH_REV2 closing | **2,997.55 = legacy 117.55 + approved unbanked receipt 015361 (2,880.00)** |
 | 04/06 pool (fixture 5) | collected 17,747.60, banked 17,747.60, remaining **0.00** |
 | RV registry June | 83 numbers: 78 bank-ins + 5 manual reservations; gaps/sequence intact |
 | BANK_PBB June DR | 653,556.89 vs legacy 685,388.69 — every missing/extra row NAMED (worklist below) |
@@ -278,7 +278,7 @@ Per-phase "files changed" and "verification queries/results" sections get append
 **Final recon results (10 Jul 2026):**
 | Ledger | Matched | Legacy-only | ERP-only | Within-day order mismatches |
 |---|---|---|---|---|
-| CH_REV2 | 20 | 0 | 0 | **0** |
+| CH_REV2 | 20 | 0 | 1 row = 015361 (2,880.00 approved) | **0** |
 | CH_REV1 | 279 | 4 zero rows | 27 zero rows + 015375 (+34.00 approved) | **0** |
 | CASH_SALES | 210 | 4 zero rows | 27 zero rows | **0** |
 | CR_SALES | 183 | 015359 @ 08/06 | 015359 @ 09/06 + 6 zero rows | **0** |
@@ -343,7 +343,7 @@ The five-ledger recon (§5e) is unaffected — the rewrite only moved TR-side li
 - Trial Balance / statements: CN revenue effects flow automatically via fs_note; the TB shows one Trade Debtors row; **pre-existing limitation stands** — the Balance Sheet's Note 22/7 figures are computed live from invoices and the statements remain YTD-from-Jan-1 with no brought-forward (gap 1A-7, outside this project).
 - GT/JP: GT fully untouched. JP verified — own payments/adjustment routes, shared adjustment factory posts `jp_adjustment`+TR, PaymentForm branches. **Pre-existing cross-company defect found (NOT introduced here): JP's PaymentPage renders the shared `PaymentTable`, whose Confirm/Cancel buttons call TH `/api/payments/:id/...` with JP payment ids** — those actions have always targeted the wrong company's rows. Voucher printing is safe (JP rows lack journal ids → toast). Recommend a JP-endpoint prop or a JP table clone as a separate fix.
 
-**Final user worklist (unchanged from §9):** the five manual RVs, PBE037/06, the PCE008/06 amount check, the 015359 date decision, July-statement reconciliation of CIMBI008054 + MBB932202, and the future-dated REC typo rows.
+**Final user worklist (production snapshot refreshed 12 Jul):** the five manual RVs; re-date the existing PBE037/06 from 15/07 to the legacy 15/06 (do not create another); the PCE008/06 amount check; the 015359 date decision; July-statement reconciliation of CIMBI008054 + MBB932202; and the future-dated REC typo rows.
 
 ---
 
@@ -374,7 +374,7 @@ One reconciliation script (read-only SQL through the dev docker psql) reporting,
 | CASH_SALES | 214 tx (incl. 7 zero rows) | ✅ CR 213,365.10 exact; zero informational rows posted | row-by-row diff in Phase 5 |
 | CR_SALES | 184 tx | ✅ credits 513,062.80 AND THCN debits 158.35 exact (10/06 + 30/06, THCN/26/n refs); **closing 2,809,873.38 CR = legacy exact** (anchored) | Phase 5 row diff only |
 | CH_REV1 | 283 tx | ✅ debits 213,365.10 (= legacy + approved 34.00) AND credits 214,784.90 exact; closing 34,224.55 | Phase 5 row diff only |
-| CH_REV2 | 20 tx | ✅ debits 7,202.70 AND credits 8,145.20 exact; **closing 117.55 = legacy exact** | Phase 5 row diff only |
+| CH_REV2 | 20 legacy tx + 015361 | debits 10,082.70 (= legacy 7,202.70 + approved 015361 receipt 2,880.00), credits 8,145.20 exact; **closing 2,997.55 = legacy 117.55 + 2,880.00** | Phase 5 named difference only |
 | BANK_PBB | 278 tx | DR 653,556.89 vs 685,388.69 — all remaining rows named in §5c worklist; CR 619,901.48 vs 644,938.48 (user manual entries) | Phase 5 worklist |
 | C-CARE(1) | 31 rows (Jan–Jun) | ✅ anchor 8,748.00 + June DR 9,835.00 − CR 6,795.00 = **closing 11,788.00 exact**; full history on the child | Phase 7 statements |
 
@@ -404,13 +404,13 @@ One reconciliation script (read-only SQL through the dev docker psql) reporting,
 
 **USER worklist (June close-out — all remaining bridges):**
 1. Key the five manual RVs via Journal Entries (numbers reserved in `rv_registry`; each = DR BANK_PBB / CR your confirmed contra): RV021/06 3,054.90 + RV022/06 1,750.00 (FROM DRAWING WORKERS, 10/06), RV048/06 1,500.00 (24/06), RV082/06 143.70 (CTOS refund, 30/06), RV083/06 5.40 (Puncak Niaga refund, 30/06).
-2. Key manual PBE037/06 (JOHOR BAHRU FLOUR MILL, 14,700.00 credit, 15/06).
+2. PBE037/06 already exists as journal 2932 for JOHOR BAHRU FLOUR MILL / RM14,700, but is dated 15/07/2026. Re-date that existing journal to the legacy 15/06/2026; do not create a duplicate.
 3. Check PCE008/06: keyed as 1,427.40 credit on 30/06, but legacy PV008/06 is 11,764.40 (CLAIM BILLS/DRAWING WORKERS/SALARY 06/2026) — correct the amount or key the difference.
 4. Invoice 015359 (6,365.00): ERP dated 09/06, legacy CR_SALES prints 08/06 — re-date the invoice if desired (touches the invoice document; e-Invoice caution).
 5. July: when the July bank statement arrives, reconcile CIMBI008054 11,920.60 and the MBB932202 family 27,169.50 (June-keyed cheques that cleared in July).
 
 **ALL PHASES COMPLETE (12 Jul 2026).** Remaining actions, in order:
-1. **USER (June close-out):** key RV021/06 3,054.90 + RV022/06 1,750.00 (drawing workers), RV048/06 1,500.00, RV082/06 143.70 (CTOS refund), RV083/06 5.40 (Puncak Niaga refund) — numbers reserved in `rv_registry`, contras to confirm; key PBE037/06 14,700.00 (15/06); verify PCE008/06 (keyed 1,427.40 vs legacy PV008/06 11,764.40); decide invoice 015359 re-date 09/06→08/06; fix the future-dated REC typo rows.
+1. **USER (June close-out):** key RV021/06 3,054.90 + RV022/06 1,750.00 (drawing workers), RV048/06 1,500.00, RV082/06 143.70 (CTOS refund), RV083/06 5.40 (Puncak Niaga refund) — numbers reserved in `rv_registry`, contras to confirm; re-date existing PBE037/06 journal 2932 from 15/07 to 15/06; verify PCE008/06 (keyed 1,427.40 vs legacy PV008/06 11,764.40); decide invoice 015359 re-date 09/06→08/06; fix the future-dated REC typo rows.
 2. **USER (July):** reconcile CIMBI008054 11,920.60 + MBB932202 family 27,169.50 when the July bank statement arrives; run the July five-ledger recon with the tool (`dev/migrations/2026-07-10_phase5_recon_tool.sql` pattern) as the first fully-organic month.
 3. **PROD deployment:** apply the migrations in order — `2026-07-10_receipts_bankins_foundation.sql` → `_receipts_phase2_columns.sql` → `_receipts_phase2_migration.sql` → `_bankins_phase3_import.sql` → `_cn_journals_phase4_migration.sql` → `_phase5_bank_receipts_migration.sql` → `_phase5_reference_fixes.sql` → `_debtor_children_phase6_migration.sql` → `_debtor_zero_anchors_phase7.sql` — after prod data-entry reaches dev parity; run each dry-run/verification block and compare to the §5a–§5g numbers.
 4. **Recommended separate fixes:** the pre-existing JP PaymentTable cross-company endpoint defect (§5h); browser-level UI pass over the new BankInPage/PaymentForm flows.

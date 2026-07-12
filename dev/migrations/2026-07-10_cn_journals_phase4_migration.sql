@@ -26,6 +26,73 @@
 
 BEGIN;
 
+DO $$
+DECLARE
+  v_target_count INTEGER;
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM account_opening_balances
+     WHERE account_code = 'CASH_SALES' AND as_of_date = DATE '2026-06-01'
+       AND (amount IS NULL OR ABS(amount - (-1037680.40)) > 0.005)
+  ) OR EXISTS (
+    SELECT 1 FROM account_opening_balances
+     WHERE account_code = 'CR_SALES' AND as_of_date = DATE '2026-06-01'
+       AND (amount IS NULL OR ABS(amount - (-2296968.93)) > 0.005)
+  ) THEN
+    RAISE EXCEPTION 'Existing CASH_SALES/CR_SALES cutover anchor conflicts with approved legacy values';
+  END IF;
+
+  SELECT COUNT(*) INTO v_target_count
+    FROM adjustment_documents ad
+    JOIN journal_entries je ON je.id = ad.journal_entry_id
+    JOIN invoices i ON i.id = ad.original_invoice_id
+   WHERE ad.type = 'credit_note'
+     AND ((ad.id ~ '^CN-2026-[0-9]+$'
+           AND substring(ad.id FROM '([0-9]+)$')::int BETWEEN 1 AND 19)
+       OR ad.id IN ('TH-CN-26-1', 'TH-CN-26-2'));
+  IF v_target_count <> 21 THEN
+    RAISE EXCEPTION 'Expected exactly 21 linked historical credit notes, found %', v_target_count;
+  END IF;
+
+  IF EXISTS (
+    SELECT expected.id
+      FROM (
+        SELECT 'CN-2026-' || LPAD(n::text, 4, '0') AS id
+          FROM generate_series(1, 19) AS nums(n)
+        UNION ALL
+        SELECT id FROM unnest(ARRAY['TH-CN-26-1', 'TH-CN-26-2']) AS ids(id)
+      ) expected
+    EXCEPT
+    SELECT ad.id
+      FROM adjustment_documents ad
+      JOIN journal_entries je ON je.id = ad.journal_entry_id
+      JOIN invoices i ON i.id = ad.original_invoice_id
+     WHERE ad.type = 'credit_note'
+       AND ((ad.id ~ '^CN-2026-[0-9]+$'
+             AND substring(ad.id FROM '([0-9]+)$')::int BETWEEN 1 AND 19)
+         OR ad.id IN ('TH-CN-26-1', 'TH-CN-26-2'))
+  ) OR EXISTS (
+    SELECT ad.id
+      FROM adjustment_documents ad
+      JOIN journal_entries je ON je.id = ad.journal_entry_id
+      JOIN invoices i ON i.id = ad.original_invoice_id
+     WHERE ad.type = 'credit_note'
+       AND ((ad.id ~ '^CN-2026-[0-9]+$'
+             AND substring(ad.id FROM '([0-9]+)$')::int BETWEEN 1 AND 19)
+         OR ad.id IN ('TH-CN-26-1', 'TH-CN-26-2'))
+    EXCEPT
+    SELECT expected.id
+      FROM (
+        SELECT 'CN-2026-' || LPAD(n::text, 4, '0') AS id
+          FROM generate_series(1, 19) AS nums(n)
+        UNION ALL
+        SELECT id FROM unnest(ARRAY['TH-CN-26-1', 'TH-CN-26-2']) AS ids(id)
+      ) expected
+  ) THEN
+    RAISE EXCEPTION 'Historical credit-note target IDs differ from the approved exact 21-document set';
+  END IF;
+END $$;
+
 -- Revenue opening anchors at the cutover (credit balances stored negative).
 INSERT INTO account_opening_balances (account_code, as_of_date, amount, notes, created_by)
 VALUES
@@ -56,11 +123,13 @@ BEGIN
            ad.totalamountpayable::numeric(12,2) AS total_amt,
            ad.journal_entry_id, ad.status AS doc_status,
            je.reference_no, i.paymenttype
-      FROM adjustment_documents ad
+     FROM adjustment_documents ad
       JOIN journal_entries je ON je.id = ad.journal_entry_id
       JOIN invoices i ON i.id = ad.original_invoice_id
      WHERE ad.type = 'credit_note'
-       AND (ad.id LIKE 'CN-2026-%' OR ad.id IN ('TH-CN-26-1', 'TH-CN-26-2'))
+       AND ((ad.id ~ '^CN-2026-[0-9]+$'
+             AND substring(ad.id FROM '([0-9]+)$')::int BETWEEN 1 AND 19)
+         OR ad.id IN ('TH-CN-26-1', 'TH-CN-26-2'))
      ORDER BY je.reference_no
   LOOP
     -- Legacy THCN sequence + target accounting date.

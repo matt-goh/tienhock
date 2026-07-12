@@ -39,10 +39,52 @@ DECLARE
   v_total NUMERIC(12,2);
   v_line INTEGER;
   v_rv_number VARCHAR(20);
+  v_existing_registry INTEGER;
+  v_existing_bank_registry INTEGER;
+  v_existing_reservations INTEGER;
+  v_existing_bank_ins INTEGER;
+  v_existing_exact BOOLEAN;
 BEGIN
-  IF EXISTS (SELECT 1 FROM rv_registry WHERE rv_year = 2026 AND rv_month = 6) THEN
-    RAISE NOTICE 'June 2026 RVs already imported - skipping';
-    RETURN;
+  SELECT COUNT(*),
+         COUNT(*) FILTER (WHERE source_type = 'bank_in'),
+         COUNT(*) FILTER (WHERE source_type IN ('import', 'manual_journal'))
+    INTO v_existing_registry, v_existing_bank_registry, v_existing_reservations
+    FROM rv_registry
+   WHERE rv_year = 2026 AND rv_month = 6;
+  SELECT COUNT(*) INTO v_existing_bank_ins
+    FROM bank_ins bi
+    JOIN rv_registry rv ON rv.id = bi.rv_registry_id
+   WHERE rv.rv_year = 2026 AND rv.rv_month = 6;
+
+  IF v_existing_registry > 0 THEN
+    SELECT NOT EXISTS (
+      SELECT 1
+        FROM generate_series(1, 83) expected(seq)
+        LEFT JOIN rv_registry rv
+          ON rv.rv_year = 2026 AND rv.rv_month = 6 AND rv.rv_seq = expected.seq
+        LEFT JOIN bank_ins bi ON bi.rv_registry_id = rv.id
+       WHERE rv.id IS NULL
+          OR rv.rv_number <> 'RV' || lpad(expected.seq::text, 3, '0') || '/06'
+          OR (expected.seq NOT IN (21, 22, 48, 82, 83)
+              AND rv.source_type <> 'bank_in')
+          OR (expected.seq IN (21, 22, 48, 82, 83)
+              AND rv.source_type NOT IN ('import', 'manual_journal'))
+          OR (expected.seq NOT IN (21, 22, 48, 82, 83) AND bi.id IS NULL)
+          OR (expected.seq IN (21, 22, 48, 82, 83) AND bi.id IS NOT NULL)
+    ) INTO v_existing_exact;
+
+    IF v_existing_registry = 83
+       AND v_existing_bank_registry = 78
+       AND v_existing_reservations = 5
+       AND v_existing_bank_ins = 78
+       AND v_existing_exact THEN
+      RAISE NOTICE 'Complete June 2026 RV import already exists - skipping';
+      RETURN;
+    END IF;
+    RAISE EXCEPTION
+      'Partial/conflicting June 2026 RV state: registry %, bank registry %, reservations %, bank-ins %',
+      v_existing_registry, v_existing_bank_registry,
+      v_existing_reservations, v_existing_bank_ins;
   END IF;
 
   -- ---------------------------------------------------------------------------

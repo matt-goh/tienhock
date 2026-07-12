@@ -90,7 +90,7 @@ HAVING COUNT(DISTINCT payment_date::date) > 1
 
 \echo '=== J. Journal census by type with source-link coverage (post-foundation) ==='
 SELECT je.entry_type, je.status, COUNT(*) AS rows,
-       COUNT(*) FILTER (WHERE je.source_type IS NOT NULL) AS source_linked
+       COUNT(*) FILTER (WHERE (to_jsonb(je) ->> 'source_type') IS NOT NULL) AS source_linked
   FROM journal_entries je
  GROUP BY je.entry_type, je.status
  ORDER BY je.entry_type, je.status;

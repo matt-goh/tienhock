@@ -16,8 +16,11 @@
 --      cancels their old REC journals, and posts ONE new-contract journal per
 --      receipt (cash -> DR CH_REV2 per invoice with C{invoice} line refs;
 --      bank -> one aggregated DR bank + itemized CR TR; overpaid -> CR
---      CUST_DEP). NO invoice balance or customer credit is touched — those
---      effects were applied when the payments were first recorded.
+--      CUST_DEP). Existing settlement effects are not reapplied — those
+--      effects were applied when the payments were first recorded, except for
+--      the one approved 015361 conversion repair described in C2 below.
+--   C2. Applies the approved 015361 settlement once after proving its exact
+--       payment, receipt, balance, customer, and credit_used state.
 --   D. Rebuilds June+ invoice-owned S journals: CASH bills become
 --      DR CH_REV1 / CR CASH_SALES (4-line TR form when genuine receipts
 --      exist); INVOICE journals keep DR TR / CR CR_SALES; descriptions become
@@ -30,6 +33,47 @@
 -- =============================================================================
 
 BEGIN;
+
+-- Abort instead of guessing if production gained a tax-bearing invoice or an
+-- unexplained later cash payment on a CASH bill after this migration was
+-- prepared. Rounding is included in revenue and is therefore allowed; output
+-- tax would require the newer split-journal service rather than this backfill.
+DO $$
+DECLARE
+  v_bad RECORD;
+BEGIN
+  SELECT i.id, i.tax_amount INTO v_bad
+    FROM invoices i
+   WHERE COALESCE(i.is_consolidated, false) = false
+     AND i.invoice_status <> 'cancelled'
+     AND (to_timestamp(i.createddate::bigint / 1000) AT TIME ZONE 'Asia/Kuala_Lumpur')::date >= DATE '2026-06-01'
+     AND ABS(COALESCE(i.tax_amount, 0)) > 0.005
+   LIMIT 1;
+  IF FOUND THEN
+    RAISE EXCEPTION 'Invoice % has non-zero tax %; Phase 2 migration must be reviewed',
+      v_bad.id, v_bad.tax_amount;
+  END IF;
+
+  SELECT p.payment_id, p.invoice_id, p.payment_date INTO v_bad
+    FROM payments p
+    JOIN invoices i ON i.id = p.invoice_id
+   WHERE p.receipt_allocation_id IS NULL
+     AND p.payment_method = 'cash'
+     AND i.paymenttype = 'CASH'
+     AND (p.status IS NULL OR p.status = 'active')
+     AND (to_timestamp(i.createddate::bigint / 1000) AT TIME ZONE 'Asia/Kuala_Lumpur')::date >= DATE '2026-06-01'
+     AND p.payment_date::date <>
+         (to_timestamp(i.createddate::bigint / 1000) AT TIME ZONE 'Asia/Kuala_Lumpur')::date
+     AND NOT (COALESCE(p.notes, '') LIKE 'Automatic payment%'
+           OR COALESCE(p.notes, '') LIKE 'Payment automatically recorded%')
+     AND p.invoice_id <> '015375'
+   LIMIT 1;
+  IF FOUND THEN
+    RAISE EXCEPTION
+      'Payment % on CASH invoice % has an unexplained different payment date %; review before auto-classification',
+      v_bad.payment_id, v_bad.invoice_id, v_bad.payment_date;
+  END IF;
+END $$;
 
 -- -----------------------------------------------------------------------------
 -- A. June+ cash-method payments on CASH invoices = automatic collections.
@@ -57,6 +101,7 @@ UPDATE journal_entries je
   JOIN invoices i ON i.id = p.invoice_id
  WHERE p.journal_entry_id = je.id
    AND p.is_auto_collection = true
+   AND i.paymenttype = 'CASH'
    AND je.status = 'posted'
    AND (to_timestamp(i.createddate::bigint / 1000) AT TIME ZONE 'Asia/Kuala_Lumpur')::date >= DATE '2026-06-01';
 
@@ -65,6 +110,7 @@ UPDATE payments p
   FROM invoices i
  WHERE i.id = p.invoice_id
    AND p.is_auto_collection = true
+   AND i.paymenttype = 'CASH'
    AND p.journal_entry_id IS NOT NULL
    AND (to_timestamp(i.createddate::bigint / 1000) AT TIME ZONE 'Asia/Kuala_Lumpur')::date >= DATE '2026-06-01';
 
@@ -74,6 +120,7 @@ UPDATE payments p
   FROM invoices i
  WHERE i.id = p.invoice_id
    AND p.is_auto_collection = true
+   AND i.paymenttype = 'CASH'
    AND (p.status IS NULL OR p.status = 'active')
    AND (to_timestamp(i.createddate::bigint / 1000) AT TIME ZONE 'Asia/Kuala_Lumpur')::date >= DATE '2026-06-01'
    AND p.payment_date::date <> (to_timestamp(i.createddate::bigint / 1000) AT TIME ZONE 'Asia/Kuala_Lumpur')::date;
@@ -281,6 +328,197 @@ BEGIN
        WHERE id = v_receipt_id;
     END IF;
   END LOOP;
+END $$;
+
+-- -----------------------------------------------------------------------------
+-- C2. Invoice 015361: the user confirmed payment 5229 is genuine physical cash
+--     received for this credit invoice. The old CASH -> INVOICE conversion left
+--     the payment row/journal in place but restored the full invoice balance and
+--     customer credit_used. Step C preserves the receipt; this guarded repair
+--     applies its settlement effect exactly once.
+-- -----------------------------------------------------------------------------
+DO $$
+DECLARE
+  v_payment RECORD;
+  v_receipt RECORD;
+  v_active_count INTEGER;
+  v_active_total NUMERIC(12,2);
+  v_allocation_count INTEGER;
+  v_allocation_total NUMERIC(12,2);
+  v_credit_used NUMERIC(12,2);
+  v_open_balance NUMERIC(12,2);
+BEGIN
+  -- Lock every existing payment for this invoice, plus the invoice itself, so
+  -- the exact approved case cannot change between proof and repair.
+  PERFORM payment_id
+    FROM payments
+   WHERE invoice_id = '015361'
+   FOR UPDATE;
+
+  SELECT p.payment_id, p.amount_paid, p.payment_method, p.payment_reference,
+         p.payment_date::date AS payment_date, p.status,
+         p.is_auto_collection, p.journal_entry_id, p.receipt_allocation_id,
+         i.customerid, i.paymenttype, i.totalamountpayable,
+         i.balance_due, i.invoice_status
+    INTO v_payment
+    FROM payments p
+    JOIN invoices i ON i.id = p.invoice_id
+   WHERE p.payment_id = 5229 AND p.invoice_id = '015361'
+   FOR UPDATE OF p, i;
+
+  IF NOT FOUND
+     OR v_payment.amount_paid <> 2880.00
+     OR v_payment.payment_method IS DISTINCT FROM 'cash'
+     OR COALESCE(v_payment.payment_reference, '') <> ''
+     OR v_payment.payment_date IS DISTINCT FROM DATE '2026-06-13'
+     OR v_payment.status IS DISTINCT FROM 'active'
+     OR v_payment.is_auto_collection IS DISTINCT FROM false
+     OR v_payment.journal_entry_id IS NOT NULL
+     OR v_payment.customerid IS DISTINCT FROM 'YESOKEY'
+     OR v_payment.paymenttype IS DISTINCT FROM 'INVOICE'
+     OR v_payment.totalamountpayable IS DISTINCT FROM 2880.00
+     OR v_payment.receipt_allocation_id IS NULL THEN
+    RAISE EXCEPTION 'Payment 5229 / invoice 015361 no longer matches the approved migration case';
+  END IF;
+
+  SELECT COUNT(*), COALESCE(SUM(amount_paid), 0)::numeric(12,2)
+    INTO v_active_count, v_active_total
+    FROM payments
+   WHERE invoice_id = '015361'
+     AND (status IS NULL OR status IN ('active', 'pending', 'overpaid'));
+
+  IF v_active_count <> 1 OR ABS(v_active_total - 2880.00) > 0.005 THEN
+    RAISE EXCEPTION
+      'Invoice 015361 settlement changed: expected one active RM2880 payment, found % totaling %',
+      v_active_count, v_active_total;
+  END IF;
+
+  SELECT ra.receipt_id, ra.line_number, ra.allocation_type, ra.invoice_id,
+         ra.customer_id, ra.target_account, ra.external_reference, ra.amount,
+         ra.legacy_payment_id,
+         r.payment_method, r.debit_account, r.display_reference,
+         r.received_date, r.posting_date, r.status AS receipt_status,
+         r.origin, r.total_amount, r.journal_entry_id AS receipt_journal_id,
+         je.entry_type, je.entry_date, je.status AS journal_status,
+         je.total_debit, je.total_credit, je.display_reference AS journal_display_reference,
+         je.source_type, je.source_id
+    INTO v_receipt
+      FROM receipt_allocations ra
+      JOIN receipts r ON r.id = ra.receipt_id
+      JOIN journal_entries je ON je.id = r.journal_entry_id
+     WHERE ra.id = v_payment.receipt_allocation_id
+     FOR UPDATE OF ra, r, je;
+
+  IF NOT FOUND
+     OR v_receipt.line_number IS DISTINCT FROM 1
+     OR v_receipt.allocation_type IS DISTINCT FROM 'invoice'
+     OR v_receipt.invoice_id IS DISTINCT FROM '015361'
+     OR v_receipt.customer_id IS DISTINCT FROM 'YESOKEY'
+     OR v_receipt.target_account IS NOT NULL
+     OR v_receipt.external_reference IS NOT NULL
+     OR v_receipt.amount IS DISTINCT FROM 2880.00
+     OR v_receipt.legacy_payment_id IS DISTINCT FROM 5229
+     OR v_receipt.payment_method IS DISTINCT FROM 'cash'
+     OR v_receipt.debit_account IS DISTINCT FROM 'CH_REV2'
+     OR v_receipt.display_reference IS DISTINCT FROM 'C015361'
+     OR v_receipt.received_date IS DISTINCT FROM v_payment.payment_date
+     OR v_receipt.posting_date IS DISTINCT FROM v_payment.payment_date
+     OR v_receipt.receipt_status IS DISTINCT FROM 'posted'
+     OR v_receipt.origin IS DISTINCT FROM 'erp'
+     OR v_receipt.total_amount IS DISTINCT FROM 2880.00
+     OR v_receipt.receipt_journal_id IS NULL
+     OR v_receipt.entry_type IS DISTINCT FROM 'REC'
+     OR v_receipt.entry_date IS DISTINCT FROM v_payment.payment_date
+     OR v_receipt.journal_status IS DISTINCT FROM 'posted'
+     OR v_receipt.total_debit IS DISTINCT FROM 2880.00
+     OR v_receipt.total_credit IS DISTINCT FROM 2880.00
+     OR v_receipt.journal_display_reference IS DISTINCT FROM 'C015361'
+     OR v_receipt.source_type IS DISTINCT FROM 'receipt'
+     OR v_receipt.source_id IS DISTINCT FROM v_receipt.receipt_id::text THEN
+    RAISE EXCEPTION 'Invoice 015361 genuine CH_REV2 receipt was not created correctly';
+  END IF;
+
+  SELECT COUNT(*), COALESCE(SUM(amount), 0)::numeric(12,2)
+    INTO v_allocation_count, v_allocation_total
+    FROM receipt_allocations
+   WHERE receipt_id = v_receipt.receipt_id;
+  IF v_allocation_count <> 1 OR v_allocation_total <> 2880.00 THEN
+    RAISE EXCEPTION
+      'Invoice 015361 receipt has % allocations totaling %, expected one RM2880 allocation',
+      v_allocation_count, v_allocation_total;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+      FROM journal_entry_lines
+     WHERE journal_entry_id = v_receipt.receipt_journal_id
+     GROUP BY journal_entry_id
+    HAVING COUNT(*) = 2
+       AND SUM(debit_amount) = 2880.00
+       AND SUM(credit_amount) = 2880.00
+       AND COUNT(*) FILTER (
+             WHERE account_code = 'CH_REV2'
+               AND debit_amount = 2880.00
+               AND credit_amount = 0
+               AND display_reference = 'C015361'
+           ) = 1
+       AND COUNT(*) FILTER (
+             WHERE debit_amount = 0 AND credit_amount = 2880.00
+           ) = 1
+  ) THEN
+    RAISE EXCEPTION 'Invoice 015361 receipt journal lines do not match the approved RM2880 shape';
+  END IF;
+
+  SELECT credit_used::numeric(12,2)
+    INTO v_credit_used
+    FROM customers
+   WHERE id = 'YESOKEY'
+   FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Customer YESOKEY no longer exists';
+  END IF;
+
+  SELECT COALESCE(SUM(balance_due), 0)::numeric(12,2)
+    INTO v_open_balance
+    FROM invoices
+   WHERE customerid = 'YESOKEY'
+     AND paymenttype = 'INVOICE'
+     AND LOWER(COALESCE(invoice_status, '')) <> 'cancelled';
+  IF v_credit_used IS NULL OR ABS(v_credit_used - v_open_balance) > 0.005 THEN
+    RAISE EXCEPTION
+      'YESOKEY credit_used % differs from open INVOICE balance % before 015361 repair',
+      v_credit_used, v_open_balance;
+  END IF;
+
+  IF v_payment.balance_due = 2880.00
+     AND LOWER(COALESCE(v_payment.invoice_status, '')) = 'unpaid' THEN
+    UPDATE invoices
+       SET balance_due = 0, invoice_status = 'paid'
+     WHERE id = '015361';
+    UPDATE customers
+       SET credit_used = credit_used - 2880.00
+     WHERE id = 'YESOKEY';
+  ELSIF NOT (v_payment.balance_due = 0 AND v_payment.invoice_status = 'paid') THEN
+    RAISE EXCEPTION
+      'Invoice 015361 has unexpected balance/status %/%',
+      v_payment.balance_due, v_payment.invoice_status;
+  END IF;
+
+  SELECT credit_used::numeric(12,2)
+    INTO v_credit_used
+    FROM customers
+   WHERE id = 'YESOKEY';
+  SELECT COALESCE(SUM(balance_due), 0)::numeric(12,2)
+    INTO v_open_balance
+    FROM invoices
+   WHERE customerid = 'YESOKEY'
+     AND paymenttype = 'INVOICE'
+     AND LOWER(COALESCE(invoice_status, '')) <> 'cancelled';
+  IF v_credit_used IS NULL OR ABS(v_credit_used - v_open_balance) > 0.005 THEN
+    RAISE EXCEPTION
+      'YESOKEY credit_used % differs from open INVOICE balance % after 015361 repair',
+      v_credit_used, v_open_balance;
+  END IF;
 END $$;
 
 -- -----------------------------------------------------------------------------

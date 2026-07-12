@@ -263,6 +263,37 @@ CREATE INDEX IF NOT EXISTS bank_in_alloc_source_date_idx ON bank_in_allocations 
 -- 10. Backfill journal source links (traceability). Idempotent; only touches
 --     source_type/source_id; never amounts or statuses.
 -- -----------------------------------------------------------------------------
+DO $$
+DECLARE
+  v_conflict RECORD;
+BEGIN
+  SELECT journal_id, array_agg(source_name ORDER BY source_name) AS sources
+    INTO v_conflict
+    FROM (
+      SELECT journal_entry_id AS journal_id, 'invoice' AS source_name FROM invoices
+       WHERE journal_entry_id IS NOT NULL
+      UNION ALL
+      SELECT journal_entry_id, 'payment' FROM payments WHERE journal_entry_id IS NOT NULL
+      UNION ALL
+      SELECT journal_entry_id, 'adjustment' FROM adjustment_documents WHERE journal_entry_id IS NOT NULL
+      UNION ALL
+      SELECT journal_entry_id, 'jp_adjustment' FROM jellypolly.adjustment_documents WHERE journal_entry_id IS NOT NULL
+      UNION ALL
+      SELECT journal_entry_id, 'self_billed_invoice' FROM self_billed_invoices WHERE journal_entry_id IS NOT NULL
+      UNION ALL
+      SELECT journal_entry_id, 'purchase_invoice' FROM purchase_invoices WHERE journal_entry_id IS NOT NULL
+      UNION ALL
+      SELECT journal_entry_id, 'supplier_payment' FROM supplier_payments WHERE journal_entry_id IS NOT NULL
+    ) refs
+   GROUP BY journal_id
+  HAVING COUNT(*) > 1
+   LIMIT 1;
+  IF FOUND THEN
+    RAISE EXCEPTION 'Journal % is linked by multiple source tables: %',
+      v_conflict.journal_id, v_conflict.sources;
+  END IF;
+END $$;
+
 UPDATE journal_entries je SET source_type = 'invoice', source_id = i.id
   FROM invoices i
  WHERE i.journal_entry_id = je.id
