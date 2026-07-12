@@ -281,7 +281,8 @@ export default function (pool) {
       const entryQuery = `
         SELECT
           je.id, je.reference_no, je.entry_type, je.entry_date,
-          je.description, je.status, je.created_at, je.created_by
+          je.description, je.status, je.created_at, je.created_by,
+          je.display_reference, je.source_type, je.source_id
         FROM journal_entries je
         WHERE je.id = $1
       `;
@@ -307,7 +308,89 @@ export default function (pool) {
         });
       }
 
-      // Get the linked payment
+      // Journal lines with account descriptions (shared by both paths)
+      const linesResult = await pool.query(
+        `SELECT
+            jel.account_code,
+            COALESCE(ac.description, jel.account_code) as account_description,
+            jel.debit_amount,
+            jel.credit_amount
+          FROM journal_entry_lines jel
+          LEFT JOIN account_codes ac ON jel.account_code = ac.code
+          WHERE jel.journal_entry_id = $1
+          ORDER BY jel.line_number`,
+        [id]
+      );
+      const lines = linesResult.rows.map((line) => ({
+        account_code: line.account_code,
+        account_description: line.account_description,
+        debit_amount: parseFloat(line.debit_amount) || 0,
+        credit_amount: parseFloat(line.credit_amount) || 0,
+      }));
+
+      // ----- Receipt-owned journal (header + allocations model) -----
+      if (entry.source_type === "receipt") {
+        const receiptResult = await pool.query(
+          `SELECT r.*, ac.description AS debit_account_description
+             FROM receipts r
+             LEFT JOIN account_codes ac ON ac.code = r.debit_account
+            WHERE r.id = $1::int`,
+          [entry.source_id]
+        );
+        if (receiptResult.rows.length === 0) {
+          return res.status(404).json({ message: "Receipt not found for this journal entry" });
+        }
+        const receipt = receiptResult.rows[0];
+
+        const allocResult = await pool.query(
+          `SELECT ra.line_number, ra.allocation_type, ra.invoice_id, ra.customer_id,
+                  ra.target_account, ra.external_reference, ra.amount,
+                  ra.legacy_payment_id,
+                  COALESCE(c.name, ra.customer_id) AS customer_name
+             FROM receipt_allocations ra
+             LEFT JOIN customers c ON c.id = ra.customer_id
+            WHERE ra.receipt_id = $1
+            ORDER BY ra.line_number`,
+          [receipt.id]
+        );
+
+        const customers = [
+          ...new Set(allocResult.rows.map((a) => a.customer_name).filter(Boolean)),
+        ];
+        const invoiceIds = allocResult.rows
+          .filter((a) => a.invoice_id)
+          .map((a) => a.invoice_id);
+        const isUndepositedCash = ["CH_REV1", "CH_REV2"].includes(receipt.debit_account);
+
+        return res.json({
+          voucher_number: entry.display_reference || receipt.display_reference || entry.reference_no,
+          voucher_date: receipt.posting_date || receipt.received_date,
+          payment_id: allocResult.rows.find((a) => a.legacy_payment_id)?.legacy_payment_id || null,
+          amount: parseFloat(receipt.total_amount),
+          payment_method: receipt.payment_method,
+          payment_reference: receipt.display_reference || null,
+          cheque_reference: receipt.cheque_reference || null,
+          bank_account: receipt.debit_account,
+          bank_account_description: receipt.debit_account_description || receipt.debit_account,
+          is_undeposited_cash: isUndepositedCash,
+          customer_name: customers.join(", ") || "Unknown Customer",
+          invoice_id: invoiceIds.join("/"),
+          journal_entry_id: parseInt(id),
+          description: receipt.description || entry.description,
+          allocations: allocResult.rows.map((a) => ({
+            allocation_type: a.allocation_type,
+            invoice_id: a.invoice_id,
+            customer_name: a.customer_name,
+            external_reference: a.external_reference,
+            amount: parseFloat(a.amount),
+          })),
+          lines,
+          created_at: receipt.created_at,
+          created_by: receipt.created_by,
+        });
+      }
+
+      // ----- Legacy payment-owned REC journal -----
       const paymentQuery = `
         SELECT
           p.payment_id, p.invoice_id, p.payment_date, p.amount_paid,
@@ -331,40 +414,23 @@ export default function (pool) {
 
       const payment = paymentResult.rows[0];
 
-      // Get journal entry lines with account descriptions
-      const linesQuery = `
-        SELECT
-          jel.account_code,
-          COALESCE(ac.description, jel.account_code) as account_description,
-          jel.debit_amount,
-          jel.credit_amount
-        FROM journal_entry_lines jel
-        LEFT JOIN account_codes ac ON jel.account_code = ac.code
-        WHERE jel.journal_entry_id = $1
-        ORDER BY jel.line_number
-      `;
-      const linesResult = await pool.query(linesQuery, [id]);
-
       // Construct the voucher data
       const voucherData = {
-        voucher_number: entry.reference_no,
+        voucher_number: entry.display_reference || entry.reference_no,
         voucher_date: payment.payment_date,
         payment_id: payment.payment_id,
         amount: parseFloat(payment.amount_paid),
         payment_method: payment.payment_method,
         payment_reference: payment.payment_reference || null,
+        cheque_reference: null,
         bank_account: payment.bank_account,
         bank_account_description: payment.bank_account_description || payment.bank_account,
+        is_undeposited_cash: payment.bank_account === "CASH",
         customer_name: payment.customer_name || "Unknown Customer",
         invoice_id: payment.invoice_id,
         journal_entry_id: parseInt(id),
         description: entry.description,
-        lines: linesResult.rows.map((line) => ({
-          account_code: line.account_code,
-          account_description: line.account_description,
-          debit_amount: parseFloat(line.debit_amount) || 0,
-          credit_amount: parseFloat(line.credit_amount) || 0,
-        })),
+        lines,
         created_at: payment.created_at,
         created_by: null,
       };

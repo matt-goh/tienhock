@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-07-12",
+    ms: "Baucar Resit Tunai kini dicetak terus (tanpa tetingkap pratonton) dan menyokong resit berkumpulan: semua invois dalam satu resit disenaraikan, rujukan Journal dan No. Cek/Pindahan dipaparkan berasingan, dan tunai yang belum dibankkan dilabel 'pending bank-in' dan bukannya didakwa sudah masuk bank.",
+    en: "The Cash Receipt Voucher now prints directly (no preview window) and supports grouped receipts: every invoice in one receipt is listed, the Journal reference and Cheque/Transfer number are shown separately, and undeposited cash is labelled 'pending bank-in' instead of being claimed as already deposited.",
+  },
+  {
     date: "2026-07-10",
     ms: "Account Ledger kini menyokong sebarang julat tarikh, bulan penuh atau tahun penuh (termasuk pintasan 'This year'), dengan pautan yang boleh dikongsi dan PDF yang melabel tempoh dengan betul. Penyata Am penghutang dan Penyata Pelanggan kini dikira daripada lejar penghutang pelanggan: baki bawa ke hadapan (BAL B/F) mengikut baki pembukaan 1 Jun, transaksi merangkumi nota kredit/debit/bayaran balik, dan penyata bulan lepas tidak lagi berubah apabila bayaran kemudian diterima. Susunan umur hutang dikira pada tarikh akhir penyata.",
     en: "The Account Ledger now supports any date range, full month, or full year (including a 'This year' shortcut), with shareable links and PDFs that label the period correctly. The debtor General Statement and Customer Statement are now calculated from each customer's debtor ledger: the balance brought forward (BAL B/F) follows the 1 June opening balances, transactions include credit/debit/refund notes, and last month's statement no longer changes when later payments come in. Aging is calculated as at the statement end date.",
