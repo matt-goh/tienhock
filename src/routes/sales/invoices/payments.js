@@ -55,11 +55,15 @@ export default function (pool) {
         SELECT
           p.payment_id, p.invoice_id, p.payment_date, p.amount_paid,
           p.payment_method, p.payment_reference, p.internal_reference,
-          p.bank_account, p.journal_entry_id,
+          p.bank_account, p.journal_entry_id, p.is_auto_collection,
+          p.receipt_allocation_id, ra.receipt_id,
+          COALESCE(r.journal_entry_id, p.journal_entry_id) as voucher_journal_id,
           p.notes, p.created_at, p.status, p.cancellation_date,
           je.reference_no as journal_reference_no
         FROM payments p
         LEFT JOIN journal_entries je ON p.journal_entry_id = je.id
+        LEFT JOIN receipt_allocations ra ON ra.id = p.receipt_allocation_id
+        LEFT JOIN receipts r ON r.id = ra.receipt_id
         WHERE 1=1
       `;
       const queryParams = [];
@@ -110,7 +114,9 @@ export default function (pool) {
       SELECT
         p.payment_id, p.invoice_id, p.payment_date, p.amount_paid,
         p.payment_method, p.payment_reference, p.internal_reference,
-        p.bank_account, p.journal_entry_id,
+        p.bank_account, p.journal_entry_id, p.is_auto_collection,
+        p.receipt_allocation_id, ra.receipt_id,
+        COALESCE(r.journal_entry_id, p.journal_entry_id) as voucher_journal_id,
         p.notes, p.created_at, p.status, p.cancellation_date,
         i.customerid, i.salespersonid, c.name as customer_name,
         je.reference_no as journal_reference_no
@@ -118,6 +124,8 @@ export default function (pool) {
       JOIN invoices i ON p.invoice_id = i.id
       LEFT JOIN customers c ON i.customerid = c.id
       LEFT JOIN journal_entries je ON p.journal_entry_id = je.id
+      LEFT JOIN receipt_allocations ra ON ra.id = p.receipt_allocation_id
+      LEFT JOIN receipts r ON r.id = ra.receipt_id
       WHERE 1=1
     `;
 

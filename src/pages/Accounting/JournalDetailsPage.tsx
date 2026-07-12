@@ -12,7 +12,7 @@ import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
-import CashReceiptVoucherModal from "../../components/Accounting/CashReceiptVoucherModal";
+import { printCashReceiptVoucherPDF } from "../../utils/accounting/CashReceiptVoucherPDF";
 import { generateJournalVoucherPDF } from "../../utils/accounting/JournalVoucherPDFMake";
 import {
   IconFileText,
@@ -48,9 +48,7 @@ const JournalDetailsPage: React.FC = () => {
     suggestion?: string;
   } | null>(null);
 
-  // Receipt voucher modal states
-  const [showVoucherModal, setShowVoucherModal] = useState(false);
-  const [voucherData, setVoucherData] = useState<CashReceiptVoucherData | null>(null);
+  // Receipt voucher print state
   const [isLoadingVoucher, setIsLoadingVoucher] = useState(false);
 
   // Journal voucher PDF print state
@@ -195,18 +193,17 @@ const JournalDetailsPage: React.FC = () => {
     }
   };
 
-  // Handle print receipt voucher
+  // Handle print receipt voucher (direct Blob print via the shared fallback)
   const handlePrintVoucher = async () => {
     if (!id) return;
 
     setIsLoadingVoucher(true);
     try {
       const response = await api.get(`/api/journal-entries/${id}/receipt-voucher`);
-      setVoucherData(response as CashReceiptVoucherData);
-      setShowVoucherModal(true);
+      await printCashReceiptVoucherPDF(response as CashReceiptVoucherData);
     } catch (err: unknown) {
-      console.error("Error fetching voucher data:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to load voucher data";
+      console.error("Error printing voucher:", err);
+      const errorMessage = err instanceof Error ? err.message : "Failed to print voucher";
       toast.error(errorMessage);
     } finally {
       setIsLoadingVoucher(false);
@@ -604,15 +601,6 @@ const JournalDetailsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Cash Receipt Voucher Modal */}
-      <CashReceiptVoucherModal
-        isOpen={showVoucherModal}
-        onClose={() => {
-          setShowVoucherModal(false);
-          setVoucherData(null);
-        }}
-        voucherData={voucherData}
-      />
     </div>
   );
 };

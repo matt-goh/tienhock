@@ -152,7 +152,7 @@ Defaults (editable at the owning source; override persisted; resync never erases
 | 5 | Full five-ledger row-by-row June reconciliation vs fixtures (gate for Phase 6) | ✅ complete 10 Jul 2026 (see §5e) — gate PASSED; residuals are user entries/July timing |
 | 6 | Customer debtor child postings + historical rewrite (per debtor handover doc) | ✅ complete 10 Jul 2026 (see §5f) |
 | 7 | Account Ledger TimeNavigator ranges; debtor anchors → General Statement BAL B/F; Customer Statement corrections; C-CARE validation | ✅ complete 10 Jul 2026 (see §5g) |
-| 8 | CashReceiptVoucher print cleanup, connected reports, changelog (BM+EN), doc refresh, final bug-scan offer | ⬜ |
+| 8 | CashReceiptVoucher print cleanup, connected reports, changelog (BM+EN), doc refresh, final bug-scan offer | ✅ complete 12 Jul 2026 (see §5h) — **ALL PROJECT PHASES DONE** |
 
 Per-phase "files changed" and "verification queries/results" sections get appended here as phases execute.
 
@@ -328,6 +328,23 @@ The five-ledger recon (§5e) is unaffected — the rewrite only moved TR-side li
 
 **Known limitation (recorded per plan §10):** the aging buckets are computed from the ERP's own invoice-level history (which exists back to 2025), not from the scalar 1 June anchors; where a customer's anchor differs from the ERP invoice composition, aging totals may not equal `TOTAL DUE` — that difference is the same named opening bridge as elsewhere, not a calculation error. No age buckets are fabricated from scalar anchors.
 
+### 5h. Phase 8 — executed 12 Jul 2026 — printing cleanup, connected checks, handoff
+
+**Code (files changed):**
+- `src/routes/accounting/journal-entries.js` — the `/:id/receipt-voucher` endpoint is receipt-aware: receipt-owned journals return the grouped voucher (visible Journal ref as the voucher number, posting date, Cheque/transfer ref, itemized allocations with customer names, `is_undeposited_cash` for CH_REV1/CH_REV2 money); legacy payment-owned journals keep the old path.
+- `src/utils/accounting/CashReceiptVoucherPDF.tsx` — grouped receipts list every allocation ("Being Payment For" itemized: invoices, overpayment deposits, account refs); Journal and Cheque/Transfer references print as separate rows; the money line reads **"Held In (undeposited) … — pending bank-in"** for holding-account cash and "Deposited To" only for real bank money; NEW `printCashReceiptVoucherPDF` prints the Blob directly through the shared `printPdfFrameWithFallback`.
+- `src/components/Accounting/CashReceiptVoucherModal.tsx` — **DELETED** (0 references remain). `PaymentTable.tsx` and `JournalDetailsPage.tsx` print directly; PaymentTable resolves the journal via the new `voucher_journal_id` (the owning receipt's journal, falling back to the row's own legacy journal) exposed by the payments GET endpoints.
+- `src/types/types.ts` — `CashReceiptVoucherData` extended (allocations, cheque_reference, is_undeposited_cash, nullable payment_id); `Payment` gains is_auto_collection / receipt_allocation_id / receipt_id / voucher_journal_id.
+- `docs/Account/ACCOUNTING_PROGRESS.md` — superseded-sections banner pointing here.
+
+**End-to-end forward-path verification (the "future months" proof, run 12 Jul):** one rolled-back transaction driving the REAL services — grouped online receipt (aggregated bank debit 20.00, Cheque TF120726, Journal TF120726-9, itemized debtor-child credits, balance reduced), physical cash receipt (DR CH_REV2, line ref C{invoice}), pending cheque (no journal/no balance) confirmed onto its CLEAR date, RV bank-in **auto-numbered RV001/07** (one bank debit per group, holding credits aggregated), over-banking blocked, banked-receipt cancellation blocked, bank-in cancellation returning the cash to the pool with the RV number staying reserved — **19/19 assertions passed**. Future months need no SQL: this whole cycle is the live app path.
+
+**Connected checks:**
+- Trial Balance / statements: CN revenue effects flow automatically via fs_note; the TB shows one Trade Debtors row; **pre-existing limitation stands** — the Balance Sheet's Note 22/7 figures are computed live from invoices and the statements remain YTD-from-Jan-1 with no brought-forward (gap 1A-7, outside this project).
+- GT/JP: GT fully untouched. JP verified — own payments/adjustment routes, shared adjustment factory posts `jp_adjustment`+TR, PaymentForm branches. **Pre-existing cross-company defect found (NOT introduced here): JP's PaymentPage renders the shared `PaymentTable`, whose Confirm/Cancel buttons call TH `/api/payments/:id/...` with JP payment ids** — those actions have always targeted the wrong company's rows. Voucher printing is safe (JP rows lack journal ids → toast). Recommend a JP-endpoint prop or a JP table clone as a separate fix.
+
+**Final user worklist (unchanged from §9):** the five manual RVs, PBE037/06, the PCE008/06 amount check, the 015359 date decision, July-statement reconciliation of CIMBI008054 + MBB932202, and the future-dated REC typo rows.
+
 ---
 
 ## 6. Migration dry-run design (Phase 1 deliverable; read-only)
@@ -392,7 +409,12 @@ One reconciliation script (read-only SQL through the dev docker psql) reporting,
 4. Invoice 015359 (6,365.00): ERP dated 09/06, legacy CR_SALES prints 08/06 — re-date the invoice if desired (touches the invoice document; e-Invoice caution).
 5. July: when the July bank statement arrives, reconcile CIMBI008054 11,920.60 and the MBB932202 family 27,169.50 (June-keyed cheques that cleared in July).
 
-**Then start Phase 8 — printing cleanup, connected checks, and handoff** (the final phase): (1) adapt `src/utils/accounting/CashReceiptVoucherPDF.tsx` to the receipt header+allocation model (grouped receipts, multiple invoices, the actual debit account, visible Journal/Cheque refs; never label CH_REV1/2 cash as banked); (2) REMOVE `src/components/Accounting/CashReceiptVoucherModal.tsx` and replace its callers (at least `PaymentTable.tsx`, `JournalDetailsPage.tsx`) with direct Blob + `printPdfFrameWithFallback`; (3) connected-report recheck: `financial-reports.js` Note 7/22 and report source guides vs the reconciled journals, GT/JP compatibility sweep; (4) refresh `ACCOUNTING_PROGRESS.md`, this doc, `AGENTS.md`/`CLAUDE.md`; (5) summarize edge cases and ask the user whether they want the full bug/limitation scan of every file created/modified in this project (CLAUDE.md rule 15).
+**ALL PHASES COMPLETE (12 Jul 2026).** Remaining actions, in order:
+1. **USER (June close-out):** key RV021/06 3,054.90 + RV022/06 1,750.00 (drawing workers), RV048/06 1,500.00, RV082/06 143.70 (CTOS refund), RV083/06 5.40 (Puncak Niaga refund) — numbers reserved in `rv_registry`, contras to confirm; key PBE037/06 14,700.00 (15/06); verify PCE008/06 (keyed 1,427.40 vs legacy PV008/06 11,764.40); decide invoice 015359 re-date 09/06→08/06; fix the future-dated REC typo rows.
+2. **USER (July):** reconcile CIMBI008054 11,920.60 + MBB932202 family 27,169.50 when the July bank statement arrives; run the July five-ledger recon with the tool (`dev/migrations/2026-07-10_phase5_recon_tool.sql` pattern) as the first fully-organic month.
+3. **PROD deployment:** apply the migrations in order — `2026-07-10_receipts_bankins_foundation.sql` → `_receipts_phase2_columns.sql` → `_receipts_phase2_migration.sql` → `_bankins_phase3_import.sql` → `_cn_journals_phase4_migration.sql` → `_phase5_bank_receipts_migration.sql` → `_phase5_reference_fixes.sql` → `_debtor_children_phase6_migration.sql` → `_debtor_zero_anchors_phase7.sql` — after prod data-entry reaches dev parity; run each dry-run/verification block and compare to the §5a–§5g numbers.
+4. **Recommended separate fixes:** the pre-existing JP PaymentTable cross-company endpoint defect (§5h); browser-level UI pass over the new BankInPage/PaymentForm flows.
+5. **Offered to the user (rule 15):** a full bug/limitation scan of every file created or modified in this project.
 
 ---
 
