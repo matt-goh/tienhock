@@ -106,6 +106,7 @@ import greenTargetOthersRecordsRouter from "./greentarget/others-records.js";
 import greenTargetDailyLoriHabukRouter from "./greentarget/daily-lori-habuk.js";
 import greenTargetSalaryReportRouter from "./greentarget/salary-report.js";
 import greenTargetECarumanRouter from "./greentarget/e-caruman.js";
+import greenTargetCustomerSignupsRouter from "./greentarget/customer-signups.js";
 
 // Jellypolly routes
 import jellypollyInvoiceRouter from "./jellypolly/invoices.js";
@@ -321,6 +322,10 @@ export default function setupRoutes(app, pool) {
     greenTargetSalaryReportRouter(pool)
   );
   app.use("/greentarget/api/e-caruman", greenTargetECarumanRouter(pool));
+  app.use(
+    "/greentarget/api/customer-signups",
+    greenTargetCustomerSignupsRouter(pool)
+  );
 
   // Jellypolly routes
   app.use(
