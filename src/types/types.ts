@@ -385,6 +385,10 @@ export interface Payment {
   bank_account?: "CASH" | "BANK_PBB" | "BANK_ABB";
   journal_entry_id?: number;
   journal_reference_no?: string; // Reference number from associated journal entry (e.g., REC001/01)
+  is_auto_collection?: boolean; // automatic CASH-bill collection row (non-posting, invoice-owned)
+  receipt_allocation_id?: number | null; // set when this row is the projection of a receipt allocation
+  receipt_id?: number | null; // owning receipt (via the allocation)
+  voucher_journal_id?: number | null; // journal to print the receipt voucher from (receipt's, else the row's own)
   notes?: string;
   created_at?: string;
   status?: "active" | "cancelled" | "pending" | "overpaid";
@@ -1525,20 +1529,27 @@ export interface MaterialFilters {
 // Cash Receipt Voucher data for PDF generation
 export interface CashReceiptVoucherData {
   // Voucher identification
-  voucher_number: string; // REC reference (e.g., "REC001/01")
-  voucher_date: string; // Payment date
+  voucher_number: string; // Visible Journal reference (e.g. "TF040626-2", "C63740")
+  voucher_date: string; // Posting/receipt date
 
   // Payment info
-  payment_id: number;
+  payment_id: number | null;
   amount: number;
   payment_method: "cash" | "cheque" | "bank_transfer" | "online";
   payment_reference: string | null;
+  cheque_reference?: string | null;
   bank_account: string;
   bank_account_description: string;
+  // true when the money sits in a cash-holding account (CH_REV1/CH_REV2 or
+  // legacy CASH) awaiting an RV bank-in — the voucher must not say "deposited"
+  is_undeposited_cash?: boolean;
 
-  // Customer/Invoice info
+  // Customer/Invoice info (joined summaries for grouped receipts)
   customer_name: string;
   invoice_id: string;
+
+  // Grouped receipt allocations (absent on legacy single-payment vouchers)
+  allocations?: CashReceiptVoucherAllocation[];
 
   // Journal entry info
   journal_entry_id: number;
@@ -1550,6 +1561,14 @@ export interface CashReceiptVoucherData {
   // Metadata
   created_at: string | null;
   created_by: string | null;
+}
+
+export interface CashReceiptVoucherAllocation {
+  allocation_type: "invoice" | "excess" | "account";
+  invoice_id: string | null;
+  customer_name: string | null;
+  external_reference: string | null;
+  amount: number;
 }
 
 export interface CashReceiptVoucherLine {

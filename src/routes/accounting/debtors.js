@@ -158,12 +158,101 @@ export default function (pool, config) {
     }
   });
 
-  // GET /api/debtors/statement/:customerId - Get customer statement for a specific month
+  // ---------------------------------------------------------------------------
+  // Shared helpers (Phase 7): statements read the customer DEBTOR child ledger
+  // (posted journal lines) so invoices, receipts, CN/DN/RN and cash-bill
+  // settlements all appear, and historical statements never change when later
+  // receipts arrive. Openings use the anchor rule: latest anchor on/before the
+  // period start plus posted movement from the anchor to the start.
+  // ---------------------------------------------------------------------------
+
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const isoDate = (y, m, d) => `${y}-${pad2(m)}-${pad2(d)}`;
+
+  /** Resolve a customer's debtor child account code (same rule as debtorSync). */
+  const resolveChildCode = async (customerId) => {
+    const result = await pool.query(
+      `SELECT code FROM account_codes
+        WHERE parent_code = 'DEBTOR'
+          AND (code = $1 OR code LIKE $1 || '-D%')
+        ORDER BY (code = $1) DESC, code
+        LIMIT 1`,
+      [customerId]
+    );
+    return result.rows.length > 0 ? result.rows[0].code : null;
+  };
+
+  /** Anchor-rule opening balance of one child account at startStr (yyyy-MM-dd). */
+  const childOpeningBalance = async (childCode, startStr) => {
+    const anchorResult = await pool.query(
+      `SELECT to_char(as_of_date, 'YYYY-MM-DD') AS as_of_date, amount
+         FROM account_opening_balances
+        WHERE account_code = $1 AND as_of_date <= $2
+        ORDER BY as_of_date DESC LIMIT 1`,
+      [childCode, startStr]
+    );
+    const anchor = anchorResult.rows[0] || null;
+    const movementResult = await pool.query(
+      `SELECT COALESCE(SUM(jel.debit_amount - jel.credit_amount), 0) AS movement
+         FROM journal_entry_lines jel
+         JOIN journal_entries je ON je.id = jel.journal_entry_id
+        WHERE je.status = 'posted'
+          AND jel.account_code = $1
+          AND je.entry_date < $2
+          ${anchor ? "AND je.entry_date >= $3" : ""}`,
+      anchor ? [childCode, startStr, anchor.as_of_date] : [childCode, startStr]
+    );
+    return (
+      (anchor ? parseFloat(anchor.amount) || 0 : 0) +
+      (parseFloat(movementResult.rows[0].movement) || 0)
+    );
+  };
+
+  /**
+   * As-of-date invoice aging for one or all customers. Each open invoice's
+   * outstanding AS AT the period end = total − active receipts dated ≤ end
+   * − credit notes ≤ end + debit notes ≤ end (never today's mutable
+   * balance_due, so historical statements stay stable).
+   */
+  const agingSql = `
+    SELECT i.customerid,
+      COALESCE(SUM(CASE WHEN inv_date >= $2 THEN outstanding ELSE 0 END), 0) AS aging_current,
+      COALESCE(SUM(CASE WHEN inv_date >= ($2::date - INTERVAL '1 month') AND inv_date < $2 THEN outstanding ELSE 0 END), 0) AS aging_1_month,
+      COALESCE(SUM(CASE WHEN inv_date >= ($2::date - INTERVAL '2 months') AND inv_date < ($2::date - INTERVAL '1 month') THEN outstanding ELSE 0 END), 0) AS aging_2_months,
+      COALESCE(SUM(CASE WHEN inv_date < ($2::date - INTERVAL '2 months') THEN outstanding ELSE 0 END), 0) AS aging_3_plus
+    FROM (
+      SELECT i0.id, i0.customerid,
+             (to_timestamp(i0.createddate::bigint / 1000) AT TIME ZONE 'Asia/Kuala_Lumpur')::date AS inv_date,
+             i0.totalamountpayable
+             - COALESCE((SELECT SUM(p.amount_paid) FROM payments p
+                          WHERE p.invoice_id = i0.id
+                            AND (p.status IS NULL OR p.status = 'active')
+                            AND p.payment_date::date <= $3), 0)
+             - COALESCE((SELECT SUM(ad.totalamountpayable) FROM adjustment_documents ad
+                          WHERE ad.original_invoice_id = i0.id AND ad.type = 'credit_note'
+                            AND ad.status = 'active' AND COALESCE(ad.is_consolidated, false) = false
+                            AND (to_timestamp(ad.createddate::bigint / 1000) AT TIME ZONE 'Asia/Kuala_Lumpur')::date <= $3), 0)
+             + COALESCE((SELECT SUM(ad.totalamountpayable) FROM adjustment_documents ad
+                          WHERE ad.original_invoice_id = i0.id AND ad.type = 'debit_note'
+                            AND ad.status = 'active' AND COALESCE(ad.is_consolidated, false) = false
+                            AND (to_timestamp(ad.createddate::bigint / 1000) AT TIME ZONE 'Asia/Kuala_Lumpur')::date <= $3), 0)
+             AS outstanding
+        FROM invoices i0
+       WHERE i0.invoice_status <> 'cancelled'
+         AND COALESCE(i0.is_consolidated, false) = false
+         AND (to_timestamp(i0.createddate::bigint / 1000) AT TIME ZONE 'Asia/Kuala_Lumpur')::date <= $3
+         AND ($1::varchar IS NULL OR i0.customerid = $1)
+    ) i
+    WHERE i.outstanding > 0.01
+    GROUP BY i.customerid
+  `;
+
+  // GET /api/debtors/statement/:customerId - Customer statement for a month,
+  // built from the customer's debtor child ledger (posted journal lines).
   router.get("/statement/:customerId", async (req, res) => {
     const { customerId } = req.params;
     const { month, year } = req.query;
 
-    // Validate required parameters
     if (!month || !year) {
       return res.status(400).json({
         message: "Month and year are required query parameters",
@@ -180,208 +269,80 @@ export default function (pool, config) {
     }
 
     try {
-      // Calculate statement period dates
-      const startOfMonth = new Date(yearInt, monthInt - 1, 1);
-      const endOfMonth = new Date(yearInt, monthInt, 0); // Last day of month
-      const startOfMonthTs = startOfMonth.getTime();
-      const endOfMonthTs = new Date(yearInt, monthInt, 0, 23, 59, 59, 999).getTime();
+      const lastDay = new Date(yearInt, monthInt, 0).getDate();
+      const startStr = isoDate(yearInt, monthInt, 1);
+      const endStr = isoDate(yearInt, monthInt, lastDay);
+      const statementDate = `${pad2(lastDay)}/${pad2(monthInt)}/${yearInt}`;
 
-      // Format statement date (end of month)
-      const statementDate = endOfMonth.toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      });
-
-      // 1. Get customer details
-      const customerQuery = `
-        SELECT id, name, address, city, state, phone_number, email
-        FROM customers
-        WHERE id = $1
-      `;
-      const customerResult = await pool.query(customerQuery, [customerId]);
-
+      // 1. Customer details
+      const customerResult = await pool.query(
+        `SELECT id, name, address, city, state, phone_number, email
+           FROM customers WHERE id = $1`,
+        [customerId]
+      );
       if (customerResult.rows.length === 0) {
-        return res.status(404).json({
-          message: "Customer not found",
-        });
+        return res.status(404).json({ message: "Customer not found" });
       }
-
       const customer = customerResult.rows[0];
 
-      // 2. Get previous balance = true outstanding as at the start of the month
-      //    (all invoiced amounts before the month) - (all active payments before the month).
-      //    Using the residual balance_due here would double-count payments made during the
-      //    statement month against prior-month invoices, since those payments are also
-      //    subtracted as in-month credits below.
-      const previousBalanceQuery = `
-        SELECT
-          (SELECT COALESCE(SUM(totalamountpayable), 0)
-             FROM invoices
-             WHERE customerid = $1
-               AND createddate::bigint < $2)
-          -
-          (SELECT COALESCE(SUM(p.amount_paid), 0)
-             FROM payments p
-             JOIN invoices i ON p.invoice_id = i.id
-             WHERE i.customerid = $1
-               AND p.status NOT IN ('cancelled', 'pending')
-               AND p.payment_date < $3)
-          AS previous_balance
-      `;
-      const previousBalanceResult = await pool.query(previousBalanceQuery, [
-        customerId,
-        startOfMonthTs,
-        startOfMonth.toISOString(),
-      ]);
-      const previousBalance = parseFloat(
-        previousBalanceResult.rows[0]?.previous_balance || 0
-      );
+      const childCode = await resolveChildCode(customerId);
 
-      // 3. Get all invoices for this customer in the selected month (as DEBIT transactions)
-      const invoicesQuery = `
-        SELECT
-          id as invoice_id,
-          createddate,
-          totalamountpayable as amount,
-          balance_due
-        FROM invoices
-        WHERE customerid = $1
-          AND createddate::bigint >= $2
-          AND createddate::bigint <= $3
-        ORDER BY createddate::bigint ASC
-      `;
-      const invoicesResult = await pool.query(invoicesQuery, [
-        customerId,
-        startOfMonthTs,
-        endOfMonthTs,
-      ]);
+      // 2. Opening balance (anchor rule on the debtor child ledger)
+      const previousBalance = childCode
+        ? await childOpeningBalance(childCode, startStr)
+        : 0;
 
-      // 4. Get all payments for this customer's invoices in the selected month (as CREDIT transactions)
-      // Use date range that includes the full last day of the month
-      const endOfMonthEndOfDay = new Date(yearInt, monthInt, 0, 23, 59, 59, 999);
-      const paymentsQuery = `
-        SELECT
-          p.payment_id,
-          p.invoice_id,
-          p.payment_date,
-          p.amount_paid,
-          p.payment_reference
-        FROM payments p
-        JOIN invoices i ON p.invoice_id = i.id
-        WHERE i.customerid = $1
-          AND p.status NOT IN ('cancelled', 'pending')
-          AND p.payment_date >= $2
-          AND p.payment_date <= $3
-        ORDER BY p.payment_date ASC
-      `;
-      const paymentsResult = await pool.query(paymentsQuery, [
-        customerId,
-        startOfMonth.toISOString(),
-        endOfMonthEndOfDay.toISOString(),
-      ]);
-
-      // 5. Build transactions array with running balance
-      const transactions = [];
+      // 3. Transactions = posted journal lines on the child within the month
+      //    (invoices, receipts, CN/DN/RN, cash-bill settlements), ordered like
+      //    the Account Ledger.
+      let transactions = [];
       let runningBalance = previousBalance;
-
-      // Combine invoices and payments, then sort by date
-      const allTransactions = [];
-
-      // Add invoices (DEBIT)
-      for (const inv of invoicesResult.rows) {
-        const invoiceDate = new Date(parseInt(inv.createddate, 10));
-        allTransactions.push({
-          date: invoiceDate,
-          dateStr: invoiceDate.toLocaleDateString("en-GB", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-          }),
-          particulars: `INV/${inv.invoice_id}`,
-          type: "debit",
-          amount: parseFloat(inv.amount),
-          sortKey: invoiceDate.getTime(),
+      if (childCode) {
+        const txResult = await pool.query(
+          `SELECT je.entry_date,
+                  COALESCE(jel.display_reference, je.display_reference, je.reference_no) AS ref,
+                  jel.particulars,
+                  jel.debit_amount, jel.credit_amount
+             FROM journal_entry_lines jel
+             JOIN journal_entries je ON je.id = jel.journal_entry_id
+            WHERE je.status = 'posted'
+              AND jel.account_code = $1
+              AND je.entry_date >= $2 AND je.entry_date <= $3
+              AND (jel.debit_amount > 0 OR jel.credit_amount > 0)
+            ORDER BY je.entry_date,
+                     je.posting_sequence ASC NULLS LAST,
+                     COALESCE(jel.display_reference, je.display_reference, je.reference_no),
+                     je.id, jel.line_number`,
+          [childCode, startStr, endStr]
+        );
+        transactions = txResult.rows.map((row) => {
+          const debit = parseFloat(row.debit_amount) || 0;
+          const credit = parseFloat(row.credit_amount) || 0;
+          runningBalance += debit - credit;
+          const d =
+            row.entry_date instanceof Date
+              ? `${pad2(row.entry_date.getDate())}/${pad2(row.entry_date.getMonth() + 1)}/${row.entry_date.getFullYear()}`
+              : String(row.entry_date).slice(0, 10).split("-").reverse().join("/");
+          return {
+            date: d,
+            particulars: row.particulars || row.ref || "",
+            reference: row.ref,
+            type: debit > 0 ? "debit" : "credit",
+            amount: debit > 0 ? debit : credit,
+            running_balance: runningBalance,
+          };
         });
       }
 
-      // Add payments (CREDIT)
-      for (const pay of paymentsResult.rows) {
-        const paymentDate = new Date(pay.payment_date);
-        allTransactions.push({
-          date: paymentDate,
-          dateStr: paymentDate.toLocaleDateString("en-GB", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-          }),
-          particulars: `INV/NO : ${pay.invoice_id}/${customerId}`,
-          type: "credit",
-          amount: parseFloat(pay.amount_paid),
-          sortKey: paymentDate.getTime(),
-        });
-      }
-
-      // Sort by date
-      allTransactions.sort((a, b) => a.sortKey - b.sortKey);
-
-      // Calculate running balance
-      for (const txn of allTransactions) {
-        if (txn.type === "debit") {
-          runningBalance += txn.amount;
-        } else {
-          runningBalance -= txn.amount;
-        }
-        transactions.push({
-          date: txn.dateStr,
-          particulars: txn.particulars,
-          type: txn.type,
-          amount: txn.amount,
-          running_balance: runningBalance,
-        });
-      }
-
-      // 6. Calculate aging breakdown based on invoice creation date relative to selected month
-      // Aging is calculated on ALL unpaid invoices up to end of selected month
-      const agingQuery = `
-        SELECT
-          COALESCE(SUM(CASE
-            WHEN to_timestamp(createddate::bigint / 1000) >= $2
-                 AND to_timestamp(createddate::bigint / 1000) <= $3
-            THEN balance_due ELSE 0 END), 0) as current_month,
-          COALESCE(SUM(CASE
-            WHEN to_timestamp(createddate::bigint / 1000) >= ($2 - INTERVAL '1 month')
-                 AND to_timestamp(createddate::bigint / 1000) < $2
-            THEN balance_due ELSE 0 END), 0) as one_month,
-          COALESCE(SUM(CASE
-            WHEN to_timestamp(createddate::bigint / 1000) >= ($2 - INTERVAL '2 months')
-                 AND to_timestamp(createddate::bigint / 1000) < ($2 - INTERVAL '1 month')
-            THEN balance_due ELSE 0 END), 0) as two_months,
-          COALESCE(SUM(CASE
-            WHEN to_timestamp(createddate::bigint / 1000) < ($2 - INTERVAL '2 months')
-            THEN balance_due ELSE 0 END), 0) as three_months_plus
-        FROM invoices
-        WHERE customerid = $1
-          AND invoice_status IN ('Unpaid', 'Overdue')
-          AND balance_due > 0.01
-          AND createddate::bigint <= $4
-      `;
-      const agingResult = await pool.query(agingQuery, [
-        customerId,
-        startOfMonth,
-        endOfMonth,
-        endOfMonthTs,
-      ]);
-
+      // 4. Aging as at the period end (per-invoice as-of outstanding)
+      const agingResult = await pool.query(agingSql, [customerId, startStr, endStr]);
+      const agingRow = agingResult.rows[0] || {};
       const aging = {
-        current_month: parseFloat(agingResult.rows[0]?.current_month || 0),
-        one_month: parseFloat(agingResult.rows[0]?.one_month || 0),
-        two_months: parseFloat(agingResult.rows[0]?.two_months || 0),
-        three_months_plus: parseFloat(agingResult.rows[0]?.three_months_plus || 0),
+        current_month: parseFloat(agingRow.aging_current || 0),
+        one_month: parseFloat(agingRow.aging_1_month || 0),
+        two_months: parseFloat(agingRow.aging_2_months || 0),
+        three_months_plus: parseFloat(agingRow.aging_3_plus || 0),
       };
-
-      // Final total amount due is the running balance after all transactions
-      const totalAmountDue = runningBalance;
 
       res.json({
         customer: {
@@ -398,7 +359,7 @@ export default function (pool, config) {
         statement_year: yearInt,
         previous_balance: previousBalance,
         transactions,
-        total_amount_due: totalAmountDue,
+        total_amount_due: runningBalance,
         aging,
       });
     } catch (error) {
@@ -427,18 +388,12 @@ export default function (pool, config) {
     }
 
     try {
-      // Calculate statement period dates
-      const startOfMonth = new Date(yearInt, monthInt - 1, 1);
-      const endOfMonth = new Date(yearInt, monthInt, 0);
-      const startOfMonthTs = startOfMonth.getTime();
-      const endOfMonthTs = new Date(yearInt, monthInt, 0, 23, 59, 59, 999).getTime();
+      const lastDay = new Date(yearInt, monthInt, 0).getDate();
+      const startStr = isoDate(yearInt, monthInt, 1);
+      const endStr = isoDate(yearInt, monthInt, lastDay);
 
       // Format dates for display
-      const statementDate = endOfMonth.toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      });
+      const statementDate = `${pad2(lastDay)}/${pad2(monthInt)}/${yearInt}`;
       const reportDateTime = new Date().toLocaleString("en-GB", {
         day: "2-digit",
         month: "short",
@@ -449,91 +404,72 @@ export default function (pool, config) {
         hour12: false,
       });
 
-      // Get all customers with outstanding invoices up to end of selected month
+      // One bulk query over the customer DEBTOR child ledgers (no per-customer
+      // round-trips): BAL B/F = latest anchor on/before the period start plus
+      // posted movement from the anchor to the start; the period columns are
+      // the child's posted debits (invoices/DN) and credits (receipts/CN/
+      // cash-bill settlements); TOTAL DUE = B/F + debits − credits.
       const query = `
-        WITH customer_invoices AS (
-          SELECT
-            c.id as customer_id,
-            c.name as customer_name,
-            i.id as invoice_id,
-            i.createddate,
-            i.balance_due,
-            i.totalamountpayable
-          FROM customers c
-          JOIN invoices i ON c.id = i.customerid
-          WHERE i.invoice_status IN ('Unpaid', 'Overdue')
-            AND i.balance_due > 0.01
-            AND i.createddate::bigint <= $1
+        WITH children AS (
+          -- One customer per child: the exact id match wins over the -D
+          -- fallback pattern (customers literally named "X-D" exist).
+          SELECT DISTINCT ON (ac.code)
+                 ac.code AS child_code, c.id AS customer_id, c.name AS customer_name
+            FROM account_codes ac
+            JOIN customers c
+              ON ac.code = c.id OR ac.code LIKE c.id || '-D%'
+           WHERE ac.parent_code = 'DEBTOR'
+           ORDER BY ac.code, (ac.code = c.id) DESC
         ),
-        customer_payments AS (
-          SELECT
-            c.id as customer_id,
-            COALESCE(SUM(p.amount_paid), 0) as monthly_payment
-          FROM customers c
-          JOIN invoices i ON c.id = i.customerid
-          JOIN payments p ON i.id = p.invoice_id
-          WHERE p.status NOT IN ('cancelled', 'pending')
-            AND p.payment_date >= $2
-            AND p.payment_date <= $3
-          GROUP BY c.id
+        anchors AS (
+          SELECT DISTINCT ON (aob.account_code)
+                 aob.account_code, aob.amount,
+                 to_char(aob.as_of_date, 'YYYY-MM-DD') AS as_of_date
+            FROM account_opening_balances aob
+            JOIN children ch ON ch.child_code = aob.account_code
+           WHERE aob.as_of_date <= $1
+           ORDER BY aob.account_code, aob.as_of_date DESC
         ),
-        customer_summary AS (
-          SELECT
-            ci.customer_id,
-            ci.customer_name,
-            -- Balance B/F: invoices before selected month
-            COALESCE(SUM(CASE
-              WHEN ci.createddate::bigint < $4
-              THEN ci.balance_due ELSE 0 END), 0) as bal_bf,
-            -- Current month invoices
-            COALESCE(SUM(CASE
-              WHEN ci.createddate::bigint >= $4 AND ci.createddate::bigint <= $1
-              THEN ci.totalamountpayable ELSE 0 END), 0) as current_invoices,
-            -- Total due (sum of all outstanding)
-            COALESCE(SUM(ci.balance_due), 0) as total_due,
-            -- Aging breakdown based on invoice creation date
-            COALESCE(SUM(CASE
-              WHEN to_timestamp(ci.createddate::bigint / 1000) >= $5
-                   AND to_timestamp(ci.createddate::bigint / 1000) <= $6
-              THEN ci.balance_due ELSE 0 END), 0) as aging_current,
-            COALESCE(SUM(CASE
-              WHEN to_timestamp(ci.createddate::bigint / 1000) >= ($5 - INTERVAL '1 month')
-                   AND to_timestamp(ci.createddate::bigint / 1000) < $5
-              THEN ci.balance_due ELSE 0 END), 0) as aging_1_month,
-            COALESCE(SUM(CASE
-              WHEN to_timestamp(ci.createddate::bigint / 1000) >= ($5 - INTERVAL '2 months')
-                   AND to_timestamp(ci.createddate::bigint / 1000) < ($5 - INTERVAL '1 month')
-              THEN ci.balance_due ELSE 0 END), 0) as aging_2_months,
-            COALESCE(SUM(CASE
-              WHEN to_timestamp(ci.createddate::bigint / 1000) < ($5 - INTERVAL '2 months')
-              THEN ci.balance_due ELSE 0 END), 0) as aging_3_plus
-          FROM customer_invoices ci
-          GROUP BY ci.customer_id, ci.customer_name
+        movement AS (
+          SELECT jel.account_code,
+                 SUM(CASE WHEN je.entry_date < $1
+                            AND (a.as_of_date IS NULL OR je.entry_date >= a.as_of_date::date)
+                          THEN jel.debit_amount - jel.credit_amount ELSE 0 END) AS pre_movement,
+                 SUM(CASE WHEN je.entry_date >= $1 AND je.entry_date <= $2
+                          THEN jel.debit_amount ELSE 0 END) AS period_debits,
+                 SUM(CASE WHEN je.entry_date >= $1 AND je.entry_date <= $2
+                          THEN jel.credit_amount ELSE 0 END) AS period_credits
+            FROM journal_entry_lines jel
+            JOIN journal_entries je ON je.id = jel.journal_entry_id
+            JOIN children ch ON ch.child_code = jel.account_code
+            LEFT JOIN anchors a ON a.account_code = jel.account_code
+           WHERE je.status = 'posted' AND je.entry_date <= $2
+           GROUP BY jel.account_code
         )
-        SELECT
-          cs.customer_id,
-          cs.customer_name,
-          cs.bal_bf,
-          cs.current_invoices,
-          COALESCE(cp.monthly_payment, 0) as payment,
-          cs.total_due,
-          cs.aging_current,
-          cs.aging_1_month,
-          cs.aging_2_months,
-          cs.aging_3_plus
-        FROM customer_summary cs
-        LEFT JOIN customer_payments cp ON cs.customer_id = cp.customer_id
-        ORDER BY cs.customer_id ASC
+        SELECT ch.customer_id,
+               ch.customer_name,
+               (COALESCE(a.amount, 0) + COALESCE(m.pre_movement, 0))::numeric(14,2) AS bal_bf,
+               COALESCE(m.period_debits, 0)::numeric(14,2) AS current_invoices,
+               COALESCE(m.period_credits, 0)::numeric(14,2) AS payment,
+               (COALESCE(a.amount, 0) + COALESCE(m.pre_movement, 0)
+                + COALESCE(m.period_debits, 0) - COALESCE(m.period_credits, 0))::numeric(14,2) AS total_due
+          FROM children ch
+          LEFT JOIN anchors a ON a.account_code = ch.child_code
+          LEFT JOIN movement m ON m.account_code = ch.child_code
+         WHERE ABS(COALESCE(a.amount, 0) + COALESCE(m.pre_movement, 0)) > 0.005
+            OR COALESCE(m.period_debits, 0) > 0.005
+            OR COALESCE(m.period_credits, 0) > 0.005
+         ORDER BY ch.customer_id ASC
       `;
+      const result = await pool.query(query, [startStr, endStr]);
 
-      const result = await pool.query(query, [
-        endOfMonthTs,                    // $1 - end of selected month (timestamp)
-        startOfMonth.toISOString(),      // $2 - start of month for payments
-        new Date(yearInt, monthInt, 0, 23, 59, 59, 999).toISOString(), // $3 - end of month for payments
-        startOfMonthTs,                  // $4 - start of selected month (timestamp)
-        startOfMonth,                    // $5 - start of month (date for aging)
-        endOfMonth,                      // $6 - end of month (date for aging)
-      ]);
+      // As-of aging for all customers in one pass (per-invoice outstanding at
+      // the period end; never today's mutable balance_due).
+      const agingResult = await pool.query(agingSql, [null, startStr, endStr]);
+      const agingByCustomer = {};
+      for (const row of agingResult.rows) {
+        agingByCustomer[row.customerid] = row;
+      }
 
       // Process results and calculate totals
       let totals = {
@@ -548,6 +484,7 @@ export default function (pool, config) {
       };
 
       const customers = result.rows.map((row) => {
+        const aging = agingByCustomer[row.customer_id] || {};
         const customer = {
           account_no: row.customer_id,
           particular: row.customer_name || "UNNAMED",
@@ -555,10 +492,10 @@ export default function (pool, config) {
           current_invoices: parseFloat(row.current_invoices) || 0,
           payment: parseFloat(row.payment) || 0,
           total_due: parseFloat(row.total_due) || 0,
-          aging_current: parseFloat(row.aging_current) || 0,
-          aging_1_month: parseFloat(row.aging_1_month) || 0,
-          aging_2_months: parseFloat(row.aging_2_months) || 0,
-          aging_3_plus: parseFloat(row.aging_3_plus) || 0,
+          aging_current: parseFloat(aging.aging_current) || 0,
+          aging_1_month: parseFloat(aging.aging_1_month) || 0,
+          aging_2_months: parseFloat(aging.aging_2_months) || 0,
+          aging_3_plus: parseFloat(aging.aging_3_plus) || 0,
         };
 
         // Accumulate totals

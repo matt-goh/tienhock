@@ -49,6 +49,12 @@ const unwrapAccountCodesResponse = (
   return Array.isArray(response) ? response : response.data;
 };
 
+// Shared across every mounted instance of useAccountCodesCache, so a page and
+// a child component (e.g. AccountCodeCombobox) that both mount at once and
+// both find a cold cache await the SAME network request instead of each
+// firing their own /api/account-codes call.
+let accountCodesInFlight: Promise<AccountCode[]> | null = null;
+
 /**
  * Refresh account codes cache globally
  */
@@ -110,14 +116,24 @@ export const useAccountCodesCache = () => {
         }
       }
 
-      const response = await api.get("/api/account-codes?flat=true") as AccountCodesResponse;
-      const data = unwrapAccountCodesResponse(response);
-
-      const cacheData: AccountCodesCache = {
-        data,
-        timestamp: Date.now(),
-      };
-      localStorage.setItem(CACHE_KEYS.ACCOUNT_CODES, JSON.stringify(cacheData));
+      if (!accountCodesInFlight) {
+        accountCodesInFlight = (
+          api.get("/api/account-codes?flat=true") as Promise<AccountCodesResponse>
+        )
+          .then((response) => {
+            const data = unwrapAccountCodesResponse(response);
+            const cacheData: AccountCodesCache = { data, timestamp: Date.now() };
+            localStorage.setItem(
+              CACHE_KEYS.ACCOUNT_CODES,
+              JSON.stringify(cacheData)
+            );
+            return data;
+          })
+          .finally(() => {
+            accountCodesInFlight = null;
+          });
+      }
+      const data = await accountCodesInFlight;
 
       setAccountCodes(data);
       setError(null);
@@ -176,6 +192,9 @@ interface LedgerTypesCache {
   data: LedgerType[];
   timestamp: number;
 }
+
+// See accountCodesInFlight above — same de-dup for simultaneous hook mounts.
+let ledgerTypesInFlight: Promise<LedgerType[]> | null = null;
 
 /**
  * Refresh ledger types cache globally
@@ -237,13 +256,23 @@ export const useLedgerTypesCache = () => {
         }
       }
 
-      const data = await api.get("/api/ledger-types") as LedgerType[];
-
-      const cacheData: LedgerTypesCache = {
-        data,
-        timestamp: Date.now(),
-      };
-      localStorage.setItem(CACHE_KEYS.LEDGER_TYPES, JSON.stringify(cacheData));
+      if (!ledgerTypesInFlight) {
+        ledgerTypesInFlight = (
+          api.get("/api/ledger-types") as Promise<LedgerType[]>
+        )
+          .then((data) => {
+            const cacheData: LedgerTypesCache = { data, timestamp: Date.now() };
+            localStorage.setItem(
+              CACHE_KEYS.LEDGER_TYPES,
+              JSON.stringify(cacheData)
+            );
+            return data;
+          })
+          .finally(() => {
+            ledgerTypesInFlight = null;
+          });
+      }
+      const data = await ledgerTypesInFlight;
 
       setLedgerTypes(data);
       setError(null);
@@ -302,6 +331,9 @@ interface JournalEntryTypesCache {
   data: JournalEntryTypeInfo[];
   timestamp: number;
 }
+
+// See accountCodesInFlight above — same de-dup for simultaneous hook mounts.
+let journalEntryTypesInFlight: Promise<JournalEntryTypeInfo[]> | null = null;
 
 /**
  * Refresh journal entry types cache globally
@@ -363,13 +395,23 @@ export const useJournalEntryTypesCache = () => {
         }
       }
 
-      const data = await api.get("/api/journal-entries/types") as JournalEntryTypeInfo[];
-
-      const cacheData: JournalEntryTypesCache = {
-        data,
-        timestamp: Date.now(),
-      };
-      localStorage.setItem(CACHE_KEYS.JOURNAL_ENTRY_TYPES, JSON.stringify(cacheData));
+      if (!journalEntryTypesInFlight) {
+        journalEntryTypesInFlight = (
+          api.get("/api/journal-entries/types") as Promise<JournalEntryTypeInfo[]>
+        )
+          .then((data) => {
+            const cacheData: JournalEntryTypesCache = { data, timestamp: Date.now() };
+            localStorage.setItem(
+              CACHE_KEYS.JOURNAL_ENTRY_TYPES,
+              JSON.stringify(cacheData)
+            );
+            return data;
+          })
+          .finally(() => {
+            journalEntryTypesInFlight = null;
+          });
+      }
+      const data = await journalEntryTypesInFlight;
 
       setEntryTypes(data);
       setError(null);

@@ -1,6 +1,8 @@
 # Accounting System — Progress & Handoff
 
-**Status date: 8 Jul 2026.** Verified against the repo (`src/routes/accounting/`, `src/pages/Accounting/`) and the dev DB on this date. This is the single entry-point document for any agent continuing accounting work. Read this first, then [ACCOUNTING_GAP_ANALYSIS.md](ACCOUNTING_GAP_ANALYSIS.md) for the full gap catalogue and the bank-statement manual-entry mapping guide.
+**Status date: 8 Jul 2026 — PARTIALLY SUPERSEDED 10–12 Jul 2026.** The Sales Invoice / Payment / Receipt / Bank-In / Debtor refactor (Phases 0–8) replaced the receipt and sales-journal model described below: receipts are now header+allocation `receipts`/`receipt_allocations` rows owning one journal each, cash bank-ins are structured `bank_ins` with a shared `RV###/MM` registry, CNs debit the original revenue ledger, all receivable lines post to per-customer DEBTOR child accounts, the Account Ledger supports arbitrary date ranges with legacy-visible Journal/Cheque columns and legacy print order, and the June 2026 five-ledger row-by-row reconciliation passed. **Read [INVOICE_PAYMENT_ACCOUNTING_PROGRESS.md](INVOICE_PAYMENT_ACCOUNTING_PROGRESS.md) FIRST for everything receipt/bank/debtor related** — the S/REC rows in §1 below and the §3 bank tie-out narrative describe the pre-refactor system. The rest of this file (JVDR/JVSL, purchases, payroll payments, fs_note bridge, statement gaps 1A-*) remains current.
+
+Verified against the repo (`src/routes/accounting/`, `src/pages/Accounting/`) and the dev DB. This is the entry-point document for accounting work outside the receipt refactor; see [ACCOUNTING_GAP_ANALYSIS.md](ACCOUNTING_GAP_ANALYSIS.md) for the full gap catalogue.
 
 ---
 
