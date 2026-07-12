@@ -42,6 +42,47 @@ export default function (pool) {
     return map;
   }
 
+  /**
+   * Sum posted journal purchase amounts (debit - credit) for accounts mapped
+   * to material stock records via material_account_mappings.
+   * Returns rows shaped like the purchase_invoice_lines aggregates:
+   * { material_id, variant_id, custom_description: null, quantity: 0, value }.
+   * Journal lines carry no quantity, so these contribute value only.
+   */
+  async function getJournalPurchaseRows(productLine, { before, from, to }) {
+    const conditions = ["je.status = 'posted'", "mam.is_active = true", "mam.product_line = $1"];
+    const params = [productLine];
+
+    if (before) {
+      params.push(before);
+      conditions.push(`je.entry_date < $${params.length}`);
+    }
+    if (from) {
+      params.push(from);
+      conditions.push(`je.entry_date >= $${params.length}`);
+    }
+    if (to) {
+      params.push(to);
+      conditions.push(`je.entry_date < $${params.length}`);
+    }
+
+    const result = await pool.query(
+      `
+        SELECT
+          mam.material_id, mam.variant_id, NULL::text as custom_description,
+          0 as quantity,
+          SUM(jel.debit_amount - jel.credit_amount) as value
+        FROM journal_entry_lines jel
+        JOIN journal_entries je ON je.id = jel.journal_entry_id
+        JOIN material_account_mappings mam ON mam.account_code = jel.account_code
+        WHERE ${conditions.join(" AND ")}
+        GROUP BY mam.material_id, mam.variant_id
+      `,
+      params
+    );
+    return result.rows;
+  }
+
   // ==================== MATERIALS CRUD ====================
 
   // GET / - Get all materials with optional filters
@@ -115,6 +156,190 @@ export default function (pool) {
         message: "Error fetching material categories",
         error: error.message,
       });
+    }
+  });
+
+  // ==================== ACCOUNT MAPPINGS ====================
+  // Maps journal account codes (PUR/PM children like PU_BBER, PM_BPMS) to
+  // material stock records so journal-keyed purchases feed the Material Stock page.
+  // NOTE: These routes MUST be defined BEFORE /:id to prevent route conflicts
+
+  // GET /account-mappings - Candidate purchase accounts with their current mappings
+  router.get("/account-mappings", async (req, res) => {
+    try {
+      const query = `
+        WITH RECURSIVE purchase_accounts AS (
+          SELECT code, description FROM account_codes WHERE code IN ('PUR', 'PM')
+          UNION ALL
+          SELECT ac.code, ac.description
+          FROM account_codes ac
+          JOIN purchase_accounts pa ON ac.parent_code = pa.code
+        ),
+        candidates AS (
+          SELECT code, description FROM purchase_accounts
+          UNION
+          SELECT ac.code, ac.description
+          FROM account_codes ac
+          WHERE ac.ledger_type = 'GL'
+            AND ac.code IN (
+              SELECT DISTINCT jel.account_code
+              FROM journal_entry_lines jel
+              JOIN journal_entries je ON je.id = jel.journal_entry_id
+              WHERE je.entry_type = 'PUR' AND je.status = 'posted'
+                AND jel.debit_amount > 0
+            )
+          UNION
+          SELECT ac.code, ac.description
+          FROM account_codes ac
+          JOIN material_account_mappings mam ON mam.account_code = ac.code
+        )
+        SELECT
+          c.code, c.description,
+          mam.id as mapping_id, mam.material_id, mam.variant_id,
+          mam.product_line, mam.is_active,
+          m.code as material_code, m.name as material_name, m.applies_to,
+          mv.variant_name,
+          COALESCE(act.total_amount, 0) as total_amount,
+          COALESCE(act.line_count, 0) as line_count,
+          act.last_entry_date
+        FROM candidates c
+        LEFT JOIN material_account_mappings mam ON mam.account_code = c.code
+        LEFT JOIN materials m ON m.id = mam.material_id
+        LEFT JOIN material_variants mv ON mv.id = mam.variant_id
+        LEFT JOIN LATERAL (
+          SELECT
+            SUM(jel.debit_amount - jel.credit_amount) as total_amount,
+            COUNT(*) as line_count,
+            MAX(je.entry_date) as last_entry_date
+          FROM journal_entry_lines jel
+          JOIN journal_entries je ON je.id = jel.journal_entry_id
+          WHERE jel.account_code = c.code AND je.status = 'posted'
+        ) act ON true
+        ORDER BY c.code
+      `;
+      const result = await pool.query(query);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching material account mappings:", error);
+      res.status(500).json({
+        message: "Error fetching material account mappings",
+        error: error.message,
+      });
+    }
+  });
+
+  // POST /account-mappings/batch - Upsert/delete account-to-material mappings
+  router.post("/account-mappings/batch", async (req, res) => {
+    const { mappings } = req.body;
+
+    if (!Array.isArray(mappings)) {
+      return res.status(400).json({ message: "mappings must be an array" });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      let upserted = 0;
+      let deleted = 0;
+
+      for (const mapping of mappings) {
+        const accountCode = mapping.account_code?.trim();
+        if (!accountCode) continue;
+
+        const materialId = mapping.material_id
+          ? parseInt(mapping.material_id)
+          : null;
+
+        // No material selected = remove the mapping for this account
+        if (!materialId) {
+          const deleteResult = await client.query(
+            "DELETE FROM material_account_mappings WHERE account_code = $1",
+            [accountCode]
+          );
+          if (deleteResult.rowCount > 0) deleted++;
+          continue;
+        }
+
+        const variantId = mapping.variant_id ? parseInt(mapping.variant_id) : null;
+        const productLine = mapping.product_line;
+
+        if (!validStockBuckets.has(productLine)) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({
+            message: `Stock bucket for '${accountCode}' must be one of: mee, bihun, shared`,
+          });
+        }
+
+        const matResult = await client.query(
+          "SELECT id, name, applies_to FROM materials WHERE id = $1",
+          [materialId]
+        );
+        if (matResult.rows.length === 0) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({
+            message: `Material '${materialId}' for account '${accountCode}' does not exist`,
+          });
+        }
+
+        const appliesTo = matResult.rows[0].applies_to;
+        const bucketCompatible =
+          productLine === "shared"
+            ? appliesTo === "both"
+            : appliesTo === productLine || appliesTo === "both";
+        if (!bucketCompatible) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({
+            message: `Material '${matResult.rows[0].name}' cannot be assigned to stock bucket '${productLine}'`,
+          });
+        }
+
+        if (variantId) {
+          const variantResult = await client.query(
+            "SELECT id FROM material_variants WHERE id = $1 AND material_id = $2",
+            [variantId, materialId]
+          );
+          if (variantResult.rows.length === 0) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+              message: `Variant '${variantId}' does not belong to material '${materialId}'`,
+            });
+          }
+        }
+
+        await client.query(
+          `
+            INSERT INTO material_account_mappings (
+              account_code, material_id, variant_id, product_line, is_active, created_by
+            ) VALUES ($1, $2, $3, $4, true, $5)
+            ON CONFLICT (account_code)
+            DO UPDATE SET
+              material_id = EXCLUDED.material_id,
+              variant_id = EXCLUDED.variant_id,
+              product_line = EXCLUDED.product_line,
+              is_active = true,
+              updated_at = CURRENT_TIMESTAMP
+          `,
+          [accountCode, materialId, variantId, productLine, req.staffId || null]
+        );
+        upserted++;
+      }
+
+      await client.query("COMMIT");
+      res.json({
+        message: "Account mappings saved successfully",
+        upserted,
+        deleted,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error saving material account mappings:", error);
+      res.status(500).json({
+        message: "Error saving material account mappings",
+        error: error.message,
+      });
+    } finally {
+      client.release();
     }
   });
 
@@ -211,9 +436,21 @@ export default function (pool) {
         [product_line, currentYear, currentMonth]
       );
 
+      const journalPurchaseRows = (
+        await getJournalPurchaseRows(product_line, { before: periodStart })
+      ).map((row) => ({
+        ...row,
+        opening_quantity: 0,
+        opening_value: row.value,
+      }));
+
       res.json({
         period: { year: currentYear, month: currentMonth },
-        opening_balances: [...purchasesResult.rows, ...adjustmentsResult.rows],
+        opening_balances: [
+          ...purchasesResult.rows,
+          ...adjustmentsResult.rows,
+          ...journalPurchaseRows,
+        ],
       });
     } catch (error) {
       console.error("Error fetching opening balances:", error);
@@ -315,6 +552,15 @@ export default function (pool) {
         [periodStart, nextPeriodStart, product_line]
       );
 
+      const openingJournalPurchases = await getJournalPurchaseRows(product_line, {
+        before: periodStart,
+      });
+
+      const currentJournalPurchases = await getJournalPurchaseRows(product_line, {
+        from: periodStart,
+        to: nextPeriodStart,
+      });
+
       const openingAdjustments = await pool.query(
         `
           SELECT
@@ -339,8 +585,16 @@ export default function (pool) {
         [currentYear, currentMonth, product_line]
       );
 
-      const openingPurchaseMap = accumulateRows(openingPurchases.rows, "quantity", "value");
-      const currentPurchaseMap = accumulateRows(currentPurchases.rows, "quantity", "value");
+      const openingPurchaseMap = accumulateRows(
+        [...openingPurchases.rows, ...openingJournalPurchases],
+        "quantity",
+        "value"
+      );
+      const currentPurchaseMap = accumulateRows(
+        [...currentPurchases.rows, ...currentJournalPurchases],
+        "quantity",
+        "value"
+      );
       const openingAdjustmentMap = accumulateRows(openingAdjustments.rows, "quantity", "value");
       const currentAdjustmentMap = new Map();
       currentAdjustments.rows.forEach((row) => {

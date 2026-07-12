@@ -31,6 +31,28 @@ export default function (pool) {
     return { valid: true, year: yearNum, month: monthNum };
   };
 
+  // Resolve each account's effective FS note: its own fs_note, or the nearest
+  // ancestor's (walking parent_code). Lets journal lines posted to child
+  // accounts (e.g. PU_BBER under PUR) roll up into the parent's Income
+  // Statement / Balance Sheet / COGM note without assigning a note per child.
+  // Interpolate as the leading CTEs of a WITH RECURSIVE query.
+  const EFFECTIVE_FS_NOTES_CTES = `
+        note_walk AS (
+          SELECT code AS origin, parent_code, fs_note, 0 AS depth
+          FROM account_codes
+          UNION ALL
+          SELECT w.origin, p.parent_code, p.fs_note, w.depth + 1
+          FROM note_walk w
+          JOIN account_codes p ON p.code = w.parent_code
+          WHERE w.fs_note IS NULL
+        ),
+        effective_fs_notes AS (
+          SELECT DISTINCT ON (origin) origin AS code, fs_note
+          FROM note_walk
+          WHERE fs_note IS NOT NULL
+          ORDER BY origin, depth
+        )`;
+
   // ==================== INVOICE-BASED CALCULATIONS ====================
 
   /**
@@ -572,20 +594,20 @@ export default function (pool) {
       const { startStr: periodStartStr, endStr: periodEndStr, endTs: periodEndTs } =
         getYtdPeriod(validation.year, validation.month);
 
-      // Get balances grouped by fs_note for the YTD period
+      // Get balances grouped by effective fs_note for the YTD period
       const query = `
-        WITH period_balances AS (
+        WITH RECURSIVE ${EFFECTIVE_FS_NOTES_CTES},
+        period_balances AS (
           SELECT
-            ac.fs_note,
+            efn.fs_note,
             SUM(COALESCE(jel.debit_amount, 0)) as total_debit,
             SUM(COALESCE(jel.credit_amount, 0)) as total_credit
           FROM journal_entry_lines jel
           JOIN journal_entries je ON jel.journal_entry_id = je.id
-          JOIN account_codes ac ON jel.account_code = ac.code
+          JOIN effective_fs_notes efn ON jel.account_code = efn.code
           WHERE je.status = 'posted'
             AND je.entry_date BETWEEN $1 AND $2
-            AND ac.fs_note IS NOT NULL
-          GROUP BY ac.fs_note
+          GROUP BY efn.fs_note
         )
         SELECT
           fsn.code,
@@ -700,21 +722,21 @@ export default function (pool) {
       const { startStr: periodStartStr, endStr: periodEndStr, endTs: periodEndTs } =
         getYtdPeriod(validation.year, validation.month);
 
-      // Get YTD balances grouped by fs_note
+      // Get YTD balances grouped by effective fs_note
       const query = `
-        WITH ytd_balances AS (
+        WITH RECURSIVE ${EFFECTIVE_FS_NOTES_CTES},
+        ytd_balances AS (
           SELECT
-            ac.fs_note,
+            efn.fs_note,
             SUM(COALESCE(jel.debit_amount, 0)) as total_debit,
             SUM(COALESCE(jel.credit_amount, 0)) as total_credit
           FROM journal_entry_lines jel
           JOIN journal_entries je ON jel.journal_entry_id = je.id
-          JOIN account_codes ac ON jel.account_code = ac.code
+          JOIN effective_fs_notes efn ON jel.account_code = efn.code
           WHERE je.status = 'posted'
             AND je.entry_date >= $1
             AND je.entry_date <= $2
-            AND ac.fs_note IS NOT NULL
-          GROUP BY ac.fs_note
+          GROUP BY efn.fs_note
         )
         SELECT
           fsn.code,
@@ -856,20 +878,20 @@ export default function (pool) {
       const { startStr: periodStartStr, endStr: periodEndStr } =
         getYtdPeriod(validation.year, validation.month);
 
-      // Get COGM-related balances
+      // Get COGM-related balances grouped by effective fs_note
       const query = `
-        WITH period_balances AS (
+        WITH RECURSIVE ${EFFECTIVE_FS_NOTES_CTES},
+        period_balances AS (
           SELECT
-            ac.fs_note,
+            efn.fs_note,
             SUM(COALESCE(jel.debit_amount, 0)) as total_debit,
             SUM(COALESCE(jel.credit_amount, 0)) as total_credit
           FROM journal_entry_lines jel
           JOIN journal_entries je ON jel.journal_entry_id = je.id
-          JOIN account_codes ac ON jel.account_code = ac.code
+          JOIN effective_fs_notes efn ON jel.account_code = efn.code
           WHERE je.status = 'posted'
             AND je.entry_date BETWEEN $1 AND $2
-            AND ac.fs_note IS NOT NULL
-          GROUP BY ac.fs_note
+          GROUP BY efn.fs_note
         )
         SELECT
           fsn.code,
