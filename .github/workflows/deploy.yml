@@ -51,6 +51,7 @@ jobs:
           scp -i ~/.ssh/deploy_key /tmp/.env ${{ secrets.HETZNER_USERNAME }}@${{ secrets.HETZNER_HOST }}:~/tienhock-app/.env
 
           ssh -i ~/.ssh/deploy_key ${{ secrets.HETZNER_USERNAME }}@${{ secrets.HETZNER_HOST }} << 'EOF'
+            set -euo pipefail
             cd ~/tienhock-app
 
             # Stash any local changes (package-lock.json, etc.) to prevent pull conflicts
@@ -59,6 +60,14 @@ jobs:
             # Pull latest changes
             git checkout production
             git pull origin production
+
+            # Install, validate, and reload the Git-tracked system Nginx site.
+            # Requires the one-time bootstrap documented in prod/server/README.md.
+            if [[ ! -x /usr/local/sbin/deploy-tienhock-nginx ]]; then
+              echo "Missing Nginx deployment helper; follow prod/server/README.md" >&2
+              exit 1
+            fi
+            sudo -n /usr/local/sbin/deploy-tienhock-nginx
 
             # Install dependencies
             npm install --legacy-peer-deps

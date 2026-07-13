@@ -1,0 +1,2 @@
+Cmnd_Alias TIENHOCK_NGINX_DEPLOY = /usr/local/sbin/deploy-tienhock-nginx
+tienhock ALL=(root) NOPASSWD: TIENHOCK_NGINX_DEPLOY
