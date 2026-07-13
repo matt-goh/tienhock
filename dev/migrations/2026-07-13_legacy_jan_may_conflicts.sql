@@ -18,6 +18,49 @@
 
 BEGIN;
 
+-- Pin the complete account-code input before identifier or journal changes.
+-- The accepted states are the audited production snapshot, the normalized
+-- pre-remap state, and the fully remapped rerun state. A newly added account or
+-- manual fs_note change must be reviewed and re-pinned instead of being swept
+-- into the broad financial-statement remap later in the rollout.
+DO $account_preflight$
+DECLARE
+  v_count integer;
+  v_structure_fingerprint text;
+  v_mapping_fingerprint text;
+BEGIN
+  SELECT COUNT(*),
+         MD5(STRING_AGG(
+           FORMAT('%s|%s', code, COALESCE(ledger_type, '<null>')),
+           E'\n' ORDER BY code COLLATE "C"
+         )),
+         MD5(STRING_AGG(
+           FORMAT('%s|%s|%s', code, COALESCE(ledger_type, '<null>'),
+                  COALESCE(fs_note, '<null>')),
+           E'\n' ORDER BY code COLLATE "C"
+         ))
+    INTO v_count, v_structure_fingerprint, v_mapping_fingerprint
+    FROM account_codes;
+
+  IF NOT (
+    (v_count = 2811
+      AND v_structure_fingerprint = '798ca9081b9e4cce514d3488122fb0d3'
+      AND v_mapping_fingerprint = '465d3404d38f2bbfa2bfab9e5b96e054')
+    OR
+    (v_count = 2814
+      AND v_structure_fingerprint = '6acd9b84d895e578e770b816978d3400'
+      AND v_mapping_fingerprint IN (
+        'ac5804a0c6db188396d65fc94eaaacd3',
+        'b18746387b17147d8d81e76ec0dc62be'
+      ))
+  ) THEN
+    RAISE EXCEPTION
+      'Account-code state drifted: count %, structure %, mappings %',
+      v_count, v_structure_fingerprint, v_mapping_fingerprint;
+  END IF;
+END
+$account_preflight$;
+
 -- -----------------------------------------------------------------------------
 -- A. Customer primary-key normalization: AMY[space] -> AMY,
 --    STELLA[space] -> STELLA. The referenced rows are copied first because the
@@ -89,7 +132,7 @@ BEGIN
         ('HPA_SWJ988'::varchar, 'HPA_SWJ9882'::varchar,
          'TOYOTA HILUX DOUBLE CAB (SWJ9882)'::varchar, '16'::varchar),
         ('HPB_SWJ988'::varchar, 'HPB_SWJ9882'::varchar,
-         'TOYOTA HILUX DOUBLE CAB (SWJ9882)'::varchar, '23'::varchar)
+         'TOYOTA HILUX DOUBLE CAB (SWJ9882)'::varchar, '16'::varchar)
       ) AS renames(old_code, new_code, new_description, new_fs_note)
   LOOP
     SELECT EXISTS (SELECT 1 FROM account_codes WHERE code = r.old_code),
@@ -215,14 +258,173 @@ BEGIN
   END IF;
 END $$;
 
-UPDATE journal_entries
-   SET status = 'cancelled',
-       updated_at = NOW(),
-       updated_by = 'migration'
- WHERE entry_type = 'REC'
-   AND status = 'posted'
-   AND source_type = 'payment'
-   AND entry_date BETWEEN DATE '2026-01-01' AND DATE '2026-05-31';
+DO $$
+DECLARE
+  v_count integer;
+  v_total numeric;
+  v_fingerprint text;
+  v_posted_count integer;
+  v_posted_total numeric;
+  v_posted_fingerprint text;
+  v_expected_fingerprint constant text := 'fdd1ef35cdcdf153ea826ce60f7376bb';
+BEGIN
+  -- Normal rerun state: the exact audited population already carries the
+  -- import-specific marker and no newly posted payment REC has appeared.
+  SELECT COUNT(*), COALESCE(SUM(je.total_debit), 0),
+         MD5(STRING_AGG(
+           CONCAT_WS('|', je.id, je.reference_no, je.entry_date,
+                     je.total_debit, je.total_credit, je.source_type,
+                     je.source_id, p.payment_id),
+           E'\n' ORDER BY je.id
+         ))
+    INTO v_count, v_total, v_fingerprint
+    FROM journal_entries je
+    JOIN payments p
+      ON p.payment_id::text = je.source_id
+     AND p.journal_entry_id = je.id
+   WHERE je.entry_type = 'REC'
+     AND je.status = 'cancelled'
+     AND je.updated_by = 'legacy_jan_may_import'
+     AND je.entry_date BETWEEN DATE '2026-01-01' AND DATE '2026-05-31';
+
+  IF v_count > 0 THEN
+    IF (v_count, v_total, v_fingerprint) IS DISTINCT FROM
+       (2074, 3259534.63::numeric, v_expected_fingerprint) THEN
+      RAISE EXCEPTION 'Marked Jan-May REC population differs from the audited 2,074-row set';
+    END IF;
+
+    IF EXISTS (
+      SELECT 1
+        FROM journal_entries je
+        JOIN payments p
+          ON p.payment_id::text = je.source_id
+         AND p.journal_entry_id = je.id
+       WHERE je.entry_type = 'REC'
+         AND je.status = 'posted'
+         AND je.source_type = 'payment'
+         AND je.entry_date BETWEEN DATE '2026-01-01' AND DATE '2026-05-31'
+    ) THEN
+      RAISE EXCEPTION 'A new posted Jan-May payment REC exists after the audited import cancellation';
+    END IF;
+    RETURN;
+  END IF;
+
+  -- Fresh production state: prove the complete posted set by identity and
+  -- value before changing a single status.
+  SELECT COUNT(*), COALESCE(SUM(je.total_debit), 0),
+         MD5(STRING_AGG(
+           CONCAT_WS('|', je.id, je.reference_no, je.entry_date,
+                     je.total_debit, je.total_credit, je.source_type,
+                     je.source_id, p.payment_id),
+           E'\n' ORDER BY je.id
+         ))
+    INTO v_count, v_total, v_fingerprint
+    FROM journal_entries je
+    JOIN payments p
+      ON p.payment_id::text = je.source_id
+     AND p.journal_entry_id = je.id
+   WHERE je.entry_type = 'REC'
+     AND je.status = 'posted'
+     AND je.source_type = 'payment'
+     AND je.entry_date BETWEEN DATE '2026-01-01' AND DATE '2026-05-31';
+
+  v_posted_count := v_count;
+  v_posted_total := v_total;
+  v_posted_fingerprint := v_fingerprint;
+
+  IF (v_count, v_total, v_fingerprint) =
+     (2074, 3259534.63::numeric, v_expected_fingerprint) THEN
+    UPDATE journal_entries je
+       SET status = 'cancelled',
+           updated_at = NOW(),
+           updated_by = 'legacy_jan_may_import'
+     WHERE je.entry_type = 'REC'
+       AND je.status = 'posted'
+       AND je.source_type = 'payment'
+       AND je.entry_date BETWEEN DATE '2026-01-01' AND DATE '2026-05-31'
+       AND EXISTS (
+         SELECT 1
+           FROM payments p
+          WHERE p.payment_id::text = je.source_id
+            AND p.journal_entry_id = je.id
+       );
+    RETURN;
+  END IF;
+
+  -- Adoption path for a development database that ran the earlier reviewed
+  -- draft before the dedicated marker was added. The same exact fingerprint
+  -- is mandatory; this branch does not exist to absorb arbitrary drift.
+  SELECT COUNT(*), COALESCE(SUM(je.total_debit), 0),
+         MD5(STRING_AGG(
+           CONCAT_WS('|', je.id, je.reference_no, je.entry_date,
+                     je.total_debit, je.total_credit, je.source_type,
+                     je.source_id, p.payment_id),
+           E'\n' ORDER BY je.id
+         ))
+    INTO v_count, v_total, v_fingerprint
+    FROM journal_entries je
+    JOIN payments p
+      ON p.payment_id::text = je.source_id
+     AND p.journal_entry_id = je.id
+   WHERE je.entry_type = 'REC'
+     AND je.status = 'cancelled'
+     AND je.updated_by = 'migration'
+     AND je.source_type = 'payment'
+     AND je.entry_date BETWEEN DATE '2026-01-01' AND DATE '2026-05-31';
+
+  IF (v_count, v_total, v_fingerprint) =
+     (2074, 3259534.63::numeric, v_expected_fingerprint) THEN
+    UPDATE journal_entries je
+       SET updated_at = NOW(),
+           updated_by = 'legacy_jan_may_import'
+     WHERE je.entry_type = 'REC'
+       AND je.status = 'cancelled'
+       AND je.updated_by = 'migration'
+       AND je.source_type = 'payment'
+       AND je.entry_date BETWEEN DATE '2026-01-01' AND DATE '2026-05-31'
+       AND EXISTS (
+         SELECT 1
+           FROM payments p
+          WHERE p.payment_id::text = je.source_id
+            AND p.journal_entry_id = je.id
+       );
+    RETURN;
+  END IF;
+
+  RAISE EXCEPTION
+    'Posted Jan-May REC population drifted: expected 2,074 rows / RM3,259,534.63 / fingerprint %, found % rows / RM% / fingerprint %',
+    v_expected_fingerprint, v_posted_count, v_posted_total,
+    v_posted_fingerprint;
+END $$;
+
+DO $$
+DECLARE
+  v_count integer;
+  v_total numeric;
+  v_fingerprint text;
+BEGIN
+  SELECT COUNT(*), COALESCE(SUM(je.total_debit), 0),
+         MD5(STRING_AGG(
+           CONCAT_WS('|', je.id, je.reference_no, je.entry_date,
+                     je.total_debit, je.total_credit, je.source_type,
+                     je.source_id, p.payment_id),
+           E'\n' ORDER BY je.id
+         ))
+    INTO v_count, v_total, v_fingerprint
+    FROM journal_entries je
+    JOIN payments p
+      ON p.payment_id::text = je.source_id
+     AND p.journal_entry_id = je.id
+   WHERE je.entry_type = 'REC'
+     AND je.status = 'cancelled'
+     AND je.updated_by = 'legacy_jan_may_import'
+     AND je.entry_date BETWEEN DATE '2026-01-01' AND DATE '2026-05-31';
+
+  IF (v_count, v_total, v_fingerprint) IS DISTINCT FROM
+     (2074, 3259534.63::numeric, 'fdd1ef35cdcdf153ea826ce60f7376bb') THEN
+    RAISE EXCEPTION 'Final Jan-May REC cancellation set is not exact';
+  END IF;
+END $$;
 
 -- -----------------------------------------------------------------------------
 -- D. Exact accounting dates for THCN/26/1-16. Only journal headers move; the

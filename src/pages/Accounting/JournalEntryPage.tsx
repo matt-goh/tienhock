@@ -70,6 +70,7 @@ interface JournalEntryFormData {
 }
 
 const LAST_ENTRY_TYPE_KEY = "journalEntryLastType";
+const LEGACY_IMPORT_ENTRY_TYPE: JournalEntryType = "IMP";
 const HEADER_FIELD_CLASSNAME: string =
   "h-[38px] w-full px-3 text-sm border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 rounded-lg focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:cursor-not-allowed";
 const HEADER_LISTBOX_CLASSNAME: string =
@@ -82,7 +83,9 @@ const ACCOUNT_CODE_PATTERN: RegExp = /^[A-Za-z0-9\-_.]+$/;
 const loadLastEntryType = (): JournalEntryType => {
   try {
     const cached = localStorage.getItem(LAST_ENTRY_TYPE_KEY);
-    if (cached) return cached as JournalEntryType;
+    if (cached && cached !== LEGACY_IMPORT_ENTRY_TYPE) {
+      return cached as JournalEntryType;
+    }
   } catch (e) {
     console.error("Error loading last entry type:", e);
   }
@@ -1192,10 +1195,12 @@ const JournalEntryPage: React.FC = () => {
   };
 
   // Build options
-  const entryTypeOptions: SelectOption[] = entryTypes.map((t) => ({
-    id: t.code,
-    name: `${t.code} - ${t.name}`,
-  }));
+  const entryTypeOptions: SelectOption[] = entryTypes
+    .filter((entryType): boolean => entryType.code !== LEGACY_IMPORT_ENTRY_TYPE)
+    .map((entryType): SelectOption => ({
+      id: entryType.code,
+      name: `${entryType.code} - ${entryType.name}`,
+    }));
 
   const accountCodeOptions: SelectOption[] = accountCodes.map((a) => ({
     id: a.code,
@@ -1603,19 +1608,21 @@ const JournalEntryPage: React.FC = () => {
             {/* Form Actions */}
             <div className="px-6 py-4 flex justify-between items-center border-t border-default-200 dark:border-gray-700 bg-default-50/50 dark:bg-gray-900/30">
               <div>
-                {isEditMode && entryStatus !== "cancelled" && (
-                  <Button
-                    type="button"
-                    color="rose"
-                    variant="outline"
-                    onClick={() => setShowDeleteDialog(true)}
-                    disabled={isSaving}
-                    icon={IconTrash}
-                    iconPosition="left"
-                  >
-                    Delete
-                  </Button>
-                )}
+                {isEditMode &&
+                  entryStatus !== "cancelled" &&
+                  formData.entry_type !== LEGACY_IMPORT_ENTRY_TYPE && (
+                    <Button
+                      type="button"
+                      color="rose"
+                      variant="outline"
+                      onClick={() => setShowDeleteDialog(true)}
+                      disabled={isSaving}
+                      icon={IconTrash}
+                      iconPosition="left"
+                    >
+                      Delete
+                    </Button>
+                  )}
               </div>
               <div className="flex items-center gap-3">
                 <Button
