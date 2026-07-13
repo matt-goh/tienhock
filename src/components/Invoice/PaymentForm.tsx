@@ -11,6 +11,14 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import InvoiceSelectionTable from "./InvoiceSelectionTable";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 
+export interface PaymentFormInitialValues {
+  payment_date?: string;
+  payment_method?: Payment["payment_method"];
+  payment_reference?: string;
+  bank_account?: Payment["bank_account"];
+  notes?: string;
+}
+
 interface PaymentFormProps {
   payment: Payment | null;
   onClose: () => void;
@@ -21,12 +29,37 @@ interface PaymentFormProps {
   };
   apiEndpoint?: string; // Optional API endpoint for different companies
   invoicesEndpoint?: string; // Optional invoices endpoint for different companies
+  initialValues?: PaymentFormInitialValues;
+  referenceGroup?: string;
 }
 
 interface InvoicePaymentAllocation {
   invoice: InvoiceData;
   amountToPay: number;
 }
+
+interface PaymentFormData {
+  payment_date: string;
+  payment_method: Payment["payment_method"];
+  payment_reference: string;
+  bank_account: string;
+  notes: string;
+}
+
+const getInitialPaymentDate = (value?: string): string => {
+  if (!value) {
+    return format(new Date(), "yyyy-MM-dd");
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+
+  const parsedDate: Date = new Date(value);
+  return Number.isNaN(parsedDate.getTime())
+    ? format(new Date(), "yyyy-MM-dd")
+    : format(parsedDate, "yyyy-MM-dd");
+};
 
 const PaymentForm: React.FC<PaymentFormProps> = ({
   payment,
@@ -35,6 +68,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   dateRange,
   apiEndpoint = "/api/payments", // Default to main company endpoint
   invoicesEndpoint = "/api/invoices", // Default to main company invoices endpoint
+  initialValues,
+  referenceGroup,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
@@ -55,13 +90,15 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     | null
   >(null);
 
-  const [formData, setFormData] = useState({
-    payment_date: format(new Date(), "yyyy-MM-dd"),
-    payment_method: "cheque" as Payment["payment_method"],
-    payment_reference: "",
-    bank_account: "BANK_PBB", // Default to Public Bank
-    notes: "",
-  });
+  const [formData, setFormData] = useState<PaymentFormData>(() => ({
+    payment_date: getInitialPaymentDate(initialValues?.payment_date),
+    payment_method:
+      initialValues?.payment_method ??
+      ("cheque" as Payment["payment_method"]),
+    payment_reference: initialValues?.payment_reference ?? "",
+    bank_account: initialValues?.bank_account ?? "BANK_PBB",
+    notes: initialValues?.notes ?? "",
+  }));
 
   const paymentMethodOptions = [
     { id: "cash", name: "Cash" },
@@ -330,7 +367,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-7xl max-h-[90vh] flex flex-col">
         <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            {payment ? "Edit Payment" : "Record New Payment"}
+            {referenceGroup
+              ? `Add Payment - ${referenceGroup}`
+              : payment
+              ? "Edit Payment"
+              : "Record New Payment"}
           </h3>
           <button
             onClick={onClose}
@@ -346,6 +387,20 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           className="flex-1 flex flex-col overflow-hidden"
         >
           <div className="flex-1 overflow-y-auto px-6 py-4">
+            {referenceGroup && (
+              <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-100">
+                This creates a new payment under reference {referenceGroup} so
+                it appears in the same reference group. Select the additional
+                unpaid invoice or invoices below.
+                {formData.payment_method === "cheque" && (
+                  <span className="mt-1 block text-xs text-sky-700 dark:text-sky-300">
+                    This cheque payment will still need to be confirmed
+                    separately before it changes the invoice balance.
+                  </span>
+                )}
+              </div>
+            )}
+
             {/* Payment Details */}
             <div className="mb-4">
               <h4 className="text-md font-medium text-gray-900 dark:text-gray-100 mb-4">
@@ -360,7 +415,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                   onChange={(e) =>
                     setFormData({ ...formData, payment_date: e.target.value })
                   }
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || Boolean(referenceGroup)}
                   required
                 />
                 <FormListbox
@@ -374,7 +429,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                     })
                   }
                   options={paymentMethodOptions}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || Boolean(referenceGroup)}
                 />
                 {formData.payment_method !== 'cash' && (
                   <FormListbox
@@ -385,14 +440,20 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                       setFormData({ ...formData, bank_account: value })
                     }
                     options={bankAccountOptions}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || Boolean(referenceGroup)}
                   />
                 )}
                 <FormInput
                   name="payment_reference"
-                  label={`Payment Reference ${
-                    selectedInvoices.length > 1 ? "(Required)" : "(Optional)"
-                  }`}
+                  label={
+                    referenceGroup
+                      ? "Payment Reference (Same group)"
+                      : `Payment Reference ${
+                          selectedInvoices.length > 1
+                            ? "(Required)"
+                            : "(Optional)"
+                        }`
+                  }
                   placeholder={
                     formData.payment_method === "cheque"
                       ? "Cheque number"
@@ -409,7 +470,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                       payment_reference: e.target.value,
                     })
                   }
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || Boolean(referenceGroup)}
                   required={selectedInvoices.length > 1}
                 />
                 <FormInput

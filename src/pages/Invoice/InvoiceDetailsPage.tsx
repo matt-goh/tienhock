@@ -6,6 +6,7 @@ import type {
   AdjustmentDocument,
   ExtendedInvoiceData,
   Payment,
+  PaymentCancellationErrorData,
   ProductItem,
 } from "../../types/types";
 import BackButton from "../../components/BackButton";
@@ -19,6 +20,8 @@ import {
   getPaymentsForInvoice,
   cancelInvoice,
   cancelPayment,
+  getGroupedReceiptCancellationError,
+  getPaymentCancellationErrorData,
   syncCancellationStatus,
   confirmPayment,
 } from "../../utils/invoice/InvoiceUtils";
@@ -57,6 +60,8 @@ import InvoiceSoloPrintOverlay from "../../utils/invoice/PDF/InvoiceSoloPrintOve
 import LineItemsTable from "../../components/Invoice/LineItemsTable";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import LinkedPaymentsTooltip from "../../components/Invoice/LinkedPaymentsTooltip";
+import PaymentCancellationErrorDialog from "../../components/Invoice/PaymentCancellationErrorDialog";
+import ReceiptDetailsDialog from "../../components/Invoice/ReceiptDetailsDialog";
 import InvoiceAdjustmentDocsSection from "../../components/AdjustmentDocs/InvoiceAdjustmentDocsSection";
 import { generateAdjustmentDocPDFBlob } from "../../utils/adjustments/PDF/AdjustmentDocPDFHandler";
 import { generateAdjustmentDocPDFFilename } from "../../utils/adjustments/PDF/generateAdjustmentDocPDFFilename";
@@ -242,6 +247,11 @@ const InvoiceDetailsPage: React.FC = () => {
     useState(false);
   const [paymentToCancel, setPaymentToCancel] = useState<Payment | null>(null);
   const [isCancellingPayment, setIsCancellingPayment] = useState(false);
+  const [paymentCancellationError, setPaymentCancellationError] =
+    useState<PaymentCancellationErrorData | null>(null);
+  const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(
+    null
+  );
   const [isSubmittingEInvoice, setIsSubmittingEInvoice] = useState(false);
   const [showSubmissionResults, setShowSubmissionResults] = useState(false);
   const [submissionResults, setSubmissionResults] = useState(null);
@@ -1310,6 +1320,12 @@ const InvoiceDetailsPage: React.FC = () => {
       return;
     }
 
+    const groupedReceiptError = getGroupedReceiptCancellationError(payment);
+    if (groupedReceiptError) {
+      setPaymentCancellationError(groupedReceiptError);
+      return;
+    }
+
     setPaymentToCancel(payment);
     setShowCancelPaymentConfirm(true);
   };
@@ -1322,11 +1338,14 @@ const InvoiceDetailsPage: React.FC = () => {
     const toastId = toast.loading("Cancelling payment...");
 
     try {
-      await cancelPayment(paymentToCancel.payment_id);
+      await cancelPayment(paymentToCancel.payment_id, undefined, {
+        showErrorToast: false,
+      });
       toast.success("Payment cancelled successfully.", { id: toastId });
       await fetchDetails(); // Refresh invoice and payment data
-    } catch (error) {
-      toast.error("Failed to cancel payment.", { id: toastId });
+    } catch (error: unknown) {
+      toast.dismiss(toastId);
+      setPaymentCancellationError(getPaymentCancellationErrorData(error));
     } finally {
       setIsCancellingPayment(false);
       setPaymentToCancel(null);
@@ -2233,8 +2252,8 @@ const InvoiceDetailsPage: React.FC = () => {
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[10%]">
                       Status
                     </th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[12%]">
-                      Journal Entry
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[14%]">
+                      Receipt / Journal
                     </th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Notes
@@ -2300,15 +2319,53 @@ const InvoiceDetailsPage: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        {p.journal_entry_id ? (
-                          <button
-                            onClick={() => navigate(`/accounting/journal-entries/${p.journal_entry_id}`)}
-                            className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
-                            title="View journal entry"
-                          >
-                            <IconReceipt size={14} />
-                            <span className="font-mono">{p.journal_reference_no || `#${p.journal_entry_id}`}</span>
-                          </button>
+                        {p.receipt_id ||
+                        p.voucher_journal_id ||
+                        p.journal_entry_id ? (
+                          <div className="flex flex-col items-start gap-1">
+                            {p.receipt_id && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setSelectedReceiptId(p.receipt_id ?? null)
+                                }
+                                className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
+                                title="View the full receipt"
+                              >
+                                <IconReceipt size={14} />
+                                <span>
+                                  Receipt #{p.receipt_id}
+                                  {p.receipt_reference
+                                    ? ` (${p.receipt_reference})`
+                                    : ""}
+                                </span>
+                              </button>
+                            )}
+                            {(p.voucher_journal_id || p.journal_entry_id) && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  navigate(
+                                    `/accounting/journal-entries/${
+                                      p.voucher_journal_id ??
+                                      p.journal_entry_id
+                                    }`
+                                  )
+                                }
+                                className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
+                                title="View journal entry"
+                              >
+                                <IconFileInvoice size={14} />
+                                <span className="font-mono">
+                                  {p.journal_reference_no ||
+                                    `Journal #${
+                                      p.voucher_journal_id ??
+                                      p.journal_entry_id
+                                    }`}
+                                </span>
+                              </button>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
                         )}
@@ -2606,6 +2663,27 @@ const InvoiceDetailsPage: React.FC = () => {
           isCancellingPayment ? "Cancelling..." : "Cancel Payment"
         }
         variant="danger"
+      />
+      <PaymentCancellationErrorDialog
+        error={paymentCancellationError}
+        onClose={() => setPaymentCancellationError(null)}
+        onViewReceipt={(receiptId: number): void => {
+          setSelectedReceiptId(receiptId);
+          setPaymentCancellationError(null);
+        }}
+        onViewJournal={(journalEntryId: number): void => {
+          navigate(`/accounting/journal-entries/${journalEntryId}`);
+          setPaymentCancellationError(null);
+        }}
+      />
+      <ReceiptDetailsDialog
+        isOpen={selectedReceiptId !== null}
+        receiptId={selectedReceiptId}
+        onClose={() => setSelectedReceiptId(null)}
+        onCancelled={async (): Promise<void> => {
+          setSelectedReceiptId(null);
+          await fetchDetails();
+        }}
       />
       <ConfirmationDialog
         isOpen={showClearEInvoiceConfirm}

@@ -58,12 +58,17 @@ export default function (pool) {
           p.bank_account, p.journal_entry_id, p.is_auto_collection,
           p.receipt_allocation_id, ra.receipt_id,
           COALESCE(r.journal_entry_id, p.journal_entry_id) as voucher_journal_id,
+          r.status as receipt_status, r.display_reference as receipt_reference,
+          (SELECT COUNT(*)::integer
+             FROM receipt_allocations receipt_ra
+            WHERE receipt_ra.receipt_id = ra.receipt_id) as allocation_count,
           p.notes, p.created_at, p.status, p.cancellation_date,
           je.reference_no as journal_reference_no
         FROM payments p
-        LEFT JOIN journal_entries je ON p.journal_entry_id = je.id
         LEFT JOIN receipt_allocations ra ON ra.id = p.receipt_allocation_id
         LEFT JOIN receipts r ON r.id = ra.receipt_id
+        LEFT JOIN journal_entries je
+          ON je.id = COALESCE(r.journal_entry_id, p.journal_entry_id)
         WHERE 1=1
       `;
       const queryParams = [];
@@ -117,15 +122,20 @@ export default function (pool) {
         p.bank_account, p.journal_entry_id, p.is_auto_collection,
         p.receipt_allocation_id, ra.receipt_id,
         COALESCE(r.journal_entry_id, p.journal_entry_id) as voucher_journal_id,
+        r.status as receipt_status, r.display_reference as receipt_reference,
+        (SELECT COUNT(*)::integer
+           FROM receipt_allocations receipt_ra
+          WHERE receipt_ra.receipt_id = ra.receipt_id) as allocation_count,
         p.notes, p.created_at, p.status, p.cancellation_date,
         i.customerid, i.salespersonid, c.name as customer_name,
         je.reference_no as journal_reference_no
       FROM payments p
       JOIN invoices i ON p.invoice_id = i.id
       LEFT JOIN customers c ON i.customerid = c.id
-      LEFT JOIN journal_entries je ON p.journal_entry_id = je.id
       LEFT JOIN receipt_allocations ra ON ra.id = p.receipt_allocation_id
       LEFT JOIN receipts r ON r.id = ra.receipt_id
+      LEFT JOIN journal_entries je
+        ON je.id = COALESCE(r.journal_entry_id, p.journal_entry_id)
       WHERE 1=1
     `;
 
@@ -590,16 +600,50 @@ export default function (pool) {
       if (payment.receipt_allocation_id) {
         const allocInfo = await client.query(
           `SELECT ra.receipt_id,
-                  (SELECT COUNT(*) FROM receipt_allocations x WHERE x.receipt_id = ra.receipt_id) AS alloc_count
-             FROM receipt_allocations ra WHERE ra.id = $1`,
+                  r.status AS receipt_status,
+                  r.display_reference AS receipt_reference,
+                  r.journal_entry_id AS receipt_journal_id,
+                  je.reference_no AS receipt_journal_reference_no,
+                  COUNT(linked_ra.id)::integer AS allocation_count,
+                  COALESCE(
+                    ARRAY_AGG(DISTINCT linked_ra.invoice_id ORDER BY linked_ra.invoice_id)
+                      FILTER (WHERE linked_ra.invoice_id IS NOT NULL),
+                    ARRAY[]::varchar[]
+                  ) AS linked_invoice_ids
+             FROM receipt_allocations ra
+             JOIN receipts r ON r.id = ra.receipt_id
+             LEFT JOIN journal_entries je ON je.id = r.journal_entry_id
+             JOIN receipt_allocations linked_ra ON linked_ra.receipt_id = ra.receipt_id
+            WHERE ra.id = $1
+            GROUP BY ra.receipt_id, r.status, r.display_reference,
+                     r.journal_entry_id, je.reference_no`,
           [payment.receipt_allocation_id]
         );
         if (allocInfo.rows.length > 0) {
-          const { receipt_id: receiptId, alloc_count } = allocInfo.rows[0];
-          if (parseInt(alloc_count, 10) > 1) {
-            throw new Error(
-              `Payment ${paymentIdNum} belongs to grouped receipt #${receiptId} covering ${alloc_count} allocations. Cancel receipt #${receiptId} instead so all its invoices are reversed together.`
-            );
+          const {
+            receipt_id: receiptId,
+            receipt_status: receiptStatus,
+            receipt_reference: receiptReference,
+            receipt_journal_id: receiptJournalId,
+            receipt_journal_reference_no: receiptJournalReferenceNo,
+            allocation_count: allocationCount,
+            linked_invoice_ids: linkedInvoiceIds,
+          } = allocInfo.rows[0];
+          if (allocationCount > 1) {
+            await client.query("ROLLBACK");
+            return res.status(409).json({
+              code: "GROUPED_RECEIPT_CANCELLATION_REQUIRED",
+              message:
+                "This payment was recorded together with other payments, so it cannot be cancelled by itself.",
+              detail: `Open Receipt #${receiptId}${receiptReference ? ` (${receiptReference})` : ""} to review and cancel the full receipt. This will reverse all ${allocationCount} payments together and keep every invoice balance correct.`,
+              receipt_id: receiptId,
+              receipt_status: receiptStatus,
+              receipt_reference: receiptReference,
+              allocation_count: allocationCount,
+              receipt_journal_id: receiptJournalId,
+              receipt_journal_reference_no: receiptJournalReferenceNo,
+              linked_invoice_ids: linkedInvoiceIds,
+            });
           }
           await cancelReceipt(client, receiptId, reason || null, req.user?.id || null);
           const refreshed = await client.query(
