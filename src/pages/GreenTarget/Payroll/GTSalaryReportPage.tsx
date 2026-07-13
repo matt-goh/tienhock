@@ -218,6 +218,7 @@ const GTSalaryReportPage: React.FC = () => {
             locationMap: LOCATION_MAP,
             locationOrder: LOCATION_ORDER,
             companyName: GT_COMPANY,
+            showLocationCodes: false,
           },
           action
         );
@@ -235,6 +236,7 @@ const GTSalaryReportPage: React.FC = () => {
             locationMap: LOCATION_MAP,
             locationOrder: LOCATION_ORDER,
             companyName: GT_COMPANY,
+            showLocationCodes: false,
           },
           action
         );
@@ -602,12 +604,11 @@ const GTSalaryReportPage: React.FC = () => {
                       key={loc.location}
                       className="bg-sky-50 dark:bg-sky-900/20"
                     >
-                      <td className="px-2 py-2 text-xs font-semibold text-sky-800 dark:text-sky-300 text-center">
-                        {loc.location}
-                      </td>
-                      <td className="px-2 py-2 text-xs font-semibold text-sky-800 dark:text-sky-300 text-left">
-                        {(LOCATION_MAP[loc.location] || loc.location).toUpperCase()}{" "}
-                        (YEAR)
+                      <td
+                        colSpan={2}
+                        className="px-3 py-2 text-xs font-semibold text-sky-800 dark:text-sky-300 text-left"
+                      >
+                        {LOCATION_MAP[loc.location] || loc.location} (YEAR)
                       </td>
                       {renderAmountCells(loc.totals, true)}
                     </tr>
@@ -646,7 +647,6 @@ const GTSalaryReportPage: React.FC = () => {
                           colSpan={TABLE_COLUMN_COUNT}
                           className="px-4 py-2 text-sm font-semibold text-sky-800 dark:text-sky-300 border-y border-default-200 dark:border-gray-700"
                         >
-                          {loc.location} -{" "}
                           {(LOCATION_MAP[loc.location] || loc.location).toUpperCase()}
                         </td>
                       </tr>
