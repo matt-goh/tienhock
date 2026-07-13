@@ -51,7 +51,7 @@ const PaymentCancellationErrorDialog: React.FC<
                   onClick={() => onViewJournal(journalEntryId)}
                 >
                   View Journal
-                  {error.receipt_journal_reference_no
+                  {error?.receipt_journal_reference_no
                     ? ` ${error.receipt_journal_reference_no}`
                     : ""}
                 </Button>
