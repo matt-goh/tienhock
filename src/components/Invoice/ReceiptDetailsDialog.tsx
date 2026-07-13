@@ -23,7 +23,7 @@ import { api } from "../../routes/utils/api";
 import Button from "../Button";
 import ConfirmationDialog from "../ConfirmationDialog";
 
-type ReceiptStatus = "pending" | "posted" | "cancelled";
+type PaymentGroupStatus = "pending" | "posted" | "mixed" | "cancelled";
 type ReceiptAllocationType = "invoice" | "excess" | "account";
 
 interface ReceiptAllocation {
@@ -39,21 +39,21 @@ interface ReceiptAllocation {
   refunded_amount: number | string;
 }
 
-interface ReceiptDetails {
+interface PaymentGroupJournal {
   id: number;
+  reference_no: string | null;
+}
+
+interface PaymentGroupDetails {
   payment_method: string;
   debit_account: string;
   display_reference: string | null;
-  cheque_reference: string | null;
+  cheque_references: string[];
   received_date: string;
-  posting_date: string | null;
-  status: ReceiptStatus;
+  status: PaymentGroupStatus;
   total_amount: number | string;
-  description: string | null;
-  journal_entry_id: number | null;
-  journal_reference_no: string | null;
-  cancellation_date: string | null;
-  cancellation_reason: string | null;
+  journals: PaymentGroupJournal[];
+  cancellation_reasons: string[];
   origin: "erp" | "import_opening";
   allocations: ReceiptAllocation[];
 }
@@ -133,7 +133,7 @@ const getAllocationTitle = (allocation: ReceiptAllocation): string => {
     : "Payment to account";
 };
 
-const getStatusStyles = (status: ReceiptStatus): string => {
+const getStatusStyles = (status: PaymentGroupStatus): string => {
   if (status === "cancelled") {
     return "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300";
   }
@@ -142,16 +142,24 @@ const getStatusStyles = (status: ReceiptStatus): string => {
     return "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300";
   }
 
+  if (status === "mixed") {
+    return "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300";
+  }
+
   return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300";
 };
 
-const getStatusLabel = (status: ReceiptStatus): string => {
+const getStatusLabel = (status: PaymentGroupStatus): string => {
   if (status === "cancelled") {
     return "Cancelled";
   }
 
   if (status === "pending") {
     return "Pending";
+  }
+
+  if (status === "mixed") {
+    return "Partly confirmed";
   }
 
   return "Paid";
@@ -164,7 +172,8 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
   onCancelled,
   onReferenceUpdated,
 }) => {
-  const [receipt, setReceipt] = useState<ReceiptDetails | null>(null);
+  const [paymentGroup, setPaymentGroup] =
+    useState<PaymentGroupDetails | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState<boolean>(false);
@@ -179,23 +188,23 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
 
   const invoiceAllocations: ReceiptAllocation[] = useMemo(
     (): ReceiptAllocation[] =>
-      receipt?.allocations.filter(
+      paymentGroup?.allocations.filter(
         (allocation: ReceiptAllocation): boolean =>
           allocation.allocation_type === "invoice" && Boolean(allocation.invoice_id)
       ) ?? [],
-    [receipt]
+    [paymentGroup]
   );
 
   const nonInvoiceAllocationCount: number =
-    (receipt?.allocations.length ?? 0) - invoiceAllocations.length;
+    (paymentGroup?.allocations.length ?? 0) - invoiceAllocations.length;
   const canEditReference: boolean = Boolean(
-    receipt &&
-      receipt.status !== "cancelled" &&
-      receipt.origin === "erp" &&
-      receipt.payment_method !== "cash"
+    paymentGroup &&
+      paymentGroup.status !== "cancelled" &&
+      paymentGroup.origin === "erp" &&
+      paymentGroup.payment_method !== "cash"
   );
 
-  const loadReceipt = useCallback(async (): Promise<void> => {
+  const loadPaymentGroup = useCallback(async (): Promise<void> => {
     if (!isOpen || receiptId === null) {
       return;
     }
@@ -204,15 +213,15 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
     setLoadError(null);
 
     try {
-      const response: ReceiptDetails = await api.get<ReceiptDetails>(
-        `/api/receipts/${receiptId}`
+      const response: PaymentGroupDetails = await api.get<PaymentGroupDetails>(
+        `/api/receipts/${receiptId}/group`
       );
-      setReceipt(response);
+      setPaymentGroup(response);
     } catch (error: unknown) {
-      console.error("Error loading receipt:", error);
-      setReceipt(null);
+      console.error("Error loading payment group:", error);
+      setPaymentGroup(null);
       setLoadError(
-        getErrorMessage(error, "We could not load this receipt. Please try again.")
+        getErrorMessage(error, "We could not load this payment group. Please try again.")
       );
     } finally {
       setIsLoading(false);
@@ -222,29 +231,29 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
   useEffect((): (() => void) => {
     let isCurrentRequest: boolean = true;
 
-    const fetchReceipt = async (): Promise<void> => {
+    const fetchPaymentGroup = async (): Promise<void> => {
       if (!isOpen || receiptId === null) {
         return;
       }
 
-      setReceipt(null);
+      setPaymentGroup(null);
       setIsLoading(true);
       setLoadError(null);
 
       try {
-        const response: ReceiptDetails = await api.get<ReceiptDetails>(
-          `/api/receipts/${receiptId}`
+        const response: PaymentGroupDetails = await api.get<PaymentGroupDetails>(
+          `/api/receipts/${receiptId}/group`
         );
         if (isCurrentRequest) {
-          setReceipt(response);
+          setPaymentGroup(response);
         }
       } catch (error: unknown) {
         if (isCurrentRequest) {
-          console.error("Error loading receipt:", error);
+          console.error("Error loading payment group:", error);
           setLoadError(
             getErrorMessage(
               error,
-              "We could not load this receipt. Please try again."
+              "We could not load this payment group. Please try again."
             )
           );
         }
@@ -255,7 +264,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
       }
     };
 
-    void fetchReceipt();
+    void fetchPaymentGroup();
 
     return (): void => {
       isCurrentRequest = false;
@@ -287,8 +296,8 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
   };
 
   const handleStartReferenceEdit = (): void => {
-    if (!receipt) return;
-    setReferenceValue(receipt.display_reference || "");
+    if (!paymentGroup) return;
+    setReferenceValue(paymentGroup.display_reference || "");
     setReferenceError(null);
     setIsEditingReference(true);
   };
@@ -304,14 +313,14 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
     event: React.FormEvent<HTMLFormElement>
   ): Promise<void> => {
     event.preventDefault();
-    if (!receipt || isSavingReference) return;
+    if (!paymentGroup || receiptId === null || isSavingReference) return;
 
     const nextReference: string = referenceValue.trim();
     if (!nextReference) {
       setReferenceError("Enter a payment reference.");
       return;
     }
-    if (nextReference === receipt.display_reference) {
+    if (nextReference === paymentGroup.display_reference) {
       handleCancelReferenceEdit();
       return;
     }
@@ -321,28 +330,24 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
     try {
       const response: ReceiptReferenceUpdateResponse =
         await api.patch<ReceiptReferenceUpdateResponse>(
-          `/api/receipts/${receipt.id}/reference`,
+          `/api/receipts/${receiptId}/reference`,
           {
-            expected_reference: receipt.display_reference,
+            expected_reference: paymentGroup.display_reference,
             reference: nextReference,
           }
         );
-      setReceipt(
-        (currentReceipt: ReceiptDetails | null): ReceiptDetails | null =>
-          currentReceipt
+      setPaymentGroup(
+        (currentGroup: PaymentGroupDetails | null): PaymentGroupDetails | null =>
+          currentGroup
             ? {
-                ...currentReceipt,
+                ...currentGroup,
                 display_reference: response.receipt.display_reference,
               }
-            : currentReceipt
+            : currentGroup
       );
       setIsEditingReference(false);
       setReferenceValue("");
-      toast.success(
-        response.updated_receipt_count > 1
-          ? `Reference updated across ${response.updated_receipt_count} linked receipts.`
-          : "Payment reference updated."
-      );
+      toast.success("Payment reference updated for all payments in this group.");
     } catch (error: unknown) {
       console.error("Error updating receipt reference:", error);
       setReferenceError(
@@ -364,8 +369,13 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
     }
   };
 
-  const handleCancelReceipt = async (): Promise<void> => {
-    if (!receipt || receipt.status === "cancelled" || isCancelling) {
+  const handleCancelPaymentGroup = async (): Promise<void> => {
+    if (
+      !paymentGroup ||
+      receiptId === null ||
+      paymentGroup.status === "cancelled" ||
+      isCancelling
+    ) {
       return;
     }
 
@@ -373,19 +383,21 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
     setIsCancelling(true);
 
     try {
-      await api.put<ReceiptCancelResponse>(`/api/receipts/${receipt.id}/cancel`, {});
-      setReceipt((currentReceipt: ReceiptDetails | null): ReceiptDetails | null =>
-        currentReceipt
-          ? { ...currentReceipt, status: "cancelled" }
-          : currentReceipt
+      await api.put<ReceiptCancelResponse>(
+        `/api/receipts/${receiptId}/group/cancel`,
+        {}
       );
-      toast.success("The entire receipt and all its payments were cancelled.");
+      setPaymentGroup(
+        (currentGroup: PaymentGroupDetails | null): PaymentGroupDetails | null =>
+          currentGroup ? { ...currentGroup, status: "cancelled" } : currentGroup
+      );
+      toast.success("The payment group and all its payments were cancelled.");
     } catch (error: unknown) {
-      console.error("Error cancelling receipt:", error);
+      console.error("Error cancelling payment group:", error);
       toast.error(
         getErrorMessage(
           error,
-          "We could not cancel this receipt. No payments were changed."
+          "We could not cancel this payment group. No payments were changed."
         )
       );
       setIsCancelling(false);
@@ -395,7 +407,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
     try {
       await onCancelled();
     } catch (error: unknown) {
-      console.error("Error refreshing invoice after cancelling receipt:", error);
+      console.error("Error refreshing invoice after cancelling payment group:", error);
     } finally {
       setIsCancelling(false);
       onClose();
@@ -416,20 +428,20 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
               }`
             : ""
         }`
-      : `${receipt?.allocations.length ?? 0} payment ${
-          receipt?.allocations.length === 1 ? "amount" : "amounts"
+      : `${paymentGroup?.allocations.length ?? 0} payment ${
+          paymentGroup?.allocations.length === 1 ? "amount" : "amounts"
         }`;
 
   const confirmationMessage: React.ReactNode = (
     <div className="space-y-3">
       <p>
-        This receipt was shared across {cancellationScopeText}. Cancelling it
-        will reverse every payment below together; you cannot cancel only one
-        of them.
+        Payment reference {paymentGroup?.display_reference || "this group"} covers{" "}
+        {cancellationScopeText}. Cancelling this group will reverse every payment
+        below together; you cannot cancel only one of them.
       </p>
-      {receipt && receipt.allocations.length > 0 && (
+      {paymentGroup && paymentGroup.allocations.length > 0 && (
         <ul className="space-y-1.5 rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
-          {receipt.allocations.map(
+          {paymentGroup.allocations.map(
             (allocation: ReceiptAllocation): React.ReactNode => (
               <li
                 key={allocation.id}
@@ -491,19 +503,21 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
               >
                 <DialogPanel className="my-auto flex max-h-[calc(100vh-3rem)] w-full max-w-2xl transform flex-col overflow-hidden rounded-2xl border border-default-200 bg-white text-left align-middle shadow-xl ring-1 ring-black/5 transition-all dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/40 dark:ring-white/10">
                   <div className="flex items-start justify-between gap-3 border-b border-default-200 bg-default-50 px-5 py-4 dark:border-gray-700 dark:bg-gray-900/60">
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex min-w-0 items-center gap-2.5">
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-300">
                         <IconReceipt size={20} />
                       </span>
-                      <div>
+                      <div className="min-w-0">
                         <DialogTitle
                           as="h3"
-                          className="text-base font-semibold text-default-800 dark:text-gray-100"
+                          className="break-all text-base font-semibold text-default-800 dark:text-gray-100"
                         >
-                          {receiptId === null ? "Receipt details" : `Receipt #${receiptId}`}
+                          {paymentGroup?.display_reference
+                            ? `Payment Group ${paymentGroup.display_reference}`
+                            : "Payment Group Details"}
                         </DialogTitle>
                         <p className="text-xs text-default-500 dark:text-gray-400">
-                          See every invoice paid by this receipt.
+                          See every invoice paid under this reference.
                         </p>
                       </div>
                     </div>
@@ -512,7 +526,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                       onClick={handleClose}
                       disabled={isCancelling || isSavingReference}
                       className="rounded-lg p-1 text-default-400 transition-colors hover:bg-default-100 hover:text-default-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-200"
-                      aria-label="Close receipt details"
+                      aria-label="Close payment group details"
                     >
                       <IconX size={18} />
                     </button>
@@ -522,7 +536,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                     {isLoading ? (
                       <div className="flex min-h-52 flex-col items-center justify-center gap-3 text-default-500 dark:text-gray-400">
                         <span className="h-8 w-8 animate-spin rounded-full border-2 border-default-200 border-t-sky-500 dark:border-gray-600 dark:border-t-sky-400" />
-                        <p className="text-sm">Loading receipt details...</p>
+                        <p className="text-sm">Loading payment group...</p>
                       </div>
                     ) : loadError ? (
                       <div className="flex min-h-52 flex-col items-center justify-center gap-3 text-center">
@@ -532,7 +546,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                         />
                         <div>
                           <p className="font-medium text-default-800 dark:text-gray-100">
-                            Receipt details could not be loaded
+                            Payment group could not be loaded
                           </p>
                           <p className="mt-1 max-w-md text-sm text-default-500 dark:text-gray-400">
                             {loadError}
@@ -543,14 +557,15 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                           color="sky"
                           size="sm"
                           icon={IconRefresh}
-                          onClick={() => void loadReceipt()}
+                          onClick={() => void loadPaymentGroup()}
                         >
                           Try Again
                         </Button>
                       </div>
-                    ) : receipt ? (
+                    ) : paymentGroup ? (
                       <div className="space-y-5">
-                        {receipt.allocations.length > 1 && receipt.status !== "cancelled" && (
+                        {paymentGroup.allocations.length > 1 &&
+                          paymentGroup.status !== "cancelled" && (
                           <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-800/70 dark:bg-amber-900/20 dark:text-amber-100">
                             <IconAlertTriangle
                               size={20}
@@ -558,19 +573,18 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                             />
                             <div>
                               <p className="text-sm font-semibold">
-                                This receipt contains more than one payment
+                                This reference includes more than one payment
                               </p>
                               <p className="mt-1 text-sm leading-5">
-                                These payments were recorded together as one receipt.
                                 To keep every invoice correct, an individual payment
-                                cannot be cancelled by itself. The entire receipt must
-                                be cancelled together.
+                                cannot be cancelled by itself. All payments in this
+                                group must be cancelled together.
                               </p>
                             </div>
                           </div>
                         )}
 
-                        {receipt.status === "cancelled" && (
+                        {paymentGroup.status === "cancelled" && (
                           <div className="flex gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-900 dark:border-rose-800/70 dark:bg-rose-900/20 dark:text-rose-100">
                             <IconBan
                               size={20}
@@ -578,15 +592,15 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                             />
                             <div>
                               <p className="text-sm font-semibold">
-                                This receipt has already been cancelled
+                                This payment group has already been cancelled
                               </p>
                               <p className="mt-1 text-sm leading-5">
-                                All payments belonging to this receipt were reversed
+                                All payments belonging to this group were reversed
                                 together.
                               </p>
-                              {receipt.cancellation_reason && (
+                              {paymentGroup.cancellation_reasons.length > 0 && (
                                 <p className="mt-1 text-xs opacity-80">
-                                  Reason: {receipt.cancellation_reason}
+                                  Reason: {paymentGroup.cancellation_reasons.join("; ")}
                                 </p>
                               )}
                             </div>
@@ -598,28 +612,28 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                             <p className="text-xs text-default-500 dark:text-gray-400">Status</p>
                             <span
                               className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getStatusStyles(
-                                receipt.status
+                                paymentGroup.status
                               )}`}
                             >
-                              {getStatusLabel(receipt.status)}
+                              {getStatusLabel(paymentGroup.status)}
                             </span>
                           </div>
                           <div className="rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
                             <p className="text-xs text-default-500 dark:text-gray-400">Total received</p>
                             <p className="mt-1 text-sm font-semibold text-default-800 dark:text-gray-100">
-                              {formatCurrency(receipt.total_amount)}
+                              {formatCurrency(paymentGroup.total_amount)}
                             </p>
                           </div>
                           <div className="rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
                             <p className="text-xs text-default-500 dark:text-gray-400">Received date</p>
                             <p className="mt-1 text-sm font-medium text-default-800 dark:text-gray-100">
-                              {formatReceiptDate(receipt.received_date)}
+                              {formatReceiptDate(paymentGroup.received_date)}
                             </p>
                           </div>
                           <div className="rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
                             <p className="text-xs text-default-500 dark:text-gray-400">Method</p>
                             <p className="mt-1 text-sm font-medium text-default-800 dark:text-gray-100">
-                              {formatPaymentMethod(receipt.payment_method)}
+                              {formatPaymentMethod(paymentGroup.payment_method)}
                             </p>
                           </div>
                         </div>
@@ -685,17 +699,17 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                                   )}
                                 </form>
                               ) : (
-                                <div className="flex items-start gap-2">
-                                  <span className="break-all font-mono">
-                                    {receipt.display_reference ||
-                                      receipt.cheque_reference ||
+                                <div className="inline-flex max-w-full items-center gap-2">
+                                  <span className="min-w-0 break-all font-mono leading-7">
+                                    {paymentGroup.display_reference ||
+                                      paymentGroup.cheque_references[0] ||
                                       "-"}
                                   </span>
                                   {canEditReference && (
                                     <button
                                       type="button"
                                       onClick={handleStartReferenceEdit}
-                                      className="mt-0.5 shrink-0 rounded p-1 text-sky-600 hover:bg-sky-50 hover:text-sky-800 dark:text-sky-400 dark:hover:bg-sky-900/30 dark:hover:text-sky-300"
+                                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-sky-600 hover:bg-sky-50 hover:text-sky-800 dark:text-sky-400 dark:hover:bg-sky-900/30 dark:hover:text-sky-300"
                                       title="Edit payment reference"
                                       aria-label="Edit payment reference"
                                     >
@@ -706,39 +720,45 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                               )}
                             </dd>
                           </div>
-                          {receipt.cheque_reference &&
-                            receipt.cheque_reference !== receipt.display_reference && (
-                              <div>
-                                <dt className="text-xs text-default-500 dark:text-gray-400">Cheque number</dt>
-                                <dd className="mt-0.5 font-mono text-default-800 dark:text-gray-100">
-                                  {receipt.cheque_reference}
-                                </dd>
-                              </div>
-                            )}
-                          <div>
-                            <dt className="text-xs text-default-500 dark:text-gray-400">Description</dt>
-                            <dd className="mt-0.5 text-default-800 dark:text-gray-100">
-                              {receipt.description || "-"}
-                            </dd>
-                          </div>
-                          <div>
-                            <dt className="text-xs text-default-500 dark:text-gray-400">Journal entry</dt>
-                            <dd className="mt-0.5">
-                              {receipt.journal_entry_id ? (
-                                <Link
-                                  to={`/accounting/journal-entries/${receipt.journal_entry_id}`}
-                                  onClick={handleClose}
-                                  className="inline-flex items-center gap-1 font-medium text-sky-600 hover:underline dark:text-sky-400"
-                                >
-                                  <IconReceipt size={15} />
-                                  <span className="font-mono">
-                                    {receipt.journal_reference_no || `#${receipt.journal_entry_id}`}
-                                  </span>
-                                  <IconExternalLink size={13} />
-                                </Link>
-                              ) : receipt.status === "pending" ? (
+                          {paymentGroup.cheque_references.length > 0 && (
+                            <div>
+                              <dt className="text-xs text-default-500 dark:text-gray-400">
+                                {paymentGroup.cheque_references.length === 1
+                                  ? "Cheque number"
+                                  : "Cheque numbers"}
+                              </dt>
+                              <dd className="mt-0.5 font-mono text-default-800 dark:text-gray-100">
+                                {paymentGroup.cheque_references.join(", ")}
+                              </dd>
+                            </div>
+                          )}
+                          <div className="sm:col-span-2">
+                            <dt className="text-xs text-default-500 dark:text-gray-400">
+                              {paymentGroup.journals.length === 1
+                                ? "Journal entry"
+                                : "Journal entries"}
+                            </dt>
+                            <dd className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                              {paymentGroup.journals.length > 0 ? (
+                                paymentGroup.journals.map(
+                                  (journal: PaymentGroupJournal): React.ReactNode => (
+                                    <Link
+                                      key={journal.id}
+                                      to={`/accounting/journal-entries/${journal.id}`}
+                                      onClick={handleClose}
+                                      className="inline-flex items-center gap-1 font-medium text-sky-600 hover:underline dark:text-sky-400"
+                                    >
+                                      <IconReceipt size={15} />
+                                      <span className="font-mono">
+                                        {journal.reference_no || "View Journal"}
+                                      </span>
+                                      <IconExternalLink size={13} />
+                                    </Link>
+                                  )
+                                )
+                              ) : paymentGroup.status === "pending" ? (
                                 <span className="text-default-500 dark:text-gray-400">
-                                  Not created yet while this payment is pending
+                                  Not created yet while these payments are pending
                                 </span>
                               ) : (
                                 <span className="text-default-500 dark:text-gray-400">None</span>
@@ -750,14 +770,17 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                         <div>
                           <div className="mb-2 flex items-center justify-between gap-3">
                             <h4 className="text-sm font-semibold text-default-800 dark:text-gray-100">
-                              Payments covered by this receipt
+                              Payments in this group
                             </h4>
                             <span className="text-xs text-default-500 dark:text-gray-400">
-                              {receipt.allocations.length} {receipt.allocations.length === 1 ? "payment" : "payments"}
+                              {paymentGroup.allocations.length}{" "}
+                              {paymentGroup.allocations.length === 1
+                                ? "payment"
+                                : "payments"}
                             </span>
                           </div>
                           <ul className="divide-y divide-default-200 overflow-hidden rounded-xl border border-default-200 dark:divide-gray-700 dark:border-gray-700">
-                            {receipt.allocations.map(
+                            {paymentGroup.allocations.map(
                               (allocation: ReceiptAllocation): React.ReactNode => (
                                 <li
                                   key={allocation.id}
@@ -800,26 +823,28 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                       </div>
                     ) : (
                       <div className="flex min-h-52 items-center justify-center text-sm text-default-500 dark:text-gray-400">
-                        Select a receipt to view its details.
+                        Select a payment group to view its details.
                       </div>
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between gap-3 border-t border-default-200 px-5 py-3 dark:border-gray-700">
+                  <div className="flex flex-col gap-3 border-t border-default-200 px-5 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-gray-700">
                     <p className="text-xs text-default-500 dark:text-gray-400">
-                      {receipt?.status === "cancelled"
-                        ? "This receipt can no longer be changed."
-                        : receipt?.allocations.length && receipt.allocations.length > 1
+                      {paymentGroup?.status === "cancelled"
+                        ? "This payment group can no longer be changed."
+                        : paymentGroup?.allocations.length &&
+                          paymentGroup.allocations.length > 1
                         ? "Cancelling reverses every payment shown above."
-                        : "Cancelling reverses this receipt's payment."}
+                        : "Cancelling reverses this payment."}
                     </p>
-                    <div className="flex shrink-0 gap-2">
+                    <div className="flex w-full shrink-0 gap-2 sm:w-auto">
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
                         onClick={handleClose}
                         disabled={isCancelling || isSavingReference}
+                        className="flex-1 sm:flex-none"
                       >
                         Close
                       </Button>
@@ -830,15 +855,16 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                         size="sm"
                         icon={IconBan}
                         onClick={() => setIsCancelConfirmationOpen(true)}
+                        className="flex-1 sm:flex-none"
                         disabled={
-                          !receipt ||
-                          receipt.status === "cancelled" ||
+                          !paymentGroup ||
+                          paymentGroup.status === "cancelled" ||
                           isLoading ||
                           isCancelling ||
                           isSavingReference
                         }
                       >
-                        {isCancelling ? "Cancelling..." : "Cancel Entire Receipt"}
+                        {isCancelling ? "Cancelling..." : "Cancel Payment Group"}
                       </Button>
                     </div>
                   </div>
@@ -852,10 +878,12 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
       <ConfirmationDialog
         isOpen={isCancelConfirmationOpen}
         onClose={() => setIsCancelConfirmationOpen(false)}
-        onConfirm={() => void handleCancelReceipt()}
-        title={`Cancel receipt #${receipt?.id ?? receiptId ?? ""}?`}
+        onConfirm={() => void handleCancelPaymentGroup()}
+        title={`Cancel payment group ${
+          paymentGroup?.display_reference || ""
+        }?`}
         message={confirmationMessage}
-        confirmButtonText="Cancel Entire Receipt"
+        confirmButtonText="Cancel Payment Group"
         variant="danger"
       />
     </>

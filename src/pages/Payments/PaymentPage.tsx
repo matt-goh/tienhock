@@ -279,14 +279,14 @@ const PaymentPage: React.FC = () => {
           onRefresh={fetchPayments}
           onCancellationError={setPaymentCancellationError}
           onAddPaymentToGroup={handleAddPaymentToGroup}
-          onViewReceipt={setSelectedReceiptId}
+          onViewPaymentGroup={setSelectedReceiptId}
         />
       )}
 
       <PaymentCancellationErrorDialog
         error={paymentCancellationError}
         onClose={() => setPaymentCancellationError(null)}
-        onViewReceipt={(receiptId: number): void => {
+        onViewPaymentGroup={(receiptId: number): void => {
           setSelectedReceiptId(receiptId);
           setPaymentCancellationError(null);
         }}

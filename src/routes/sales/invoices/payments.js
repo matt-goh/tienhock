@@ -60,8 +60,14 @@ export default function (pool) {
           COALESCE(r.journal_entry_id, p.journal_entry_id) as voucher_journal_id,
           r.status as receipt_status, r.display_reference as receipt_reference,
           (SELECT COUNT(*)::integer
-             FROM receipt_allocations receipt_ra
-            WHERE receipt_ra.receipt_id = ra.receipt_id) as allocation_count,
+             FROM receipts group_r
+             JOIN receipt_allocations group_ra ON group_ra.receipt_id = group_r.id
+            WHERE group_r.display_reference IS NOT DISTINCT FROM r.display_reference
+              AND group_r.received_date = r.received_date
+              AND group_r.payment_method = r.payment_method
+              AND group_r.debit_account = r.debit_account
+              AND group_r.origin = r.origin
+              AND group_r.status IN ('pending', 'posted')) as allocation_count,
           p.notes, p.created_at, p.status, p.cancellation_date,
           je.reference_no as journal_reference_no
         FROM payments p
@@ -124,8 +130,14 @@ export default function (pool) {
         COALESCE(r.journal_entry_id, p.journal_entry_id) as voucher_journal_id,
         r.status as receipt_status, r.display_reference as receipt_reference,
         (SELECT COUNT(*)::integer
-           FROM receipt_allocations receipt_ra
-          WHERE receipt_ra.receipt_id = ra.receipt_id) as allocation_count,
+           FROM receipts group_r
+           JOIN receipt_allocations group_ra ON group_ra.receipt_id = group_r.id
+          WHERE group_r.display_reference IS NOT DISTINCT FROM r.display_reference
+            AND group_r.received_date = r.received_date
+            AND group_r.payment_method = r.payment_method
+            AND group_r.debit_account = r.debit_account
+            AND group_r.origin = r.origin
+            AND group_r.status IN ('pending', 'posted')) as allocation_count,
         p.notes, p.created_at, p.status, p.cancellation_date,
         i.customerid, i.salespersonid, c.name as customer_name,
         je.reference_no as journal_reference_no
@@ -401,31 +413,55 @@ export default function (pool) {
         [paymentIdNum]
       );
       if (rowResult.rows.length === 0) {
-        throw new Error(`Payment ${paymentIdNum} not found.`);
+        throw new Error("Payment not found.");
       }
       const row = rowResult.rows[0];
       if (row.status !== "pending") {
         if (row.status === "active" || row.status === "overpaid") {
-          throw new Error(`Payment ${paymentIdNum} has already been confirmed.`);
+          throw new Error("This payment has already been confirmed.");
         }
-        throw new Error(`Payment ${paymentIdNum} is ${row.status}, not pending.`);
+        throw new Error(`This payment is ${row.status}, not pending.`);
       }
 
       let confirmedReceiptId;
+      let confirmedReceiptIds;
 
       if (row.receipt_id) {
-        // 2a. Receipt-backed pending cheque: confirm the exact receipt (all of
-        // its allocations clear together — never matched by reference text).
-        const confirmResult = await confirmReceipt(
-          client,
-          row.receipt_id,
-          {
-            posting_date: req.body?.posting_date || undefined,
-            cheque_reference: req.body?.cheque_reference || undefined,
-          },
-          req.user?.id || null
+        // 2a. Confirm every pending internal receipt in the same visible
+        // reference/date/method/account group.
+        const pendingGroup = await client.query(
+          `SELECT member.id
+             FROM receipts anchor
+             JOIN receipts member
+               ON member.display_reference IS NOT DISTINCT FROM anchor.display_reference
+              AND member.received_date = anchor.received_date
+              AND member.payment_method = anchor.payment_method
+              AND member.debit_account = anchor.debit_account
+              AND member.origin = anchor.origin
+              AND member.status = 'pending'
+            WHERE anchor.id = $1 AND anchor.status = 'pending'
+            ORDER BY member.id
+            FOR UPDATE OF member`,
+          [row.receipt_id]
         );
-        confirmedReceiptId = confirmResult.receipt.id;
+        if (pendingGroup.rows.length === 0) {
+          throw new Error(
+            "This payment group changed after you opened it. Reload and try again."
+          );
+        }
+        confirmedReceiptIds = pendingGroup.rows.map((receipt) => receipt.id);
+        for (const memberReceiptId of confirmedReceiptIds) {
+          await confirmReceipt(
+            client,
+            memberReceiptId,
+            {
+              posting_date: req.body?.posting_date || undefined,
+              cheque_reference: req.body?.cheque_reference || undefined,
+            },
+            req.user?.id || null
+          );
+        }
+        confirmedReceiptId = row.receipt_id;
       } else {
         // 2b. Legacy pending cheque row(s): wrap them into one posted receipt
         // (grouped by the shared reference like the old batch confirm), then
@@ -481,23 +517,27 @@ export default function (pool) {
           req.user?.id || null
         );
         confirmedReceiptId = result.receipt.id;
+        confirmedReceiptIds = [confirmedReceiptId];
 
         await client.query(
           `UPDATE payments
               SET status = 'cancelled', cancellation_date = NOW(),
                   cancellation_reason = $2
             WHERE payment_id = ANY($1::int[])`,
-          [usable.map((r) => r.payment_id), `Superseded by receipt #${confirmedReceiptId} on confirmation`]
+          [
+            usable.map((r) => r.payment_id),
+            "Replaced when the payment group was confirmed",
+          ]
         );
       }
 
-      // 3. Return the confirmed compat rows of the receipt
+      // 3. Return every compat row confirmed by this operation.
       const confirmedRows = await client.query(
         `SELECT p.* FROM payments p
            JOIN receipt_allocations ra ON ra.id = p.receipt_allocation_id
-          WHERE ra.receipt_id = $1
+          WHERE ra.receipt_id = ANY($1::int[])
           ORDER BY p.payment_id`,
-        [confirmedReceiptId]
+        [confirmedReceiptIds]
       );
 
       await client.query("COMMIT");
@@ -515,6 +555,7 @@ export default function (pool) {
             : "Payment confirmed successfully.",
         payments: confirmedPayments,
         receipt_id: confirmedReceiptId,
+        receipt_ids: confirmedReceiptIds,
         hasOverpaidPayments: overpaidCount > 0,
       });
     } catch (error) {
@@ -554,9 +595,7 @@ export default function (pool) {
       const paymentResult = await client.query(paymentQuery, [paymentIdNum]);
 
       if (paymentResult.rows.length === 0) {
-        throw new Error(
-          `Payment ${paymentIdNum} not found or already cancelled.`
-        );
+        throw new Error("Payment not found or already cancelled.");
       }
       const payment = paymentResult.rows[0];
       const {
@@ -579,7 +618,7 @@ export default function (pool) {
       // are adjusted/cancelled only through invoice edits and conversions.
       if (payment.is_auto_collection) {
         throw new Error(
-          `Payment ${paymentIdNum} is the automatic collection of CASH invoice ${invoice_id}. Edit or convert the invoice instead.`
+          `This payment is the automatic collection of CASH invoice ${invoice_id}. Edit or convert the invoice instead.`
         );
       }
 
@@ -593,10 +632,9 @@ export default function (pool) {
         );
       }
 
-      // Receipt-backed rows are cancelled through the receipt so the shared
-      // journal and every sibling allocation stay consistent. A single-
-      // allocation receipt cancels transparently right here; a grouped one
-      // must be cancelled explicitly (never silently affect other invoices).
+      // Receipt-backed rows are cancelled through their visible payment
+      // reference group so separate internal receipts with the same group key
+      // can never be silently split.
       if (payment.receipt_allocation_id) {
         const allocInfo = await client.query(
           `SELECT ra.receipt_id,
@@ -613,7 +651,14 @@ export default function (pool) {
              FROM receipt_allocations ra
              JOIN receipts r ON r.id = ra.receipt_id
              LEFT JOIN journal_entries je ON je.id = r.journal_entry_id
-             JOIN receipt_allocations linked_ra ON linked_ra.receipt_id = ra.receipt_id
+             JOIN receipts linked_r
+               ON linked_r.display_reference IS NOT DISTINCT FROM r.display_reference
+              AND linked_r.received_date = r.received_date
+              AND linked_r.payment_method = r.payment_method
+              AND linked_r.debit_account = r.debit_account
+              AND linked_r.origin = r.origin
+              AND linked_r.status IN ('pending', 'posted')
+             JOIN receipt_allocations linked_ra ON linked_ra.receipt_id = linked_r.id
             WHERE ra.id = $1
             GROUP BY ra.receipt_id, r.status, r.display_reference,
                      r.journal_entry_id, je.reference_no`,
@@ -635,7 +680,7 @@ export default function (pool) {
               code: "GROUPED_RECEIPT_CANCELLATION_REQUIRED",
               message:
                 "This payment was recorded together with other payments, so it cannot be cancelled by itself.",
-              detail: `Open Receipt #${receiptId}${receiptReference ? ` (${receiptReference})` : ""} to review and cancel the full receipt. This will reverse all ${allocationCount} payments together and keep every invoice balance correct.`,
+              detail: `Open payment group ${receiptReference || "for this payment"} to review and cancel all ${allocationCount} payments together. This keeps every invoice balance correct.`,
               receipt_id: receiptId,
               receipt_status: receiptStatus,
               receipt_reference: receiptReference,

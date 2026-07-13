@@ -2253,7 +2253,7 @@ const InvoiceDetailsPage: React.FC = () => {
                       Status
                     </th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[14%]">
-                      Receipt / Journal
+                      Journal
                     </th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Notes
@@ -2288,7 +2288,20 @@ const InvoiceDetailsPage: React.FC = () => {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap font-mono text-sm text-gray-600 dark:text-gray-400">
                         <div className="flex items-center">
-                          <span>{p.payment_reference || "-"}</span>
+                          {p.payment_reference && p.receipt_id ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSelectedReceiptId(p.receipt_id ?? null)
+                              }
+                              className="text-sky-600 hover:underline dark:text-sky-400"
+                              title={`Manage payment group ${p.payment_reference}`}
+                            >
+                              {p.payment_reference}
+                            </button>
+                          ) : (
+                            <span>{p.payment_reference || "-"}</span>
+                          )}
                           {p.payment_reference && p.status != "cancelled" && (
                             <LinkedPaymentsTooltip
                               paymentReference={p.payment_reference}
@@ -2319,53 +2332,24 @@ const InvoiceDetailsPage: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        {p.receipt_id ||
-                        p.voucher_journal_id ||
-                        p.journal_entry_id ? (
-                          <div className="flex flex-col items-start gap-1">
-                            {p.receipt_id && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setSelectedReceiptId(p.receipt_id ?? null)
-                                }
-                                className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
-                                title="View the full receipt"
-                              >
-                                <IconReceipt size={14} />
-                                <span>
-                                  Receipt #{p.receipt_id}
-                                  {p.receipt_reference
-                                    ? ` (${p.receipt_reference})`
-                                    : ""}
-                                </span>
-                              </button>
-                            )}
-                            {(p.voucher_journal_id || p.journal_entry_id) && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  navigate(
-                                    `/accounting/journal-entries/${
-                                      p.voucher_journal_id ??
-                                      p.journal_entry_id
-                                    }`
-                                  )
-                                }
-                                className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
-                                title="View journal entry"
-                              >
-                                <IconFileInvoice size={14} />
-                                <span className="font-mono">
-                                  {p.journal_reference_no ||
-                                    `Journal #${
-                                      p.voucher_journal_id ??
-                                      p.journal_entry_id
-                                    }`}
-                                </span>
-                              </button>
-                            )}
-                          </div>
+                        {p.voucher_journal_id || p.journal_entry_id ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              navigate(
+                                `/accounting/journal-entries/${
+                                  p.voucher_journal_id ?? p.journal_entry_id
+                                }`
+                              )
+                            }
+                            className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
+                            title="View journal entry"
+                          >
+                            <IconFileInvoice size={14} />
+                            <span className="font-mono">
+                              {p.journal_reference_no || "View Journal"}
+                            </span>
+                          </button>
                         ) : (
                           <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
                         )}
@@ -2667,7 +2651,7 @@ const InvoiceDetailsPage: React.FC = () => {
       <PaymentCancellationErrorDialog
         error={paymentCancellationError}
         onClose={() => setPaymentCancellationError(null)}
-        onViewReceipt={(receiptId: number): void => {
+        onViewPaymentGroup={(receiptId: number): void => {
           setSelectedReceiptId(receiptId);
           setPaymentCancellationError(null);
         }}
