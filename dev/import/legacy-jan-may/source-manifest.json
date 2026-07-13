@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "sources": {
+    "THLD": {
+      "filename": "EXCEL_THLD_(JAN-MAY26).csv",
+      "sha256": "6230d4613768f3f1b51c6195852560446103e39b57b2deb8ac575d8c8ecaa918",
+      "byteLength": 861967,
+      "physicalLineCount": 12684,
+      "columnCount": 10,
+      "sentinelRecord": "\u001a,,,,,,,,,",
+      "expectedCounts": {
+        "accountSections": 884,
+        "activeAccounts": 215,
+        "nonzeroOpenings": 140,
+        "transactionRows": 8261
+      },
+      "expectedOpeningDateExceptions": [],
+      "allowedControlBytes": [
+        {
+          "offset": 297002,
+          "byte": 31,
+          "physicalLine": 4417,
+          "reason": "Audited unit-separator byte embedded in the source PARTICULAR text."
+        }
+      ],
+      "lineNormalizations": [
+        {
+          "physicalLine": 7262,
+          "rawLineSha256": "f0527fcd9d1a9cc639357d05f235e4f9d540bcde2de8ee8847e1a5a7b6c5d3ec",
+          "reason": "The export left the first comma-containing part of PARTICULAR unquoted.",
+          "normalizedFields": [
+            "7262",
+            "30/01/2026",
+            "PV012/01",
+            "CBN (EAST MALAYSIA) S/B #210972-27/01/2026 (9/16X2 NC BOLT/NUT/SW/FW, M12 X 50 G10.9 BOLT/NUT/SW/FW/M10 X 50 Z/P BOLT/NUT/SW.FW, 3/8 X 1.1/4\" NC SS304 BOLT/NUT/M12 X 50 SS304/5/16 X 1\" NC SS304 BOLT/\"",
+            "PB350743",
+            "194.4",
+            "",
+            "899.73 DR",
+            "",
+            ""
+          ]
+        },
+        {
+          "physicalLine": 12049,
+          "rawLineSha256": "9f6f35fb3443de46bfa19200371bc1117a4f661658b1e44335047fa2c01e53df",
+          "reason": "The export split the 3/4-inch text in PARTICULAR into a false CSV column.",
+          "normalizedFields": [
+            "12049",
+            "27/03/2026",
+            "PV005/03",
+            "T.E.W MACHINERY S/B #M-IV2603/025-11/03/2026 (AVA/AV FUEL TANK/MODIFY AVA FUEL PIPE/C/W HOSE CLIP 20,38,50,70,3/4\" FOR REPAIR CONCRETE MIXER)\"",
+            "PB350757",
+            "225",
+            "",
+            "1,721.05 DR",
+            "",
+            ""
+          ]
+        }
+      ]
+    },
+    "THDB": {
+      "filename": "EXCEL_THDB_(Jan-May26).csv",
+      "sha256": "6ef5ee949cca9b7903cff5ede201bea5d6e6bc8d341c45e91ea060aeac905a81",
+      "byteLength": 330107,
+      "physicalLineCount": 10271,
+      "columnCount": 8,
+      "sentinelRecord": "\u001a,,,,,,,",
+      "expectedCounts": {
+        "accountSections": 1685,
+        "activeAccounts": 208,
+        "nonzeroOpenings": 152,
+        "transactionRows": 1843
+      },
+      "expectedOpeningDateExceptions": [
+        {
+          "physicalLine": 8834,
+          "accountCode": "SUN",
+          "entryDate": "2026-05-31",
+          "runningBalanceCents": 0
+        }
+      ],
+      "allowedControlBytes": [],
+      "lineNormalizations": []
+    }
+  },
+  "expectedCombinedSource": {
+    "transactionRows": 10104,
+    "journalGroups": 3880,
+    "debitCents": 1350848707,
+    "creditCents": 1350848707,
+    "unbalancedJournalGroups": 8
+  },
+  "expectedStagingSha256": "08dae08b3f730716000d3f27a5407686b05ca2a4df0cd242ef93a836fd4e8b7f"
+}

@@ -20,6 +20,7 @@ import { EInvoiceConsolidatedAdjustmentTemplate } from "../../../utils/invoice/e
 import {
   TIENHOCK_INFO,
 } from "../../../utils/invoice/einvoice/companyInfo.js";
+import { assertTienHockAccountingDateUnlocked } from "../../accounting/posting-lock.js";
 
 const VALID_TYPES = ["credit_note", "debit_note", "refund_note"];
 const MONEY_TOLERANCE = 0.005;
@@ -450,6 +451,13 @@ async function applyAccountingForCreate(client, doc, invoice) {
     paymenttype: invoice.paymenttype,
     sourceType: T.docs.startsWith("jellypolly") ? "jp_adjustment" : "adjustment",
   };
+
+  if (journalOpts.sourceType === "adjustment") {
+    assertTienHockAccountingDateUnlocked(
+      doc.createddate,
+      `Adjustment document ${doc.display_id || doc.id}`
+    );
+  }
 
   let journalEntryId = null;
 
@@ -891,8 +899,17 @@ async function resolveReferencedDocument(client, doc) {
     let docCreatedDate;
     try {
       docCreatedDate = normalizeCreatedDate(createddate);
+      if (COMPANY_PREFIX === "TH") {
+        assertTienHockAccountingDateUnlocked(
+          docCreatedDate,
+          "Adjustment document"
+        );
+      }
     } catch (error) {
-      return res.status(400).json({ message: error.message });
+      return res.status(error.status || 400).json({
+        code: error.code,
+        message: error.message,
+      });
     }
 
     const client = await pool.connect();
@@ -1216,8 +1233,8 @@ async function resolveReferencedDocument(client, doc) {
           ? "Document No. is already used by an active adjustment document"
           : error.message || "Error creating adjustment document";
       res
-        .status(400)
-        .json({ message });
+        .status(error.status || 400)
+        .json({ code: error.code, message });
     } finally {
       client.release();
     }
@@ -1238,6 +1255,13 @@ async function resolveReferencedDocument(client, doc) {
       );
       if (docResult.rows.length === 0) throw new Error("Document not found");
       const doc = docResult.rows[0];
+
+      if (COMPANY_PREFIX === "TH") {
+        assertTienHockAccountingDateUnlocked(
+          doc.createddate,
+          `Adjustment document ${doc.display_id || doc.id}`
+        );
+      }
 
       if (doc.status === "cancelled") {
         throw new Error(
@@ -1397,7 +1421,10 @@ async function resolveReferencedDocument(client, doc) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error(`Error cancelling adjustment doc ${id}:`, error);
-      res.status(400).json({ message: error.message });
+      res.status(error.status || 400).json({
+        code: error.code,
+        message: error.message,
+      });
     } finally {
       client.release();
     }

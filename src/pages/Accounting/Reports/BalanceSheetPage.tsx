@@ -10,10 +10,13 @@ import { generateBalanceSheetPDF } from "../../../utils/accounting/BalanceSheetP
 import toast from "react-hot-toast";
 
 interface LineItem {
-  note: string;
+  note: string | null;
   name: string;
   amount: number;
 }
+
+const formatLineItemLabel = (item: LineItem): string =>
+  item.note ? `${item.name} (Note ${item.note})` : item.name;
 
 interface BalanceSheetData {
   period: {
@@ -106,10 +109,11 @@ const BalanceSheetPage: React.FC = () => {
   };
 
   const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat("en-MY", {
+    const formatted = new Intl.NumberFormat("en-MY", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(Math.abs(amount));
+    return amount < 0 ? `(${formatted})` : formatted;
   };
 
   const getMonthName = (date: Date): string => {
@@ -239,9 +243,12 @@ const BalanceSheetPage: React.FC = () => {
                   </h4>
                   <div className="space-y-1 pl-4">
                     {data.assets.non_current.items.map((item) => (
-                      <div key={item.note} className="flex justify-between text-sm">
+                      <div
+                        key={`${item.note ?? "no-note"}-${item.name}`}
+                        className="flex justify-between text-sm"
+                      >
                         <span className="text-gray-700 dark:text-gray-300">
-                          {item.name} (Note {item.note})
+                          {formatLineItemLabel(item)}
                         </span>
                         <span className="text-gray-900 dark:text-white">
                           {formatCurrency(item.amount)}
@@ -266,9 +273,12 @@ const BalanceSheetPage: React.FC = () => {
                   </h4>
                   <div className="space-y-1 pl-4">
                     {data.assets.current.items.map((item) => (
-                      <div key={item.note} className="flex justify-between text-sm">
+                      <div
+                        key={`${item.note ?? "no-note"}-${item.name}`}
+                        className="flex justify-between text-sm"
+                      >
                         <span className="text-gray-700 dark:text-gray-300">
-                          {item.name} (Note {item.note})
+                          {formatLineItemLabel(item)}
                         </span>
                         <span className="text-gray-900 dark:text-white">
                           {formatCurrency(item.amount)}
@@ -308,9 +318,12 @@ const BalanceSheetPage: React.FC = () => {
                   </h4>
                   <div className="space-y-1 pl-4">
                     {data.liabilities.non_current.items.map((item) => (
-                      <div key={item.note} className="flex justify-between text-sm">
+                      <div
+                        key={`${item.note ?? "no-note"}-${item.name}`}
+                        className="flex justify-between text-sm"
+                      >
                         <span className="text-gray-700 dark:text-gray-300">
-                          {item.name} (Note {item.note})
+                          {formatLineItemLabel(item)}
                         </span>
                         <span className="text-gray-900 dark:text-white">
                           {formatCurrency(item.amount)}
@@ -335,9 +348,12 @@ const BalanceSheetPage: React.FC = () => {
                   </h4>
                   <div className="space-y-1 pl-4">
                     {data.liabilities.current.items.map((item) => (
-                      <div key={item.note} className="flex justify-between text-sm">
+                      <div
+                        key={`${item.note ?? "no-note"}-${item.name}`}
+                        className="flex justify-between text-sm"
+                      >
                         <span className="text-gray-700 dark:text-gray-300">
-                          {item.name} (Note {item.note})
+                          {formatLineItemLabel(item)}
                         </span>
                         <span className="text-gray-900 dark:text-white">
                           {formatCurrency(item.amount)}
@@ -362,9 +378,12 @@ const BalanceSheetPage: React.FC = () => {
                   </h4>
                   <div className="space-y-1 pl-4">
                     {data.equity.items.map((item) => (
-                      <div key={item.note} className="flex justify-between text-sm">
+                      <div
+                        key={`${item.note ?? "no-note"}-${item.name}`}
+                        className="flex justify-between text-sm"
+                      >
                         <span className="text-gray-700 dark:text-gray-300">
-                          {item.name} (Note {item.note})
+                          {formatLineItemLabel(item)}
                         </span>
                         <span className="text-gray-900 dark:text-white">
                           {formatCurrency(item.amount)}

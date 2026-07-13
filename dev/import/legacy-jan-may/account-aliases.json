@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "aliases": [
+    {
+      "source": "THLD",
+      "sourceCode": "PBB_1",
+      "targetCode": "BANK_PBB",
+      "reason": "Legacy Public Bank activity belongs on the ERP bank code."
+    },
+    {
+      "source": "THLD",
+      "sourceCode": "ABB",
+      "targetCode": "BANK_ABB",
+      "reason": "Legacy Alliance Bank activity belongs on the ERP bank code."
+    },
+    {
+      "source": "THDB",
+      "sourceCode": "HR",
+      "targetCode": "HR-D",
+      "reason": "The debtor child uses HR-D because HR is already an ERP account code."
+    },
+    {
+      "source": "THDB",
+      "sourceCode": "CRYISTELLY",
+      "targetCode": "CRYISTELLYN",
+      "reason": "Audited customer-id normalization."
+    },
+    {
+      "source": "THDB",
+      "sourceCode": "RS THOYIBAN-PTN",
+      "targetCode": "RS THOYYIBAN-PTN",
+      "reason": "Audited customer-id normalization."
+    },
+    {
+      "source": "THDB",
+      "sourceCode": "SABRINA",
+      "targetCode": "SABRINA_F",
+      "reason": "Audited customer-id normalization."
+    }
+  ],
+  "requiredExactCodes": [
+    {
+      "source": "THDB",
+      "code": "AMY",
+      "reason": "The ERP id is normalized by SQL to AMY with no trailing space."
+    },
+    {
+      "source": "THDB",
+      "code": "STELLA",
+      "reason": "The ERP id is normalized by SQL to STELLA with no trailing space."
+    },
+    {
+      "source": "THLD",
+      "code": "HPA_SWJ9882",
+      "reason": "SWJ9882 is the approved and correct hire-purchase code."
+    },
+    {
+      "source": "THLD",
+      "code": "HPB_SWJ9882",
+      "reason": "SWJ9882 is the approved and correct hire-purchase code."
+    }
+  ],
+  "excludedSections": [
+    {
+      "source": "THLD",
+      "code": "HR",
+      "reason": "Duplicate projection of the THDB HR debtor section."
+    },
+    {
+      "source": "THLD",
+      "code": "DEBTOR",
+      "reason": "Static control opening superseded by THDB customer detail."
+    }
+  ],
+  "sourceOwnedJournalRefs": [
+    "THCN/26/01",
+    "THCN/26/02",
+    "THCN/26/03",
+    "THCN/26/04",
+    "THCN/26/05",
+    "THCN/26/06",
+    "THCN/26/07",
+    "THCN/26/08",
+    "THCN/26/09",
+    "THCN/26/10",
+    "THCN/26/11",
+    "THCN/26/12",
+    "THCN/26/13",
+    "THCN/26/14",
+    "THCN/26/15",
+    "THCN/26/16"
+  ],
+  "specialCases": {
+    "invoice015347": {
+      "invoiceId": "015347",
+      "customerAccount": "CHARLES-C",
+      "entryDate": "2026-05-26",
+      "amountCents": 17000,
+      "groupKey": "2026-05-26|SPECIAL-015347-CHARLES-C",
+      "salesSource": {
+        "source": "THLD",
+        "physicalLine": 5497,
+        "legacyAccountCode": "CR_SALES",
+        "journalRef": "15347",
+        "particulars": "INV/NO : 015347 CHARLES-C"
+      },
+      "bankSource": {
+        "source": "THLD",
+        "physicalLine": 11349,
+        "legacyAccountCode": "PBB_1",
+        "journalRef": "T260526",
+        "particulars": "INV/NO : 015347/CHARLES-C",
+        "chequeReference": "T260526"
+      },
+      "reason": "User-approved four-line routing: DR CHARLES-C / CR CR_SALES, then DR BANK_PBB / CR CHARLES-C, while preserving both legacy display references."
+    }
+  }
+}

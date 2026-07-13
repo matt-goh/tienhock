@@ -7,6 +7,7 @@ import {
   cancelReceipt,
   toLocalDateString,
 } from "../../accounting/receipt-service.js";
+import { assertTienHockAccountingDateUnlocked } from "../../accounting/posting-lock.js";
 
 // Helper function (can be moved to a shared util if used elsewhere)
 const updateCustomerCredit = async (client, customerId, amount) => {
@@ -378,8 +379,14 @@ export default function (pool) {
       await client.query("ROLLBACK");
       console.error("Error creating payment:", error);
       res
-        .status(500)
-        .json({ message: "Error creating payment", error: error.message });
+        .status(error.status || 500)
+        .json({
+          code: error.code,
+          message: error.status
+            ? error.message
+            : "Error creating payment",
+          error: error.status ? undefined : error.message,
+        });
     } finally {
       client.release();
     }
@@ -563,7 +570,10 @@ export default function (pool) {
       console.error("Error confirming payment(s):", error);
       res
         .status(error.status || 400)
-        .json({ message: error.message || "Error confirming payment(s)" });
+        .json({
+          code: error.code,
+          message: error.message || "Error confirming payment(s)",
+        });
     } finally {
       client.release();
     }
@@ -606,6 +616,11 @@ export default function (pool) {
         invoice_status,
       } = payment;
       const paidAmount = parseFloat(amount_paid || 0);
+
+      assertTienHockAccountingDateUnlocked(
+        payment.payment_date,
+        `Payment ${paymentIdNum}`
+      );
 
       // Optional: Prevent canceling payment if invoice is cancelled?
       if (invoice_status === "cancelled") {
@@ -818,8 +833,14 @@ export default function (pool) {
       await client.query("ROLLBACK");
       console.error("Error cancelling payment:", error);
       res
-        .status(500)
-        .json({ message: "Error cancelling payment", error: error.message });
+        .status(error.status || 500)
+        .json({
+          code: error.code,
+          message: error.status
+            ? error.message
+            : "Error cancelling payment",
+          error: error.status ? undefined : error.message,
+        });
     } finally {
       client.release();
     }

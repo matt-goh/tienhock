@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-13",
+    ms: "Laporan Trial Balance dan Balance Sheet kini menggunakan baki pembukaan akaun bersama pergerakan jurnal bagi tempoh yang dipilih, manakala Income Statement dan CoGM menggunakan jurnal sahaja. Balance Sheet turut memaparkan Untung Tahun Semasa. Rekod jualan, resit dan nota pelarasan Tien Hock bertarikh sebelum 1 Jun 2026 kini dilindungi daripada perubahan yang boleh memposkan semula catatan akaun lama secara tidak sengaja.",
+    en: "Trial Balance and Balance Sheet reports now use account opening balances together with journal movements for the selected period, while the Income Statement and CoGM use journals only. The Balance Sheet also shows Current Year Profit. Tien Hock sales, receipts and adjustment notes dated before 1 June 2026 are now protected from changes that could accidentally repost historical accounting entries.",
+  },
+  {
+    date: "2026-07-13",
     ms: "Bahagian Stock Kilang pada halaman Material Stock kini menjadi rekod kos bulanan yang berasingan. Kuantitinya hanya berubah melalui catatan pada halaman ini dan tidak lagi diambil daripada atau mengubah rekod pengeluaran, jualan atau stok produk. Semua produk MEE atau BIHUN yang aktif kini dipaparkan supaya kuantiti boleh dimasukkan walaupun belum mempunyai baki.",
     en: "The Stock Kilang section on Material Stock is now a separate monthly costing record. Its quantities change only through entries on this page and no longer come from or alter production, sales, or product-stock records. All active MEE or BIHUN products are now shown so quantities can be entered even when they have no balance yet.",
   },

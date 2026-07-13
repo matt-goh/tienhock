@@ -16,6 +16,10 @@ import {
   invoiceLocalDateString,
 } from "../../accounting/sales-journal.js";
 import { createReceipt } from "../../accounting/receipt-service.js";
+import {
+  assertTienHockAccountingDateUnlocked,
+  isAccountingPeriodLockedError,
+} from "../../accounting/posting-lock.js";
 
 // Map to track pending invoices with their timeout handlers
 const pendingInvoiceTimeouts = new Map();
@@ -2338,6 +2342,11 @@ export default function (pool, config) {
         );
       }
 
+      assertTienHockAccountingDateUnlocked(
+        invoice.createddate,
+        `Sales invoice ${invoice.id}`
+      );
+
       const checkQuery = "SELECT id FROM invoices WHERE id = $1";
       const checkResult = await client.query(checkQuery, [invoice.id]);
       if (checkResult.rows.length > 0) {
@@ -2465,6 +2474,12 @@ export default function (pool, config) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Error submitting invoice:", error);
+      if (isAccountingPeriodLockedError(error)) {
+        return res.status(error.status).json({
+          code: error.code,
+          message: error.message,
+        });
+      }
       // Send specific duplicate error if applicable
       if (error.message && error.message.includes("already exists")) {
         res.status(409).json({ message: error.message });
@@ -2482,12 +2497,28 @@ export default function (pool, config) {
   router.post("/submit-invoices", async (req, res) => {
     const fieldsParam = req.query.fields;
     const isMinimal = fieldsParam === "minimal";
+    const invoicePayloads = Array.isArray(req.body) ? req.body : [req.body]; // Original payloads
+
+    // Reject the whole batch before any database or MyInvois side effects.
+    try {
+      for (const invoice of invoicePayloads) {
+        assertTienHockAccountingDateUnlocked(
+          invoice.createdDate || Date.now().toString(),
+          `Sales invoice ${invoice.billNumber || "(new)"}`
+        );
+      }
+    } catch (error) {
+      return res.status(error.status || 400).json({
+        code: error.code,
+        message: error.message,
+      });
+    }
+
     const client = await pool.connect(); // DB client for initial inserts
 
     // Arrays to track outcomes
     const dbResults = { success: [], errors: [], duplicates: [] };
     const savedInvoiceDataForEInvoice = []; // Data for MyInvois API call
-    const invoicePayloads = Array.isArray(req.body) ? req.body : [req.body]; // Original payloads
 
     try {
       // --- Step 1: Process and Save Invoices to Database ---
@@ -2629,12 +2660,14 @@ export default function (pool, config) {
 
           // Post the invoice-owned journal (CASH bills: DR CH_REV1 / CR CASH_SALES
           // plus the auto-collection payment row dated to the invoice's LOCAL date —
-          // never the submission time). Swallow errors so a mobile bill is never
-          // blocked by a journal failure — sync self-heals on later edits and the
-          // backfill is idempotent.
+          // never the submission time). Non-lock failures remain recoverable so
+          // the journal can self-heal later; a locked date aborts the batch.
           try {
             await syncSalesJournalEntry(client, savedInvoice, null);
           } catch (salesJournalError) {
+            if (isAccountingPeriodLockedError(salesJournalError)) {
+              throw salesJournalError;
+            }
             console.error(
               `Failed to post sales journal for invoice ${savedInvoice.id}:`,
               salesJournalError
@@ -2663,6 +2696,9 @@ export default function (pool, config) {
           });
           dbResults.success.push({ billNumber: savedInvoice.id }); // Minimal success info for DB step
         } catch (error) {
+          if (isAccountingPeriodLockedError(error)) {
+            throw error;
+          }
           if (error.code === "DUPLICATE_DB") {
             dbResults.duplicates.push({
               billNumber: invoice.billNumber,
@@ -2722,6 +2758,12 @@ export default function (pool, config) {
     } catch (dbError) {
       await client.query("ROLLBACK");
       console.error("Critical error during database processing:", dbError);
+      if (isAccountingPeriodLockedError(dbError)) {
+        return res.status(dbError.status).json({
+          code: dbError.code,
+          message: dbError.message,
+        });
+      }
       // *** RESPONSE CONSISTENCY: Mimic old error format ***
       if (isMinimal) {
         return res.status(500).json({
@@ -3102,7 +3144,8 @@ export default function (pool, config) {
 
       // 1. Get Invoice details for credit adjustment and e-invoice check
       const invoiceQuery = `
-        SELECT id, customerid, paymenttype, totalamountpayable, balance_due, uuid, einvoice_status, invoice_status, journal_entry_id
+        SELECT id, customerid, paymenttype, totalamountpayable, balance_due,
+               uuid, einvoice_status, invoice_status, journal_entry_id, createddate
         FROM invoices
         WHERE id = $1 FOR UPDATE`; // Lock row
       const invoiceResult = await client.query(invoiceQuery, [id]);
@@ -3113,6 +3156,11 @@ export default function (pool, config) {
       }
       const invoice = invoiceResult.rows[0];
       const invoiceTotal = parseFloat(invoice.totalamountpayable || 0);
+
+      assertTienHockAccountingDateUnlocked(
+        invoice.createddate,
+        `Sales invoice ${id}`
+      );
 
       // If already cancelled, do nothing
       if (invoice.invoice_status === "cancelled") {
@@ -3331,9 +3379,12 @@ export default function (pool, config) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Error cancelling invoice and payments:", error); // Updated log message
-      res.status(500).json({
-        message: "Error cancelling invoice and payments",
-        error: error.message,
+      res.status(error.status || 500).json({
+        code: error.code,
+        message: error.status
+          ? error.message
+          : "Error cancelling invoice and payments",
+        error: error.status ? undefined : error.message,
       }); // Updated error message
     } finally {
       client.release();
@@ -3453,6 +3504,11 @@ export default function (pool, config) {
 
       const invoice = invoiceResult.rows[0];
       const oldTotal = parseFloat(invoice.totalamountpayable || 0);
+
+      assertTienHockAccountingDateUnlocked(
+        invoice.createddate,
+        `Sales invoice ${id}`
+      );
 
       // 2. Check if this requires e-Invoice cancellation confirmation
       const requiresConfirmation =
@@ -3719,9 +3775,10 @@ export default function (pool, config) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Error updating order details:", error);
-      res.status(500).json({
-        message: "Error updating order details",
-        error: error.message,
+      res.status(error.status || 500).json({
+        code: error.code,
+        message: error.status ? error.message : "Error updating order details",
+        error: error.status ? undefined : error.message,
       });
     } finally {
       client.release();
@@ -3746,7 +3803,8 @@ export default function (pool, config) {
 
       // 1. First, get the current invoice to check status
       const invoiceCheckQuery = `
-      SELECT id, customerid, einvoice_status, invoice_status, uuid, submission_uid, datetime_validated
+      SELECT id, customerid, einvoice_status, invoice_status, uuid,
+             submission_uid, datetime_validated, createddate
       FROM invoices 
       WHERE id = $1
     `;
@@ -3760,6 +3818,11 @@ export default function (pool, config) {
       }
 
       const invoice = invoiceResult.rows[0];
+
+      assertTienHockAccountingDateUnlocked(
+        invoice.createddate,
+        `Sales invoice ${id}`
+      );
 
       // 2. Check if this is critical e-Invoice data change
       const requiresConfirmation =
@@ -3857,9 +3920,12 @@ export default function (pool, config) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Error updating invoice customer:", error);
-      res.status(500).json({
-        message: "Error updating invoice customer",
-        error: error.message,
+      res.status(error.status || 500).json({
+        code: error.code,
+        message: error.status
+          ? error.message
+          : "Error updating invoice customer",
+        error: error.status ? undefined : error.message,
       });
     } finally {
       client.release();
@@ -3970,6 +4036,11 @@ export default function (pool, config) {
           paymenttype: paymenttype,
         });
       }
+
+      assertTienHockAccountingDateUnlocked(
+        currentInvoice.createddate,
+        `Sales invoice ${id}`
+      );
 
       // A pending cheque receipt must be resolved before converting either way —
       // its allocation is validated against the invoice's balance semantics.
@@ -4118,8 +4189,13 @@ export default function (pool, config) {
       await client.query("ROLLBACK");
       console.error("Error updating payment type:", error);
       res
-        .status(error.message === "Invoice not found" ? 404 : 400)
-        .json({ message: error.message || "Error updating payment type" });
+        .status(
+          error.status || (error.message === "Invoice not found" ? 404 : 400)
+        )
+        .json({
+          code: error.code,
+          message: error.message || "Error updating payment type",
+        });
     } finally {
       client.release();
     }
@@ -4151,7 +4227,7 @@ export default function (pool, config) {
 
       // Check if invoice exists and get current status
       const invoiceCheck = await client.query(
-        "SELECT id, einvoice_status, invoice_status, uuid, submission_uid, datetime_validated, paymenttype, totalamountpayable, customerid, is_consolidated, journal_entry_id FROM invoices WHERE id = $1",
+        "SELECT id, einvoice_status, invoice_status, uuid, submission_uid, datetime_validated, paymenttype, totalamountpayable, customerid, is_consolidated, journal_entry_id, createddate FROM invoices WHERE id = $1",
         [id]
       );
 
@@ -4160,6 +4236,15 @@ export default function (pool, config) {
       }
 
       const invoice = invoiceCheck.rows[0];
+
+      assertTienHockAccountingDateUnlocked(
+        invoice.createddate,
+        `Sales invoice ${id} (current date)`
+      );
+      assertTienHockAccountingDateUnlocked(
+        createddate,
+        `Sales invoice ${id} (new date)`
+      );
 
       // Check if this requires e-Invoice cancellation confirmation
       const requiresConfirmation =
@@ -4252,8 +4337,13 @@ export default function (pool, config) {
       await client.query("ROLLBACK");
       console.error("Error updating date/time:", error);
       res
-        .status(error.message === "Invoice not found" ? 404 : 400)
-        .json({ message: error.message || "Error updating date/time" });
+        .status(
+          error.status || (error.message === "Invoice not found" ? 404 : 400)
+        )
+        .json({
+          code: error.code,
+          message: error.message || "Error updating date/time",
+        });
     } finally {
       client.release();
     }
