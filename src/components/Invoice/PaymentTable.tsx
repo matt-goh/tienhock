@@ -346,23 +346,25 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                   // Render grouped payments
                   return (
                     <React.Fragment key={reference}>
-                      <tr className="bg-gray-50 dark:bg-gray-900/50">
-                        <td className="px-3 py-3 text-sm">
+                      <tr className="bg-sky-50/80 dark:bg-sky-950/30">
+                        <td className="border-l-4 border-sky-400 px-3 py-3 text-sm font-medium text-gray-800 dark:border-sky-600 dark:text-gray-100">
                           {formatDate(firstPayment.payment_date)}
                         </td>
                         <td className="px-3 py-3 max-w-[150px]">
-                          <div className="font-medium text-gray-900 dark:text-gray-100 truncate" title={firstPayment.payment_reference || ''}>
+                          <div className="truncate font-mono font-semibold text-gray-900 dark:text-gray-100" title={firstPayment.payment_reference || ''}>
                             {firstPayment.payment_reference}
                           </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            ({paymentGroup.length} invoices)
-                          </div>
+                          <span className="mt-1 inline-flex rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700 dark:bg-sky-900/50 dark:text-sky-300">
+                            {paymentGroup.length} invoices
+                          </span>
                         </td>
                         <td
-                          className="px-3 py-3 text-sm text-gray-500"
+                          className="px-3 py-3 text-sm"
                           colSpan={2}
                         >
-                          Multiple invoices
+                          <span className="inline-flex rounded-md border border-sky-200 bg-white/70 px-2 py-1 text-xs font-medium text-sky-700 dark:border-sky-800 dark:bg-gray-900/40 dark:text-sky-300">
+                            Grouped payment
+                          </span>
                         </td>
                         <td className="px-3 py-3">
                           <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400 capitalize">
@@ -416,18 +418,33 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                           </div>
                         </td>
                       </tr>
-                      {paymentGroup.map((payment) => (
-                        <tr key={payment.payment_id} className="bg-white dark:bg-gray-800">
-                          <td className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400 pl-6">
-                            └
+                      {paymentGroup.map((payment, paymentIndex) => {
+                        const isLastPayment: boolean =
+                          paymentIndex === paymentGroup.length - 1;
+
+                        return (
+                          <tr
+                            key={payment.payment_id}
+                            className="bg-white transition-colors hover:bg-sky-50/60 dark:bg-gray-800 dark:hover:bg-sky-950/20"
+                          >
+                          <td className="relative border-l-4 border-sky-400 px-3 py-3 pl-8 dark:border-sky-600">
+                            <span
+                              aria-hidden="true"
+                              className={`absolute left-5 w-px bg-sky-300 dark:bg-sky-700 ${
+                                isLastPayment ? "top-0 h-1/2" : "inset-y-0"
+                              }`}
+                            />
+                            <span
+                              aria-hidden="true"
+                              className="absolute left-[17px] top-1/2 h-2 w-2 -translate-y-1/2 rounded-full border-2 border-sky-400 bg-white dark:border-sky-500 dark:bg-gray-800"
+                            />
+                            <span className="sr-only">Grouped invoice</span>
                           </td>
-                          <td className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">
-                            -
-                          </td>
+                          <td className="px-3 py-3" />
                           <td className="px-3 py-3">
                             <button
                               onClick={() => onViewPayment(payment)}
-                              className="text-sm text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
+                              className="inline-flex rounded-md bg-sky-50 px-2 py-1 font-mono text-sm font-medium text-sky-700 hover:bg-sky-100 hover:text-sky-800 dark:bg-sky-900/30 dark:text-sky-300 dark:hover:bg-sky-900/50 dark:hover:text-sky-200"
                             >
                               {payment.invoice_id}
                             </button>
@@ -440,7 +457,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                               {payment.customer_name}
                             </div>
                           </td>
-                          <td className="px-3 py-3">-</td>
+                          <td className="px-3 py-3" />
                           <td className="px-3 py-3">
                             {getStatusBadge(payment.status)}
                           </td>
@@ -498,8 +515,9 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                               )}
                             </div>
                           </td>
-                        </tr>
-                      ))}
+                          </tr>
+                        );
+                      })}
                     </React.Fragment>
                   );
                 } else {
