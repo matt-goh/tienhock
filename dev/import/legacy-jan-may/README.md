@@ -6,6 +6,14 @@ itself is file-only: it validates the immutable source files and emits a
 normalized staging CSV plus an audit report without connecting to PostgreSQL.
 The separate loader and SQL files perform the reviewed database phases.
 
+**Status:** the guarded Jan-May import was successfully applied to production
+on 2026-07-13. Production contains the exact 3,863 imported journals and
+10,068 lines, with DR = CR RM13,503,516.15. The proof and pristine rollback
+databases were retained, the rollback and post-import backups were validated,
+and the production accounting/application checks passed. The 2026-07-14
+presentation migration described below is the final layer over that unchanged
+accounting projection.
+
 ## Source placement
 
 Place the two private exports in `data/` without editing or re-saving them:
@@ -222,7 +230,44 @@ schema, population, amount, ownership, or checkpoint drift.
    The human-readable acceptance record is
    [LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md](../../../docs/Account/LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md).
 
-## 2026-07-13 development execution result
+7. After the final successful run of the original `verify-import.sql`, apply
+   the auditor-facing presentation migration and immediately rerun it to prove
+   its no-op/idempotent path:
+
+   ```powershell
+   docker cp dev/migrations/2026-07-14_legacy_journal_presentation.sql tienhock_dev_db:/tmp/2026-07-14_legacy_journal_presentation.sql
+   docker exec -i tienhock_dev_db psql -U postgres -d tienhock --no-psqlrc -v ON_ERROR_STOP=1 -f /tmp/2026-07-14_legacy_journal_presentation.sql
+   docker exec -i tienhock_dev_db psql -U postgres -d tienhock --no-psqlrc -v ON_ERROR_STOP=1 -f /tmp/2026-07-14_legacy_journal_presentation.sql
+   ```
+
+   The original `post-monthly-journals.sql`, `verify-import.sql`, and anchor
+   scripts intentionally describe and verify the pre-presentation `IMP`
+   projection: artificial line/header references, `source_type/source_id` NULL,
+   and the original import description. Run all of their required first-run and
+   no-op checks before this step. Do not run those old scripts after presentation.
+   `2026-07-14_legacy_journal_presentation.sql` is the final idempotent verifier
+   for the presented state and must itself pass twice.
+
+   The presentation migration does not change dates, accounts, amounts, status,
+   line order, cheque references, or the hidden unique `IMP-*` header key. It:
+
+   - keeps `entry_type='IMP'` for immutable internal ownership while assigning
+     semantic `legacy_entry_type` values: `S` 2,121; `PUR` 83; `B` 383; `C` 45;
+     `RV` 410; `REC` 758; `J` 53; `JVDR` 5; `JVSL` 5;
+   - sets `source_type='legacy_import'` and `source_id=journal_group_key`, giving
+     every imported header a unique direct link to its hash-pinned staging group;
+   - preserves the repeatable legacy reference for display. For example `34847`
+     legitimately identifies a purchase on 7 May and a sale on 8 May, so it
+     cannot replace the globally unique internal `IMP-*` key;
+   - restores every line's exact legacy-visible reference. The approved special
+     four-line `015347` group retains both `15347` and `T260526`;
+   - replaces `Legacy import {ref}` with a deterministic source-particular
+     summary. The export has no journal-header description field: when a group
+     has several distinct PARTICULAR values, the header is only the first
+     source particular plus `(+N more particulars)`. Exact source text remains
+     on every line and the summary must not be described as a source header.
+
+## 2026-07-13 development and production execution result
 
 - Staging: 12,635 rows; 2,567 openings; 10,068 transaction lines;
   3,863 balanced groups; DR = CR RM13,503,516.15.
@@ -238,23 +283,30 @@ schema, population, amount, ownership, or checkpoint drift.
 - The anchor rerun inserted zero rows, and the independent acceptance suite
   passed again after anchor insertion.
 
-The development accounting result is exact. Production execution still
-requires the pinned live read-only inventory, a fresh proof-database rehearsal,
-a validated rollback backup, and a maintenance window. The separate
-operational-invoice differences remain open until the original legacy
-invoice/item evidence is available; they do not alter the exact imported
-ledger projection.
+The development result was reproduced successfully on production on
+2026-07-13. The live inventory passed, the complete sequence was rehearsed on a
+fresh proof restore, PM2 was stopped for the guarded write, and byte-validated
+pre- and post-import backups plus the pristine rollback database were retained.
+Production was then verified through the database acceptance gates, January-
+June report checkpoints, PM2 health, and internal/external HTTP checks. The
+separate operational-invoice differences remain open until the original legacy
+invoice/item evidence is available; they do not alter the exact imported ledger
+projection.
 
-## Production cutover (system PostgreSQL)
+## Production cutover record and reproduction runbook (system PostgreSQL)
 
-Do not use the database-replacement upload for this rollout and do not rerun
-the broad June refactor migrations. The 13 July production snapshot already
-contains the June receipt, bank-in, debtor, and visible-reference end state.
-This rollout adds only the guarded Jan-May import phases listed above.
+The guarded cutover completed successfully on 2026-07-13. The commands below
+remain the exact recovery/reproduction runbook; they are not permission to rerun
+the import against the live database. Do not use the database-replacement upload
+for this work and do not rerun the broad June refactor migrations. The 13 July
+production snapshot already contained the June receipt, bank-in, debtor, and
+visible-reference end state. The completed rollout added only the guarded
+Jan-May phases listed above.
 
 The production checkout must first contain the anchor-aware report code, the
-pre-June application posting lock, and the API/UI guard that reserves `IMP` for
-the immutable historical import. Keep the private source CSV, generated
+pre-June application posting lock, and API/UI guards that identify immutable
+historical rows through `source_type='legacy_import'`, retaining `IMP` as the
+compatibility fallback. Keep the private source CSV, generated
 staging/report, inventory output, and database backups outside Git with mode
 `0600`/a restrictive umask.
 
@@ -344,6 +396,10 @@ psql --no-psqlrc --set ON_ERROR_STOP=1 \
 psql --no-psqlrc --set ON_ERROR_STOP=1 \
   --file dev/import/legacy-jan-may/verify-import.sql
 psql --no-psqlrc --set ON_ERROR_STOP=1 \
+  --file dev/migrations/2026-07-14_legacy_journal_presentation.sql
+psql --no-psqlrc --set ON_ERROR_STOP=1 \
+  --file dev/migrations/2026-07-14_legacy_journal_presentation.sql
+psql --no-psqlrc --set ON_ERROR_STOP=1 \
   --file dev/import/legacy-jan-may/verify-invoice-reconciliation.sql
 psql --no-psqlrc --set ON_ERROR_STOP=1 \
   --file dev/import/legacy-jan-may/production-readonly-inventory.sql \
@@ -358,3 +414,10 @@ all database checks pass, restart PM2 and immediately perform read-only
 January-June Trial Balance, Balance Sheet, account-ledger, bank, and General
 Statement spot checks through the app. Stop PM2 again before investigating any
 failed application-level check.
+
+That procedure passed in production on 2026-07-13 for the accounting import.
+The proof database and pristine rollback database were intentionally retained
+for sign-off. For the 2026-07-14 presentation change, begin from the already
+verified production projection, take another backup, then run/re-run only the
+final presentation migration after confirming the old `verify-import.sql`
+acceptance record from the cutover.
