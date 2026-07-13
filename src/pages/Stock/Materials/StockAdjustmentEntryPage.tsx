@@ -154,6 +154,46 @@ const stockTabs: { id: StockEntryTab; label: string; activeClass: string }[] = [
 const MATERIAL_STOCK_TAB_STORAGE_KEY = "materialStock.activeTab";
 const LEGACY_STOCK_TAB_STORAGE_KEY = "materialAndGeneralStock.activeTab";
 
+const selectedMonthStorageKey = (mode: StockEntryMode): string =>
+  mode === "general" ? "generalStock.selectedMonth" : "materialStock.selectedMonth";
+
+const scrollPositionStorageKey = (mode: StockEntryMode): string =>
+  mode === "general" ? "generalStock.scrollTop" : "materialStock.scrollTop";
+
+const readStoredSelectedMonth = (mode: StockEntryMode): Date | null => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const stored: string | null = window.localStorage.getItem(selectedMonthStorageKey(mode));
+    const match: RegExpExecArray | null = stored ? /^(\d{4})-(\d{2})$/.exec(stored) : null;
+    if (!match) return null;
+
+    const yearValue: number = Number.parseInt(match[1], 10);
+    const monthIndex: number = Number.parseInt(match[2], 10) - 1;
+    if (monthIndex < 0 || monthIndex > 11) return null;
+
+    return new Date(yearValue, monthIndex, 1);
+  } catch (_error: unknown) {
+    return null;
+  }
+};
+
+const storeSelectedMonth = (mode: StockEntryMode, date: Date): void => {
+  if (typeof window === "undefined") return;
+
+  try {
+    const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    window.localStorage.setItem(selectedMonthStorageKey(mode), value);
+  } catch (_error: unknown) {
+    // Month preservation is best-effort when browser storage is unavailable.
+  }
+};
+
+const getScrollContainer = (): HTMLElement | null => {
+  if (typeof document === "undefined") return null;
+  return document.querySelector("main");
+};
+
 const isStockEntryTab = (value: string | null): value is StockEntryTab => {
   return value === "general" || value === "mee" || value === "bihun" || value === "shared";
 };
@@ -583,7 +623,9 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
 }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [selectedMonth, setSelectedMonth] = useState<Date>(() => new Date());
+  const [selectedMonth, setSelectedMonth] = useState<Date>(
+    () => readStoredSelectedMonth(mode) || new Date()
+  );
   const availableTabs = useMemo<StockEntryTab[]>(() => getAvailableStockTabs(mode), [mode]);
   const defaultTab = useMemo<StockEntryTab>(() => getDefaultStockEntryTab(mode), [mode]);
   const visibleStockTabs = useMemo(
@@ -622,6 +664,8 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
   const [draggedRowKey, setDraggedRowKey] = useState<string | null>(null);
   const [dragOverlay, setDragOverlay] = useState<DragOverlayState | null>(null);
   const pageHeaderRef = useRef<HTMLDivElement | null>(null);
+  const scrollRestoredRef = useRef<boolean>(false);
+  const wasLoadingRef = useRef<boolean>(false);
   const tooltipTimeoutRef = useRef<number | null>(null);
   const dragStateRef = useRef<DragState | null>(null);
   const dragOverlayRef = useRef<HTMLDivElement | null>(null);
@@ -665,6 +709,57 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
       }
     };
   }, []);
+
+  // Persist the selected month so it is preserved when navigating away and back.
+  useEffect(() => {
+    storeSelectedMonth(mode, selectedMonth);
+  }, [mode, selectedMonth]);
+
+  // Track the main content scroll position so it can be restored on return.
+  useEffect(() => {
+    const scrollContainer: HTMLElement | null = getScrollContainer();
+    if (!scrollContainer) return;
+
+    const handleScroll = (): void => {
+      try {
+        window.sessionStorage.setItem(
+          scrollPositionStorageKey(mode),
+          String(scrollContainer.scrollTop)
+        );
+      } catch (_error: unknown) {
+        // Scroll preservation is best-effort when browser storage is unavailable.
+      }
+    };
+
+    scrollContainer.addEventListener("scroll", handleScroll, { passive: true });
+    return (): void => scrollContainer.removeEventListener("scroll", handleScroll);
+  }, [mode]);
+
+  // Restore the saved scroll position once, after the first data load renders.
+  useEffect(() => {
+    if (isLoading) {
+      wasLoadingRef.current = true;
+      return;
+    }
+    // Only restore after a real load cycle finishes, so the content has height.
+    if (!wasLoadingRef.current || scrollRestoredRef.current) return;
+
+    const scrollContainer: HTMLElement | null = getScrollContainer();
+    if (!scrollContainer) return;
+
+    scrollRestoredRef.current = true;
+    try {
+      const stored: string | null = window.sessionStorage.getItem(
+        scrollPositionStorageKey(mode)
+      );
+      const value: number = stored ? Number.parseInt(stored, 10) : 0;
+      if (!Number.isNaN(value) && value > 0) {
+        scrollContainer.scrollTop = value;
+      }
+    } catch (_error: unknown) {
+      // Ignore restore failures when browser storage is unavailable.
+    }
+  }, [isLoading, mode]);
 
   useEffect(() => {
     const tabParam: string | null = searchParams.get("tab");
