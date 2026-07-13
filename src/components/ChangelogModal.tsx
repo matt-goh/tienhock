@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-13",
+    ms: "Permintaan pendaftaran pelanggan Green Target kini dipaparkan terus di atas senarai Customers supaya staf boleh menyemak, mencipta atau menolak permintaan tanpa membuka halaman berasingan.",
+    en: "Green Target customer signup requests are now shown directly above the Customers list, so staff can review, create, or reject requests without opening a separate page.",
+  },
+  {
+    date: "2026-07-13",
     ms: "Borang pendaftaran pelanggan Green Target kini boleh dihantar dengan betul dari greentarget.tienhock.com tanpa disekat oleh sambungan pelayan.",
     en: "The Green Target customer registration form can now be submitted correctly from greentarget.tienhock.com without being blocked by the server connection.",
   },
