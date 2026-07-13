@@ -3,7 +3,11 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
-import { JournalEntry, CashReceiptVoucherData } from "../../types/types";
+import {
+  JournalEntry,
+  JournalEntryLine,
+  CashReceiptVoucherData,
+} from "../../types/types";
 import {
   useAccountCodesCache,
   useJournalEntryTypesCache,
@@ -21,6 +25,30 @@ import {
   IconX,
   IconPrinter,
 } from "@tabler/icons-react";
+
+const LEGACY_IMPORT_ENTRY_TYPE: string = "IMP";
+
+const isLegacyImportEntry = (entry: JournalEntry): boolean =>
+  entry.is_legacy_import === true ||
+  entry.entry_type === LEGACY_IMPORT_ENTRY_TYPE;
+
+const getVisibleReference = (entry: JournalEntry): string =>
+  isLegacyImportEntry(entry)
+    ? entry.display_reference?.trim() || entry.reference_no
+    : entry.reference_no;
+
+const getDisplayEntryType = (entry: JournalEntry): string =>
+  isLegacyImportEntry(entry)
+    ? entry.display_entry_type || entry.entry_type
+    : entry.entry_type;
+
+const getVisibleLineReference = (
+  line: JournalEntryLine,
+  entry: JournalEntry
+): string | undefined => {
+  if (!isLegacyImportEntry(entry)) return line.reference;
+  return line.display_reference?.trim() || getVisibleReference(entry);
+};
 
 const JournalDetailsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -221,15 +249,23 @@ const JournalDetailsPage: React.FC = () => {
         const account = accountCodes.find((a) => a.code === line.account_code);
         if (account) accountDescriptions[line.account_code] = account.description;
       });
+      const visibleReference: string = getVisibleReference(entry);
+      const displayEntryType: string = getDisplayEntryType(entry);
+      const visibleLines: JournalEntryLine[] = (entry.lines || []).map(
+        (line: JournalEntryLine): JournalEntryLine => ({
+          ...line,
+          reference: getVisibleLineReference(line, entry),
+        })
+      );
       await generateJournalVoucherPDF({
-        reference_no: entry.reference_no,
-        entry_type: entry.entry_type,
-        entry_type_name: getEntryTypeName(entry.entry_type),
+        reference_no: visibleReference,
+        entry_type: displayEntryType,
+        entry_type_name: getEntryTypeName(displayEntryType),
         entry_date: entry.entry_date,
         status: entry.status,
         description: entry.description,
         cheque_no: entry.cheque_no,
-        lines: entry.lines || [],
+        lines: visibleLines,
         total_debit: entry.total_debit,
         total_credit: entry.total_credit,
         accountDescriptions,
@@ -292,16 +328,21 @@ const JournalDetailsPage: React.FC = () => {
     "JVSL",
     "IMP",
   ];
-  const isLegacyImport: boolean = entry.entry_type === "IMP";
+  const isLegacyImport: boolean = isLegacyImportEntry(entry);
+  const visibleReference: string = getVisibleReference(entry);
+  const displayEntryType: string = getDisplayEntryType(entry);
   const isSystemGenerated: boolean =
     SYSTEM_ENTRY_TYPES.includes(entry.entry_type as string) ||
     ((entry.entry_type as string) === "B" &&
       (entry.description || "").startsWith("PRP:"));
-  const canEdit: boolean = entry.status !== "cancelled" && !isSystemGenerated;
+  const canEdit: boolean =
+    entry.status !== "cancelled" && !isLegacyImport && !isSystemGenerated;
   const canCancel: boolean = entry.status !== "cancelled" && !isLegacyImport;
   const canDelete: boolean = !isLegacyImport;
   const canPrintVoucher: boolean =
-    (entry.entry_type as string) === "REC" && entry.status !== "cancelled";
+    !isLegacyImport &&
+    (entry.entry_type as string) === "REC" &&
+    entry.status !== "cancelled";
 
   return (
     <div className="space-y-3">
@@ -321,12 +362,17 @@ const JournalDetailsPage: React.FC = () => {
               <div>
                 <div className="flex items-center gap-3">
                   <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
-                    {entry.reference_no}
+                    {visibleReference}
                   </h1>
                   {getStatusBadge(entry.status)}
+                  {isLegacyImport && (
+                    <span className="inline-flex rounded bg-default-100 dark:bg-gray-700 px-1.5 py-0.5 text-[10px] font-medium text-default-500 dark:text-gray-400">
+                      Legacy
+                    </span>
+                  )}
                 </div>
                 <p className="mt-0.5 text-sm text-default-500 dark:text-gray-400">
-                  {getEntryTypeName(entry.entry_type)} |{" "}
+                  {getEntryTypeName(displayEntryType)} |{" "}
                   {formatDate(entry.entry_date)} | {entry.description || "-"}
                   {entry.cheque_no &&
                     ` | Cheque: ${entry.cheque_no}`}
@@ -442,7 +488,7 @@ const JournalDetailsPage: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-4 py-2.5 text-sm text-default-600 dark:text-gray-300">
-                        {line.reference || "-"}
+                        {getVisibleLineReference(line, entry) || "-"}
                       </td>
                       <td className="px-4 py-2.5 text-sm text-default-600 dark:text-gray-300">
                         {line.particulars || "-"}
@@ -533,7 +579,7 @@ const JournalDetailsPage: React.FC = () => {
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={handleConfirmDelete}
         title="Delete Journal Entry"
-        message={`Are you sure you want to delete entry "${entry.reference_no}"? This action cannot be undone.`}
+        message={`Are you sure you want to delete entry "${visibleReference}"? This action cannot be undone.`}
         confirmButtonText="Delete"
         variant="danger"
       />
@@ -543,7 +589,7 @@ const JournalDetailsPage: React.FC = () => {
         onClose={() => setShowCancelDialog(false)}
         onConfirm={handleConfirmCancel}
         title="Cancel Journal Entry"
-        message={`Are you sure you want to cancel entry "${entry.reference_no}"? This will mark the entry as cancelled.`}
+        message={`Are you sure you want to cancel entry "${visibleReference}"? This will mark the entry as cancelled.`}
         confirmButtonText="Cancel Entry"
         variant="danger"
       />

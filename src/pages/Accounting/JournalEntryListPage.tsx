@@ -19,10 +19,9 @@ import {
   IconX,
 } from "@tabler/icons-react";
 
-interface JournalEntryListItem extends JournalEntry {
-  entry_type_name?: string;
-}
+type JournalEntryListItem = JournalEntry;
 
+const LEGACY_IMPORT_ENTRY_TYPE: string = "IMP";
 const LEGACY_STORAGE_KEY = "journalEntryListDateRange";
 const FILTERS_STORAGE_KEY = "journalEntryListFilters";
 const SCROLL_RESTORATION_KEY: string = "journal-entry-list";
@@ -38,6 +37,20 @@ interface CachedListFilters {
   types: string[];
   statuses: string[];
 }
+
+const isLegacyImportEntry = (entry: JournalEntry): boolean =>
+  entry.is_legacy_import === true ||
+  entry.entry_type === LEGACY_IMPORT_ENTRY_TYPE;
+
+const getVisibleReference = (entry: JournalEntry): string =>
+  isLegacyImportEntry(entry)
+    ? entry.display_reference?.trim() || entry.reference_no
+    : entry.reference_no;
+
+const getDisplayEntryType = (entry: JournalEntry): string =>
+  isLegacyImportEntry(entry)
+    ? entry.display_entry_type || entry.entry_type
+    : entry.entry_type;
 
 // Load cached filters (search, date range, and type/status pill selections) from localStorage
 const loadCachedFilters = (): CachedListFilters => {
@@ -58,7 +71,10 @@ const loadCachedFilters = (): CachedListFilters => {
           end: new Date(parsed.end),
         },
         types: Array.isArray(parsed.types)
-          ? parsed.types.filter((t: unknown) => typeof t === "string")
+          ? parsed.types.filter(
+              (t: unknown): t is string =>
+                typeof t === "string" && t !== LEGACY_IMPORT_ENTRY_TYPE
+            )
           : [],
         statuses: Array.isArray(parsed.statuses)
           ? parsed.statuses.filter((s: unknown) => typeof s === "string")
@@ -95,6 +111,8 @@ const getInitialStateFromParams = (params: URLSearchParams): {
   const urlYear = params.get("year");
   const urlMonth = params.get("month");
   const urlDate = params.get("date");
+  const urlTypes: string[] =
+    urlType && urlType !== LEGACY_IMPORT_ENTRY_TYPE ? [urlType] : [];
 
   // If we have year/month params, use them for date range
   if (urlYear && urlMonth) {
@@ -106,7 +124,7 @@ const getInitialStateFromParams = (params: URLSearchParams): {
     endDate.setHours(23, 59, 59, 999);
     return {
       search: urlSearch || "",
-      types: urlType ? [urlType] : [],
+      types: urlTypes,
       statuses: [],
       dateRange: { start: startDate, end: endDate },
     };
@@ -120,7 +138,7 @@ const getInitialStateFromParams = (params: URLSearchParams): {
     endOfDay.setHours(23, 59, 59, 999);
     return {
       search: urlSearch || "",
-      types: urlType ? [urlType] : [],
+      types: urlTypes,
       statuses: [],
       dateRange: { start: date, end: endOfDay },
     };
@@ -130,7 +148,7 @@ const getInitialStateFromParams = (params: URLSearchParams): {
   const cached = loadCachedFilters();
   return {
     search: urlSearch || cached.search,
-    types: urlType ? [urlType] : cached.types,
+    types: urlType ? urlTypes : cached.types,
     statuses: cached.statuses,
     dateRange: cached.dateRange,
   };
@@ -355,6 +373,20 @@ const JournalEntryListPage: React.FC = () => {
     );
   };
 
+  const getDisplayEntryTypeName = (
+    entry: JournalEntryListItem
+  ): string | undefined => {
+    const displayType: string = getDisplayEntryType(entry);
+    const cachedName: string | undefined = entryTypes.find(
+      (type) => type.code === displayType
+    )?.name;
+
+    if (cachedName) return cachedName;
+    return displayType === entry.entry_type
+      ? entry.entry_type_name || undefined
+      : undefined;
+  };
+
   const hasActiveFilters =
     searchTerm !== "" || selectedTypes.length > 0 || selectedStatuses.length > 0;
 
@@ -450,33 +482,35 @@ const JournalEntryListPage: React.FC = () => {
         {/* Filters - own row below the title/date controls; all pills flow in one wrapping line */}
         <div className="order-4 w-full flex flex-wrap items-center gap-1.5 min-w-0">
           {/* Type pills - toggle each journal type on/off (none selected = show all) */}
-          {entryTypes.map((type) => {
-            const active = selectedTypes.includes(type.code);
-            return (
-              <button
-                key={type.code}
-                type="button"
-                onClick={() => toggleType(type.code)}
-                aria-pressed={active}
-                className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border transition-colors select-none whitespace-nowrap ${
-                  active
-                    ? "border-sky-500 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300"
-                    : "border-default-300 dark:border-gray-600 text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700"
-                }`}
-              >
-                <span className="font-semibold">{type.code}</span>
-                <span
-                  className={
+          {entryTypes
+            .filter((type) => type.code !== LEGACY_IMPORT_ENTRY_TYPE)
+            .map((type) => {
+              const active = selectedTypes.includes(type.code);
+              return (
+                <button
+                  key={type.code}
+                  type="button"
+                  onClick={() => toggleType(type.code)}
+                  aria-pressed={active}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border transition-colors select-none whitespace-nowrap ${
                     active
-                      ? "text-sky-600/80 dark:text-sky-300/80"
-                      : "text-default-500 dark:text-gray-400"
-                  }
+                      ? "border-sky-500 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300"
+                      : "border-default-300 dark:border-gray-600 text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700"
+                  }`}
                 >
-                  {type.name}
-                </span>
-              </button>
-            );
-          })}
+                  <span className="font-semibold">{type.code}</span>
+                  <span
+                    className={
+                      active
+                        ? "text-sky-600/80 dark:text-sky-300/80"
+                        : "text-default-500 dark:text-gray-400"
+                    }
+                  >
+                    {type.name}
+                  </span>
+                </button>
+              );
+            })}
 
           {/* Divider */}
           <span className="h-5 w-px bg-default-300 dark:bg-gray-600 mx-1" />
@@ -583,15 +617,20 @@ const JournalEntryListPage: React.FC = () => {
                     onClick={() => handleView(entry)}
                   >
                     <td className="px-4 py-3 text-sm font-medium text-sky-700 dark:text-sky-400">
-                      {entry.reference_no}
+                      <span>{getVisibleReference(entry)}</span>
+                      {isLegacyImportEntry(entry) && (
+                        <span className="ml-2 inline-flex rounded bg-default-100 dark:bg-gray-700 px-1.5 py-0.5 text-[10px] font-medium text-default-500 dark:text-gray-400 align-middle">
+                          Legacy
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <span className="px-2 py-0.5 rounded bg-default-100 dark:bg-gray-700 text-default-700 dark:text-gray-200 text-xs font-medium">
-                        {entry.entry_type}
+                        {getDisplayEntryType(entry)}
                       </span>
-                      {entry.entry_type_name && (
+                      {getDisplayEntryTypeName(entry) && (
                         <span className="ml-1 text-default-500 dark:text-gray-400 text-xs">
-                          {entry.entry_type_name}
+                          {getDisplayEntryTypeName(entry)}
                         </span>
                       )}
                     </td>
@@ -612,7 +651,7 @@ const JournalEntryListPage: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center space-x-2">
-                        {entry.entry_type !== "IMP" && (
+                        {!isLegacyImportEntry(entry) && (
                           <>
                             <button
                               onClick={(e) => {
@@ -715,7 +754,9 @@ const JournalEntryListPage: React.FC = () => {
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={handleConfirmDelete}
         title="Delete Journal Entry"
-        message={`Are you sure you want to delete entry "${entryToDelete?.reference_no}"? This action cannot be undone.`}
+        message={`Are you sure you want to delete entry "${
+          entryToDelete ? getVisibleReference(entryToDelete) : ""
+        }"? This action cannot be undone.`}
         variant="danger"
       />
 

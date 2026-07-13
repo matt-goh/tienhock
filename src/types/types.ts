@@ -1088,14 +1088,24 @@ export interface AccountCodeInput {
 export type JournalEntryType =
   | "B"
   | "C"
+  | "CN"
+  | "DN"
+  | "GP"
   | "I"
-  | "S"
+  | "IMP"
   | "J"
-  | "R"
-  | "DR"
-  | "CR"
+  | "JVDR"
+  | "JVSL"
   | "O"
-  | "IMP";
+  | "PAY"
+  | "PUR"
+  | "R"
+  | "REC"
+  | "RN"
+  | "RV"
+  | "S"
+  | "DR"
+  | "CR";
 
 export interface JournalEntryTypeInfo {
   code: JournalEntryType;
@@ -1108,7 +1118,15 @@ export interface JournalEntryTypeInfo {
 export interface JournalEntry {
   id: number;
   reference_no: string; // e.g., "PBE002/06"
+  internal_reference_no?: string; // Unique stored key when a repeatable display reference is shown
+  display_reference?: string | null; // Auditor-facing reference; falls back to reference_no
   entry_type: JournalEntryType;
+  legacy_entry_type?: JournalEntryType | null; // Stored semantic type for imported legacy journals
+  display_entry_type?: JournalEntryType | null; // Semantic legacy type; falls back to entry_type
+  entry_type_name?: string | null;
+  is_legacy_import?: boolean;
+  source_type?: string | null;
+  source_id?: string | null;
   entry_date: string; // ISO date string
   description?: string;
   total_debit: number;
@@ -1134,6 +1152,8 @@ export interface JournalEntryLine {
   debit_amount: number;
   credit_amount: number;
   reference?: string; // e.g., cheque number
+  internal_reference?: string | null; // Stored line reference when a display reference is returned
+  display_reference?: string | null; // Exact legacy-visible line reference
   particulars?: string; // Line description
   created_at?: string;
 }
