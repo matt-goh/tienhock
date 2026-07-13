@@ -562,8 +562,8 @@ export default function (pool) {
       await client.query("ROLLBACK");
       console.error("Error confirming payment(s):", error);
       res
-        .status(500)
-        .json({ message: "Error confirming payment(s)", error: error.message });
+        .status(error.status || 400)
+        .json({ message: error.message || "Error confirming payment(s)" });
     } finally {
       client.release();
     }

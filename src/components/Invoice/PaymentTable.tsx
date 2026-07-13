@@ -21,6 +21,7 @@ import {
   confirmPayment,
   cancelPayment,
   getGroupedReceiptCancellationError,
+  getPaymentBankAccountLabel,
   getPaymentCancellationErrorData,
 } from "../../utils/invoice/InvoiceUtils";
 import { api } from "../../routes/utils/api";
@@ -76,8 +77,8 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
     });
   };
 
-  const handleConfirmPayment = async () => {
-    if (!selectedPayment) return;
+  const handleConfirmPayment = async (): Promise<void> => {
+    if (!selectedPayment || confirmingPaymentId !== null) return;
 
     setConfirmingPaymentId(selectedPayment.payment_id);
     setShowConfirmDialog(false);
@@ -86,7 +87,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
     try {
       const confirmedPayments = await confirmPayment(
         selectedPayment.payment_id,
-        selectedBankAccount
+        selectedPayment.receipt_id ? undefined : selectedBankAccount
       );
       let successMessage = "Payment confirmed successfully.";
       if (confirmedPayments.length > 1) {
@@ -264,6 +265,13 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
       return dateB.localeCompare(dateA);
     }
   );
+  const selectedConfirmationGroupSize: number = Math.max(
+    1,
+    Number(selectedPayment?.allocation_count) || 1
+  );
+  const selectedConfirmationIsReceiptBacked: boolean = Boolean(
+    selectedPayment?.receipt_id
+  );
 
   if (payments.length === 0) {
     return (
@@ -362,9 +370,23 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                           className="px-3 py-3 text-sm"
                           colSpan={2}
                         >
-                          <span className="inline-flex rounded-md border border-sky-200 bg-white/70 px-2 py-1 text-xs font-medium text-sky-700 dark:border-sky-800 dark:bg-gray-900/40 dark:text-sky-300">
-                            Grouped payment
-                          </span>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {canManageGroup &&
+                              onViewPaymentGroup &&
+                              manageableReceiptId !== null && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    onViewPaymentGroup(manageableReceiptId)
+                                  }
+                                  className="inline-flex items-center gap-1.5 rounded-md border border-sky-200 bg-white/70 px-2 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-100 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-1 dark:border-sky-800 dark:bg-gray-900/40 dark:text-sky-300 dark:hover:bg-sky-900/50 dark:focus:ring-offset-gray-900"
+                                  title={`Manage payment group ${groupTemplate.payment_reference}`}
+                                >
+                                  <IconSettings size={14} stroke={1.75} />
+                                  <span>Manage Group</span>
+                                </button>
+                              )}
+                          </div>
                         </td>
                         <td className="px-3 py-3">
                           <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400 capitalize">
@@ -382,22 +404,6 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                         </td>
                         <td className="px-3 py-3 text-center">
                           <div className="flex flex-wrap justify-center gap-1.5">
-                            {canManageGroup &&
-                              onViewPaymentGroup &&
-                              manageableReceiptId !== null && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  color="default"
-                                  icon={IconSettings}
-                                  onClick={() =>
-                                    onViewPaymentGroup(manageableReceiptId)
-                                  }
-                                  title={`Manage payment group ${groupTemplate.payment_reference}`}
-                                >
-                                  Manage Group
-                                </Button>
-                              )}
                             {canAddToGroup &&
                               onAddPaymentToGroup &&
                               groupTemplate.payment_reference && (
@@ -414,7 +420,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                                   Add Payment
                                 </Button>
                               )}
-                            {!canAddToGroup && !canManageGroup && "-"}
+                            {!canAddToGroup && "-"}
                           </div>
                         </td>
                       </tr>
@@ -443,6 +449,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                           <td className="px-3 py-3" />
                           <td className="px-3 py-3">
                             <button
+                              type="button"
                               onClick={() => onViewPayment(payment)}
                               className="inline-flex rounded-md bg-sky-50 px-2 py-1 font-mono text-sm font-medium text-sky-700 hover:bg-sky-100 hover:text-sky-800 dark:bg-sky-900/30 dark:text-sky-300 dark:hover:bg-sky-900/50 dark:hover:text-sky-200"
                             >
@@ -552,8 +559,9 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                       </td>
                       <td className="px-3 py-3">
                         <button
+                          type="button"
                           onClick={() => onViewPayment(payment)}
-                          className="text-sky-600 dark:text-sky-400 text-sm hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
+                          className="inline-flex rounded-md bg-sky-50 px-2 py-1 font-mono text-sm font-medium text-sky-700 hover:bg-sky-100 hover:text-sky-800 dark:bg-sky-900/30 dark:text-sky-300 dark:hover:bg-sky-900/50 dark:hover:text-sky-200"
                         >
                           {payment.invoice_id}
                         </button>
@@ -637,58 +645,90 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
         </table>
       </div>
 
-      {/* Confirm Payment Dialog with Bank Account Selection */}
-      {showConfirmDialog && selectedPayment && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md shadow-xl">
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                Confirm Payment
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                Are you sure you want to confirm this {selectedPayment.payment_method} payment of {formatCurrency(selectedPayment.amount_paid)}?
+      {selectedPayment && (
+        <ConfirmationDialog
+          isOpen={showConfirmDialog}
+          onClose={() => {
+            setShowConfirmDialog(false);
+            setSelectedPayment(null);
+            setSelectedBankAccount("BANK_PBB");
+          }}
+          onConfirm={() => void handleConfirmPayment()}
+          title={
+            selectedConfirmationGroupSize > 1
+              ? `Confirm payment group ${
+                  selectedPayment.payment_reference || ""
+                }?`
+              : "Confirm pending payment?"
+          }
+          message={
+            <div className="space-y-3">
+              <p>
+                Confirm the pending{" "}
+                {selectedPayment.payment_method.replace("_", " ")} payment of{" "}
+                <span className="font-semibold text-default-800 dark:text-gray-100">
+                  {formatCurrency(selectedPayment.amount_paid)}
+                </span>
+                ?
               </p>
 
-              <div className="mb-4">
-                <FormListbox
-                  name="bank_account"
-                  label="Deposit To"
-                  value={selectedBankAccount}
-                  onChange={(value) => setSelectedBankAccount(value)}
-                  options={[
-                    { id: "BANK_PBB", name: "Public Bank" },
-                    { id: "BANK_ABB", name: "Alliance Bank" },
-                  ]}
-                  disabled={confirmingPaymentId !== null}
-                />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Select which bank account will receive this payment
-                </p>
-              </div>
+              {selectedConfirmationGroupSize > 1 && (
+                <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sky-800 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-200">
+                  Reference {selectedPayment.payment_reference} covers{" "}
+                  {selectedConfirmationGroupSize} payments. Every payment still
+                  marked Pending will be confirmed together; payments already
+                  confirmed will not change.
+                </div>
+              )}
 
-              <div className="flex justify-end gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowConfirmDialog(false);
-                    setSelectedPayment(null);
-                    setSelectedBankAccount("BANK_PBB");
-                  }}
-                  disabled={confirmingPaymentId !== null}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  color="green"
-                  onClick={handleConfirmPayment}
-                  disabled={confirmingPaymentId !== null}
-                >
-                  Confirm Payment
-                </Button>
-              </div>
+              {selectedConfirmationIsReceiptBacked ? (
+                <div className="rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
+                  <p className="text-xs text-default-500 dark:text-gray-400">
+                    Deposit to
+                  </p>
+                  <p className="mt-1 font-semibold text-default-800 dark:text-gray-100">
+                    {getPaymentBankAccountLabel(
+                      selectedPayment.bank_account || "BANK_PBB"
+                    )}
+                  </p>
+                  <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
+                    This is the account recorded when the payment was entered.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <FormListbox
+                    name="bank_account"
+                    label="Deposit To"
+                    value={selectedBankAccount}
+                    onChange={(value: string): void =>
+                      setSelectedBankAccount(value)
+                    }
+                    options={[
+                      { id: "BANK_PBB", name: "Public Bank" },
+                      { id: "BANK_ABB", name: "Alliance Bank" },
+                    ]}
+                    disabled={confirmingPaymentId !== null}
+                  />
+                  <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
+                    Choose the bank account for this older pending payment.
+                  </p>
+                </div>
+              )}
+
+              <p className="text-xs text-default-500 dark:text-gray-400">
+                Confirming updates the related invoice balances and creates the
+                payment journal entries.
+              </p>
             </div>
-          </div>
-        </div>
+          }
+          confirmButtonText={
+            selectedConfirmationGroupSize > 1
+              ? "Confirm Pending Group"
+              : "Confirm Payment"
+          }
+          variant="success"
+        />
       )}
 
       <ConfirmationDialog

@@ -10,6 +10,20 @@ import {
 import { api } from "../../routes/utils/api"; // Adjust path as needed
 import { refreshCreditsCache } from "../../utils/catalogue/useCustomerCache";
 
+export const getPaymentBankAccountLabel = (
+  bankAccount: Payment["bank_account"] | undefined
+): string => {
+  if (bankAccount === "BANK_ABB") {
+    return "Alliance Bank";
+  }
+
+  if (bankAccount === "CASH") {
+    return "Cash";
+  }
+
+  return "Public Bank";
+};
+
 // Helper to ensure products have UIDs for frontend state
 const ensureProductsHaveUid = (products: any[]): ProductItem[] => {
   return (products || []).map((p: any) => ({
@@ -364,9 +378,10 @@ export const confirmPayment = async (
   bank_account?: string
 ): Promise<Payment[]> => {
   try {
-    const response = await api.put(`/api/payments/${paymentId}/confirm`, {
-      bank_account,
-    });
+    const response: { message: string; payments: Payment[] } = await api.put<{
+      message: string;
+      payments: Payment[];
+    }>(`/api/payments/${paymentId}/confirm`, { bank_account });
     // The backend now returns { message: string, payments: Payment[] }
     if (!response || !response.payments || !Array.isArray(response.payments)) {
       throw new Error("Invalid response received after confirming payment(s).");
@@ -376,10 +391,9 @@ export const confirmPayment = async (
     // The calling component will handle the success toast.
 
     return response.payments;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(`Error confirming payment ${paymentId}:`, error);
     const errorMessage =
-      error.response?.data?.message ||
       (error instanceof Error ? error.message : "Failed to confirm payment(s)");
     toast.error(errorMessage);
     throw new Error(errorMessage);

@@ -299,6 +299,9 @@ const PaymentPage: React.FC = () => {
         isOpen={selectedReceiptId !== null}
         receiptId={selectedReceiptId}
         onClose={() => setSelectedReceiptId(null)}
+        onConfirmed={async (): Promise<void> => {
+          await fetchPayments();
+        }}
         onCancelled={async (): Promise<void> => {
           setSelectedReceiptId(null);
           await fetchPayments();
