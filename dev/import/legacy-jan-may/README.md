@@ -11,7 +11,8 @@ on 2026-07-13. Production contains the exact 3,863 imported journals and
 10,068 lines, with DR = CR RM13,503,516.15. The proof and pristine rollback
 databases were retained, the rollback and post-import backups were validated,
 and the production accounting/application checks passed. The 2026-07-14
-presentation migration described below is the final layer over that unchanged
+presentation migration described below was then rehearsed, applied to
+production, rerun as a verified no-op, and deployed without changing that
 accounting projection.
 
 ## Source placement
@@ -416,8 +417,11 @@ Statement spot checks through the app. Stop PM2 again before investigating any
 failed application-level check.
 
 That procedure passed in production on 2026-07-13 for the accounting import.
-The proof database and pristine rollback database were intentionally retained
-for sign-off. For the 2026-07-14 presentation change, begin from the already
-verified production projection, take another backup, then run/re-run only the
-final presentation migration after confirming the old `verify-import.sql`
-acceptance record from the cutover.
+The final presentation change passed against the retained proof database and
+production on 2026-07-14: the first run updated exactly 3,863 headers and
+10,068 lines, the second updated 0/0, and the v2 accounting fingerprint remained
+`70cc1b6d97fc2fdaeff191c14092f531`. A fresh pre-change dump was catalogued and
+successfully restored into the isolated
+`tienhock_prod_legacy_presentation_rollback_20260714` database. The proof,
+pristine import rollback, and presentation rollback databases remain retained
+for sign-off.
