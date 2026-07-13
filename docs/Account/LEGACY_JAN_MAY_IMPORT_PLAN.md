@@ -1,9 +1,16 @@
 # Legacy Jan–May 2026 Ledger Import — Plan & Handover
 
-**Created 13 Jul 2026. Updated 13 Jul 2026 — PRE-IMPORT CHECKPOINT REACHED.**
+**Created 13 Jul 2026. Updated 13 Jul 2026 — DEVELOPMENT ACCOUNTING IMPORT COMPLETE; SOURCE-INVOICE DECISIONS AND PRODUCTION ROLLOUT PENDING.**
 Goal: extend the 1:1 legacy parity already achieved for June 2026 (see [INVOICE_PAYMENT_ACCOUNTING_PROGRESS.md](INVOICE_PAYMENT_ACCOUNTING_PROGRESS.md)) backwards to 1 January 2026, by importing the legacy system's Jan–May ledger exports as posted journals, so that **every 2026 report (Trial Balance, Income Statement, Balance Sheet, CoGM, Account Ledger, Customer/General Statements) reads real journal data for the whole year**. June onwards is organic ERP entry (already row-by-row reconciled); Jan–May becomes imported legacy truth; the two meet at the existing 1 June anchors, which become verification checkpoints.
 
-The deterministic file-only preflight is complete and the preparatory dev migration/report/posting-lock work is present in the working tree. **Stop here for the fresh prompt:** the staging migration has not been applied, no staging rows have been copied to PostgreSQL, no `IMP` journals exist, and no import-generated Jan–May opening anchors have been inserted. See §10 for the exact state and next boundary.
+The deterministic preflight, staging load, five monthly `IMP` batches,
+independent source-chain acceptance, and 1 January anchors are complete on the
+refreshed development snapshot. The import itself reconciles exactly. The
+approved HPB interest-in-suspense classification is applied and Balance Sheet
+residue is now the exact RM1,456,480.37 opening limitation. The RM483 debit in
+manual June journal `PV008/06` remains unchanged because available legacy
+evidence proves only its bank credit, not the expense contra. See §10 for the
+executed state and remaining source-invoice/production boundary.
 
 Everything below was re-verified against the immutable source hashes and the dev DB on 13 Jul 2026. Re-run the file preflight and the database conflict inventory before continuing because data entry is ongoing.
 
@@ -50,7 +57,7 @@ The two files are per-account **projections of one journal population**. The dou
 1. Loads both files into one staging table (`import_legacy_rows`).
 2. **Groups rows by `(journal_ref, date)` across both files** → each group becomes ONE `journal_entries` row with its `journal_entry_lines`. The raw source has **3,880 groups, 3,872 balanced**; the eight declared projection/routing exceptions in §3 transform to **3,863 final groups, all balanced to the sen**. Two distinct legacy journals sharing ref+date would merge into one journal — acceptable (both balanced, identical display ref; June evidence `MBB932037-P` already proved display refs are not unique keys).
 3. Journal fields:
-   - `entry_type` = **`IMP`** (new row in `journal_entry_types`, name "Legacy Import"). Not added to `SYSTEM_ENTRY_TYPES` in [journal-entries.js](../../src/routes/accounting/journal-entries.js), so rows stay hand-fixable during verification; consider locking after sign-off.
+   - `entry_type` = **`IMP`** (new row in `journal_entry_types`, name "Legacy Import"). `IMP` is reserved for the migration: the manual form hides it and the journal API rejects manual creation, edit, cancellation, or deletion so the verified source projection remains immutable.
    - `reference_no` = deterministic unique internal ref (`IMP-{yyyymmdd}-{seq}`) — `journal_entries.reference_no` has a DB UNIQUE constraint; the repeatable legacy ref goes to **`display_reference`** (header), which every ledger/report already resolves first.
    - `entry_date` = row date; `status` = `posted`; `source_type/source_id` = NULL (manual-like); `description` = `Legacy import {ref}` or dominant particulars.
    - Lines: `account_code` (mapped, §4), `debit/credit`, `particulars` = PARTICULAR, `cheque_reference` = CHEQUE column (real cheque nos for PV rows e.g. `PB350751`, batch refs for PBE rows), `display_order` = file order within the account so within-day ledger print order can reproduce legacy. Do **NOT** set header `cheque_no` (keeps the C-type auto-sequence PBB350779+ untouched).
@@ -58,7 +65,13 @@ The two files are per-account **projections of one journal population**. The dou
 4. Openings become **per-account anchors at 2026-01-01** + statement-engine wiring (§5 — the one code deliverable of this project).
 5. Batched by month (5 SQL batches), each batch re-runnable/idempotent (keyed on the deterministic `reference_no`), each followed by a month-end balance check against the CSV BALANCE column.
 
-Implementation shape: the completed Node preflight under `dev/import/legacy-jan-may/` verifies source hashes and parsing rules, then emits a normalized staging CSV plus JSON audit report. The PostgreSQL load and idempotent monthly transform SQL are the next phase and **have not been written or run yet**. All exceptions must remain explicit in the report; nothing may be silently dropped.
+Implementation shape: the completed Node preflight under
+`dev/import/legacy-jan-may/` verifies source hashes and parsing rules, then
+emits a normalized staging CSV plus JSON audit report. The guarded PostgreSQL
+loader, five idempotent monthly transforms, opening-anchor insert, independent
+source-chain verification, and invoice reconciliation have all been written
+and run on development. All exceptions remain explicit in the report; nothing
+is silently dropped.
 
 ---
 
@@ -103,11 +116,14 @@ Family sums (THLD): NCA fixed assets +11,284,675.98 · AD accum-depr −3,836,90
 
 | Population | Count / amount | Resolution |
 |---|---|---|
-| Posted `REC` journals dated Jan–May 2026 (old-model receipts, all `source_type='payment'`, none receipt-owned) | **2,074 / 3,259,534.63** | **Applied on dev:** cancelled by the guarded L2 migration. The `payments` rows remain as subledger history. Imported THDB/THLD rows will become the ledger truth. |
+| Posted `REC` journals dated Jan–May 2026 (old-model receipts, all `source_type='payment'`, none receipt-owned) | **2,074 / 3,259,534.63** | **Applied on dev:** cancelled by the guarded L2 migration. The `payments` rows remain as subledger history. Imported THDB/THLD rows are now the ledger truth. |
 | Posted `CN` journals parked at 2026-05-31 (THCN/26/1–16) | 16 / 1,834.92 | **Applied on dev:** the 16 adjustment-owned journal headers now use the exact legacy dates while documents/e-Invoice state remain untouched. The preflight excludes all 32 matching THLD/THDB projection rows so the CN journals stay source-owned. |
-| Cancelled REC (248) / 2025 RECs (20 posted) | — | No action. The pending 01-01 active-account anchors will fence off 2025 rows. |
+| Cancelled REC (248) / 2025 RECs (20 posted) | — | No action. The applied 01-01 active-account anchors fence off the 2025 rows. |
 
-After L2, the only posted Jan–May journals in dev are the 16 source-owned CN journals. There are zero `IMP` journals. Re-run this inventory before the next mutation and again on production.
+At the completed L2 checkpoint, the only posted Jan–May journals in dev were
+the 16 source-owned CN journals and there were zero `IMP` journals. L3B then
+added the exact 3,863 guarded `IMP` population. Re-run the pre-L3B inventory
+when reproducing the sequence on production.
 
 ### 4b. Account code mapping
 
@@ -115,19 +131,31 @@ After L2, the only posted Jan–May journals in dev are the 16 source-owned CN j
 - **THDB codes = ERP debtor-child codes** (code = customer id per debtorSync). Exact-match wins; never post to `TR`.
 - **Applied identifier normalization:** existing `AMY ` / `STELLA ` customer and account IDs were moved to exact `AMY` / `STELLA`; existing shortened `HPA_SWJ988` / `HPB_SWJ988` were moved to the approved `HPA_SWJ9882` / `HPB_SWJ9882` codes.
 - **Created GL codes:** `CA_HINO` (note 8), `OIL920` (note 5), and contra-receivable `CL_AFI` (note 22). No speculative duplicate customer/account codes were created.
-- The restored `fs_note_remap_2026-07.sql` migration has been applied on dev; all 2,813 current account codes have a non-null direct `fs_note`. Statement engines still retain parent-note inheritance for future child accounts.
+- The restored `fs_note_remap_2026-07.sql` migration has been applied on dev; all 2,814 current account codes have a non-null direct `fs_note`. Statement engines still retain parent-note inheritance for future child accounts.
 
 ### 4c. Cross-checks with ERP source documents
 
-ERP `invoices` Jan–May (non-cancelled): 2,168 / 4,661,888.65 vs legacy CASH_SALES 1,229 rows + CR_SALES 908 rows — same magnitude; Phase L4 does the exact invoice-by-invoice diff (every ERP invoice should have exactly one imported sales row; differences become a named list like June's 015375/015359). Pre-cutover ERP invoices have **no S journals** (confirmed), so nothing collides; imported rows simply ARE the Jan–May sales ledger.
+The completed reconciliation excludes five consolidated wrappers and compares
+2,163 ERP source invoices / RM3,335,065.85 with 2,121 imported sales lines /
+RM3,336,484.25. The complete bridge—including every unmatched, zero-value,
+reference, amount, date, sale-term, and debtor difference—is pinned in
+[LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md](LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md).
+Pre-cutover ERP invoices have **no S journals** (confirmed), so nothing
+collides; imported rows are the Jan–May sales ledger.
 
 ---
 
-## 5. Openings & statement wiring — engine implemented, anchors pending
+## 5. Openings & statement wiring — implemented on development
 
-**Approved mechanism:** anchors at 2026-01-01 + `account_opening_balances` in the TB/BS engines. The engine changes are implemented in the working tree; inserting the import's anchors remains L4 work:
+**Applied mechanism:** anchors at 2026-01-01 + `account_opening_balances` in the
+TB/BS engines. Development now has 580 January anchors: 291 nonzero balances
+and 289 explicit zero fences. The guarded insert preserved the pre-existing
+`C-CARE(1)` RM7,635.00 row, inserted 579 rows, and inserted zero rows on rerun:
 
-1. Insert per-account anchors `as_of_date = 2026-01-01` for every nonzero C/FWD (THLD ~140 excl. DEBTOR + THDB ~152; `C-CARE(1)` already has exactly this anchor: 7,635.00 — precedent set). Signed DR-positive, same convention as the June revenue anchors. Also insert explicit **0.00 anchors** for imported-active accounts whose C/FWD is zero, so pre-2026 organic noise (the 20 posted 2025 RECs, etc.) can never leak into a derived opening.
+1. Per-account anchors use `as_of_date = 2026-01-01`, with signed DR-positive
+   amounts for every selected nonzero C/FWD and explicit **0.00 anchors** for
+   imported-active zero-opening accounts. This fences off pre-2026 organic
+   noise such as the 20 posted 2025 RECs.
 2. Account Ledger / Bank Statement / Customer & General Statements need **no changes** — they already implement the latest-anchor-≤-start rule, so January ledgers show `BALANCE C/FWD` exactly like legacy.
 3. **Implemented in [financial-reports.js](../../src/routes/accounting/financial-reports.js):** Trial Balance and Balance Sheet use the latest anchor ≤ period end plus posted movement in `[anchor_date, period_end]`, then roll up through the effective inherited `fs_note`. Anchor-only and explicit zero-fence accounts remain present. With both 01-01 and 06-01 anchors, June reads the 06-01 checkpoint + June movement. IS/CoGM remain pure journal-based YTD movement.
 4. Keep the existing 1,571 anchors @ 2026-06-01 — after import they become **checkpoints**: derived 31-May close must equal each 06-01 anchor (§7).
@@ -149,11 +177,11 @@ The giant synthetic opening-journal fallback was not selected and must not be in
 | **L0** ✅ | Re-parse both immutable files, prove all 423 active balance chains, correct the malformed-line finding, inventory openings and DB conflicts | corrected results in §3–§4 |
 | **L1** ✅ | Resolve every user decision in §8; accept the opening gap only as a named limitation, never a fabricated balance | decisions recorded |
 | **L2** ✅ dev | Apply the guarded conflict migration: normalize IDs/codes, create three GL codes + `IMP`, cancel 2,074 superseded RECs, and re-date 16 CN journal headers | only 16 posted CNs remain in Jan–May; zero IMP journals |
-| **L3A** ✅ **STOP HERE** | Hash-pinned file-only parser → declared exclusions/aliases → exact malformed-line normalization → approved `CHARLES-C` routing → deterministic staging CSV/report | 3,863 groups balanced; staging SHA in §3/§10 |
-| **L3B** ⏭ **NEXT FRESH PROMPT / BIG TASK** | Re-audit DB, review and apply the staging-table migration, load the validated CSV, then design/apply five idempotent monthly journal batches | all imported groups balanced; per-month/per-account closes match source |
-| **L4** pending | Insert 01-01 anchors (+ 0.00 active-account fences); run §7; produce the ERP-invoice↔imported-row named-difference list | every difference explained and approved |
-| **L5** ◐ code prepared | TB/BS anchor engine, Current Year Profit, journal-only Note 7/22, bank cutoff, fs-note remap, guide, posting lock, and changelog are prepared; post-import report verification remains | monthly movements balance; TB/BS carry only the named RM1,456,480.37 opening residue; IS/CoGM and June frozen recon pass |
-| **L6** | Prod rollout: prod must FIRST receive the June-refactor migration chain (INVOICE_PAYMENT doc §9-3), then L2→L5 re-run against prod data (re-quantify §4a populations there — prod counts WILL differ) | prod verification = dev results |
+| **L3A** ✅ | Hash-pinned file-only parser → declared exclusions/aliases → exact malformed-line normalization → approved `CHARLES-C` routing → deterministic staging CSV/report | 3,863 groups balanced; staging SHA in §3/§10 |
+| **L3B** ✅ dev | Re-audit DB, apply the staging table, load the hash-validated CSV, and post five idempotent monthly journal batches | 3,863 journals / 10,068 lines; every monthly and per-account gate passes |
+| **L4** ◐ accounting exact; source decision pending | Insert 01-01 anchors, run §7, and reconcile ERP invoices to imported rows | 580 anchors and exact accounting gates pass; literal source-record parity requires the evidence/decisions in the reconciliation document |
+| **L5** ✅ dev | TB/BS anchor engine, Current Year Profit, journal-only Note 7/22, bank cutoff, fs-note remap, HPB Note 16, guide, posting lock, and changelog | Jan–Jun BS residue exactly RM1,456,480.37; manual `PV008/06` RM483 retained as unproven contra |
+| **L6** ◐ rollout preparation | Audit live state, rehearse on a fresh proof database, stop writes, back up/prepare rollback, then reproduce L2→L5 with direct system PostgreSQL | June refactor is already present in the 13 July prod snapshot and must be verified—not blindly rerun; live access and fresh drift inventory still required |
 
 ---
 
@@ -174,9 +202,37 @@ Every one of these is a hard equality; any residual must be explained and user-a
 | Sum of imported journal DR = CR globally | **13,503,516.15** each from 10,068 staged transaction lines; diff 0.00 |
 | Every imported journal balanced; reference_no unique; display_reference = legacy ref | invariant queries |
 | Debtor children: Σ derived 31-May closes vs the June General-Statement B/F total | 507,697.72 (any residual = the §8-3 control drift, named) |
-| ERP invoices Jan–May (2,168 / 4,661,888.65) ↔ imported sales rows | 1:1 with named-difference list |
+| ERP invoices Jan–May ↔ imported sales rows | zero unexplained rows: every exact match, evidence alias, operational-only document, and source-only row is hard-pinned; literal source-table rewriting requires additional invoice/item evidence |
 | Imported journal movement balances for every month Jan–May | monthly DR = CR; cumulative TB/BS difference is exactly the named RM1,456,480.37 opening residue |
 | June five-ledger recon re-run unchanged | June numbers identical to the frozen §5e results |
+
+### 7a. Development acceptance result — 13 July 2026
+
+- The source/import gates pass: 12,665 reconstructed source rows, zero running-
+  balance mismatches, 3,863 `IMP` journals / 10,068 lines, and DR = CR
+  RM13,503,516.15. Every monthly and cumulative per-account check passes.
+- The 580 January anchors are exact (291 nonzero + 289 zero fences), with the
+  named RM1,456,480.37 CR opening residue. All 1,571 June checkpoints match the
+  report-semantics 31 May close; 52 source-absent checkpoints are deliberate
+  0.00 debtor fences.
+- The named bank/holding/customer targets and June General Statement B/F
+  RM507,697.72 all pass. Trial Balance carries exactly RM1,456,480.37 more
+  credit than debit for every January–June month.
+- The ERP-invoice reconciliation is fully enumerated in
+  [LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md](LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md).
+  Imported legacy sales exceed ERP numeric invoices by RM1,418.40: RM1,391.00
+  from eight positive source-only invoices plus RM27.40 net across two matched
+  amount differences. All remaining date, sale-term, debtor, reference, and
+  zero-value projection differences are named there.
+- **Resolved — Balance Sheet:** `HPB`, `CL_HPB`, and all `HPB_*` suspense
+  accounts now use Balance Sheet Note 16 while released interest `HPI` remains
+  P&L Note 23. January–June assets are exactly RM1,456,480.37 below liabilities
+  and equity in every month, matching the approved missing-opening residue.
+- **Retained — frozen June recon:** journal 3563 / `PV008/06` is a pre-import
+  manual June cash-payment journal already present in the production dump. The
+  legacy bank fixture proves its RM11,764.40 credit but not the RM483 contra;
+  `R9882` is only a plausible guess from manually keyed particulars. The RM483
+  `BANK_PBB` debit remains unchanged and explicitly unproven.
 
 ---
 
@@ -192,12 +248,21 @@ Every one of these is a hard equality; any residual must be explained and user-a
 8. **Identifiers/accounts:** use exact `AMY` and `STELLA` without trailing spaces; use exact `HPA_SWJ9882` / `HPB_SWJ9882`; apply the audited aliases in §4b; create only the three genuinely missing GL codes. Applied on dev.
 9. **CSV storage:** move both private files to `dev/import/legacy-jan-may/data/` and gitignore both source and generated artifacts. Applied locally.
 10. **CN dates:** move only the 16 source-owned CN journal headers to their exact legacy dates; leave adjustment documents and e-Invoice fields untouched. Applied on dev.
+11. **HP interest in suspense:** present `HPB`, `CL_HPB`, and `HPB_*` with the
+    paired HP payable in Balance Sheet Note 16; keep released interest `HPI` in
+    P&L Note 23. Applied on dev; Jan–Jun report residue is exact.
+12. **Manual June `PV008/06`:** do not reclassify its RM483 `BANK_PBB` debit
+    without contra-ledger evidence. It predates this import and did not come
+    from the Jan–May Excel files.
 
-There is no unresolved L1 decision blocking L3B. The next prompt must still re-audit the current dev DB before mutating it.
+L3B and the anchor mutation are complete on development. The remaining decisions are the explicitly evidenced L4/L5 acceptance items recorded in §10; no import row or anchor is awaiting repair.
 
 ## 9. Known limitations / expected named differences
 
-- Legacy internal inconsistencies (June's RM34 015375 pattern) may exist in Jan–May. The source has no dropped rows and the two malformed records are normalized exactly, but the ERP-invoice↔ledger diff in L4 may surface source-vs-ERP differences — each becomes a named difference, never a fake counter-entry.
+- The completed ERP-invoice↔ledger comparison found the exact named
+  source-versus-ERP differences recorded in
+  [LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md](LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md).
+  None was hidden with a fake counter-entry.
 - Within-day ledger print order: default ordering sorts by visible Journal ref (June rule); `display_order` preserves per-account file order. Residual cosmetic order differences are reported, not chased with per-row `posting_sequence` overrides unless the user asks.
 - Two legacy journals sharing (ref, date) merge into one imported journal — same visible rows, one entry behind them.
 - The `IMP` journals are standalone (no source links): invoice/payment detail pages for Jan–May won't deep-link to them (subledger detail stays in `invoices`/`payments` rows). Acceptable for historical months; June+ unaffected.
@@ -210,34 +275,70 @@ There is no unresolved L1 decision blocking L3B. The next prompt must still re-a
 
 ---
 
-## 10. Pre-import checkpoint and fresh-prompt entry point
+## 10. Development execution checkpoint
 
 ### 10a. Applied to the development database
 
-- [2026-07-13_legacy_jan_may_conflicts.sql](../../dev/migrations/2026-07-13_legacy_jan_may_conflicts.sql) was applied successfully: 2,074 target RECs cancelled, 16 CN journal headers re-dated, `AMY`/`STELLA` and `SWJ9882` identifiers normalized, three GL codes created, and `IMP` registered.
-- [fs_note_remap_2026-07.sql](../../dev/migrations/fs_note_remap_2026-07.sql) was restored with `CL_AFI` mapped to note 22 and applied. Dev has 2,813 account codes and zero null direct `fs_note` values.
-- Current Jan–May posted population: 16 CN journals / RM1,834.92 only. Current cancelled REC population in that window is 2,322 total (the pre-existing 248 plus the newly cancelled 2,074).
+- The supplied 13 July production SQL was first restored into an isolated
+  restricted-role proof database, validated as 154 base tables plus the
+  required hierarchy view (155 user relations), with unique journal IDs and
+  zero unvalidated constraints, then promoted as a clean local replacement.
+  The corrupt prior local database was removed only after proof.
+- [2026-07-13_legacy_jan_may_conflicts.sql](../../dev/migrations/2026-07-13_legacy_jan_may_conflicts.sql)
+  cancelled the exact 2,074 superseded RECs, re-dated the 16 source-owned CNs,
+  normalized identifiers, created three required codes, and registered `IMP`.
+- [fs_note_remap_2026-07.sql](../../dev/migrations/fs_note_remap_2026-07.sql)
+  and [2026-07-13_legacy_jan_may_staging.sql](../../dev/migrations/2026-07-13_legacy_jan_may_staging.sql)
+  were applied. Dev has 2,814 account codes, zero null direct `fs_note` values,
+  and the documented 86th table, `import_legacy_rows`.
+- [load-staging.mjs](../../dev/import/legacy-jan-may/load-staging.mjs) loaded
+  the exact 12,635 rows in one transaction after rechecking source hashes.
+- [post-monthly-journals.sql](../../dev/import/legacy-jan-may/post-monthly-journals.sql)
+  posted January–May separately: 3,863 journals / 10,068 lines / DR = CR
+  RM13,503,516.15. January was rerun as an exact no-op.
+- [verify-import.sql](../../dev/import/legacy-jan-may/verify-import.sql) passes
+  every source-chain, CN, header/line, monthly account-close, and June-anchor
+  gate. It passed again after anchors were inserted.
+- [insert-opening-anchors.sql](../../dev/import/legacy-jan-may/insert-opening-anchors.sql)
+  inserted 579 rows and preserved the exact pre-existing `C-CARE(1)` row. The
+  final 580-row set has 291 nonzero anchors and 289 zero fences; its rerun
+  inserted zero rows.
 
-### 10b. Prepared locally but deliberately not applied/imported
+### 10b. Current database truth
 
-- [2026-07-13_legacy_jan_may_staging.sql](../../dev/migrations/2026-07-13_legacy_jan_may_staging.sql) defines the auditable `import_legacy_rows` table but **has not been applied**. `to_regclass('public.import_legacy_rows')` is NULL.
-- [Legacy import preflight README](../../dev/import/legacy-jan-may/README.md), `prepare-staging.mjs`, `source-manifest.json`, and `account-aliases.json` are complete. Private source CSVs and generated artifacts are present locally but gitignored.
-- Generated staging proof: 12,635 rows = 2,567 openings + 10,068 transactions; 3,863 balanced groups; DR = CR 1,350,351,615 cents; SHA-256 `08dae08b3f730716000d3f27a5407686b05ca2a4df0cd242ef93a836fd4e8b7f`; zero reported anomalies.
-- The report-anchor/current-profit/journal-only changes, bank cutoff, Tien Hock posting lock, bilingual guide updates, and changelog entry are prepared in the working tree. Backend syntax/runtime checks and exact read-only report CTE checks passed; no frontend build/typecheck/lint was run.
-- Dev has **zero `IMP` journals**. It has one pre-existing 2026-01-01 `C-CARE(1)` anchor; no new legacy opening anchors were inserted.
+- Posted legacy population in Jan–May: 3,863 `IMP` + 16 source-owned `CN`
+  journals = 3,879 journals / 10,100 lines / DR = CR RM13,505,351.07.
+- Cancelled Jan–May REC population: 2,322 (248 pre-existing + 2,074 migration).
+- All 1,571 June checkpoints equal the report-semantics 31 May close. June
+  anchor net is −RM2,617,959.05; source opening net is −RM1,456,480.37.
+- Trial Balance, named account closes, imported monthly balance, source running
+  chains, and June General Statement B/F RM507,697.72 pass exactly.
+- The complete sales-document bridge is in
+  [LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md](LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md).
 
-⚠ **Transitional runtime warning:** do not deploy this working tree or rely on its Jan–May financial/bank reports until L3B journal import and L4 anchors are complete. The prepared code already disables the old Jan–May synthetic bank projection and makes reports journal/anchor-authoritative, while the dev DB has cancelled the superseded RECs but still has zero IMP journals/new anchors. Running this half-complete state necessarily produces incomplete historical figures.
+### 10c. Remaining boundary
 
-### 10c. Start the next fresh prompt here
+The accounting import and L5 report work are complete on development. Before a
+production mutation:
 
-1. Read this checkpoint and [the preflight README](../../dev/import/legacy-jan-may/README.md), then inspect the dirty working tree without discarding unrelated user changes.
-2. Re-run `node dev/import/legacy-jan-may/prepare-staging.mjs --check-only`; require the exact counts and staging hash above.
-3. Re-run the read-only Jan–May journal/account/anchor inventory because users may have entered more data.
-4. Review and apply the staging-table migration. Because it adds a table, update the Database Schema in both `AGENTS.md` and `CLAUDE.md` from 85 to 86 tables and document `import_legacy_rows` when it is actually applied.
-5. Implement an auditable load for the generated staging CSV and verify all row counts/hashes before any journal write. No loader or monthly journal-transform SQL exists yet.
-6. Design and execute the five idempotent monthly `IMP` batches, stopping on any balance or per-account-close mismatch; only then proceed to L4 anchors and the full §7 verification suite.
+1. The user confirmed that all source-record differences must ultimately be
+   reconciled rather than accepted as permanent bridges. That work remains
+   blocked by missing legacy item/quantity/salesperson evidence and valid
+   MyInvois wrapper history; the exact evidence and decisions required are in
+   the reconciliation document. This does not block deploying the already
+   exact ledger/report projection, because later source repairs must remain
+   nonposting and leave `IMP` untouched.
+2. Commit and review every rollout script while keeping the private source CSV,
+   generated staging CSV/report, and production dump untracked.
+3. Re-audit the live database. The 13 July production snapshot already has the
+   June refactor end-state, so those broad June migrations must be verified and
+   skipped rather than blindly rerun.
+4. Rehearse against a fresh proof restore, stop PM2 writes, take and validate a
+   final rollback backup/database, then run the guarded direct-PostgreSQL
+   sequence. No direct production credential is available in this workspace.
 
-**Commands deliberately not run at this checkpoint:** the staging migration, PostgreSQL COPY/load, IMP journal creation, January anchor insertion, `npm run build`, TypeScript checks, and lint.
+No build, TypeScript check, or lint command was run, in accordance with
+repository instructions.
 
 ---
 

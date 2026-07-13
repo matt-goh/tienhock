@@ -1,23 +1,71 @@
 -- Financial-statement note remap, restored for the Jan-May legacy rollout.
--- Re-tags every account code from the documented legacy rules. Safe to rerun.
+-- Re-tags the exact audited account population from the documented legacy
+-- rules. Any account or mapping drift aborts before the first update.
 
 BEGIN;
 
-UPDATE account_codes SET fs_note = NULL;
+CREATE TEMP TABLE fs_note_remap_state (
+  mode text PRIMARY KEY CHECK (mode IN ('fresh', 'final'))
+) ON COMMIT DROP;
+
+DO $guard$
+DECLARE
+  v_count integer;
+  v_structure_fingerprint text;
+  v_mapping_fingerprint text;
+BEGIN
+  SELECT COUNT(*),
+         MD5(STRING_AGG(
+           FORMAT('%s|%s', code, COALESCE(ledger_type, '<null>')),
+           E'\n' ORDER BY code COLLATE "C"
+         )),
+         MD5(STRING_AGG(
+           FORMAT('%s|%s|%s', code, COALESCE(ledger_type, '<null>'),
+                  COALESCE(fs_note, '<null>')),
+           E'\n' ORDER BY code COLLATE "C"
+         ))
+    INTO v_count, v_structure_fingerprint, v_mapping_fingerprint
+    FROM account_codes;
+
+  IF v_count <> 2814
+     OR v_structure_fingerprint <> '6acd9b84d895e578e770b816978d3400' THEN
+    RAISE EXCEPTION
+      'Account population drifted before fs-note remap: expected 2,814 / %, found % / %',
+      '6acd9b84d895e578e770b816978d3400', v_count,
+      v_structure_fingerprint;
+  END IF;
+
+  IF v_mapping_fingerprint = 'ac5804a0c6db188396d65fc94eaaacd3' THEN
+    INSERT INTO fs_note_remap_state (mode) VALUES ('fresh');
+  ELSIF v_mapping_fingerprint = 'b18746387b17147d8d81e76ec0dc62be' THEN
+    INSERT INTO fs_note_remap_state (mode) VALUES ('final');
+  ELSE
+    RAISE EXCEPTION
+      'Account fs_note mappings drifted before remap: fingerprint %',
+      v_mapping_fingerprint;
+  END IF;
+END
+$guard$;
+
+UPDATE account_codes
+   SET fs_note = NULL
+ WHERE EXISTS (
+   SELECT 1 FROM fs_note_remap_state WHERE mode = 'fresh'
+ );
 
 -- Ledger-type defaults.
-UPDATE account_codes SET fs_note = '22' WHERE ledger_type = 'TD';
-UPDATE account_codes SET fs_note = '13' WHERE ledger_type = 'TC';
-UPDATE account_codes SET fs_note = '19' WHERE ledger_type = 'BK';
+UPDATE account_codes SET fs_note = '22' WHERE fs_note IS NULL AND ledger_type = 'TD';
+UPDATE account_codes SET fs_note = '13' WHERE fs_note IS NULL AND ledger_type = 'TC';
+UPDATE account_codes SET fs_note = '19' WHERE fs_note IS NULL AND ledger_type = 'BK';
 
 -- Closing stock.
-UPDATE account_codes SET fs_note = '14-1' WHERE ledger_type = 'CS' AND (code LIKE '%FIN%' OR code = 'CS');
+UPDATE account_codes SET fs_note = '14-1' WHERE fs_note IS NULL AND ledger_type = 'CS' AND (code LIKE '%FIN%' OR code = 'CS');
 UPDATE account_codes SET fs_note = '14-2' WHERE ledger_type = 'CS' AND fs_note IS NULL AND (code LIKE '%BER%' OR code LIKE '%JAG%' OR code LIKE '%SAG%' OR code LIKE '%SDM%' OR code LIKE '%TH%' OR code LIKE '%CHEM%');
 UPDATE account_codes SET fs_note = '14-3' WHERE ledger_type = 'CS' AND fs_note IS NULL AND (code LIKE '%PM%' OR code LIKE '%TAP%');
 UPDATE account_codes SET fs_note = '14-1' WHERE ledger_type = 'CS' AND fs_note IS NULL;
 
 -- Opening stock.
-UPDATE account_codes SET fs_note = '3-1' WHERE ledger_type = 'OS' AND (code LIKE '%FIN%' OR code = 'OS');
+UPDATE account_codes SET fs_note = '3-1' WHERE fs_note IS NULL AND ledger_type = 'OS' AND (code LIKE '%FIN%' OR code = 'OS');
 UPDATE account_codes SET fs_note = '3-3' WHERE ledger_type = 'OS' AND fs_note IS NULL AND (code LIKE '%BER%' OR code LIKE '%JAG%' OR code LIKE '%SAG%' OR code LIKE '%SDM%' OR code LIKE '%TH%' OR code LIKE '%CHEM%');
 UPDATE account_codes SET fs_note = '3-7' WHERE ledger_type = 'OS' AND fs_note IS NULL AND (code LIKE '%PM%' OR code LIKE '%TAP%');
 UPDATE account_codes SET fs_note = '3-1' WHERE ledger_type = 'OS' AND fs_note IS NULL;
@@ -38,8 +86,8 @@ UPDATE account_codes SET fs_note = '1' WHERE fs_note IS NULL AND code = 'DF_TAX'
 UPDATE account_codes SET fs_note = '1' WHERE fs_note IS NULL AND (code LIKE 'ACC%' OR code LIKE 'AC\_%' OR code LIKE 'ACW%' OR code LIKE 'ACD%');
 
 -- Hire purchase.
-UPDATE account_codes SET fs_note = '16' WHERE fs_note IS NULL AND (code LIKE 'HPA\_%' OR code = 'CL_HPA');
-UPDATE account_codes SET fs_note = '23' WHERE fs_note IS NULL AND (code LIKE 'HPB\_%' OR code IN ('HPI', 'CL_HPB'));
+UPDATE account_codes SET fs_note = '16' WHERE fs_note IS NULL AND (code LIKE 'HPA\_%' OR code LIKE 'HPB\_%' OR code IN ('CL_HPA', 'CL_HPB', 'HPB'));
+UPDATE account_codes SET fs_note = '23' WHERE fs_note IS NULL AND code = 'HPI';
 
 -- PPE and depreciation.
 UPDATE account_codes SET fs_note = '15' WHERE fs_note IS NULL AND code IN ('DPE', 'AE_DEP');
@@ -79,9 +127,25 @@ UPDATE account_codes SET fs_note = '22' WHERE fs_note IS NULL AND code = 'DEBTOR
 UPDATE account_codes SET fs_note = '5' WHERE fs_note IS NULL;
 
 DO $$
+DECLARE
+  v_fingerprint text;
 BEGIN
   IF EXISTS (SELECT 1 FROM account_codes WHERE fs_note IS NULL) THEN
     RAISE EXCEPTION 'Financial-statement remap left account codes without fs_note';
+  END IF;
+
+  SELECT MD5(STRING_AGG(
+           FORMAT('%s|%s|%s', code, COALESCE(ledger_type, '<null>'),
+                  COALESCE(fs_note, '<null>')),
+           E'\n' ORDER BY code COLLATE "C"
+         ))
+    INTO v_fingerprint
+    FROM account_codes;
+
+  IF v_fingerprint <> 'b18746387b17147d8d81e76ec0dc62be' THEN
+    RAISE EXCEPTION
+      'Financial-statement remap final fingerprint differs: %',
+      v_fingerprint;
   END IF;
 END $$;
 

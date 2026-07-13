@@ -612,23 +612,27 @@ const JournalEntryListPage: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center space-x-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEdit(entry);
-                          }}
-                          className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
-                          title="Edit"
-                        >
-                          <IconPencil size={18} />
-                        </button>
-                        <button
-                          onClick={(e) => handleDeleteClick(entry, e)}
-                          className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
-                          title="Delete"
-                        >
-                          <IconTrash size={18} />
-                        </button>
+                        {entry.entry_type !== "IMP" && (
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEdit(entry);
+                              }}
+                              className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
+                              title="Edit"
+                            >
+                              <IconPencil size={18} />
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteClick(entry, e)}
+                              className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
+                              title="Delete"
+                            >
+                              <IconTrash size={18} />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
