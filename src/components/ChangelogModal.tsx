@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-07-14",
+    ms: "Catatan jurnal legasi Januari hingga Mei kini memaparkan nombor rujukan asal, jenis dokumen yang sepadan dan keterangan berdasarkan particulars asal dalam senarai, butiran serta cetakan baucar. Nombor import dalaman tidak lagi dipaparkan, manakala tanda Legacy dan rekod sumber dikekalkan untuk jejak audit.",
+    en: "January to May legacy journals now show their original reference numbers, matching document types, and descriptions based on the original particulars in journal lists, details, and voucher prints. Internal import numbers are no longer displayed, while a Legacy marker and source trace remain for auditability.",
+  },
+  {
     date: "2026-07-13",
     ms: "Catatan jurnal import legasi kini dilindungi daripada perubahan manual. Jenis IMP tidak lagi boleh dipilih semasa mencipta catatan jurnal, dan catatan yang diimport tidak boleh diedit, dibatalkan atau dipadam melalui aplikasi.",
     en: "Legacy-import journal entries are now protected from manual changes. The IMP type can no longer be selected when creating a journal entry, and imported entries cannot be edited, cancelled, or deleted through the app.",
