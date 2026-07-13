@@ -1,14 +1,26 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Payment, CashReceiptVoucherData } from "../../types/types";
+import {
+  Payment,
+  CashReceiptVoucherData,
+  PaymentCancellationErrorData,
+} from "../../types/types";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { printCashReceiptVoucherPDF } from "../../utils/accounting/CashReceiptVoucherPDF";
 import { FormListbox } from "../../components/FormComponents";
-import { IconCircleCheck, IconBan, IconReceipt, IconPrinter } from "@tabler/icons-react";
+import {
+  IconCircleCheck,
+  IconBan,
+  IconReceipt,
+  IconPrinter,
+  IconPlus,
+} from "@tabler/icons-react";
 import {
   confirmPayment,
   cancelPayment,
+  getGroupedReceiptCancellationError,
+  getPaymentCancellationErrorData,
 } from "../../utils/invoice/InvoiceUtils";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
@@ -18,12 +30,16 @@ interface PaymentTableProps {
   payments: Payment[];
   onViewPayment: (payment: Payment) => void;
   onRefresh: () => void;
+  onCancellationError?: (error: PaymentCancellationErrorData) => void;
+  onAddPaymentToGroup?: (payment: Payment) => void;
 }
 
 const PaymentTable: React.FC<PaymentTableProps> = ({
   payments,
   onViewPayment,
   onRefresh,
+  onCancellationError,
+  onAddPaymentToGroup,
 }) => {
   const navigate = useNavigate();
   const [confirmingPaymentId, setConfirmingPaymentId] = useState<number | null>(
@@ -86,18 +102,34 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
     }
   };
 
-  const handleCancelPayment = async () => {
+  const handleCancelPaymentClick = (payment: Payment): void => {
+    const groupedReceiptError = getGroupedReceiptCancellationError(payment);
+    if (groupedReceiptError && onCancellationError) {
+      onCancellationError(groupedReceiptError);
+      return;
+    }
+
+    setSelectedPayment(payment);
+    setShowCancelDialog(true);
+  };
+
+  const handleCancelPayment = async (): Promise<void> => {
     if (!selectedPayment) return;
 
     setCancellingPaymentId(selectedPayment.payment_id);
     setShowCancelDialog(false);
 
     try {
-      await cancelPayment(selectedPayment.payment_id);
+      await cancelPayment(selectedPayment.payment_id, undefined, {
+        showErrorToast: !onCancellationError,
+      });
       toast.success("Payment cancelled successfully");
       onRefresh();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error cancelling payment:", error);
+      if (onCancellationError) {
+        onCancellationError(getPaymentCancellationErrorData(error));
+      }
     } finally {
       setCancellingPaymentId(null);
       setSelectedPayment(null);
@@ -156,32 +188,57 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
     }
   };
 
-  // Group payments by payment_reference
-  const groupedPayments = payments.reduce((acc, payment) => {
-    const key = payment.payment_reference || `single_${payment.payment_id}`;
-    if (!acc[key]) {
-      acc[key] = [];
-    }
-    acc[key].push(payment);
-    return acc;
-  }, {} as Record<string, Payment[]>);
+  // A reused reference on a different date/account is a different payment
+  // event. Keep the visible grouping tied to the full reference-group identity.
+  const groupedPayments: Record<string, Payment[]> = payments.reduce(
+    (
+      acc: Record<string, Payment[]>,
+      payment: Payment
+    ): Record<string, Payment[]> => {
+      const paymentDate: string = String(payment.payment_date).slice(0, 10);
+      const bankAccount: string =
+        payment.bank_account ||
+        (payment.payment_method === "cash" ? "CASH" : "BANK_PBB");
+      const key: string = payment.payment_reference
+        ? [
+            payment.payment_reference,
+            paymentDate,
+            payment.payment_method,
+            bankAccount,
+          ].join("::")
+        : `single_${payment.payment_id}`;
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(payment);
+      return acc;
+    },
+    {}
+  );
 
   // Sort groups so that groups with any pending payments appear at the top
-  const sortedGroupEntries = Object.entries(groupedPayments).sort(([, groupA], [, groupB]) => {
-    // Check if any payment in group A has pending status
-    const groupAHasPending = groupA.some(p => p.status === 'pending');
-    // Check if any payment in group B has pending status
-    const groupBHasPending = groupB.some(p => p.status === 'pending');
-    
-    // First priority: groups with pending payments go to top
-    if (groupAHasPending && !groupBHasPending) return -1;
-    if (!groupAHasPending && groupBHasPending) return 1;
-    
-    // Second priority: sort by payment date (newest first)
-    const dateA = new Date(groupA[0].payment_date).getTime();
-    const dateB = new Date(groupB[0].payment_date).getTime();
-    return dateB - dateA;
-  });
+  const sortedGroupEntries: [string, Payment[]][] = Object.entries(
+    groupedPayments
+  ).sort(
+    (
+      [, groupA]: [string, Payment[]],
+      [, groupB]: [string, Payment[]]
+    ): number => {
+      const groupAHasPending: boolean = groupA.some(
+        (payment: Payment): boolean => payment.status === "pending"
+      );
+      const groupBHasPending: boolean = groupB.some(
+        (payment: Payment): boolean => payment.status === "pending"
+      );
+
+      if (groupAHasPending && !groupBHasPending) return -1;
+      if (!groupAHasPending && groupBHasPending) return 1;
+
+      const dateA: string = String(groupA[0].payment_date).slice(0, 10);
+      const dateB: string = String(groupB[0].payment_date).slice(0, 10);
+      return dateB.localeCompare(dateA);
+    }
+  );
 
   if (payments.length === 0) {
     return (
@@ -233,6 +290,11 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
               ([reference, paymentGroup]) => {
                 const isGrouped = paymentGroup.length > 1;
                 const firstPayment = paymentGroup[0];
+                const groupTemplate: Payment =
+                  paymentGroup.find(
+                    (payment: Payment): boolean =>
+                      payment.status !== "cancelled"
+                  ) ?? firstPayment;
                 const totalAmount = paymentGroup.reduce(
                   (sum, p) => sum + (p.amount_paid || 0),
                   0
@@ -275,7 +337,23 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                           {formatCurrency(totalAmount)}
                         </td>
                         <td className="px-3 py-3 text-center">
-                          -
+                          {onAddPaymentToGroup &&
+                          groupTemplate.payment_reference ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              color="sky"
+                              icon={IconPlus}
+                              onClick={() =>
+                                onAddPaymentToGroup(groupTemplate)
+                              }
+                              title={`Add another payment with reference ${groupTemplate.payment_reference}`}
+                            >
+                              Add Payment
+                            </Button>
+                          ) : (
+                            "-"
+                          )}
                         </td>
                       </tr>
                       {paymentGroup.map((payment) => (
@@ -360,10 +438,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                                   size="sm"
                                   variant="outline"
                                   color="rose"
-                                  onClick={() => {
-                                    setSelectedPayment(payment);
-                                    setShowCancelDialog(true);
-                                  }}
+                                  onClick={() => handleCancelPaymentClick(payment)}
                                   disabled={
                                     cancellingPaymentId === payment.payment_id
                                   }
@@ -469,10 +544,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                               size="sm"
                               variant="outline"
                               color="rose"
-                              onClick={() => {
-                                setSelectedPayment(payment);
-                                setShowCancelDialog(true);
-                              }}
+                              onClick={() => handleCancelPaymentClick(payment)}
                               disabled={
                                 cancellingPaymentId === payment.payment_id
                               }

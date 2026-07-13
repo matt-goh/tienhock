@@ -20,6 +20,16 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-13",
+    ms: "Baris 'Multiple invoices' dalam Payment Management kini mempunyai butang 'Add Payment'. Butang ini membuka borang bayaran baharu dengan tarikh, kaedah, akaun bank dan rujukan yang sama supaya invois tambahan boleh direkodkan terus di bawah kumpulan rujukan tersebut.",
+    en: "The 'Multiple invoices' row in Payment Management now has an 'Add Payment' button. It opens a new payment form with the same date, method, bank account and reference, so additional invoices can be recorded directly under that reference group.",
+  },
+  {
+    date: "2026-07-13",
+    ms: "Bayaran yang merupakan sebahagian daripada resit berkumpulan kini menerangkan sebab ia tidak boleh dibatalkan secara berasingan pada Payment History dan Payment Management. Kedua-duanya menyediakan pautan untuk melihat resit penuh, semua invois berkaitan dan catatan jurnal selepas diposkan, serta membatalkan seluruh resit bersama-sama dengan pengesahan yang jelas.",
+    en: "Payments that belong to a grouped receipt now explain why they cannot be cancelled separately in both Payment History and Payment Management. Both provide links to the full receipt, every related invoice and its journal entry once posted, with a clear confirmation before the entire receipt is cancelled together.",
+  },
+  {
+    date: "2026-07-13",
     ms: "Permintaan pendaftaran pelanggan Green Target kini dipaparkan terus di atas senarai Customers supaya staf boleh menyemak, mencipta atau menolak permintaan tanpa membuka halaman berasingan.",
     en: "Green Target customer signup requests are now shown directly above the Customers list, so staff can review, create, or reject requests without opening a separate page.",
   },

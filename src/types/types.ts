@@ -388,12 +388,28 @@ export interface Payment {
   is_auto_collection?: boolean; // automatic CASH-bill collection row (non-posting, invoice-owned)
   receipt_allocation_id?: number | null; // set when this row is the projection of a receipt allocation
   receipt_id?: number | null; // owning receipt (via the allocation)
+  receipt_status?: "pending" | "posted" | "cancelled" | null;
+  receipt_reference?: string | null;
+  allocation_count?: number;
   voucher_journal_id?: number | null; // journal to print the receipt voucher from (receipt's, else the row's own)
   notes?: string;
   created_at?: string;
   status?: "active" | "cancelled" | "pending" | "overpaid";
   cancellation_date?: string;
   cancellation_reason?: string;
+}
+
+export interface PaymentCancellationErrorData {
+  code?: "GROUPED_RECEIPT_CANCELLATION_REQUIRED";
+  message: string;
+  detail?: string;
+  receipt_id?: number;
+  allocation_count?: number;
+  receipt_status?: Payment["receipt_status"];
+  receipt_reference?: string | null;
+  receipt_journal_id?: number | null;
+  receipt_journal_reference_no?: string | null;
+  linked_invoice_ids?: string[];
 }
 
 export type AdjustmentDocType = "credit_note" | "debit_note" | "refund_note";
