@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-13",
+    ms: "Rujukan kumpulan bayaran kini boleh dibetulkan terus daripada butiran resit tanpa membatalkan dan merekodkan semula bayaran. Rujukan baharu dikemas kini pada semua bayaran dan catatan jurnal berkaitan dalam kumpulan yang sama, manakala nombor cek, amaun dan baki invois tidak berubah.",
+    en: "A payment group's reference can now be corrected directly from the receipt details without cancelling and recording the payments again. The new reference is updated across every related payment and journal entry in the same group, while cheque numbers, amounts and invoice balances remain unchanged.",
+  },
+  {
+    date: "2026-07-13",
     ms: "Baris 'Multiple invoices' dalam Payment Management kini mempunyai butang 'Add Payment'. Butang ini membuka borang bayaran baharu dengan tarikh, kaedah, akaun bank dan rujukan yang sama supaya invois tambahan boleh direkodkan terus di bawah kumpulan rujukan tersebut.",
     en: "The 'Multiple invoices' row in Payment Management now has an 'Add Payment' button. It opens a new payment form with the same date, method, bank account and reference, so additional invoices can be recorded directly under that reference group.",
   },

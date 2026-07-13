@@ -279,6 +279,7 @@ const PaymentPage: React.FC = () => {
           onRefresh={fetchPayments}
           onCancellationError={setPaymentCancellationError}
           onAddPaymentToGroup={handleAddPaymentToGroup}
+          onViewReceipt={setSelectedReceiptId}
         />
       )}
 
@@ -300,6 +301,9 @@ const PaymentPage: React.FC = () => {
         onClose={() => setSelectedReceiptId(null)}
         onCancelled={async (): Promise<void> => {
           setSelectedReceiptId(null);
+          await fetchPayments();
+        }}
+        onReferenceUpdated={async (): Promise<void> => {
           await fetchPayments();
         }}
       />

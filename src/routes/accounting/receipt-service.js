@@ -389,6 +389,139 @@ export async function createReceipt(client, payload, userId) {
 }
 
 /**
+ * Updates a receipt reference group without changing its accounting. Receipts
+ * sharing the current reference/date/method/account are renamed together so a
+ * visible Payment Management group never splits. Receipt rows, payment-history
+ * projections, and posted journal headers stay in sync in one transaction.
+ * Cash and imported opening receipts keep their fixed historical semantics.
+ */
+export async function updateReceiptReference(
+  client,
+  receiptId,
+  expectedReference,
+  reference,
+  userId
+) {
+  const nextReference = String(reference || "").trim();
+  if (!nextReference) {
+    throw new Error("Receipt reference is required");
+  }
+  if (nextReference.length > 100) {
+    throw new Error("Receipt reference must be 100 characters or fewer");
+  }
+
+  const receiptResult = await client.query(`SELECT * FROM receipts WHERE id = $1`, [
+    receiptId,
+  ]);
+  if (receiptResult.rows.length === 0) {
+    const error = new Error(`Receipt ${receiptId} not found`);
+    error.status = 404;
+    throw error;
+  }
+
+  const receipt = receiptResult.rows[0];
+  if (receipt.status === "cancelled") {
+    throw new Error(`Receipt ${receiptId} is cancelled and cannot be changed`);
+  }
+  if (receipt.origin !== "erp") {
+    throw new Error("Imported opening receipts cannot be changed");
+  }
+  if (receipt.payment_method === "cash") {
+    throw new Error(
+      "Cash receipt references are invoice-specific and cannot be changed"
+    );
+  }
+
+  const normalizedExpectedReference =
+    expectedReference === null || expectedReference === undefined
+      ? null
+      : String(expectedReference).trim();
+  if (receipt.display_reference !== normalizedExpectedReference) {
+    const error = new Error(
+      "This receipt reference changed after you opened it. Reload and try again."
+    );
+    error.status = 409;
+    error.code = "RECEIPT_REFERENCE_CHANGED";
+    throw error;
+  }
+
+  const groupResult = await client.query(
+    `SELECT id, journal_entry_id
+       FROM receipts
+      WHERE display_reference IS NOT DISTINCT FROM $1
+        AND received_date = $2
+        AND payment_method = $3
+        AND debit_account = $4
+        AND origin = 'erp'
+        AND status IN ('pending', 'posted')
+      ORDER BY id
+      FOR UPDATE`,
+    [
+      receipt.display_reference,
+      receipt.received_date,
+      receipt.payment_method,
+      receipt.debit_account,
+    ]
+  );
+  const receiptIds = groupResult.rows.map((row) => row.id);
+  if (!receiptIds.includes(receiptId)) {
+    const error = new Error(
+      "This receipt reference changed after you opened it. Reload and try again."
+    );
+    error.status = 409;
+    error.code = "RECEIPT_REFERENCE_CHANGED";
+    throw error;
+  }
+
+  if (receipt.display_reference === nextReference) {
+    return {
+      receipt,
+      receipt_ids: receiptIds,
+      updated_receipt_count: 0,
+      updated_payment_count: 0,
+    };
+  }
+
+  await client.query(
+    `UPDATE receipts
+        SET display_reference = $2, updated_at = NOW(), updated_by = $3
+      WHERE id = ANY($1::int[])`,
+    [receiptIds, nextReference, userId || null]
+  );
+
+  const paymentUpdate = await client.query(
+    `UPDATE payments p
+        SET payment_reference = $2
+       FROM receipt_allocations ra
+      WHERE p.receipt_allocation_id = ra.id
+        AND ra.receipt_id = ANY($1::int[])`,
+    [receiptIds, nextReference]
+  );
+
+  const journalEntryIds = groupResult.rows
+    .map((row) => row.journal_entry_id)
+    .filter((journalEntryId) => journalEntryId !== null);
+  if (journalEntryIds.length > 0) {
+    await client.query(
+      `UPDATE journal_entries
+          SET display_reference = $2, updated_at = NOW(), updated_by = $3
+        WHERE id = ANY($1::int[])`,
+      [journalEntryIds, nextReference, userId || null]
+    );
+  }
+
+  const fresh = await client.query(`SELECT * FROM receipts WHERE id = $1`, [
+    receiptId,
+  ]);
+  return {
+    receipt: fresh.rows[0],
+    receipt_ids: receiptIds,
+    updated_receipt_count: receiptIds.length,
+    updated_payment_count: paymentUpdate.rowCount,
+  };
+}
+
+/**
  * Confirms a pending (cheque) receipt: posts the journal on the clearance date
  * and applies balances. Re-validates allocations against CURRENT balances.
  */
