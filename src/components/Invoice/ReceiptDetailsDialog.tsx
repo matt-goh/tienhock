@@ -10,6 +10,7 @@ import {
 import {
   IconAlertTriangle,
   IconBan,
+  IconCircleCheck,
   IconExternalLink,
   IconFileInvoice,
   IconReceipt,
@@ -62,6 +63,13 @@ interface ReceiptCancelResponse {
   message: string;
 }
 
+interface ReceiptConfirmResponse {
+  message: string;
+  confirmed_receipt_count: number;
+  confirmed_payment_count: number;
+  payment_group: PaymentGroupDetails;
+}
+
 interface ReceiptReferenceUpdateResponse {
   message: string;
   receipt: {
@@ -76,6 +84,7 @@ interface ReceiptDetailsDialogProps {
   receiptId: number | null;
   isOpen: boolean;
   onClose: () => void;
+  onConfirmed: () => void | Promise<void>;
   onCancelled: () => void | Promise<void>;
   onReferenceUpdated: () => void | Promise<void>;
 }
@@ -169,6 +178,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
   receiptId,
   isOpen,
   onClose,
+  onConfirmed,
   onCancelled,
   onReferenceUpdated,
 }) => {
@@ -177,7 +187,10 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState<boolean>(false);
+  const [isConfirming, setIsConfirming] = useState<boolean>(false);
   const [isCancelConfirmationOpen, setIsCancelConfirmationOpen] =
+    useState<boolean>(false);
+  const [isConfirmConfirmationOpen, setIsConfirmConfirmationOpen] =
     useState<boolean>(false);
   const [isEditingReference, setIsEditingReference] =
     useState<boolean>(false);
@@ -202,6 +215,11 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
       paymentGroup.status !== "cancelled" &&
       paymentGroup.origin === "erp" &&
       paymentGroup.payment_method !== "cash"
+  );
+  const canConfirmGroup: boolean = Boolean(
+    paymentGroup &&
+      paymentGroup.origin === "erp" &&
+      (paymentGroup.status === "pending" || paymentGroup.status === "mixed")
   );
 
   const loadPaymentGroup = useCallback(async (): Promise<void> => {
@@ -274,7 +292,9 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
   useEffect((): void => {
     if (!isOpen) {
       setIsCancelConfirmationOpen(false);
+      setIsConfirmConfirmationOpen(false);
       setIsCancelling(false);
+      setIsConfirming(false);
       setIsEditingReference(false);
       setReferenceValue("");
       setIsSavingReference(false);
@@ -289,21 +309,22 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
   }, [receiptId]);
 
   const handleClose = (): void => {
-    if (!isCancelling && !isSavingReference) {
+    if (!isCancelling && !isConfirming && !isSavingReference) {
       setIsCancelConfirmationOpen(false);
+      setIsConfirmConfirmationOpen(false);
       onClose();
     }
   };
 
   const handleStartReferenceEdit = (): void => {
-    if (!paymentGroup) return;
+    if (!paymentGroup || isConfirming) return;
     setReferenceValue(paymentGroup.display_reference || "");
     setReferenceError(null);
     setIsEditingReference(true);
   };
 
   const handleCancelReferenceEdit = (): void => {
-    if (isSavingReference) return;
+    if (isSavingReference || isConfirming) return;
     setIsEditingReference(false);
     setReferenceValue("");
     setReferenceError(null);
@@ -313,7 +334,14 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
     event: React.FormEvent<HTMLFormElement>
   ): Promise<void> => {
     event.preventDefault();
-    if (!paymentGroup || receiptId === null || isSavingReference) return;
+    if (
+      !paymentGroup ||
+      receiptId === null ||
+      isSavingReference ||
+      isConfirming
+    ) {
+      return;
+    }
 
     const nextReference: string = referenceValue.trim();
     if (!nextReference) {
@@ -369,12 +397,59 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
     }
   };
 
+  const handleConfirmPaymentGroup = async (): Promise<void> => {
+    if (
+      !paymentGroup ||
+      receiptId === null ||
+      !canConfirmGroup ||
+      isConfirming
+    ) {
+      return;
+    }
+
+    setIsConfirmConfirmationOpen(false);
+    setIsConfirming(true);
+
+    try {
+      const response: ReceiptConfirmResponse =
+        await api.put<ReceiptConfirmResponse>(
+          `/api/receipts/${receiptId}/group/confirm`,
+          {}
+        );
+      setPaymentGroup(response.payment_group);
+      toast.success(
+        response.confirmed_payment_count === 1
+          ? "The pending payment was confirmed."
+          : `${response.confirmed_payment_count} pending payments were confirmed together.`
+      );
+    } catch (error: unknown) {
+      console.error("Error confirming payment group:", error);
+      toast.error(
+        getErrorMessage(
+          error,
+          "We could not confirm this payment group. No payments were changed."
+        )
+      );
+      setIsConfirming(false);
+      return;
+    }
+
+    try {
+      await onConfirmed();
+    } catch (error: unknown) {
+      console.error("Error refreshing payments after group confirmation:", error);
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
   const handleCancelPaymentGroup = async (): Promise<void> => {
     if (
       !paymentGroup ||
       receiptId === null ||
       paymentGroup.status === "cancelled" ||
-      isCancelling
+      isCancelling ||
+      isConfirming
     ) {
       return;
     }
@@ -432,7 +507,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
           paymentGroup?.allocations.length === 1 ? "amount" : "amounts"
         }`;
 
-  const confirmationMessage: React.ReactNode = (
+  const cancellationConfirmationMessage: React.ReactNode = (
     <div className="space-y-3">
       <p>
         Payment reference {paymentGroup?.display_reference || "this group"} covers{" "}
@@ -474,6 +549,20 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
     </div>
   );
 
+  const groupConfirmationMessage: React.ReactNode = (
+    <div className="space-y-3">
+      <p>
+        Every payment still marked Pending under reference{" "}
+        {paymentGroup?.display_reference || "this group"} will be confirmed
+        together. Payments already confirmed will not be changed.
+      </p>
+      <p>
+        The related invoice balances will be updated and their journal entries
+        will be created using the payment details already recorded.
+      </p>
+    </div>
+  );
+
   return (
     <>
       <Transition appear show={isOpen} as={Fragment}>
@@ -501,7 +590,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                 leaveFrom="opacity-100 scale-100"
                 leaveTo="opacity-0 scale-95"
               >
-                <DialogPanel className="my-auto flex max-h-[calc(100vh-3rem)] w-full max-w-2xl transform flex-col overflow-hidden rounded-2xl border border-default-200 bg-white text-left align-middle shadow-xl ring-1 ring-black/5 transition-all dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/40 dark:ring-white/10">
+                <DialogPanel className="my-auto flex max-h-[calc(100vh-3rem)] w-full max-w-3xl transform flex-col overflow-hidden rounded-2xl border border-default-200 bg-white text-left align-middle shadow-xl ring-1 ring-black/5 transition-all dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/40 dark:ring-white/10">
                   <div className="flex items-start justify-between gap-3 border-b border-default-200 bg-default-50 px-5 py-4 dark:border-gray-700 dark:bg-gray-900/60">
                     <div className="flex min-w-0 items-center gap-2.5">
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-300">
@@ -524,7 +613,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                     <button
                       type="button"
                       onClick={handleClose}
-                      disabled={isCancelling || isSavingReference}
+                      disabled={isCancelling || isConfirming || isSavingReference}
                       className="rounded-lg p-1 text-default-400 transition-colors hover:bg-default-100 hover:text-default-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-200"
                       aria-label="Close payment group details"
                     >
@@ -576,9 +665,9 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                                 This reference includes more than one payment
                               </p>
                               <p className="mt-1 text-sm leading-5">
-                                To keep every invoice correct, an individual payment
-                                cannot be cancelled by itself. All payments in this
-                                group must be cancelled together.
+                                To keep every invoice correct, pending payments are
+                                confirmed together and payments must also be
+                                cancelled as a group.
                               </p>
                             </div>
                           </div>
@@ -659,7 +748,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                                       }}
                                       maxLength={100}
                                       autoFocus
-                                      disabled={isSavingReference}
+                                      disabled={isSavingReference || isConfirming}
                                       className="h-9 min-w-0 flex-1 rounded-lg border border-default-300 bg-white px-3 font-mono text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
                                       aria-label="New payment reference"
                                     />
@@ -669,7 +758,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                                         size="sm"
                                         variant="outline"
                                         onClick={handleCancelReferenceEdit}
-                                        disabled={isSavingReference}
+                                        disabled={isSavingReference || isConfirming}
                                         className="flex-1 sm:flex-none"
                                       >
                                         Cancel
@@ -678,7 +767,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                                         type="submit"
                                         size="sm"
                                         color="sky"
-                                        disabled={isSavingReference}
+                                        disabled={isSavingReference || isConfirming}
                                         className="flex-1 sm:flex-none"
                                       >
                                         {isSavingReference
@@ -709,7 +798,8 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                                     <button
                                       type="button"
                                       onClick={handleStartReferenceEdit}
-                                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-sky-600 hover:bg-sky-50 hover:text-sky-800 dark:text-sky-400 dark:hover:bg-sky-900/30 dark:hover:text-sky-300"
+                                      disabled={isConfirming}
+                                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-sky-600 hover:bg-sky-50 hover:text-sky-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-sky-400 dark:hover:bg-sky-900/30 dark:hover:text-sky-300"
                                       title="Edit payment reference"
                                       aria-label="Edit payment reference"
                                     >
@@ -832,22 +922,45 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                     <p className="text-xs text-default-500 dark:text-gray-400">
                       {paymentGroup?.status === "cancelled"
                         ? "This payment group can no longer be changed."
+                        : canConfirmGroup
+                        ? "Confirming applies every pending payment in this group together."
                         : paymentGroup?.allocations.length &&
                           paymentGroup.allocations.length > 1
                         ? "Cancelling reverses every payment shown above."
                         : "Cancelling reverses this payment."}
                     </p>
-                    <div className="flex w-full shrink-0 gap-2 sm:w-auto">
+                    <div className="flex w-full shrink-0 flex-wrap gap-2 sm:w-auto">
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
                         onClick={handleClose}
-                        disabled={isCancelling || isSavingReference}
+                        disabled={isCancelling || isConfirming || isSavingReference}
                         className="flex-1 sm:flex-none"
                       >
                         Close
                       </Button>
+                      {canConfirmGroup && (
+                        <Button
+                          type="button"
+                          color="sky"
+                          variant="filled"
+                          size="sm"
+                          icon={IconCircleCheck}
+                          onClick={() => setIsConfirmConfirmationOpen(true)}
+                          className="flex-1 sm:flex-none"
+                          disabled={
+                            isLoading ||
+                            isCancelling ||
+                            isConfirming ||
+                            isSavingReference
+                          }
+                        >
+                          {isConfirming
+                            ? "Confirming..."
+                            : "Confirm Payment Group"}
+                        </Button>
+                      )}
                       <Button
                         type="button"
                         color="rose"
@@ -861,6 +974,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                           paymentGroup.status === "cancelled" ||
                           isLoading ||
                           isCancelling ||
+                          isConfirming ||
                           isSavingReference
                         }
                       >
@@ -876,13 +990,25 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
       </Transition>
 
       <ConfirmationDialog
+        isOpen={isConfirmConfirmationOpen}
+        onClose={() => setIsConfirmConfirmationOpen(false)}
+        onConfirm={() => void handleConfirmPaymentGroup()}
+        title={`Confirm payment group ${
+          paymentGroup?.display_reference || ""
+        }?`}
+        message={groupConfirmationMessage}
+        confirmButtonText="Confirm All Pending Payments"
+        variant="success"
+      />
+
+      <ConfirmationDialog
         isOpen={isCancelConfirmationOpen}
         onClose={() => setIsCancelConfirmationOpen(false)}
         onConfirm={() => void handleCancelPaymentGroup()}
         title={`Cancel payment group ${
           paymentGroup?.display_reference || ""
         }?`}
-        message={confirmationMessage}
+        message={cancellationConfirmationMessage}
         confirmButtonText="Cancel Payment Group"
         variant="danger"
       />

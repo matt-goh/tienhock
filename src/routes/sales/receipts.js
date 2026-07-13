@@ -6,6 +6,7 @@ import { Router } from "express";
 import {
   createReceipt,
   confirmReceipt,
+  confirmReceiptGroup,
   cancelReceipt,
   cancelReceiptGroup,
   getReceiptGroup,
@@ -151,6 +152,38 @@ export default function (pool) {
       res.status(error.status || 400).json({
         code: error.code,
         message: error.message || "Error updating receipt reference",
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  // --- PUT /api/receipts/:id/group/confirm ---
+  router.put("/:id/group/confirm", async (req, res) => {
+    const receiptId = parseInt(req.params.id, 10);
+    if (!Number.isInteger(receiptId) || receiptId <= 0) {
+      return res.status(400).json({ message: "Invalid payment group" });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await confirmReceiptGroup(
+        client,
+        receiptId,
+        {
+          posting_date: req.body?.posting_date,
+          cheque_reference: req.body?.cheque_reference,
+        },
+        req.user?.id || null
+      );
+      await client.query("COMMIT");
+      res.json({ message: "Payment group confirmed and posted", ...result });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error confirming payment group:", error);
+      res.status(error.status || 400).json({
+        message: error.message || "Error confirming payment group",
       });
     } finally {
       client.release();

@@ -620,6 +620,90 @@ export async function getReceiptGroup(client, receiptId) {
 }
 
 /**
+ * Confirms every pending receipt behind one visible payment group atomically.
+ * Posted members are left unchanged so partly confirmed groups can safely
+ * finish the remaining payments in one action.
+ */
+export async function confirmReceiptGroup(
+  client,
+  receiptId,
+  options,
+  userId
+) {
+  const anchorResult = await client.query(
+    `SELECT * FROM receipts WHERE id = $1`,
+    [receiptId]
+  );
+  if (anchorResult.rows.length === 0) {
+    const error = new Error("Payment group not found");
+    error.status = 404;
+    throw error;
+  }
+
+  const anchor = anchorResult.rows[0];
+  const groupLabel = anchor.display_reference || "this payment";
+  if (anchor.status === "cancelled") {
+    throw new Error(`Payment group ${groupLabel} is cancelled and cannot be confirmed`);
+  }
+  if (anchor.origin !== "erp") {
+    throw new Error("Imported opening payment groups cannot be confirmed");
+  }
+
+  const groupResult = await client.query(
+    `SELECT id, status
+       FROM receipts
+      WHERE display_reference IS NOT DISTINCT FROM $1
+        AND received_date = $2
+        AND payment_method = $3
+        AND debit_account = $4
+        AND origin = 'erp'
+        AND status IN ('pending', 'posted')
+      ORDER BY id
+      FOR UPDATE`,
+    [
+      anchor.display_reference,
+      anchor.received_date,
+      anchor.payment_method,
+      anchor.debit_account,
+    ]
+  );
+  const receiptIds = groupResult.rows.map((receipt) => receipt.id);
+  if (!receiptIds.includes(receiptId)) {
+    const error = new Error(
+      "This payment group changed after you opened it. Reload and try again."
+    );
+    error.status = 409;
+    throw error;
+  }
+
+  const pendingReceiptIds = groupResult.rows
+    .filter((receipt) => receipt.status === "pending")
+    .map((receipt) => receipt.id);
+  if (pendingReceiptIds.length === 0) {
+    throw new Error(`Payment group ${groupLabel} has already been confirmed`);
+  }
+
+  const pendingPaymentResult = await client.query(
+    `SELECT COUNT(*)::integer AS count
+       FROM payments p
+       JOIN receipt_allocations ra ON ra.id = p.receipt_allocation_id
+      WHERE ra.receipt_id = ANY($1::int[])
+        AND p.status = 'pending'`,
+    [pendingReceiptIds]
+  );
+
+  for (const pendingReceiptId of pendingReceiptIds) {
+    await confirmReceipt(client, pendingReceiptId, options || {}, userId);
+  }
+
+  return {
+    confirmed_receipt_count: pendingReceiptIds.length,
+    confirmed_payment_count: pendingPaymentResult.rows[0]?.count || 0,
+    payment_group: await getReceiptGroup(client, receiptId),
+  };
+}
+
+/**
  * Cancels every live receipt behind one visible payment group atomically.
  */
 export async function cancelReceiptGroup(client, receiptId, reason, userId) {

@@ -25,6 +25,16 @@ const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   },
   {
     date: "2026-07-13",
+    ms: "Kumpulan bayaran cek tertunda kini boleh disahkan terus melalui 'Manage Group' atau butang pengesahan pada bayaran. Dialog pengesahan kini menerangkan bahawa semua bayaran tertunda dengan rujukan yang sama akan disahkan bersama, memaparkan akaun bank yang telah direkodkan, dan menunjukkan sebab sebenar jika pengesahan tidak dapat dibuat.",
+    en: "Pending cheque payment groups can now be confirmed from 'Manage Group' or a payment's confirmation button. The refreshed confirmation dialog explains that every pending payment under the same reference will be confirmed together, shows the bank account already recorded, and displays the actual reason when confirmation cannot proceed.",
+  },
+  {
+    date: "2026-07-13",
+    ms: "Borang bayaran kini mempunyai pemilih tarikh yang seragam untuk tarikh bayaran serta tempoh carian invois. Susun atur baharu menggunakan ruang skrin yang tersedia dan memisahkan butiran bayaran serta invois terpilih daripada senarai carian supaya setiap bahagian boleh ditatal dengan lebih selesa, termasuk pada telefon. Senarai carian hanya menunjukkan baki perlu dibayar pada kebanyakan skrin, manakala jumlah asal invois boleh dilihat dengan meletakkan penuding pada baki; lajur Jumlah turut dipaparkan pada skrin desktop yang sangat lebar. Butang 'Add' tidak lagi cuba menghantar borang secara tidak sengaja, dan amaun kosong, sifar atau melebihi baki pada syarikat yang tidak menyokong lebihan bayaran kini diterangkan sebelum dihantar.",
+    en: "The payment form now uses consistent date pickers for both the payment date and invoice search period. Its new layout uses the available screen space and separates payment details and selected invoices from the search results so each area scrolls more comfortably, including on phones. Search results show only the balance due on most screens, with the invoice's original total available by hovering over that balance; the Total column is also shown on very wide desktop screens. The 'Add' button no longer attempts to submit the form accidentally, and blank, zero or unsupported above-balance amounts are now explained before submission.",
+  },
+  {
+    date: "2026-07-13",
     ms: "Tajuk tab pelayar kini menunjukkan halaman dan syarikat yang sedang digunakan. Borang pendaftaran pelanggan awam juga kini memaparkan Green Target dan tajuk dalam bahasa yang dipilih, bukannya Tien Hock ERP.",
     en: "Browser tab titles now show the current page and company. The public customer registration form also shows Green Target and the title in the selected language instead of Tien Hock ERP.",
   },
