@@ -18,7 +18,7 @@ import {
   IconChevronLeft,
   IconChevronRight,
 } from "@tabler/icons-react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import TimeNavigator, { TimeRange } from "../../../components/TimeNavigator";
 import Button from "../../../components/Button";
@@ -479,7 +479,13 @@ const AccountLedgerPage: React.FC = () => {
       {statement && (
         <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm px-0.5">
           <span className="font-medium text-default-700 dark:text-gray-200">
-            {statement.account.code}
+            <Link
+              to={`/accounting/account-codes/${encodeURIComponent(statement.account.code)}`}
+              className="hover:text-sky-600 dark:hover:text-sky-400 hover:underline transition-colors"
+              title={`Open account code ${statement.account.code}`}
+            >
+              {statement.account.code}
+            </Link>
             <span className="ml-1.5 font-normal text-default-500 dark:text-gray-400">
               {statement.account.description}
             </span>
