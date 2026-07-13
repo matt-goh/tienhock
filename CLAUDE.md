@@ -54,6 +54,14 @@ This is a comprehensive ERP system supporting three companies:
 - **Route Organization**: `src/routes/index.js` sets up all API routes
 - **Company-specific Routes**: Each company has separate route handlers under their respective directories
 
+### Production Deployment & Request Path
+
+- `tienhock.com` and `greentarget.tienhock.com` are served by the same Cloudflare Pages project.
+- API traffic follows: browser -> `api.tienhock.com` -> Cloudflare Tunnel (`tienhock-hetzner`) -> `http://localhost:80` -> system Nginx on the Hetzner server -> the Node/Express server managed by PM2.
+- `.github/workflows/deploy.yml` deploys the `production` branch by pulling the repository, building the frontend, and restarting `tienhock-server` with PM2. It does not run Docker Compose or install/reload Nginx configuration.
+- The live production Nginx configuration is under `/etc/nginx` on the Hetzner server. `prod/nginx/nginx.conf` is for the separate Docker topology and proxies to the Docker hostname `prod_server:5000`; changing that repository file alone does not change the live system Nginx configuration.
+- In production, Express disables its own CORS headers and system Nginx owns CORS. Any new production frontend origin must be added to the live Nginx allowlist, and Nginx must be validated and reloaded. Keep `PATCH` in `Access-Control-Allow-Methods` for APIs that use it.
+
 ### Database
 
 - PostgreSQL with connection pooling
