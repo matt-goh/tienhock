@@ -280,16 +280,28 @@ const JournalDetailsPage: React.FC = () => {
   }
 
   // System-generated journals are owned by their source record (payment, purchase,
-  // payroll voucher…) — they can be cancelled here but not edited line-by-line.
-  const SYSTEM_ENTRY_TYPES = ["REC", "PUR", "GP", "PAY", "CN", "JVDR", "JVSL"];
-  const isSystemGenerated =
+  // payroll voucher…) and cannot be edited line-by-line. Migration journals are
+  // also immutable and cannot be cancelled from the app.
+  const SYSTEM_ENTRY_TYPES: string[] = [
+    "REC",
+    "PUR",
+    "GP",
+    "PAY",
+    "CN",
+    "JVDR",
+    "JVSL",
+    "IMP",
+  ];
+  const isLegacyImport: boolean = entry.entry_type === "IMP";
+  const isSystemGenerated: boolean =
     SYSTEM_ENTRY_TYPES.includes(entry.entry_type as string) ||
     ((entry.entry_type as string) === "B" &&
       (entry.description || "").startsWith("PRP:"));
-  const canEdit = entry.status !== "cancelled" && !isSystemGenerated;
-  const canCancel = entry.status !== "cancelled";
-  const canDelete = true;
-  const canPrintVoucher = (entry.entry_type as string) === "REC" && entry.status !== "cancelled";
+  const canEdit: boolean = entry.status !== "cancelled" && !isSystemGenerated;
+  const canCancel: boolean = entry.status !== "cancelled" && !isLegacyImport;
+  const canDelete: boolean = !isLegacyImport;
+  const canPrintVoucher: boolean =
+    (entry.entry_type as string) === "REC" && entry.status !== "cancelled";
 
   return (
     <div className="space-y-3">

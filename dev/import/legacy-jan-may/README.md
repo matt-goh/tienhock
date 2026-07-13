@@ -1,9 +1,10 @@
 # Legacy Jan-May 2026 staging preflight
 
-This directory contains deterministic, file-only preparation for the legacy
-THLD and THDB ledger exports. It validates the immutable source files and emits
-a normalized staging CSV plus an audit report. It does **not** connect to
-PostgreSQL, create tables, post journals, or run any import SQL.
+This directory contains the deterministic preparation and guarded database
+runbook for the legacy THLD and THDB ledger exports. The preparation script
+itself is file-only: it validates the immutable source files and emits a
+normalized staging CSV plus an audit report without connecting to PostgreSQL.
+The separate loader and SQL files perform the reviewed database phases.
 
 ## Source placement
 
@@ -135,9 +136,225 @@ For `record_kind=opening`, the authoritative signed C/FWD value is
 `debit_cents`/`credit_cents`: THDB commonly prints its opening only in the
 BALANCE column, leaving both amount columns blank.
 
-## Stop boundary
+## Guarded database execution
 
-Successful generation is the end of this preparation step. Review
-`validation-report.json` before designing or running a database load. Do not
-COPY the staging file, apply migrations, cancel journals, create anchors, or
-post import journals as part of this runbook.
+Only run these steps after restoring a fresh production snapshot and reviewing
+`generated/validation-report.json`. The database scripts abort on any source,
+schema, population, amount, ownership, or checkpoint drift.
+
+1. Apply the conflict migration, fs-note remap, approved HPB classification,
+   and staging-table migration in that order:
+
+   - `dev/migrations/2026-07-13_legacy_jan_may_conflicts.sql`
+   - `dev/migrations/fs_note_remap_2026-07.sql`
+   - `dev/migrations/2026-07-13_hpb_interest_suspense_note16.sql`
+   - `dev/migrations/2026-07-13_legacy_jan_may_staging.sql`
+
+2. Load the hash-validated CSV into staging:
+
+   ```powershell
+   node dev/import/legacy-jan-may/load-staging.mjs
+   ```
+
+   The loader verifies the approved staging CSV SHA-256 before opening Docker,
+   then checks its embedded source hashes and performs `TRUNCATE`, `COPY`, and
+   every staging invariant in one transaction. The 180 unmapped accounts it
+   permits are all zero-opening-only provenance sections; no transaction or
+   nonzero opening uses a missing account. Run `prepare-staging.mjs` first when
+   the private source files themselves need to be revalidated.
+
+   Docker is the default. For a disposable proof database or the system
+   PostgreSQL used by production, select direct mode and export every
+   connection setting explicitly; the loader deliberately does not guess or
+   load `.env` itself:
+
+   ```bash
+   export LEGACY_IMPORT_DB_MODE=direct
+   export DB_HOST=localhost
+   export DB_PORT=5432
+   export DB_USER=postgres
+   export DB_NAME=tienhock_prod_proof
+   read -rsp 'PostgreSQL password: ' DB_PASSWORD
+   export DB_PASSWORD
+   printf '\n'
+   node dev/import/legacy-jan-may/load-staging.mjs
+   ```
+
+   Do not point direct mode at the live database until the production
+   read-only inventory, proof-database rehearsal, final backup, and maintenance
+   cutover gates have passed.
+
+3. Copy `post-monthly-journals.sql` into the database container and execute it
+   once per month, changing `month_start` from January through May:
+
+   ```powershell
+   docker cp dev/import/legacy-jan-may/post-monthly-journals.sql tienhock_dev_db:/tmp/post-monthly-journals.sql
+   docker exec -i tienhock_dev_db psql -U postgres -d tienhock --no-psqlrc -v ON_ERROR_STOP=1 -v month_start=2026-01-01 -f /tmp/post-monthly-journals.sql
+   ```
+
+4. Run the independent acceptance suite. It reconstructs all source running
+   balances, checks every staged header/line and source-owned CN, verifies all
+   five cumulative per-account closes, and compares the 31 May close with every
+   1 June checkpoint:
+
+   ```powershell
+   docker cp dev/import/legacy-jan-may/verify-import.sql tienhock_dev_db:/tmp/verify-import.sql
+   docker exec -i tienhock_dev_db psql -U postgres -d tienhock --no-psqlrc -v ON_ERROR_STOP=1 -f /tmp/verify-import.sql
+   ```
+
+5. Only after that passes, insert the 1 January anchors and rerun both scripts
+   to prove their no-op behavior:
+
+   ```powershell
+   docker cp dev/import/legacy-jan-may/insert-opening-anchors.sql tienhock_dev_db:/tmp/insert-opening-anchors.sql
+   docker exec -i tienhock_dev_db psql -U postgres -d tienhock --no-psqlrc -v ON_ERROR_STOP=1 -f /tmp/insert-opening-anchors.sql
+   ```
+
+6. Run the read-only invoice reconciliation. It hard-pins the local-date
+   scope, consolidated-wrapper exclusion, every exact and corrected-reference
+   match, all named differences, and both zero-value populations:
+
+   ```powershell
+   docker cp dev/import/legacy-jan-may/verify-invoice-reconciliation.sql tienhock_dev_db:/tmp/verify-invoice-reconciliation.sql
+   docker exec -i tienhock_dev_db psql -U postgres -d tienhock --no-psqlrc -v ON_ERROR_STOP=1 -f /tmp/verify-invoice-reconciliation.sql
+   ```
+
+   The human-readable acceptance record is
+   [LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md](../../../docs/Account/LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md).
+
+## 2026-07-13 development execution result
+
+- Staging: 12,635 rows; 2,567 openings; 10,068 transaction lines;
+  3,863 balanced groups; DR = CR RM13,503,516.15.
+- Posted `IMP`: 3,863 journals / 10,068 lines, with each monthly batch matching
+  its pinned count and amount. A January batch rerun inserted no duplicates.
+- Source proof: 12,665 reconstructed rows including the 32 source-owned CN
+  projections; zero running-balance mismatches.
+- 31 May checkpoint proof: 2,568 source accounts; all 1,571 June anchors match;
+  the 52 June anchors absent from the export are deliberate zero debtor fences.
+- 1 January anchors: 580 total = 291 nonzero + 289 explicit zero fences. The
+  existing `C-CARE(1)` RM7,635.00 row was preserved; 579 rows were inserted.
+  Signed opening net is RM1,456,480.37 CR, the approved named residue.
+- The anchor rerun inserted zero rows, and the independent acceptance suite
+  passed again after anchor insertion.
+
+The development accounting result is exact. Production execution still
+requires the pinned live read-only inventory, a fresh proof-database rehearsal,
+a validated rollback backup, and a maintenance window. The separate
+operational-invoice differences remain open until the original legacy
+invoice/item evidence is available; they do not alter the exact imported
+ledger projection.
+
+## Production cutover (system PostgreSQL)
+
+Do not use the database-replacement upload for this rollout and do not rerun
+the broad June refactor migrations. The 13 July production snapshot already
+contains the June receipt, bank-in, debtor, and visible-reference end state.
+This rollout adds only the guarded Jan-May import phases listed above.
+
+The production checkout must first contain the anchor-aware report code, the
+pre-June application posting lock, and the API/UI guard that reserves `IMP` for
+the immutable historical import. Keep the private source CSV, generated
+staging/report, inventory output, and database backups outside Git with mode
+`0600`/a restrictive umask.
+
+On the server, configure standard libpq variables without putting the password
+on a command line. A `~/.pgpass` file with mode `0600` is preferred; otherwise
+read it interactively:
+
+```bash
+set -euo pipefail
+umask 077
+export PGHOST=localhost
+export PGPORT=5432
+export PGUSER=postgres
+export PGDATABASE=tienhock_prod
+read -rsp 'PostgreSQL password: ' PGPASSWORD
+export PGPASSWORD
+printf '\n'
+```
+
+Before any write, run the repeatable-read inventory and retain its output:
+
+```bash
+psql --no-psqlrc --set ON_ERROR_STOP=1 \
+  --file dev/import/legacy-jan-may/production-readonly-inventory.sql \
+  | tee legacy-jan-may-inventory-before.txt
+```
+
+Require the audited pre-rollout account and REC fingerprints, zero ownership
+exceptions, zero `IMP` journals, the exact 16-CN source population, the June
+end-state indicators, and the expected invoice census. Any false comparison or
+unexpected row is a stop, not permission to weaken a guard.
+
+Rehearse the complete sequence below against a fresh disposable restore of a
+new production dump. Then start the maintenance window, stop `tienhock-server`
+with PM2, take a final custom-format `pg_dump`, validate it with
+`pg_restore --list`, restore it into a disposable rollback database, and rerun
+the inventory there. Run the live inventory once more only after PM2 is
+stopped. Do not continue unless both the backup restore and final inventory
+pass.
+
+Apply the guarded database phases in this exact order:
+
+```bash
+psql --no-psqlrc --set ON_ERROR_STOP=1 \
+  --file dev/migrations/2026-07-13_legacy_jan_may_conflicts.sql
+psql --no-psqlrc --set ON_ERROR_STOP=1 \
+  --file dev/migrations/fs_note_remap_2026-07.sql
+psql --no-psqlrc --set ON_ERROR_STOP=1 \
+  --file dev/migrations/2026-07-13_hpb_interest_suspense_note16.sql
+psql --no-psqlrc --set ON_ERROR_STOP=1 \
+  --file dev/migrations/2026-07-13_legacy_jan_may_staging.sql
+```
+
+Load the private, hash-pinned staging CSV through direct mode:
+
+```bash
+export LEGACY_IMPORT_DB_MODE=direct
+export DB_HOST="$PGHOST"
+export DB_PORT="$PGPORT"
+export DB_USER="$PGUSER"
+export DB_NAME="$PGDATABASE"
+node dev/import/legacy-jan-may/load-staging.mjs \
+  --csv dev/import/legacy-jan-may/generated/legacy_jan_may_staging.csv
+```
+
+Post and verify all five months, insert anchors only after the first acceptance
+pass, then rerun every idempotent phase:
+
+```bash
+for month in 2026-01-01 2026-02-01 2026-03-01 2026-04-01 2026-05-01; do
+  psql --no-psqlrc --set ON_ERROR_STOP=1 --set month_start="$month" \
+    --file dev/import/legacy-jan-may/post-monthly-journals.sql
+done
+
+psql --no-psqlrc --set ON_ERROR_STOP=1 \
+  --file dev/import/legacy-jan-may/verify-import.sql
+psql --no-psqlrc --set ON_ERROR_STOP=1 \
+  --file dev/import/legacy-jan-may/insert-opening-anchors.sql
+
+for month in 2026-01-01 2026-02-01 2026-03-01 2026-04-01 2026-05-01; do
+  psql --no-psqlrc --set ON_ERROR_STOP=1 --set month_start="$month" \
+    --file dev/import/legacy-jan-may/post-monthly-journals.sql
+done
+
+psql --no-psqlrc --set ON_ERROR_STOP=1 \
+  --file dev/import/legacy-jan-may/insert-opening-anchors.sql
+psql --no-psqlrc --set ON_ERROR_STOP=1 \
+  --file dev/import/legacy-jan-may/verify-import.sql
+psql --no-psqlrc --set ON_ERROR_STOP=1 \
+  --file dev/import/legacy-jan-may/verify-invoice-reconciliation.sql
+psql --no-psqlrc --set ON_ERROR_STOP=1 \
+  --file dev/import/legacy-jan-may/production-readonly-inventory.sql \
+  | tee legacy-jan-may-inventory-after.txt
+```
+
+Every command above commits independently. If any command, comparison, or
+database-level post-import check fails, do not improvise and do not restart
+PM2. Restore or swap back to the already validated pristine rollback database,
+confirm the pre-rollout inventory, and only then restart the application. Once
+all database checks pass, restart PM2 and immediately perform read-only
+January-June Trial Balance, Balance Sheet, account-ledger, bank, and General
+Statement spot checks through the app. Stop PM2 again before investigating any
+failed application-level check.
