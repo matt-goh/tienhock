@@ -1,6 +1,6 @@
 # Legacy Jan–May 2026 Ledger Import — Plan & Handover
 
-**Created 13 Jul 2026. Updated 14 Jul 2026 — GUARDED ACCOUNTING IMPORT COMPLETE AND VERIFIED IN PRODUCTION; AUDITOR-FACING PRESENTATION MIGRATION DOCUMENTED.**
+**Created 13 Jul 2026. Updated 14 Jul 2026 — GUARDED ACCOUNTING IMPORT AND AUDITOR-FACING PRESENTATION COMPLETE AND VERIFIED IN PRODUCTION.**
 Goal: extend the 1:1 legacy parity already achieved for June 2026 (see [INVOICE_PAYMENT_ACCOUNTING_PROGRESS.md](INVOICE_PAYMENT_ACCOUNTING_PROGRESS.md)) backwards to 1 January 2026, by importing the legacy system's Jan–May ledger exports as posted journals, so that **every 2026 report (Trial Balance, Income Statement, Balance Sheet, CoGM, Account Ledger, Customer/General Statements) reads real journal data for the whole year**. June onwards is organic ERP entry (already row-by-row reconciled); Jan–May becomes imported legacy truth; the two meet at the existing 1 June anchors, which become verification checkpoints.
 
 The deterministic preflight, staging load, five monthly `IMP` batches,
@@ -17,8 +17,9 @@ executed state and remaining source-invoice boundary.
 
 The source projection was re-verified against the immutable hashes on
 development and production on 13 July 2026. The 14 July presentation migration
-changes only provenance and auditor-facing metadata over that frozen accounting
-projection; its own guarded, idempotent verifier is the final acceptance step.
+was subsequently rehearsed and applied to production; it changed only
+provenance and auditor-facing metadata over that frozen accounting projection,
+and its guarded second run was a verified no-op.
 
 ---
 
@@ -192,7 +193,7 @@ The giant synthetic opening-journal fallback was not selected and must not be in
 | **L4** ◐ accounting exact in prod; source decision pending | Insert 01-01 anchors, run §7, and reconcile ERP invoices to imported rows | 580 anchors and exact accounting gates pass; literal source-record parity requires the evidence/decisions in the reconciliation document |
 | **L5** ✅ dev + prod | TB/BS anchor engine, Current Year Profit, journal-only Note 7/22, bank cutoff, fs-note remap, HPB Note 16, guide, posting lock, and changelog | Jan–Jun BS residue exactly RM1,456,480.37; manual `PV008/06` RM483 retained as unproven contra |
 | **L6** ✅ production cutover | Audit live state, rehearse on a fresh proof database, stop writes, validate rollback, reproduce L2→L5, and verify the live app | completed 13 Jul 2026; proof and pristine rollback retained; production database/report/PM2/HTTP gates passed |
-| **L7** ◐ final presentation | After the last successful old `verify-import.sql`, run and rerun `2026-07-14_legacy_journal_presentation.sql` | semantic types/provenance/descriptions/line refs exact; second run is a verified no-op |
+| **L7** ✅ dev + proof + prod | After the last successful old `verify-import.sql`, run and rerun `2026-07-14_legacy_journal_presentation.sql`, then deploy the auditor-facing API/UI | completed 14 Jul 2026; semantic types/provenance/descriptions/line refs exact, second run updated 0/0, v2 accounting fingerprint unchanged |
 
 ---
 
@@ -274,6 +275,13 @@ type counts, unique group provenance, duplicate `34847`, special
 `15347`/`T260526` line references, and DR = CR RM13,503,516.15. Its snapshots
 also prove that dates, accounts, amounts, status, creation/posting identity,
 line order, cheque references, and the hidden `IMP-*` header keys did not move.
+
+Execution result: the retained proof database passed with updates of
+3,863/10,068 and then 0/0. Production passed the same two runs during a PM2
+maintenance window. The post-migration inventory matched accounting fingerprint
+`70cc1b6d97fc2fdaeff191c14092f531`, all nine semantic type counts, 3,863 unique
+source links, 3,862 visible references, and 10,068 exact line references. The
+application deployment completed on production commit `b4a6493d`.
 
 ---
 
@@ -372,29 +380,21 @@ in §10; no imported accounting row or anchor is awaiting repair.
   derived summary, and exact line reference are presentation metadata; none
   changes the totals above.
 
-### 10c. Presentation finalization and remaining source-record boundary
+### 10c. Remaining source-record boundary
 
-The guarded accounting import and L5 report work are complete and verified in
-production. They are not pending. The remaining work is bounded as follows:
+The guarded accounting import, L5 report work, and L7 presentation are complete
+and verified in production. They are not pending. The remaining work is bounded
+as follows:
 
-1. Take a fresh backup, confirm the retained 13 July `verify-import.sql`
-   acceptance record (or run it before presentation on a proof copy), then run
-   and rerun
-   [2026-07-14_legacy_journal_presentation.sql](../../dev/migrations/2026-07-14_legacy_journal_presentation.sql).
-   That migration, not the old post/verify scripts, is the final idempotent
-   verifier for the presented population.
-2. The user confirmed that all source-record differences must ultimately be
+1. The user confirmed that all source-record differences must ultimately be
    reconciled rather than accepted as permanent bridges. That work remains
    blocked by missing legacy item/quantity/salesperson evidence and valid
    MyInvois wrapper history; the exact evidence and decisions required are in
    the reconciliation document. This does not block deploying the already
    exact ledger/report projection, because later source repairs must remain
    nonposting and leave the imported journals untouched.
-3. Keep the private source CSV,
+2. Keep the private source CSV,
    generated staging CSV/report, and production dump untracked.
-
-No build, TypeScript check, or lint command was run, in accordance with
-repository instructions.
 
 ---
 
