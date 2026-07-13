@@ -2,7 +2,7 @@
 // Public (unauthenticated), mobile-first Green Target customer registration form.
 // Served on greentarget.tienhock.com and at /greentarget-form for dev/testing.
 // Self-contained: no Navbar, no auth context, no shared app form components.
-import { useState, FormEvent } from "react";
+import { useEffect, useState, FormEvent } from "react";
 import { IconCheck, IconDownload } from "@tabler/icons-react";
 import { API_BASE_URL } from "../../../configs/config";
 import {
@@ -22,6 +22,10 @@ const QR_IMAGE_PATH = "/greentarget-duitnow-qr.jpg";
 const CustomerSignupPage = () => {
   const [lang, setLang] = useState<FormLanguage>("ms");
   const t = translations[lang];
+
+  useEffect((): void => {
+    document.title = `${t.title} | Green Target`;
+  }, [t.title]);
 
   const [name, setName] = useState("");
   const [idNumber, setIdNumber] = useState("");

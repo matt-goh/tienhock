@@ -19,6 +19,66 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-07-13",
+    ms: "Laporan Trial Balance dan Balance Sheet kini menggunakan baki pembukaan akaun bersama pergerakan jurnal bagi tempoh yang dipilih, manakala Income Statement dan CoGM menggunakan jurnal sahaja. Balance Sheet turut memaparkan Untung Tahun Semasa. Rekod jualan, resit dan nota pelarasan Tien Hock bertarikh sebelum 1 Jun 2026 kini dilindungi daripada perubahan yang boleh memposkan semula catatan akaun lama secara tidak sengaja.",
+    en: "Trial Balance and Balance Sheet reports now use account opening balances together with journal movements for the selected period, while the Income Statement and CoGM use journals only. The Balance Sheet also shows Current Year Profit. Tien Hock sales, receipts and adjustment notes dated before 1 June 2026 are now protected from changes that could accidentally repost historical accounting entries.",
+  },
+  {
+    date: "2026-07-13",
+    ms: "Bahagian Stock Kilang pada halaman Material Stock kini menjadi rekod kos bulanan yang berasingan. Kuantitinya hanya berubah melalui catatan pada halaman ini dan tidak lagi diambil daripada atau mengubah rekod pengeluaran, jualan atau stok produk. Semua produk MEE atau BIHUN yang aktif kini dipaparkan supaya kuantiti boleh dimasukkan walaupun belum mempunyai baki.",
+    en: "The Stock Kilang section on Material Stock is now a separate monthly costing record. Its quantities change only through entries on this page and no longer come from or alter production, sales, or product-stock records. All active MEE or BIHUN products are now shown so quantities can be entered even when they have no balance yet.",
+  },
+  {
+    date: "2026-07-13",
+    ms: "Kumpulan bayaran cek tertunda kini boleh disahkan terus melalui 'Manage Group' atau butang pengesahan pada bayaran. Dialog pengesahan kini menerangkan bahawa semua bayaran tertunda dengan rujukan yang sama akan disahkan bersama, memaparkan akaun bank yang telah direkodkan, dan menunjukkan sebab sebenar jika pengesahan tidak dapat dibuat.",
+    en: "Pending cheque payment groups can now be confirmed from 'Manage Group' or a payment's confirmation button. The refreshed confirmation dialog explains that every pending payment under the same reference will be confirmed together, shows the bank account already recorded, and displays the actual reason when confirmation cannot proceed.",
+  },
+  {
+    date: "2026-07-13",
+    ms: "Borang bayaran kini mempunyai pemilih tarikh yang seragam untuk tarikh bayaran serta tempoh carian invois. Susun atur baharu menggunakan ruang skrin yang tersedia dan memisahkan butiran bayaran serta invois terpilih daripada senarai carian supaya setiap bahagian boleh ditatal dengan lebih selesa, termasuk pada telefon. Senarai carian hanya menunjukkan baki perlu dibayar pada kebanyakan skrin, manakala jumlah asal invois boleh dilihat dengan meletakkan penuding pada baki; lajur Jumlah turut dipaparkan pada skrin desktop yang sangat lebar. Butang 'Add' tidak lagi cuba menghantar borang secara tidak sengaja, dan amaun kosong, sifar atau melebihi baki pada syarikat yang tidak menyokong lebihan bayaran kini diterangkan sebelum dihantar.",
+    en: "The payment form now uses consistent date pickers for both the payment date and invoice search period. Its new layout uses the available screen space and separates payment details and selected invoices from the search results so each area scrolls more comfortably, including on phones. Search results show only the balance due on most screens, with the invoice's original total available by hovering over that balance; the Total column is also shown on very wide desktop screens. The 'Add' button no longer attempts to submit the form accidentally, and blank, zero or unsupported above-balance amounts are now explained before submission.",
+  },
+  {
+    date: "2026-07-13",
+    ms: "Tajuk tab pelayar kini menunjukkan halaman dan syarikat yang sedang digunakan. Borang pendaftaran pelanggan awam juga kini memaparkan Green Target dan tajuk dalam bahasa yang dipilih, bukannya Tien Hock ERP.",
+    en: "Browser tab titles now show the current page and company. The public customer registration form also shows Green Target and the title in the selected language instead of Tien Hock ERP.",
+  },
+  {
+    date: "2026-07-13",
+    ms: "Payment Management dan Payment History kini memaparkan serta mengurus bayaran mengikut kumpulan rujukan, tanpa menunjukkan nombor rekod dalaman. Semua invois dengan rujukan, tarikh, kaedah dan akaun bank yang sama ditunjukkan bersama, dan pembatalan atau pengesahan melibatkan seluruh kumpulan supaya baki invois kekal tepat.",
+    en: "Payment Management and Payment History now display and manage payments by reference group without showing internal record numbers. Every invoice with the same reference, date, method and bank account is shown together, and cancellation or confirmation applies to the full group so invoice balances remain correct.",
+  },
+  {
+    date: "2026-07-13",
+    ms: "Perubahan pada cawangan pelanggan (menambah, membuang atau menukar cawangan utama) dan harga khas produk pelanggan kini dipaparkan serta-merta selepas disimpan. Sebelum ini, perubahan tersebut boleh mengambil masa sehingga sejam untuk muncul walaupun selepas halaman dimuat semula.",
+    en: "Changes to customer branches (adding, removing, or changing the main branch) and customer product custom prices now appear immediately after saving. Previously, these changes could take up to an hour to show even after refreshing the page.",
+  },
+  {
+    date: "2026-07-13",
+    ms: "Rujukan kumpulan bayaran kini boleh dibetulkan terus daripada butiran kumpulan tanpa membatalkan dan merekodkan semula bayaran. Rujukan baharu dikemas kini pada semua bayaran dan catatan jurnal berkaitan dalam kumpulan yang sama, manakala nombor cek, amaun dan baki invois tidak berubah.",
+    en: "A payment group's reference can now be corrected directly from the group details without cancelling and recording the payments again. The new reference is updated across every related payment and journal entry in the same group, while cheque numbers, amounts and invoice balances remain unchanged.",
+  },
+  {
+    date: "2026-07-13",
+    ms: "Baris 'Multiple invoices' dalam Payment Management kini mempunyai butang 'Add Payment'. Butang ini membuka borang bayaran baharu dengan tarikh, kaedah, akaun bank dan rujukan yang sama supaya invois tambahan boleh direkodkan terus di bawah kumpulan rujukan tersebut.",
+    en: "The 'Multiple invoices' row in Payment Management now has an 'Add Payment' button. It opens a new payment form with the same date, method, bank account and reference, so additional invoices can be recorded directly under that reference group.",
+  },
+  {
+    date: "2026-07-13",
+    ms: "Bayaran yang menggunakan rujukan yang sama kini menerangkan sebab satu bayaran tidak boleh dibatalkan secara berasingan pada Payment History dan Payment Management. Kedua-duanya menyediakan pautan ke kumpulan bayaran, semua invois berkaitan dan catatan jurnal selepas diposkan, serta pengesahan yang jelas sebelum semua bayaran dalam kumpulan dibatalkan bersama.",
+    en: "Payments under the same reference now explain why one payment cannot be cancelled separately in both Payment History and Payment Management. Both provide links to the payment group, every related invoice and its journal entry once posted, with a clear confirmation before all payments in the group are cancelled together.",
+  },
+  {
+    date: "2026-07-13",
+    ms: "Permintaan pendaftaran pelanggan Green Target kini dipaparkan terus di atas senarai Customers supaya staf boleh menyemak, mencipta atau menolak permintaan tanpa membuka halaman berasingan.",
+    en: "Green Target customer signup requests are now shown directly above the Customers list, so staff can review, create, or reject requests without opening a separate page.",
+  },
+  {
+    date: "2026-07-13",
+    ms: "Borang pendaftaran pelanggan Green Target kini boleh dihantar dengan betul dari greentarget.tienhock.com tanpa disekat oleh sambungan pelayan.",
+    en: "The Green Target customer registration form can now be submitted correctly from greentarget.tienhock.com without being blocked by the server connection.",
+  },
+  {
     date: "2026-07-12",
     ms: "Borang pendaftaran pelanggan Green Target dalam talian telah ditambah — pelanggan baharu boleh mengisi nama/syarikat, no. IC/syarikat, no. telefon, alamat dan kaedah pembayaran (Tunai, Online Transfer atau QR) terus dari telefon mereka, dengan pilihan bahasa BM, Inggeris dan Cina serta kod QR DuitNow yang boleh dimuat turun. Setiap penghantaran masuk ke halaman baharu 'Signup Requests' di bawah Customers Green Target, di mana staf boleh menyemak dan mencipta pelanggan dengan satu klik.",
     en: "A new online Green Target customer registration form has been added — new customers can fill in their name/company, IC/company no., phone, address and payment method (Cash, Online Transfer or QR) straight from their phone, with a Malay/English/Chinese language switch and a downloadable DuitNow QR code. Each submission lands in a new 'Signup Requests' page under Green Target Customers, where staff can review it and create the customer with one click.",

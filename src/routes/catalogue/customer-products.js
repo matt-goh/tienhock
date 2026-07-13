@@ -1,5 +1,6 @@
 // src/routes/catalogue/customer-products.js
 import { Router } from "express";
+import cache, { CACHE_KEYS } from "../utils/memory-cache.js";
 
 export default function (pool) {
   const router = Router();
@@ -201,6 +202,9 @@ export default function (pool) {
       }
 
       await client.query("COMMIT");
+
+      // Invalidate cache (customProducts is part of the cached /api/customers payload)
+      cache.invalidate(CACHE_KEYS.CUSTOMERS);
 
       res.status(200).json({
         success: true,

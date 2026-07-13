@@ -22,14 +22,16 @@ The original January 2026 bulk mapping was **lost in a dev-DB refresh** (only 2 
 1. **Journal Entries** → `journal_entry_lines` table stores debit/credit amounts per account code
 2. **Account Codes** → `account_codes.fs_note` column maps each account to a financial statement note
 3. **Financial Statement Notes** → `financial_statement_notes` table defines report line items
-4. **Reports** → Backend aggregates journal entries by `fs_note` to generate reports
-5. **Invoice-Based Overrides** → Note 22 & Note 7 are calculated directly from `invoices` table
+4. **Effective Note Inheritance** → a child account without its own `fs_note` inherits the nearest ancestor's note
+5. **As-of Reports** → Trial Balance and Balance Sheet use the latest account opening anchor on or before period end, plus posted movement from the anchor date
+6. **Movement Reports** → Income Statement and CoGM use posted journal movement from 1 January to period end
 
 ### Key Tables
 - `account_codes` - Contains `fs_note` column linking to financial statement notes
 - `financial_statement_notes` - Defines 33 report line items with category/section
 - `journal_entry_lines` - Transaction data with debit/credit amounts
-- `invoices` - Source for Trade Receivables (Note 22) and Revenue (Note 7)
+- `journal_entries` - Supplies posting status and accounting date
+- `account_opening_balances` - Signed DR-positive opening anchors used by Trial Balance and Balance Sheet
 
 ---
 
@@ -242,17 +244,16 @@ This section documents where each financial statement note gets its data from.
 - Account codes: BS_*, MS_*, MB* (factory labor by section)
 
 **Note 22 - Trade Receivables** ✅ IMPLEMENTED
-- Source: `invoices` table (direct calculation, bypasses journal entries)
-- Calculation: `SUM(balance_due)` from unpaid/overdue invoices
-- Filter: `invoice_status IN ('Unpaid', 'Overdue') AND balance_due > 0.01`
-- Date logic: Cumulative - all outstanding invoices up to period end date
-- Implementation: `getTradeReceivables()` in `financial-reports.js`
+- Source: effective-Note-22 account balances (the per-customer TD children)
+- Calculation: latest signed opening anchor on or before period end + posted debits/credits from the anchor date
+- Unanchored accounts: posted movement from 1 January to period end
+- Includes invoice, receipt and adjustment journals; current invoice status is not a report override
 
 **Note 7 - Revenue/Sales** ✅ IMPLEMENTED
-- Source: `invoices` table (direct calculation, bypasses journal entries)
-- Calculation: `SUM(total_excluding_tax)` from all invoices (accrual basis)
+- Source: posted journal lines on effective-Note-7 accounts
+- Calculation: credit movement less debit movement (sales less posted adjustments)
 - Date logic: YTD - from January 1 to end of selected month
-- Implementation: `getRevenue()` in `financial-reports.js`
+- Used consistently by the Trial Balance, Income Statement and Current Year Profit calculation
 
 ---
 
@@ -312,20 +313,19 @@ This section documents where each financial statement note gets its data from.
 ### Implementation Priority
 
 **Completed** ✅:
-1. ~~Invoices → Trade Receivables + Revenue~~ - **DONE** (Note 22 & Note 7 now pull directly from invoices)
-
-**High Priority** (data waiting to be converted):
-2. Payments → Cash/Bank (Note 19)
+1. Notes 22 and 7 are derived from posted journals, with no invoice-table override
+2. Trial Balance and Balance Sheet use the latest applicable opening anchor per account
+3. Balance Sheet includes journal-based Current Year Profit in Equity
 
 **Medium Priority** (needs stock system first):
-3. Stock entries → Closing/Opening Stock
-4. Production → COGM entries
+4. Stock entries → Closing/Opening Stock
+5. Production → COGM entries
 
 **Lower Priority** (likely manual):
-5. Fixed asset purchases
-6. Purchases/AP
-7. Petty cash
-8. Depreciation
+6. Fixed asset purchases
+7. Purchases/AP
+8. Petty cash
+9. Depreciation
 
 ---
 
@@ -344,19 +344,20 @@ Backend API: `src/routes/accounting/financial-reports.js`
 
 ## Date Range Logic
 
-All financial reports now use **Year-to-Date (YTD)** date ranges:
+Income Statement and CoGM use **Year-to-Date (YTD)** movement:
 
 | Selected Month | Data Range |
 |----------------|------------|
 | August 2025 | January 1, 2025 → August 31, 2025 |
 | December 2025 | January 1, 2025 → December 31, 2025 |
 
-- **Trial Balance**: YTD journal entries + invoice-based Note 22 & Note 7
-- **Income Statement**: YTD revenue/expenses, Note 7 from invoices
-- **Balance Sheet**: YTD balances, Note 22 from invoices (cumulative outstanding)
-- **COGM**: YTD cost of goods manufactured
+- **Trial Balance**: for each account, latest anchor with `as_of_date <= period_end` + posted movement in `[anchor_date, period_end]`; an unanchored account uses `[January 1, period_end]`. Anchor-only and explicit zero-fence accounts remain in the unfiltered result.
+- **Income Statement**: posted YTD revenue, CoGM and expense movement grouped by effective `fs_note`.
+- **Balance Sheet**: the same per-account anchor rule as Trial Balance, rolled up by effective `fs_note`. Equity also includes a no-note **Current Year Profit** line calculated from the same journal-only YTD Income Statement/CoGM movements.
+- **COGM**: posted YTD cost-of-goods-manufactured movement.
+
+Anchors represent the balance at the **start** of `as_of_date`, so movement on the anchor date is included. A later anchor fences off all earlier anchors and journal activity for that account.
 
 ---
 
-*Last Updated: 8 Jul 2026 — mapping re-applied via `dev/migrations/fs_note_remap_2026-07.sql`; per-note "Mapped Count" figures above are from the original Jan 2026 run and are approximate (notably Note 5 ≈ 583 and Note 5-1 ≈ 42 after the MB\* correction).*
-*Note 22 (Trade Receivables) and Note 7 (Revenue) are automated from invoices.*
+*Last Updated: 13 Jul 2026 — report engines use journal-authoritative Note 22/7 figures, account opening anchors, effective-note inheritance and Current Year Profit. Per-note "Mapped Count" figures above remain approximate.*

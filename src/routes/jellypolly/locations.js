@@ -174,8 +174,9 @@ export default function (pool) {
 
           await client.query("COMMIT");
 
-          // Invalidate cache
+          // Invalidate cache (JP staffs too — their location values were rewritten)
           cache.invalidate(JP_LOCATIONS_CACHE_KEY);
+          cache.invalidatePrefix(`jp:${CACHE_KEYS.STAFFS}`);
 
           res.json({
             message: "Location updated successfully",

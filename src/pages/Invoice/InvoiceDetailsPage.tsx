@@ -6,6 +6,7 @@ import type {
   AdjustmentDocument,
   ExtendedInvoiceData,
   Payment,
+  PaymentCancellationErrorData,
   ProductItem,
 } from "../../types/types";
 import BackButton from "../../components/BackButton";
@@ -19,6 +20,9 @@ import {
   getPaymentsForInvoice,
   cancelInvoice,
   cancelPayment,
+  getGroupedReceiptCancellationError,
+  getPaymentBankAccountLabel,
+  getPaymentCancellationErrorData,
   syncCancellationStatus,
   confirmPayment,
 } from "../../utils/invoice/InvoiceUtils";
@@ -57,6 +61,8 @@ import InvoiceSoloPrintOverlay from "../../utils/invoice/PDF/InvoiceSoloPrintOve
 import LineItemsTable from "../../components/Invoice/LineItemsTable";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import LinkedPaymentsTooltip from "../../components/Invoice/LinkedPaymentsTooltip";
+import PaymentCancellationErrorDialog from "../../components/Invoice/PaymentCancellationErrorDialog";
+import ReceiptDetailsDialog from "../../components/Invoice/ReceiptDetailsDialog";
 import InvoiceAdjustmentDocsSection from "../../components/AdjustmentDocs/InvoiceAdjustmentDocsSection";
 import { generateAdjustmentDocPDFBlob } from "../../utils/adjustments/PDF/AdjustmentDocPDFHandler";
 import { generateAdjustmentDocPDFFilename } from "../../utils/adjustments/PDF/generateAdjustmentDocPDFFilename";
@@ -242,6 +248,11 @@ const InvoiceDetailsPage: React.FC = () => {
     useState(false);
   const [paymentToCancel, setPaymentToCancel] = useState<Payment | null>(null);
   const [isCancellingPayment, setIsCancellingPayment] = useState(false);
+  const [paymentCancellationError, setPaymentCancellationError] =
+    useState<PaymentCancellationErrorData | null>(null);
+  const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(
+    null
+  );
   const [isSubmittingEInvoice, setIsSubmittingEInvoice] = useState(false);
   const [showSubmissionResults, setShowSubmissionResults] = useState(false);
   const [submissionResults, setSubmissionResults] = useState(null);
@@ -256,6 +267,13 @@ const InvoiceDetailsPage: React.FC = () => {
     useState(false);
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
   const [selectedBankAccountForConfirm, setSelectedBankAccountForConfirm] = useState<string>("BANK_PBB"); // Default to Public Bank for payment confirmation
+  const paymentConfirmationGroupSize: number = Math.max(
+    1,
+    Number(paymentToConfirm?.allocation_count) || 1
+  );
+  const paymentConfirmationIsReceiptBacked: boolean = Boolean(
+    paymentToConfirm?.receipt_id
+  );
   const [isEditingCustomer, setIsEditingCustomer] = useState<boolean>(false);
   const [selectedCustomer, setSelectedCustomer] = useState<{
     id: string;
@@ -1243,7 +1261,7 @@ const InvoiceDetailsPage: React.FC = () => {
     await processPayment();
   };
 
-  const handleConfirmPaymentClick = (payment: Payment) => {
+  const handleConfirmPaymentClick = (payment: Payment): void => {
     if (invoiceData?.invoice_status === "cancelled") {
       toast.error("Cannot confirm payment for a cancelled invoice.");
       return;
@@ -1260,7 +1278,7 @@ const InvoiceDetailsPage: React.FC = () => {
     setShowConfirmPaymentDialog(true);
   };
 
-  const handleConfirmPaymentConfirm = async () => {
+  const handleConfirmPaymentConfirm = async (): Promise<void> => {
     if (!paymentToConfirm || isConfirmingPayment) return;
 
     setIsConfirmingPayment(true);
@@ -1270,7 +1288,9 @@ const InvoiceDetailsPage: React.FC = () => {
     try {
       const confirmedPayments = await confirmPayment(
         paymentToConfirm.payment_id,
-        selectedBankAccountForConfirm
+        paymentToConfirm.receipt_id
+          ? undefined
+          : selectedBankAccountForConfirm
       );
       const successMessage =
         confirmedPayments.length > 1
@@ -1310,6 +1330,12 @@ const InvoiceDetailsPage: React.FC = () => {
       return;
     }
 
+    const groupedReceiptError = getGroupedReceiptCancellationError(payment);
+    if (groupedReceiptError) {
+      setPaymentCancellationError(groupedReceiptError);
+      return;
+    }
+
     setPaymentToCancel(payment);
     setShowCancelPaymentConfirm(true);
   };
@@ -1322,11 +1348,14 @@ const InvoiceDetailsPage: React.FC = () => {
     const toastId = toast.loading("Cancelling payment...");
 
     try {
-      await cancelPayment(paymentToCancel.payment_id);
+      await cancelPayment(paymentToCancel.payment_id, undefined, {
+        showErrorToast: false,
+      });
       toast.success("Payment cancelled successfully.", { id: toastId });
       await fetchDetails(); // Refresh invoice and payment data
-    } catch (error) {
-      toast.error("Failed to cancel payment.", { id: toastId });
+    } catch (error: unknown) {
+      toast.dismiss(toastId);
+      setPaymentCancellationError(getPaymentCancellationErrorData(error));
     } finally {
       setIsCancellingPayment(false);
       setPaymentToCancel(null);
@@ -2233,8 +2262,8 @@ const InvoiceDetailsPage: React.FC = () => {
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[10%]">
                       Status
                     </th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[12%]">
-                      Journal Entry
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[14%]">
+                      Journal
                     </th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Notes
@@ -2269,7 +2298,20 @@ const InvoiceDetailsPage: React.FC = () => {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap font-mono text-sm text-gray-600 dark:text-gray-400">
                         <div className="flex items-center">
-                          <span>{p.payment_reference || "-"}</span>
+                          {p.payment_reference && p.receipt_id ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSelectedReceiptId(p.receipt_id ?? null)
+                              }
+                              className="text-sky-600 hover:underline dark:text-sky-400"
+                              title={`Manage payment group ${p.payment_reference}`}
+                            >
+                              {p.payment_reference}
+                            </button>
+                          ) : (
+                            <span>{p.payment_reference || "-"}</span>
+                          )}
                           {p.payment_reference && p.status != "cancelled" && (
                             <LinkedPaymentsTooltip
                               paymentReference={p.payment_reference}
@@ -2300,14 +2342,23 @@ const InvoiceDetailsPage: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        {p.journal_entry_id ? (
+                        {p.voucher_journal_id || p.journal_entry_id ? (
                           <button
-                            onClick={() => navigate(`/accounting/journal-entries/${p.journal_entry_id}`)}
+                            type="button"
+                            onClick={() =>
+                              navigate(
+                                `/accounting/journal-entries/${
+                                  p.voucher_journal_id ?? p.journal_entry_id
+                                }`
+                              )
+                            }
                             className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
                             title="View journal entry"
                           >
-                            <IconReceipt size={14} />
-                            <span className="font-mono">{p.journal_reference_no || `#${p.journal_entry_id}`}</span>
+                            <IconFileInvoice size={14} />
+                            <span className="font-mono">
+                              {p.journal_reference_no || "View Journal"}
+                            </span>
                           </button>
                         ) : (
                           <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
@@ -2541,58 +2592,90 @@ const InvoiceDetailsPage: React.FC = () => {
         confirmButtonText="Confirm Cancellation"
         variant="danger"
       />
-      {/* Confirm Payment Dialog with Bank Account Selection */}
-      {showConfirmPaymentDialog && paymentToConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md shadow-xl">
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                Confirm Payment
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                Are you sure you want to confirm this {paymentToConfirm.payment_method} payment of {formatCurrency(paymentToConfirm.amount_paid)}?
+      {paymentToConfirm && (
+        <ConfirmationDialog
+          isOpen={showConfirmPaymentDialog}
+          onClose={() => {
+            setShowConfirmPaymentDialog(false);
+            setPaymentToConfirm(null);
+            setSelectedBankAccountForConfirm("BANK_PBB");
+          }}
+          onConfirm={() => void handleConfirmPaymentConfirm()}
+          title={
+            paymentConfirmationGroupSize > 1
+              ? `Confirm payment group ${
+                  paymentToConfirm.payment_reference || ""
+                }?`
+              : "Confirm pending payment?"
+          }
+          message={
+            <div className="space-y-3">
+              <p>
+                Confirm the pending{" "}
+                {paymentToConfirm.payment_method.replace("_", " ")} payment of{" "}
+                <span className="font-semibold text-default-800 dark:text-gray-100">
+                  {formatCurrency(paymentToConfirm.amount_paid)}
+                </span>
+                ?
               </p>
 
-              <div className="mb-4">
-                <FormListbox
-                  name="bank_account"
-                  label="Deposit To"
-                  value={selectedBankAccountForConfirm}
-                  onChange={(value) => setSelectedBankAccountForConfirm(value)}
-                  options={[
-                    { id: "BANK_PBB", name: "Public Bank" },
-                    { id: "BANK_ABB", name: "Alliance Bank" },
-                  ]}
-                  disabled={isConfirmingPayment}
-                />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Select which bank account will receive this payment
-                </p>
-              </div>
+              {paymentConfirmationGroupSize > 1 && (
+                <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sky-800 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-200">
+                  Reference {paymentToConfirm.payment_reference} covers{" "}
+                  {paymentConfirmationGroupSize} payments. Every payment still
+                  marked Pending will be confirmed together; payments already
+                  confirmed will not change.
+                </div>
+              )}
 
-              <div className="flex justify-end gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowConfirmPaymentDialog(false);
-                    setPaymentToConfirm(null);
-                    setSelectedBankAccountForConfirm("BANK_PBB");
-                  }}
-                  disabled={isConfirmingPayment}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  color="green"
-                  onClick={handleConfirmPaymentConfirm}
-                  disabled={isConfirmingPayment}
-                >
-                  {isConfirmingPayment ? "Confirming..." : "Confirm Payment"}
-                </Button>
-              </div>
+              {paymentConfirmationIsReceiptBacked ? (
+                <div className="rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
+                  <p className="text-xs text-default-500 dark:text-gray-400">
+                    Deposit to
+                  </p>
+                  <p className="mt-1 font-semibold text-default-800 dark:text-gray-100">
+                    {getPaymentBankAccountLabel(
+                      paymentToConfirm.bank_account || "BANK_PBB"
+                    )}
+                  </p>
+                  <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
+                    This is the account recorded when the payment was entered.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <FormListbox
+                    name="bank_account"
+                    label="Deposit To"
+                    value={selectedBankAccountForConfirm}
+                    onChange={(value: string): void =>
+                      setSelectedBankAccountForConfirm(value)
+                    }
+                    options={[
+                      { id: "BANK_PBB", name: "Public Bank" },
+                      { id: "BANK_ABB", name: "Alliance Bank" },
+                    ]}
+                    disabled={isConfirmingPayment}
+                  />
+                  <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
+                    Choose the bank account for this older pending payment.
+                  </p>
+                </div>
+              )}
+
+              <p className="text-xs text-default-500 dark:text-gray-400">
+                Confirming updates the related invoice balances and creates the
+                payment journal entries.
+              </p>
             </div>
-          </div>
-        </div>
+          }
+          confirmButtonText={
+            paymentConfirmationGroupSize > 1
+              ? "Confirm Pending Group"
+              : "Confirm Payment"
+          }
+          variant="success"
+        />
       )}
       <ConfirmationDialog
         isOpen={showCancelPaymentConfirm}
@@ -2606,6 +2689,33 @@ const InvoiceDetailsPage: React.FC = () => {
           isCancellingPayment ? "Cancelling..." : "Cancel Payment"
         }
         variant="danger"
+      />
+      <PaymentCancellationErrorDialog
+        error={paymentCancellationError}
+        onClose={() => setPaymentCancellationError(null)}
+        onViewPaymentGroup={(receiptId: number): void => {
+          setSelectedReceiptId(receiptId);
+          setPaymentCancellationError(null);
+        }}
+        onViewJournal={(journalEntryId: number): void => {
+          navigate(`/accounting/journal-entries/${journalEntryId}`);
+          setPaymentCancellationError(null);
+        }}
+      />
+      <ReceiptDetailsDialog
+        isOpen={selectedReceiptId !== null}
+        receiptId={selectedReceiptId}
+        onClose={() => setSelectedReceiptId(null)}
+        onConfirmed={async (): Promise<void> => {
+          await fetchDetails();
+        }}
+        onCancelled={async (): Promise<void> => {
+          setSelectedReceiptId(null);
+          await fetchDetails();
+        }}
+        onReferenceUpdated={async (): Promise<void> => {
+          await fetchDetails();
+        }}
       />
       <ConfirmationDialog
         isOpen={showClearEInvoiceConfirm}

@@ -631,6 +631,25 @@ export const TienHockNavData: SidebarItem[] = [
     icon: IconListDetails,
     subItems: [
       {
+        name: "Customer",
+        path: "/catalogue/customer",
+        component: CustomerPage,
+        group: "People",
+        subItems: [
+          {
+            name: "New Customer",
+            path: "/catalogue/customer/new",
+            component: CustomerAddPage,
+            showInPopover: true,
+          },
+          {
+            name: "Edit Customer",
+            path: "/catalogue/customer/:id",
+            component: CustomerFormPage,
+          },
+        ],
+      },
+      {
         name: "Staff",
         path: "/catalogue/staff",
         component: StaffPage,
@@ -656,25 +675,6 @@ export const TienHockNavData: SidebarItem[] = [
             name: "Staff Edit",
             path: "/catalogue/staff/:id/edit",
             component: StaffFormPage,
-          },
-        ],
-      },
-      {
-        name: "Customer",
-        path: "/catalogue/customer",
-        component: CustomerPage,
-        group: "People",
-        subItems: [
-          {
-            name: "New Customer",
-            path: "/catalogue/customer/new",
-            component: CustomerAddPage,
-            showInPopover: true,
-          },
-          {
-            name: "Staff Edit",
-            path: "/catalogue/customer/:id",
-            component: CustomerFormPage,
           },
         ],
       },

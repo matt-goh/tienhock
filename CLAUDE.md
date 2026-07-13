@@ -54,13 +54,22 @@ This is a comprehensive ERP system supporting three companies:
 - **Route Organization**: `src/routes/index.js` sets up all API routes
 - **Company-specific Routes**: Each company has separate route handlers under their respective directories
 
+### Production Deployment & Request Path
+
+- `tienhock.com` and `greentarget.tienhock.com` are served by the same Cloudflare Pages project.
+- API traffic follows: browser -> `api.tienhock.com` -> Cloudflare Tunnel (`tienhock-hetzner`) -> `http://localhost:80` -> system Nginx on the Hetzner server -> the Node/Express server managed by PM2.
+- `.github/workflows/deploy.yml` deploys the `production` branch by pulling the repository, installing the tracked system-Nginx site through `sudo -n /usr/local/sbin/deploy-tienhock-nginx`, building the frontend, and restarting `tienhock-server` with PM2. It does not run Docker Compose.
+- `prod/nginx/tienhock-api.conf` is the source of truth for the live system Nginx site installed at `/etc/nginx/sites-available/tienhock-api`. The root-owned helper validates with `nginx -t`, reloads Nginx, and rolls back on failure. Its one-time server setup and restricted sudoers rule are documented in `prod/server/README.md`.
+- `prod/nginx/nginx.conf` is only for the separate Docker Compose topology and proxies to the Docker hostname `prod_server:5000`; it is not the live Hetzner configuration.
+- In production, Express disables its own CORS headers and system Nginx owns CORS. Any new production frontend origin must be added to the live Nginx allowlist, and Nginx must be validated and reloaded. Keep `PATCH` in `Access-Control-Allow-Methods` for APIs that use it.
+
 ### Database
 
 - PostgreSQL with connection pooling
 - Maintenance mode support for database operations
 - Environment variables for database configuration
 
-#### Database Schema (84 tables)
+#### Database Schema (85 tables)
 
 **Accounting & Finance:**
 
@@ -123,6 +132,7 @@ This is a comprehensive ERP system supporting three companies:
 - `materials` - id, code (unique), name, category (ingredient/raw_material/packing_material), default_unit_cost, applies_to (mee/bihun/both), sort_order, is_active, created_at, updated_at, created_by
 - `material_variants` - id, material_id (FK), variant_name, default_unit_cost, sort_order, is_active, created_at, updated_at (unique: material_id, variant_name). For materials with multiple suppliers/types like "Beras 50KG" having Vietnam Coklat, Vietnam Hijau, etc.
 - `material_stock_entries` - id, year, month, material_id, product_line (mee/bihun/shared), variant_id (nullable FK to material_variants), custom_name, custom_description, adjustment_quantity (manual plus/minus stock adjustment), unit_cost, adjustment_value (adjustment_quantity \* unit_cost), notes, created_at, updated_at, created_by (unique: year, month, material_id, product_line, COALESCE(variant_id::text, custom_description, 'default')). Closing stock is derived from cumulative opening + purchase_invoice_lines for the bucket + adjustment_quantity.
+- `material_stock_kilang_entries` - id, year, month, product_line (mee/bihun), product_id (FK products), quantity, unit_cost, stock_value (quantity \* unit_cost), created_at, updated_at, created_by, updated_by (unique: year, month, product_line, product_id). Monthly finished-goods costing records entered only in the Material Stock page; isolated from production, sales, stock openings and operational `stock_adjustments`. The saved unit cost is a historical snapshot, so later product-price changes do not alter saved months.
 
 **Staff & Employees:**
 

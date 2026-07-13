@@ -4,6 +4,10 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
   const validStockBuckets = new Set(["mee", "bihun", "shared"]);
+  const stockKilangProductTypes = new Map([
+    ["mee", "MEE"],
+    ["bihun", "BH"],
+  ]);
 
   function toNumber(value) {
     return parseFloat(value) || 0;
@@ -345,6 +349,264 @@ export default function (pool) {
 
   // ==================== STOCK ENTRIES ====================
   // NOTE: These routes MUST be defined BEFORE /:id to prevent route conflicts
+
+  // GET /stock-kilang - Get isolated monthly finished-goods costing entries.
+  // These records intentionally do not read from or write to operational product stock.
+  router.get("/stock-kilang", async (req, res) => {
+    try {
+      const { year, month, product_line } = req.query;
+      const yearNumber = Number(year);
+      const monthNumber = Number(month);
+
+      if (
+        !Number.isInteger(yearNumber) ||
+        !Number.isInteger(monthNumber) ||
+        monthNumber < 1 ||
+        monthNumber > 12 ||
+        !stockKilangProductTypes.has(product_line)
+      ) {
+        return res.status(400).json({
+          message: "Valid year, month, and product_line (mee or bihun) are required",
+        });
+      }
+
+      const result = await pool.query(
+        `
+          SELECT product_id, quantity, unit_cost, stock_value
+          FROM material_stock_kilang_entries
+          WHERE year = $1 AND month = $2 AND product_line = $3
+          ORDER BY product_id
+        `,
+        [yearNumber, monthNumber, product_line]
+      );
+
+      res.json({
+        year: yearNumber,
+        month: monthNumber,
+        product_line,
+        entries: result.rows,
+      });
+    } catch (error) {
+      console.error("Error fetching Stock Kilang costing entries:", error);
+      res.status(500).json({
+        message: "Error fetching Stock Kilang costing entries",
+        error: error.message,
+      });
+    }
+  });
+
+  // PUT /stock-kilang/product - Save one monthly finished-goods costing row.
+  router.put("/stock-kilang/product", async (req, res) => {
+    try {
+      const { year, month, product_line, product_id, quantity, unit_cost } = req.body;
+      const yearNumber = Number(year);
+      const monthNumber = Number(month);
+      const quantityNumber = Number(quantity);
+      const unitCostNumber = Number(unit_cost);
+      const expectedProductType = stockKilangProductTypes.get(product_line);
+
+      if (
+        !Number.isInteger(yearNumber) ||
+        !Number.isInteger(monthNumber) ||
+        monthNumber < 1 ||
+        monthNumber > 12 ||
+        !expectedProductType ||
+        !product_id ||
+        !Number.isFinite(quantityNumber) ||
+        !Number.isFinite(unitCostNumber) ||
+        unitCostNumber < 0
+      ) {
+        return res.status(400).json({
+          message:
+            "Valid year, month, product_line, product_id, quantity, and unit_cost are required",
+        });
+      }
+
+      const productResult = await pool.query(
+        "SELECT id, type FROM products WHERE id = $1",
+        [product_id]
+      );
+      const product = productResult.rows[0];
+
+      if (!product || product.type !== expectedProductType) {
+        return res.status(400).json({
+          message: `Product must be a ${expectedProductType} product`,
+        });
+      }
+
+      if (quantityNumber === 0) {
+        await pool.query(
+          `
+            DELETE FROM material_stock_kilang_entries
+            WHERE year = $1 AND month = $2 AND product_line = $3 AND product_id = $4
+          `,
+          [yearNumber, monthNumber, product_line, product_id]
+        );
+
+        return res.json({
+          message: "Stock Kilang costing entry cleared",
+          entry: null,
+        });
+      }
+
+      const stockValue = quantityNumber * unitCostNumber;
+      const result = await pool.query(
+        `
+          INSERT INTO material_stock_kilang_entries (
+            year, month, product_line, product_id, quantity,
+            unit_cost, stock_value, created_by, updated_by
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
+          ON CONFLICT (year, month, product_line, product_id)
+          DO UPDATE SET
+            quantity = EXCLUDED.quantity,
+            unit_cost = EXCLUDED.unit_cost,
+            stock_value = EXCLUDED.stock_value,
+            updated_at = CURRENT_TIMESTAMP,
+            updated_by = EXCLUDED.updated_by
+          RETURNING product_id, quantity, unit_cost, stock_value
+        `,
+        [
+          yearNumber,
+          monthNumber,
+          product_line,
+          product_id,
+          quantityNumber,
+          unitCostNumber,
+          stockValue,
+          req.staffId || null,
+        ]
+      );
+
+      res.json({
+        message: "Stock Kilang costing entry saved",
+        entry: result.rows[0],
+      });
+    } catch (error) {
+      console.error("Error saving Stock Kilang costing entry:", error);
+      res.status(500).json({
+        message: "Error saving Stock Kilang costing entry",
+        error: error.message,
+      });
+    }
+  });
+
+  // POST /stock-kilang/batch - Replace all rows for one month/product line.
+  router.post("/stock-kilang/batch", async (req, res) => {
+    const client = await pool.connect();
+
+    try {
+      const { year, month, product_line, entries } = req.body;
+      const yearNumber = Number(year);
+      const monthNumber = Number(month);
+      const expectedProductType = stockKilangProductTypes.get(product_line);
+
+      if (
+        !Number.isInteger(yearNumber) ||
+        !Number.isInteger(monthNumber) ||
+        monthNumber < 1 ||
+        monthNumber > 12 ||
+        !expectedProductType ||
+        !Array.isArray(entries)
+      ) {
+        return res.status(400).json({
+          message: "Valid year, month, product_line, and entries array are required",
+        });
+      }
+
+      const normalizedEntries = entries.map((entry) => ({
+        product_id: entry.product_id,
+        quantity: Number(entry.quantity),
+        unit_cost: Number(entry.unit_cost),
+      }));
+
+      if (
+        normalizedEntries.some(
+          (entry) =>
+            !entry.product_id ||
+            !Number.isFinite(entry.quantity) ||
+            !Number.isFinite(entry.unit_cost) ||
+            entry.unit_cost < 0
+        )
+      ) {
+        return res.status(400).json({
+          message: "Every Stock Kilang entry must have a valid product, quantity, and unit cost",
+        });
+      }
+
+      const productIds = [...new Set(normalizedEntries.map((entry) => entry.product_id))];
+      const productsResult = productIds.length
+        ? await client.query(
+            "SELECT id, type FROM products WHERE id = ANY($1::varchar[])",
+            [productIds]
+          )
+        : { rows: [] };
+      const productTypes = new Map(
+        productsResult.rows.map((product) => [product.id, product.type])
+      );
+
+      if (
+        normalizedEntries.some(
+          (entry) => productTypes.get(entry.product_id) !== expectedProductType
+        )
+      ) {
+        return res.status(400).json({
+          message: `Every product must be a ${expectedProductType} product`,
+        });
+      }
+
+      await client.query("BEGIN");
+      await client.query(
+        `
+          DELETE FROM material_stock_kilang_entries
+          WHERE year = $1 AND month = $2 AND product_line = $3
+            AND product_id IN (
+              SELECT id FROM products WHERE type = $4 AND is_active = true
+            )
+        `,
+        [yearNumber, monthNumber, product_line, expectedProductType]
+      );
+
+      let savedCount = 0;
+      for (const entry of normalizedEntries) {
+        if (entry.quantity === 0) continue;
+
+        await client.query(
+          `
+            INSERT INTO material_stock_kilang_entries (
+              year, month, product_line, product_id, quantity,
+              unit_cost, stock_value, created_by, updated_by
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
+          `,
+          [
+            yearNumber,
+            monthNumber,
+            product_line,
+            entry.product_id,
+            entry.quantity,
+            entry.unit_cost,
+            entry.quantity * entry.unit_cost,
+            req.staffId || null,
+          ]
+        );
+        savedCount += 1;
+      }
+
+      await client.query("COMMIT");
+      res.json({
+        message: "Stock Kilang costing entries saved",
+        saved: savedCount,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error saving Stock Kilang costing entries:", error);
+      res.status(500).json({
+        message: "Error saving Stock Kilang costing entries",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
 
   // GET /stock/entries - Get manual stock adjustments for a period
   router.get("/stock/entries", async (req, res) => {
