@@ -18,7 +18,7 @@ Every code is a **prefix-based mnemonic**. The legacy system had no relational d
 | `CL_GTH`, `CL_WSF` | Amount Due to Director (Goh Thai Ho, Wong Shuk Fun) | 9 |
 | `CL_LOAN` → `CL_PB13`, `CL_PB16`, `CL_SCB` | Term loans | 11 |
 | `CL_HPA` → `HPA_6893`, `HPA_PILL`, `HPA_SWJ988` etc. | Hire purchase principal | 16 |
-| `CL_HPB` → `HPB_6893` etc. (mirrors HPA) | HP interest in suspense | 23 |
+| `CL_HPB` → `HPB_6893` etc. (mirrors HPA) | HP interest in suspense | 23 in the legacy APPX; approved ERP presentation is Balance Sheet Note 16 |
 | `ACC` → `ACW_EPF`, `ACW_SC`, `ACW_SAL`, `ACW_PCB`, `ACW_SIP`, `AC_TAX`, `AC_SESB`, `AC_TM`, `AC_LEVY`, `AC_INS` | Accruals | 1 |
 | `ACD_*` | Director-specific accruals | 1 |
 | `NCA_*` → `NCA_FB`, `NCA_MV`, `NCA_PM`, `NCA_OE`, `NCA_FF`, `NCA_PL`, `NCA_RV`, `NCA_CW` | Property, Plant & Equipment | 4 |
@@ -56,7 +56,13 @@ Every code is a **prefix-based mnemonic**. The legacy system had no relational d
 1. **The "APPX" column = `fs_note`** — the bridge between ~2,754 leaf codes and ~25 statement lines is the same `fs_note` column the new ERP already has. No new bridge needed.
 2. **Schedule B is the missing audit-readiness piece.** The new Income Statement shows Note 5 as one number; the legacy breaks it into ~40 line items by expense nature.
 3. **VRE rollup is non-trivial.** ~120 per-vehicle codes collapse into one "Vehicle Running Expenses" number in Schedule B. The new system consolidates these codes; the historical rollup pattern is preserved here for reference.
-4. **HPA/HPB are paired.** Every hire-purchase asset has a principal account (`HPA_*`) and an interest-in-suspense account (`HPB_*`). Monthly entry: DR `HPA_*` + DR `HPI` (interest expense, Note 23) + CR Bank, and CR `HPB_*` (releases interest from suspense into expense). The new ERP has neither yet (gaps 1A-6 / Type-2 #6).
+4. **HPA/HPB are paired.** Every hire-purchase contract has a principal account
+   (`HPA_*`) and an interest-in-suspense account (`HPB_*`). Monthly entry: DR
+   `HPA_*` + DR `HPI` (released interest expense, Note 23) + CR Bank, and CR
+   `HPB_*` (reduces the Balance Sheet suspense paired with the payable). The
+   ERP therefore presents both `HPA_*` and `HPB_*` in Note 16 while `HPI`
+   remains Note 23. A full amortization schedule is still missing (gap 1A-6 /
+   Type-2 #6).
 5. **The PBB bank running ledger is just a specialised "Account Ledger".** The same view shape works for any account code — supplier, director (`CL_WSF`), prepayment (`CA_INS`), inter-company (`CL_GT`). One generic Account Ledger page solves many missing-report items at once (gap 1B-2).
 
 ## Open classification questions (still unresolved)

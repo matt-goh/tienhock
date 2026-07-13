@@ -1085,7 +1085,17 @@ export interface AccountCodeInput {
 }
 
 // Journal Entry Types
-export type JournalEntryType = "B" | "C" | "I" | "S" | "J" | "R" | "DR" | "CR" | "O";
+export type JournalEntryType =
+  | "B"
+  | "C"
+  | "I"
+  | "S"
+  | "J"
+  | "R"
+  | "DR"
+  | "CR"
+  | "O"
+  | "IMP";
 
 export interface JournalEntryTypeInfo {
   code: JournalEntryType;

@@ -1,6 +1,8 @@
 // src/routes/accounting/journal-entries.js
 import { Router } from "express";
 
+const LEGACY_IMPORT_ENTRY_TYPE = "IMP";
+
 export default function (pool) {
   const router = Router();
 
@@ -132,6 +134,12 @@ export default function (pool) {
   router.get("/next-reference/:type", async (req, res) => {
     try {
       const { type } = req.params;
+      if (type === LEGACY_IMPORT_ENTRY_TYPE) {
+        return res.status(400).json({
+          message: "IMP reference numbers are generated only by the legacy import migration",
+        });
+      }
+
       const currentMonth = new Date().getMonth() + 1;
       const currentYear = new Date().getFullYear();
 
@@ -450,6 +458,12 @@ export default function (pool) {
     const { reference_no, entry_type, entry_date, description, cheque_no, lines } =
       req.body;
 
+    if (entry_type === LEGACY_IMPORT_ENTRY_TYPE) {
+      return res.status(400).json({
+        message: "IMP journal entries can only be created by the legacy import migration",
+      });
+    }
+
     // Cheque number only applies to Cash Payment (C) entries
     const normalizedChequeNo =
       entry_type === "C" && cheque_no && String(cheque_no).trim()
@@ -579,6 +593,12 @@ export default function (pool) {
     const { reference_no, entry_type, entry_date, description, cheque_no, lines } =
       req.body;
 
+    if (entry_type === LEGACY_IMPORT_ENTRY_TYPE) {
+      return res.status(400).json({
+        message: "IMP journal entries cannot be created or edited manually",
+      });
+    }
+
     // Cheque number only applies to Cash Payment (C) entries
     const normalizedChequeNo =
       entry_type === "C" && cheque_no && String(cheque_no).trim()
@@ -627,6 +647,13 @@ export default function (pool) {
       }
 
       const existing = checkResult.rows[0];
+      if (existing.entry_type === LEGACY_IMPORT_ENTRY_TYPE) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: "Legacy import journal entries cannot be edited manually",
+        });
+      }
+
       if (existing.status === "cancelled") {
         await client.query("ROLLBACK");
         return res.status(400).json({
@@ -750,12 +777,19 @@ export default function (pool) {
 
       // Check if entry exists and is draft
       const checkQuery =
-        "SELECT status, total_debit, total_credit FROM journal_entries WHERE id = $1";
+        "SELECT status, entry_type, total_debit, total_credit FROM journal_entries WHERE id = $1";
       const checkResult = await client.query(checkQuery, [id]);
 
       if (checkResult.rows.length === 0) {
         await client.query("ROLLBACK");
         return res.status(404).json({ message: "Journal entry not found" });
+      }
+
+      if (checkResult.rows[0].entry_type === LEGACY_IMPORT_ENTRY_TYPE) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: "Legacy import journal entries cannot be posted manually",
+        });
       }
 
       if (checkResult.rows[0].status !== "draft") {
@@ -806,12 +840,20 @@ export default function (pool) {
     try {
       await client.query("BEGIN");
 
-      const checkQuery = "SELECT status FROM journal_entries WHERE id = $1";
+      const checkQuery =
+        "SELECT status, entry_type FROM journal_entries WHERE id = $1";
       const checkResult = await client.query(checkQuery, [id]);
 
       if (checkResult.rows.length === 0) {
         await client.query("ROLLBACK");
         return res.status(404).json({ message: "Journal entry not found" });
+      }
+
+      if (checkResult.rows[0].entry_type === LEGACY_IMPORT_ENTRY_TYPE) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: "Legacy import journal entries cannot be cancelled manually",
+        });
       }
 
       if (checkResult.rows[0].status === "cancelled") {
@@ -861,6 +903,13 @@ export default function (pool) {
       }
 
       const { status, entry_type, reference_no } = checkResult.rows[0];
+
+      if (entry_type === LEGACY_IMPORT_ENTRY_TYPE) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: "Legacy import journal entries cannot be deleted manually",
+        });
+      }
 
       // Special handling for auto-generated receipt (REC) entries
       if (entry_type === "REC" && status === "posted") {

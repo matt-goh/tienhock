@@ -6,9 +6,11 @@ const sessionLastUpdated = new WeakMap();
 const MIN_SESSION_UPDATE_INTERVAL = 10 * 60 * 1000;
 
 export const authMiddleware = (pool) => async (req, res, next) => {
+  const requestPath = req.originalUrl?.split("?")[0] || req.path;
+
   // STEP 1: Routes that always bypass auth check
   if (
-    req.path.startsWith("/api/backup") ||
+    (req.method === "GET" && requestPath === "/api/backup/restore/status") ||
     req.method === "OPTIONS" ||
     req.path === "/api/sessions/initialize" ||
     req.path === "/api/auth/login" ||
@@ -19,7 +21,8 @@ export const authMiddleware = (pool) => async (req, res, next) => {
 
   // STEP 2: Check for maintenance mode
   if (pool.pool.maintenanceMode) {
-    return res.status(200).json({
+    const statusCode = requestPath.startsWith("/api/backup/") ? 503 : 200;
+    return res.status(statusCode).json({
       status: "maintenance",
       message: "System is currently undergoing maintenance.",
       maintenance: true,

@@ -4,7 +4,7 @@
 
 **MAPPING COMPLETE (re-applied 8 Jul 2026):** All 2,750 account codes have `fs_note` assigned.
 
-The original January 2026 bulk mapping was **lost in a dev-DB refresh** (only 2 codes still had `fs_note`), which left the Income Statement / Balance Sheet / CoGM completely empty. The mapping was re-applied on 8 Jul 2026 with a **corrected script**: [`dev/migrations/fs_note_remap_2026-07.sql`](../../dev/migrations/fs_note_remap_2026-07.sql) — that file is now the single source of truth for the mapping rules (idempotent, safe to re-run; **run it in prod too**). Corrections vs the old script embedded in earlier versions of this doc:
+The original January 2026 bulk mapping was **lost in a dev-DB refresh** (only 2 codes still had `fs_note`), which left the Income Statement / Balance Sheet / CoGM completely empty. The mapping was re-applied on 8 Jul 2026 with a **corrected script**: [`dev/migrations/fs_note_remap_2026-07.sql`](../../dev/migrations/fs_note_remap_2026-07.sql) — that file is now the single source of truth for the mapping rules. The production version is idempotent only for the exact audited pre-remap/final populations and aborts on any account or mapping drift; review and re-pin new accounts instead of silently catch-all mapping them. Corrections vs the old script embedded in earlier versions of this doc:
 
 - `MB*` admin-by-nature codes and vehicle codes → Note **5**, not 5-1 (per the legacy prefix table in [LEGACY_SYSTEM_REFERENCE.md](LEGACY_SYSTEM_REFERENCE.md)); only factory-section salary codes (suffix `_MM/_PM/_MB/_PB/_JB/_K`) + `THJ_*` → **5-1**.
 - `CASH% → 6` no longer clobbers `CASH_SALES` (revenue); `CR_SALES` added to Note 7.
@@ -120,8 +120,8 @@ The original January 2026 bulk mapping was **lost in a dev-DB refresh** (only 2 
 | `CASH*` | 6 | Cash in Hand |
 | `SLS*`, `SL_*` | 7 | Revenue/Sales |
 | `ACC*`, `AC_*`, `ACW*`, `ACD*` | 1 | Accruals |
-| `HPA_*` | 16 | Hire Purchase Principal |
-| `HPB_*`, `HPI` | 23 | Hire Purchase Interest |
+| `HPA_*`, `HPB`, `CL_HPB`, `HPB_*` | 16 | Hire Purchase principal/payable and paired interest in suspense |
+| `HPI` | 23 | Released Hire Purchase Interest expense |
 | `AD_*`, `CAR`, `E`, `FV`, `LRY`, `PPE` | 4 | Property, Plant & Equipment |
 | `DPE`, `AE_DEP` | 15 | Depreciation |
 | `CA_*` | 8 | Prepayments & Deposits |
@@ -273,7 +273,10 @@ This section documents where each financial statement note gets its data from.
 
 **Note 4 (PPE) / Note 15 (Depreciation)** — needs the fixed-asset register (gap 1A-4).
 
-**Note 23 (HP Interest) / Note 16 (HP Payable)** — needs the HP schedule (gap 1A-6); currently only manual journals.
+**Note 23 (HP Interest) / Note 16 (HP Payable)** — `HPI` records released
+finance cost in Note 23. `HPA_*` principal and the paired `HPB_*` interest in
+suspense remain together in Balance Sheet Note 16. The full HP schedule is
+still needed (gap 1A-6); currently only manual journals exist.
 
 **Notes 20/21 (Retained Profit, Share Capital)** — pure opening-balance items; blocked on gap 1A-7.
 

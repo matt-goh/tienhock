@@ -20,6 +20,21 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-13",
+    ms: "Catatan jurnal import legasi kini dilindungi daripada perubahan manual. Jenis IMP tidak lagi boleh dipilih semasa mencipta catatan jurnal, dan catatan yang diimport tidak boleh diedit, dibatalkan atau dipadam melalui aplikasi.",
+    en: "Legacy-import journal entries are now protected from manual changes. The IMP type can no longer be selected when creating a journal entry, and imported entries cannot be edited, cancelled, or deleted through the app.",
+  },
+  {
+    date: "2026-07-13",
+    ms: "Baki faedah sewa beli belum matang kini dipaparkan bersama baki hutang sewa beli dalam Nota 16 Kunci Kira-Kira. Hanya faedah yang telah dilepaskan kekal sebagai kos kewangan dalam Nota 23, supaya laporan tidak mengira baki belum matang sebagai perbelanjaan.",
+    en: "Hire-purchase interest-in-suspense balances are now shown with hire-purchase payables in Balance Sheet Note 16. Only released interest remains a finance cost in Note 23, so reports no longer treat unexpired interest balances as an expense.",
+  },
+  {
+    date: "2026-07-13",
+    ms: "Database Backups dalam sistem pembangunan kini mempunyai pilihan 'Replace Database from SQL'. Fail SQL disahkan terlebih dahulu, kemudian seluruh pangkalan data pembangunan semasa digantikan dengan kandungan sandaran tersebut dan bukannya menambah rekod pendua. Pengesahan yang jelas dipaparkan sebelum penggantian bermula.",
+    en: "Database Backups in the development system now has a 'Replace Database from SQL' option. The SQL file is validated first, then the entire current development database is replaced with that backup instead of appending duplicate records. A clear confirmation is shown before replacement begins.",
+  },
+  {
+    date: "2026-07-13",
     ms: "Laporan Trial Balance dan Balance Sheet kini menggunakan baki pembukaan akaun bersama pergerakan jurnal bagi tempoh yang dipilih, manakala Income Statement dan CoGM menggunakan jurnal sahaja. Balance Sheet turut memaparkan Untung Tahun Semasa. Rekod jualan, resit dan nota pelarasan Tien Hock bertarikh sebelum 1 Jun 2026 kini dilindungi daripada perubahan yang boleh memposkan semula catatan akaun lama secara tidak sengaja.",
     en: "Trial Balance and Balance Sheet reports now use account opening balances together with journal movements for the selected period, while the Income Statement and CoGM use journals only. The Balance Sheet also shows Current Year Profit. Tien Hock sales, receipts and adjustment notes dated before 1 June 2026 are now protected from changes that could accidentally repost historical accounting entries.",
   },

@@ -36,6 +36,15 @@ interface Backup {
   created: string;
 }
 
+interface RestoreStatus {
+  status: "IDLE" | "RESTORING" | "COMPLETED" | "FAILED";
+  phase: string | null;
+  message?: string | null;
+}
+
+type RestoreOperation = "backup" | "sql";
+type RestorePollResult = "pending" | "terminal" | "retry";
+
 const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -49,23 +58,31 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
   const [error, setError] = useState<string | null>(null);
   const [backupName, setBackupName] = useState(defaultBackUpName);
   const [showBackupNameInput, setShowBackupNameInput] = useState(false);
-  const [statusCheckInterval, setStatusCheckInterval] =
-    useState<NodeJS.Timeout | null>(null);
   const [restorePhase, setRestorePhase] = useState<string | null>(null);
   const [hasScrollbar, setHasScrollbar] = useState(false);
   const tableBodyRef = useRef<HTMLDivElement>(null);
+  const statusCheckTimeoutRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
+  const statusPollGenerationRef = useRef<number>(0);
+  const statusRetryCountRef = useRef<number>(0);
+  const activeRestoreOperationRef = useRef<RestoreOperation | null>(null);
   const lockedLocationRef = useRef<string | null>(null);
   const navigationToastShownRef = useRef(false);
   const skipBeforeUnloadPromptRef = useRef<boolean>(false);
   const [backupToDelete, setBackupToDelete] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [sqlFileToReplaceFrom, setSqlFileToReplaceFrom] =
+    useState<File | null>(null);
+  const [showSqlReplaceConfirmDialog, setShowSqlReplaceConfirmDialog] =
+    useState<boolean>(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadingBackup, setDownloadingBackup] = useState<string | null>(
     null
   );
   const isBlockingOperation = restoring || uploading || downloading;
   const isBusy = loading || isBlockingOperation;
+  const isSqlReplacementAvailable: boolean = NODE_ENV === "development";
   const currentLocationPath = `${location.pathname}${location.search}${location.hash}`;
 
   // Reset backup name when modal closes
@@ -73,6 +90,8 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
     if (!isOpen) {
       setBackupName(defaultBackUpName);
       setShowBackupNameInput(false);
+      setSqlFileToReplaceFrom(null);
+      setShowSqlReplaceConfirmDialog(false);
     }
   }, [isOpen]);
 
@@ -113,60 +132,152 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
     }
   }, []);
 
-  const checkRestoreStatus = useCallback(async () => {
-    try {
-      const status = await api.get("/api/backup/restore/status");
+  const stopRestoreStatusPolling = useCallback((): void => {
+    statusPollGenerationRef.current += 1;
+    statusRetryCountRef.current = 0;
+    if (statusCheckTimeoutRef.current) {
+      clearTimeout(statusCheckTimeoutRef.current);
+      statusCheckTimeoutRef.current = null;
+    }
+  }, []);
 
-      // Update restore phase
-      if (status.phase) {
-        setRestorePhase(status.phase);
-      }
+  const checkRestoreStatus = useCallback(
+    async (generation: number): Promise<RestorePollResult> => {
+      try {
+        const status: RestoreStatus = await api.get(
+          "/api/backup/restore/status"
+        );
 
-      if (status.status === "COMPLETED") {
-        if (statusCheckInterval) {
-          clearInterval(statusCheckInterval);
-          setStatusCheckInterval(null);
+        if (generation !== statusPollGenerationRef.current) {
+          return "terminal";
         }
 
-        setRestorePhase("COOLDOWN");
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        toast.success(
-          uploading ? "SQL imported successfully!" : "Database restored successfully!"
-        );
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        if (status.phase) {
+          setRestorePhase(status.phase);
+        }
 
-        setRestorePhase(null);
-        setRestoring(false);
-        setUploading(false);
-        onClose();
-        skipBeforeUnloadPromptRef.current = true;
-        window.location.reload();
+        if (status.status === "COMPLETED") {
+          const completedOperation: RestoreOperation | null =
+            activeRestoreOperationRef.current;
+          stopRestoreStatusPolling();
 
-        return true;
+          setRestorePhase("COOLDOWN");
+          await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+          toast.success(
+            status.phase === "RECOVERED"
+              ? "Database recovery completed!"
+              : completedOperation === "sql"
+              ? "Database replaced successfully!"
+              : "Database restored successfully!"
+          );
+          if (status.message) {
+            toast.error(status.message, { duration: 10000 });
+          }
+          await new Promise<void>((resolve) => setTimeout(resolve, 500));
+
+          setRestorePhase(null);
+          setRestoring(false);
+          setUploading(false);
+          setSqlFileToReplaceFrom(null);
+          activeRestoreOperationRef.current = null;
+          onClose();
+          skipBeforeUnloadPromptRef.current = true;
+          window.location.reload();
+
+          return "terminal";
+        }
+
+        if (status.status === "FAILED") {
+          const failedOperation: RestoreOperation | null =
+            activeRestoreOperationRef.current;
+          stopRestoreStatusPolling();
+
+          const failureMessage: string =
+            status.message ||
+            (failedOperation === "sql"
+              ? "Database replacement failed. The existing database was not replaced."
+              : "Database restore failed.");
+          setRestorePhase(null);
+          setRestoring(false);
+          setUploading(false);
+          setSqlFileToReplaceFrom(null);
+          activeRestoreOperationRef.current = null;
+          setError(failureMessage);
+          toast.error(failureMessage);
+          return "terminal";
+        }
+
+        if (status.status === "IDLE") {
+          stopRestoreStatusPolling();
+          const failureMessage: string =
+            "The server restarted before the database operation finished. The current database was not confirmed as replaced.";
+          setRestorePhase(null);
+          setRestoring(false);
+          setUploading(false);
+          setSqlFileToReplaceFrom(null);
+          activeRestoreOperationRef.current = null;
+          setError(failureMessage);
+          toast.error(failureMessage);
+          return "terminal";
+        }
+
+        return "pending";
+      } catch (error: any) {
+        if (generation !== statusPollGenerationRef.current) {
+          return "terminal";
+        }
+
+        if (error?.message?.includes("maintenance")) {
+          setRestorePhase("DATABASE_RESTORE");
+        } else {
+          console.error("Status check failed; retrying:", error);
+        }
+        return "retry";
       }
+    },
+    [onClose, stopRestoreStatusPolling]
+  );
 
-      return false;
-    } catch (error: any) {
-      // Check if error is due to maintenance mode
-      if (error?.message?.includes("maintenance")) {
-        // Don't treat maintenance mode as an error
-        // Keep showing loading state and continue polling
-        setRestorePhase("DATABASE_RESTORE");
-        return false;
-      }
+  const startRestoreStatusPolling = useCallback(
+    (operation: RestoreOperation): void => {
+      stopRestoreStatusPolling();
+      activeRestoreOperationRef.current = operation;
+      const generation: number = statusPollGenerationRef.current;
 
-      // For other errors, handle as before
-      console.error("Status check failed:", error);
-      if (statusCheckInterval) {
-        clearInterval(statusCheckInterval);
-        setStatusCheckInterval(null);
-      }
-      setRestorePhase(null);
-      setRestoring(false);
-      setUploading(false);
-      return false;
-    }
-  }, [statusCheckInterval, onClose, uploading]);
+      const poll = async (): Promise<void> => {
+        const result: RestorePollResult = await checkRestoreStatus(generation);
+        if (
+          result === "terminal" ||
+          generation !== statusPollGenerationRef.current
+        ) {
+          return;
+        }
+
+        if (result === "retry") {
+          statusRetryCountRef.current = Math.min(
+            statusRetryCountRef.current + 1,
+            4
+          );
+        } else {
+          statusRetryCountRef.current = 0;
+        }
+
+        const retryDelay: number =
+          result === "retry"
+            ? Math.min(
+                2000 * 2 ** Math.max(0, statusRetryCountRef.current - 1),
+                10000
+              )
+            : 2000;
+        statusCheckTimeoutRef.current = setTimeout((): void => {
+          void poll();
+        }, retryDelay);
+      };
+
+      void poll();
+    },
+    [checkRestoreStatus, stopRestoreStatusPolling]
+  );
 
   const handleCreateBackup = async () => {
     try {
@@ -206,7 +317,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleRestore = async () => {
+  const handleRestore = async (): Promise<void> => {
     if (!selectedBackup) return;
 
     try {
@@ -216,13 +327,11 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
 
       await api.post("/api/backup/restore", { filename: selectedBackup });
 
-      const interval = setInterval(() => {
-        checkRestoreStatus();
-      }, 2000);
-
-      setStatusCheckInterval(interval);
+      startRestoreStatusPolling("backup");
     } catch (error) {
       console.error("Restore failed:", error);
+      stopRestoreStatusPolling();
+      activeRestoreOperationRef.current = null;
       setError("Database restore failed. Please try again in a few moments.");
       toast.error("Failed to restore backup. Please try again.");
       setRestoring(false);
@@ -292,37 +401,47 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleUploadSql = async (
+  const handleSqlFileSelected = (
     event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
+  ): void => {
+    const file: File | undefined = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setSqlFileToReplaceFrom(file);
+    setShowSqlReplaceConfirmDialog(true);
+  };
+
+  const closeSqlReplaceConfirmation = (): void => {
+    setShowSqlReplaceConfirmDialog(false);
+    setSqlFileToReplaceFrom(null);
+  };
+
+  const handleReplaceDatabaseFromSql = async (): Promise<void> => {
+    const file: File | null = sqlFileToReplaceFrom;
     if (!file) return;
 
     try {
+      setShowSqlReplaceConfirmDialog(false);
       setUploading(true);
       setError(null);
 
-      // Read file as text
-      const sqlContent = await file.text();
+      const sqlContent: string = await file.text();
 
-      // Send to backend
       await api.post("/api/backup/upload-sql", { sqlContent });
+      setSqlFileToReplaceFrom(null);
 
-      // Start polling for status (reuse existing restore status polling)
-      const interval = setInterval(() => {
-        checkRestoreStatus();
-      }, 2000);
-      setStatusCheckInterval(interval);
+      startRestoreStatusPolling("sql");
     } catch (error: any) {
-      console.error("SQL upload failed:", error);
-      setError("Failed to upload SQL file. Please try again.");
-      toast.error("Failed to upload SQL file.");
+      console.error("Database replacement failed:", error);
+      stopRestoreStatusPolling();
+      activeRestoreOperationRef.current = null;
+      const failureMessage: string =
+        error?.message || "Failed to replace database from SQL.";
+      setError(failureMessage);
+      toast.error(failureMessage);
       setUploading(false);
-    }
-
-    // Reset file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+      setSqlFileToReplaceFrom(null);
     }
   };
 
@@ -341,12 +460,10 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
 
   useEffect(() => {
     return () => {
-      if (statusCheckInterval) {
-        clearInterval(statusCheckInterval);
-        toast.dismiss("restore-status");
-      }
+      stopRestoreStatusPolling();
+      toast.dismiss("restore-status");
     };
-  }, [statusCheckInterval]);
+  }, [stopRestoreStatusPolling]);
 
   useEffect(() => {
     if (!isBlockingOperation) return;
@@ -388,12 +505,12 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
   }, [currentLocationPath, isBlockingOperation, navigate]);
 
   useEffect(() => {
-    if (!isOpen && statusCheckInterval) {
-      clearInterval(statusCheckInterval);
-      setStatusCheckInterval(null);
+    if (!isOpen) {
+      stopRestoreStatusPolling();
+      activeRestoreOperationRef.current = null;
       toast.dismiss("restore-status");
     }
-  }, [isOpen, statusCheckInterval]);
+  }, [isOpen, stopRestoreStatusPolling]);
 
   useEffect(() => {
     if (isOpen) {
@@ -472,13 +589,15 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                 )}
 
                 {/* Hidden file input for SQL upload */}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleUploadSql}
-                  accept=".sql"
-                  className="hidden"
-                />
+                {isSqlReplacementAvailable && (
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleSqlFileSelected}
+                    accept=".sql"
+                    className="hidden"
+                  />
+                )}
 
                 {/* Action Buttons */}
                 <div className="mt-4">
@@ -493,14 +612,16 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                           >
                             Create New Backup
                           </Button>
-                          <Button
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={isBusy}
-                            variant="outline"
-                            icon={IconUpload}
-                          >
-                            Upload SQL
-                          </Button>
+                          {isSqlReplacementAvailable && (
+                            <Button
+                              onClick={() => fileInputRef.current?.click()}
+                              disabled={isBusy}
+                              variant="outline"
+                              icon={IconUpload}
+                            >
+                              Replace Database from SQL
+                            </Button>
+                          )}
                         </>
                       ) : (
                         <div className="flex items-center space-x-2">
@@ -707,26 +828,30 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                           {downloading
                             ? "Downloading Backup"
                             : uploading
-                            ? "Importing SQL"
+                            ? "Replacing Database"
                             : "Restoring Database"}
                         </h3>
                         <p className="text-default-600 dark:text-gray-300">
                           {downloading
                             ? "Preparing the SQL backup download..."
                             : restorePhase === "INITIALIZATION"
-                            ? "Preparing for restore..."
+                            ? "Preparing database replacement..."
+                            : restorePhase === "DATABASE_VALIDATION"
+                            ? "Validating the SQL backup in a temporary database..."
+                            : restorePhase === "DATABASE_REPLACE"
+                            ? "Replacing the current database..."
                             : restorePhase === "CLEANUP"
-                            ? "Cleaning up existing data..."
+                            ? "Removing the previous database..."
                             : restorePhase === "DATABASE_RESTORE"
                             ? uploading
-                              ? "Importing SQL file..."
+                              ? "Loading the selected SQL backup..."
                               : "Restoring database from backup..."
                             : restorePhase === "SESSION_RESTORE"
                             ? "Restoring active sessions..."
                             : restorePhase === "COOLDOWN"
                             ? "Finalizing restore process..."
                             : uploading
-                            ? "Please wait while the SQL is being imported"
+                            ? "Please wait while the database is being replaced"
                             : "Please wait while the database is being restored"}
                         </p>
                         <p className="text-sm text-default-500 dark:text-gray-400">
@@ -753,6 +878,34 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
         message="Please ensure all users have saved their work before proceeding. Are you sure you want to restore this backup?"
         confirmButtonText="Yes, Restore Database"
         variant="default"
+      />
+
+      <ConfirmationDialog
+        isOpen={isSqlReplacementAvailable && showSqlReplaceConfirmDialog}
+        onClose={closeSqlReplaceConfirmation}
+        onConfirm={handleReplaceDatabaseFromSql}
+        title="Replace Entire Database?"
+        message={
+          <div className="space-y-3">
+            <p>
+              This validates the selected SQL backup first, then permanently
+              replaces all current data in <strong>{DB_NAME}</strong>.
+            </p>
+            <p className="break-all rounded-lg bg-default-100 px-3 py-2 font-medium text-default-700 dark:bg-gray-700 dark:text-gray-200">
+              {sqlFileToReplaceFrom?.name}
+            </p>
+            <p>
+              Data that is not in this backup will be deleted. Make sure all
+              users have saved their work before continuing.
+            </p>
+            <p>
+              Only continue with a trusted PostgreSQL backup from your own
+              production system; database dumps contain executable definitions.
+            </p>
+          </div>
+        }
+        confirmButtonText="Yes, Replace Database"
+        variant="danger"
       />
 
       <ConfirmationDialog
