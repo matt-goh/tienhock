@@ -643,7 +643,7 @@ export const TienHockNavData: SidebarItem[] = [
             showInPopover: true,
           },
           {
-            name: "Staff Edit",
+            name: "Edit Customer",
             path: "/catalogue/customer/:id",
             component: CustomerFormPage,
           },

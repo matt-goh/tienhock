@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-13",
+    ms: "Tajuk tab pelayar kini menunjukkan halaman dan syarikat yang sedang digunakan. Borang pendaftaran pelanggan awam juga kini memaparkan Green Target dan tajuk dalam bahasa yang dipilih, bukannya Tien Hock ERP.",
+    en: "Browser tab titles now show the current page and company. The public customer registration form also shows Green Target and the title in the selected language instead of Tien Hock ERP.",
+  },
+  {
+    date: "2026-07-13",
     ms: "Payment Management dan Payment History kini memaparkan serta mengurus bayaran mengikut kumpulan rujukan, tanpa menunjukkan nombor rekod dalaman. Semua invois dengan rujukan, tarikh, kaedah dan akaun bank yang sama ditunjukkan bersama, dan pembatalan atau pengesahan melibatkan seluruh kumpulan supaya baki invois kekal tepat.",
     en: "Payment Management and Payment History now display and manage payments by reference group without showing internal record numbers. Every invoice with the same reference, date, method and bank account is shown together, and cancellation or confirmation applies to the full group so invoice balances remain correct.",
   },

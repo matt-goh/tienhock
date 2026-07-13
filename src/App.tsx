@@ -4,10 +4,11 @@ import {
   Routes,
   useLocation,
   Navigate,
+  matchPath,
 } from "react-router-dom";
 import React from "react";
 import { Toaster } from "react-hot-toast";
-import { routes } from "./pages/pagesRoute";
+import { routes, type RouteItem } from "./pages/pagesRoute";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { CompanyProvider } from "./contexts/CompanyContext";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
@@ -20,6 +21,47 @@ import HomePage from "./pages/HomePage";
 import GreenTargetDashboardPage from "./pages/GreenTarget/GreenTargetDashboardPage";
 import CustomerSignupPage from "./pages/GreenTarget/PublicForm/CustomerSignupPage";
 
+const getCompanyNameFromPath = (pathname: string): string => {
+  if (pathname.startsWith("/greentarget")) {
+    return "Green Target";
+  }
+
+  if (pathname.startsWith("/jellypolly")) {
+    return "Jelly Polly";
+  }
+
+  return "Tien Hock";
+};
+
+const getDocumentTitle = (pathname: string): string => {
+  const companyName: string = getCompanyNameFromPath(pathname);
+
+  if (pathname === "/login") {
+    return "Login | Tien Hock ERP";
+  }
+
+  if (
+    pathname === "/" ||
+    pathname === "/greentarget" ||
+    pathname === "/jellypolly"
+  ) {
+    return `Dashboard | ${companyName} ERP`;
+  }
+
+  if (pathname === "/pdf-viewer") {
+    return `PDF Viewer | ${companyName} ERP`;
+  }
+
+  const matchingRoute: RouteItem | undefined = routes.find(
+    (route: RouteItem): boolean =>
+      matchPath({ path: route.path, end: true }, pathname) !== null
+  );
+
+  return matchingRoute
+    ? `${matchingRoute.name} | ${companyName} ERP`
+    : `${companyName} ERP`;
+};
+
 const Layout: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const { isDarkMode } = useTheme();
@@ -27,6 +69,12 @@ const Layout: React.FC = () => {
   const isPDFRoute = location.pathname === "/pdf-viewer";
   const isLoginRoute = location.pathname === "/login";
   const isPublicFormRoute = location.pathname === "/greentarget-form";
+
+  React.useEffect((): void => {
+    if (!isPublicFormRoute) {
+      document.title = getDocumentTitle(location.pathname);
+    }
+  }, [isPublicFormRoute, location.pathname]);
 
   if (isLoading) {
     return (
