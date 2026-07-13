@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-13",
+    ms: "Perubahan pada cawangan pelanggan (menambah, membuang atau menukar cawangan utama) dan harga khas produk pelanggan kini dipaparkan serta-merta selepas disimpan. Sebelum ini, perubahan tersebut boleh mengambil masa sehingga sejam untuk muncul walaupun selepas halaman dimuat semula.",
+    en: "Changes to customer branches (adding, removing, or changing the main branch) and customer product custom prices now appear immediately after saving. Previously, these changes could take up to an hour to show even after refreshing the page.",
+  },
+  {
+    date: "2026-07-13",
     ms: "Rujukan kumpulan bayaran kini boleh dibetulkan terus daripada butiran resit tanpa membatalkan dan merekodkan semula bayaran. Rujukan baharu dikemas kini pada semua bayaran dan catatan jurnal berkaitan dalam kumpulan yang sama, manakala nombor cek, amaun dan baki invois tidak berubah.",
     en: "A payment group's reference can now be corrected directly from the receipt details without cancelling and recording the payments again. The new reference is updated across every related payment and journal entry in the same group, while cheque numbers, amounts and invoice balances remain unchanged.",
   },
