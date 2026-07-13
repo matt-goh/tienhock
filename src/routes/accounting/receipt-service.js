@@ -26,6 +26,7 @@
 import { generateReceiptReference } from "./payment-journal.js";
 import { determineBankAccount } from "../../utils/payment-helpers.js";
 import { getCustomerDebtorAccountCode } from "./debtorSync.js";
+import { assertTienHockAccountingDateUnlocked } from "./posting-lock.js";
 
 const round2 = (v) => Math.round(parseFloat(v || 0) * 100) / 100;
 
@@ -42,6 +43,26 @@ export function toLocalDateString(value) {
     throw new Error(`Invalid date: ${value}`);
   }
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * Guard both the receipt date and its accounting posting date when present.
+ *
+ * @param {object} receipt
+ * @param {string} operation
+ * @returns {void}
+ */
+function assertReceiptDatesUnlocked(receipt, operation) {
+  assertTienHockAccountingDateUnlocked(
+    receipt.received_date,
+    `${operation} (receipt date)`
+  );
+  if (receipt.posting_date) {
+    assertTienHockAccountingDateUnlocked(
+      receipt.posting_date,
+      `${operation} (posting date)`
+    );
+  }
 }
 
 async function ensureAccountsExist(client, codes) {
@@ -161,6 +182,7 @@ async function lockInvoices(client, allocs) {
  * credit effects. Assumes invoices are already locked and validated.
  */
 async function postReceiptJournal(client, receipt, allocs, invoiceMap, userId) {
+  assertReceiptDatesUnlocked(receipt, `Receipt ${receipt.id}`);
   const isCash = receipt.payment_method === "cash";
   const debitAccount = receipt.debit_account;
   const total = round2(allocs.reduce((s, a) => s + a.amount, 0));
@@ -286,6 +308,11 @@ export async function createReceipt(client, payload, userId) {
   const postingDate = toLocalDateString(payload.posting_date || payload.received_date);
   const isPending = method === "cheque" && payload.post_immediately !== true;
   const debitAccount = method === "cash" ? "CH_REV2" : determineBankAccount(method, payload.bank_account);
+
+  assertTienHockAccountingDateUnlocked(receivedDate, "Receipt (receipt date)");
+  if (!isPending) {
+    assertTienHockAccountingDateUnlocked(postingDate, "Receipt (posting date)");
+  }
 
   // Fill customer ids for invoice allocations + description default.
   const preMap = {};
@@ -420,6 +447,7 @@ export async function updateReceiptReference(
   }
 
   const receipt = receiptResult.rows[0];
+  assertReceiptDatesUnlocked(receipt, `Payment group ${receiptId}`);
   if (receipt.status === "cancelled") {
     throw new Error("This payment group is cancelled and cannot be changed");
   }
@@ -446,7 +474,7 @@ export async function updateReceiptReference(
   }
 
   const groupResult = await client.query(
-    `SELECT id, journal_entry_id
+    `SELECT id, journal_entry_id, received_date, posting_date
        FROM receipts
       WHERE display_reference IS NOT DISTINCT FROM $1
         AND received_date = $2
@@ -471,6 +499,12 @@ export async function updateReceiptReference(
     error.status = 409;
     error.code = "RECEIPT_REFERENCE_CHANGED";
     throw error;
+  }
+  for (const groupReceipt of groupResult.rows) {
+    assertReceiptDatesUnlocked(
+      groupReceipt,
+      `Payment group ${receipt.display_reference || receiptId}`
+    );
   }
 
   if (receipt.display_reference === nextReference) {
@@ -641,6 +675,7 @@ export async function confirmReceiptGroup(
   }
 
   const anchor = anchorResult.rows[0];
+  assertReceiptDatesUnlocked(anchor, `Payment group ${receiptId}`);
   const groupLabel = anchor.display_reference || "this payment";
   if (anchor.status === "cancelled") {
     throw new Error(`Payment group ${groupLabel} is cancelled and cannot be confirmed`);
@@ -718,6 +753,7 @@ export async function cancelReceiptGroup(client, receiptId, reason, userId) {
   }
 
   const anchor = anchorResult.rows[0];
+  assertReceiptDatesUnlocked(anchor, `Payment group ${receiptId}`);
   const groupLabel = anchor.display_reference || "this payment";
   if (anchor.status === "cancelled") {
     throw new Error(`Payment group ${groupLabel} is already cancelled`);
@@ -809,6 +845,7 @@ export async function confirmReceipt(client, receiptId, options, userId) {
   );
   if (receiptResult.rows.length === 0) throw new Error("Payment group not found");
   const receipt = receiptResult.rows[0];
+  assertReceiptDatesUnlocked(receipt, `Receipt ${receiptId}`);
   if (receipt.status !== "pending") {
     throw new Error(`This payment is ${receipt.status}, not pending`);
   }
@@ -830,6 +867,7 @@ export async function confirmReceipt(client, receiptId, options, userId) {
   receipt.posting_date = toLocalDateString(
     (options && options.posting_date) || new Date()
   );
+  assertReceiptDatesUnlocked(receipt, `Receipt ${receiptId}`);
   if (options && options.cheque_reference) {
     await client.query(`UPDATE receipts SET cheque_reference = $1 WHERE id = $2`, [
       options.cheque_reference,
@@ -866,6 +904,7 @@ export async function cancelReceipt(client, receiptId, reason, userId) {
   );
   if (receiptResult.rows.length === 0) throw new Error("Payment group not found");
   const receipt = receiptResult.rows[0];
+  assertReceiptDatesUnlocked(receipt, `Receipt ${receiptId}`);
   if (receipt.status === "cancelled") {
     throw new Error("This payment is already cancelled");
   }

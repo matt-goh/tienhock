@@ -33,7 +33,10 @@ export default function (pool) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Error creating receipt:", error);
-      res.status(400).json({ message: error.message || "Error creating receipt" });
+      res.status(error.status || 400).json({
+        code: error.code,
+        message: error.message || "Error creating receipt",
+      });
     } finally {
       client.release();
     }
@@ -183,6 +186,7 @@ export default function (pool) {
       await client.query("ROLLBACK");
       console.error("Error confirming payment group:", error);
       res.status(error.status || 400).json({
+        code: error.code,
         message: error.message || "Error confirming payment group",
       });
     } finally {
@@ -206,7 +210,10 @@ export default function (pool) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Error confirming receipt:", error);
-      res.status(400).json({ message: error.message || "Error confirming receipt" });
+      res.status(error.status || 400).json({
+        code: error.code,
+        message: error.message || "Error confirming receipt",
+      });
     } finally {
       client.release();
     }
@@ -234,6 +241,7 @@ export default function (pool) {
       await client.query("ROLLBACK");
       console.error("Error cancelling payment group:", error);
       res.status(error.status || 400).json({
+        code: error.code,
         message: error.message || "Error cancelling payment group",
       });
     } finally {
@@ -257,7 +265,10 @@ export default function (pool) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Error cancelling receipt:", error);
-      res.status(400).json({ message: error.message || "Error cancelling receipt" });
+      res.status(error.status || 400).json({
+        code: error.code,
+        message: error.message || "Error cancelling receipt",
+      });
     } finally {
       client.release();
     }

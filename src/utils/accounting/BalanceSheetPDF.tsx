@@ -179,10 +179,13 @@ const styles = StyleSheet.create({
 });
 
 interface LineItem {
-  note: string;
+  note: string | null;
   name: string;
   amount: number;
 }
+
+const formatLineItemLabel = (item: LineItem): string =>
+  item.note ? `${item.name} (Note ${item.note})` : item.name;
 
 interface BalanceSheetData {
   period: {
@@ -224,10 +227,11 @@ interface BalanceSheetData {
 }
 
 const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat("en-MY", {
+  const formatted = new Intl.NumberFormat("en-MY", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Math.abs(amount));
+  return amount < 0 ? `(${formatted})` : formatted;
 };
 
 interface BalanceSheetPDFDocumentProps {
@@ -282,9 +286,12 @@ const BalanceSheetPDFDocument: React.FC<BalanceSheetPDFDocumentProps> = ({
             <View style={styles.subSection}>
               <Text style={styles.subSectionTitle}>Non-Current Assets</Text>
               {data.assets.non_current.items.map((item) => (
-                <View key={item.note} style={styles.lineItem}>
+                <View
+                  key={`${item.note ?? "no-note"}-${item.name}`}
+                  style={styles.lineItem}
+                >
                   <Text style={styles.lineItemLabel}>
-                    {item.name} (Note {item.note})
+                    {formatLineItemLabel(item)}
                   </Text>
                   <Text style={styles.lineItemAmount}>
                     {formatCurrency(item.amount)}
@@ -305,9 +312,12 @@ const BalanceSheetPDFDocument: React.FC<BalanceSheetPDFDocumentProps> = ({
             <View style={styles.subSection}>
               <Text style={styles.subSectionTitle}>Current Assets</Text>
               {data.assets.current.items.map((item) => (
-                <View key={item.note} style={styles.lineItem}>
+                <View
+                  key={`${item.note ?? "no-note"}-${item.name}`}
+                  style={styles.lineItem}
+                >
                   <Text style={styles.lineItemLabel}>
-                    {item.name} (Note {item.note})
+                    {formatLineItemLabel(item)}
                   </Text>
                   <Text style={styles.lineItemAmount}>
                     {formatCurrency(item.amount)}
@@ -341,9 +351,12 @@ const BalanceSheetPDFDocument: React.FC<BalanceSheetPDFDocumentProps> = ({
             <View style={styles.subSection}>
               <Text style={styles.subSectionTitle}>Non-Current Liabilities</Text>
               {data.liabilities.non_current.items.map((item) => (
-                <View key={item.note} style={styles.lineItem}>
+                <View
+                  key={`${item.note ?? "no-note"}-${item.name}`}
+                  style={styles.lineItem}
+                >
                   <Text style={styles.lineItemLabel}>
-                    {item.name} (Note {item.note})
+                    {formatLineItemLabel(item)}
                   </Text>
                   <Text style={styles.lineItemAmount}>
                     {formatCurrency(item.amount)}
@@ -364,9 +377,12 @@ const BalanceSheetPDFDocument: React.FC<BalanceSheetPDFDocumentProps> = ({
             <View style={styles.subSection}>
               <Text style={styles.subSectionTitle}>Current Liabilities</Text>
               {data.liabilities.current.items.map((item) => (
-                <View key={item.note} style={styles.lineItem}>
+                <View
+                  key={`${item.note ?? "no-note"}-${item.name}`}
+                  style={styles.lineItem}
+                >
                   <Text style={styles.lineItemLabel}>
-                    {item.name} (Note {item.note})
+                    {formatLineItemLabel(item)}
                   </Text>
                   <Text style={styles.lineItemAmount}>
                     {formatCurrency(item.amount)}
@@ -387,9 +403,12 @@ const BalanceSheetPDFDocument: React.FC<BalanceSheetPDFDocumentProps> = ({
             <View style={styles.subSection}>
               <Text style={styles.subSectionTitle}>Equity</Text>
               {data.equity.items.map((item) => (
-                <View key={item.note} style={styles.lineItem}>
+                <View
+                  key={`${item.note ?? "no-note"}-${item.name}`}
+                  style={styles.lineItem}
+                >
                   <Text style={styles.lineItemLabel}>
-                    {item.name} (Note {item.note})
+                    {formatLineItemLabel(item)}
                   </Text>
                   <Text style={styles.lineItemAmount}>
                     {formatCurrency(item.amount)}

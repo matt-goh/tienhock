@@ -13,7 +13,6 @@ export default function (pool) {
     return {
       startStr: `${year}-01-01`,
       endStr: `${year}-${mm}-${String(lastDay).padStart(2, "0")}`,
-      endTs: new Date(year, month, 0, 23, 59, 59, 999).getTime(),
     };
   };
 
@@ -53,42 +52,55 @@ export default function (pool) {
           ORDER BY origin, depth
         )`;
 
-  // ==================== INVOICE-BASED CALCULATIONS ====================
-
-  /**
-   * Calculate Trade Receivables (Note 22) - cumulative outstanding as of period end
-   * Returns the sum of balance_due from all unpaid/overdue invoices created up to the end date
-   * @param {number} endDateTs - End date as milliseconds timestamp
-   */
-  const getTradeReceivables = async (endDateTs) => {
-    const query = `
-      SELECT COALESCE(SUM(balance_due), 0) as total
-      FROM invoices
-      WHERE invoice_status IN ('Unpaid', 'Overdue')
-        AND balance_due > 0.01
-        AND createddate::bigint <= $1
-    `;
-    const result = await pool.query(query, [endDateTs]);
-    return parseFloat(result.rows[0]?.total || 0);
-  };
-
-  /**
-   * Calculate Revenue (Note 7) - YTD from Jan 1 of year to period end
-   * Returns the sum of total_excluding_tax from all invoices in the period
-   * @param {number} year - The year
-   * @param {number} endDateTs - End date as milliseconds timestamp
-   */
-  const getRevenue = async (year, endDateTs) => {
-    const startOfYearTs = new Date(year, 0, 1).getTime(); // Jan 1
-    const query = `
-      SELECT COALESCE(SUM(total_excluding_tax), 0) as total
-      FROM invoices
-      WHERE createddate::bigint >= $1
-        AND createddate::bigint <= $2
-    `;
-    const result = await pool.query(query, [startOfYearTs, endDateTs]);
-    return parseFloat(result.rows[0]?.total || 0);
-  };
+  // Trial Balance and Balance Sheet are as-of reports. For each account, use
+  // the latest opening anchor on or before the period end and add only posted
+  // movement from that anchor date onward. An unanchored account starts at
+  // January 1. Keeping the anchor as the account source also preserves explicit
+  // zero fences and anchor-only balances in the report population.
+  // Interpolate after EFFECTIVE_FS_NOTES_CTES; $1 = Jan 1, $2 = period end.
+  const ANCHORED_ACCOUNT_BALANCES_CTES = `
+        latest_anchors AS (
+          SELECT DISTINCT ON (aob.account_code)
+            aob.account_code,
+            aob.as_of_date,
+            aob.amount
+          FROM account_opening_balances aob
+          WHERE aob.as_of_date <= $2::date
+          ORDER BY aob.account_code, aob.as_of_date DESC
+        ),
+        account_periods AS (
+          SELECT
+            ac.code,
+            la.as_of_date AS anchor_date,
+            la.amount AS anchor_amount,
+            COALESCE(la.as_of_date, $1::date) AS movement_start
+          FROM account_codes ac
+          LEFT JOIN latest_anchors la ON la.account_code = ac.code
+          WHERE ac.is_active = true
+        ),
+        account_movements AS (
+          SELECT
+            ap.code,
+            SUM(
+              COALESCE(jel.debit_amount, 0)
+              - COALESCE(jel.credit_amount, 0)
+            ) AS net
+          FROM account_periods ap
+          JOIN journal_entry_lines jel ON jel.account_code = ap.code
+          JOIN journal_entries je ON je.id = jel.journal_entry_id
+          WHERE je.status = 'posted'
+            AND je.entry_date >= ap.movement_start
+            AND je.entry_date <= $2::date
+          GROUP BY ap.code
+        ),
+        account_balances AS (
+          SELECT
+            ap.code,
+            COALESCE(ap.anchor_amount, 0) + COALESCE(am.net, 0) AS net
+          FROM account_periods ap
+          LEFT JOIN account_movements am ON am.code = ap.code
+          WHERE ap.anchor_date IS NOT NULL OR am.code IS NOT NULL
+        )`;
 
   // ==================== FINANCIAL STATEMENT NOTES ====================
 
@@ -409,10 +421,13 @@ export default function (pool) {
       }
 
       // Calculate YTD period: Jan 1 to end of selected month
-      const { startStr: periodStartStr, endStr: periodEndStr, endTs: periodEndTs } =
-        getYtdPeriod(validation.year, validation.month);
+      const { startStr: periodStartStr, endStr: periodEndStr } = getYtdPeriod(
+        validation.year,
+        validation.month
+      );
 
-      // Shared CTE: every active account with journal activity in the period
+      // Shared CTE: every active account with an applicable opening anchor or
+      // posted movement in its account-specific reporting window.
       const baseParams = [periodStartStr, periodEndStr];
       let ledgerFilter = "";
       if (ledger_type) {
@@ -425,37 +440,26 @@ export default function (pool) {
       // every customer child instead.
       const groupTd = ledger_type !== "TD";
       const baseCte = `
-        WITH account_balances AS (
-          SELECT
-            jel.account_code,
-            SUM(COALESCE(jel.debit_amount, 0)) as total_debit,
-            SUM(COALESCE(jel.credit_amount, 0)) as total_credit
-          FROM journal_entry_lines jel
-          JOIN journal_entries je ON jel.journal_entry_id = je.id
-          WHERE je.status = 'posted'
-            AND je.entry_date >= $1
-            AND je.entry_date <= $2
-          GROUP BY jel.account_code
-        ),
+        WITH RECURSIVE ${EFFECTIVE_FS_NOTES_CTES},
+        ${ANCHORED_ACCOUNT_BALANCES_CTES},
         raw_accounts AS (
           SELECT
             ac.code,
             ac.description,
             ac.ledger_type,
-            ac.fs_note,
+            efn.fs_note,
             fsn.name as note_name,
-            ab.total_debit,
-            ab.total_credit,
+            GREATEST(ab.net, 0) as total_debit,
+            GREATEST(-ab.net, 0) as total_credit,
             CASE
-              WHEN fsn.normal_balance = 'debit' THEN
-                ab.total_debit - ab.total_credit
-              ELSE
-                ab.total_credit - ab.total_debit
+              WHEN fsn.normal_balance = 'credit' THEN -ab.net
+              ELSE ab.net
             END as balance,
-            ab.total_debit - ab.total_credit as net
-          FROM account_codes ac
-          JOIN account_balances ab ON ac.code = ab.account_code
-          LEFT JOIN financial_statement_notes fsn ON ac.fs_note = fsn.code
+            ab.net
+          FROM account_balances ab
+          JOIN account_codes ac ON ac.code = ab.code
+          LEFT JOIN effective_fs_notes efn ON efn.code = ac.code
+          LEFT JOIN financial_statement_notes fsn ON fsn.code = efn.fs_note
           WHERE ac.is_active = true${ledgerFilter}
         ),
         active_accounts AS (
@@ -538,10 +542,6 @@ export default function (pool) {
         };
       });
 
-      // Calculate invoice-based values for Note 22 and Note 7
-      const tradeReceivables = await getTradeReceivables(periodEndTs);
-      const revenue = await getRevenue(validation.year, periodEndTs);
-
       res.json({
         period: {
           year: validation.year,
@@ -560,11 +560,6 @@ export default function (pool) {
           credit: totalCredit,
           difference: Math.abs(totalDebit - totalCredit),
           is_balanced: Math.abs(totalDebit - totalCredit) < 0.01,
-        },
-        // Invoice-based values (override journal-based for these notes)
-        invoice_based: {
-          note_22_trade_receivables: tradeReceivables,
-          note_7_revenue: revenue,
         },
       });
     } catch (error) {
@@ -591,8 +586,10 @@ export default function (pool) {
       }
 
       // Calculate YTD period: Jan 1 to end of selected month
-      const { startStr: periodStartStr, endStr: periodEndStr, endTs: periodEndTs } =
-        getYtdPeriod(validation.year, validation.month);
+      const { startStr: periodStartStr, endStr: periodEndStr } = getYtdPeriod(
+        validation.year,
+        validation.month
+      );
 
       // Get balances grouped by effective fs_note for the YTD period
       const query = `
@@ -633,9 +630,6 @@ export default function (pool) {
 
       const result = await pool.query(query, [periodStartStr, periodEndStr]);
 
-      // Calculate invoice-based revenue (Note 7)
-      const invoiceRevenue = await getRevenue(validation.year, periodEndTs);
-
       // Organize into sections
       const revenue = [];
       const expenses = [];
@@ -645,17 +639,10 @@ export default function (pool) {
       let totalCogs = 0;
 
       for (const row of result.rows) {
-        let amount = parseFloat(row.balance);
-
-        // Override Note 7 (Revenue/Sales) with invoice-based value
-        if (row.code === "7") {
-          amount = invoiceRevenue;
-        }
-
         const item = {
           note: row.code,
           name: row.name,
-          amount: amount,
+          amount: parseFloat(row.balance),
         };
 
         if (row.category === "revenue") {
@@ -707,7 +694,6 @@ export default function (pool) {
   // ==================== BALANCE SHEET ====================
 
   // GET /balance-sheet/:year/:month - Generate balance sheet as of period end
-  // Date range: YTD from Jan 1 of year to end of selected month
   router.get("/balance-sheet/:year/:month", async (req, res) => {
     try {
       const { year, month } = req.params;
@@ -718,25 +704,66 @@ export default function (pool) {
         return res.status(400).json({ message: validation.error });
       }
 
-      // Calculate YTD period: Jan 1 to end of selected month
-      const { startStr: periodStartStr, endStr: periodEndStr, endTs: periodEndTs } =
-        getYtdPeriod(validation.year, validation.month);
+      const { startStr: periodStartStr, endStr: periodEndStr } = getYtdPeriod(
+        validation.year,
+        validation.month
+      );
 
-      // Get YTD balances grouped by effective fs_note
+      // Balance Sheet notes use each account's latest applicable opening
+      // anchor plus subsequent posted movement. Current Year Profit is kept
+      // movement-only and follows the same journal/note rules as the Income
+      // Statement and CoGM reports.
       const query = `
         WITH RECURSIVE ${EFFECTIVE_FS_NOTES_CTES},
-        ytd_balances AS (
+        ${ANCHORED_ACCOUNT_BALANCES_CTES},
+        statement_balances AS (
           SELECT
             efn.fs_note,
-            SUM(COALESCE(jel.debit_amount, 0)) as total_debit,
-            SUM(COALESCE(jel.credit_amount, 0)) as total_credit
+            SUM(CASE WHEN ab.net > 0 THEN ab.net ELSE 0 END) AS total_debit,
+            SUM(CASE WHEN ab.net < 0 THEN -ab.net ELSE 0 END) AS total_credit,
+            SUM(ab.net) AS net
+          FROM account_balances ab
+          JOIN effective_fs_notes efn ON efn.code = ab.code
+          GROUP BY efn.fs_note
+        ),
+        pnl_movements AS (
+          SELECT
+            efn.fs_note,
+            SUM(
+              COALESCE(jel.debit_amount, 0)
+              - COALESCE(jel.credit_amount, 0)
+            ) AS net
           FROM journal_entry_lines jel
-          JOIN journal_entries je ON jel.journal_entry_id = je.id
-          JOIN effective_fs_notes efn ON jel.account_code = efn.code
+          JOIN journal_entries je ON je.id = jel.journal_entry_id
+          JOIN effective_fs_notes efn ON efn.code = jel.account_code
           WHERE je.status = 'posted'
             AND je.entry_date >= $1
             AND je.entry_date <= $2
           GROUP BY efn.fs_note
+        ),
+        current_year_profit AS (
+          SELECT COALESCE(
+            SUM(
+              CASE
+                WHEN fsn.category = 'revenue' THEN
+                  CASE
+                    WHEN fsn.normal_balance = 'debit' THEN COALESCE(pm.net, 0)
+                    ELSE -COALESCE(pm.net, 0)
+                  END
+                WHEN fsn.category IN ('expense', 'cogs') THEN
+                  -(CASE
+                    WHEN fsn.normal_balance = 'debit' THEN COALESCE(pm.net, 0)
+                    ELSE -COALESCE(pm.net, 0)
+                  END)
+                ELSE 0
+              END
+            ),
+            0
+          ) AS balance
+          FROM financial_statement_notes fsn
+          LEFT JOIN pnl_movements pm ON pm.fs_note = fsn.code
+          WHERE fsn.report_section IN ('income_statement', 'cogm')
+            AND fsn.is_active = true
         )
         SELECT
           fsn.code,
@@ -745,25 +772,32 @@ export default function (pool) {
           fsn.report_section,
           fsn.normal_balance,
           fsn.sort_order,
-          COALESCE(yb.total_debit, 0) as total_debit,
-          COALESCE(yb.total_credit, 0) as total_credit,
+          COALESCE(sb.total_debit, 0) as total_debit,
+          COALESCE(sb.total_credit, 0) as total_credit,
           CASE
-            WHEN fsn.normal_balance = 'debit' THEN
-              COALESCE(yb.total_debit, 0) - COALESCE(yb.total_credit, 0)
-            ELSE
-              COALESCE(yb.total_credit, 0) - COALESCE(yb.total_debit, 0)
+            WHEN fsn.normal_balance = 'credit' THEN -COALESCE(sb.net, 0)
+            ELSE COALESCE(sb.net, 0)
           END as balance
         FROM financial_statement_notes fsn
-        LEFT JOIN ytd_balances yb ON fsn.code = yb.fs_note
+        LEFT JOIN statement_balances sb ON sb.fs_note = fsn.code
         WHERE fsn.report_section = 'balance_sheet'
           AND fsn.is_active = true
-        ORDER BY fsn.sort_order, fsn.code
+        UNION ALL
+        SELECT
+          NULL::varchar AS code,
+          'Current Year Profit'::varchar AS name,
+          'equity'::varchar AS category,
+          'balance_sheet'::varchar AS report_section,
+          'credit'::varchar AS normal_balance,
+          2147483647::integer AS sort_order,
+          0::numeric AS total_debit,
+          0::numeric AS total_credit,
+          cyp.balance
+        FROM current_year_profit cyp
+        ORDER BY sort_order, code
       `;
 
       const result = await pool.query(query, [periodStartStr, periodEndStr]);
-
-      // Calculate invoice-based trade receivables (Note 22)
-      const tradeReceivables = await getTradeReceivables(periodEndTs);
 
       // Organize into sections
       const assets = { current: [], non_current: [] };
@@ -779,17 +813,10 @@ export default function (pool) {
       const nonCurrentLiabilityNotes = ["11", "16"]; // Term Loans, Hire Purchase Payable
 
       for (const row of result.rows) {
-        let amount = parseFloat(row.balance);
-
-        // Override Note 22 (Trade Receivables) with invoice-based value
-        if (row.code === "22") {
-          amount = tradeReceivables;
-        }
-
         const item = {
           note: row.code,
           name: row.name,
-          amount: amount,
+          amount: parseFloat(row.balance),
         };
 
         if (row.category === "asset") {

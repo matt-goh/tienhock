@@ -6,10 +6,10 @@
 // transaction with a running balance. The account is treated as debit-normal
 // (an asset), so a debit increases the balance and a credit decreases it.
 //
-// Linked accounts (PRE-CUTOVER ONLY): before the 1 June 2026 accounting
+// Linked accounts (PRE-2026 ONLY): before the 1 January 2026 ledger import
 // cutover, no real RV bank-in journals exist, so the BANK_PBB ledger surfaces
 // the cash-received holding accounts (CH_REV*) as synthetic money-in rows to
-// keep the historical May proof intact. From the cutover onward, cash reaches
+// preserve older historical views. From the cutover onward, cash reaches
 // the bank ONLY through real RV bank-in journals (DR bank / CR CH_REV*), and
 // the synthetic projection is excluded from EVERY calculation path (anchor
 // movement, derived opening, period rows, totals). No date can ever produce
@@ -28,7 +28,7 @@ const BANK_LINKED_ACCOUNTS = {
     keep: ["CH_REV1", "CH_REV2"],
   },
 };
-const LINKED_ACCOUNTS_CUTOFF = "2026-06-01";
+const LINKED_ACCOUNTS_CUTOFF = "2026-01-01";
 
 const pad = (n) => String(n).padStart(2, "0");
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
