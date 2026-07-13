@@ -424,9 +424,9 @@ export const getGroupedReceiptCancellationError = (
   return {
     code: "GROUPED_RECEIPT_CANCELLATION_REQUIRED",
     message: "This payment cannot be cancelled by itself.",
-    detail: `It is part of Receipt #${payment.receipt_id}${
-      payment.receipt_reference ? ` (${payment.receipt_reference})` : ""
-    }, which covers ${payment.allocation_count} payments. Open the receipt to review every invoice and cancel the whole receipt together.`,
+    detail: `It is part of payment group ${
+      payment.receipt_reference || payment.payment_reference || "with the same reference"
+    }, which covers ${payment.allocation_count} payments. Open the group to review every invoice and cancel all its payments together.`,
     receipt_id: payment.receipt_id,
     allocation_count: payment.allocation_count,
     receipt_status: payment.receipt_status,

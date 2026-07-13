@@ -7,6 +7,8 @@ import {
   createReceipt,
   confirmReceipt,
   cancelReceipt,
+  cancelReceiptGroup,
+  getReceiptGroup,
   updateReceiptReference,
 } from "../accounting/receipt-service.js";
 
@@ -82,6 +84,24 @@ export default function (pool) {
     }
   });
 
+  // --- GET /api/receipts/:id/group ---
+  router.get("/:id/group", async (req, res) => {
+    const receiptId = parseInt(req.params.id, 10);
+    if (!Number.isInteger(receiptId) || receiptId <= 0) {
+      return res.status(400).json({ message: "Invalid payment group" });
+    }
+
+    try {
+      const result = await getReceiptGroup(pool, receiptId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching payment group:", error);
+      res.status(error.status || 500).json({
+        message: error.message || "Error fetching payment group",
+      });
+    }
+  });
+
   // --- GET /api/receipts/:id ---
   router.get("/:id", async (req, res) => {
     try {
@@ -110,7 +130,7 @@ export default function (pool) {
   router.patch("/:id/reference", async (req, res) => {
     const receiptId = parseInt(req.params.id, 10);
     if (!Number.isInteger(receiptId) || receiptId <= 0) {
-      return res.status(400).json({ message: "Invalid receipt ID" });
+      return res.status(400).json({ message: "Invalid payment group" });
     }
 
     const client = await pool.connect();
@@ -124,7 +144,7 @@ export default function (pool) {
         req.user?.id || null
       );
       await client.query("COMMIT");
-      res.json({ message: "Receipt reference updated", ...result });
+      res.json({ message: "Payment group reference updated", ...result });
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Error updating receipt reference:", error);
@@ -154,6 +174,35 @@ export default function (pool) {
       await client.query("ROLLBACK");
       console.error("Error confirming receipt:", error);
       res.status(400).json({ message: error.message || "Error confirming receipt" });
+    } finally {
+      client.release();
+    }
+  });
+
+  // --- PUT /api/receipts/:id/group/cancel ---
+  router.put("/:id/group/cancel", async (req, res) => {
+    const receiptId = parseInt(req.params.id, 10);
+    if (!Number.isInteger(receiptId) || receiptId <= 0) {
+      return res.status(400).json({ message: "Invalid payment group" });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await cancelReceiptGroup(
+        client,
+        receiptId,
+        req.body?.reason || null,
+        req.user?.id || null
+      );
+      await client.query("COMMIT");
+      res.json({ message: "Payment group cancelled", ...result });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error cancelling payment group:", error);
+      res.status(error.status || 400).json({
+        message: error.message || "Error cancelling payment group",
+      });
     } finally {
       client.release();
     }

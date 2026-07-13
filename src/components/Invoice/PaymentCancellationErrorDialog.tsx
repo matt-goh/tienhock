@@ -6,13 +6,13 @@ import ConfirmationDialog from "../ConfirmationDialog";
 interface PaymentCancellationErrorDialogProps {
   error: PaymentCancellationErrorData | null;
   onClose: () => void;
-  onViewReceipt: (receiptId: number) => void;
+  onViewPaymentGroup: (receiptId: number) => void;
   onViewJournal: (journalEntryId: number) => void;
 }
 
 const PaymentCancellationErrorDialog: React.FC<
   PaymentCancellationErrorDialogProps
-> = ({ error, onClose, onViewReceipt, onViewJournal }) => {
+> = ({ error, onClose, onViewPaymentGroup, onViewJournal }) => {
   const receiptId: number | undefined = error?.receipt_id;
   const journalEntryId: number | null | undefined =
     error?.receipt_journal_id;
@@ -35,9 +35,11 @@ const PaymentCancellationErrorDialog: React.FC<
                   type="button"
                   size="sm"
                   color="sky"
-                  onClick={() => onViewReceipt(receiptId)}
+                  onClick={() => onViewPaymentGroup(receiptId)}
                 >
-                  View Receipt #{receiptId}
+                  {error?.receipt_reference
+                    ? `View Payment Group ${error.receipt_reference}`
+                    : "View Related Payments"}
                 </Button>
               )}
               {journalEntryId && (

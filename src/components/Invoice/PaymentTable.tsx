@@ -15,6 +15,7 @@ import {
   IconReceipt,
   IconPrinter,
   IconPlus,
+  IconSettings,
 } from "@tabler/icons-react";
 import {
   confirmPayment,
@@ -32,7 +33,7 @@ interface PaymentTableProps {
   onRefresh: () => void;
   onCancellationError?: (error: PaymentCancellationErrorData) => void;
   onAddPaymentToGroup?: (payment: Payment) => void;
-  onViewReceipt?: (receiptId: number) => void;
+  onViewPaymentGroup?: (receiptId: number) => void;
 }
 
 const PaymentTable: React.FC<PaymentTableProps> = ({
@@ -41,7 +42,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
   onRefresh,
   onCancellationError,
   onAddPaymentToGroup,
-  onViewReceipt,
+  onViewPaymentGroup,
 }) => {
   const navigate = useNavigate();
   const [confirmingPaymentId, setConfirmingPaymentId] = useState<number | null>(
@@ -161,43 +162,25 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
     }
   };
 
-  const renderReceiptJournalLinks = (payment: Payment): React.ReactNode => {
-    const receiptId: number | null = payment.receipt_id ?? null;
+  const renderJournalLink = (payment: Payment): React.ReactNode => {
     const journalEntryId: number | null =
       payment.voucher_journal_id ?? payment.journal_entry_id ?? null;
-    if ((!receiptId || !onViewReceipt) && !journalEntryId) {
+    if (!journalEntryId) {
       return <span className="text-xs text-gray-400 dark:text-gray-500">-</span>;
     }
 
     return (
-      <div className="flex flex-col items-start gap-1">
-        {receiptId && onViewReceipt && (
-          <button
-            type="button"
-            onClick={() => onViewReceipt(receiptId)}
-            className="inline-flex items-center gap-1 text-xs text-sky-600 hover:underline dark:text-sky-400"
-            title="View receipt details"
-          >
-            <IconReceipt size={14} className="flex-shrink-0" />
-            <span>Receipt #{receiptId}</span>
-          </button>
-        )}
-        {journalEntryId && (
-          <button
-            type="button"
-            onClick={() =>
-              navigate(`/accounting/journal-entries/${journalEntryId}`)
-            }
-            className="inline-flex items-center gap-1 text-xs text-sky-600 hover:underline dark:text-sky-400"
-            title="View journal entry"
-          >
-            <IconReceipt size={14} className="flex-shrink-0" />
-            <span className="font-mono">
-              {payment.journal_reference_no || `#${journalEntryId}`}
-            </span>
-          </button>
-        )}
-      </div>
+      <button
+        type="button"
+        onClick={() => navigate(`/accounting/journal-entries/${journalEntryId}`)}
+        className="inline-flex items-center gap-1 text-xs text-sky-600 hover:underline dark:text-sky-400"
+        title="View journal entry"
+      >
+        <IconReceipt size={14} className="flex-shrink-0" />
+        <span className="font-mono">
+          {payment.journal_reference_no || "View Journal"}
+        </span>
+      </button>
     );
   };
 
@@ -337,6 +320,23 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                     (payment: Payment): boolean =>
                       payment.status !== "cancelled"
                   ) ?? firstPayment;
+                const manageableGroupPayment: Payment | undefined =
+                  paymentGroup.find(
+                    (payment: Payment): boolean =>
+                      payment.status !== "cancelled" &&
+                      Boolean(payment.receipt_id)
+                  ) ??
+                  paymentGroup.find(
+                    (payment: Payment): boolean => Boolean(payment.receipt_id)
+                  );
+                const manageableReceiptId: number | null =
+                  manageableGroupPayment?.receipt_id ?? null;
+                const canManageGroup: boolean = Boolean(
+                  onViewPaymentGroup && manageableReceiptId !== null
+                );
+                const canAddToGroup: boolean = Boolean(
+                  onAddPaymentToGroup && groupTemplate.payment_reference
+                );
                 const totalAmount = paymentGroup.reduce(
                   (sum, p) => sum + (p.amount_paid || 0),
                   0
@@ -379,23 +379,41 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                           {formatCurrency(totalAmount)}
                         </td>
                         <td className="px-3 py-3 text-center">
-                          {onAddPaymentToGroup &&
-                          groupTemplate.payment_reference ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              color="sky"
-                              icon={IconPlus}
-                              onClick={() =>
-                                onAddPaymentToGroup(groupTemplate)
-                              }
-                              title={`Add another payment with reference ${groupTemplate.payment_reference}`}
-                            >
-                              Add Payment
-                            </Button>
-                          ) : (
-                            "-"
-                          )}
+                          <div className="flex flex-wrap justify-center gap-1.5">
+                            {canManageGroup &&
+                              onViewPaymentGroup &&
+                              manageableReceiptId !== null && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  color="default"
+                                  icon={IconSettings}
+                                  onClick={() =>
+                                    onViewPaymentGroup(manageableReceiptId)
+                                  }
+                                  title={`Manage payment group ${groupTemplate.payment_reference}`}
+                                >
+                                  Manage Group
+                                </Button>
+                              )}
+                            {canAddToGroup &&
+                              onAddPaymentToGroup &&
+                              groupTemplate.payment_reference && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  color="sky"
+                                  icon={IconPlus}
+                                  onClick={() =>
+                                    onAddPaymentToGroup(groupTemplate)
+                                  }
+                                  title={`Add another payment with reference ${groupTemplate.payment_reference}`}
+                                >
+                                  Add Payment
+                                </Button>
+                              )}
+                            {!canAddToGroup && !canManageGroup && "-"}
+                          </div>
                         </td>
                       </tr>
                       {paymentGroup.map((payment) => (
@@ -427,7 +445,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                             {getStatusBadge(payment.status)}
                           </td>
                           <td className="px-3 py-3">
-                            {renderReceiptJournalLinks(payment)}
+                            {renderJournalLink(payment)}
                           </td>
                           <td className="px-3 py-3 text-right font-medium text-green-600 dark:text-green-400">
                             {formatCurrency(payment.amount_paid)}
@@ -487,15 +505,32 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                 } else {
                   // Render single payment
                   const payment = paymentGroup[0];
+                  const paymentReceiptId: number | null =
+                    payment.receipt_id ?? null;
                   return (
                     <tr key={payment.payment_id}>
                       <td className="px-3 py-3 text-sm">
                         {formatDate(payment.payment_date)}
                       </td>
                       <td className="px-3 py-3 max-w-[150px]">
-                        <span className="font-mono text-sm text-gray-600 dark:text-gray-400 truncate block" title={payment.payment_reference || ''}>
-                          {payment.payment_reference || "-"}
-                        </span>
+                        {onViewPaymentGroup &&
+                        paymentReceiptId !== null &&
+                        payment.payment_reference ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onViewPaymentGroup(paymentReceiptId)
+                            }
+                            className="block max-w-full truncate font-mono text-sm text-sky-600 hover:underline dark:text-sky-400"
+                            title={`Manage payment group ${payment.payment_reference}`}
+                          >
+                            {payment.payment_reference}
+                          </button>
+                        ) : (
+                          <span className="font-mono text-sm text-gray-600 dark:text-gray-400 truncate block" title={payment.payment_reference || ''}>
+                            {payment.payment_reference || "-"}
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-3">
                         <button
@@ -522,7 +557,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                         {getStatusBadge(payment.status)}
                       </td>
                       <td className="px-3 py-3">
-                        {renderReceiptJournalLinks(payment)}
+                        {renderJournalLink(payment)}
                       </td>
                       <td className="px-3 py-3 text-right font-medium text-green-600 dark:text-green-400">
                         {formatCurrency(payment.amount_paid)}

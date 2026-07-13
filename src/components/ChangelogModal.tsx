@@ -20,13 +20,18 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-13",
+    ms: "Payment Management dan Payment History kini memaparkan serta mengurus bayaran mengikut kumpulan rujukan, tanpa menunjukkan nombor rekod dalaman. Semua invois dengan rujukan, tarikh, kaedah dan akaun bank yang sama ditunjukkan bersama, dan pembatalan atau pengesahan melibatkan seluruh kumpulan supaya baki invois kekal tepat.",
+    en: "Payment Management and Payment History now display and manage payments by reference group without showing internal record numbers. Every invoice with the same reference, date, method and bank account is shown together, and cancellation or confirmation applies to the full group so invoice balances remain correct.",
+  },
+  {
+    date: "2026-07-13",
     ms: "Perubahan pada cawangan pelanggan (menambah, membuang atau menukar cawangan utama) dan harga khas produk pelanggan kini dipaparkan serta-merta selepas disimpan. Sebelum ini, perubahan tersebut boleh mengambil masa sehingga sejam untuk muncul walaupun selepas halaman dimuat semula.",
     en: "Changes to customer branches (adding, removing, or changing the main branch) and customer product custom prices now appear immediately after saving. Previously, these changes could take up to an hour to show even after refreshing the page.",
   },
   {
     date: "2026-07-13",
-    ms: "Rujukan kumpulan bayaran kini boleh dibetulkan terus daripada butiran resit tanpa membatalkan dan merekodkan semula bayaran. Rujukan baharu dikemas kini pada semua bayaran dan catatan jurnal berkaitan dalam kumpulan yang sama, manakala nombor cek, amaun dan baki invois tidak berubah.",
-    en: "A payment group's reference can now be corrected directly from the receipt details without cancelling and recording the payments again. The new reference is updated across every related payment and journal entry in the same group, while cheque numbers, amounts and invoice balances remain unchanged.",
+    ms: "Rujukan kumpulan bayaran kini boleh dibetulkan terus daripada butiran kumpulan tanpa membatalkan dan merekodkan semula bayaran. Rujukan baharu dikemas kini pada semua bayaran dan catatan jurnal berkaitan dalam kumpulan yang sama, manakala nombor cek, amaun dan baki invois tidak berubah.",
+    en: "A payment group's reference can now be corrected directly from the group details without cancelling and recording the payments again. The new reference is updated across every related payment and journal entry in the same group, while cheque numbers, amounts and invoice balances remain unchanged.",
   },
   {
     date: "2026-07-13",
@@ -35,8 +40,8 @@ const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   },
   {
     date: "2026-07-13",
-    ms: "Bayaran yang merupakan sebahagian daripada resit berkumpulan kini menerangkan sebab ia tidak boleh dibatalkan secara berasingan pada Payment History dan Payment Management. Kedua-duanya menyediakan pautan untuk melihat resit penuh, semua invois berkaitan dan catatan jurnal selepas diposkan, serta membatalkan seluruh resit bersama-sama dengan pengesahan yang jelas.",
-    en: "Payments that belong to a grouped receipt now explain why they cannot be cancelled separately in both Payment History and Payment Management. Both provide links to the full receipt, every related invoice and its journal entry once posted, with a clear confirmation before the entire receipt is cancelled together.",
+    ms: "Bayaran yang menggunakan rujukan yang sama kini menerangkan sebab satu bayaran tidak boleh dibatalkan secara berasingan pada Payment History dan Payment Management. Kedua-duanya menyediakan pautan ke kumpulan bayaran, semua invois berkaitan dan catatan jurnal selepas diposkan, serta pengesahan yang jelas sebelum semua bayaran dalam kumpulan dibatalkan bersama.",
+    en: "Payments under the same reference now explain why one payment cannot be cancelled separately in both Payment History and Payment Management. Both provide links to the payment group, every related invoice and its journal entry once posted, with a clear confirmation before all payments in the group are cancelled together.",
   },
   {
     date: "2026-07-13",
