@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-14",
+    ms: "Halaman Stok Bahan kini mengingati bulan yang dipilih dan kedudukan skrol, jadi apabila anda keluar dan kembali ke halaman itu, ia akan berada di tempat yang sama seperti sebelumnya.",
+    en: "The Material Stock page now remembers the selected month and your scroll position, so when you leave and return to the page it stays where you left off.",
+  },
+  {
+    date: "2026-07-14",
     ms: "Catatan jurnal legasi Januari hingga Mei kini memaparkan nombor rujukan asal, jenis dokumen yang sepadan dan keterangan berdasarkan particulars asal dalam senarai, butiran serta cetakan baucar. Nombor import dalaman tidak lagi dipaparkan, manakala tanda Legacy dan rekod sumber dikekalkan untuk jejak audit.",
     en: "January to May legacy journals now show their original reference numbers, matching document types, and descriptions based on the original particulars in journal lists, details, and voucher prints. Internal import numbers are no longer displayed, while a Legacy marker and source trace remain for auditability.",
   },
