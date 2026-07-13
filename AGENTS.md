@@ -69,7 +69,7 @@ This is a comprehensive ERP system supporting three companies:
 - Maintenance mode support for database operations
 - Environment variables for database configuration
 
-#### Database Schema (84 tables)
+#### Database Schema (85 tables)
 
 **Accounting & Finance:**
 
@@ -132,6 +132,7 @@ This is a comprehensive ERP system supporting three companies:
 - `materials` - id, code (unique), name, category (ingredient/raw_material/packing_material), default_unit_cost, applies_to (mee/bihun/both), sort_order, is_active, created_at, updated_at, created_by
 - `material_variants` - id, material_id (FK), variant_name, default_unit_cost, sort_order, is_active, created_at, updated_at (unique: material_id, variant_name). For materials with multiple suppliers/types like "Beras 50KG" having Vietnam Coklat, Vietnam Hijau, etc.
 - `material_stock_entries` - id, year, month, material_id, product_line (mee/bihun/shared), variant_id (nullable FK to material_variants), custom_name, custom_description, adjustment_quantity (manual plus/minus stock adjustment), unit_cost, adjustment_value (adjustment_quantity \* unit_cost), notes, created_at, updated_at, created_by (unique: year, month, material_id, product_line, COALESCE(variant_id::text, custom_description, 'default')). Closing stock is derived from cumulative opening + purchase_invoice_lines for the bucket + adjustment_quantity.
+- `material_stock_kilang_entries` - id, year, month, product_line (mee/bihun), product_id (FK products), quantity, unit_cost, stock_value (quantity \* unit_cost), created_at, updated_at, created_by, updated_by (unique: year, month, product_line, product_id). Monthly finished-goods costing records entered only in the Material Stock page; isolated from production, sales, stock openings and operational `stock_adjustments`. The saved unit cost is a historical snapshot, so later product-price changes do not alter saved months.
 
 **Staff & Employees:**
 
