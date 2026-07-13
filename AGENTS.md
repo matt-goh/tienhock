@@ -58,8 +58,9 @@ This is a comprehensive ERP system supporting three companies:
 
 - `tienhock.com` and `greentarget.tienhock.com` are served by the same Cloudflare Pages project.
 - API traffic follows: browser -> `api.tienhock.com` -> Cloudflare Tunnel (`tienhock-hetzner`) -> `http://localhost:80` -> system Nginx on the Hetzner server -> the Node/Express server managed by PM2.
-- `.github/workflows/deploy.yml` deploys the `production` branch by pulling the repository, building the frontend, and restarting `tienhock-server` with PM2. It does not run Docker Compose or install/reload Nginx configuration.
-- The live production Nginx configuration is under `/etc/nginx` on the Hetzner server. `prod/nginx/nginx.conf` is for the separate Docker topology and proxies to the Docker hostname `prod_server:5000`; changing that repository file alone does not change the live system Nginx configuration.
+- `.github/workflows/deploy.yml` deploys the `production` branch by pulling the repository, installing the tracked system-Nginx site through `sudo -n /usr/local/sbin/deploy-tienhock-nginx`, building the frontend, and restarting `tienhock-server` with PM2. It does not run Docker Compose.
+- `prod/nginx/tienhock-api.conf` is the source of truth for the live system Nginx site installed at `/etc/nginx/sites-available/tienhock-api`. The root-owned helper validates with `nginx -t`, reloads Nginx, and rolls back on failure. Its one-time server setup and restricted sudoers rule are documented in `prod/server/README.md`.
+- `prod/nginx/nginx.conf` is only for the separate Docker Compose topology and proxies to the Docker hostname `prod_server:5000`; it is not the live Hetzner configuration.
 - In production, Express disables its own CORS headers and system Nginx owns CORS. Any new production frontend origin must be added to the live Nginx allowlist, and Nginx must be validated and reloaded. Keep `PATCH` in `Access-Control-Allow-Methods` for APIs that use it.
 
 ### Database

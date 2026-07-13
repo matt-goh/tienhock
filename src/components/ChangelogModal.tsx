@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-07-13",
+    ms: "Borang pendaftaran pelanggan Green Target kini boleh dihantar dengan betul dari greentarget.tienhock.com tanpa disekat oleh sambungan pelayan.",
+    en: "The Green Target customer registration form can now be submitted correctly from greentarget.tienhock.com without being blocked by the server connection.",
+  },
+  {
     date: "2026-07-12",
     ms: "Borang pendaftaran pelanggan Green Target dalam talian telah ditambah — pelanggan baharu boleh mengisi nama/syarikat, no. IC/syarikat, no. telefon, alamat dan kaedah pembayaran (Tunai, Online Transfer atau QR) terus dari telefon mereka, dengan pilihan bahasa BM, Inggeris dan Cina serta kod QR DuitNow yang boleh dimuat turun. Setiap penghantaran masuk ke halaman baharu 'Signup Requests' di bawah Customers Green Target, di mana staf boleh menyemak dan mencipta pelanggan dengan satu klik.",
     en: "A new online Green Target customer registration form has been added — new customers can fill in their name/company, IC/company no., phone, address and payment method (Cash, Online Transfer or QR) straight from their phone, with a Malay/English/Chinese language switch and a downloadable DuitNow QR code. Each submission lands in a new 'Signup Requests' page under Green Target Customers, where staff can review it and create the customer with one click.",
