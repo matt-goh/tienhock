@@ -7,3 +7,4 @@
 *.jsx text eol=lf
 *.json text eol=lf
 *.yml text eol=lf
+prod/server/deploy-tienhock-nginx text eol=lf

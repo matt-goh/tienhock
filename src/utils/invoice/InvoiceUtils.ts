@@ -5,9 +5,24 @@ import {
   InvoiceFilters,
   ProductItem,
   Payment,
+  PaymentCancellationErrorData,
 } from "../../types/types";
 import { api } from "../../routes/utils/api"; // Adjust path as needed
 import { refreshCreditsCache } from "../../utils/catalogue/useCustomerCache";
+
+export const getPaymentBankAccountLabel = (
+  bankAccount: Payment["bank_account"] | undefined
+): string => {
+  if (bankAccount === "BANK_ABB") {
+    return "Alliance Bank";
+  }
+
+  if (bankAccount === "CASH") {
+    return "Cash";
+  }
+
+  return "Public Bank";
+};
 
 // Helper to ensure products have UIDs for frontend state
 const ensureProductsHaveUid = (products: any[]): ProductItem[] => {
@@ -363,9 +378,10 @@ export const confirmPayment = async (
   bank_account?: string
 ): Promise<Payment[]> => {
   try {
-    const response = await api.put(`/api/payments/${paymentId}/confirm`, {
-      bank_account,
-    });
+    const response: { message: string; payments: Payment[] } = await api.put<{
+      message: string;
+      payments: Payment[];
+    }>(`/api/payments/${paymentId}/confirm`, { bank_account });
     // The backend now returns { message: string, payments: Payment[] }
     if (!response || !response.payments || !Array.isArray(response.payments)) {
       throw new Error("Invalid response received after confirming payment(s).");
@@ -375,10 +391,9 @@ export const confirmPayment = async (
     // The calling component will handle the success toast.
 
     return response.payments;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(`Error confirming payment ${paymentId}:`, error);
     const errorMessage =
-      error.response?.data?.message ||
       (error instanceof Error ? error.message : "Failed to confirm payment(s)");
     toast.error(errorMessage);
     throw new Error(errorMessage);
@@ -409,10 +424,57 @@ export const getPaymentsForInvoice = async (
   }
 };
 
+export const getGroupedReceiptCancellationError = (
+  payment: Payment
+): PaymentCancellationErrorData | null => {
+  if (
+    !payment.receipt_id ||
+    !payment.allocation_count ||
+    payment.allocation_count <= 1
+  ) {
+    return null;
+  }
+
+  return {
+    code: "GROUPED_RECEIPT_CANCELLATION_REQUIRED",
+    message: "This payment cannot be cancelled by itself.",
+    detail: `It is part of payment group ${
+      payment.receipt_reference || payment.payment_reference || "with the same reference"
+    }, which covers ${payment.allocation_count} payments. Open the group to review every invoice and cancel all its payments together.`,
+    receipt_id: payment.receipt_id,
+    allocation_count: payment.allocation_count,
+    receipt_status: payment.receipt_status,
+    receipt_reference: payment.receipt_reference,
+    receipt_journal_id:
+      payment.voucher_journal_id ?? payment.journal_entry_id ?? null,
+    receipt_journal_reference_no: payment.journal_reference_no ?? null,
+  };
+};
+
+export const getPaymentCancellationErrorData = (
+  error: unknown
+): PaymentCancellationErrorData => {
+  const cancellationError = error as Error & {
+    data?: PaymentCancellationErrorData;
+  };
+  const errorData = cancellationError.data;
+
+  return {
+    ...errorData,
+    message: errorData?.message || "This payment could not be cancelled.",
+    detail:
+      errorData?.detail ||
+      (error instanceof Error
+        ? error.message
+        : "Please review the payment and try again."),
+  };
+};
+
 // CANCEL Payment
 export const cancelPayment = async (
   paymentId: number,
-  reason?: string
+  reason?: string,
+  options: { showErrorToast?: boolean } = {}
 ): Promise<Payment> => {
   try {
     const response = await api.put(`/api/payments/${paymentId}/cancel`, {
@@ -423,13 +485,32 @@ export const cancelPayment = async (
     }
     await refreshCreditsCache(); // Refresh customer cache
     return response.payment;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(`Error cancelling payment ${paymentId}:`, error);
+    const requestError = error as Error & {
+      data?: Partial<PaymentCancellationErrorData> & { error?: string };
+    };
+    const errorData = requestError.data;
     const errorMessage =
-      error.response?.data?.message ||
+      errorData?.detail ||
+      errorData?.error ||
+      errorData?.message ||
       (error instanceof Error ? error.message : "Failed to cancel payment");
-    toast.error(errorMessage);
-    throw new Error(errorMessage);
+
+    if (options.showErrorToast !== false) {
+      toast.error(errorMessage);
+    }
+
+    const cancellationError = new Error(errorMessage) as Error & {
+      data?: PaymentCancellationErrorData;
+    };
+    if (errorData?.message) {
+      cancellationError.data = {
+        ...errorData,
+        message: errorData.message,
+      } as PaymentCancellationErrorData;
+    }
+    throw cancellationError;
   }
 };
 

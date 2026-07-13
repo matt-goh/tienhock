@@ -11,3 +11,7 @@
 .env
 dev/docker-compose.yml
 prod/docker-compose.yml
+
+# private legacy accounting imports and generated preflight artifacts
+dev/import/legacy-jan-may/data/*.csv
+dev/import/legacy-jan-may/generated/

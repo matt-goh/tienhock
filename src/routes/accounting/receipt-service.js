@@ -26,6 +26,7 @@
 import { generateReceiptReference } from "./payment-journal.js";
 import { determineBankAccount } from "../../utils/payment-helpers.js";
 import { getCustomerDebtorAccountCode } from "./debtorSync.js";
+import { assertTienHockAccountingDateUnlocked } from "./posting-lock.js";
 
 const round2 = (v) => Math.round(parseFloat(v || 0) * 100) / 100;
 
@@ -42,6 +43,26 @@ export function toLocalDateString(value) {
     throw new Error(`Invalid date: ${value}`);
   }
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * Guard both the receipt date and its accounting posting date when present.
+ *
+ * @param {object} receipt
+ * @param {string} operation
+ * @returns {void}
+ */
+function assertReceiptDatesUnlocked(receipt, operation) {
+  assertTienHockAccountingDateUnlocked(
+    receipt.received_date,
+    `${operation} (receipt date)`
+  );
+  if (receipt.posting_date) {
+    assertTienHockAccountingDateUnlocked(
+      receipt.posting_date,
+      `${operation} (posting date)`
+    );
+  }
 }
 
 async function ensureAccountsExist(client, codes) {
@@ -161,6 +182,7 @@ async function lockInvoices(client, allocs) {
  * credit effects. Assumes invoices are already locked and validated.
  */
 async function postReceiptJournal(client, receipt, allocs, invoiceMap, userId) {
+  assertReceiptDatesUnlocked(receipt, `Receipt ${receipt.id}`);
   const isCash = receipt.payment_method === "cash";
   const debitAccount = receipt.debit_account;
   const total = round2(allocs.reduce((s, a) => s + a.amount, 0));
@@ -287,6 +309,11 @@ export async function createReceipt(client, payload, userId) {
   const isPending = method === "cheque" && payload.post_immediately !== true;
   const debitAccount = method === "cash" ? "CH_REV2" : determineBankAccount(method, payload.bank_account);
 
+  assertTienHockAccountingDateUnlocked(receivedDate, "Receipt (receipt date)");
+  if (!isPending) {
+    assertTienHockAccountingDateUnlocked(postingDate, "Receipt (posting date)");
+  }
+
   // Fill customer ids for invoice allocations + description default.
   const preMap = {};
   const ids = [...new Set(allocs.filter((a) => a.type === "invoice").map((a) => a.invoice_id))];
@@ -389,6 +416,425 @@ export async function createReceipt(client, payload, userId) {
 }
 
 /**
+ * Updates a receipt reference group without changing its accounting. Receipts
+ * sharing the current reference/date/method/account are renamed together so a
+ * visible Payment Management group never splits. Receipt rows, payment-history
+ * projections, and posted journal headers stay in sync in one transaction.
+ * Cash and imported opening receipts keep their fixed historical semantics.
+ */
+export async function updateReceiptReference(
+  client,
+  receiptId,
+  expectedReference,
+  reference,
+  userId
+) {
+  const nextReference = String(reference || "").trim();
+  if (!nextReference) {
+    throw new Error("Payment reference is required");
+  }
+  if (nextReference.length > 100) {
+    throw new Error("Payment reference must be 100 characters or fewer");
+  }
+
+  const receiptResult = await client.query(`SELECT * FROM receipts WHERE id = $1`, [
+    receiptId,
+  ]);
+  if (receiptResult.rows.length === 0) {
+    const error = new Error("Payment group not found");
+    error.status = 404;
+    throw error;
+  }
+
+  const receipt = receiptResult.rows[0];
+  assertReceiptDatesUnlocked(receipt, `Payment group ${receiptId}`);
+  if (receipt.status === "cancelled") {
+    throw new Error("This payment group is cancelled and cannot be changed");
+  }
+  if (receipt.origin !== "erp") {
+    throw new Error("Imported opening payment groups cannot be changed");
+  }
+  if (receipt.payment_method === "cash") {
+    throw new Error(
+      "Cash payment references are invoice-specific and cannot be changed"
+    );
+  }
+
+  const normalizedExpectedReference =
+    expectedReference === null || expectedReference === undefined
+      ? null
+      : String(expectedReference).trim();
+  if (receipt.display_reference !== normalizedExpectedReference) {
+    const error = new Error(
+      "This payment group reference changed after you opened it. Reload and try again."
+    );
+    error.status = 409;
+    error.code = "RECEIPT_REFERENCE_CHANGED";
+    throw error;
+  }
+
+  const groupResult = await client.query(
+    `SELECT id, journal_entry_id, received_date, posting_date
+       FROM receipts
+      WHERE display_reference IS NOT DISTINCT FROM $1
+        AND received_date = $2
+        AND payment_method = $3
+        AND debit_account = $4
+        AND origin = 'erp'
+        AND status IN ('pending', 'posted')
+      ORDER BY id
+      FOR UPDATE`,
+    [
+      receipt.display_reference,
+      receipt.received_date,
+      receipt.payment_method,
+      receipt.debit_account,
+    ]
+  );
+  const receiptIds = groupResult.rows.map((row) => row.id);
+  if (!receiptIds.includes(receiptId)) {
+    const error = new Error(
+      "This payment group reference changed after you opened it. Reload and try again."
+    );
+    error.status = 409;
+    error.code = "RECEIPT_REFERENCE_CHANGED";
+    throw error;
+  }
+  for (const groupReceipt of groupResult.rows) {
+    assertReceiptDatesUnlocked(
+      groupReceipt,
+      `Payment group ${receipt.display_reference || receiptId}`
+    );
+  }
+
+  if (receipt.display_reference === nextReference) {
+    return {
+      receipt,
+      receipt_ids: receiptIds,
+      updated_receipt_count: 0,
+      updated_payment_count: 0,
+    };
+  }
+
+  await client.query(
+    `UPDATE receipts
+        SET display_reference = $2, updated_at = NOW(), updated_by = $3
+      WHERE id = ANY($1::int[])`,
+    [receiptIds, nextReference, userId || null]
+  );
+
+  const paymentUpdate = await client.query(
+    `UPDATE payments p
+        SET payment_reference = $2
+       FROM receipt_allocations ra
+      WHERE p.receipt_allocation_id = ra.id
+        AND ra.receipt_id = ANY($1::int[])`,
+    [receiptIds, nextReference]
+  );
+
+  const journalEntryIds = groupResult.rows
+    .map((row) => row.journal_entry_id)
+    .filter((journalEntryId) => journalEntryId !== null);
+  if (journalEntryIds.length > 0) {
+    await client.query(
+      `UPDATE journal_entries
+          SET display_reference = $2, updated_at = NOW(), updated_by = $3
+        WHERE id = ANY($1::int[])`,
+      [journalEntryIds, nextReference, userId || null]
+    );
+  }
+
+  const fresh = await client.query(`SELECT * FROM receipts WHERE id = $1`, [
+    receiptId,
+  ]);
+  return {
+    receipt: fresh.rows[0],
+    receipt_ids: receiptIds,
+    updated_receipt_count: receiptIds.length,
+    updated_payment_count: paymentUpdate.rowCount,
+  };
+}
+
+/**
+ * Loads the user-visible payment group that contains a receipt. Live groups
+ * include pending and posted members; a cancelled anchor loads the matching
+ * cancelled history instead.
+ */
+export async function getReceiptGroup(client, receiptId) {
+  const anchorResult = await client.query(
+    `SELECT * FROM receipts WHERE id = $1`,
+    [receiptId]
+  );
+  if (anchorResult.rows.length === 0) {
+    const error = new Error("Payment group not found");
+    error.status = 404;
+    throw error;
+  }
+
+  const anchor = anchorResult.rows[0];
+  const groupStatuses =
+    anchor.status === "cancelled" ? ["cancelled"] : ["pending", "posted"];
+  const receiptResult = await client.query(
+    `SELECT r.*, je.reference_no AS journal_reference_no
+       FROM receipts r
+       LEFT JOIN journal_entries je ON je.id = r.journal_entry_id
+      WHERE r.display_reference IS NOT DISTINCT FROM $1
+        AND r.received_date = $2
+        AND r.payment_method = $3
+        AND r.debit_account = $4
+        AND r.origin = $5
+        AND r.status = ANY($6::varchar[])
+      ORDER BY r.id`,
+    [
+      anchor.display_reference,
+      anchor.received_date,
+      anchor.payment_method,
+      anchor.debit_account,
+      anchor.origin,
+      groupStatuses,
+    ]
+  );
+  const receiptIds = receiptResult.rows.map((receipt) => receipt.id);
+  if (receiptIds.length === 0) {
+    const error = new Error("Payment group not found");
+    error.status = 404;
+    throw error;
+  }
+
+  const allocationResult = await client.query(
+    `SELECT ra.id, ra.line_number, ra.allocation_type, ra.invoice_id,
+            ra.customer_id, ra.target_account, ra.external_reference,
+            ra.amount, ra.applied_amount, ra.refunded_amount
+       FROM receipt_allocations ra
+      WHERE ra.receipt_id = ANY($1::int[])
+      ORDER BY ra.receipt_id, ra.line_number`,
+    [receiptIds]
+  );
+  const statuses = [
+    ...new Set(receiptResult.rows.map((receipt) => receipt.status)),
+  ];
+  const chequeReferences = [
+    ...new Set(
+      receiptResult.rows
+        .map((receipt) => receipt.cheque_reference)
+        .filter((reference) => Boolean(reference))
+    ),
+  ];
+  const cancellationReasons = [
+    ...new Set(
+      receiptResult.rows
+        .map((receipt) => receipt.cancellation_reason)
+        .filter((reason) => Boolean(reason))
+    ),
+  ];
+
+  return {
+    display_reference: anchor.display_reference,
+    payment_method: anchor.payment_method,
+    debit_account: anchor.debit_account,
+    received_date: anchor.received_date,
+    status: statuses.length === 1 ? statuses[0] : "mixed",
+    origin: anchor.origin,
+    total_amount: round2(
+      receiptResult.rows.reduce(
+        (total, receipt) => total + parseFloat(receipt.total_amount || 0),
+        0
+      )
+    ),
+    cheque_references: chequeReferences,
+    cancellation_reasons: cancellationReasons,
+    journals: receiptResult.rows
+      .filter((receipt) => receipt.journal_entry_id !== null)
+      .map((receipt) => ({
+        id: receipt.journal_entry_id,
+        reference_no: receipt.journal_reference_no,
+      })),
+    allocations: allocationResult.rows,
+  };
+}
+
+/**
+ * Confirms every pending receipt behind one visible payment group atomically.
+ * Posted members are left unchanged so partly confirmed groups can safely
+ * finish the remaining payments in one action.
+ */
+export async function confirmReceiptGroup(
+  client,
+  receiptId,
+  options,
+  userId
+) {
+  const anchorResult = await client.query(
+    `SELECT * FROM receipts WHERE id = $1`,
+    [receiptId]
+  );
+  if (anchorResult.rows.length === 0) {
+    const error = new Error("Payment group not found");
+    error.status = 404;
+    throw error;
+  }
+
+  const anchor = anchorResult.rows[0];
+  assertReceiptDatesUnlocked(anchor, `Payment group ${receiptId}`);
+  const groupLabel = anchor.display_reference || "this payment";
+  if (anchor.status === "cancelled") {
+    throw new Error(`Payment group ${groupLabel} is cancelled and cannot be confirmed`);
+  }
+  if (anchor.origin !== "erp") {
+    throw new Error("Imported opening payment groups cannot be confirmed");
+  }
+
+  const groupResult = await client.query(
+    `SELECT id, status
+       FROM receipts
+      WHERE display_reference IS NOT DISTINCT FROM $1
+        AND received_date = $2
+        AND payment_method = $3
+        AND debit_account = $4
+        AND origin = 'erp'
+        AND status IN ('pending', 'posted')
+      ORDER BY id
+      FOR UPDATE`,
+    [
+      anchor.display_reference,
+      anchor.received_date,
+      anchor.payment_method,
+      anchor.debit_account,
+    ]
+  );
+  const receiptIds = groupResult.rows.map((receipt) => receipt.id);
+  if (!receiptIds.includes(receiptId)) {
+    const error = new Error(
+      "This payment group changed after you opened it. Reload and try again."
+    );
+    error.status = 409;
+    throw error;
+  }
+
+  const pendingReceiptIds = groupResult.rows
+    .filter((receipt) => receipt.status === "pending")
+    .map((receipt) => receipt.id);
+  if (pendingReceiptIds.length === 0) {
+    throw new Error(`Payment group ${groupLabel} has already been confirmed`);
+  }
+
+  const pendingPaymentResult = await client.query(
+    `SELECT COUNT(*)::integer AS count
+       FROM payments p
+       JOIN receipt_allocations ra ON ra.id = p.receipt_allocation_id
+      WHERE ra.receipt_id = ANY($1::int[])
+        AND p.status = 'pending'`,
+    [pendingReceiptIds]
+  );
+
+  for (const pendingReceiptId of pendingReceiptIds) {
+    await confirmReceipt(client, pendingReceiptId, options || {}, userId);
+  }
+
+  return {
+    confirmed_receipt_count: pendingReceiptIds.length,
+    confirmed_payment_count: pendingPaymentResult.rows[0]?.count || 0,
+    payment_group: await getReceiptGroup(client, receiptId),
+  };
+}
+
+/**
+ * Cancels every live receipt behind one visible payment group atomically.
+ */
+export async function cancelReceiptGroup(client, receiptId, reason, userId) {
+  const anchorResult = await client.query(
+    `SELECT * FROM receipts WHERE id = $1`,
+    [receiptId]
+  );
+  if (anchorResult.rows.length === 0) {
+    const error = new Error("Payment group not found");
+    error.status = 404;
+    throw error;
+  }
+
+  const anchor = anchorResult.rows[0];
+  assertReceiptDatesUnlocked(anchor, `Payment group ${receiptId}`);
+  const groupLabel = anchor.display_reference || "this payment";
+  if (anchor.status === "cancelled") {
+    throw new Error(`Payment group ${groupLabel} is already cancelled`);
+  }
+  if (anchor.origin !== "erp") {
+    throw new Error("Imported opening payment groups cannot be cancelled");
+  }
+
+  const groupResult = await client.query(
+    `SELECT id
+       FROM receipts
+      WHERE display_reference IS NOT DISTINCT FROM $1
+        AND received_date = $2
+        AND payment_method = $3
+        AND debit_account = $4
+        AND origin = 'erp'
+        AND status IN ('pending', 'posted')
+      ORDER BY id
+      FOR UPDATE`,
+    [
+      anchor.display_reference,
+      anchor.received_date,
+      anchor.payment_method,
+      anchor.debit_account,
+    ]
+  );
+  const receiptIds = groupResult.rows.map((receipt) => receipt.id);
+  if (!receiptIds.includes(receiptId)) {
+    const error = new Error(
+      "This payment group changed after you opened it. Reload and try again."
+    );
+    error.status = 409;
+    throw error;
+  }
+
+  const bankInCheck = await client.query(
+    `SELECT 1
+       FROM bank_in_allocations bia
+       JOIN bank_in_groups big ON big.id = bia.group_id
+       JOIN bank_ins bi ON bi.id = big.bank_in_id
+      WHERE bia.receipt_id = ANY($1::int[]) AND bi.status = 'posted'
+      LIMIT 1`,
+    [receiptIds]
+  );
+  if (bankInCheck.rows.length > 0) {
+    throw new Error(
+      `Payment group ${groupLabel} has already been included in a bank-in. Reverse that bank-in first.`
+    );
+  }
+
+  const adjustmentCheck = await client.query(
+    `SELECT ad.id, ad.original_invoice_id
+       FROM adjustment_documents ad
+      WHERE ad.original_invoice_id IN (
+              SELECT invoice_id
+                FROM receipt_allocations
+               WHERE receipt_id = ANY($1::int[]) AND invoice_id IS NOT NULL)
+        AND ad.status = 'active'
+        AND COALESCE(ad.is_consolidated, false) = false
+      LIMIT 1`,
+    [receiptIds]
+  );
+  if (adjustmentCheck.rows.length > 0) {
+    throw new Error(
+      `Payment group ${groupLabel} includes invoice ${adjustmentCheck.rows[0].original_invoice_id}, which has active adjustment document ${adjustmentCheck.rows[0].id}. Cancel the adjustment document first.`
+    );
+  }
+
+  const cancellationReason =
+    reason || `Payment group ${groupLabel} cancelled`;
+  for (const memberReceiptId of receiptIds) {
+    await cancelReceipt(client, memberReceiptId, cancellationReason, userId);
+  }
+
+  return {
+    display_reference: anchor.display_reference,
+    status: "cancelled",
+  };
+}
+
+/**
  * Confirms a pending (cheque) receipt: posts the journal on the clearance date
  * and applies balances. Re-validates allocations against CURRENT balances.
  */
@@ -397,10 +843,11 @@ export async function confirmReceipt(client, receiptId, options, userId) {
     `SELECT * FROM receipts WHERE id = $1 FOR UPDATE`,
     [receiptId]
   );
-  if (receiptResult.rows.length === 0) throw new Error(`Receipt ${receiptId} not found`);
+  if (receiptResult.rows.length === 0) throw new Error("Payment group not found");
   const receipt = receiptResult.rows[0];
+  assertReceiptDatesUnlocked(receipt, `Receipt ${receiptId}`);
   if (receipt.status !== "pending") {
-    throw new Error(`Receipt ${receiptId} is ${receipt.status}, not pending`);
+    throw new Error(`This payment is ${receipt.status}, not pending`);
   }
 
   const allocResult = await client.query(
@@ -420,6 +867,7 @@ export async function confirmReceipt(client, receiptId, options, userId) {
   receipt.posting_date = toLocalDateString(
     (options && options.posting_date) || new Date()
   );
+  assertReceiptDatesUnlocked(receipt, `Receipt ${receiptId}`);
   if (options && options.cheque_reference) {
     await client.query(`UPDATE receipts SET cheque_reference = $1 WHERE id = $2`, [
       options.cheque_reference,
@@ -454,10 +902,11 @@ export async function cancelReceipt(client, receiptId, reason, userId) {
     `SELECT * FROM receipts WHERE id = $1 FOR UPDATE`,
     [receiptId]
   );
-  if (receiptResult.rows.length === 0) throw new Error(`Receipt ${receiptId} not found`);
+  if (receiptResult.rows.length === 0) throw new Error("Payment group not found");
   const receipt = receiptResult.rows[0];
+  assertReceiptDatesUnlocked(receipt, `Receipt ${receiptId}`);
   if (receipt.status === "cancelled") {
-    throw new Error(`Receipt ${receiptId} is already cancelled`);
+    throw new Error("This payment is already cancelled");
   }
 
   const bankInCheck = await client.query(
@@ -471,7 +920,7 @@ export async function cancelReceipt(client, receiptId, reason, userId) {
   );
   if (bankInCheck.rows.length > 0) {
     throw new Error(
-      `Receipt ${receiptId} has been banked in (bank-in #${bankInCheck.rows[0].id}). Reverse that bank-in first.`
+      `This payment has been included in bank-in #${bankInCheck.rows[0].id}. Reverse that bank-in first.`
     );
   }
 
@@ -488,7 +937,7 @@ export async function cancelReceipt(client, receiptId, reason, userId) {
   );
   if (adjCheck.rows.length > 0) {
     throw new Error(
-      `Cannot cancel receipt ${receiptId}: active adjustment document ${adjCheck.rows[0].id} references invoice ${adjCheck.rows[0].original_invoice_id}. Cancel the adjustment document first.`
+      `Cannot cancel this payment: active adjustment document ${adjCheck.rows[0].id} references invoice ${adjCheck.rows[0].original_invoice_id}. Cancel the adjustment document first.`
     );
   }
 
@@ -545,7 +994,7 @@ export async function cancelReceipt(client, receiptId, reason, userId) {
         SET status = 'cancelled', cancellation_date = NOW(), cancellation_reason = $2
       WHERE receipt_allocation_id IN (SELECT id FROM receipt_allocations WHERE receipt_id = $1)
         AND status <> 'cancelled'`,
-    [receiptId, reason || `Receipt ${receiptId} cancelled`]
+    [receiptId, reason || "Payment cancelled"]
   );
 
   await client.query(

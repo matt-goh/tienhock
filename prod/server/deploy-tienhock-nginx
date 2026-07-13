@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly PATH="/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH
+
+readonly SOURCE_CONFIG="/home/tienhock/tienhock-app/prod/nginx/tienhock-api.conf"
+readonly TARGET_CONFIG="/etc/nginx/sites-available/tienhock-api"
+readonly ENABLED_CONFIG="/etc/nginx/sites-enabled/tienhock-api"
+readonly NGINX_BIN="/usr/sbin/nginx"
+readonly SYSTEMCTL_BIN="/usr/bin/systemctl"
+
+if [[ "$(id -u)" -ne 0 ]]; then
+    echo "deploy-tienhock-nginx must run as root" >&2
+    exit 1
+fi
+
+if [[ ! -f "$SOURCE_CONFIG" ]]; then
+    echo "Source Nginx configuration not found: $SOURCE_CONFIG" >&2
+    exit 1
+fi
+
+if [[ ! -f "$TARGET_CONFIG" ]]; then
+    echo "Live Nginx configuration not found: $TARGET_CONFIG" >&2
+    exit 1
+fi
+
+if [[ ! -L "$ENABLED_CONFIG" ]]; then
+    echo "Expected an enabled-site symlink at: $ENABLED_CONFIG" >&2
+    exit 1
+fi
+
+if [[ "$(readlink -f "$ENABLED_CONFIG")" != "$TARGET_CONFIG" ]]; then
+    echo "$ENABLED_CONFIG does not point to $TARGET_CONFIG" >&2
+    exit 1
+fi
+
+backup_config="$(mktemp "${TARGET_CONFIG}.rollback.XXXXXX")"
+cp --preserve=mode,ownership "$TARGET_CONFIG" "$backup_config"
+
+cleanup() {
+    rm -f "$backup_config"
+}
+trap cleanup EXIT
+
+restore_previous_config() {
+    echo "Restoring the previous Nginx configuration" >&2
+    install -o root -g root -m 0644 "$backup_config" "$TARGET_CONFIG"
+
+    if "$NGINX_BIN" -t; then
+        "$SYSTEMCTL_BIN" reload nginx || true
+    fi
+}
+
+if ! install -o root -g root -m 0644 "$SOURCE_CONFIG" "$TARGET_CONFIG"; then
+    restore_previous_config
+    exit 1
+fi
+
+if ! "$NGINX_BIN" -t; then
+    restore_previous_config
+    exit 1
+fi
+
+if ! "$SYSTEMCTL_BIN" reload nginx; then
+    restore_previous_config
+    exit 1
+fi
+
+echo "Installed and reloaded $TARGET_CONFIG"

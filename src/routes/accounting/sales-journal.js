@@ -27,6 +27,7 @@
 // customer's Account Ledger shows the invoice and its immediate settlement.
 
 import { getCustomerDebtorAccountCode } from "./debtorSync.js";
+import { assertTienHockAccountingDateUnlocked } from "./posting-lock.js";
 
 /**
  * Convert a unix-ms timestamp (invoices.createddate) to a local yyyy-MM-dd date string.
@@ -93,6 +94,12 @@ export async function syncSalesJournalEntry(client, invoice, createdBy = null) {
     return null;
   }
 
+  const entryDate = invoiceLocalDateString(inv.createddate);
+  assertTienHockAccountingDateUnlocked(
+    entryDate,
+    `Sales invoice ${inv.id}`
+  );
+
   let journalEntryId = dbResult.rows[0].journal_entry_id || null;
 
   // Adopt a pre-column legacy journal that shares the invoice reference.
@@ -117,7 +124,6 @@ export async function syncSalesJournalEntry(client, invoice, createdBy = null) {
 
   const amount = round2(inv.totalamountpayable);
   const isCash = inv.paymenttype === "CASH";
-  const entryDate = invoiceLocalDateString(inv.createddate);
   const customerId = inv.customerid ? String(inv.customerid) : "";
   const description =
     inv.accounting_description ||
@@ -351,6 +357,21 @@ export async function cancelSalesJournalEntry(client, journalEntryId) {
   if (!journalEntryId) {
     return false;
   }
+
+  const entryResult = await client.query(
+    `SELECT entry_date, reference_no
+       FROM journal_entries
+      WHERE id = $1 AND entry_type = 'S' AND status = 'posted'
+      FOR UPDATE`,
+    [journalEntryId]
+  );
+  if (entryResult.rows.length === 0) {
+    return false;
+  }
+  assertTienHockAccountingDateUnlocked(
+    entryResult.rows[0].entry_date,
+    `Sales invoice ${entryResult.rows[0].reference_no}`
+  );
 
   const result = await client.query(
     `UPDATE journal_entries

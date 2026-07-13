@@ -158,6 +158,7 @@ const styles = StyleSheet.create({
   // EPF/SOCSO/SIP columns: padding 1 horizontal (matching px-1 py-2 scaled down)
   colBil: { width: "2.5%", textAlign: "center", paddingVertical: 1, paddingHorizontal: 1, borderRightWidth: 0.5, borderRightColor: colors.border },
   colName: { width: "13.5%", textAlign: "left", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
+  colLeading: { width: "16%", textAlign: "left", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
   // Breakdown view leading columns (BIL + MONTH + NAMA = same 16% as BIL + NAMA above)
   colMonthB: { width: "4%", textAlign: "center", paddingVertical: 1, paddingHorizontal: 1, borderRightWidth: 0.5, borderRightColor: colors.border },
   colNameB: { width: "9.5%", textAlign: "left", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
@@ -338,6 +339,8 @@ export interface SalaryReportPDFProps {
   fileNameSuffix?: string;
   // Optional company header (default Tien Hock); Green Target passes its own.
   companyName?: string;
+  // Hide internal location codes when the friendly label already identifies the group.
+  showLocationCodes?: boolean;
 }
 
 // Helper functions
@@ -431,7 +434,13 @@ const TableHeader: React.FC<{
   isLocationReport?: boolean;
   nameLabel?: string;
   repeat?: boolean;
-}> = ({ isLocationReport = false, nameLabel, repeat = true }) => {
+  spanLeadingColumns?: boolean;
+}> = ({
+  isLocationReport = false,
+  nameLabel,
+  repeat = true,
+  spanLeadingColumns = false,
+}) => {
   const nameHeader =
     nameLabel ?? (isLocationReport ? "BAHAGIAN KERJA" : "NAMA PEKERJA");
 
@@ -444,12 +453,20 @@ const TableHeader: React.FC<{
     <View fixed={repeat}>
       {/* Main Header Row */}
       <View style={styles.tableHeader} wrap={false}>
-        <View style={styles.colBil}>
-          <Text style={styles.headerText}>BIL</Text>
-        </View>
-        <View style={styles.colName}>
-          <Text style={styles.headerText}>{nameHeader}</Text>
-        </View>
+        {spanLeadingColumns ? (
+          <View style={styles.colLeading}>
+            <Text style={styles.headerText}>{nameHeader}</Text>
+          </View>
+        ) : (
+          <>
+            <View style={styles.colBil}>
+              <Text style={styles.headerText}>BIL</Text>
+            </View>
+            <View style={styles.colName}>
+              <Text style={styles.headerText}>{nameHeader}</Text>
+            </View>
+          </>
+        )}
         <View style={styles.colGaji}>
           <Text style={styles.headerText}>GAJI</Text>
         </View>
@@ -501,8 +518,14 @@ const TableHeader: React.FC<{
       </View>
       {/* Sub Header Row for MAJ/PKJ */}
       <View style={styles.tableHeaderSub} wrap={false}>
-        <View style={styles.colBil}><Text style={styles.subHeaderText}></Text></View>
-        <View style={styles.colName}><Text style={styles.subHeaderText}></Text></View>
+        {spanLeadingColumns ? (
+          <View style={styles.colLeading}><Text style={styles.subHeaderText}></Text></View>
+        ) : (
+          <>
+            <View style={styles.colBil}><Text style={styles.subHeaderText}></Text></View>
+            <View style={styles.colName}><Text style={styles.subHeaderText}></Text></View>
+          </>
+        )}
         <View style={styles.colGaji}><Text style={styles.subHeaderText}></Text></View>
         <View style={styles.colOt}><Text style={styles.subHeaderText}></Text></View>
         <View style={styles.colBonus}><Text style={styles.subHeaderText}></Text></View>
@@ -533,13 +556,27 @@ const DataRow: React.FC<{
   data: GrandTotals;
   isBold?: boolean;
   rowStyle?: any;
-}> = ({ bil, name, data, isBold = false, rowStyle }) => {
+  spanLeadingColumns?: boolean;
+}> = ({
+  bil,
+  name,
+  data,
+  isBold = false,
+  rowStyle,
+  spanLeadingColumns = false,
+}) => {
   const textStyle = isBold ? styles.dataTextBold : styles.dataText;
 
   return (
     <View style={rowStyle || styles.tableRow} wrap={false}>
-      <View style={styles.colBil}><Text style={textStyle}>{bil}</Text></View>
-      <View style={styles.colName}><Text style={textStyle}>{name}</Text></View>
+      {spanLeadingColumns ? (
+        <View style={styles.colLeading}><Text style={textStyle}>{name}</Text></View>
+      ) : (
+        <>
+          <View style={styles.colBil}><Text style={textStyle}>{bil}</Text></View>
+          <View style={styles.colName}><Text style={textStyle}>{name}</Text></View>
+        </>
+      )}
       <View style={styles.colGaji}><Text style={textStyle}>{formatCurrency(data.gaji)}</Text></View>
       <View style={styles.colOt}><Text style={textStyle}>{formatCurrency(data.ot)}</Text></View>
       <View style={styles.colBonus}><Text style={textStyle}>{formatCurrency(data.bonus)}</Text></View>
@@ -856,7 +893,8 @@ const AnnualSummaryContent: React.FC<{
   annualData: AnnualSummaryData;
   locationMap: Record<string, string>;
   locationOrder: LocationOrderItem[];
-}> = ({ annualData, locationMap, locationOrder }) => {
+  showLocationCodes: boolean;
+}> = ({ annualData, locationMap, locationOrder, showLocationCodes }) => {
   const emptyData: GrandTotals = {
     gaji: 0, ot: 0, bonus: 0, comm: 0, cuti: 0, gaji_kasar: 0,
     epf_majikan: 0, epf_pekerja: 0, socso_majikan: 0, socso_pekerja: 0,
@@ -883,7 +921,11 @@ const AnnualSummaryContent: React.FC<{
 
       {/* BY LOCATION (start on a new page so each table keeps its header) */}
       <View break>
-        <TableHeader nameLabel="BAHAGIAN KERJA" repeat={false} />
+        <TableHeader
+          nameLabel="BAHAGIAN KERJA"
+          repeat={false}
+          spanLeadingColumns={!showLocationCodes}
+        />
         {locationOrder.map((item, idx) => {
           if (item.type === "header") {
             return <SectionHeaderRow key={`header-${idx}`} text={item.text || ""} />;
@@ -895,9 +937,10 @@ const AnnualSummaryContent: React.FC<{
           return (
             <DataRow
               key={`loc-${item.id}`}
-              bil={item.id || ""}
+              bil={showLocationCodes ? item.id || "" : ""}
               name={truncateName(locationName, 35)}
               data={locData?.totals ?? emptyData}
+              spanLeadingColumns={!showLocationCodes}
             />
           );
         })}
@@ -1017,7 +1060,13 @@ const AnnualBreakdownContent: React.FC<{
   annualBreakdownData: AnnualBreakdownData;
   locationMap: Record<string, string>;
   locationOrder: LocationOrderItem[];
-}> = ({ annualBreakdownData, locationMap, locationOrder }) => {
+  showLocationCodes: boolean;
+}> = ({
+  annualBreakdownData,
+  locationMap,
+  locationOrder,
+  showLocationCodes,
+}) => {
   const locById = new Map(
     annualBreakdownData.locations.map(
       (l): [string, AnnualBreakdownData["locations"][0]] => [l.location, l]
@@ -1040,7 +1089,8 @@ const AnnualBreakdownContent: React.FC<{
         return (
           <View key={loc.location} break={locIdx > 0}>
             <Text style={styles.viewSubtitle}>
-              BY LOCATION : {loc.location} - {locationName.toUpperCase()}
+              BY LOCATION : {showLocationCodes ? `${loc.location} - ` : ""}
+              {locationName.toUpperCase()}
             </Text>
             <BreakdownTableHeader />
             {loc.employees.map((emp, eIdx) => (
@@ -1116,6 +1166,7 @@ const SalaryReportPDF: React.FC<SalaryReportPDFProps> = ({
   locationMap,
   locationOrder,
   companyName = "TIEN HOCK FOOD INDUSTRIES S/B (953309-T)",
+  showLocationCodes = true,
 }) => {
   const reportTitle = buildReportTitle(periodType, year, month);
   const viewSubtitle = buildViewSubtitle(reportType);
@@ -1132,6 +1183,7 @@ const SalaryReportPDF: React.FC<SalaryReportPDFProps> = ({
         annualBreakdownData={annualBreakdownData}
         locationMap={locationMap}
         locationOrder={locationOrder}
+        showLocationCodes={showLocationCodes}
       />
     );
   } else if (reportType === "annual" && annualData && annualData.monthly.length > 0) {
@@ -1140,6 +1192,7 @@ const SalaryReportPDF: React.FC<SalaryReportPDFProps> = ({
         annualData={annualData}
         locationMap={locationMap}
         locationOrder={locationOrder}
+        showLocationCodes={showLocationCodes}
       />
     );
   } else if (reportType === "employee-individual" && employees && employees.length > 0 && grandTotals) {

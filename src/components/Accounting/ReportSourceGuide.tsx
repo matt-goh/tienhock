@@ -36,7 +36,7 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
     ms: {
       title: "Dari mana angka-angka ini datang?",
       intro:
-        "Senarai ini menunjukkan jumlah pergerakan setiap akaun dari 1 Januari hingga akhir bulan yang dipilih. Setiap kali sesuatu direkod dalam sistem, ia masuk ke akaun berkenaan secara automatik.",
+        "Senarai ini menunjukkan baki setiap akaun setakat akhir bulan yang dipilih. Sistem menggunakan baki pembukaan terkini, kemudian menambah semua catatan jurnal selepas tarikh baki itu. Akaun tanpa baki pembukaan bermula dari 1 Januari.",
       sourcesHeading: "Sumber angka",
       sources: [
         {
@@ -86,7 +86,7 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
       ],
       missingHeading: "Belum termasuk",
       missing: [
-        "Baki tahun lepas (baki pembukaan) — laporan bermula dari 1 Januari sahaja.",
+        "Akaun tanpa baki pembukaan akan menunjukkan pergerakan dari 1 Januari sahaja.",
         "Nilai stok (stok awal / stok akhir) dan susut nilai — belum direkodkan secara automatik.",
       ],
       footer:
@@ -95,7 +95,7 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
     en: {
       title: "Where do these numbers come from?",
       intro:
-        "This list shows the total movement of every account from 1 January to the end of the selected month. Whenever something is recorded in the system, it lands in the matching account automatically.",
+        "This list shows each account balance as at the end of the selected month. The latest opening balance is used, then all journal entries from that date are added. Accounts without an opening balance start from 1 January.",
       sourcesHeading: "Where the amounts come from",
       sources: [
         {
@@ -144,7 +144,7 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
       ],
       missingHeading: "Not included yet",
       missing: [
-        "Last year's balances (opening balances) — the report starts from 1 January only.",
+        "Accounts without an opening balance show movement from 1 January only.",
         "Stock values (opening/closing stock) and depreciation — not recorded automatically yet.",
       ],
       footer:
@@ -161,7 +161,7 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
         {
           label: "Jualan (Nota 7)",
           detail:
-            "Diambil terus daripada semua invois jualan (bil tunai + invois kredit), sebelum cukai dan pembundaran.",
+            "Daripada catatan jurnal jualan dan pelarasan yang telah dipos ke akaun di bawah Nota 7.",
         },
         {
           label: "Belian bahan mentah",
@@ -197,7 +197,7 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
         {
           label: "Sales (Note 7)",
           detail:
-            "Taken directly from all sales invoices (cash bills + credit invoices), before tax and rounding.",
+            "From posted sales and adjustment journal entries mapped to accounts under Note 7.",
         },
         {
           label: "Raw material purchases",
@@ -229,13 +229,13 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
     ms: {
       title: "Dari mana angka-angka ini datang?",
       intro:
-        "Laporan ini menunjukkan kedudukan syarikat (harta, hutang, modal) setakat akhir bulan yang dipilih, berdasarkan semua rekod dari 1 Januari tahun ini.",
+        "Laporan ini menunjukkan kedudukan syarikat (harta, hutang, modal) setakat akhir bulan yang dipilih. Setiap akaun menggunakan baki pembukaan terkini dan catatan jurnal selepas tarikh baki itu.",
       sourcesHeading: "Sumber angka",
       sources: [
         {
           label: "Wang di bank (Nota 19)",
           detail:
-            "Semua bayaran pelanggan masuk bank, tolak bayaran keluar (pembekal, gaji, catatan manual).",
+            "Baki pembukaan bank, ditambah wang masuk dan ditolak bayaran keluar yang telah dipos.",
         },
         {
           label: "Wang tunai di tangan (Nota 6)",
@@ -245,7 +245,7 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
         {
           label: "Hutang pelanggan (Nota 22)",
           detail:
-            "Diambil terus daripada baki invois yang belum dibayar.",
+            "Daripada baki pembukaan dan catatan jurnal setiap akaun pelanggan, termasuk invois, resit dan pelarasan.",
         },
         {
           label: "Hutang kepada pembekal (Nota 13)",
@@ -257,27 +257,32 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
           detail:
             "Gaji/KWSP/PERKESO yang sudah dikira tetapi belum dibayar, daripada baucar gaji.",
         },
+        {
+          label: "Untung tahun semasa",
+          detail:
+            "Untung atau rugi dari 1 Januari hingga akhir bulan dikira daripada catatan jurnal Jualan, CoGM dan Perbelanjaan, kemudian dimasukkan ke Modal.",
+        },
       ],
-      missingHeading: "Belum termasuk — sebab itu laporan ini belum seimbang",
+      missingHeading: "Masih perlu direkod atau disahkan",
       missing: [
-        "Baki tahun lepas (baki pembukaan) untuk semua akaun — bank, harta tetap, pinjaman, modal saham dan untung tertahan. Tanpa ini, Harta ≠ Hutang + Modal.",
-        "Nilai stok akhir (Nota 14).",
-        "Harta tetap dan susut nilai terkumpul (Nota 4).",
-        "Untung tahun semasa belum dipindahkan ke bahagian modal.",
+        "Akaun tanpa baki pembukaan akan bermula dari 1 Januari sahaja.",
+        "Perubahan nilai stok selepas baki pembukaan (Nota 14) belum direkod secara automatik.",
+        "Susut nilai selepas baki pembukaan (Nota 4/15) masih perlu direkod melalui jurnal.",
+        "Perbezaan baki pembukaan lama yang telah dikenal pasti kekal sehingga Trial Balance atau Balance Sheet 1 Januari disahkan.",
       ],
       footer:
-        "Buat masa ini gunakan laporan ini untuk melihat pergerakan tahun semasa sahaja. Ia akan seimbang selepas baki pembukaan dimasukkan.",
+        "Angka laporan datang daripada baki pembukaan dan jurnal yang telah dipos, bukan terus daripada status invois semasa.",
     },
     en: {
       title: "Where do these numbers come from?",
       intro:
-        "This report shows the company's position (assets, debts, capital) as at the end of the selected month, based on everything recorded since 1 January this year.",
+        "This report shows the company's position (assets, debts, capital) as at the end of the selected month. Each account uses its latest opening balance and the journal entries posted from that date onward.",
       sourcesHeading: "Where the amounts come from",
       sources: [
         {
           label: "Money at bank (Note 19)",
           detail:
-            "All customer payments into the bank, minus payments out (suppliers, salaries, manual entries).",
+            "The bank opening balance, plus posted money in and minus posted payments out.",
         },
         {
           label: "Cash in hand (Note 6)",
@@ -285,7 +290,8 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
         },
         {
           label: "Customers owing us (Note 22)",
-          detail: "Taken directly from unpaid invoice balances.",
+          detail:
+            "From each customer's opening balance and posted journal entries, including invoices, receipts and adjustments.",
         },
         {
           label: "Owing to suppliers (Note 13)",
@@ -296,16 +302,21 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
           detail:
             "Salaries/EPF/SOCSO already calculated but not yet paid, from the payroll vouchers.",
         },
+        {
+          label: "Current Year Profit",
+          detail:
+            "Profit or loss from 1 January to the selected month end is calculated from posted Sales, CoGM and Expense journals, then included in Equity.",
+        },
       ],
-      missingHeading: "Not included yet — why this report doesn't balance",
+      missingHeading: "Still to be recorded or confirmed",
       missing: [
-        "Last year's balances (opening balances) for every account — bank, fixed assets, loans, share capital and retained profit. Without these, Assets ≠ Liabilities + Equity.",
-        "Closing stock values (Note 14).",
-        "Fixed assets and accumulated depreciation (Note 4).",
-        "This year's profit is not yet carried into the equity section.",
+        "Accounts without an opening balance start from 1 January only.",
+        "Stock-value changes after the opening balance (Note 14) are not posted automatically yet.",
+        "Depreciation after the opening balance (Notes 4/15) still needs a journal entry.",
+        "The named legacy opening-balance difference remains until a 1 January Trial Balance or Balance Sheet is confirmed.",
       ],
       footer:
-        "For now, use this report to see the current year's movement only. It will balance once opening balances are entered.",
+        "Report amounts come from opening balances and posted journals, not directly from current invoice statuses.",
     },
   },
   cogm: {

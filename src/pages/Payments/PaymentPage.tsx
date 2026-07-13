@@ -1,14 +1,21 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconCash, IconPlus, IconSearch } from "@tabler/icons-react";
+import { IconPlus, IconSearch } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import TimeNavigator from "../../components/TimeNavigator";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
-import { Payment } from "../../types/types";
+import {
+  Payment,
+  PaymentCancellationErrorData,
+} from "../../types/types";
 import PaymentTable from "../../components/Invoice/PaymentTable";
-import PaymentForm from "../../components/Invoice/PaymentForm";
+import PaymentForm, {
+  type PaymentFormInitialValues,
+} from "../../components/Invoice/PaymentForm";
+import PaymentCancellationErrorDialog from "../../components/Invoice/PaymentCancellationErrorDialog";
+import ReceiptDetailsDialog from "../../components/Invoice/ReceiptDetailsDialog";
 import StyledListbox from "../../components/StyledListbox";
 
 interface PaymentFilters {
@@ -28,6 +35,13 @@ const PaymentPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+  const [paymentFormInitialValues, setPaymentFormInitialValues] =
+    useState<PaymentFormInitialValues | null>(null);
+  const [paymentCancellationError, setPaymentCancellationError] =
+    useState<PaymentCancellationErrorData | null>(null);
+  const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(
+    null
+  );
 
   const [filters, setFilters] = useState<PaymentFilters>(() => {
     const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -117,14 +131,42 @@ const PaymentPage: React.FC = () => {
     []
   );
 
-  const handleNewPayment = () => {
+  const handleNewPayment = (): void => {
     setSelectedPayment(null);
+    setPaymentFormInitialValues(null);
     setShowPaymentForm(true);
   };
 
-  const handlePaymentCreated = () => {
+  const handlePaymentCreated = (): void => {
+    const shouldShowFullReferenceGroup: boolean = Boolean(
+      paymentFormInitialValues?.payment_reference
+    );
     setShowPaymentForm(false);
-    fetchPayments();
+    setPaymentFormInitialValues(null);
+    if (shouldShowFullReferenceGroup) {
+      setFilters((previousFilters: PaymentFilters): PaymentFilters => ({
+        ...previousFilters,
+        status: null,
+      }));
+    } else {
+      void fetchPayments();
+    }
+  };
+
+  const handleAddPaymentToGroup = (payment: Payment): void => {
+    if (!payment.payment_reference) {
+      toast.error("This payment group does not have a reference to reuse.");
+      return;
+    }
+
+    setSelectedPayment(null);
+    setPaymentFormInitialValues({
+      payment_date: payment.payment_date,
+      payment_method: payment.payment_method,
+      payment_reference: payment.payment_reference,
+      bank_account: payment.bank_account,
+    });
+    setShowPaymentForm(true);
   };
 
   const handleViewPayment = (payment: Payment) => {
@@ -135,23 +177,12 @@ const PaymentPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-          <IconCash size={28} className="text-gray-700 dark:text-gray-200" />
-          Payment Management
-        </h1>
-        <Button onClick={handleNewPayment} icon={IconPlus} size="md">
-          New Payment
-        </Button>
-      </div>
-
       {/* Filters */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-4">
-        <div className="p-4">
-          <div className="flex flex-wrap items-center gap-4">
+      <div className="mb-4 rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="p-3 sm:p-4">
+          <div className="flex flex-wrap items-center gap-3">
             {/* Search */}
-            <div className="relative flex-1 min-w-[200px]">
+            <div className="relative w-full min-w-0 flex-1 sm:w-auto sm:min-w-[220px]">
               <IconSearch
                 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500"
                 size={18}
@@ -172,13 +203,16 @@ const PaymentPage: React.FC = () => {
             </div>
 
             {/* Time Navigator */}
-            <TimeNavigator
-              range={filters.dateRange}
-              onChange={handleTimeNavigatorChange}
-            />
+            <div className="w-full min-w-0 sm:w-auto">
+              <TimeNavigator
+                range={filters.dateRange}
+                onChange={handleTimeNavigatorChange}
+                className="max-w-full"
+              />
+            </div>
 
             {/* Payment Method Filter */}
-            <div className="w-40">
+            <div className="w-[calc(50%-0.375rem)] min-w-[130px] sm:w-40">
               <StyledListbox
                 value={filters.paymentMethod || ""}
                 onChange={(value) =>
@@ -200,7 +234,7 @@ const PaymentPage: React.FC = () => {
             </div>
 
             {/* Status Filter */}
-            <div className="w-40">
+            <div className="w-[calc(50%-0.375rem)] min-w-[130px] sm:w-40">
               <StyledListbox
                 value={filters.status || ""}
                 onChange={(value) =>
@@ -220,6 +254,15 @@ const PaymentPage: React.FC = () => {
                 rounded="lg"
               />
             </div>
+
+            <Button
+              onClick={handleNewPayment}
+              icon={IconPlus}
+              size="md"
+              className="w-full whitespace-nowrap sm:w-auto"
+            >
+              New Payment
+            </Button>
           </div>
         </div>
       </div>
@@ -234,16 +277,52 @@ const PaymentPage: React.FC = () => {
           payments={sortedPayments}
           onViewPayment={handleViewPayment}
           onRefresh={fetchPayments}
+          onCancellationError={setPaymentCancellationError}
+          onAddPaymentToGroup={handleAddPaymentToGroup}
+          onViewPaymentGroup={setSelectedReceiptId}
         />
       )}
+
+      <PaymentCancellationErrorDialog
+        error={paymentCancellationError}
+        onClose={() => setPaymentCancellationError(null)}
+        onViewPaymentGroup={(receiptId: number): void => {
+          setSelectedReceiptId(receiptId);
+          setPaymentCancellationError(null);
+        }}
+        onViewJournal={(journalEntryId: number): void => {
+          navigate(`/accounting/journal-entries/${journalEntryId}`);
+          setPaymentCancellationError(null);
+        }}
+      />
+      <ReceiptDetailsDialog
+        isOpen={selectedReceiptId !== null}
+        receiptId={selectedReceiptId}
+        onClose={() => setSelectedReceiptId(null)}
+        onConfirmed={async (): Promise<void> => {
+          await fetchPayments();
+        }}
+        onCancelled={async (): Promise<void> => {
+          setSelectedReceiptId(null);
+          await fetchPayments();
+        }}
+        onReferenceUpdated={async (): Promise<void> => {
+          await fetchPayments();
+        }}
+      />
 
       {/* Payment Form Modal */}
       {showPaymentForm && (
         <PaymentForm
           payment={selectedPayment}
-          onClose={() => setShowPaymentForm(false)}
+          onClose={() => {
+            setShowPaymentForm(false);
+            setPaymentFormInitialValues(null);
+          }}
           onSuccess={handlePaymentCreated}
           dateRange={filters.dateRange}
+          initialValues={paymentFormInitialValues ?? undefined}
+          referenceGroup={paymentFormInitialValues?.payment_reference}
         />
       )}
     </div>

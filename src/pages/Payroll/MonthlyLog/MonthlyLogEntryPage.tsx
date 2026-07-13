@@ -1345,11 +1345,14 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     hoursField: EmployeeHourField,
     overtimeField: EmployeeHourField,
     label: string,
+    showLabel: boolean = true,
   ) => (
     <div className="min-w-[9.5rem] rounded-md border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-2">
-      <div className="mb-1 text-center text-[11px] font-semibold uppercase text-default-500 dark:text-gray-400">
-        {label}
-      </div>
+      {showLabel && (
+        <div className="mb-1 text-center text-[11px] font-semibold uppercase text-default-500 dark:text-gray-400">
+          {label}
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-1.5">
         <div>
           <div className="mb-0.5 text-center text-[10px] uppercase text-default-400 dark:text-gray-500">
@@ -1542,6 +1545,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       "totalHours",
                       "overtimeHours",
                       "Biasa",
+                      false,
                     )}
                   </td>
                   {supportsDayTypeHours && (

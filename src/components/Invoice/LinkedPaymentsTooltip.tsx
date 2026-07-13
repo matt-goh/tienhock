@@ -23,9 +23,14 @@ const LinkedPaymentsTooltip: React.FC<LinkedPaymentsTooltipProps> = ({
   currentInvoiceId,
 }) => {
   const [isVisible, setIsVisible] = useState<boolean>(false);
-  const [position, setPosition] = useState<{ top: number; left: number }>({
+  const [position, setPosition] = useState<{
+    top: number;
+    left: number;
+    maxHeight: number;
+  }>({
     top: 0,
     left: 0,
+    maxHeight: 300,
   });
   const [linkedPayments, setLinkedPayments] = useState<LinkedPaymentInfo[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -72,9 +77,24 @@ const LinkedPaymentsTooltip: React.FC<LinkedPaymentsTooltipProps> = ({
     timeoutRef.current = setTimeout(() => {
       if (iconRef.current) {
         const rect = iconRef.current.getBoundingClientRect();
+        const viewportMargin: number = 12;
+        const tooltipGap: number = 8;
+        const tooltipWidth: number = Math.min(
+          384,
+          window.innerWidth - viewportMargin * 2
+        );
+        const left: number = Math.min(
+          Math.max(rect.left, viewportMargin),
+          window.innerWidth - tooltipWidth - viewportMargin
+        );
+        const maxHeight: number = Math.min(
+          300,
+          Math.max(80, rect.top - tooltipGap - viewportMargin)
+        );
         setPosition({
-          top: rect.top + rect.height / 2,
-          left: rect.right + 5,
+          top: rect.top - tooltipGap,
+          left,
+          maxHeight,
         });
       }
       setIsVisible(true);
@@ -109,13 +129,12 @@ const LinkedPaymentsTooltip: React.FC<LinkedPaymentsTooltipProps> = ({
       {isVisible &&
         createPortal(
           <div
-            className="fixed z-[9999] bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 shadow-lg rounded-lg p-4 w-96 transform opacity-0 transition-opacity duration-200 flex flex-col"
+            className="fixed z-[9999] flex w-[calc(100vw-1.5rem)] max-w-96 -translate-y-full transform flex-col rounded-lg border border-default-200 bg-white p-4 opacity-0 shadow-lg transition-opacity duration-200 dark:border-gray-700 dark:bg-gray-800"
             style={{
               top: `${position.top}px`,
               left: `${position.left}px`,
-              maxHeight: "300px",
+              maxHeight: `${position.maxHeight}px`,
               opacity: isVisible ? 1 : 0,
-              transform: `translate(0%, -50%)`,
             }}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
