@@ -75,6 +75,7 @@ const REQUIRED_RESTORED_COLUMNS = [
   'public.journal_entries.entry_date',
   'public.journal_entries.status',
   'public.journal_entries.display_reference',
+  'public.journal_entries.legacy_entry_type',
   'public.journal_entries.posting_sequence',
   'public.journal_entries.source_type',
   'public.journal_entries.source_id',

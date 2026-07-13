@@ -2,6 +2,34 @@
 import { Router } from "express";
 
 const LEGACY_IMPORT_ENTRY_TYPE = "IMP";
+const LEGACY_IMPORT_SOURCE_TYPE = "legacy_import";
+
+const LEGACY_IMPORT_SQL =
+  `(je.entry_type = '${LEGACY_IMPORT_ENTRY_TYPE}' OR ` +
+  `je.source_type = '${LEGACY_IMPORT_SOURCE_TYPE}')`;
+const VISIBLE_REFERENCE_SQL =
+  `CASE WHEN ${LEGACY_IMPORT_SQL} ` +
+  "THEN COALESCE(je.display_reference, je.reference_no) " +
+  "ELSE je.reference_no END";
+const DISPLAY_ENTRY_TYPE_SQL =
+  `CASE WHEN ${LEGACY_IMPORT_SQL} ` +
+  "THEN COALESCE(je.legacy_entry_type, je.entry_type) " +
+  "ELSE je.entry_type END";
+
+/**
+ * Imported journals keep their operational IMP type, while source_type is the
+ * durable provenance marker after the legacy presentation migration. Accept
+ * either marker so entries remain immutable during a rolling deployment.
+ *
+ * @param {{ entry_type?: string | null, source_type?: string | null }} entry
+ * @returns {boolean}
+ */
+function isLegacyImportEntry(entry) {
+  return (
+    entry.entry_type === LEGACY_IMPORT_ENTRY_TYPE ||
+    entry.source_type === LEGACY_IMPORT_SOURCE_TYPE
+  );
+}
 
 export default function (pool) {
   const router = Router();
@@ -45,12 +73,21 @@ export default function (pool) {
 
       let query = `
         SELECT
-          je.id, je.reference_no, je.entry_type, je.entry_date,
+          je.id,
+          ${VISIBLE_REFERENCE_SQL} AS reference_no,
+          je.reference_no AS internal_reference_no,
+          je.entry_type,
+          ${DISPLAY_ENTRY_TYPE_SQL} AS display_entry_type,
+          je.legacy_entry_type,
+          ${LEGACY_IMPORT_SQL} AS is_legacy_import,
+          je.display_reference,
+          je.source_type,
+          je.entry_date,
           je.description, je.total_debit, je.total_credit, je.status,
           je.cheque_no, je.created_at, je.updated_at, je.posted_at,
           jet.name as entry_type_name
         FROM journal_entries je
-        LEFT JOIN journal_entry_types jet ON je.entry_type = jet.code
+        LEFT JOIN journal_entry_types jet ON ${DISPLAY_ENTRY_TYPE_SQL} = jet.code
         WHERE 1=1
       `;
       const params = [];
@@ -75,7 +112,7 @@ export default function (pool) {
           .map((t) => t.trim())
           .filter(Boolean);
         if (types.length > 0) {
-          query += ` AND je.entry_type = ANY($${paramIndex})`;
+          query += ` AND ${DISPLAY_ENTRY_TYPE_SQL} = ANY($${paramIndex})`;
           params.push(types);
           paramIndex++;
         }
@@ -95,7 +132,12 @@ export default function (pool) {
       }
 
       if (search) {
-        query += ` AND (je.reference_no ILIKE $${paramIndex} OR je.description ILIKE $${paramIndex})`;
+        query += ` AND (
+          ${VISIBLE_REFERENCE_SQL} ILIKE $${paramIndex}
+          OR je.description ILIKE $${paramIndex}
+          OR (${LEGACY_IMPORT_SQL} AND ${DISPLAY_ENTRY_TYPE_SQL} ILIKE $${paramIndex})
+          OR (${LEGACY_IMPORT_SQL} AND jet.name ILIKE $${paramIndex})
+        )`;
         params.push(`%${search}%`);
         paramIndex++;
       }
@@ -109,7 +151,7 @@ export default function (pool) {
       const total = parseInt(countResult.rows[0].total);
 
       // Add ordering and pagination
-      query += ` ORDER BY je.entry_date DESC, je.reference_no DESC`;
+      query += ` ORDER BY je.entry_date DESC, ${VISIBLE_REFERENCE_SQL} DESC`;
       query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
       params.push(parseInt(limit), parseInt(offset));
 
@@ -239,13 +281,22 @@ export default function (pool) {
       // Get entry header
       const entryQuery = `
         SELECT
-          je.id, je.reference_no, je.entry_type, je.entry_date,
+          je.id,
+          ${VISIBLE_REFERENCE_SQL} AS reference_no,
+          je.reference_no AS internal_reference_no,
+          je.entry_type,
+          ${DISPLAY_ENTRY_TYPE_SQL} AS display_entry_type,
+          je.legacy_entry_type,
+          ${LEGACY_IMPORT_SQL} AS is_legacy_import,
+          je.display_reference,
+          je.source_type,
+          je.entry_date,
           je.description, je.total_debit, je.total_credit, je.status,
           je.cheque_no, je.created_at, je.updated_at, je.posted_at,
           je.created_by, je.updated_by, je.posted_by,
           jet.name as entry_type_name
         FROM journal_entries je
-        LEFT JOIN journal_entry_types jet ON je.entry_type = jet.code
+        LEFT JOIN journal_entry_types jet ON ${DISPLAY_ENTRY_TYPE_SQL} = jet.code
         WHERE je.id = $1
       `;
       const entryResult = await pool.query(entryQuery, [id]);
@@ -258,9 +309,17 @@ export default function (pool) {
       const linesQuery = `
         SELECT
           jel.id, jel.line_number, jel.account_code, jel.debit_amount,
-          jel.credit_amount, jel.reference, jel.particulars,
+          jel.credit_amount,
+          CASE WHEN ${LEGACY_IMPORT_SQL}
+            THEN COALESCE(jel.display_reference, je.display_reference, jel.reference)
+            ELSE jel.reference
+          END AS reference,
+          jel.reference AS internal_reference,
+          jel.display_reference,
+          jel.particulars,
           ac.description as account_description
         FROM journal_entry_lines jel
+        JOIN journal_entries je ON je.id = jel.journal_entry_id
         LEFT JOIN account_codes ac ON jel.account_code = ac.code
         WHERE jel.journal_entry_id = $1
         ORDER BY jel.line_number
@@ -303,7 +362,7 @@ export default function (pool) {
       const entry = entryResult.rows[0];
 
       // Only allow REC type entries
-      if (entry.entry_type !== "REC") {
+      if (isLegacyImportEntry(entry) || entry.entry_type !== "REC") {
         return res.status(400).json({
           message: "Receipt voucher is only available for REC (Receipt) journal entries",
         });
@@ -638,7 +697,7 @@ export default function (pool) {
 
       // Check if entry exists and is editable
       const checkQuery =
-        "SELECT status, entry_type, description FROM journal_entries WHERE id = $1";
+        "SELECT status, entry_type, source_type, description FROM journal_entries WHERE id = $1";
       const checkResult = await client.query(checkQuery, [id]);
 
       if (checkResult.rows.length === 0) {
@@ -647,7 +706,7 @@ export default function (pool) {
       }
 
       const existing = checkResult.rows[0];
-      if (existing.entry_type === LEGACY_IMPORT_ENTRY_TYPE) {
+      if (isLegacyImportEntry(existing)) {
         await client.query("ROLLBACK");
         return res.status(400).json({
           message: "Legacy import journal entries cannot be edited manually",
@@ -777,7 +836,7 @@ export default function (pool) {
 
       // Check if entry exists and is draft
       const checkQuery =
-        "SELECT status, entry_type, total_debit, total_credit FROM journal_entries WHERE id = $1";
+        "SELECT status, entry_type, source_type, total_debit, total_credit FROM journal_entries WHERE id = $1";
       const checkResult = await client.query(checkQuery, [id]);
 
       if (checkResult.rows.length === 0) {
@@ -785,7 +844,7 @@ export default function (pool) {
         return res.status(404).json({ message: "Journal entry not found" });
       }
 
-      if (checkResult.rows[0].entry_type === LEGACY_IMPORT_ENTRY_TYPE) {
+      if (isLegacyImportEntry(checkResult.rows[0])) {
         await client.query("ROLLBACK");
         return res.status(400).json({
           message: "Legacy import journal entries cannot be posted manually",
@@ -841,7 +900,7 @@ export default function (pool) {
       await client.query("BEGIN");
 
       const checkQuery =
-        "SELECT status, entry_type FROM journal_entries WHERE id = $1";
+        "SELECT status, entry_type, source_type FROM journal_entries WHERE id = $1";
       const checkResult = await client.query(checkQuery, [id]);
 
       if (checkResult.rows.length === 0) {
@@ -849,7 +908,7 @@ export default function (pool) {
         return res.status(404).json({ message: "Journal entry not found" });
       }
 
-      if (checkResult.rows[0].entry_type === LEGACY_IMPORT_ENTRY_TYPE) {
+      if (isLegacyImportEntry(checkResult.rows[0])) {
         await client.query("ROLLBACK");
         return res.status(400).json({
           message: "Legacy import journal entries cannot be cancelled manually",
@@ -894,7 +953,8 @@ export default function (pool) {
     try {
       await client.query("BEGIN");
 
-      const checkQuery = "SELECT status, entry_type, reference_no FROM journal_entries WHERE id = $1";
+      const checkQuery =
+        "SELECT status, entry_type, source_type, reference_no FROM journal_entries WHERE id = $1";
       const checkResult = await client.query(checkQuery, [id]);
 
       if (checkResult.rows.length === 0) {
@@ -902,9 +962,9 @@ export default function (pool) {
         return res.status(404).json({ message: "Journal entry not found" });
       }
 
-      const { status, entry_type, reference_no } = checkResult.rows[0];
+      const { status, entry_type, source_type, reference_no } = checkResult.rows[0];
 
-      if (entry_type === LEGACY_IMPORT_ENTRY_TYPE) {
+      if (isLegacyImportEntry({ entry_type, source_type })) {
         await client.query("ROLLBACK");
         return res.status(400).json({
           message: "Legacy import journal entries cannot be deleted manually",

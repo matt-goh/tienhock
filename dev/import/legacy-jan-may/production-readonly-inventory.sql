@@ -46,6 +46,7 @@ WITH required(schema_name, table_name, column_name) AS (
     ('public', 'journal_entries', 'posting_sequence'),
     ('public', 'journal_entries', 'source_type'),
     ('public', 'journal_entries', 'source_id'),
+    ('public', 'journal_entries', 'legacy_entry_type'),
     ('public', 'journal_entry_lines', 'cheque_reference'),
     ('public', 'journal_entry_lines', 'display_order'),
     ('public', 'journal_entry_lines', 'display_reference'),
@@ -73,18 +74,19 @@ WITH required_relations(relation_name) AS (
     ('bank_in_groups'),
     ('bank_in_allocations')
 ),
-required_columns(table_name, column_name) AS (
+required_columns(table_name, column_name, presentation_only) AS (
   VALUES
-    ('journal_entries', 'display_reference'),
-    ('journal_entries', 'posting_sequence'),
-    ('journal_entries', 'source_type'),
-    ('journal_entries', 'source_id'),
-    ('journal_entry_lines', 'cheque_reference'),
-    ('journal_entry_lines', 'display_order'),
-    ('journal_entry_lines', 'display_reference'),
-    ('payments', 'is_auto_collection'),
-    ('payments', 'receipt_allocation_id'),
-    ('invoices', 'accounting_description')
+    ('journal_entries', 'display_reference', false),
+    ('journal_entries', 'posting_sequence', false),
+    ('journal_entries', 'source_type', false),
+    ('journal_entries', 'source_id', false),
+    ('journal_entries', 'legacy_entry_type', true),
+    ('journal_entry_lines', 'cheque_reference', false),
+    ('journal_entry_lines', 'display_order', false),
+    ('journal_entry_lines', 'display_reference', false),
+    ('payments', 'is_auto_collection', false),
+    ('payments', 'receipt_allocation_id', false),
+    ('invoices', 'accounting_description', false)
 )
 SELECT NOT EXISTS (
          SELECT 1
@@ -93,8 +95,18 @@ SELECT NOT EXISTS (
              ON columns.table_schema = 'public'
             AND columns.table_name = required.table_name
             AND columns.column_name = required.column_name
-          WHERE columns.column_name IS NULL
+           WHERE columns.column_name IS NULL
        ) AS rollout_columns_queryable,
+       NOT EXISTS (
+         SELECT 1
+           FROM required_columns required
+           LEFT JOIN information_schema.columns columns
+             ON columns.table_schema = 'public'
+            AND columns.table_name = required.table_name
+            AND columns.column_name = required.column_name
+          WHERE NOT required.presentation_only
+            AND columns.column_name IS NULL
+       ) AS accounting_columns_queryable,
        NOT EXISTS (
          SELECT 1
            FROM required_relations
@@ -109,7 +121,8 @@ SELECT NOT EXISTS (
              ON columns.table_schema = 'public'
             AND columns.table_name = required.table_name
             AND columns.column_name = required.column_name
-          WHERE columns.column_name IS NULL
+          WHERE NOT required.presentation_only
+            AND columns.column_name IS NULL
        ) AS june_schema_queryable
 \gset
 
@@ -331,7 +344,7 @@ SELECT COUNT(*) AS debtor_child_anchor_rows,
  WHERE anchors.as_of_date = DATE '2026-06-01'
    AND accounts.parent_code = 'DEBTOR';
 
-\if :rollout_columns_queryable
+\if :accounting_columns_queryable
   SELECT COUNT(*) AS posted_source_owned_tr_lines,
          COUNT(*) = 0 AS matches_audited_20260713_snapshot
     FROM journal_entry_lines lines
@@ -373,7 +386,7 @@ SELECT status,
  GROUP BY status
  ORDER BY status;
 
-\if :rollout_columns_queryable
+\if :accounting_columns_queryable
   SELECT COUNT(*) FILTER (WHERE journals.source_type = 'payment')
            AS payment_source_rows,
          COUNT(*) FILTER (
@@ -514,51 +527,275 @@ SELECT entry_type,
  ORDER BY entry_type;
 
 \if :rollout_columns_queryable
-  -- IMP semantic fingerprint v1 covers every posted imported header and line.
-  -- A zero population is expected before rollout; the comparison boolean is
-  -- the audited final state, not a pre-rollout requirement.
-  SELECT COUNT(DISTINCT journals.id) AS posted_imp_journals,
-       COUNT(lines.id) AS posted_imp_lines,
-       COALESCE(SUM(ROUND(lines.debit_amount * 100)), 0)::bigint
-         AS line_debit_cents,
-       COALESCE(SUM(ROUND(lines.credit_amount * 100)), 0)::bigint
-         AS line_credit_cents,
-       COUNT(DISTINCT journals.id) = 3863
-         AND COUNT(lines.id) = 10068
-         AND COALESCE(SUM(ROUND(lines.debit_amount * 100)), 0)::bigint
-               = 1350351615
-         AND COALESCE(SUM(ROUND(lines.credit_amount * 100)), 0)::bigint
-               = 1350351615
-         AS matches_audited_final_imp_population,
-       MD5(COALESCE(STRING_AGG(
-         JSONB_BUILD_ARRAY(
-           journals.reference_no,
-           journals.entry_date::text,
-           journals.display_reference,
-           ROUND(journals.total_debit * 100)::bigint,
-           ROUND(journals.total_credit * 100)::bigint,
-           lines.line_number,
-           lines.display_order,
-           lines.account_code,
-           ROUND(lines.debit_amount * 100)::bigint,
-           ROUND(lines.credit_amount * 100)::bigint,
-           lines.reference,
-           lines.particulars,
-           lines.cheque_reference,
-           lines.display_reference
-         )::text,
-         E'\n' ORDER BY journals.reference_no, lines.line_number, lines.id
-       ), '')) AS imp_semantic_fingerprint_md5
+  \echo '=== 8a. Legacy-import semantic presentation and provenance ==='
+  WITH expected(legacy_entry_type, expected_count, sort_order) AS (
+    VALUES
+      ('S'::varchar, 2121::bigint, 1),
+      ('PUR'::varchar, 83::bigint, 2),
+      ('B'::varchar, 383::bigint, 3),
+      ('C'::varchar, 45::bigint, 4),
+      ('RV'::varchar, 410::bigint, 5),
+      ('REC'::varchar, 758::bigint, 6),
+      ('J'::varchar, 53::bigint, 7),
+      ('JVDR'::varchar, 5::bigint, 8),
+      ('JVSL'::varchar, 5::bigint, 9)
+  ),
+  actual AS (
+    SELECT journals.legacy_entry_type,
+           COUNT(*) AS actual_count
+      FROM journal_entries journals
+     WHERE journals.source_type = 'legacy_import'
+       AND journals.status = 'posted'
+     GROUP BY journals.legacy_entry_type
+  )
+  SELECT COALESCE(expected.legacy_entry_type, actual.legacy_entry_type)
+           AS legacy_entry_type,
+         expected.expected_count,
+         actual.actual_count,
+         expected.expected_count IS NOT DISTINCT FROM actual.actual_count
+           AS matches_audited_type_count
+    FROM expected
+    FULL JOIN actual USING (legacy_entry_type)
+   ORDER BY expected.sort_order NULLS LAST, actual.legacy_entry_type;
+
+  SELECT COUNT(*) AS legacy_import_journals,
+         COUNT(source_id) AS populated_source_links,
+         COUNT(DISTINCT source_id) AS unique_source_links,
+         COUNT(*) FILTER (
+           WHERE entry_type = 'IMP' AND status = 'posted'
+         ) AS posted_operational_imp_journals,
+         COUNT(*) = 3863
+           AND COUNT(source_id) = 3863
+           AND COUNT(DISTINCT source_id) = 3863
+           AND COUNT(*) FILTER (
+                 WHERE entry_type = 'IMP' AND status = 'posted'
+               ) = 3863
+           AS matches_audited_unique_source_links
+    FROM journal_entries
+   WHERE source_type = 'legacy_import';
+
+  WITH imported AS (
+    SELECT display_reference, entry_date
+      FROM journal_entries
+     WHERE source_type = 'legacy_import'
+  ),
+  repeated AS (
+    SELECT display_reference,
+           COUNT(*) AS journal_count,
+           ARRAY_AGG(entry_date ORDER BY entry_date) AS entry_dates
+      FROM imported
+     GROUP BY display_reference
+    HAVING COUNT(*) > 1
+  )
+  SELECT (SELECT COUNT(*) FROM imported) AS legacy_import_journals,
+         (SELECT COUNT(display_reference) FROM imported)
+           AS populated_visible_references,
+         (SELECT COUNT(DISTINCT display_reference) FROM imported)
+           AS distinct_visible_references,
+         (SELECT COUNT(*) FROM repeated) AS repeated_reference_values,
+         (SELECT STRING_AGG(
+                   display_reference || ' @ ' ||
+                     ARRAY_TO_STRING(entry_dates, ', '),
+                   '; ' ORDER BY display_reference
+                 )
+            FROM repeated) AS repeated_reference_detail,
+         (SELECT COUNT(*) FROM imported) = 3863
+           AND (SELECT COUNT(display_reference) FROM imported) = 3863
+           AND (SELECT COUNT(DISTINCT display_reference) FROM imported) = 3862
+           AND (SELECT COUNT(*) FROM repeated) = 1
+           AND COALESCE((
+                 SELECT journal_count = 2
+                   AND entry_dates = ARRAY[
+                         DATE '2026-05-07', DATE '2026-05-08'
+                       ]
+                   FROM repeated
+                  WHERE display_reference = '34847'
+               ), false)
+           AS matches_audited_visible_reference_state;
+
+  SELECT COUNT(*) AS legacy_import_journals,
+         COUNT(*) FILTER (
+           WHERE description LIKE 'Legacy import %'
+         ) AS artificial_import_descriptions,
+         COUNT(*) FILTER (
+           WHERE description IS NULL OR BTRIM(description) = ''
+         ) AS empty_descriptions,
+         COUNT(*) = 3863
+           AND COUNT(*) FILTER (
+                 WHERE description LIKE 'Legacy import %'
+               ) = 0
+           AND COUNT(*) FILTER (
+                 WHERE description IS NULL OR BTRIM(description) = ''
+               ) = 0
+           AS matches_source_derived_description_state
+    FROM journal_entries
+   WHERE source_type = 'legacy_import';
+
+  SELECT COUNT(lines.id) AS legacy_import_lines,
+         COUNT(lines.id) FILTER (
+           WHERE lines.reference IS NOT DISTINCT FROM lines.display_reference
+         ) AS references_matching_display_reference,
+         COUNT(lines.id) FILTER (
+           WHERE lines.reference IS DISTINCT FROM lines.display_reference
+         ) AS reference_mismatches,
+         COUNT(lines.id) = 10068
+           AND COUNT(lines.id) FILTER (
+                 WHERE lines.reference IS NOT DISTINCT FROM lines.display_reference
+               ) = 10068
+           AS matches_audited_line_reference_state
+    FROM journal_entries journals
+    JOIN journal_entry_lines lines ON lines.journal_entry_id = journals.id
+   WHERE journals.source_type = 'legacy_import';
+
+  SELECT COUNT(lines.id) AS special_015347_lines,
+         ARRAY_AGG(
+           DISTINCT lines.reference::text ORDER BY lines.reference::text
+         ) AS special_015347_references,
+         COUNT(lines.id) FILTER (
+           WHERE lines.reference IS DISTINCT FROM lines.display_reference
+         ) AS special_015347_reference_mismatches,
+         COUNT(lines.id) = 4
+           AND ARRAY_AGG(
+                 DISTINCT lines.reference::text ORDER BY lines.reference::text
+               ) = ARRAY['15347', 'T260526']::text[]
+           AND COUNT(lines.id) FILTER (
+                 WHERE lines.reference IS DISTINCT FROM lines.display_reference
+               ) = 0
+           AS matches_approved_015347_reference_state
+    FROM journal_entries journals
+    JOIN journal_entry_lines lines ON lines.journal_entry_id = journals.id
+   WHERE journals.source_type = 'legacy_import'
+     AND journals.source_id =
+           '2026-05-26|SPECIAL-015347-CHARLES-C';
+
+  -- Legacy-import accounting fingerprint v2 deliberately excludes the fields
+  -- changed only for presentation/provenance (description, legacy type,
+  -- source link, and line.reference). Every included accounting/identity field
+  -- is unchanged from the audited import and remains hash-pinned across the
+  -- presentation migration.
+  SELECT 'legacy_import_accounting_v2' AS fingerprint_formula,
+         COUNT(DISTINCT journals.id) AS posted_legacy_import_journals,
+         COUNT(lines.id) AS posted_legacy_import_lines,
+         COALESCE(SUM(ROUND(lines.debit_amount * 100)), 0)::bigint
+           AS line_debit_cents,
+         COALESCE(SUM(ROUND(lines.credit_amount * 100)), 0)::bigint
+           AS line_credit_cents,
+         MD5(COALESCE(STRING_AGG(
+           JSONB_BUILD_ARRAY(
+             journals.reference_no,
+             journals.entry_date::text,
+             journals.display_reference,
+             ROUND(journals.total_debit * 100)::bigint,
+             ROUND(journals.total_credit * 100)::bigint,
+             lines.line_number,
+             lines.display_order,
+             lines.account_code,
+             ROUND(lines.debit_amount * 100)::bigint,
+             ROUND(lines.credit_amount * 100)::bigint,
+             lines.particulars,
+             lines.cheque_reference,
+             lines.display_reference
+           )::text,
+           E'\n' ORDER BY journals.reference_no, lines.line_number, lines.id
+         ), '')) AS accounting_fingerprint_v2_md5,
+         COUNT(DISTINCT journals.id) = 3863
+           AND COUNT(lines.id) = 10068
+           AND COALESCE(SUM(ROUND(lines.debit_amount * 100)), 0)::bigint
+                 = 1350351615
+           AND COALESCE(SUM(ROUND(lines.credit_amount * 100)), 0)::bigint
+                 = 1350351615
+           AND MD5(COALESCE(STRING_AGG(
+                 JSONB_BUILD_ARRAY(
+                   journals.reference_no,
+                   journals.entry_date::text,
+                   journals.display_reference,
+                   ROUND(journals.total_debit * 100)::bigint,
+                   ROUND(journals.total_credit * 100)::bigint,
+                   lines.line_number,
+                   lines.display_order,
+                   lines.account_code,
+                   ROUND(lines.debit_amount * 100)::bigint,
+                   ROUND(lines.credit_amount * 100)::bigint,
+                   lines.particulars,
+                   lines.cheque_reference,
+                   lines.display_reference
+                 )::text,
+                 E'\n' ORDER BY journals.reference_no,
+                                lines.line_number, lines.id
+               ), '')) = '70cc1b6d97fc2fdaeff191c14092f531'
+           AS matches_audited_accounting_fingerprint_v2
     FROM journal_entries journals
     LEFT JOIN journal_entry_lines lines ON lines.journal_entry_id = journals.id
-   WHERE journals.entry_type = 'IMP'
+   WHERE journals.source_type = 'legacy_import'
      AND journals.status = 'posted';
 \else
-  \echo 'IMP semantic fingerprint skipped: required display columns are absent.'
+  \if :accounting_columns_queryable
+    \echo 'Legacy presentation checks skipped: legacy_entry_type is absent; using the pre-migration IMP accounting fallback.'
+    SELECT 'legacy_import_accounting_v2_pre_migration_imp_fallback'
+             AS fingerprint_formula,
+           COUNT(DISTINCT journals.id) AS posted_legacy_import_journals,
+           COUNT(lines.id) AS posted_legacy_import_lines,
+           COALESCE(SUM(ROUND(lines.debit_amount * 100)), 0)::bigint
+             AS line_debit_cents,
+           COALESCE(SUM(ROUND(lines.credit_amount * 100)), 0)::bigint
+             AS line_credit_cents,
+           MD5(COALESCE(STRING_AGG(
+             JSONB_BUILD_ARRAY(
+               journals.reference_no,
+               journals.entry_date::text,
+               journals.display_reference,
+               ROUND(journals.total_debit * 100)::bigint,
+               ROUND(journals.total_credit * 100)::bigint,
+               lines.line_number,
+               lines.display_order,
+               lines.account_code,
+               ROUND(lines.debit_amount * 100)::bigint,
+               ROUND(lines.credit_amount * 100)::bigint,
+               lines.particulars,
+               lines.cheque_reference,
+               lines.display_reference
+             )::text,
+             E'\n' ORDER BY journals.reference_no,
+                            lines.line_number, lines.id
+           ), '')) AS accounting_fingerprint_v2_md5,
+           COUNT(DISTINCT journals.id) = 3863
+             AND COUNT(lines.id) = 10068
+             AND COALESCE(SUM(ROUND(lines.debit_amount * 100)), 0)::bigint
+                   = 1350351615
+             AND COALESCE(SUM(ROUND(lines.credit_amount * 100)), 0)::bigint
+                   = 1350351615
+             AND MD5(COALESCE(STRING_AGG(
+                   JSONB_BUILD_ARRAY(
+                     journals.reference_no,
+                     journals.entry_date::text,
+                     journals.display_reference,
+                     ROUND(journals.total_debit * 100)::bigint,
+                     ROUND(journals.total_credit * 100)::bigint,
+                     lines.line_number,
+                     lines.display_order,
+                     lines.account_code,
+                     ROUND(lines.debit_amount * 100)::bigint,
+                     ROUND(lines.credit_amount * 100)::bigint,
+                     lines.particulars,
+                     lines.cheque_reference,
+                     lines.display_reference
+                   )::text,
+                   E'\n' ORDER BY journals.reference_no,
+                                  lines.line_number, lines.id
+                 ), '')) = '70cc1b6d97fc2fdaeff191c14092f531'
+             AS matches_audited_accounting_fingerprint_v2
+      FROM journal_entries journals
+      LEFT JOIN journal_entry_lines lines
+        ON lines.journal_entry_id = journals.id
+     WHERE journals.entry_type = 'IMP'
+       AND journals.status = 'posted';
+  \else
+    \echo 'Legacy-import accounting fingerprint v2 skipped: required display columns are absent.'
+  \endif
 \endif
 
 \echo '=== 9. Exact source-owned CN checkpoint ==='
-\if :rollout_columns_queryable
+\if :accounting_columns_queryable
 WITH expected(source_id, display_reference, target_date) AS (
   VALUES
     ('CN-2026-0001', 'THCN/26/1',  DATE '2026-01-09'),
