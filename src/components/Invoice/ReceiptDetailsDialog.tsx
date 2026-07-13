@@ -14,6 +14,7 @@ import {
   IconFileInvoice,
   IconReceipt,
   IconRefresh,
+  IconPencil,
   IconX,
 } from "@tabler/icons-react";
 import { Link } from "react-router-dom";
@@ -53,6 +54,7 @@ interface ReceiptDetails {
   journal_reference_no: string | null;
   cancellation_date: string | null;
   cancellation_reason: string | null;
+  origin: "erp" | "import_opening";
   allocations: ReceiptAllocation[];
 }
 
@@ -60,11 +62,22 @@ interface ReceiptCancelResponse {
   message: string;
 }
 
+interface ReceiptReferenceUpdateResponse {
+  message: string;
+  receipt: {
+    id: number;
+    display_reference: string | null;
+  };
+  updated_receipt_count: number;
+  updated_payment_count: number;
+}
+
 interface ReceiptDetailsDialogProps {
   receiptId: number | null;
   isOpen: boolean;
   onClose: () => void;
   onCancelled: () => void | Promise<void>;
+  onReferenceUpdated: () => void | Promise<void>;
 }
 
 const formatCurrency = (amount: number | string): string => {
@@ -149,6 +162,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
   isOpen,
   onClose,
   onCancelled,
+  onReferenceUpdated,
 }) => {
   const [receipt, setReceipt] = useState<ReceiptDetails | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -156,6 +170,12 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
   const [isCancelling, setIsCancelling] = useState<boolean>(false);
   const [isCancelConfirmationOpen, setIsCancelConfirmationOpen] =
     useState<boolean>(false);
+  const [isEditingReference, setIsEditingReference] =
+    useState<boolean>(false);
+  const [referenceValue, setReferenceValue] = useState<string>("");
+  const [isSavingReference, setIsSavingReference] =
+    useState<boolean>(false);
+  const [referenceError, setReferenceError] = useState<string | null>(null);
 
   const invoiceAllocations: ReceiptAllocation[] = useMemo(
     (): ReceiptAllocation[] =>
@@ -168,6 +188,12 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
 
   const nonInvoiceAllocationCount: number =
     (receipt?.allocations.length ?? 0) - invoiceAllocations.length;
+  const canEditReference: boolean = Boolean(
+    receipt &&
+      receipt.status !== "cancelled" &&
+      receipt.origin === "erp" &&
+      receipt.payment_method !== "cash"
+  );
 
   const loadReceipt = useCallback(async (): Promise<void> => {
     if (!isOpen || receiptId === null) {
@@ -240,13 +266,101 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
     if (!isOpen) {
       setIsCancelConfirmationOpen(false);
       setIsCancelling(false);
+      setIsEditingReference(false);
+      setReferenceValue("");
+      setIsSavingReference(false);
+      setReferenceError(null);
     }
   }, [isOpen]);
 
+  useEffect((): void => {
+    setIsEditingReference(false);
+    setReferenceValue("");
+    setReferenceError(null);
+  }, [receiptId]);
+
   const handleClose = (): void => {
-    if (!isCancelling) {
+    if (!isCancelling && !isSavingReference) {
       setIsCancelConfirmationOpen(false);
       onClose();
+    }
+  };
+
+  const handleStartReferenceEdit = (): void => {
+    if (!receipt) return;
+    setReferenceValue(receipt.display_reference || "");
+    setReferenceError(null);
+    setIsEditingReference(true);
+  };
+
+  const handleCancelReferenceEdit = (): void => {
+    if (isSavingReference) return;
+    setIsEditingReference(false);
+    setReferenceValue("");
+    setReferenceError(null);
+  };
+
+  const handleSaveReference = async (
+    event: React.FormEvent<HTMLFormElement>
+  ): Promise<void> => {
+    event.preventDefault();
+    if (!receipt || isSavingReference) return;
+
+    const nextReference: string = referenceValue.trim();
+    if (!nextReference) {
+      setReferenceError("Enter a payment reference.");
+      return;
+    }
+    if (nextReference === receipt.display_reference) {
+      handleCancelReferenceEdit();
+      return;
+    }
+
+    setIsSavingReference(true);
+    setReferenceError(null);
+    try {
+      const response: ReceiptReferenceUpdateResponse =
+        await api.patch<ReceiptReferenceUpdateResponse>(
+          `/api/receipts/${receipt.id}/reference`,
+          {
+            expected_reference: receipt.display_reference,
+            reference: nextReference,
+          }
+        );
+      setReceipt(
+        (currentReceipt: ReceiptDetails | null): ReceiptDetails | null =>
+          currentReceipt
+            ? {
+                ...currentReceipt,
+                display_reference: response.receipt.display_reference,
+              }
+            : currentReceipt
+      );
+      setIsEditingReference(false);
+      setReferenceValue("");
+      toast.success(
+        response.updated_receipt_count > 1
+          ? `Reference updated across ${response.updated_receipt_count} linked receipts.`
+          : "Payment reference updated."
+      );
+    } catch (error: unknown) {
+      console.error("Error updating receipt reference:", error);
+      setReferenceError(
+        getErrorMessage(
+          error,
+          "We couldn't update this payment reference. No payment details were changed."
+        )
+      );
+      setIsSavingReference(false);
+      return;
+    }
+
+    try {
+      await onReferenceUpdated();
+    } catch (error: unknown) {
+      console.error("Error refreshing payments after reference update:", error);
+    } finally {
+      setIsSavingReference(false);
     }
   };
 
@@ -396,7 +510,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                     <button
                       type="button"
                       onClick={handleClose}
-                      disabled={isCancelling}
+                      disabled={isCancelling || isSavingReference}
                       className="rounded-lg p-1 text-default-400 transition-colors hover:bg-default-100 hover:text-default-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-200"
                       aria-label="Close receipt details"
                     >
@@ -511,10 +625,85 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                         </div>
 
                         <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-                          <div>
+                          <div className="sm:col-span-2">
                             <dt className="text-xs text-default-500 dark:text-gray-400">Payment reference</dt>
-                            <dd className="mt-0.5 font-mono text-default-800 dark:text-gray-100">
-                              {receipt.display_reference || receipt.cheque_reference || "-"}
+                            <dd className="mt-1 text-default-800 dark:text-gray-100">
+                              {isEditingReference ? (
+                                <form
+                                  onSubmit={handleSaveReference}
+                                  className="space-y-2"
+                                >
+                                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                    <input
+                                      type="text"
+                                      value={referenceValue}
+                                      onChange={(
+                                        event: React.ChangeEvent<HTMLInputElement>
+                                      ): void => {
+                                        setReferenceValue(event.target.value);
+                                        setReferenceError(null);
+                                      }}
+                                      maxLength={100}
+                                      autoFocus
+                                      disabled={isSavingReference}
+                                      className="h-9 min-w-0 flex-1 rounded-lg border border-default-300 bg-white px-3 font-mono text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                                      aria-label="New payment reference"
+                                    />
+                                    <div className="flex gap-2">
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={handleCancelReferenceEdit}
+                                        disabled={isSavingReference}
+                                        className="flex-1 sm:flex-none"
+                                      >
+                                        Cancel
+                                      </Button>
+                                      <Button
+                                        type="submit"
+                                        size="sm"
+                                        color="sky"
+                                        disabled={isSavingReference}
+                                        className="flex-1 sm:flex-none"
+                                      >
+                                        {isSavingReference
+                                          ? "Saving..."
+                                          : "Save Reference"}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  <p className="text-xs text-default-500 dark:text-gray-400">
+                                    This updates every payment in the same
+                                    reference group. Amounts and payment status
+                                    will not change.
+                                  </p>
+                                  {referenceError && (
+                                    <p className="text-xs text-rose-600 dark:text-rose-300">
+                                      {referenceError}
+                                    </p>
+                                  )}
+                                </form>
+                              ) : (
+                                <div className="flex items-start gap-2">
+                                  <span className="break-all font-mono">
+                                    {receipt.display_reference ||
+                                      receipt.cheque_reference ||
+                                      "-"}
+                                  </span>
+                                  {canEditReference && (
+                                    <button
+                                      type="button"
+                                      onClick={handleStartReferenceEdit}
+                                      className="mt-0.5 shrink-0 rounded p-1 text-sky-600 hover:bg-sky-50 hover:text-sky-800 dark:text-sky-400 dark:hover:bg-sky-900/30 dark:hover:text-sky-300"
+                                      title="Edit payment reference"
+                                      aria-label="Edit payment reference"
+                                    >
+                                      <IconPencil size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                             </dd>
                           </div>
                           {receipt.cheque_reference &&
@@ -630,7 +819,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                         variant="outline"
                         size="sm"
                         onClick={handleClose}
-                        disabled={isCancelling}
+                        disabled={isCancelling || isSavingReference}
                       >
                         Close
                       </Button>
@@ -645,7 +834,8 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                           !receipt ||
                           receipt.status === "cancelled" ||
                           isLoading ||
-                          isCancelling
+                          isCancelling ||
+                          isSavingReference
                         }
                       >
                         {isCancelling ? "Cancelling..." : "Cancel Entire Receipt"}

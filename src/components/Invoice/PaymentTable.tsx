@@ -32,6 +32,7 @@ interface PaymentTableProps {
   onRefresh: () => void;
   onCancellationError?: (error: PaymentCancellationErrorData) => void;
   onAddPaymentToGroup?: (payment: Payment) => void;
+  onViewReceipt?: (receiptId: number) => void;
 }
 
 const PaymentTable: React.FC<PaymentTableProps> = ({
@@ -40,6 +41,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
   onRefresh,
   onCancellationError,
   onAddPaymentToGroup,
+  onViewReceipt,
 }) => {
   const navigate = useNavigate();
   const [confirmingPaymentId, setConfirmingPaymentId] = useState<number | null>(
@@ -157,6 +159,46 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
     } finally {
       setLoadingVoucherId(null);
     }
+  };
+
+  const renderReceiptJournalLinks = (payment: Payment): React.ReactNode => {
+    const receiptId: number | null = payment.receipt_id ?? null;
+    const journalEntryId: number | null =
+      payment.voucher_journal_id ?? payment.journal_entry_id ?? null;
+    if ((!receiptId || !onViewReceipt) && !journalEntryId) {
+      return <span className="text-xs text-gray-400 dark:text-gray-500">-</span>;
+    }
+
+    return (
+      <div className="flex flex-col items-start gap-1">
+        {receiptId && onViewReceipt && (
+          <button
+            type="button"
+            onClick={() => onViewReceipt(receiptId)}
+            className="inline-flex items-center gap-1 text-xs text-sky-600 hover:underline dark:text-sky-400"
+            title="View receipt details"
+          >
+            <IconReceipt size={14} className="flex-shrink-0" />
+            <span>Receipt #{receiptId}</span>
+          </button>
+        )}
+        {journalEntryId && (
+          <button
+            type="button"
+            onClick={() =>
+              navigate(`/accounting/journal-entries/${journalEntryId}`)
+            }
+            className="inline-flex items-center gap-1 text-xs text-sky-600 hover:underline dark:text-sky-400"
+            title="View journal entry"
+          >
+            <IconReceipt size={14} className="flex-shrink-0" />
+            <span className="font-mono">
+              {payment.journal_reference_no || `#${journalEntryId}`}
+            </span>
+          </button>
+        )}
+      </div>
+    );
   };
 
   const getStatusBadge = (status?: string) => {
@@ -385,18 +427,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                             {getStatusBadge(payment.status)}
                           </td>
                           <td className="px-3 py-3">
-                            {payment.journal_entry_id ? (
-                              <button
-                                onClick={() => navigate(`/accounting/journal-entries/${payment.journal_entry_id}`)}
-                                className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline truncate"
-                                title="View journal entry"
-                              >
-                                <IconReceipt size={14} className="flex-shrink-0" />
-                                <span className="font-mono truncate">{payment.journal_reference_no || `#${payment.journal_entry_id}`}</span>
-                              </button>
-                            ) : (
-                              <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
-                            )}
+                            {renderReceiptJournalLinks(payment)}
                           </td>
                           <td className="px-3 py-3 text-right font-medium text-green-600 dark:text-green-400">
                             {formatCurrency(payment.amount_paid)}
@@ -491,18 +522,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                         {getStatusBadge(payment.status)}
                       </td>
                       <td className="px-3 py-3">
-                        {payment.journal_entry_id ? (
-                          <button
-                            onClick={() => navigate(`/accounting/journal-entries/${payment.journal_entry_id}`)}
-                            className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline truncate"
-                            title="View journal entry"
-                          >
-                            <IconReceipt size={14} className="flex-shrink-0" />
-                            <span className="font-mono truncate">{payment.journal_reference_no || `#${payment.journal_entry_id}`}</span>
-                          </button>
-                        ) : (
-                          <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
-                        )}
+                        {renderReceiptJournalLinks(payment)}
                       </td>
                       <td className="px-3 py-3 text-right font-medium text-green-600 dark:text-green-400">
                         {formatCurrency(payment.amount_paid)}

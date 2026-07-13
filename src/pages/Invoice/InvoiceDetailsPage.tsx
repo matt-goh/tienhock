@@ -2684,6 +2684,9 @@ const InvoiceDetailsPage: React.FC = () => {
           setSelectedReceiptId(null);
           await fetchDetails();
         }}
+        onReferenceUpdated={async (): Promise<void> => {
+          await fetchDetails();
+        }}
       />
       <ConfirmationDialog
         isOpen={showClearEInvoiceConfirm}

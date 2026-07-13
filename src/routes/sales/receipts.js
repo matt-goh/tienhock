@@ -7,6 +7,7 @@ import {
   createReceipt,
   confirmReceipt,
   cancelReceipt,
+  updateReceiptReference,
 } from "../accounting/receipt-service.js";
 
 export default function (pool) {
@@ -105,7 +106,38 @@ export default function (pool) {
     }
   });
 
-  // --- PUT /api/receipts/:id/confirm — pending cheque cleared ---
+  // --- PATCH /api/receipts/:id/reference ---
+  router.patch("/:id/reference", async (req, res) => {
+    const receiptId = parseInt(req.params.id, 10);
+    if (!Number.isInteger(receiptId) || receiptId <= 0) {
+      return res.status(400).json({ message: "Invalid receipt ID" });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await updateReceiptReference(
+        client,
+        receiptId,
+        req.body?.expected_reference,
+        req.body?.reference,
+        req.user?.id || null
+      );
+      await client.query("COMMIT");
+      res.json({ message: "Receipt reference updated", ...result });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error updating receipt reference:", error);
+      res.status(error.status || 400).json({
+        code: error.code,
+        message: error.message || "Error updating receipt reference",
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  // --- PUT /api/receipts/:id/confirm - pending cheque cleared ---
   router.put("/:id/confirm", async (req, res) => {
     const client = await pool.connect();
     try {
