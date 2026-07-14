@@ -26,9 +26,79 @@
 import { generateReceiptReference } from "./payment-journal.js";
 import { determineBankAccount } from "../../utils/payment-helpers.js";
 import { getCustomerDebtorAccountCode } from "./debtorSync.js";
-import { assertTienHockAccountingDateUnlocked } from "./posting-lock.js";
+import {
+  assertTienHockAccountingDateUnlocked,
+  toLocalAccountingDateString,
+} from "./posting-lock.js";
 
 const round2 = (v) => Math.round(parseFloat(v || 0) * 100) / 100;
+
+const CHEQUE_CLEARANCE_DATE_REQUIRED_CODE =
+  "CHEQUE_CLEARANCE_DATE_REQUIRED";
+const CHEQUE_CLEARANCE_DATE_INVALID_CODE = "CHEQUE_CLEARANCE_DATE_INVALID";
+
+/**
+ * @param {string} message
+ * @param {string} code
+ * @returns {Error}
+ */
+function createClearanceDateError(message, code) {
+  const error = new Error(message);
+  error.status = 400;
+  error.code = code;
+  return error;
+}
+
+/**
+ * Require the actual bank-clearance date for a cheque posting.
+ *
+ * @param {unknown} value
+ * @param {string|number|Date} receivedDate
+ * @returns {string}
+ */
+function requireChequeClearanceDate(value, receivedDate) {
+  const clearanceDateValue = typeof value === "string" ? value.trim() : "";
+  if (!clearanceDateValue) {
+    throw createClearanceDateError(
+      "Cheque Clearance Date is required. Select the date the cheque actually cleared the bank.",
+      CHEQUE_CLEARANCE_DATE_REQUIRED_CODE
+    );
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(clearanceDateValue)) {
+    throw createClearanceDateError(
+      "Cheque Clearance Date must be a valid date in yyyy-MM-dd format.",
+      CHEQUE_CLEARANCE_DATE_INVALID_CODE
+    );
+  }
+
+  let clearanceDate;
+  try {
+    clearanceDate = toLocalAccountingDateString(clearanceDateValue);
+  } catch (_error) {
+    throw createClearanceDateError(
+      "Cheque Clearance Date must be a valid date in yyyy-MM-dd format.",
+      CHEQUE_CLEARANCE_DATE_INVALID_CODE
+    );
+  }
+
+  const normalizedReceivedDate = toLocalAccountingDateString(receivedDate);
+  if (clearanceDate < normalizedReceivedDate) {
+    throw createClearanceDateError(
+      `Cheque Clearance Date cannot be before the received date (${normalizedReceivedDate}).`,
+      CHEQUE_CLEARANCE_DATE_INVALID_CODE
+    );
+  }
+
+  const today = toLocalAccountingDateString(new Date());
+  if (clearanceDate > today) {
+    throw createClearanceDateError(
+      "Cheque Clearance Date cannot be in the future.",
+      CHEQUE_CLEARANCE_DATE_INVALID_CODE
+    );
+  }
+
+  return clearanceDate;
+}
 
 /** Normalize a date input (yyyy-MM-dd string, ISO timestamp, unix ms, Date) to a LOCAL yyyy-MM-dd string. */
 export function toLocalDateString(value) {
@@ -179,10 +249,14 @@ async function lockInvoices(client, allocs) {
 
 /**
  * Posts the journal for a receipt and applies invoice balance / customer
- * credit effects. Assumes invoices are already locked and validated.
+ * credit effects. Assumes invoices and the receipt date are already validated;
+ * the accounting posting date is guarded again at the mutation boundary.
  */
 async function postReceiptJournal(client, receipt, allocs, invoiceMap, userId) {
-  assertReceiptDatesUnlocked(receipt, `Receipt ${receipt.id}`);
+  assertTienHockAccountingDateUnlocked(
+    receipt.posting_date,
+    `Receipt ${receipt.id} (posting date)`
+  );
   const isCash = receipt.payment_method === "cash";
   const debitAccount = receipt.debit_account;
   const total = round2(allocs.reduce((s, a) => s + a.amount, 0));
@@ -305,11 +379,22 @@ export async function createReceipt(client, payload, userId) {
   const allocs = normalizeAllocations(payload.allocations);
   const total = round2(allocs.reduce((s, a) => s + a.amount, 0));
   const receivedDate = toLocalDateString(payload.received_date);
-  const postingDate = toLocalDateString(payload.posting_date || payload.received_date);
   const isPending = method === "cheque" && payload.post_immediately !== true;
+  let postingDate = null;
+  if (!isPending) {
+    postingDate =
+      method === "cheque"
+        ? requireChequeClearanceDate(payload.posting_date, receivedDate)
+        : toLocalDateString(payload.posting_date || payload.received_date);
+  }
   const debitAccount = method === "cash" ? "CH_REV2" : determineBankAccount(method, payload.bank_account);
 
-  assertTienHockAccountingDateUnlocked(receivedDate, "Receipt (receipt date)");
+  // A posted-immediately cheque is the compatibility conversion of an
+  // existing pending payment. Its received date is historical; only its new
+  // clearance posting must be in an open accounting period.
+  if (isPending || method !== "cheque") {
+    assertTienHockAccountingDateUnlocked(receivedDate, "Receipt (receipt date)");
+  }
   if (!isPending) {
     assertTienHockAccountingDateUnlocked(postingDate, "Receipt (posting date)");
   }
@@ -358,7 +443,7 @@ export async function createReceipt(client, payload, userId) {
     ]
   );
   const receipt = receiptResult.rows[0];
-  receipt.posting_date = isPending ? null : postingDate;
+  receipt.posting_date = postingDate;
 
   const allocationRows = [];
   for (let i = 0; i < allocs.length; i++) {
@@ -675,7 +760,6 @@ export async function confirmReceiptGroup(
   }
 
   const anchor = anchorResult.rows[0];
-  assertReceiptDatesUnlocked(anchor, `Payment group ${receiptId}`);
   const groupLabel = anchor.display_reference || "this payment";
   if (anchor.status === "cancelled") {
     throw new Error(`Payment group ${groupLabel} is cancelled and cannot be confirmed`);
@@ -845,10 +929,18 @@ export async function confirmReceipt(client, receiptId, options, userId) {
   );
   if (receiptResult.rows.length === 0) throw new Error("Payment group not found");
   const receipt = receiptResult.rows[0];
-  assertReceiptDatesUnlocked(receipt, `Receipt ${receiptId}`);
   if (receipt.status !== "pending") {
     throw new Error(`This payment is ${receipt.status}, not pending`);
   }
+
+  const postingDate = requireChequeClearanceDate(
+    options && options.posting_date,
+    receipt.received_date
+  );
+  assertTienHockAccountingDateUnlocked(
+    postingDate,
+    `Receipt ${receiptId} (cheque clearance date)`
+  );
 
   const allocResult = await client.query(
     `SELECT * FROM receipt_allocations WHERE receipt_id = $1 ORDER BY line_number`,
@@ -864,10 +956,7 @@ export async function confirmReceipt(client, receiptId, options, userId) {
     allocation_id: r.id,
   }));
 
-  receipt.posting_date = toLocalDateString(
-    (options && options.posting_date) || new Date()
-  );
-  assertReceiptDatesUnlocked(receipt, `Receipt ${receiptId}`);
+  receipt.posting_date = postingDate;
   if (options && options.cheque_reference) {
     await client.query(`UPDATE receipts SET cheque_reference = $1 WHERE id = $2`, [
       options.cheque_reference,

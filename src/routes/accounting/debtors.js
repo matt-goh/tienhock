@@ -210,9 +210,10 @@ export default function (pool, config) {
 
   /**
    * As-of-date invoice aging for one or all customers. Each open invoice's
-   * outstanding AS AT the period end = total − active receipts dated ≤ end
-   * − credit notes ≤ end + debit notes ≤ end (never today's mutable
-   * balance_due, so historical statements stay stable).
+   * outstanding AS AT the period end = total − active receipts effective by
+   * the end date − credit notes ≤ end + debit notes ≤ end. Receipt-backed
+   * payments use the accounting posting/clearance date; legacy rows fall back
+   * to payment_date. Never use today's mutable balance_due here.
    */
   const agingSql = `
     SELECT i.customerid,
@@ -224,10 +225,14 @@ export default function (pool, config) {
       SELECT i0.id, i0.customerid,
              (to_timestamp(i0.createddate::bigint / 1000) AT TIME ZONE 'Asia/Kuala_Lumpur')::date AS inv_date,
              i0.totalamountpayable
-             - COALESCE((SELECT SUM(p.amount_paid) FROM payments p
+             - COALESCE((SELECT SUM(p.amount_paid)
+                          FROM payments p
+                          LEFT JOIN receipt_allocations ra
+                            ON ra.id = p.receipt_allocation_id
+                          LEFT JOIN receipts r ON r.id = ra.receipt_id
                           WHERE p.invoice_id = i0.id
                             AND (p.status IS NULL OR p.status = 'active')
-                            AND p.payment_date::date <= $3), 0)
+                            AND COALESCE(r.posting_date, p.payment_date)::date <= $3), 0)
              - COALESCE((SELECT SUM(ad.totalamountpayable) FROM adjustment_documents ad
                           WHERE ad.original_invoice_id = i0.id AND ad.type = 'credit_note'
                             AND ad.status = 'active' AND COALESCE(ad.is_consolidated, false) = false

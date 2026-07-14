@@ -20,6 +20,21 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-14",
+    ms: "Apabila Nombor Rujukan catatan jurnal manual diubah, Nombor Jurnal pada Lejar Akaun kini turut dikemas kini. PCE008/06 tidak lagi dipaparkan sebagai PV008/06 dalam lejar BANK_PBB; amaun, tarikh dan akaunnya tidak diubah.",
+    en: "When a manual journal's Reference No. is changed, its Journal No. in Account Ledger now stays in sync. PCE008/06 no longer appears as PV008/06 in the BANK_PBB ledger; its amount, date, and accounts are unchanged.",
+  },
+  {
+    date: "2026-07-14",
+    ms: "Memadam catatan jurnal kini berjaya walaupun ia dipautkan kepada Nota Kredit, Debit atau Bayaran Balik — pautan ke nota itu dibuang secara automatik. Bagi jurnal yang dipautkan kepada rekod lain (invois, resit, bayaran, atau kemasukan bank), penjelasan yang jelas ditunjukkan dan bukannya ralat pangkalan data.",
+    en: "Deleting a journal entry now works even when it is linked to a Credit, Debit, or Refund Note — the link to the note is cleared automatically. Journals linked to other records (invoices, receipts, payments, or bank-ins) still show a clear explanation instead of a database error.",
+  },
+  {
+    date: "2026-07-14",
+    ms: "Semasa mengesahkan bayaran cek Tien Hock yang tertunda, Tarikh Penjelasan diperlukan. Di Pengurusan Bayaran, pemilih tarikh bermula pada hari ini; ubahnya kepada tarikh sebenar pada penyata bank jika berbeza. Lejar akaun, laporan bank dan pengumuran penghutang menggunakan tarikh penjelasan itu. Empat cek HAPSENG dan TETAP JAYA berjumlah RM39,090.10 yang diterima pada Jun telah dipindahkan ke 7 dan 10 Julai.",
+    en: "A Clearance Date is required when confirming a pending Tien Hock cheque payment. In Payment Management, the date picker starts on today; change it to the actual bank-statement date when different. Account ledgers, bank reports, and debtor aging use that clearance date. Four HAPSENG and TETAP JAYA cheques totalling RM39,090.10 that were received in June have been moved to 7 and 10 July.",
+  },
+  {
+    date: "2026-07-14",
     ms: "Pelanggan Green Target kini boleh mempunyai nama Tapak bagi setiap lokasi. Semua nama Tapak berbeza daripada sewaan dalam satu invois disertakan selepas alamat bil pada e-Invois jualan individu dan nota pelarasannya. Borang pendaftaran awam kini menerima beberapa lokasi, mewajibkan maklumat asas, menggunakan logo Green Target, serta menyembunyikan maklumat e-Invois sehingga pelanggan memilih untuk memerlukannya; maklumat pengenalan e-Invois disahkan sebelum permintaan diterima. Senarai pilihan e-Invois pada borang pelanggan juga kekal di atas bar tindakan supaya semua pilihan boleh dipilih.",
     en: "Green Target customers can now have a Site name for each location. Every distinct Site from the rentals on an invoice is included after the billing address on individual sales e-Invoices and their adjustment notes. The public registration form now accepts multiple locations, requires the basic details, uses the Green Target logo, and hides e-Invoice information until the customer says they need it; e-Invoice identity details are verified before the request is accepted. E-Invoice selection lists on the customer form also remain above the action bar so every option can be selected.",
   },

@@ -26,6 +26,7 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import AccountCodeCombobox from "../../../components/Accounting/AccountCodeCombobox";
 import OpeningBalanceModal from "../../../components/Accounting/OpeningBalanceModal";
 import { api } from "../../../routes/utils/api";
+import { sessionService } from "../../../services/SessionService";
 import { useAccountCodesCache } from "../../../utils/accounting/useAccountingCache";
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import {
@@ -116,6 +117,47 @@ const saveCachedUsageCounts = (data: Record<string, number>): void => {
   }
 };
 
+// Last accessed period, remembered per logged-in user so every return to the
+// page reopens the month they last looked at (unless a deep-link overrides it).
+const LAST_RANGE_STORAGE_KEY_PREFIX: string = "account-ledger-last-range";
+
+const getLastRangeStorageKey = (): string => {
+  const staffId: string = sessionService.getStoredSession()?.staffId || "anon";
+  return `${LAST_RANGE_STORAGE_KEY_PREFIX}:${staffId}`;
+};
+
+const readLastRange = (): { start: string; end: string } | null => {
+  try {
+    const stored: string | null = localStorage.getItem(getLastRangeStorageKey());
+    if (!stored) return null;
+    const parsed: unknown = JSON.parse(stored);
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      typeof (parsed as { start: unknown }).start === "string" &&
+      typeof (parsed as { end: unknown }).end === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test((parsed as { start: string }).start) &&
+      /^\d{4}-\d{2}-\d{2}$/.test((parsed as { end: string }).end)
+    ) {
+      return parsed as { start: string; end: string };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+const saveLastRange = (start: string, end: string): void => {
+  try {
+    localStorage.setItem(
+      getLastRangeStorageKey(),
+      JSON.stringify({ start, end })
+    );
+  } catch {
+    // Ignore storage failures so the page remains usable.
+  }
+};
+
 const AccountLedgerPage: React.FC = () => {
   const navigate = useNavigate();
   const { accountCodes, isLoading: accountsLoading } = useAccountCodesCache();
@@ -168,6 +210,12 @@ const AccountLedgerPage: React.FC = () => {
     const urlStart = parseIso(searchParams.get("start"));
     const urlEnd = parseIso(searchParams.get("end"));
     if (urlStart && urlEnd) return { start: urlStart, end: urlEnd };
+    const saved = readLastRange();
+    if (saved) {
+      const savedStart = parseIso(saved.start);
+      const savedEnd = parseIso(saved.end);
+      if (savedStart && savedEnd) return { start: savedStart, end: savedEnd };
+    }
     const now = new Date();
     return {
       start: new Date(now.getFullYear(), now.getMonth(), 1),
@@ -203,6 +251,15 @@ const AccountLedgerPage: React.FC = () => {
     setRange(next);
     syncUrl(selectedAccount, next);
   };
+
+  // Remember the last accessed period per user so a plain return to the page
+  // (no deep-link params) reopens the same month.
+  useEffect(() => {
+    if (range.start && range.end) {
+      saveLastRange(toLocalIso(range.start), toLocalIso(range.end));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [range.start?.getTime(), range.end?.getTime()]);
 
   // Float a successfully opened ledger to the top of the quick-access list.
   const recordRecentLedger = useCallback((code: string): void => {

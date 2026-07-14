@@ -773,7 +773,15 @@ export default function (pool) {
         UPDATE journal_entries
         SET reference_no = $1, entry_type = $2, entry_date = $3,
             description = $4, total_debit = $5, total_credit = $6,
-            cheque_no = $7, updated_by = $8, updated_at = CURRENT_TIMESTAMP
+            cheque_no = $7,
+            display_reference = CASE
+              WHEN source_type IS NULL
+                AND display_reference IS NOT NULL
+                AND reference_no IS DISTINCT FROM $1
+              THEN $1
+              ELSE display_reference
+            END,
+            updated_by = $8, updated_at = CURRENT_TIMESTAMP
         WHERE id = $9
       `;
 
