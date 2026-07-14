@@ -255,6 +255,8 @@ const PaymentPage: React.FC = () => {
           payments={sortedPayments}
           onViewPayment={handleViewPayment}
           onRefresh={fetchPayments}
+          requiresClearanceDate
+          paymentApiEndpoint="/jellypolly/api/payments"
         />
       )}
 

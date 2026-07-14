@@ -378,6 +378,7 @@ export interface Payment {
   customerid?: string;
   customer_name?: string;
   payment_date: string;
+  posting_date?: string | null;
   amount_paid: number;
   payment_method: "cash" | "cheque" | "bank_transfer" | "online";
   payment_reference?: string;

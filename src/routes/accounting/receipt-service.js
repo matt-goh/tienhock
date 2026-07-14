@@ -30,75 +30,9 @@ import {
   assertTienHockAccountingDateUnlocked,
   toLocalAccountingDateString,
 } from "./posting-lock.js";
+import { requireChequeClearanceDate } from "../utils/cheque-clearance-date.js";
 
 const round2 = (v) => Math.round(parseFloat(v || 0) * 100) / 100;
-
-const CHEQUE_CLEARANCE_DATE_REQUIRED_CODE =
-  "CHEQUE_CLEARANCE_DATE_REQUIRED";
-const CHEQUE_CLEARANCE_DATE_INVALID_CODE = "CHEQUE_CLEARANCE_DATE_INVALID";
-
-/**
- * @param {string} message
- * @param {string} code
- * @returns {Error}
- */
-function createClearanceDateError(message, code) {
-  const error = new Error(message);
-  error.status = 400;
-  error.code = code;
-  return error;
-}
-
-/**
- * Require the actual bank-clearance date for a cheque posting.
- *
- * @param {unknown} value
- * @param {string|number|Date} receivedDate
- * @returns {string}
- */
-function requireChequeClearanceDate(value, receivedDate) {
-  const clearanceDateValue = typeof value === "string" ? value.trim() : "";
-  if (!clearanceDateValue) {
-    throw createClearanceDateError(
-      "Cheque Clearance Date is required. Select the date the cheque actually cleared the bank.",
-      CHEQUE_CLEARANCE_DATE_REQUIRED_CODE
-    );
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(clearanceDateValue)) {
-    throw createClearanceDateError(
-      "Cheque Clearance Date must be a valid date in yyyy-MM-dd format.",
-      CHEQUE_CLEARANCE_DATE_INVALID_CODE
-    );
-  }
-
-  let clearanceDate;
-  try {
-    clearanceDate = toLocalAccountingDateString(clearanceDateValue);
-  } catch (_error) {
-    throw createClearanceDateError(
-      "Cheque Clearance Date must be a valid date in yyyy-MM-dd format.",
-      CHEQUE_CLEARANCE_DATE_INVALID_CODE
-    );
-  }
-
-  const normalizedReceivedDate = toLocalAccountingDateString(receivedDate);
-  if (clearanceDate < normalizedReceivedDate) {
-    throw createClearanceDateError(
-      `Cheque Clearance Date cannot be before the received date (${normalizedReceivedDate}).`,
-      CHEQUE_CLEARANCE_DATE_INVALID_CODE
-    );
-  }
-
-  const today = toLocalAccountingDateString(new Date());
-  if (clearanceDate > today) {
-    throw createClearanceDateError(
-      "Cheque Clearance Date cannot be in the future.",
-      CHEQUE_CLEARANCE_DATE_INVALID_CODE
-    );
-  }
-
-  return clearanceDate;
-}
 
 /** Normalize a date input (yyyy-MM-dd string, ISO timestamp, unix ms, Date) to a LOCAL yyyy-MM-dd string. */
 export function toLocalDateString(value) {
