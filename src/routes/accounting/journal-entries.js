@@ -771,7 +771,7 @@ export default function (pool) {
       // Update entry header
       const updateEntryQuery = `
         UPDATE journal_entries
-        SET reference_no = $1, entry_type = $2, entry_date = $3,
+        SET reference_no = $1::varchar, entry_type = $2, entry_date = $3,
             description = $4, total_debit = $5, total_credit = $6,
             cheque_no = $7,
             display_reference = CASE

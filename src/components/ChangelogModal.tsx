@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-14",
+    ms: "Catatan jurnal manual kini boleh disimpan semula selepas akaun pada barisnya diubah, termasuk pertukaran daripada BANK_PBB kepada akaun lain.",
+    en: "Manual journal entries can now be saved after changing the account on one of their lines, including changing BANK_PBB to another account.",
+  },
+  {
+    date: "2026-07-14",
     ms: "Harga seunit bagi Stok Kilang pada halaman Stok Bahan kini boleh diubah terus, sama seperti kuantiti. Harga ini disimpan untuk halaman itu sahaja mengikut bulan; jika tidak diubah, ia masih diambil daripada harga produk seperti biasa. Nilai stok dikira semula secara automatik apabila harga diubah.",
     en: "The unit price for Stock Kilang on the Material Stock page can now be edited directly, just like the quantity. This price is stored for that page only per month; if left unchanged, it is still taken from the product price as before. The stock value recalculates automatically when the price is changed.",
   },
