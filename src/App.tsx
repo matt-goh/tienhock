@@ -21,6 +21,8 @@ import HomePage from "./pages/HomePage";
 import GreenTargetDashboardPage from "./pages/GreenTarget/GreenTargetDashboardPage";
 import CustomerSignupPage from "./pages/GreenTarget/PublicForm/CustomerSignupPage";
 
+const GT_SIGNUP_PREVIEW_PATH = "/greentarget/dev/customer-signup-preview";
+
 const getCompanyNameFromPath = (pathname: string): string => {
   if (pathname.startsWith("/greentarget")) {
     return "Green Target";
@@ -68,7 +70,9 @@ const Layout: React.FC = () => {
   const location = useLocation();
   const isPDFRoute = location.pathname === "/pdf-viewer";
   const isLoginRoute = location.pathname === "/login";
-  const isPublicFormRoute = location.pathname === "/greentarget-form";
+  const isPublicFormRoute =
+    location.pathname === "/greentarget-form" ||
+    (import.meta.env.DEV && location.pathname === GT_SIGNUP_PREVIEW_PATH);
 
   React.useEffect((): void => {
     if (!isPublicFormRoute) {
@@ -115,6 +119,13 @@ const Layout: React.FC = () => {
           <Routes>
             {/* Public Green Target customer registration form (no auth) */}
             <Route path="/greentarget-form" element={<CustomerSignupPage />} />
+
+            {import.meta.env.DEV && (
+              <Route
+                path={GT_SIGNUP_PREVIEW_PATH}
+                element={<CustomerSignupPage previewMode />}
+              />
+            )}
 
             {/* Login route */}
             <Route
