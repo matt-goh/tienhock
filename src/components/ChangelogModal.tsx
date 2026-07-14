@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-14",
+    ms: "Pemilihan Akaun Induk kini memaparkan kod akaun mengikut hierarki yang boleh dikembangkan atau dikecilkan, supaya akaun induk dan akaun anak lebih mudah dibezakan. Pilihan Tiada akaun induk sentiasa tersedia untuk akaun aras teratas, dan halaman suntingan akaun kini menyenaraikan semua akaun anak terus bersama statusnya.",
+    en: "Parent Account selection now shows account codes in an expandable hierarchy, making parent and child accounts easier to distinguish. A No parent option remains readily available for top-level accounts, and account edit pages now list every direct child account with its status.",
+  },
+  {
+    date: "2026-07-14",
     ms: "Catatan jurnal manual kini boleh disimpan semula selepas akaun pada barisnya diubah, termasuk pertukaran daripada BANK_PBB kepada akaun lain.",
     en: "Manual journal entries can now be saved after changing the account on one of their lines, including changing BANK_PBB to another account.",
   },
