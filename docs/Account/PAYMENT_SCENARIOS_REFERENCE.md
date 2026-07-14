@@ -52,6 +52,7 @@ Dokumen ini menyenaraikan setiap senario invois jualan / bayaran / resit / bank-
 
 ### Notes / Nota
 
+- Jelly Polly follows the same received-date versus clearance-date rule for scenario 7 through `jellypolly.payments.payment_date` and `posting_date`. JP creates no shared bank journal; its debtor statements use the submitted clearance date. / Jelly Polly menggunakan peraturan tarikh diterima dan tarikh penjelasan yang sama bagi senario 7 melalui `jellypolly.payments.payment_date` dan `posting_date`. JP tidak mencipta jurnal bank bersama; penyata penghutangnya menggunakan tarikh penjelasan yang dihantar.
 - **CH_REV1** = physical cash collected from CASH bills, held as undeposited cash until banked in. / Tunai fizikal dikutip daripada bil TUNAI, disimpan sebagai tunai belum dibank sehingga di-bank-in.
 - **CH_REV2** = physical cash collected as a standalone receipt against a CREDIT invoice, held as undeposited cash until banked in. / Tunai fizikal dikutip sebagai resit berasingan untuk invois KREDIT, disimpan sebagai tunai belum dibank sehingga di-bank-in.
 - **CASH_SALES / CR_SALES** = revenue ledgers for cash-bill sales and credit-invoice sales respectively. / Lejar hasil untuk jualan bil tunai dan jualan invois kredit masing-masing.

@@ -1,5 +1,6 @@
 // src/routes/sales/invoices/payments.js
 import { Router } from "express";
+import { requireChequeClearanceDate } from "../utils/cheque-clearance-date.js";
 
 // Helper function (can be moved to a shared util if used elsewhere)
 const updateCustomerCredit = async (client, customerId, amount) => {
@@ -48,6 +49,7 @@ export default function (pool) {
       let query = `
         SELECT
           p.payment_id, p.invoice_id, p.payment_date, p.amount_paid,
+          p.posting_date,
           p.payment_method, p.payment_reference, p.internal_reference,
           p.notes, p.created_at, p.status, p.cancellation_date
         FROM jellypolly.payments p
@@ -100,6 +102,7 @@ export default function (pool) {
       let query = `
         SELECT
           p.payment_id, p.invoice_id, p.payment_date, p.amount_paid,
+          p.posting_date,
           p.payment_method, p.payment_reference, p.internal_reference,
           p.notes, p.created_at, p.status, p.cancellation_date,
           i.customerid, i.salespersonid, c.name as customer_name
@@ -253,8 +256,8 @@ export default function (pool) {
       const insertPaymentQuery = `
   INSERT INTO jellypolly.payments (
     invoice_id, payment_date, amount_paid, payment_method,
-    payment_reference, notes, status
-  ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+    payment_reference, notes, status, posting_date
+  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
   RETURNING *
 `;
 
@@ -269,6 +272,7 @@ export default function (pool) {
         payment_reference || null, // Use null if empty/undefined
         notes || null,
         initialStatus, // Set initial status based on payment method
+        initialStatus === "pending" ? null : payment_date,
       ];
       const paymentResult = await client.query(
         insertPaymentQuery,
@@ -344,6 +348,7 @@ export default function (pool) {
   // --- PUT /api/payments/:payment_id/confirm - Mark pending payment as paid ---
   router.put("/:payment_id/confirm", async (req, res) => {
     const { payment_id } = req.params;
+    const { posting_date } = req.body;
     const paymentIdNum = parseInt(payment_id);
 
     if (isNaN(paymentIdNum)) {
@@ -360,7 +365,7 @@ export default function (pool) {
       FROM jellypolly.payments p
       JOIN jellypolly.invoices i ON p.invoice_id = i.id
       WHERE p.payment_id = $1 AND p.status = 'pending'
-      FOR UPDATE OF i -- Lock the associated invoice row
+      FOR UPDATE OF p, i
     `;
       const paymentResult = await client.query(paymentQuery, [paymentIdNum]);
 
@@ -378,6 +383,10 @@ export default function (pool) {
         invoice_status,
       } = payment;
       const paidAmount = parseFloat(amount_paid || 0);
+      const postingDate = requireChequeClearanceDate(
+        posting_date,
+        payment.payment_date
+      );
 
       // Prevent confirming payment if invoice is cancelled
       if (invoice_status === "cancelled") {
@@ -389,12 +398,13 @@ export default function (pool) {
       // 2. Update payment status to active
       const updatePaymentQuery = `
       UPDATE jellypolly.payments 
-      SET status = 'active'
+      SET status = 'active', posting_date = $2
       WHERE payment_id = $1
       RETURNING *
     `;
       const updateResult = await client.query(updatePaymentQuery, [
         paymentIdNum,
+        postingDate,
       ]);
       const confirmedPayment = updateResult.rows[0];
 
@@ -447,8 +457,11 @@ export default function (pool) {
       await client.query("ROLLBACK");
       console.error("Error confirming payment:", error);
       res
-        .status(500)
-        .json({ message: "Error confirming payment", error: error.message });
+        .status(error.status || 500)
+        .json({
+          message: error.message || "Error confirming payment",
+          code: error.code,
+        });
     } finally {
       client.release();
     }

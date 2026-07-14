@@ -11,6 +11,9 @@ import type {
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
+import TimeNavigator, {
+  type TimeRange,
+} from "../../components/TimeNavigator";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import SubmissionResultsModal from "../../components/Invoice/SubmissionResultsModal";
 import { FormInput, FormListbox } from "../../components/FormComponents";
@@ -184,6 +187,11 @@ const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
   );
 };
 
+const createTodayClearanceRange = (): TimeRange => {
+  const today: Date = new Date();
+  return { start: today, end: today };
+};
+
 // --- Main Component ---
 const InvoiceDetailsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -233,6 +241,9 @@ const InvoiceDetailsPage: React.FC = () => {
     null
   );
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
+  const [clearanceDateRange, setClearanceDateRange] = useState<TimeRange>(
+    createTodayClearanceRange
+  );
   const [showOverpaymentConfirm, setShowOverpaymentConfirm] = useState(false);
   const [overpaymentDetails, setOverpaymentDetails] = useState<{
     totalAmount: number;
@@ -1222,6 +1233,7 @@ const InvoiceDetailsPage: React.FC = () => {
     }
 
     setPaymentToConfirm(payment);
+    setClearanceDateRange(createTodayClearanceRange());
     setShowConfirmPaymentDialog(true);
   };
 
@@ -1233,7 +1245,11 @@ const InvoiceDetailsPage: React.FC = () => {
     const toastId = toast.loading("Confirming payment...");
 
     try {
-      await confirmPayment(paymentToConfirm.payment_id);
+      const clearanceDate: string = format(
+        clearanceDateRange.start,
+        "yyyy-MM-dd"
+      );
+      await confirmPayment(paymentToConfirm.payment_id, clearanceDate);
       toast.success("Payment confirmed successfully.", { id: toastId });
       await fetchDetails(); // Refresh invoice and payment data
     } catch (error) {
@@ -1241,6 +1257,7 @@ const InvoiceDetailsPage: React.FC = () => {
     } finally {
       setIsConfirmingPayment(false);
       setPaymentToConfirm(null);
+      setClearanceDateRange(createTodayClearanceRange());
     }
   };
 
@@ -2425,18 +2442,49 @@ const InvoiceDetailsPage: React.FC = () => {
         />
         <ConfirmationDialog
           isOpen={showConfirmPaymentDialog}
-          onClose={() => setShowConfirmPaymentDialog(false)}
+          onClose={() => {
+            setShowConfirmPaymentDialog(false);
+            setPaymentToConfirm(null);
+            setClearanceDateRange(createTodayClearanceRange());
+          }}
           onConfirm={handleConfirmPaymentConfirm}
           title="Confirm Payment"
-          message={`Are you sure you want to confirm this ${
-            paymentToConfirm?.payment_method
-          } payment of ${formatCurrency(
-            paymentToConfirm?.amount_paid
-          )}? This will mark the payment as paid and update the invoice balance.`}
+          message={
+            <div className="space-y-3">
+              <p>
+                Confirm this {paymentToConfirm?.payment_method} payment of{" "}
+                {formatCurrency(paymentToConfirm?.amount_paid)} and update the
+                invoice balance?
+              </p>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300">
+                  Cheque Clearance Date
+                </label>
+                <TimeNavigator
+                  range={clearanceDateRange}
+                  onChange={(range: TimeRange): void =>
+                    setClearanceDateRange(range)
+                  }
+                  modes={["day"]}
+                  presets={false}
+                  showArrows={false}
+                  size="sm"
+                  disabled={isConfirmingPayment}
+                  className="w-full"
+                  triggerClassName="w-full justify-between"
+                />
+                <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
+                  Use the date the bank statement shows the cheque as cleared.
+                  Debtor statements use this date.
+                </p>
+              </div>
+            </div>
+          }
           confirmButtonText={
             isConfirmingPayment ? "Confirming..." : "Confirm Payment"
           }
           variant="success"
+          allowContentOverflow
         />
         <ConfirmationDialog
           isOpen={showCancelConfirm}

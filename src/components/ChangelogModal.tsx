@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-14",
+    ms: "Pengesahan cek tertunda Jelly Polly kini menggunakan Tarikh Penjelasan yang bermula pada hari ini dan boleh diubah kepada tarikh sebenar pada penyata bank. Tarikh cek diterima kekal dalam sejarah bayaran, manakala penyata penghutang menggunakan tarikh penjelasan. Butang Sahkan dan Batal pada Pengurusan Bayaran Jelly Polly kini mengemas kini bayaran Jelly Polly yang betul.",
+    en: "Jelly Polly pending-cheque confirmation now uses a Clearance Date picker starting on today, which can be changed to the actual bank-statement date. The cheque-received date remains in payment history, while debtor statements use the clearance date. Confirm and Cancel in Jelly Polly Payment Management now update the correct Jelly Polly payment.",
+  },
+  {
+    date: "2026-07-14",
     ms: "Apabila Nombor Rujukan catatan jurnal manual diubah, Nombor Jurnal pada Lejar Akaun kini turut dikemas kini. PCE008/06 tidak lagi dipaparkan sebagai PV008/06 dalam lejar BANK_PBB; amaun, tarikh dan akaunnya tidak diubah.",
     en: "When a manual journal's Reference No. is changed, its Journal No. in Account Ledger now stays in sync. PCE008/06 no longer appears as PV008/06 in the BANK_PBB ledger; its amount, date, and accounts are unchanged.",
   },

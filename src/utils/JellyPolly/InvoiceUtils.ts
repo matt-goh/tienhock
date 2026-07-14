@@ -337,10 +337,14 @@ export const syncCancellationStatus = async (invoiceId: string) => {
 };
 
 // CONFIRM Payment (mark pending payment as paid)
-export const confirmPayment = async (paymentId: number): Promise<Payment> => {
+export const confirmPayment = async (
+  paymentId: number,
+  postingDate: string
+): Promise<Payment> => {
   try {
     const response = await api.put(
-      `/jellypolly/api/payments/${paymentId}/confirm`
+      `/jellypolly/api/payments/${paymentId}/confirm`,
+      { posting_date: postingDate }
     );
     if (!response || !response.payment) {
       throw new Error("Invalid response received after confirming payment.");

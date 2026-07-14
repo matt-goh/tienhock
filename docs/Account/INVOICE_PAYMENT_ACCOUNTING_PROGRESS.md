@@ -341,7 +341,7 @@ The five-ledger recon (§5e) is unaffected — the rewrite only moved TR-side li
 
 **Connected checks:**
 - Trial Balance / statements: CN revenue effects flow automatically via fs_note; the TB shows one Trade Debtors row; **pre-existing limitation stands** — the Balance Sheet's Note 22/7 figures are computed live from invoices and the statements remain YTD-from-Jan-1 with no brought-forward (gap 1A-7, outside this project).
-- GT/JP: GT fully untouched. JP verified — own payments/adjustment routes, shared adjustment factory posts `jp_adjustment`+TR, PaymentForm branches. **Pre-existing cross-company defect found (NOT introduced here): JP's PaymentPage renders the shared `PaymentTable`, whose Confirm/Cancel buttons call TH `/api/payments/:id/...` with JP payment ids** — those actions have always targeted the wrong company's rows. Voucher printing is safe (JP rows lack journal ids → toast). Recommend a JP-endpoint prop or a JP table clone as a separate fix.
+- GT/JP: GT fully untouched. JP keeps its own payments/adjustment routes and shared adjustment factory (`jp_adjustment`+TR). The previously identified shared-`PaymentTable` cross-company Confirm/Cancel defect is resolved in §5k: JP actions now call only `/jellypolly/api/payments`.
 
 ### 5i. 14 Jul 2026 — customer-cheque clearance dates corrected and guarded
 
@@ -360,7 +360,14 @@ The HUP SENG HENG journal stored the user's new editable `reference_no = PCE008/
 
 `dev/migrations/2026-07-14_pce008_display_reference_sync.sql` is the guarded, idempotent one-row repair for the already-edited header. It changes only `display_reference` plus update audit metadata; the journal's date, amounts, accounts, cheque number, status, and all 81 lines remain untouched. Development proof updated **1 header**, then **0** on the required rerun, and returned `reference_no = display_reference = PCE008/06` with balanced RM11,764.40 totals. The intentional legacy displays `PV001/06` through `PV007/06` are not changed. Production was not changed. The separate PCE008 amount/contra check remains open.
 
-**Final user worklist (production snapshot refreshed 14 Jul):** apply the guarded cheque-clearance migration and run its dry-run before/after; apply the PCE008 display-reference repair with the code deployment; complete the full July five-ledger reconciliation; key the five manual RVs; re-date the existing PBE037/06 from 15/07 to the legacy 15/06 (do not create another); check the separate PCE008/06 amount/contra issue; decide invoice 015359; and fix the future-dated REC typo rows.
+### 5k. 14 Jul 2026 — Jelly Polly cheque clearance date and endpoint isolation
+
+- `dev/migrations/2026-07-14_jp_cheque_clearance_dates.sql` adds nullable `jellypolly.payments.posting_date`. `payment_date` remains the received/history date. Existing non-cheque rows are backfilled because they post immediately; historical active cheques remain NULL where no clearance evidence exists, and JP reports use their received date only as a compatibility fallback. Development updated **146** non-cheque rows, then **0** on rerun; all 44 pending cheques remained NULL. Production was not changed.
+- JP Payment Management and Invoice Details now require the same valid, non-future clearance date used by Tien Hock and default their shared `TimeNavigator` to the user's local today. Confirmation rejects a date before the cheque-received date.
+- Shared `PaymentTable` confirm/cancel calls are now endpoint-scoped. JP calls `/jellypolly/api/payments`; it no longer risks mutating a Tien Hock payment with the same numeric id. JP's modal also omits Tien Hock-only bank-account and journal wording.
+- JP debtor details, customer statements, and general statements resolve active payments by `COALESCE(posting_date, payment_date::date)`. JP still creates no shared bank journal, so no BANK_PBB/Account Ledger posting is added.
+
+**Final user worklist (production snapshot refreshed 14 Jul):** apply the guarded TH cheque-clearance migration and run its dry-run before/after; apply the PCE008 display-reference repair and JP cheque-clearance schema migration with the code deployment; complete the full July five-ledger reconciliation; key the five manual RVs; re-date the existing PBE037/06 from 15/07 to the legacy 15/06 (do not create another); check the separate PCE008/06 amount/contra issue; decide invoice 015359; and fix the future-dated REC typo rows.
 
 ---
 

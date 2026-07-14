@@ -40,6 +40,7 @@ interface PaymentTableProps {
   onAddPaymentToGroup?: (payment: Payment) => void;
   onViewPaymentGroup?: (receiptId: number) => void;
   requiresClearanceDate?: boolean;
+  paymentApiEndpoint?: string;
 }
 
 const createTodayClearanceRange = (): TimeRange => {
@@ -55,6 +56,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
   onAddPaymentToGroup,
   onViewPaymentGroup,
   requiresClearanceDate = false,
+  paymentApiEndpoint = "/api/payments",
 }) => {
   const navigate = useNavigate();
   const [confirmingPaymentId, setConfirmingPaymentId] = useState<number | null>(
@@ -72,6 +74,8 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
   );
   const [loadingVoucherId, setLoadingVoucherId] = useState<number | null>(null);
   const { customers } = useCustomersCache();
+  const usesTienHockReceiptAccounting: boolean =
+    paymentApiEndpoint === "/api/payments";
 
   const formatCurrency = (amount: number | string): string => {
     const num = Number(amount);
@@ -105,8 +109,11 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
     try {
       const confirmedPayments = await confirmPayment(
         selectedPayment.payment_id,
-        selectedPayment.receipt_id ? undefined : selectedBankAccount,
-        requiresClearanceDate ? clearanceDate : undefined
+        selectedPayment.receipt_id || !usesTienHockReceiptAccounting
+          ? undefined
+          : selectedBankAccount,
+        requiresClearanceDate ? clearanceDate : undefined,
+        paymentApiEndpoint
       );
       let successMessage = "Payment confirmed successfully.";
       if (confirmedPayments.length > 1) {
@@ -146,6 +153,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
     try {
       await cancelPayment(selectedPayment.payment_id, undefined, {
         showErrorToast: !onCancellationError,
+        apiEndpoint: paymentApiEndpoint,
       });
       toast.success("Payment cancelled successfully");
       onRefresh();
@@ -292,7 +300,6 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
   const selectedConfirmationIsReceiptBacked: boolean = Boolean(
     selectedPayment?.receipt_id
   );
-
   if (payments.length === 0) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center">
@@ -704,7 +711,8 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                 </div>
               )}
 
-              {selectedConfirmationIsReceiptBacked ? (
+              {usesTienHockReceiptAccounting &&
+              selectedConfirmationIsReceiptBacked ? (
                 <div className="rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
                   <p className="text-xs text-default-500 dark:text-gray-400">
                     Deposit to
@@ -718,7 +726,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                     This is the account recorded when the payment was entered.
                   </p>
                 </div>
-              ) : (
+              ) : usesTienHockReceiptAccounting ? (
                 <div>
                   <FormListbox
                     name="bank_account"
@@ -737,7 +745,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                     Choose the bank account for this older pending payment.
                   </p>
                 </div>
-              )}
+              ) : null}
 
               {requiresClearanceDate && (
                 <div>
@@ -759,14 +767,17 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                   />
                   <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
                     Use the date the bank statement shows the cheque as cleared.
-                    This date controls the bank and account-ledger reports.
+                    {usesTienHockReceiptAccounting
+                      ? " This date controls the bank and account-ledger reports."
+                      : " This date controls Jelly Polly debtor statements."}
                   </p>
                 </div>
               )}
 
               <p className="text-xs text-default-500 dark:text-gray-400">
-                Confirming updates the related invoice balances and creates the
-                payment journal entries.
+                {usesTienHockReceiptAccounting
+                  ? "Confirming updates the related invoice balances and creates the payment journal entries."
+                  : "Confirming updates the related invoice balance using the clearance date above."}
               </p>
             </div>
           }
