@@ -423,7 +423,7 @@ export default function (pool) {
       }
 
       const productResult = await pool.query(
-        "SELECT id, type FROM products WHERE id = $1",
+        "SELECT id, type, price_per_unit FROM products WHERE id = $1",
         [product_id]
       );
       const product = productResult.rows[0];
@@ -434,7 +434,12 @@ export default function (pool) {
         });
       }
 
-      if (quantityNumber === 0) {
+      // A zero-quantity row is only cleared when its unit cost is back at the
+      // product default; a non-default price is a deliberate override we keep.
+      const defaultCostCents = Math.round(Number(product.price_per_unit) * 100);
+      const unitCostCents = Math.round(unitCostNumber * 100);
+
+      if (quantityNumber === 0 && unitCostCents === defaultCostCents) {
         await pool.query(
           `
             DELETE FROM material_stock_kilang_entries
@@ -536,12 +541,18 @@ export default function (pool) {
       const productIds = [...new Set(normalizedEntries.map((entry) => entry.product_id))];
       const productsResult = productIds.length
         ? await client.query(
-            "SELECT id, type FROM products WHERE id = ANY($1::varchar[])",
+            "SELECT id, type, price_per_unit FROM products WHERE id = ANY($1::varchar[])",
             [productIds]
           )
         : { rows: [] };
       const productTypes = new Map(
         productsResult.rows.map((product) => [product.id, product.type])
+      );
+      const productDefaultCostCents = new Map(
+        productsResult.rows.map((product) => [
+          product.id,
+          Math.round(Number(product.price_per_unit) * 100),
+        ])
       );
 
       if (
@@ -568,7 +579,11 @@ export default function (pool) {
 
       let savedCount = 0;
       for (const entry of normalizedEntries) {
-        if (entry.quantity === 0) continue;
+        // Keep a zero-quantity row only when it carries a non-default price
+        // override; a default-priced empty row has nothing worth storing.
+        const unitCostCents = Math.round(entry.unit_cost * 100);
+        const defaultCostCents = productDefaultCostCents.get(entry.product_id);
+        if (entry.quantity === 0 && unitCostCents === defaultCostCents) continue;
 
         await client.query(
           `

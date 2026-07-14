@@ -1853,15 +1853,15 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
       let stockKilangSaved = false;
 
       if (hasStockKilangUnsavedChanges) {
-        const stockKilangEntries: StockKilangSaveEntry[] = stockKilang
-          .map((item: StockKilangItem) => ({
+        // Send every row (including zero-quantity price overrides); the backend
+        // keeps only rows with a quantity or a non-default unit cost.
+        const stockKilangEntries: StockKilangSaveEntry[] = stockKilang.map(
+          (item: StockKilangItem) => ({
             product_id: item.product_id,
             quantity: item.quantity,
             unit_cost: item.unit_cost,
-          }))
-          .filter(
-            (entry: StockKilangSaveEntry) => entry.quantity !== 0
-          );
+          })
+        );
 
         await api.post("/api/materials/stock-kilang/batch", {
           year,
