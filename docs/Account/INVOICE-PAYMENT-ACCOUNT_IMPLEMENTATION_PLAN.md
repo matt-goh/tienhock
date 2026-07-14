@@ -376,7 +376,7 @@ Miscellaneous non-sales RV receipts such as worker repayments or vendor refunds 
 
 - Replace the current frontend loop with one atomic backend request containing header plus allocations.
 - Support cash, cheque, bank transfer, and online methods already present in the app.
-- Store `received_date` separately from nullable `cleared_at`/accounting posting date. A pending cheque has no journal or balance effect; confirmation preserves when it was received and posts on the actual clearance date.
+- Store `received_date` separately from nullable `cleared_at`/accounting posting date. A pending cheque has no journal or balance effect; confirmation preserves when it was received and posts on the actual clearance date. The confirmation UI must show and submit that date; Payment Management defaults its local-date picker to today for convenience, and the user changes it to the actual bank-statement date when different. The backend must never silently substitute the received date or server date.
 - Support one/many invoices, one/many customers where business data requires it, partial allocations, and one unapplied excess.
 - Show invoice balance as of the receipt transaction, not only today's mutable balance.
 - Validate totals in the transaction: received total = allocated total + unapplied excess.
