@@ -31,13 +31,16 @@ export default function (pool, defaultConfig) {
               c.email,
               c.state,
               r.rental_id,
-              l.address as location_address
+              l.address as location_address,
+              l.site as location_site
         FROM greentarget.invoices i
         JOIN greentarget.customers c ON i.customer_id = c.customer_id
         LEFT JOIN greentarget.invoice_rentals ir ON i.invoice_id = ir.invoice_id
         LEFT JOIN greentarget.rentals r ON ir.rental_id = r.rental_id
         LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
         WHERE i.invoice_id = $1
+        ORDER BY (NULLIF(BTRIM(l.address), '') IS NULL),
+                 r.rental_id ASC NULLS LAST
       `;
       const invoiceResult = await pool.query(invoiceQuery, [invoiceId]);
 
@@ -49,6 +52,14 @@ export default function (pool, defaultConfig) {
       }
 
       const invoice = invoiceResult.rows[0];
+      const invoiceSites = Array.from(
+        new Map(
+          invoiceResult.rows
+            .map((row) => String(row.location_site || "").trim())
+            .filter(Boolean)
+            .map((site) => [site.toLocaleLowerCase("en-MY"), site])
+        ).values()
+      );
 
       // 2. Check if invoice already has an e-Invoice (now directly in the invoices table)
       const existingCheckQuery = `
@@ -80,6 +91,7 @@ export default function (pool, defaultConfig) {
         email: invoice.email,
         state: invoice.state,
         address: invoice.location_address || "Tong Location",
+        sites: invoiceSites,
       };
 
       // 4. Submit to MyInvois

@@ -41,6 +41,7 @@ interface Customer {
 interface Location {
   location_id: number;
   customer_id: number;
+  site?: string | null;
   address: string;
   phone_number?: string | null;
 }
@@ -88,6 +89,11 @@ interface Rental {
   pickup_destination?: string | null;
   addon_count?: number;
 }
+
+const formatLocationLabel = (location: Location): string => {
+  const site: string = location.site?.trim() || "";
+  return site ? `${site} — ${location.address}` : location.address;
+};
 
 // Helper to format date
 const formatDateForInput = (dateString: string | null): string => {
@@ -725,7 +731,7 @@ const RentalFormPage: React.FC = () => {
   }));
   const locationOptions: SelectOption[] = customerLocations.map((l) => ({
     id: l.location_id,
-    name: l.address,
+    name: formatLocationLabel(l),
     phone_number: l.phone_number,
   }));
   const driverOptions: SelectOption[] = drivers.map((d) => ({
@@ -894,7 +900,9 @@ const RentalFormPage: React.FC = () => {
                             const l = customerLocations.find(
                               (loc) => loc.location_id === formData.location_id
                             );
-                            const a = l?.address || "No Specific Location";
+                            const locationLabel = l
+                              ? formatLocationLabel(l)
+                              : "No Specific Location";
                             const p = l?.phone_number;
                             const cp = customers.find(
                               (c) => c.customer_id === formData.customer_id
@@ -903,7 +911,7 @@ const RentalFormPage: React.FC = () => {
                             return (
                               <div className="flex flex-col">
                                 <span className="block truncate font-medium">
-                                  {a}
+                                  {locationLabel}
                                 </span>
                                 {s && (
                                   <span className="text-xs text-default-500 dark:text-gray-400 flex items-center mt-0.5">
@@ -991,7 +999,7 @@ const RentalFormPage: React.FC = () => {
                                             : "font-normal"
                                         )}
                                       >
-                                        {l.address}
+                                        {formatLocationLabel(l)}
                                       </span>
                                       {l.phone_number &&
                                         l.phone_number !==
@@ -1547,9 +1555,10 @@ const RentalFormPage: React.FC = () => {
                   location_id: null,
                 }));
                 setCustomerQuery("");
-                if (data.address) {
+                if (data.site && data.address) {
                   await greenTargetApi.createLocation({
                     customer_id: n,
+                    site: data.site,
                     address: data.address,
                     phone_number: data.phone_number,
                   });
@@ -1576,9 +1585,10 @@ const RentalFormPage: React.FC = () => {
         onSubmit={async (data) => {
           setIsNewLocationModalOpen(false);
           try {
-            if (data.address && formData.customer_id) {
+            if (data.site && data.address && formData.customer_id) {
               const r = await greenTargetApi.createLocation({
                 customer_id: formData.customer_id,
+                site: data.site,
                 address: data.address,
                 phone_number: data.phone_number,
               });

@@ -1,19 +1,28 @@
 // src/components/GreenTarget/LocationFormModal.tsx
 import React, { useState, useEffect, useRef } from "react";
-import { IconMapPin, IconPhone } from "@tabler/icons-react";
+import { IconBuilding, IconMapPin, IconPhone } from "@tabler/icons-react";
 import Button from "../Button";
+
+interface LocationFormData {
+  site: string;
+  address: string;
+  phone_number: string;
+  customer_id?: number;
+  customer_name?: string;
+}
+
+interface LocationFormErrors {
+  site?: string;
+  address?: string;
+}
 
 interface LocationFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (locationData: {
-    address: string;
-    phone_number: string;
-    customer_id?: number;
-    customer_name?: string;
-  }) => void;
+  onSubmit: (locationData: LocationFormData) => void;
   title?: string;
   initialData?: {
+    site?: string;
     address?: string;
     phone_number?: string;
     location_id?: number;
@@ -29,18 +38,19 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
   onClose,
   onSubmit,
   title,
-  initialData = { address: "", phone_number: "" },
+  initialData = { site: "", address: "", phone_number: "" },
   customerPhoneNumber = "",
   isCreatingCustomer = false,
   customerName = "",
   customerId,
 }) => {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<LocationFormData>({
+    site: initialData.site || "",
     address: initialData.address || "",
     phone_number: initialData.phone_number || "",
     customer_name: customerName || "",
   });
-  const [errors, setErrors] = useState<{ address?: string }>({});
+  const [errors, setErrors] = useState<LocationFormErrors>({});
 
   // Add ref for modal content
   const modalRef = useRef<HTMLDivElement>(null);
@@ -72,6 +82,7 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setFormData({
+        site: initialData.site || "",
         address: initialData.address || "",
         phone_number: initialData.phone_number || "",
         customer_name: customerName || "",
@@ -80,27 +91,37 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
     }
   }, [isOpen]); // Only depend on isOpen to prevent resets during typing
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
 
     // Clear validation error when user types
-    if (name === "address" && errors.address) {
-      setErrors({});
+    if ((name === "site" || name === "address") && errors[name]) {
+      setErrors((currentErrors: LocationFormErrors) => ({
+        ...currentErrors,
+        [name]: undefined,
+      }));
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
 
-    // Validate form
+    const validationErrors: LocationFormErrors = {};
+    if (!formData.site.trim()) {
+      validationErrors.site = "Site is required";
+    }
     if (!formData.address.trim()) {
-      setErrors({ address: "Address is required" });
+      validationErrors.address = "Address is required";
+    }
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
       return;
     }
 
     // Prepare data for submission based on context
-    const submitData = {
+    const submitData: LocationFormData = {
+      site: formData.site.trim(),
       address: formData.address.trim(),
       phone_number: formData.phone_number.trim(),
       ...(customerId && { customer_id: customerId }),
@@ -154,6 +175,37 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
               </div>
             )}
 
+            {/* Site Field */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-default-600 dark:text-gray-300 mb-1">
+                Site
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-default-400 dark:text-gray-400">
+                  <IconBuilding size={18} />
+                </span>
+                <input
+                  type="text"
+                  name="site"
+                  value={formData.site}
+                  onChange={handleChange}
+                  maxLength={100}
+                  required
+                  className={`w-full pl-10 pr-3 py-2 border ${
+                    errors.site
+                      ? "border-rose-300 dark:border-rose-500 focus:border-rose-500"
+                      : "border-default-300 dark:border-gray-600 focus:border-default-500 dark:focus:border-sky-500"
+                  } rounded-lg focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
+                  placeholder="e.g. Kolombong"
+                />
+              </div>
+              {errors.site && (
+                <p className="mt-1 text-sm text-rose-600 dark:text-rose-400">
+                  {errors.site}
+                </p>
+              )}
+            </div>
+
             {/* Location Address Field */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-default-600 dark:text-gray-300 mb-1">
@@ -168,6 +220,8 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
                   name="address"
                   value={formData.address}
                   onChange={handleChange}
+                  maxLength={255}
+                  required
                   className={`w-full pl-10 pr-3 py-2 border ${
                     errors.address
                       ? "border-rose-300 dark:border-rose-500 focus:border-rose-500"
@@ -195,6 +249,7 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
                   name="phone_number"
                   value={formData.phone_number}
                   onChange={handleChange}
+                  maxLength={20}
                   className="w-full pl-10 pr-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg focus:outline-none focus:border-default-500 dark:focus:border-sky-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                   placeholder={`Custom phone number (optional, default: ${
                     customerPhoneNumber || "none"

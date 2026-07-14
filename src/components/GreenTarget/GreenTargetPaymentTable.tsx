@@ -1,19 +1,34 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Payment } from "../../types/types";
+import {
+  IconBan,
+  IconCircleCheck,
+  IconReceipt,
+} from "@tabler/icons-react";
+import toast from "react-hot-toast";
+import { greenTargetApi } from "../../routes/greentarget/api";
 import { GreenTargetPayment } from "../../types/greenTargetTypes";
 import Button from "../Button";
 import ConfirmationDialog from "../ConfirmationDialog";
-import { FormListbox } from "../FormComponents";
-import { IconCircleCheck, IconBan, IconReceipt } from "@tabler/icons-react";
-import { greenTargetApi } from "../../routes/greentarget/api";
-import toast from "react-hot-toast";
 
 interface GreenTargetPaymentTableProps {
   payments: GreenTargetPayment[];
   onViewPayment: (payment: GreenTargetPayment) => void;
   onRefresh: () => void;
 }
+
+interface ApiErrorShape {
+  message?: string;
+  data?: {
+    message?: string;
+  };
+}
+
+const getApiErrorMessage = (error: unknown, fallback: string): string => {
+  if (typeof error !== "object" || error === null) return fallback;
+  const apiError: ApiErrorShape = error as ApiErrorShape;
+  return apiError.data?.message || apiError.message || fallback;
+};
 
 const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
   payments,
@@ -27,53 +42,56 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
   const [cancellingPaymentId, setCancellingPaymentId] = useState<number | null>(
     null
   );
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<GreenTargetPayment | null>(null);
-  const [selectedBankAccount, setSelectedBankAccount] = useState<string>("BANK_PBB"); // Default to Public Bank
+  const [showConfirmDialog, setShowConfirmDialog] = useState<boolean>(false);
+  const [showCancelDialog, setShowCancelDialog] = useState<boolean>(false);
+  const [selectedPayment, setSelectedPayment] =
+    useState<GreenTargetPayment | null>(null);
 
   const formatCurrency = (amount: number | string): string => {
-    const num = Number(amount);
-    return isNaN(num)
+    const numericAmount: number = Number(amount);
+    return Number.isNaN(numericAmount)
       ? "RM 0.00"
-      : num.toLocaleString("en-MY", {
+      : numericAmount.toLocaleString("en-MY", {
           style: "currency",
           currency: "MYR",
         });
   };
 
-  const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString("en-GB", {
+  const formatDate = (dateString: string): string =>
+    new Date(dateString).toLocaleDateString("en-GB", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
     });
-  };
 
-  const handleConfirmPayment = async () => {
-    if (!selectedPayment) return;
+  const handleConfirmPayment = async (): Promise<void> => {
+    if (!selectedPayment || confirmingPaymentId !== null) {
+      return;
+    }
 
     setConfirmingPaymentId(selectedPayment.payment_id);
     setShowConfirmDialog(false);
-    const toastId = toast.loading("Confirming payment(s)...");
+    const toastId: string = toast.loading("Confirming payment...");
 
     try {
-      await greenTargetApi.confirmPayment(selectedPayment.payment_id, selectedBankAccount);
+      await greenTargetApi.confirmPayment(selectedPayment.payment_id);
       toast.success("Payment confirmed successfully", { id: toastId });
-      onRefresh(); // This will refetch all payments and update the table
-    } catch (error) {
-      // Error is already toasted by API, just log it and dismiss loading.
+      onRefresh();
+    } catch (error: unknown) {
       console.error("Error confirming payment:", error);
-      toast.error("Failed to confirm payment", { id: toastId });
+      toast.error(getApiErrorMessage(error, "Failed to confirm payment"), {
+        id: toastId,
+      });
     } finally {
       setConfirmingPaymentId(null);
       setSelectedPayment(null);
-      setSelectedBankAccount("BANK_PBB"); // Reset to default
     }
   };
 
-  const handleCancelPayment = async () => {
-    if (!selectedPayment) return;
+  const handleCancelPayment = async (): Promise<void> => {
+    if (!selectedPayment || cancellingPaymentId !== null) {
+      return;
+    }
 
     setCancellingPaymentId(selectedPayment.payment_id);
     setShowCancelDialog(false);
@@ -82,74 +100,175 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
       await greenTargetApi.cancelPayment(selectedPayment.payment_id);
       toast.success("Payment cancelled successfully");
       onRefresh();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error cancelling payment:", error);
-      toast.error("Failed to cancel payment");
+      toast.error(getApiErrorMessage(error, "Failed to cancel payment"));
     } finally {
       setCancellingPaymentId(null);
       setSelectedPayment(null);
     }
   };
 
-  const getStatusBadge = (status?: string) => {
+  const openConfirmDialog = (payment: GreenTargetPayment): void => {
+    setSelectedPayment(payment);
+    setShowConfirmDialog(true);
+  };
+
+  const openCancelDialog = (payment: GreenTargetPayment): void => {
+    setSelectedPayment(payment);
+    setShowCancelDialog(true);
+  };
+
+  const getStatusBadge = (
+    status?: GreenTargetPayment["status"]
+  ): React.ReactNode => {
     switch (status) {
       case "pending":
         return (
-          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300">
+          <span className="inline-flex rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300">
             Pending
-          </span>
-        );
-      case "overpaid":
-        return (
-          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300">
-            Overpaid
           </span>
         );
       case "cancelled":
         return (
-          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300">
+          <span className="inline-flex rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700 dark:bg-red-900/50 dark:text-red-300">
             Cancelled
           </span>
         );
       default:
         return (
-          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300">
+          <span className="inline-flex rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700 dark:bg-green-900/50 dark:text-green-300">
             Settled
           </span>
         );
     }
   };
 
-  // Group payments by payment_reference
-  const groupedPayments = payments.reduce((acc, payment) => {
-    const key = payment.payment_reference || `single_${payment.payment_id}`;
-    if (!acc[key]) {
-      acc[key] = [];
-    }
-    acc[key].push(payment);
-    return acc;
-  }, {} as Record<string, GreenTargetPayment[]>);
+  const groupedPayments: Record<string, GreenTargetPayment[]> = payments.reduce(
+    (
+      groups: Record<string, GreenTargetPayment[]>,
+      payment: GreenTargetPayment
+    ): Record<string, GreenTargetPayment[]> => {
+      const paymentDate: string = String(payment.payment_date).slice(0, 10);
+      const statusGroup: "active" | "pending" | "cancelled" =
+        payment.status === "pending"
+          ? "pending"
+          : payment.status === "cancelled"
+          ? "cancelled"
+          : "active";
+      const groupKey: string = payment.payment_reference
+        ? [
+            payment.payment_reference,
+            paymentDate,
+            payment.payment_method,
+            statusGroup,
+          ].join("::")
+        : `single_${payment.payment_id}`;
 
-  // Sort groups so that groups with any pending payments appear at the top
-  const sortedGroupEntries = Object.entries(groupedPayments).sort(([, groupA], [, groupB]) => {
-    // Check if any payment in group A has pending status
-    const groupAHasPending = groupA.some(p => p.status === 'pending');
-    // Check if any payment in group B has pending status
-    const groupBHasPending = groupB.some(p => p.status === 'pending');
-    
-    // First priority: groups with pending payments go to top
-    if (groupAHasPending && !groupBHasPending) return -1;
-    if (!groupAHasPending && groupBHasPending) return 1;
-    
-    // Second priority: sort by payment date (newest first)
-    const dateA = new Date(groupA[0].payment_date).getTime();
-    const dateB = new Date(groupB[0].payment_date).getTime();
-    return dateB - dateA;
-  });
+      if (!groups[groupKey]) {
+        groups[groupKey] = [];
+      }
+      groups[groupKey].push(payment);
+      return groups;
+    },
+    {}
+  );
+
+  const sortedGroupEntries: [string, GreenTargetPayment[]][] = Object.entries(
+    groupedPayments
+  ).sort(
+    (
+      [, firstGroup]: [string, GreenTargetPayment[]],
+      [, secondGroup]: [string, GreenTargetPayment[]]
+    ): number => {
+      const firstGroupHasPending: boolean = firstGroup.some(
+        (payment: GreenTargetPayment): boolean => payment.status === "pending"
+      );
+      const secondGroupHasPending: boolean = secondGroup.some(
+        (payment: GreenTargetPayment): boolean => payment.status === "pending"
+      );
+
+      if (firstGroupHasPending && !secondGroupHasPending) {
+        return -1;
+      }
+      if (!firstGroupHasPending && secondGroupHasPending) {
+        return 1;
+      }
+
+      const firstDate: string = String(firstGroup[0].payment_date).slice(0, 10);
+      const secondDate: string = String(secondGroup[0].payment_date).slice(
+        0,
+        10
+      );
+      return secondDate.localeCompare(firstDate);
+    }
+  );
+
+  const renderPaymentActions = (
+    payment: GreenTargetPayment
+  ): React.ReactNode => (
+    <div className="flex justify-center gap-1">
+      {payment.status === "pending" && (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          color="sky"
+          onClick={(): void => openConfirmDialog(payment)}
+          disabled={
+            confirmingPaymentId === payment.payment_id ||
+            cancellingPaymentId === payment.payment_id
+          }
+          title="Confirm Payment"
+        >
+          <IconCircleCheck size={16} />
+        </Button>
+      )}
+      {payment.status !== "cancelled" && (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          color="rose"
+          onClick={(): void => openCancelDialog(payment)}
+          disabled={
+            cancellingPaymentId === payment.payment_id ||
+            confirmingPaymentId === payment.payment_id
+          }
+          title="Cancel Payment"
+        >
+          <IconBan size={16} />
+        </Button>
+      )}
+    </div>
+  );
+
+  const renderJournalLink = (
+    payment: GreenTargetPayment
+  ): React.ReactNode =>
+    payment.journal_entry_id ? (
+      <button
+        type="button"
+        onClick={(): void =>
+          navigate(
+            `/greentarget/accounting/journal-entries/${payment.journal_entry_id}`
+          )
+        }
+        className="inline-flex items-center gap-1 text-xs text-sky-600 hover:text-sky-800 hover:underline dark:text-sky-400 dark:hover:text-sky-300"
+        title="View journal entry"
+      >
+        <IconReceipt size={14} />
+        <span className="font-mono">
+          {payment.journal_reference_no || `#${payment.journal_entry_id}`}
+        </span>
+      </button>
+    ) : (
+      <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
+    );
 
   if (payments.length === 0) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center">
+      <div className="rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <p className="text-gray-500 dark:text-gray-400">
           No payments found for the selected filters.
         </p>
@@ -157,354 +276,312 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
     );
   }
 
+  const tableHeaderClassName: string =
+    "whitespace-nowrap px-3 py-3 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400";
+
   return (
     <>
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-900/50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Date
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Reference
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Internal Ref
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Invoice(s)
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Customer
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Method
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Journal Entry
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Amount
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-            {sortedGroupEntries.map(
-              ([reference, paymentGroup]) => {
-                const isGrouped = paymentGroup.length > 1;
-                const firstPayment = paymentGroup[0];
-                const totalAmount = paymentGroup.reduce(
-                  (sum, p) => sum + (p.amount_paid || 0),
-                  0
-                );
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1100px] divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-900/50">
+              <tr>
+                <th className={`${tableHeaderClassName} text-left`}>Date</th>
+                <th className={`${tableHeaderClassName} text-left`}>
+                  Reference
+                </th>
+                <th className={`${tableHeaderClassName} text-left`}>
+                  Internal Ref
+                </th>
+                <th className={`${tableHeaderClassName} text-left`}>
+                  Invoice(s)
+                </th>
+                <th className={`${tableHeaderClassName} text-left`}>
+                  Customer
+                </th>
+                <th className={`${tableHeaderClassName} text-left`}>Method</th>
+                <th className={`${tableHeaderClassName} text-left`}>Status</th>
+                <th className={`${tableHeaderClassName} text-left`}>
+                  Journal Entry
+                </th>
+                <th className={`${tableHeaderClassName} text-right`}>
+                  Amount
+                </th>
+                <th className={`${tableHeaderClassName} text-center`}>
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
+              {sortedGroupEntries.map(
+                ([groupKey, paymentGroup]: [
+                  string,
+                  GreenTargetPayment[]
+                ]): React.ReactNode => {
+                  const isGrouped: boolean = paymentGroup.length > 1;
+                  const firstPayment: GreenTargetPayment = paymentGroup[0];
+                  const totalAmount: number = paymentGroup.reduce(
+                    (sum: number, payment: GreenTargetPayment): number =>
+                      sum + Number(payment.amount_paid || 0),
+                    0
+                  );
+                  const groupStatus: GreenTargetPayment["status"] =
+                    paymentGroup.some(
+                      (payment: GreenTargetPayment): boolean =>
+                        payment.status === "pending"
+                    )
+                      ? "pending"
+                      : paymentGroup.every(
+                          (payment: GreenTargetPayment): boolean =>
+                            payment.status === "cancelled"
+                        )
+                      ? "cancelled"
+                      : "active";
 
-                if (isGrouped) {
-                  // Render grouped payments
-                  return (
-                    <React.Fragment key={reference}>
-                      <tr className="bg-gray-50 dark:bg-gray-900/50">
-                        <td className="px-6 py-3 whitespace-nowrap text-sm">
-                          {formatDate(firstPayment.payment_date)}
-                        </td>
-                        <td className="px-6 py-3 whitespace-nowrap">
-                          <span className="font-medium text-gray-900 dark:text-gray-100">
-                            {firstPayment.payment_reference}
-                          </span>
-                          <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                            ({paymentGroup.length} invoices)
-                          </span>
-                        </td>
-                        <td
-                          className="px-6 py-3 text-sm text-gray-500 dark:text-gray-400"
-                          colSpan={2}
-                        >
-                          Multiple invoices
-                        </td>
-                        <td className="px-6 py-3 whitespace-nowrap">
-                          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 capitalize">
-                            {firstPayment.payment_method.replace("_", " ")}
-                          </span>
-                        </td>
-                        <td className="px-6 py-3 whitespace-nowrap">
-                          {getStatusBadge(firstPayment.status)}
-                        </td>
-                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          -
-                        </td>
-                        <td className="px-6 py-3 whitespace-nowrap text-right font-medium text-green-600 dark:text-green-400">
-                          {formatCurrency(totalAmount)}
-                        </td>
-                        <td className="px-6 py-3 whitespace-nowrap text-center">
-                          -
-                        </td>
-                      </tr>
-                      {paymentGroup.map((payment) => (
-                        <tr key={payment.payment_id} className="bg-white dark:bg-gray-800">
-                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 pl-12">
-                            └
+                  if (isGrouped) {
+                    return (
+                      <React.Fragment key={groupKey}>
+                        <tr className="bg-sky-50/80 dark:bg-sky-950/30">
+                          <td className="border-l-4 border-sky-400 px-3 py-3 text-sm font-medium text-gray-800 dark:border-sky-600 dark:text-gray-100">
+                            {formatDate(firstPayment.payment_date)}
                           </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            -
-                          </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-sm font-mono text-gray-500 dark:text-gray-400">
-                            {payment.internal_reference || "-"}
-                          </td>
-                          <td className="px-6 py-3 whitespace-nowrap">
-                            <button
-                              onClick={() => onViewPayment(payment)}
-                              className="text-sm text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
+                          <td className="max-w-[170px] px-3 py-3">
+                            <div
+                              className="truncate font-mono font-semibold text-gray-900 dark:text-gray-100"
+                              title={firstPayment.payment_reference || ""}
                             >
-                              {payment.invoice_id}
-                            </button>
+                              {firstPayment.payment_reference}
+                            </div>
+                            <span className="mt-1 inline-flex rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700 dark:bg-sky-900/50 dark:text-sky-300">
+                              {paymentGroup.length} invoices
+                            </span>
                           </td>
                           <td
-                            className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100"
-                            title={payment.customerid}
+                            className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400"
+                            colSpan={3}
                           >
-                            <div className="truncate max-w-60">
-                              {payment.customer_name}
-                            </div>
+                            Multiple invoices
                           </td>
-                          <td className="px-6 py-3 whitespace-nowrap">-</td>
-                          <td className="px-6 py-3 whitespace-nowrap">
-                            {getStatusBadge(payment.status)}
+                          <td className="px-3 py-3">
+                            <span className="inline-flex rounded-full bg-blue-50 px-2 py-1 text-xs font-medium capitalize text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+                              {firstPayment.payment_method.replace("_", " ")}
+                            </span>
                           </td>
-                          <td className="px-6 py-3 whitespace-nowrap">
-                            {payment.journal_entry_id ? (
-                              <button
-                                onClick={() => navigate(`/greentarget/accounting/journal-entries/${payment.journal_entry_id}`)}
-                                className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
-                                title="View journal entry"
-                              >
-                                <IconReceipt size={14} />
-                                <span className="font-mono">{payment.journal_reference_no || `#${payment.journal_entry_id}`}</span>
-                              </button>
-                            ) : (
-                              <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
-                            )}
+                          <td className="px-3 py-3">
+                            {getStatusBadge(groupStatus)}
                           </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-right font-medium text-green-600 dark:text-green-400">
-                            {formatCurrency(payment.amount_paid)}
+                          <td className="px-3 py-3 text-sm text-gray-400 dark:text-gray-500">
+                            -
                           </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-center">
-                            <div className="flex justify-center gap-1">
-                              {payment.status === "pending" && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  color="sky"
-                                  onClick={() => {
-                                    setSelectedPayment(payment);
-                                    setSelectedBankAccount(payment.bank_account || "BANK_PBB");
-                                    setShowConfirmDialog(true);
-                                  }}
-                                  disabled={
-                                    confirmingPaymentId === payment.payment_id
-                                  }
-                                  title="Confirm Payment"
-                                >
-                                  <IconCircleCheck size={16} />
-                                </Button>
-                              )}
-                              {payment.status !== "cancelled" && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  color="rose"
-                                  onClick={() => {
-                                    setSelectedPayment(payment);
-                                    setShowCancelDialog(true);
-                                  }}
-                                  disabled={
-                                    cancellingPaymentId === payment.payment_id
-                                  }
-                                  title="Cancel Payment"
-                                >
-                                  <IconBan size={16} />
-                                </Button>
-                              )}
-                            </div>
+                          <td className="px-3 py-3 text-right font-medium text-green-600 dark:text-green-400">
+                            {formatCurrency(totalAmount)}
+                          </td>
+                          <td className="px-3 py-3 text-center text-sm text-gray-400 dark:text-gray-500">
+                            -
                           </td>
                         </tr>
-                      ))}
-                    </React.Fragment>
-                  );
-                } else {
-                  // Render single payment
-                  const payment = paymentGroup[0];
+
+                        {paymentGroup.map(
+                          (
+                            payment: GreenTargetPayment,
+                            paymentIndex: number
+                          ): React.ReactNode => {
+                            const isLastPayment: boolean =
+                              paymentIndex === paymentGroup.length - 1;
+
+                            return (
+                              <tr
+                                key={payment.payment_id}
+                                className="bg-white transition-colors hover:bg-sky-50/60 dark:bg-gray-800 dark:hover:bg-sky-950/20"
+                              >
+                                <td className="relative border-l-4 border-sky-400 px-3 py-3 pl-8 dark:border-sky-600">
+                                  <span
+                                    aria-hidden="true"
+                                    className={`absolute left-5 w-px bg-sky-300 dark:bg-sky-700 ${
+                                      isLastPayment
+                                        ? "top-0 h-1/2"
+                                        : "inset-y-0"
+                                    }`}
+                                  />
+                                  <span
+                                    aria-hidden="true"
+                                    className="absolute left-[17px] top-1/2 h-2 w-2 -translate-y-1/2 rounded-full border-2 border-sky-400 bg-white dark:border-sky-500 dark:bg-gray-800"
+                                  />
+                                  <span className="sr-only">
+                                    Grouped invoice
+                                  </span>
+                                </td>
+                                <td className="px-3 py-3" />
+                                <td className="whitespace-nowrap px-3 py-3 font-mono text-sm text-gray-500 dark:text-gray-400">
+                                  {payment.internal_reference || "-"}
+                                </td>
+                                <td className="px-3 py-3">
+                                  <button
+                                    type="button"
+                                    onClick={(): void =>
+                                      onViewPayment(payment)
+                                    }
+                                    className="inline-flex rounded-md bg-sky-50 px-2 py-1 font-mono text-sm font-medium text-sky-700 hover:bg-sky-100 hover:text-sky-800 dark:bg-sky-900/30 dark:text-sky-300 dark:hover:bg-sky-900/50 dark:hover:text-sky-200"
+                                  >
+                                    {payment.invoice_id}
+                                  </button>
+                                </td>
+                                <td
+                                  className="max-w-[240px] px-3 py-3 text-sm text-gray-900 dark:text-gray-100"
+                                  title={
+                                    payment.customer_name ||
+                                    payment.customerid ||
+                                    ""
+                                  }
+                                >
+                                  <div className="truncate">
+                                    {payment.customer_name ||
+                                      payment.customerid ||
+                                      "-"}
+                                  </div>
+                                </td>
+                                <td className="px-3 py-3" />
+                                <td className="px-3 py-3">
+                                  {getStatusBadge(payment.status)}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-3">
+                                  {renderJournalLink(payment)}
+                                </td>
+                                <td className="px-3 py-3 text-right font-medium text-green-600 dark:text-green-400">
+                                  {formatCurrency(payment.amount_paid)}
+                                </td>
+                                <td className="px-3 py-3 text-center">
+                                  {renderPaymentActions(payment)}
+                                </td>
+                              </tr>
+                            );
+                          }
+                        )}
+                      </React.Fragment>
+                    );
+                  }
+
                   return (
-                    <tr key={payment.payment_id}>
-                      <td className="px-6 py-3 whitespace-nowrap text-sm">
-                        {formatDate(payment.payment_date)}
+                    <tr
+                      key={firstPayment.payment_id}
+                      className="transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/60"
+                    >
+                      <td className="whitespace-nowrap px-3 py-3 text-sm">
+                        {formatDate(firstPayment.payment_date)}
                       </td>
-                      <td className="px-6 py-3 whitespace-nowrap">
-                        <span className="font-mono text-sm text-gray-600 dark:text-gray-400">
-                          {payment.payment_reference || "-"}
+                      <td className="max-w-[170px] px-3 py-3">
+                        <span
+                          className="block truncate font-mono text-sm text-gray-600 dark:text-gray-400"
+                          title={firstPayment.payment_reference || ""}
+                        >
+                          {firstPayment.payment_reference || "-"}
                         </span>
                       </td>
-                      <td className="px-6 py-3 whitespace-nowrap text-sm font-mono text-gray-500 dark:text-gray-400">
-                        {payment.internal_reference || "-"}
+                      <td className="whitespace-nowrap px-3 py-3 font-mono text-sm text-gray-500 dark:text-gray-400">
+                        {firstPayment.internal_reference || "-"}
                       </td>
-                      <td className="px-6 py-3 whitespace-nowrap">
+                      <td className="px-3 py-3">
                         <button
-                          onClick={() => onViewPayment(payment)}
-                          className="text-sky-600 dark:text-sky-400 text-sm hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
+                          type="button"
+                          onClick={(): void => onViewPayment(firstPayment)}
+                          className="inline-flex rounded-md bg-sky-50 px-2 py-1 font-mono text-sm font-medium text-sky-700 hover:bg-sky-100 hover:text-sky-800 dark:bg-sky-900/30 dark:text-sky-300 dark:hover:bg-sky-900/50 dark:hover:text-sky-200"
                         >
-                          {payment.invoice_id}
+                          {firstPayment.invoice_id}
                         </button>
                       </td>
                       <td
-                        className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100"
-                        title={payment.customerid}
+                        className="max-w-[240px] px-3 py-3 text-sm text-gray-900 dark:text-gray-100"
+                        title={
+                          firstPayment.customer_name ||
+                          firstPayment.customerid ||
+                          ""
+                        }
                       >
-                        <div className="truncate max-w-60">
-                          {payment.customer_name}
+                        <div className="truncate">
+                          {firstPayment.customer_name ||
+                            firstPayment.customerid ||
+                            "-"}
                         </div>
                       </td>
-                      <td className="px-6 py-3 whitespace-nowrap">
-                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 capitalize">
-                          {payment.payment_method.replace("_", " ")}
+                      <td className="px-3 py-3">
+                        <span className="inline-flex rounded-full bg-blue-50 px-2 py-1 text-xs font-medium capitalize text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+                          {firstPayment.payment_method.replace("_", " ")}
                         </span>
                       </td>
-                      <td className="px-6 py-3 whitespace-nowrap">
-                        {getStatusBadge(payment.status)}
+                      <td className="px-3 py-3">
+                        {getStatusBadge(firstPayment.status)}
                       </td>
-                      <td className="px-6 py-3 whitespace-nowrap">
-                        {payment.journal_entry_id ? (
-                          <button
-                            onClick={() => navigate(`/greentarget/accounting/journal-entries/${payment.journal_entry_id}`)}
-                            className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
-                            title="View journal entry"
-                          >
-                            <IconReceipt size={14} />
-                            <span className="font-mono">{payment.journal_reference_no || `#${payment.journal_entry_id}`}</span>
-                          </button>
-                        ) : (
-                          <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
-                        )}
+                      <td className="whitespace-nowrap px-3 py-3">
+                        {renderJournalLink(firstPayment)}
                       </td>
-                      <td className="px-6 py-3 whitespace-nowrap text-right font-medium text-green-600 dark:text-green-400">
-                        {formatCurrency(payment.amount_paid)}
+                      <td className="px-3 py-3 text-right font-medium text-green-600 dark:text-green-400">
+                        {formatCurrency(firstPayment.amount_paid)}
                       </td>
-                      <td className="px-6 py-3 whitespace-nowrap text-center">
-                        <div className="flex justify-center gap-1">
-                          {payment.status === "pending" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              color="sky"
-                              onClick={() => {
-                                setSelectedPayment(payment);
-                                setShowConfirmDialog(true);
-                              }}
-                              disabled={
-                                confirmingPaymentId === payment.payment_id
-                              }
-                              title="Confirm Payment"
-                            >
-                              <IconCircleCheck size={16} />
-                            </Button>
-                          )}
-                          {payment.status !== "cancelled" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              color="rose"
-                              onClick={() => {
-                                setSelectedPayment(payment);
-                                setShowCancelDialog(true);
-                              }}
-                              disabled={
-                                cancellingPaymentId === payment.payment_id
-                              }
-                              title="Cancel Payment"
-                            >
-                              <IconBan size={16} />
-                            </Button>
-                          )}
-                        </div>
+                      <td className="px-3 py-3 text-center">
+                        {renderPaymentActions(firstPayment)}
                       </td>
                     </tr>
                   );
                 }
-              }
-            )}
-          </tbody>
-        </table>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* Confirm Payment Dialog with Bank Account Selection */}
-      {showConfirmDialog && selectedPayment && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md shadow-xl">
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                Confirm Payment
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                Are you sure you want to confirm this {selectedPayment.payment_method} payment of {formatCurrency(selectedPayment.amount_paid)}?
+      {selectedPayment && (
+        <ConfirmationDialog
+          isOpen={showConfirmDialog}
+          onClose={(): void => {
+            setShowConfirmDialog(false);
+            setSelectedPayment(null);
+          }}
+          onConfirm={(): void => {
+            void handleConfirmPayment();
+          }}
+          title="Confirm pending payment?"
+          message={
+            <div className="space-y-3">
+              <p>
+                Confirm the pending{" "}
+                {selectedPayment.payment_method.replace("_", " ")} payment of{" "}
+                <span className="font-semibold text-default-800 dark:text-gray-100">
+                  {formatCurrency(selectedPayment.amount_paid)}
+                </span>
+                ?
               </p>
-
-              <div className="mb-4">
-                <FormListbox
-                  name="bank_account"
-                  label="Deposit To"
-                  value={selectedBankAccount}
-                  onChange={(value) => setSelectedBankAccount(value)}
-                  options={[
-                    { id: "BANK_PBB", name: "Public Bank" },
-                    { id: "BANK_ABB", name: "Alliance Bank" },
-                  ]}
-                  disabled={confirmingPaymentId !== null}
-                />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Select which bank account will receive this payment
-                </p>
-              </div>
-
-              <div className="flex justify-end gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowConfirmDialog(false);
-                    setSelectedPayment(null);
-                    setSelectedBankAccount("BANK_PBB");
-                  }}
-                  disabled={confirmingPaymentId !== null}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  color="green"
-                  onClick={handleConfirmPayment}
-                  disabled={confirmingPaymentId !== null}
-                >
-                  Confirm Payment
-                </Button>
-              </div>
+              <p className="text-xs text-default-500 dark:text-gray-400">
+                Confirming updates the related invoice balance.
+              </p>
             </div>
-          </div>
-        </div>
+          }
+          confirmButtonText="Confirm Payment"
+          variant="success"
+        />
       )}
 
       <ConfirmationDialog
         isOpen={showCancelDialog}
-        onClose={() => {
+        onClose={(): void => {
           setShowCancelDialog(false);
           setSelectedPayment(null);
         }}
         onConfirm={handleCancelPayment}
         title="Cancel Payment"
-        message={`Are you sure you want to cancel this payment of ${formatCurrency(
-          selectedPayment?.amount_paid || 0
-        )}?`}
+        message={
+          <div className="space-y-2">
+            <p>
+              Are you sure you want to cancel this payment of{" "}
+              {formatCurrency(selectedPayment?.amount_paid || 0)}?
+            </p>
+            {selectedPayment?.status === "pending" && (
+              <p className="text-xs text-default-500 dark:text-gray-400">
+                This pending payment has not reduced the invoice balance, so
+                cancelling it will leave that balance unchanged.
+              </p>
+            )}
+          </div>
+        }
         confirmButtonText="Cancel Payment"
         variant="danger"
       />

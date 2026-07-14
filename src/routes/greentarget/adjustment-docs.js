@@ -1437,7 +1437,19 @@ export default function (pool, myInvoisGTConfig) {
                      AND BTRIM(l.address) <> ''
                    ORDER BY r.rental_id
                    LIMIT 1
-                ) AS location_address
+                ) AS location_address,
+                (
+                  SELECT COALESCE(json_agg(site_row.site ORDER BY site_row.first_rental_id), '[]'::json)
+                    FROM (
+                      SELECT BTRIM(l.site) AS site, MIN(r.rental_id) AS first_rental_id
+                        FROM greentarget.invoice_rentals ir
+                        JOIN greentarget.rentals r ON ir.rental_id = r.rental_id
+                        JOIN greentarget.locations l ON r.location_id = l.location_id
+                       WHERE ir.invoice_id = $2
+                         AND NULLIF(BTRIM(l.site), '') IS NOT NULL
+                       GROUP BY BTRIM(l.site)
+                    ) AS site_row
+                ) AS location_sites
            FROM greentarget.customers WHERE customer_id = $1`,
         [doc.customer_id, doc.original_invoice_id]
       );
@@ -1451,6 +1463,7 @@ export default function (pool, myInvoisGTConfig) {
       const customer = {
         ...custResult.rows[0],
         address: custResult.rows[0].location_address || "Tong Location",
+        sites: custResult.rows[0].location_sites || [],
       };
       if (!customer.tin_number || !customer.id_number) {
         await client.query("ROLLBACK");

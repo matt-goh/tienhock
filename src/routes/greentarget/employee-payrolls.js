@@ -42,7 +42,8 @@ export default function (pool) {
       fetchActiveContributionRates(pool),
       pool.query(
         `SELECT amount FROM greentarget.mid_month_payrolls
-         WHERE employee_id = $1 AND year = $2 AND month = $3`,
+         WHERE employee_id = $1 AND year = $2 AND month = $3
+           AND LOWER(COALESCE(status, '')) <> 'cancelled'`,
         [employee_id, year, month]
       ),
     ]);
@@ -181,6 +182,22 @@ export default function (pool) {
         ORDER BY pd.employee_payroll_id, pd.deduction_type
       `, [payrollIds]);
 
+      // Derive rounding against the current active advance amount rather than
+      // trusting a value stored before an advance may have been cancelled.
+      const midMonthResult = await pool.query(`
+        SELECT ep.id AS employee_payroll_id,
+               COALESCE(SUM(mmp.amount), 0) AS amount
+        FROM greentarget.employee_payrolls ep
+        JOIN greentarget.monthly_payrolls mp ON mp.id = ep.monthly_payroll_id
+        LEFT JOIN greentarget.mid_month_payrolls mmp
+          ON mmp.employee_id = ep.employee_id
+         AND mmp.year = mp.year
+         AND mmp.month = mp.month
+         AND LOWER(COALESCE(mmp.status, '')) <> 'cancelled'
+        WHERE ep.id = ANY($1)
+        GROUP BY ep.id
+      `, [payrollIds]);
+
       // Group items by payroll id
       const itemsByPayrollId = itemsResult.rows.reduce((acc, item) => {
         if (!acc[item.employee_payroll_id]) acc[item.employee_payroll_id] = [];
@@ -206,19 +223,28 @@ export default function (pool) {
         return acc;
       }, {});
 
+      const midMonthByPayrollId = midMonthResult.rows.reduce((acc, row) => {
+        acc[row.employee_payroll_id] = parseFloat(row.amount);
+        return acc;
+      }, {});
+
       // Merge data
-      const response = payrollsResult.rows.map((payroll) => ({
-        ...payroll,
-        gross_pay: parseFloat(payroll.gross_pay),
-        net_pay: parseFloat(payroll.net_pay),
-        digenapkan: parseFloat(payroll.digenapkan || 0),
-        setelah_digenapkan:
-          payroll.setelah_digenapkan != null
-            ? parseFloat(payroll.setelah_digenapkan)
-            : null,
-        items: itemsByPayrollId[payroll.id] || [],
-        deductions: deductionsByPayrollId[payroll.id] || [],
-      }));
+      const response = payrollsResult.rows.map((payroll) => {
+        const netPay = parseFloat(payroll.net_pay);
+        const jumlah = netPay - (midMonthByPayrollId[payroll.id] || 0);
+        const setelahDigenapkan = Math.ceil(jumlah);
+        const digenapkan = Math.round((setelahDigenapkan - jumlah) * 100) / 100;
+
+        return {
+          ...payroll,
+          gross_pay: parseFloat(payroll.gross_pay),
+          net_pay: netPay,
+          digenapkan,
+          setelah_digenapkan: setelahDigenapkan,
+          items: itemsByPayrollId[payroll.id] || [],
+          deductions: deductionsByPayrollId[payroll.id] || [],
+        };
+      });
 
       res.json(response);
     } catch (error) {
@@ -291,6 +317,7 @@ export default function (pool) {
             SELECT id, employee_id, year, month, amount, payment_method, status
             FROM greentarget.mid_month_payrolls
             WHERE employee_id = $1 AND year = $2 AND month = $3
+              AND LOWER(COALESCE(status, '')) <> 'cancelled'
           `, [payrollData.employee_id, payrollData.year, payrollData.month]),
         ]);
 
@@ -304,17 +331,19 @@ export default function (pool) {
       }));
 
       const midMonthRow = midMonthResult.rows[0] || null;
+      const netPay = parseFloat(payrollData.net_pay);
+      const midMonthAmount = midMonthRow ? parseFloat(midMonthRow.amount) : 0;
+      const jumlah = netPay - midMonthAmount;
+      const setelahDigenapkan = Math.ceil(jumlah);
+      const digenapkan = Math.round((setelahDigenapkan - jumlah) * 100) / 100;
 
       // Format response
       const response = {
         ...payrollData,
         gross_pay: parseFloat(payrollData.gross_pay),
-        net_pay: parseFloat(payrollData.net_pay),
-        digenapkan: parseFloat(payrollData.digenapkan || 0),
-        setelah_digenapkan:
-          payrollData.setelah_digenapkan != null
-            ? parseFloat(payrollData.setelah_digenapkan)
-            : null,
+        net_pay: netPay,
+        digenapkan,
+        setelah_digenapkan: setelahDigenapkan,
         items,
         deductions: deductionsResult.rows.map((deduction) => ({
           ...deduction,

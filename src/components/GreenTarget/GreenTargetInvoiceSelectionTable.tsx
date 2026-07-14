@@ -1,7 +1,9 @@
 import React from "react";
 import { IconSearch, IconTrash } from "@tabler/icons-react";
-import Button from "../Button";
 import { GreenTargetInvoice } from "../../types/greenTargetTypes";
+import Button from "../Button";
+import LoadingSpinner from "../LoadingSpinner";
+import TimeNavigator, { type TimeRange } from "../TimeNavigator";
 
 interface GreenTargetInvoiceSelectionTableProps {
   invoices: GreenTargetInvoice[];
@@ -10,13 +12,14 @@ interface GreenTargetInvoiceSelectionTableProps {
   onInvoiceRemove: (invoiceId: string) => void;
   searchTerm: string;
   onSearchChange: (term: string) => void;
-  dateRange: {
-    start: Date | null;
-    end: Date | null;
-  };
+  dateRange: TimeRange;
+  onDateRangeChange: (range: TimeRange) => void;
+  isLoading: boolean;
 }
 
-const GreenTargetInvoiceSelectionTable: React.FC<GreenTargetInvoiceSelectionTableProps> = ({
+const GreenTargetInvoiceSelectionTable: React.FC<
+  GreenTargetInvoiceSelectionTableProps
+> = ({
   invoices,
   selectedInvoiceIds,
   onInvoiceSelect,
@@ -24,146 +27,205 @@ const GreenTargetInvoiceSelectionTable: React.FC<GreenTargetInvoiceSelectionTabl
   searchTerm,
   onSearchChange,
   dateRange,
+  onDateRangeChange,
+  isLoading,
 }) => {
-  const formatCurrency = (amount: number): string => {
-    return amount.toLocaleString("en-MY", {
+  const tableHeaderClassName: string =
+    "bg-gray-100 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-600 dark:bg-gray-950 dark:text-gray-300";
+
+  const formatCurrency = (amount: number): string =>
+    Number(amount).toLocaleString("en-MY", {
       style: "currency",
       currency: "MYR",
     });
-  };
 
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-GB", {
+  const formatDate = (dateString: string): string =>
+    new Date(dateString).toLocaleDateString("en-GB", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
     });
-  };
 
   return (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-      <div className="px-4 py-2 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-        <h4 className="text-md font-medium text-gray-900 dark:text-gray-100">
-          Available Unpaid Invoices
-          <span className="text-xs text-gray-500 dark:text-gray-400 ml-2 font-normal">
-            (Excluding invoices with pending payments)
+    <div className="flex h-full min-h-0 flex-col rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+      <div className="relative z-20 flex flex-shrink-0 flex-col gap-3 rounded-t-xl border-b border-gray-200 bg-white px-3 py-3 dark:border-gray-700 dark:bg-gray-900 sm:px-4 sm:py-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h4 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+              Find unpaid invoices
+            </h4>
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+              Invoices with pending payments are not shown.
+            </p>
+          </div>
+          <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+            {isLoading ? "Loading..." : `${invoices.length} found`}
           </span>
-        </h4>
-        <div className="flex items-center gap-4">
-          <div className="relative w-auto">
+        </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative min-w-0 flex-1">
             <IconSearch
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
               size={18}
             />
             <input
               type="text"
-              placeholder="Search"
-              title="Search by invoice number or customer..."
-              className="w-full pl-10 pr-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-full focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 text-gray-900 dark:text-gray-100"
+              placeholder="Invoice or customer"
+              aria-label="Search available invoices"
+              className="h-[34px] w-full rounded-lg border border-gray-300 bg-white py-1.5 pl-10 pr-3 text-sm text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100"
               value={searchTerm}
-              onChange={(e) => onSearchChange(e.target.value)}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
+                onSearchChange(event.target.value)
+              }
             />
           </div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            {(() => {
-              const endDate = new Date();
-              const startDate = new Date();
-              startDate.setFullYear(endDate.getFullYear() - 1);
-
-              return `${startDate.toLocaleDateString("en-GB", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-              })} - ${endDate.toLocaleDateString("en-GB", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-              })}`;
-            })()}
-          </div>
+          <TimeNavigator
+            range={dateRange}
+            onChange={onDateRangeChange}
+            modes={["day", "month", "range", "year"]}
+            size="sm"
+            disabled={isLoading}
+            className="self-start sm:self-auto"
+          />
         </div>
       </div>
 
-      <div className="max-h-80 overflow-y-auto">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0">
+      <div className="min-h-[22rem] flex-1 overflow-auto overscroll-contain rounded-b-xl [scrollbar-gutter:stable] lg:min-h-0">
+        <table className="w-full min-w-[680px] border-separate border-spacing-0">
+          <thead className="sticky top-0 z-10">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th
+                className={`${tableHeaderClassName} border-b border-gray-200 text-left dark:border-gray-700`}
+              >
                 Invoice
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th
+                className={`${tableHeaderClassName} border-b border-gray-200 text-left dark:border-gray-700`}
+              >
                 Customer
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Date Issued
+              <th
+                className={`${tableHeaderClassName} border-b border-gray-200 text-left dark:border-gray-700`}
+              >
+                Date
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Total Amount
+              <th
+                className={`${tableHeaderClassName} hidden border-b border-gray-200 text-right dark:border-gray-700 2xl:table-cell`}
+              >
+                Total
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th
+                className={`${tableHeaderClassName} border-b border-gray-200 text-right dark:border-gray-700`}
+              >
                 Balance Due
               </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th
+                className={`${tableHeaderClassName} border-b border-gray-200 text-center dark:border-gray-700`}
+              >
                 Action
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-            {invoices.length === 0 ? (
+          <tbody>
+            {isLoading ? (
               <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                  No unpaid invoices found
+                <td colSpan={6} className="px-6 py-10 text-center">
+                  <div className="flex justify-center">
+                    <LoadingSpinner />
+                  </div>
+                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                    Loading unpaid invoices...
+                  </p>
+                </td>
+              </tr>
+            ) : invoices.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={6}
+                  className="px-6 py-8 text-center text-gray-500 dark:text-gray-400"
+                >
+                  {searchTerm.trim()
+                    ? "No invoices match your search in this date range."
+                    : "No unpaid invoices found in this date range."}
                 </td>
               </tr>
             ) : (
-              invoices.map((invoice) => {
-                const isSelected = selectedInvoiceIds.includes(invoice.invoice_id.toString());
-                return (
-                  <tr
-                    key={invoice.invoice_id}
-                    className={`${
-                      isSelected ? "bg-sky-50 dark:bg-sky-900/30" : "hover:bg-gray-50 dark:hover:bg-gray-700"
-                    }`}
-                  >
-                    <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {invoice.invoice_number}
-                    </td>
-                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                      {invoice.customer_name || `Customer ${invoice.customer_id}`}
-                    </td>
-                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {formatDate(invoice.date_issued)}
-                    </td>
-                    <td className="px-6 py-3 whitespace-nowrap text-sm text-right text-gray-900 dark:text-gray-100">
-                      {formatCurrency(invoice.total_amount)}
-                    </td>
-                    <td className="px-6 py-3 whitespace-nowrap text-sm text-right font-medium text-red-600 dark:text-red-400">
-                      {formatCurrency(invoice.current_balance)}
-                    </td>
-                    <td className="px-6 py-3 whitespace-nowrap text-center">
-                      {isSelected ? (
-                        <button
-                          type="button"
-                          onClick={() => onInvoiceRemove(invoice.invoice_id.toString())}
-                          className="text-red-500 hover:text-red-700"
+              invoices.map(
+                (invoice: GreenTargetInvoice): React.ReactNode => {
+                  const invoiceId: string = String(invoice.invoice_id);
+                  const isSelected: boolean =
+                    selectedInvoiceIds.includes(invoiceId);
+
+                  return (
+                    <tr
+                      key={invoice.invoice_id}
+                      className={
+                        isSelected
+                          ? "bg-sky-50 dark:bg-sky-950/50"
+                          : "bg-white hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800"
+                      }
+                    >
+                      <td className="whitespace-nowrap border-b border-gray-200 px-4 py-3 text-sm font-medium text-gray-900 dark:border-gray-800 dark:text-gray-100">
+                        <span className="inline-flex rounded-md bg-sky-50 px-2 py-1 font-mono text-sm font-medium text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
+                          {invoice.invoice_number}
+                        </span>
+                      </td>
+                      <td className="max-w-[280px] border-b border-gray-200 px-4 py-3 text-sm text-gray-900 dark:border-gray-800 dark:text-gray-100">
+                        <div
+                          className="truncate"
+                          title={`${invoice.customer_name || invoice.customer_id}${
+                            invoice.customer_name
+                              ? ` (${invoice.customer_id})`
+                              : ""
+                          }`}
                         >
-                          <IconTrash size={16} />
-                        </button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          color="sky"
-                          onClick={() => onInvoiceSelect(invoice)}
-                        >
-                          Add
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })
+                          {invoice.customer_name || invoice.customer_id}
+                          {invoice.customer_name
+                            ? ` (${invoice.customer_id})`
+                            : ""}
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap border-b border-gray-200 px-4 py-3 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                        {formatDate(invoice.date_issued)}
+                      </td>
+                      <td className="hidden whitespace-nowrap border-b border-gray-200 px-4 py-3 text-right text-sm text-gray-900 dark:border-gray-800 dark:text-gray-100 2xl:table-cell">
+                        {formatCurrency(invoice.total_amount)}
+                      </td>
+                      <td
+                        className="whitespace-nowrap border-b border-gray-200 px-4 py-3 text-right text-sm font-semibold text-red-600 dark:border-gray-800 dark:text-red-400"
+                        title={`Invoice total: ${formatCurrency(
+                          invoice.total_amount
+                        )}`}
+                      >
+                        {formatCurrency(invoice.current_balance)}
+                      </td>
+                      <td className="whitespace-nowrap border-b border-gray-200 px-4 py-3 text-center dark:border-gray-800">
+                        {isSelected ? (
+                          <button
+                            type="button"
+                            onClick={(): void => onInvoiceRemove(invoiceId)}
+                            className="rounded-md p-2 text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/30"
+                            aria-label={`Remove invoice ${invoice.invoice_number}`}
+                          >
+                            <IconTrash size={16} />
+                          </button>
+                        ) : (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            color="sky"
+                            onClick={(): void => onInvoiceSelect(invoice)}
+                          >
+                            Add
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                }
+              )
             )}
           </tbody>
         </table>

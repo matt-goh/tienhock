@@ -1,40 +1,56 @@
 // src/pages/GreenTarget/Payroll/GTPayrollDetailsPage.tsx
-import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+// Green Target employee payroll details using the modern payroll layout while
+// keeping GT's own item, deduction, mid-month, and pinjam data model.
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
-  IconPlus,
-  IconTrash,
+  IconBuildingBank,
   IconCash,
+  IconCoins,
+  IconExternalLink,
+  IconInfoCircle,
+  IconPlus,
   IconReceipt,
-  IconUser,
+  IconTrash,
   IconTruck,
+  IconUser,
+  IconWallet,
 } from "@tabler/icons-react";
-import Button from "../../../components/Button";
-import BackButton from "../../../components/BackButton";
-import LoadingSpinner from "../../../components/LoadingSpinner";
-import ConfirmationDialog from "../../../components/ConfirmationDialog";
-import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
-import { buildGTPayslipPayroll } from "../../../utils/greenTarget/buildGTPayslipPayroll";
+import BackButton from "../../../components/BackButton";
+import Button from "../../../components/Button";
+import ConfirmationDialog from "../../../components/ConfirmationDialog";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 import AddManualItemModal from "../../../components/Payroll/AddManualItemModal";
-import { MidMonthPayroll } from "../../../utils/payroll/midMonthPayrollUtils";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
+import { api } from "../../../routes/utils/api";
+import type { EmployeePayroll } from "../../../types/types";
+import { buildGTPayslipPayroll } from "../../../utils/greenTarget/buildGTPayslipPayroll";
+import type { MidMonthPayroll } from "../../../utils/payroll/midMonthPayrollUtils";
+import { getMonthName } from "../../../utils/payroll/payrollUtils";
 import {
   DownloadPayslipButton,
   PrintPayslipButton,
 } from "../../../utils/payroll/PayslipButtons";
 
 interface PayrollItem {
-  id: number;
-  pay_code_id: string;
+  id?: number;
+  pay_code_id: string | null;
   description: string;
   rate: number;
   rate_unit: string;
   quantity: number;
   amount: number;
   is_manual: boolean;
-  pay_type?: string;
-  job_type?: string;
+  pay_type?: string | null;
+  job_type?: string | null;
   work_log_type?: string | null;
+}
+
+interface DeductionRateInfo {
+  employee_rate?: number | string;
+  employer_rate?: number | string;
+  age_group?: string;
 }
 
 interface Deduction {
@@ -42,10 +58,7 @@ interface Deduction {
   employee_amount: number;
   employer_amount: number;
   wage_amount: number;
-  rate_info: {
-    employee_rate?: string;
-    employer_rate?: string;
-  };
+  rate_info: DeductionRateInfo;
 }
 
 interface GTPinjamRecord {
@@ -66,6 +79,8 @@ interface GTMidMonthAdvance {
   amount: number;
   payment_method: "Cash" | "Bank" | "Cheque";
   status: "Pending" | "Paid" | "Cancelled";
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface GTEmployeePayroll {
@@ -81,55 +96,240 @@ interface GTEmployeePayroll {
   setelah_digenapkan?: number | null;
   year: number;
   month: number;
-  ic_no: string;
-  bank_account_number: string;
-  epf_no: string;
-  socso_no: string;
+  ic_no?: string;
+  bank_account_number?: string;
+  epf_no?: string;
+  socso_no?: string;
+  income_tax_no?: string;
   items: PayrollItem[];
   deductions: Deduction[];
   pinjam_records?: GTPinjamRecord[];
   mid_month_payroll?: GTMidMonthAdvance | null;
 }
 
+interface GTPayslipStaffDetails {
+  name: string;
+  icNo: string;
+  jobName: string;
+  section: string;
+}
+
+interface GTPayslipData {
+  pdfPayroll: EmployeePayroll;
+  staffDetails: GTPayslipStaffDetails;
+  midMonthForPdf: MidMonthPayroll | null;
+}
+
+interface PayrollItemGroupStyle {
+  label: string;
+  headerClassName: string;
+  titleClassName: string;
+  iconClassName: string;
+  totalClassName: string;
+  addOnPath: string | null;
+  addOnLabel: string | null;
+}
+
+const parsePayrollAmount = (
+  value: number | string | null | undefined
+): number => {
+  const amount: number = Number(value ?? 0);
+  return Number.isFinite(amount) ? amount : 0;
+};
+
+const formatCurrency = (amount: number): string =>
+  new Intl.NumberFormat("en-MY", {
+    style: "currency",
+    currency: "MYR",
+  }).format(parsePayrollAmount(amount));
+
+const getDeductionCardLabel = (type: string): string => {
+  const normalizedType: string = type.toLowerCase();
+  if (normalizedType === "income_tax") return "Income Tax";
+  return normalizedType.toUpperCase();
+};
+
+const getDeductionSortOrder = (type: string): number => {
+  const order: string[] = ["epf", "sip", "socso", "income_tax"];
+  const index: number = order.indexOf(type.toLowerCase());
+  return index === -1 ? 999 : index;
+};
+
+const getPayrollItemGroupLabel = (item: PayrollItem): string => {
+  if (item.work_log_type === "advance") return "Advance";
+  if (item.work_log_type === "bonus") return "Bonus";
+  if (item.work_log_type === "others") return "Others";
+  return item.pay_type || "Other";
+};
+
+const isSpecialPayrollItem = (item: PayrollItem): boolean =>
+  item.work_log_type === "advance" ||
+  item.work_log_type === "bonus" ||
+  item.work_log_type === "others";
+
+const getPayrollGroupSortOrder = (group: string): number => {
+  const order: string[] = [
+    "Base",
+    "Tambahan",
+    "Overtime",
+    "Bonus",
+    "Advance",
+    "Others",
+    "Other",
+  ];
+  const index: number = order.indexOf(group);
+  return index === -1 ? 999 : index;
+};
+
+const getPayrollItemGroupStyle = (
+  group: string
+): PayrollItemGroupStyle => {
+  switch (group) {
+    case "Base":
+      return {
+        label: "Base Pay",
+        headerClassName:
+          "border-sky-100 bg-sky-50 dark:border-sky-800/50 dark:bg-sky-900/20",
+        titleClassName: "text-sky-800 dark:text-sky-300",
+        iconClassName: "text-sky-600 dark:text-sky-400",
+        totalClassName: "text-sky-700 dark:text-sky-300",
+        addOnPath: null,
+        addOnLabel: null,
+      };
+    case "Tambahan":
+      return {
+        label: "Additional Pay",
+        headerClassName:
+          "border-violet-100 bg-violet-50 dark:border-violet-800/50 dark:bg-violet-900/20",
+        titleClassName: "text-violet-800 dark:text-violet-300",
+        iconClassName: "text-violet-600 dark:text-violet-400",
+        totalClassName: "text-violet-700 dark:text-violet-300",
+        addOnPath: null,
+        addOnLabel: null,
+      };
+    case "Overtime":
+      return {
+        label: "Overtime",
+        headerClassName:
+          "border-amber-100 bg-amber-50 dark:border-amber-800/50 dark:bg-amber-900/20",
+        titleClassName: "text-amber-800 dark:text-amber-300",
+        iconClassName: "text-amber-600 dark:text-amber-400",
+        totalClassName: "text-amber-700 dark:text-amber-300",
+        addOnPath: null,
+        addOnLabel: null,
+      };
+    case "Bonus":
+      return {
+        label: "Bonus",
+        headerClassName:
+          "border-emerald-100 bg-emerald-50 dark:border-emerald-800/50 dark:bg-emerald-900/20",
+        titleClassName: "text-emerald-800 dark:text-emerald-300",
+        iconClassName: "text-emerald-600 dark:text-emerald-400",
+        totalClassName: "text-emerald-700 dark:text-emerald-300",
+        addOnPath: "/greentarget/payroll/bonus",
+        addOnLabel: "Open Bonus",
+      };
+    case "Advance":
+      return {
+        label: "Others (Advance)",
+        headerClassName:
+          "border-rose-100 bg-rose-50 dark:border-rose-800/50 dark:bg-rose-900/20",
+        titleClassName: "text-rose-800 dark:text-rose-300",
+        iconClassName: "text-rose-600 dark:text-rose-400",
+        totalClassName: "text-rose-700 dark:text-rose-300",
+        addOnPath: "/greentarget/payroll/others-advance",
+        addOnLabel: "Open Advances",
+      };
+    case "Others":
+      return {
+        label: "Others (Kerja Luar OT)",
+        headerClassName:
+          "border-indigo-100 bg-indigo-50 dark:border-indigo-800/50 dark:bg-indigo-900/20",
+        titleClassName: "text-indigo-800 dark:text-indigo-300",
+        iconClassName: "text-indigo-600 dark:text-indigo-400",
+        totalClassName: "text-indigo-700 dark:text-indigo-300",
+        addOnPath: "/greentarget/payroll/others",
+        addOnLabel: "Open Others",
+      };
+    default:
+      return {
+        label: group,
+        headerClassName:
+          "border-default-100 bg-default-50 dark:border-gray-700 dark:bg-gray-900/40",
+        titleClassName: "text-default-800 dark:text-gray-200",
+        iconClassName: "text-default-500 dark:text-gray-400",
+        totalClassName: "text-default-800 dark:text-gray-200",
+        addOnPath: null,
+        addOnLabel: null,
+      };
+  }
+};
+
 const GTPayrollDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
   const [payroll, setPayroll] = useState<GTEmployeePayroll | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [itemToDelete, setItemToDelete] = useState<PayrollItem | null>(null);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [showAddItemModal, setShowAddItemModal] = useState<boolean>(false);
+  const payrollRequestIdRef = useRef<number>(0);
 
-  useEffect(() => {
-    fetchPayrollDetails();
-  }, [id]);
+  useScrollRestoration(
+    `gt-payroll-details:${id || "unknown"}`,
+    !isLoading && !!payroll
+  );
 
-  const fetchPayrollDetails = async () => {
-    if (!id) return;
+  const fetchPayrollDetails = useCallback(async (): Promise<void> => {
+    const requestId: number = payrollRequestIdRef.current + 1;
+    payrollRequestIdRef.current = requestId;
+    if (!id) {
+      setPayroll(null);
+      setIsLoading(false);
+      return;
+    }
 
     setIsLoading(true);
+    setPayroll(null);
     try {
-      const response = await api.get(`/greentarget/api/employee-payrolls/${id}`);
-      setPayroll(response);
-    } catch (error) {
+      const response: GTEmployeePayroll = await api.get(
+        `/greentarget/api/employee-payrolls/${id}`
+      );
+      if (requestId === payrollRequestIdRef.current) {
+        setPayroll(response);
+      }
+    } catch (error: unknown) {
+      if (requestId !== payrollRequestIdRef.current) return;
       console.error("Error fetching GT employee payroll:", error);
+      setPayroll(null);
       toast.error("Failed to load payroll details");
     } finally {
-      setIsLoading(false);
+      if (requestId === payrollRequestIdRef.current) {
+        setIsLoading(false);
+      }
     }
-  };
+  }, [id]);
 
-  const handleDeleteItem = async () => {
-    if (!itemToDelete || !itemToDelete.id) return;
+  useEffect(() => {
+    void fetchPayrollDetails();
+    return (): void => {
+      payrollRequestIdRef.current += 1;
+    };
+  }, [fetchPayrollDetails]);
+
+  const handleDeleteItem = async (): Promise<void> => {
+    if (isDeleting || !itemToDelete?.id) return;
 
     setIsDeleting(true);
     try {
-      await api.delete(`/greentarget/api/employee-payrolls/items/${itemToDelete.id}`);
+      await api.delete(
+        `/greentarget/api/employee-payrolls/items/${itemToDelete.id}`
+      );
       toast.success("Item deleted successfully");
       await fetchPayrollDetails();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error deleting payroll item:", error);
       toast.error("Failed to delete payroll item");
     } finally {
@@ -139,71 +339,9 @@ const GTPayrollDetailsPage: React.FC = () => {
     }
   };
 
-  // Convert GT payroll format to EmployeePayroll format for the shared
-  // payslip download/print buttons (same PDF as Tien Hock payslips). The helper
-  // moves Bonus/Advance/Kerja-Luar-OT items into commission_records/others_records
-  // so the payslip renders them (and the advance deduction) like Tien Hock.
-  const buildPayslipData = (payroll: GTEmployeePayroll) => {
-    const { pdfPayroll } = buildGTPayslipPayroll(payroll);
-
-    const staffDetails = {
-      name: payroll.employee_name,
-      icNo: payroll.ic_no || "N/A",
-      jobName: payroll.job_type,
-      section: payroll.section || "GREEN TARGET",
-    };
-
-    const midMonthForPdf: MidMonthPayroll | null = payroll.mid_month_payroll
-      ? {
-          id: payroll.mid_month_payroll.id,
-          employee_id: payroll.employee_id,
-          employee_name: payroll.employee_name,
-          year: payroll.year,
-          month: payroll.month,
-          amount: payroll.mid_month_payroll.amount,
-          payment_method: payroll.mid_month_payroll.payment_method,
-          status: payroll.mid_month_payroll.status,
-          created_at: "",
-          updated_at: "",
-        }
-      : null;
-
-    return { pdfPayroll, staffDetails, midMonthForPdf };
-  };
-
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat("en-MY", {
-      style: "currency",
-      currency: "MYR",
-    }).format(amount);
-  };
-
-  const getMonthName = (month: number): string => {
-    const months = [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December",
-    ];
-    return months[month - 1] || "";
-  };
-
-  const getDeductionLabel = (type: string): string => {
-    switch (type) {
-      case "epf":
-        return "EPF (KWSP)";
-      case "socso":
-        return "SOCSO (PERKESO)";
-      case "sip":
-        return "SIP (EIS)";
-      case "income_tax":
-        return "Income Tax (PCB)";
-      default:
-        return type.toUpperCase();
-    }
-  };
-
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-64">
+      <div className="flex h-96 items-center justify-center">
         <LoadingSpinner />
       </div>
     );
@@ -211,488 +349,936 @@ const GTPayrollDetailsPage: React.FC = () => {
 
   if (!payroll) {
     return (
-      <div className="p-6">
-        <BackButton onClick={() => navigate("/greentarget/payroll")} />
-        <div className="mt-4 text-center text-default-500 dark:text-gray-400">
-          Payroll not found
-        </div>
+      <div className="py-12 text-center">
+        <p className="text-default-500 dark:text-gray-400">
+          Employee payroll not found
+        </p>
+        <Button
+          onClick={() => navigate("/greentarget/payroll")}
+          className="mt-4"
+          variant="outline"
+        >
+          Back
+        </Button>
       </div>
     );
   }
 
-  // Group items by pay type
-  const groupedItems = payroll.items.reduce(
-    (acc: Record<string, PayrollItem[]>, item) => {
-      const type = item.pay_type || "Other";
-      if (!acc[type]) acc[type] = [];
-      acc[type].push(item);
-      return acc;
+  const buildPayslipData = (
+    currentPayroll: GTEmployeePayroll
+  ): GTPayslipData => {
+    const normalizedPayroll: EmployeePayroll = buildGTPayslipPayroll({
+      ...currentPayroll,
+      gross_pay: parsePayrollAmount(currentPayroll.gross_pay),
+      net_pay: parsePayrollAmount(currentPayroll.net_pay),
+      digenapkan: parsePayrollAmount(currentPayroll.digenapkan),
+      setelah_digenapkan:
+        currentPayroll.setelah_digenapkan == null
+          ? null
+          : parsePayrollAmount(currentPayroll.setelah_digenapkan),
+    }).pdfPayroll;
+
+    // GT payroll IDs can overlap with Tien Hock IDs. Removing the ID from the
+    // print-only object prevents the shared manager from refetching a TH record.
+    const pdfPayroll: EmployeePayroll = {
+      ...normalizedPayroll,
+      id: undefined,
+    };
+    const staffDetails: GTPayslipStaffDetails = {
+      name: currentPayroll.employee_name,
+      icNo: currentPayroll.ic_no || "N/A",
+      jobName: currentPayroll.job_type,
+      section: currentPayroll.section || "GREEN TARGET",
+    };
+    const midMonthForPdf: MidMonthPayroll | null =
+      currentPayroll.mid_month_payroll
+        ? {
+            id: currentPayroll.mid_month_payroll.id,
+            employee_id: currentPayroll.employee_id,
+            employee_name: currentPayroll.employee_name,
+            year: currentPayroll.year,
+            month: currentPayroll.month,
+            amount: parsePayrollAmount(
+              currentPayroll.mid_month_payroll.amount
+            ),
+            payment_method: currentPayroll.mid_month_payroll.payment_method,
+            status: currentPayroll.mid_month_payroll.status,
+            created_at: currentPayroll.mid_month_payroll.created_at || "",
+            updated_at: currentPayroll.mid_month_payroll.updated_at || "",
+          }
+        : null;
+
+    return { pdfPayroll, staffDetails, midMonthForPdf };
+  };
+
+  const { pdfPayroll, staffDetails, midMonthForPdf }: GTPayslipData =
+    buildPayslipData(payroll);
+  const grossPay: number = parsePayrollAmount(payroll.gross_pay);
+  const netPay: number = parsePayrollAmount(payroll.net_pay);
+  const totalStatutoryDeductions: number = payroll.deductions.reduce(
+    (sum: number, deduction: Deduction): number =>
+      sum + parsePayrollAmount(deduction.employee_amount),
+    0
+  );
+  const commissionAdvanceTotal: number = payroll.items
+    .filter(
+      (item: PayrollItem): boolean => item.work_log_type === "advance"
+    )
+    .reduce(
+      (sum: number, item: PayrollItem): number =>
+        sum + parsePayrollAmount(item.amount),
+      0
+    );
+  const bonusTotal: number = payroll.items
+    .filter((item: PayrollItem): boolean => item.work_log_type === "bonus")
+    .reduce(
+      (sum: number, item: PayrollItem): number =>
+        sum + parsePayrollAmount(item.amount),
+      0
+    );
+  const othersTotal: number = payroll.items
+    .filter((item: PayrollItem): boolean => item.work_log_type === "others")
+    .reduce(
+      (sum: number, item: PayrollItem): number =>
+        sum + parsePayrollAmount(item.amount),
+      0
+    );
+
+  const regularPayrollItems: PayrollItem[] = payroll.items.filter(
+    (item: PayrollItem): boolean => !isSpecialPayrollItem(item)
+  );
+  const baseTotal: number = regularPayrollItems
+    .filter((item: PayrollItem): boolean => item.pay_type === "Base")
+    .reduce(
+      (sum: number, item: PayrollItem): number =>
+        sum + parsePayrollAmount(item.amount),
+      0
+    );
+  const tambahanTotal: number = regularPayrollItems
+    .filter((item: PayrollItem): boolean => item.pay_type === "Tambahan")
+    .reduce(
+      (sum: number, item: PayrollItem): number =>
+        sum + parsePayrollAmount(item.amount),
+      0
+    );
+  const overtimeTotal: number = regularPayrollItems
+    .filter((item: PayrollItem): boolean => item.pay_type === "Overtime")
+    .reduce(
+      (sum: number, item: PayrollItem): number =>
+        sum + parsePayrollAmount(item.amount),
+      0
+    );
+  const otherWorkTotal: number = regularPayrollItems
+    .filter(
+      (item: PayrollItem): boolean =>
+        item.pay_type !== "Base" &&
+        item.pay_type !== "Tambahan" &&
+        item.pay_type !== "Overtime"
+    )
+    .reduce(
+      (sum: number, item: PayrollItem): number =>
+        sum + parsePayrollAmount(item.amount),
+      0
+    );
+
+  const midMonthAmount: number = parsePayrollAmount(
+    payroll.mid_month_payroll?.amount
+  );
+  const totalFinalDeductions: number =
+    totalStatutoryDeductions + commissionAdvanceTotal + midMonthAmount;
+  const jumlah: number = netPay - midMonthAmount;
+  const setelahDigenapkan: number =
+    payroll.setelah_digenapkan ?? Math.ceil(jumlah);
+  const digenapkan: number =
+    payroll.digenapkan ?? setelahDigenapkan - jumlah;
+
+  const pinjamRecords: GTPinjamRecord[] = payroll.pinjam_records || [];
+  const midMonthPinjamRecords: GTPinjamRecord[] = pinjamRecords.filter(
+    (record: GTPinjamRecord): boolean => record.pinjam_type === "mid_month"
+  );
+  const monthlyPinjamRecords: GTPinjamRecord[] = pinjamRecords.filter(
+    (record: GTPinjamRecord): boolean => record.pinjam_type === "monthly"
+  );
+  const midMonthPinjamTotal: number = midMonthPinjamRecords.reduce(
+    (sum: number, record: GTPinjamRecord): number =>
+      sum + parsePayrollAmount(record.amount),
+    0
+  );
+  const monthlyPinjamTotal: number = monthlyPinjamRecords.reduce(
+    (sum: number, record: GTPinjamRecord): number =>
+      sum + parsePayrollAmount(record.amount),
+    0
+  );
+  const midMonthFinalPay: number = midMonthAmount - midMonthPinjamTotal;
+  const monthlyFinalPay: number = setelahDigenapkan - monthlyPinjamTotal;
+  const hasMidMonthPinjam: boolean = midMonthPinjamRecords.length > 0;
+  const hasMonthlyPinjam: boolean = monthlyPinjamRecords.length > 0;
+  const hasBothPinjamPanels: boolean =
+    hasMidMonthPinjam && hasMonthlyPinjam;
+
+  const groupedItems: Record<string, PayrollItem[]> = payroll.items.reduce(
+    (
+      groups: Record<string, PayrollItem[]>,
+      item: PayrollItem
+    ): Record<string, PayrollItem[]> => {
+      const group: string = getPayrollItemGroupLabel(item);
+      if (!groups[group]) groups[group] = [];
+      groups[group].push(item);
+      return groups;
     },
     {}
   );
-
-  // Calculate totals
-  const totalDeductions = payroll.deductions.reduce(
-    (sum, d) => sum + d.employee_amount,
-    0
+  const groupedItemEntries: Array<[string, PayrollItem[]]> = Object.entries(
+    groupedItems
+  ).sort(
+    (
+      [leftGroup]: [string, PayrollItem[]],
+      [rightGroup]: [string, PayrollItem[]]
+    ): number =>
+      getPayrollGroupSortOrder(leftGroup) -
+      getPayrollGroupSortOrder(rightGroup)
   );
 
-  // Advance (is_advance Bonus/Commission) is stored as a gross item but deducted
-  // from net — surface it so gross - statutory - advance = net reconciles.
-  const commissionAdvanceTotal = payroll.items
-    .filter((it) => it.work_log_type === "advance")
-    .reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
+  const pinjamAmountColor = (
+    value: number,
+    positiveClass: string
+  ): string =>
+    value < -0.005 ? "text-red-600 dark:text-red-400" : positiveClass;
 
-  // Finalize/status system removed: payrolls are always editable.
-  const isFinalized = false;
-  const { pdfPayroll, staffDetails, midMonthForPdf } = buildPayslipData(payroll);
-
-  // Mid-month advance + rounding (mirrors the backend processing math)
-  const midMonthAmount = payroll.mid_month_payroll?.amount || 0;
-  const jumlah = payroll.net_pay - midMonthAmount;
-  const setelahDigenapkan = payroll.setelah_digenapkan ?? Math.ceil(jumlah);
-  const digenapkan = payroll.digenapkan ?? setelahDigenapkan - jumlah;
-
-  // Pinjam summary (deducted from the rounded pay, not part of net pay)
-  const pinjamRecords = payroll.pinjam_records || [];
-  const midMonthPinjamRecords = pinjamRecords.filter(
-    (r) => r.pinjam_type === "mid_month"
-  );
-  const monthlyPinjamRecords = pinjamRecords.filter(
-    (r) => r.pinjam_type === "monthly"
-  );
-  const midMonthPinjamTotal = midMonthPinjamRecords.reduce(
-    (sum, r) => sum + r.amount,
-    0
-  );
-  const monthlyPinjamTotal = monthlyPinjamRecords.reduce(
-    (sum, r) => sum + r.amount,
-    0
-  );
-  const monthlyFinalPay = setelahDigenapkan - monthlyPinjamTotal;
-  const midMonthFinalPay = midMonthAmount - midMonthPinjamTotal;
+  const payrollListUrl: string = `/greentarget/payroll?year=${payroll.year}&month=${payroll.month}`;
 
   return (
-    <div className="pb-6 space-y-3">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <BackButton onClick={() => navigate("/greentarget/payroll")} />
-        <span className="text-default-300 dark:text-gray-600">|</span>
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            {payroll.job_type === "OFFICE" ? (
-              <IconUser size={24} className="text-sky-500" />
-            ) : (
-              <IconTruck size={24} className="text-amber-500" />
-            )}
-            <h1 className="text-2xl font-semibold text-default-800 dark:text-gray-100">
-              {payroll.employee_name}
+    <div className="space-y-3 pb-6">
+      <div className="sticky top-1 z-20 -mx-1 flex flex-col items-start justify-between gap-2 rounded-lg border border-default-200 bg-white/95 px-3 py-2 shadow-sm backdrop-blur dark:border-gray-700 dark:bg-gray-800/95 md:flex-row md:items-center">
+        <div className="flex min-w-0 items-center gap-4">
+          <BackButton onClick={() => navigate(payrollListUrl)} />
+          <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
+          <div className="min-w-0">
+            <h1
+              className="max-w-48 truncate text-xl font-semibold text-default-800 dark:text-gray-100 sm:max-w-72"
+              title={payroll.employee_name || "Unknown employee"}
+            >
+              {payroll.employee_name || "Unknown employee"}
             </h1>
+            <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
+              {getMonthName(payroll.month)} {payroll.year}
+            </p>
           </div>
-          <p className="text-sm text-default-500 dark:text-gray-400">
-            {getMonthName(payroll.month)} {payroll.year} - {payroll.job_type}
-          </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="mt-2 flex w-full flex-wrap gap-2 md:mt-0 md:w-auto">
           <PrintPayslipButton
             payroll={pdfPayroll}
             staffDetails={staffDetails}
             midMonthPayroll={midMonthForPdf}
             companyName="GREEN TARGET SDN. BHD."
-            size="sm"
-            variant="outline"
-            buttonText="Print"
+            buttonText="Pay Slip"
+            variant="filled"
+            color="sky"
+            className="flex-1 shadow-sm md:flex-none"
           />
           <DownloadPayslipButton
             payroll={pdfPayroll}
             staffDetails={staffDetails}
             midMonthPayroll={midMonthForPdf}
             companyName="GREEN TARGET SDN. BHD."
-            size="sm"
-            variant="outline"
-            buttonText="Download"
+            buttonText="PDF"
+            variant="default"
+            color="sky"
+            className="flex-1 md:flex-none"
           />
+          <Button
+            onClick={() => setShowAddItemModal(true)}
+            icon={IconPlus}
+            variant="default"
+            color="default"
+            className="flex-1 md:flex-none"
+          >
+            Manual Item
+          </Button>
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-sky-100 dark:bg-sky-900/30 rounded-lg">
-              <IconCash size={20} className="text-sky-600 dark:text-sky-400" />
+      <div className="mb-2 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="overflow-hidden rounded-lg border border-default-200 bg-white transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800">
+          <div className="border-b border-default-100 bg-default-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/50">
+            <h3 className="text-md font-semibold text-default-700 dark:text-gray-200">
+              Employee Information
+            </h3>
+          </div>
+          <div className="space-y-4 p-4">
+            <div>
+              <p className="mb-1 text-xs uppercase tracking-wide text-default-400 dark:text-gray-400">
+                Employee
+              </p>
+              <p className="font-semibold text-default-800 dark:text-gray-100">
+                {payroll.employee_name || "Unknown"}
+              </p>
+              <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
+                {payroll.employee_id}
+              </p>
             </div>
             <div>
-              <p className="text-sm text-default-500 dark:text-gray-400">Gross Pay</p>
-              <p className="text-xl font-semibold text-default-800 dark:text-gray-100">
-                {formatCurrency(payroll.gross_pay)}
+              <p className="mb-1 text-xs uppercase tracking-wide text-default-400 dark:text-gray-400">
+                Job Type
+              </p>
+              <p className="flex items-center gap-2 font-semibold text-default-800 dark:text-gray-100">
+                {payroll.job_type === "DRIVER" ? (
+                  <IconTruck size={18} className="text-amber-500" />
+                ) : (
+                  <IconUser size={18} className="text-sky-500" />
+                )}
+                {payroll.job_type}
+              </p>
+              <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
+                {payroll.section || "GREEN TARGET"}
               </p>
             </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
-              <IconReceipt size={20} className="text-red-600 dark:text-red-400" />
+
+        <div className="flex flex-col overflow-hidden rounded-lg border border-default-200 bg-white transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800">
+          <div className="border-b border-emerald-100 bg-emerald-50 px-4 py-3 dark:border-emerald-800/50 dark:bg-emerald-900/20">
+            <h3 className="text-md flex items-center gap-2 font-semibold text-emerald-800 dark:text-emerald-300">
+              <IconCash
+                size={18}
+                className="text-emerald-600 dark:text-emerald-400"
+              />
+              Earnings
+            </h3>
+          </div>
+          <div className="flex flex-grow flex-col p-4">
+            <div className="flex-grow space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-default-600 dark:text-gray-300">
+                  Base Pay
+                </span>
+                <span className="font-medium text-default-800 dark:text-gray-100">
+                  {formatCurrency(baseTotal)}
+                </span>
+              </div>
+              {tambahanTotal > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-default-600 dark:text-gray-300">
+                    Tambahan
+                  </span>
+                  <span className="font-medium text-default-800 dark:text-gray-100">
+                    {formatCurrency(tambahanTotal)}
+                  </span>
+                </div>
+              )}
+              {overtimeTotal > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-default-600 dark:text-gray-300">
+                    Overtime
+                  </span>
+                  <span className="font-medium text-default-800 dark:text-gray-100">
+                    {formatCurrency(overtimeTotal)}
+                  </span>
+                </div>
+              )}
+              {otherWorkTotal > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-default-600 dark:text-gray-300">
+                    Other Work Pay
+                  </span>
+                  <span className="font-medium text-default-800 dark:text-gray-100">
+                    {formatCurrency(otherWorkTotal)}
+                  </span>
+                </div>
+              )}
+              {bonusTotal > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-default-600 dark:text-gray-300">
+                    Bonus
+                  </span>
+                  <span className="font-medium text-default-800 dark:text-gray-100">
+                    {formatCurrency(bonusTotal)}
+                  </span>
+                </div>
+              )}
+              {othersTotal > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-default-600 dark:text-gray-300">
+                    Others
+                  </span>
+                  <span className="font-medium text-default-800 dark:text-gray-100">
+                    {formatCurrency(othersTotal)}
+                  </span>
+                </div>
+              )}
+              {commissionAdvanceTotal > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-default-600 dark:text-gray-300">
+                    Advance
+                  </span>
+                  <span className="font-medium text-default-800 dark:text-gray-100">
+                    {formatCurrency(commissionAdvanceTotal)}
+                  </span>
+                </div>
+              )}
             </div>
-            <div>
-              <p className="text-sm text-default-500 dark:text-gray-400">Deductions</p>
-              <p className="text-xl font-semibold text-red-600 dark:text-red-400">
-                -{formatCurrency(totalDeductions)}
-              </p>
+            <div className="mt-auto border-t border-default-200 pt-3 dark:border-gray-600">
+              <div className="flex justify-between font-semibold">
+                <span className="text-default-800 dark:text-gray-100">
+                  Gross Pay
+                </span>
+                <span className="text-lg text-emerald-700 dark:text-emerald-400">
+                  {formatCurrency(grossPay)}
+                </span>
+              </div>
             </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
-              <IconCash size={20} className="text-emerald-600 dark:text-emerald-400" />
+
+        <div className="flex flex-col rounded-lg border border-sky-200 bg-white transition-shadow hover:shadow-md dark:border-sky-800/50 dark:bg-gray-800">
+          <div className="rounded-t-lg border-b border-sky-100 bg-sky-50 px-4 py-3 dark:border-sky-800/50 dark:bg-sky-900/20">
+            <h3 className="text-md flex items-center gap-2 font-semibold text-sky-800 dark:text-sky-300">
+              <IconReceipt
+                size={18}
+                className="text-sky-600 dark:text-sky-400"
+              />
+              Deductions & Final Pay
+            </h3>
+          </div>
+          <div className="flex flex-grow flex-col p-4">
+            <div className="flex-grow space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-default-600 dark:text-gray-300">
+                  Gross Pay
+                </span>
+                <span className="font-medium text-default-800 dark:text-gray-100">
+                  {formatCurrency(grossPay)}
+                </span>
+              </div>
+              <div className="my-2 border-t border-dashed border-default-300 dark:border-gray-600" />
+              {payroll.deductions
+                .filter(
+                  (deduction: Deduction): boolean =>
+                    parsePayrollAmount(deduction.employee_amount) > 0
+                )
+                .sort(
+                  (left: Deduction, right: Deduction): number =>
+                    getDeductionSortOrder(left.deduction_type) -
+                    getDeductionSortOrder(right.deduction_type)
+                )
+                .map((deduction: Deduction): React.ReactNode => {
+                  const deductionName: string = getDeductionCardLabel(
+                    deduction.deduction_type
+                  );
+                  const employeeAmount: number = parsePayrollAmount(
+                    deduction.employee_amount
+                  );
+                  const employerAmount: number = parsePayrollAmount(
+                    deduction.employer_amount
+                  );
+                  const percentage: string =
+                    grossPay > 0
+                      ? ((employeeAmount / grossPay) * 100).toFixed(1)
+                      : "0";
+
+                  return (
+                    <div
+                      key={deduction.deduction_type}
+                      className="group relative flex justify-between text-sm"
+                    >
+                      <span className="flex cursor-help items-center gap-1 text-default-600 dark:text-gray-300">
+                        {deductionName}
+                        <IconInfoCircle
+                          size={14}
+                          className="text-default-400 opacity-60 group-hover:opacity-100 dark:text-gray-400"
+                        />
+                        <span className="text-xs text-default-400 dark:text-gray-400">
+                          ({percentage}%)
+                        </span>
+                      </span>
+                      <span className="font-medium text-rose-600 dark:text-rose-400">
+                        - {formatCurrency(employeeAmount)}
+                      </span>
+                      <div className="absolute left-0 top-full z-50 mt-2 hidden w-64 group-hover:block">
+                        <div className="relative rounded-lg bg-default-800 p-3 text-xs text-white shadow-lg">
+                          <div className="absolute bottom-full left-4 h-0 w-0 border-b-[6px] border-l-[6px] border-r-[6px] border-b-default-800 border-l-transparent border-r-transparent" />
+                          <div className="mb-2 font-semibold text-default-100">
+                            {deductionName} Breakdown
+                          </div>
+                          <div className="space-y-1">
+                            <div className="flex justify-between">
+                              <span className="text-default-300">Employee:</span>
+                              <span>{formatCurrency(employeeAmount)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-default-300">Employer:</span>
+                              <span>{formatCurrency(employerAmount)}</span>
+                            </div>
+                            <div className="mt-2 border-t border-default-600 pt-2">
+                              <div className="flex justify-between text-default-400">
+                                <span>Employee Rate:</span>
+                                <span>
+                                  {deduction.rate_info?.employee_rate || "-"}
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-default-400">
+                                <span>Employer Rate:</span>
+                                <span>
+                                  {deduction.rate_info?.employer_rate || "-"}
+                                </span>
+                              </div>
+                              {deduction.rate_info?.age_group && (
+                                <div className="flex justify-between text-default-400">
+                                  <span>Age Group:</span>
+                                  <span className="capitalize">
+                                    {deduction.rate_info.age_group.replace(
+                                      /_/g,
+                                      " "
+                                    )}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              {commissionAdvanceTotal > 0 && (
+                <div className="group relative flex justify-between text-sm">
+                  <span className="flex cursor-help items-center gap-1 text-default-600 dark:text-gray-300">
+                    Advance
+                    <IconInfoCircle
+                      size={14}
+                      className="text-default-400 opacity-60 group-hover:opacity-100 dark:text-gray-400"
+                    />
+                  </span>
+                  <span className="font-medium text-rose-600 dark:text-rose-400">
+                    - {formatCurrency(commissionAdvanceTotal)}
+                  </span>
+                  <div className="absolute left-0 top-full z-50 mt-2 hidden w-64 group-hover:block">
+                    <div className="relative rounded-lg bg-default-800 p-3 text-xs text-white shadow-lg">
+                      <div className="absolute bottom-full left-4 h-0 w-0 border-b-[6px] border-l-[6px] border-r-[6px] border-b-default-800 border-l-transparent border-r-transparent" />
+                      <div className="mb-2 font-semibold text-default-100">
+                        Advance
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-default-300">Total Amount:</span>
+                        <span>{formatCurrency(commissionAdvanceTotal)}</span>
+                      </div>
+                      <div className="mt-2 border-t border-default-600 pt-2 text-default-400">
+                        Payments made in advance, deducted from final pay.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {midMonthAmount > 0 && (
+                <div className="group relative flex justify-between text-sm">
+                  <div className="flex flex-1 items-center justify-between text-default-600 dark:text-gray-300">
+                    <span className="flex cursor-help items-center gap-1">
+                      Mid-month Advance
+                      <IconInfoCircle
+                        size={14}
+                        className="text-default-400 opacity-60 group-hover:opacity-100 dark:text-gray-400"
+                      />
+                    </span>
+                    <span className="font-medium text-rose-600 dark:text-rose-400">
+                      - {formatCurrency(midMonthAmount)}
+                    </span>
+                  </div>
+                  <div className="absolute left-0 top-full z-50 mt-2 hidden w-64 group-hover:block">
+                    <div className="relative rounded-lg bg-default-800 p-3 text-xs text-white shadow-lg">
+                      <div className="absolute bottom-full left-4 h-0 w-0 border-b-[6px] border-l-[6px] border-r-[6px] border-b-default-800 border-l-transparent border-r-transparent" />
+                      <div className="mb-2 font-semibold text-default-100">
+                        Mid-month Advance
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-default-300">Amount:</span>
+                        <span>{formatCurrency(midMonthAmount)}</span>
+                      </div>
+                      <div className="mt-2 border-t border-default-600 pt-2 text-default-400">
+                        Advance payment made mid-month, deducted before rounding.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="mt-2 border-t border-default-200 pt-2 dark:border-gray-600">
+                <div className="flex justify-between text-sm">
+                  <span className="font-medium text-default-600 dark:text-gray-300">
+                    Total Deductions
+                  </span>
+                  <span className="font-semibold text-rose-600 dark:text-rose-400">
+                    - {formatCurrency(totalFinalDeductions)}
+                  </span>
+                </div>
+              </div>
+              <div className="mt-2 border-t border-default-200 pt-2 dark:border-gray-600">
+                <div className="flex justify-between text-sm">
+                  <span className="font-medium text-default-600 dark:text-gray-300">
+                    Pay Before Rounding
+                  </span>
+                  <span className="font-semibold text-default-800 dark:text-gray-100">
+                    {formatCurrency(jumlah)}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-default-500 dark:text-gray-400">Net Pay</p>
-              <p className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">
-                {formatCurrency(payroll.net_pay)}
-              </p>
+            {digenapkan > 0.001 && (
+              <div className="mt-2 flex justify-between text-sm">
+                <span className="text-default-600 dark:text-gray-300">
+                  Digenapkan
+                </span>
+                <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                  + {formatCurrency(digenapkan)}
+                </span>
+              </div>
+            )}
+            <div className="-mx-4 -mb-4 mt-4 rounded-b-lg border-t border-sky-200 bg-sky-100 px-4 py-4 dark:border-sky-800/50 dark:bg-sky-900/30">
+              <div className="flex items-center justify-between">
+                <span className="text-base font-bold text-sky-800 dark:text-sky-300">
+                  Jumlah Digenapkan
+                </span>
+                <span className="text-2xl font-bold text-sky-900 dark:text-sky-200">
+                  {formatCurrency(setelahDigenapkan)}
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Payroll Items */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-        <div className="px-4 py-3 border-b border-default-200 dark:border-gray-700 flex justify-between items-center">
-          <h3 className="font-medium text-default-800 dark:text-gray-200">
-            Earnings
-          </h3>
-          {!isFinalized && (
+      <section className="space-y-3">
+        <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+          <div>
+            <h2 className="text-lg font-semibold text-default-800 dark:text-gray-100">
+              Earnings Breakdown
+            </h2>
+            <p className="text-sm text-default-500 dark:text-gray-400">
+              Pay items are separated by source so additions and manual entries
+              are easier to review.
+            </p>
+          </div>
+        </div>
+
+        {payroll.items.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-default-300 bg-white px-6 py-8 text-center dark:border-gray-600 dark:bg-gray-800">
+            <IconCoins
+              size={28}
+              className="mx-auto mb-2 text-default-300 dark:text-gray-500"
+            />
+            <p className="text-default-500 dark:text-gray-400">
+              No earnings recorded.
+            </p>
             <Button
               size="sm"
               variant="outline"
-              onClick={() => setShowAddItemModal(true)}
+              onClick={(): void => setShowAddItemModal(true)}
               icon={IconPlus}
               iconSize={16}
+              className="mt-3"
             >
-              Add Item
+              Add Manual Item
             </Button>
-          )}
-        </div>
-        <div className="p-4">
-          {payroll.items.length === 0 ? (
-            <p className="text-center text-default-400 dark:text-gray-500 py-4">
-              No earnings recorded
-            </p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-default-200 dark:border-gray-700">
-                  <th className="text-left py-2 text-default-600 dark:text-gray-400 font-medium">
-                    Description
-                  </th>
-                  <th className="text-right py-2 text-default-600 dark:text-gray-400 font-medium w-24">
-                    Rate
-                  </th>
-                  <th className="text-right py-2 text-default-600 dark:text-gray-400 font-medium w-20">
-                    Qty
-                  </th>
-                  <th className="text-right py-2 text-default-600 dark:text-gray-400 font-medium w-28">
-                    Amount
-                  </th>
-                  {!isFinalized && (
-                    <th className="w-10"></th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(groupedItems).map(([type, items]) => (
-                  <React.Fragment key={type}>
-                    <tr>
-                      <td
-                        colSpan={isFinalized ? 4 : 5}
-                        className="py-2 pt-4 text-xs font-semibold text-default-500 dark:text-gray-400 uppercase tracking-wide"
-                      >
-                        {type}
-                      </td>
-                    </tr>
-                    {items.map((item) => (
-                      <tr
-                        key={item.id}
-                        className="border-b border-default-100 dark:border-gray-700/50"
-                      >
-                        <td className="py-2 text-default-800 dark:text-gray-200">
-                          {item.description}
-                          {item.is_manual && (
-                            <span className="ml-2 px-1.5 py-0.5 text-xs bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 rounded">
-                              Manual
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-2 text-right text-default-600 dark:text-gray-400">
-                          {formatCurrency(item.rate)}
-                          <span className="text-xs text-default-400 dark:text-gray-500 ml-1">
-                            /{item.rate_unit}
-                          </span>
-                        </td>
-                        <td className="py-2 text-right text-default-600 dark:text-gray-400">
-                          {item.quantity}
-                        </td>
-                        <td className="py-2 text-right font-medium text-default-800 dark:text-gray-200">
-                          {formatCurrency(item.amount)}
-                        </td>
-                        {!isFinalized && (
-                          <td className="py-2 text-right">
-                            {item.is_manual && (
-                              <button
-                                onClick={() => {
-                                  setItemToDelete(item);
-                                  setShowDeleteDialog(true);
-                                }}
-                                className="p-1 text-red-500 hover:text-red-700 dark:hover:text-red-400"
-                              >
-                                <IconTrash size={16} />
-                              </button>
-                            )}
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </React.Fragment>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t-2 border-default-200 dark:border-gray-600">
-                  <td
-                    colSpan={isFinalized ? 3 : 4}
-                    className="py-2 font-semibold text-default-800 dark:text-gray-200"
-                  >
-                    Total Earnings
-                  </td>
-                  <td className="py-2 text-right font-bold text-emerald-600 dark:text-emerald-400">
-                    {formatCurrency(payroll.gross_pay)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          )}
-        </div>
-      </div>
+          </div>
+        ) : (
+          groupedItemEntries.map(
+            ([group, items]: [string, PayrollItem[]]): React.ReactNode => {
+              const groupStyle: PayrollItemGroupStyle =
+                getPayrollItemGroupStyle(group);
+              const groupTotal: number = items.reduce(
+                (sum: number, item: PayrollItem): number =>
+                  sum + parsePayrollAmount(item.amount),
+                0
+              );
+              const addOnUrl: string | null = groupStyle.addOnPath
+                ? `${groupStyle.addOnPath}?year=${payroll.year}&month=${
+                    payroll.month
+                  }&search=${encodeURIComponent(payroll.employee_id)}`
+                : null;
 
-      {/* Deductions */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-        <div className="px-4 py-3 border-b border-default-200 dark:border-gray-700">
-          <h3 className="font-medium text-default-800 dark:text-gray-200">
-            Statutory Deductions
-          </h3>
-        </div>
-        <div className="p-4">
-          {payroll.deductions.length === 0 ? (
-            <p className="text-center text-default-400 dark:text-gray-500 py-4">
-              No deductions
-            </p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-default-200 dark:border-gray-700">
-                  <th className="text-left py-2 text-default-600 dark:text-gray-400 font-medium">
-                    Type
-                  </th>
-                  <th className="text-right py-2 text-default-600 dark:text-gray-400 font-medium">
-                    Rate
-                  </th>
-                  <th className="text-right py-2 text-default-600 dark:text-gray-400 font-medium">
-                    Employee
-                  </th>
-                  <th className="text-right py-2 text-default-600 dark:text-gray-400 font-medium">
-                    Employer
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {payroll.deductions.map((deduction, index) => (
-                  <tr
-                    key={index}
-                    className="border-b border-default-100 dark:border-gray-700/50"
+              return (
+                <div
+                  key={group}
+                  className="overflow-hidden rounded-lg border border-default-200 bg-white dark:border-gray-700 dark:bg-gray-800"
+                >
+                  <div
+                    className={`flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5 ${groupStyle.headerClassName}`}
                   >
-                    <td className="py-2 text-default-800 dark:text-gray-200">
-                      {getDeductionLabel(deduction.deduction_type)}
-                    </td>
-                    <td className="py-2 text-right text-default-600 dark:text-gray-400 text-xs">
-                      {deduction.rate_info?.employee_rate || "-"}
-                    </td>
-                    <td className="py-2 text-right text-red-600 dark:text-red-400 font-medium">
-                      {formatCurrency(deduction.employee_amount)}
-                    </td>
-                    <td className="py-2 text-right text-default-600 dark:text-gray-400">
-                      {formatCurrency(deduction.employer_amount)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t-2 border-default-200 dark:border-gray-600">
-                  <td
-                    colSpan={2}
-                    className="py-2 font-semibold text-default-800 dark:text-gray-200"
-                  >
-                    Total Deductions
-                  </td>
-                  <td className="py-2 text-right font-bold text-red-600 dark:text-red-400">
-                    {formatCurrency(totalDeductions)}
-                  </td>
-                  <td className="py-2 text-right font-medium text-default-600 dark:text-gray-400">
-                    {formatCurrency(
-                      payroll.deductions.reduce((sum, d) => sum + d.employer_amount, 0)
+                    <h3
+                      className={`flex items-center gap-2 font-semibold ${groupStyle.titleClassName}`}
+                    >
+                      <IconCoins
+                        size={18}
+                        className={groupStyle.iconClassName}
+                      />
+                      <span>{groupStyle.label}</span>
+                      <span className="rounded-full bg-white/70 px-2 py-0.5 text-xs font-medium text-default-500 dark:bg-gray-800/70 dark:text-gray-400">
+                        {items.length}
+                      </span>
+                    </h3>
+                    {addOnUrl && groupStyle.addOnLabel && (
+                      <Link
+                        to={addOnUrl}
+                        className={`inline-flex items-center gap-1 text-sm font-medium transition-opacity hover:opacity-75 ${groupStyle.titleClassName}`}
+                        title={`${groupStyle.addOnLabel} for ${payroll.employee_name}`}
+                      >
+                        {groupStyle.addOnLabel}
+                        <IconExternalLink size={14} />
+                      </Link>
                     )}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          )}
-        </div>
-      </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[620px]">
+                      <thead className="bg-default-50/70 dark:bg-gray-800">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-400">
+                            Description
+                          </th>
+                          <th className="w-28 px-3 py-2 text-right text-xs font-medium uppercase text-default-500 dark:text-gray-400">
+                            Rate
+                          </th>
+                          <th className="w-20 px-3 py-2 text-right text-xs font-medium uppercase text-default-500 dark:text-gray-400">
+                            Qty
+                          </th>
+                          <th className="w-28 px-3 py-2 text-right text-xs font-medium uppercase text-default-500 dark:text-gray-400">
+                            Amount
+                          </th>
+                          <th className="w-10 px-3 py-2" />
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-default-100 dark:divide-gray-700">
+                        {items.map(
+                          (
+                            item: PayrollItem,
+                            index: number
+                          ): React.ReactNode => (
+                            <tr key={`${group}-${item.id || index}`}>
+                              <td className="px-3 py-2 text-sm text-default-800 dark:text-gray-200">
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <span className="truncate">
+                                    {item.description}
+                                  </span>
+                                  {item.is_manual && (
+                                    <span className="rounded bg-sky-100 px-1.5 py-0.5 text-xs text-sky-600 dark:bg-sky-900/30 dark:text-sky-400">
+                                      Manual
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-3 py-2 text-right text-sm text-default-600 dark:text-gray-400">
+                                {formatCurrency(item.rate)}
+                                {item.rate_unit && (
+                                  <span className="ml-1 text-xs text-default-400 dark:text-gray-500">
+                                    /{item.rate_unit}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-right text-sm text-default-600 dark:text-gray-400">
+                                {item.quantity}
+                              </td>
+                              <td className="px-3 py-2 text-right text-sm font-medium text-default-800 dark:text-gray-200">
+                                {formatCurrency(item.amount)}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {item.is_manual && (
+                                  <button
+                                    type="button"
+                                    onClick={(): void => {
+                                      setItemToDelete(item);
+                                      setShowDeleteDialog(true);
+                                    }}
+                                    className="rounded p-1 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                                    title="Delete manual item"
+                                    aria-label={`Delete ${item.description}`}
+                                  >
+                                    <IconTrash size={16} />
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        )}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t border-default-200 bg-default-50/60 dark:border-gray-700 dark:bg-gray-900/30">
+                          <td
+                            colSpan={3}
+                            className="px-3 py-2 text-sm font-semibold text-default-700 dark:text-gray-200"
+                          >
+                            Total {groupStyle.label}
+                          </td>
+                          <td
+                            className={`px-3 py-2 text-right font-bold ${groupStyle.totalClassName}`}
+                          >
+                            {formatCurrency(groupTotal)}
+                          </td>
+                          <td />
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              );
+            }
+          )
+        )}
+      </section>
 
-      {/* Net Pay + Rounding Summary */}
-      <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg shadow p-4 space-y-2">
-        {commissionAdvanceTotal > 0 && (
-          <div className="space-y-1 pb-2 mb-1 border-b border-emerald-200 dark:border-emerald-800 text-sm">
-            <div className="flex justify-between items-center text-emerald-700 dark:text-emerald-300">
-              <span>Gross Pay</span>
-              <span>{formatCurrency(payroll.gross_pay)}</span>
-            </div>
-            <div className="flex justify-between items-center text-emerald-700 dark:text-emerald-300">
-              <span>Statutory Deductions</span>
-              <span className="text-red-600 dark:text-red-400">
-                -{formatCurrency(totalDeductions)}
-              </span>
-            </div>
-            <div className="flex justify-between items-center text-emerald-700 dark:text-emerald-300">
-              <span>Advance (Bonus/Commission)</span>
-              <span className="text-red-600 dark:text-red-400">
-                -{formatCurrency(commissionAdvanceTotal)}
-              </span>
-            </div>
-          </div>
-        )}
-        <div className="flex justify-between items-center">
-          <span className="text-lg font-medium text-emerald-800 dark:text-emerald-300">
-            Net Pay
-          </span>
-          <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-            {formatCurrency(payroll.net_pay)}
-          </span>
-        </div>
-        {midMonthAmount > 0 && (
-          <div className="flex justify-between items-center text-sm">
-            <span className="text-emerald-700 dark:text-emerald-300">
-              Bayaran Pendahuluan (Mid-month)
-            </span>
-            <span className="font-medium text-red-600 dark:text-red-400">
-              -{formatCurrency(midMonthAmount)}
-            </span>
-          </div>
-        )}
-        {digenapkan > 0.001 && (
-          <div className="flex justify-between items-center text-sm">
-            <span className="text-emerald-700 dark:text-emerald-300">
-              Digenapkan (Rounding)
-            </span>
-            <span className="font-medium text-emerald-700 dark:text-emerald-300">
-              +{formatCurrency(digenapkan)}
-            </span>
-          </div>
-        )}
-        <div className="flex justify-between items-center pt-2 border-t border-emerald-200 dark:border-emerald-800">
-          <span className="text-lg font-medium text-emerald-800 dark:text-emerald-300">
-            Jumlah Digenapkan
-          </span>
-          <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-            {formatCurrency(setelahDigenapkan)}
-          </span>
-        </div>
-      </div>
-
-      {/* Pinjam Summary - final pay after pinjam deductions.
-          Only shown when this employee has pinjam recorded this month. */}
       {pinjamRecords.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-          <div className="px-4 py-3 border-b border-default-200 dark:border-gray-700">
-            <h3 className="font-medium text-default-800 dark:text-gray-200">
-              Pinjam
+        <div
+          id="pinjam-section"
+          className="mb-4 overflow-hidden rounded-lg border border-default-200 bg-white dark:border-gray-700 dark:bg-gray-800"
+        >
+          <div className="flex items-center justify-between gap-3 border-b border-red-100 bg-red-50 px-4 py-2 dark:border-red-800/50 dark:bg-red-900/20">
+            <h3 className="text-md flex items-center gap-2 font-semibold text-red-800 dark:text-red-300">
+              <IconWallet
+                size={18}
+                className="text-red-600 dark:text-red-400"
+              />
+              <span>Pinjam</span>
             </h3>
           </div>
-          <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-            {midMonthPinjamRecords.length > 0 && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-                <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">
-                  Mid-Month Pinjam
-                </p>
-                <div className="flex justify-between text-sm text-blue-700 dark:text-blue-300">
-                  <span>Bayaran Pendahuluan</span>
-                  <span>{formatCurrency(midMonthAmount)}</span>
-                </div>
-                {midMonthPinjamRecords.map((record) => (
-                  <div
-                    key={record.id}
-                    className="flex justify-between text-sm text-blue-700 dark:text-blue-300"
-                  >
-                    <span>{record.description}</span>
-                    <span>-{formatCurrency(record.amount)}</span>
+          <div className="p-4">
+            <div
+              className={`flex flex-col gap-6 ${
+                hasBothPinjamPanels
+                  ? "lg:flex-row lg:divide-x lg:divide-default-200 dark:lg:divide-gray-700"
+                  : ""
+              }`}
+            >
+              {hasMidMonthPinjam && (
+                <div
+                  className={`flex min-w-0 flex-col ${
+                    hasBothPinjamPanels ? "flex-1 lg:pr-6" : "w-full"
+                  }`}
+                >
+                  <div className="mb-3">
+                    <p className="mb-1 text-sm text-default-500 dark:text-gray-400">
+                      Mid-Month Pay (Before Pinjam)
+                    </p>
+                    <p
+                      className={`text-xl font-bold ${pinjamAmountColor(
+                        midMonthAmount,
+                        "text-default-800 dark:text-gray-100"
+                      )}`}
+                    >
+                      {formatCurrency(midMonthAmount)}
+                    </p>
                   </div>
-                ))}
-                <div className="flex justify-between mt-2 pt-2 border-t border-blue-200 dark:border-blue-800 font-semibold">
-                  <span className="text-blue-800 dark:text-blue-200">
-                    Final Mid-Month Pay
-                  </span>
-                  <span
-                    className={
-                      midMonthFinalPay < 0
-                        ? "text-rose-600 dark:text-rose-400"
-                        : "text-blue-800 dark:text-blue-200"
-                    }
-                  >
-                    {formatCurrency(midMonthFinalPay)}
-                  </span>
-                </div>
-              </div>
-            )}
-            {monthlyPinjamRecords.length > 0 && (
-              <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
-                <p className="text-sm font-semibold text-green-800 dark:text-green-200 mb-2">
-                  Monthly Pinjam
-                </p>
-                <div className="flex justify-between text-sm text-green-700 dark:text-green-300">
-                  <span>Jumlah Digenapkan</span>
-                  <span>{formatCurrency(setelahDigenapkan)}</span>
-                </div>
-                {monthlyPinjamRecords.map((record) => (
-                  <div
-                    key={record.id}
-                    className="flex justify-between text-sm text-green-700 dark:text-green-300"
-                  >
-                    <span>{record.description}</span>
-                    <span>-{formatCurrency(record.amount)}</span>
+                  <div className="mb-3">
+                    <p className="mb-2 text-sm font-medium text-default-700 dark:text-gray-200">
+                      Pinjam Items:
+                    </p>
+                    <div className="space-y-1 text-sm text-default-600 dark:text-gray-300">
+                      {midMonthPinjamRecords.map(
+                        (record: GTPinjamRecord): React.ReactNode => (
+                          <div key={record.id} className="flex items-start">
+                            <span className="mr-2 mt-0.5 text-default-400">•</span>
+                            <span className="min-w-0 flex-1">
+                              {record.description}
+                            </span>
+                            <span className="ml-2 flex-shrink-0 font-medium text-default-700 dark:text-gray-200">
+                              {formatCurrency(record.amount)}
+                            </span>
+                          </div>
+                        )
+                      )}
+                    </div>
                   </div>
-                ))}
-                <div className="flex justify-between mt-2 pt-2 border-t border-green-200 dark:border-green-800 font-semibold">
-                  <span className="text-green-800 dark:text-green-200">
-                    Final Pay
-                  </span>
-                  <span
-                    className={
-                      monthlyFinalPay < 0
-                        ? "text-rose-600 dark:text-rose-400"
-                        : "text-green-800 dark:text-green-200"
-                    }
-                  >
-                    {formatCurrency(monthlyFinalPay)}
-                  </span>
+                  <div className="mt-auto text-sm">
+                    <div className="mb-2 flex justify-between">
+                      <span className="text-default-600 dark:text-gray-300">
+                        Jumlah Pinjam:
+                      </span>
+                      <span className="font-semibold text-red-600 dark:text-red-400">
+                        - {formatCurrency(midMonthPinjamTotal)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-default-200 pt-2 font-semibold dark:border-gray-600">
+                      <span className="text-default-800 dark:text-gray-100">
+                        Final Mid-Month Pay
+                      </span>
+                      <span
+                        className={`text-lg font-bold ${pinjamAmountColor(
+                          midMonthFinalPay,
+                          "text-sky-600 dark:text-sky-400"
+                        )}`}
+                      >
+                        {formatCurrency(midMonthFinalPay)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+
+              {hasMonthlyPinjam && (
+                <div
+                  className={`flex min-w-0 flex-col ${
+                    hasBothPinjamPanels ? "flex-1 lg:pl-6" : "w-full"
+                  }`}
+                >
+                  <div className="mb-3">
+                    <p className="mb-1 text-sm text-default-500 dark:text-gray-400">
+                      Gaji Genap (Before Pinjam)
+                    </p>
+                    <p
+                      className={`text-xl font-bold ${pinjamAmountColor(
+                        setelahDigenapkan,
+                        "text-default-800 dark:text-gray-100"
+                      )}`}
+                    >
+                      {formatCurrency(setelahDigenapkan)}
+                    </p>
+                  </div>
+                  <div className="mb-3">
+                    <p className="mb-2 text-sm font-medium text-default-700 dark:text-gray-200">
+                      Pinjam Items:
+                    </p>
+                    <div className="space-y-1 text-sm text-default-600 dark:text-gray-300">
+                      {monthlyPinjamRecords.map(
+                        (record: GTPinjamRecord): React.ReactNode => (
+                          <div key={record.id} className="flex items-start">
+                            <span className="mr-2 mt-0.5 text-default-400">•</span>
+                            <span className="min-w-0 flex-1">
+                              {record.description}
+                            </span>
+                            <span className="ml-2 flex-shrink-0 font-medium text-default-700 dark:text-gray-200">
+                              {formatCurrency(record.amount)}
+                            </span>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-auto text-sm">
+                    <div className="mb-2 flex justify-between">
+                      <span className="text-default-600 dark:text-gray-300">
+                        Jumlah Pinjam:
+                      </span>
+                      <span className="font-semibold text-red-600 dark:text-red-400">
+                        - {formatCurrency(monthlyPinjamTotal)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-default-200 pt-2 font-semibold dark:border-gray-600">
+                      <span className="flex items-center gap-1.5 text-default-800 dark:text-gray-100">
+                        <IconBuildingBank className="h-4 w-4 flex-shrink-0" />
+                        Jumlah Masuk Bank
+                      </span>
+                      <span
+                        className={`text-lg font-bold ${pinjamAmountColor(
+                          monthlyFinalPay,
+                          "text-sky-600 dark:text-sky-400"
+                        )}`}
+                      >
+                        {formatCurrency(monthlyFinalPay)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Add Manual Item Modal */}
       <AddManualItemModal
         isOpen={showAddItemModal}
         onClose={() => setShowAddItemModal(false)}
@@ -702,7 +1288,6 @@ const GTPayrollDetailsPage: React.FC = () => {
         apiBasePath="/greentarget/api/employee-payrolls"
       />
 
-      {/* Delete Confirmation Dialog */}
       <ConfirmationDialog
         isOpen={showDeleteDialog}
         onClose={() => {
@@ -711,8 +1296,10 @@ const GTPayrollDetailsPage: React.FC = () => {
         }}
         onConfirm={handleDeleteItem}
         title="Delete Payroll Item"
-        message={`Are you sure you want to delete "${itemToDelete?.description}"? This action cannot be undone.`}
-        confirmButtonText="Delete"
+        message={`Are you sure you want to delete "${
+          itemToDelete?.description || "this item"
+        }"? This action cannot be undone.`}
+        confirmButtonText={isDeleting ? "Deleting..." : "Delete"}
         variant="danger"
       />
     </div>
