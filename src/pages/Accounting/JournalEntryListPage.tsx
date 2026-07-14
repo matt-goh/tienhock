@@ -36,6 +36,7 @@ interface CachedListFilters {
   dateRange: { start: Date; end: Date };
   types: string[];
   statuses: string[];
+  page: number;
 }
 
 const isLegacyImportEntry = (entry: JournalEntry): boolean =>
@@ -59,6 +60,7 @@ const loadCachedFilters = (): CachedListFilters => {
     dateRange: { start: new Date(), end: new Date() },
     types: [],
     statuses: [],
+    page: 1,
   };
   try {
     const cached = localStorage.getItem(FILTERS_STORAGE_KEY);
@@ -79,6 +81,8 @@ const loadCachedFilters = (): CachedListFilters => {
         statuses: Array.isArray(parsed.statuses)
           ? parsed.statuses.filter((s: unknown) => typeof s === "string")
           : [],
+        page:
+          typeof parsed.page === "number" && parsed.page >= 1 ? parsed.page : 1,
       };
     }
     // Migrate from the old date-range-only cache
@@ -191,8 +195,8 @@ const JournalEntryListPage: React.FC = () => {
     }
   }, [searchParams, initialized]);
 
-  // Pagination
-  const [page, setPage] = useState(1);
+  // Pagination - restore last viewed page from cache
+  const [page, setPage] = useState<number>(() => loadCachedFilters().page);
   const [limit] = useState(50);
 
   // Delete dialog
@@ -271,12 +275,9 @@ const JournalEntryListPage: React.FC = () => {
 
   useScrollRestoration(SCROLL_RESTORATION_KEY, initialized && !loading);
 
-  // Reset pagination when filters change
-  useEffect(() => {
-    setPage(1);
-  }, [searchTerm, selectedTypes, selectedStatuses, dateRange]);
-
-  // Cache search, date range, and pill selections to localStorage
+  // Cache search, date range, pill selections, and current page to localStorage.
+  // Page is reset to 1 explicitly by the filter handlers (not on restore), so the
+  // restored page survives the initial mount.
   useEffect(() => {
     try {
       localStorage.setItem(
@@ -287,12 +288,13 @@ const JournalEntryListPage: React.FC = () => {
           end: dateRange.end.toISOString(),
           types: selectedTypes,
           statuses: selectedStatuses,
+          page,
         })
       );
     } catch (e) {
       console.error("Error caching filters:", e);
     }
-  }, [searchTerm, dateRange, selectedTypes, selectedStatuses]);
+  }, [searchTerm, dateRange, selectedTypes, selectedStatuses, page]);
 
   // Handlers
   const handleCreateNew = () => {
@@ -365,12 +367,14 @@ const JournalEntryListPage: React.FC = () => {
     setSelectedTypes((prev) =>
       prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
     );
+    setPage(1);
   };
 
   const toggleStatus = (value: string) => {
     setSelectedStatuses((prev) =>
       prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
     );
+    setPage(1);
   };
 
   const getDisplayEntryTypeName = (
@@ -394,6 +398,7 @@ const JournalEntryListPage: React.FC = () => {
     setSearchTerm("");
     setSelectedTypes([]);
     setSelectedStatuses([]);
+    setPage(1);
   };
 
   // Format date for display
@@ -466,11 +471,17 @@ const JournalEntryListPage: React.FC = () => {
             placeholder="Search reference or description..."
             className="w-full h-[40px] rounded-lg border border-default-300 dark:border-gray-600 pl-9 pr-8 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 text-default-800 dark:text-gray-100"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPage(1);
+            }}
           />
           {searchTerm && (
             <button
-              onClick={() => setSearchTerm("")}
+              onClick={() => {
+                setSearchTerm("");
+                setPage(1);
+              }}
               className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-default-400 hover:text-default-600 dark:hover:text-gray-300"
               title="Clear search"
             >

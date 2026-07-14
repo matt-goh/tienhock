@@ -96,6 +96,7 @@ const CustomerListPage = (): JSX.Element => {
     useState<StatusTab>("pending");
   const [signupToConvert, setSignupToConvert] = useState<Signup | null>(null);
   const [signupToReject, setSignupToReject] = useState<Signup | null>(null);
+  const [signupToDelete, setSignupToDelete] = useState<Signup | null>(null);
   const [processingSignup, setProcessingSignup] = useState<boolean>(false);
 
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -205,6 +206,31 @@ const CustomerListPage = (): JSX.Element => {
     } catch (err: unknown) {
       console.error("Error restoring signup:", err);
       toast.error("Failed to restore signup. Please try again.");
+    }
+  };
+
+  const handleConfirmSignupDelete = async (): Promise<void> => {
+    if (!signupToDelete || processingSignup) return;
+
+    try {
+      setProcessingSignup(true);
+      await greenTargetApi.deleteRejectedCustomerSignup(
+        signupToDelete.signup_id
+      );
+      toast.success("Rejected signup deleted");
+      setSignupToDelete(null);
+      fetchSignups();
+    } catch (err: unknown) {
+      const apiError: ApiError = err as ApiError;
+      console.error("Error deleting rejected signup:", err);
+      toast.error(
+        apiError.data?.message ||
+          apiError.message ||
+          "Failed to delete rejected signup. Please try again."
+      );
+      fetchSignups();
+    } finally {
+      setProcessingSignup(false);
     }
   };
 
@@ -476,14 +502,27 @@ const CustomerListPage = (): JSX.Element => {
                           </Button>
                         )}
                         {signup.status === "rejected" && (
-                          <Button
-                            onClick={(): Promise<void> => handleRestore(signup)}
-                            icon={IconRotateClockwise}
-                            variant="outline"
-                            size="sm"
-                          >
-                            Restore
-                          </Button>
+                          <>
+                            <Button
+                              onClick={(): Promise<void> =>
+                                handleRestore(signup)
+                              }
+                              icon={IconRotateClockwise}
+                              variant="outline"
+                              size="sm"
+                            >
+                              Restore
+                            </Button>
+                            <Button
+                              onClick={(): void => setSignupToDelete(signup)}
+                              icon={IconTrash}
+                              variant="outline"
+                              color="rose"
+                              size="sm"
+                            >
+                              Delete
+                            </Button>
+                          </>
                         )}
                       </div>
                     </div>
@@ -683,6 +722,16 @@ const CustomerListPage = (): JSX.Element => {
         title="Reject Signup"
         message={`Reject the signup from "${signupToReject?.name}"? You can restore it later from the Rejected tab.`}
         confirmButtonText={processingSignup ? "Rejecting..." : "Reject"}
+        variant="danger"
+      />
+
+      <ConfirmationDialog
+        isOpen={!!signupToDelete}
+        onClose={(): void => setSignupToDelete(null)}
+        onConfirm={handleConfirmSignupDelete}
+        title="Delete Rejected Signup"
+        message={`Permanently delete the rejected signup from "${signupToDelete?.name}"? This action cannot be undone.`}
+        confirmButtonText={processingSignup ? "Deleting..." : "Delete"}
         variant="danger"
       />
     </div>

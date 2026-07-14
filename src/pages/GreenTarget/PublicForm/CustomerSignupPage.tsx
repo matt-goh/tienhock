@@ -77,6 +77,9 @@ const CustomerSignupPage = ({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | "">("");
   const [einvoiceRequested, setEinvoiceRequested] = useState<boolean>(false);
   const [idType, setIdType] = useState<IdentityType | "">("");
+  const [einvoiceIdNumber, setEinvoiceIdNumber] = useState<string>("");
+  const [einvoiceIdNumberEdited, setEinvoiceIdNumberEdited] =
+    useState<boolean>(false);
   const [tinNumber, setTinNumber] = useState<string>("");
   const [email, setEmail] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
@@ -104,10 +107,24 @@ const CustomerSignupPage = ({
     setPaymentMethod("");
     setEinvoiceRequested(false);
     setIdType("");
+    setEinvoiceIdNumber("");
+    setEinvoiceIdNumberEdited(false);
     setTinNumber("");
     setEmail("");
     setError(null);
     setSubmitted(false);
+  };
+
+  const handleIdNumberChange = (value: string): void => {
+    setIdNumber(value);
+    if (!einvoiceIdNumberEdited) {
+      setEinvoiceIdNumber(value);
+    }
+  };
+
+  const handleEinvoiceIdNumberChange = (value: string): void => {
+    setEinvoiceIdNumber(value);
+    setEinvoiceIdNumberEdited(true);
   };
 
   const updateLocation = (
@@ -202,7 +219,7 @@ const CustomerSignupPage = ({
     }
     if (
       einvoiceRequested &&
-      (!idType || !idNumber.trim() || !tinNumber.trim())
+      (!idType || !einvoiceIdNumber.trim() || !tinNumber.trim())
     ) {
       setError(t.einvoiceFieldsRequired);
       return;
@@ -231,6 +248,9 @@ const CustomerSignupPage = ({
             payment_method: paymentMethod,
             einvoice_requested: einvoiceRequested,
             id_type: einvoiceRequested ? idType : null,
+            einvoice_id_number: einvoiceRequested
+              ? einvoiceIdNumber.trim()
+              : null,
             tin_number: einvoiceRequested ? tinNumber.trim() : null,
             email: einvoiceRequested && email.trim() ? email.trim() : null,
             state: einvoiceRequested ? SABAH_STATE_CODE : null,
@@ -440,7 +460,9 @@ const CustomerSignupPage = ({
                   <input
                     type="text"
                     value={idNumber}
-                    onChange={(event): void => setIdNumber(event.target.value)}
+                    onChange={(event): void =>
+                      handleIdNumberChange(event.target.value)
+                    }
                     placeholder={t.idPlaceholder}
                     maxLength={50}
                     required
@@ -603,9 +625,9 @@ const CustomerSignupPage = ({
                         </label>
                         <input
                           type="text"
-                          value={idNumber}
+                          value={einvoiceIdNumber}
                           onChange={(event): void =>
-                            setIdNumber(event.target.value)
+                            handleEinvoiceIdNumberChange(event.target.value)
                           }
                           placeholder={t.einvoiceIdPlaceholder}
                           maxLength={50}
