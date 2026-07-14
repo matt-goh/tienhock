@@ -126,7 +126,7 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
       phone_number: formData.phone_number.trim(),
       ...(customerId && { customer_id: customerId }),
       ...(isCreatingCustomer && {
-        customer_name: formData.customer_name.trim(),
+        customer_name: (formData.customer_name ?? "").trim(),
       }),
     };
 
