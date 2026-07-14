@@ -3,6 +3,8 @@ import { Router } from "express";
 
 const LEGACY_IMPORT_ENTRY_TYPE = "IMP";
 const LEGACY_IMPORT_SOURCE_TYPE = "legacy_import";
+// Entry types that carry a cheque number: Cash Payment (C) and Bank Payment (B)
+const CHEQUE_NO_ENTRY_TYPES = ["C", "B"];
 
 const LEGACY_IMPORT_SQL =
   `(je.entry_type = '${LEGACY_IMPORT_ENTRY_TYPE}' OR ` +
@@ -523,9 +525,11 @@ export default function (pool) {
       });
     }
 
-    // Cheque number only applies to Cash Payment (C) entries
+    // Cheque number applies to Cash Payment (C) and Bank Payment (B) entries
     const normalizedChequeNo =
-      entry_type === "C" && cheque_no && String(cheque_no).trim()
+      CHEQUE_NO_ENTRY_TYPES.includes(entry_type) &&
+      cheque_no &&
+      String(cheque_no).trim()
         ? String(cheque_no).trim()
         : null;
 
@@ -658,9 +662,11 @@ export default function (pool) {
       });
     }
 
-    // Cheque number only applies to Cash Payment (C) entries
+    // Cheque number applies to Cash Payment (C) and Bank Payment (B) entries
     const normalizedChequeNo =
-      entry_type === "C" && cheque_no && String(cheque_no).trim()
+      CHEQUE_NO_ENTRY_TYPES.includes(entry_type) &&
+      cheque_no &&
+      String(cheque_no).trim()
         ? String(cheque_no).trim()
         : null;
 
