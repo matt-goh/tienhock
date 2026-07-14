@@ -1009,6 +1009,21 @@ export default function (pool) {
         });
       }
 
+      // Adjustment documents (Credit/Debit/Refund Notes) reference this journal
+      // via journal_entry_id (a NO ACTION FK that would otherwise block the
+      // delete). Staff monitor these journals and documents directly, so detach
+      // the link from any owning document — active or cancelled — before removing
+      // the journal. A later cancellation of that document safely skips the
+      // already-removed journal (cancelAdjustmentJournalEntry no-ops on NULL).
+      await client.query(
+        "UPDATE adjustment_documents SET journal_entry_id = NULL WHERE journal_entry_id = $1",
+        [id]
+      );
+      await client.query(
+        "UPDATE jellypolly.adjustment_documents SET journal_entry_id = NULL WHERE journal_entry_id = $1",
+        [id]
+      );
+
       // Lines will be deleted by CASCADE
       await client.query("DELETE FROM journal_entries WHERE id = $1", [id]);
 
@@ -1018,6 +1033,18 @@ export default function (pool) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Error deleting journal entry:", error);
+      // A foreign-key violation means another source record (invoice, receipt,
+      // payment, bank-in, supplier/purchase invoice, RV) still owns this journal.
+      // Surface a clean message instead of the raw constraint error.
+      if (error.code === "23503") {
+        return res.status(400).json({
+          message: "Cannot delete this journal entry",
+          detail:
+            "This journal is linked to another record (such as an invoice, receipt, payment, or bank-in) and is managed through that source document.",
+          suggestion:
+            "Cancel or remove the source document, and its journal will be handled automatically.",
+        });
+      }
       res.status(500).json({
         message: "Error deleting journal entry",
         error: error.message,
