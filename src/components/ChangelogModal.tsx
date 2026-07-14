@@ -20,6 +20,16 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-14",
+    ms: "Nama Tapak kini pilihan untuk lokasi pelanggan Green Target. Borang pendaftaran awam hanya meminta alamat, manakala staf boleh menyimpan lokasi tanpa Tapak atau menambah nama Tapak kemudian jika diperlukan.",
+    en: "Site names are now optional for Green Target customer locations. The public registration form only asks for an address, while staff can save a location without a Site or add one later when needed.",
+  },
+  {
+    date: "2026-07-14",
+    ms: "Pautan borang pendaftaran Green Target kini memaparkan tajuk, penerangan dan logo Green Target yang betul apabila dikongsi dalam aplikasi mesej atau media sosial. Pratonton pautan Tien Hock kekal tidak berubah.",
+    en: "The Green Target registration form link now shows the correct Green Target title, description and logo when shared in messaging or social media apps. Tien Hock link previews remain unchanged.",
+  },
+  {
+    date: "2026-07-14",
     ms: "Pemilihan Akaun Induk kini memaparkan kod akaun mengikut hierarki yang boleh dikembangkan atau dikecilkan, supaya akaun induk dan akaun anak lebih mudah dibezakan. Pilihan Tiada akaun induk sentiasa tersedia untuk akaun aras teratas, dan halaman suntingan akaun kini menyenaraikan semua akaun anak terus bersama statusnya.",
     en: "Parent Account selection now shows account codes in an expandable hierarchy, making parent and child accounts easier to distinguish. A No parent option remains readily available for top-level accounts, and account edit pages now list every direct child account with its status.",
   },

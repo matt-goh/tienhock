@@ -1,0 +1,15 @@
+{
+  "short_name": "Green Target",
+  "name": "Green Target Customer Registration",
+  "icons": [
+    {
+      "src": "/greentarget-logo.png",
+      "type": "image/png",
+      "sizes": "1563x1563"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#047857",
+  "background_color": "#f0fdf4"
+}
