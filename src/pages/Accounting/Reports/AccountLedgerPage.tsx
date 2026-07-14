@@ -707,8 +707,18 @@ const AccountLedgerPage: React.FC = () => {
                 {/* Opening balance row (hidden while the mini search filters rows) */}
                 {!hasActiveSearch && (
                   <tr className="bg-gray-50/70 dark:bg-gray-900/40">
-                    <td colSpan={6} className="px-4 py-2.5 font-medium text-gray-700 dark:text-gray-300">
+                    <td colSpan={4} className="px-4 py-2.5 font-medium text-gray-700 dark:text-gray-300">
                       Balance Brought Forward
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-gray-900 dark:text-white">
+                      {statement.opening_balance > 0
+                        ? formatCurrency(statement.opening_balance)
+                        : "-"}
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-gray-900 dark:text-white">
+                      {statement.opening_balance < 0
+                        ? formatCurrency(Math.abs(statement.opening_balance))
+                        : "-"}
                     </td>
                     <td className="px-4 py-2.5 text-right font-semibold text-gray-900 dark:text-white">
                       {formatBalance(statement.opening_balance)}
