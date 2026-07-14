@@ -1,8 +1,9 @@
 // src/routes/greentarget/salary-report.js
-// Green Target Salary Report (Phase 5). GT has no locations and no leave, so the
-// report groups by job type (OFFICE / DRIVER) instead of location, and the
-// per-employee column buckets are computed in JS from the stored payroll
-// (employee_payrolls + payroll_items + payroll_deductions + mid-month).
+// Green Target Salary Report (Phase 5). GT has no locations, so the report
+// groups by job type (OFFICE / DRIVER) instead of location, and the per-employee
+// column buckets are computed in JS from the stored payroll (employee_payrolls +
+// payroll_items + payroll_deductions + mid-month). Leave pay lives in the GT
+// leave ledger (folded into gross_pay) and is surfaced in the Cuti column.
 //
 // Output shapes match what the shared TH PDF generator
 // (src/utils/payroll/SalaryReportPDF.tsx) consumes, with `location` = job group.
@@ -72,11 +73,14 @@ const columnForItem = (item) => {
 };
 
 // Build the per-employee column row from its items / deductions / mid-month.
-const buildRow = (ep, items, deductions, midMonthAmount) => {
+const buildRow = (ep, items, deductions, midMonthAmount, leaveAmount = 0) => {
   const row = emptyTotals();
   for (const item of items) {
     row[columnForItem(item)] += Number(item.amount) || 0;
   }
+  // Leave pay is folded into gross_pay by the processor but is not a payroll
+  // item, so surface it in the Cuti column here to reconcile with gaji_kasar.
+  row.cuti += Number(leaveAmount) || 0;
   row.gaji_kasar = Number(ep.gross_pay) || 0;
   for (const d of deductions) {
     const emp = Number(d.employee_amount) || 0;
@@ -135,7 +139,7 @@ export default function (pool) {
     const epIds = eps.rows.map((e) => e.id);
     if (epIds.length === 0) return [];
 
-    const [items, deds, mid] = await Promise.all([
+    const [items, deds, mid, leave] = await Promise.all([
       pool.query(
         `SELECT pi.employee_payroll_id, pi.amount, pi.work_log_type,
                 pc.pay_type, pc.report_column
@@ -159,6 +163,15 @@ export default function (pool) {
            AND LOWER(COALESCE(status, '')) <> 'cancelled'`,
         [year]
       ),
+      pool.query(
+        `SELECT employee_id,
+                EXTRACT(MONTH FROM leave_date)::int AS month,
+                SUM(amount_paid) AS amount
+         FROM greentarget.leave_records
+         WHERE EXTRACT(YEAR FROM leave_date) = $1 AND status = 'approved'
+         GROUP BY employee_id, EXTRACT(MONTH FROM leave_date)`,
+        [year]
+      ),
     ]);
 
     const itemsByEp = {};
@@ -175,6 +188,10 @@ export default function (pool) {
     mid.rows.forEach((m) => {
       midByEmpMonth[`${m.employee_id}_${m.month}`] = Number(m.amount);
     });
+    const leaveByEmpMonth = {};
+    leave.rows.forEach((l) => {
+      leaveByEmpMonth[`${l.employee_id}_${l.month}`] = Number(l.amount);
+    });
 
     return eps.rows.map((ep) => {
       const month = monthByMp[ep.monthly_payroll_id];
@@ -182,7 +199,8 @@ export default function (pool) {
         ep,
         itemsByEp[ep.id] || [],
         dedsByEp[ep.id] || [],
-        midByEmpMonth[`${ep.employee_id}_${month}`] || 0
+        midByEmpMonth[`${ep.employee_id}_${month}`] || 0,
+        leaveByEmpMonth[`${ep.employee_id}_${month}`] || 0
       );
       return {
         month,

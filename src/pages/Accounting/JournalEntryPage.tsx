@@ -1167,15 +1167,26 @@ const JournalEntryPage: React.FC = () => {
         lines,
       };
 
+      let entryId: string | number | undefined = id;
+
       if (isEditMode) {
         await api.put(`/api/journal-entries/${id}`, payload);
         toast.success("Journal entry updated successfully");
       } else {
-        await api.post("/api/journal-entries", payload);
+        const response = (await api.post(
+          "/api/journal-entries",
+          payload
+        )) as { entry?: { id: number } };
+        entryId = response?.entry?.id;
         toast.success("Journal entry created successfully");
       }
 
-      navigate("/accounting/journal-entries");
+      // Lead the user to the saved entry's details page
+      navigate(
+        entryId
+          ? `/accounting/journal-entries/${entryId}`
+          : "/accounting/journal-entries"
+      );
     } catch (err: unknown) {
       console.error("Error saving journal entry:", err);
       const errorMessage = err instanceof Error ? err.message : "Unknown error";

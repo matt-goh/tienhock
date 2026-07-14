@@ -339,6 +339,7 @@ export default function (pool) {
         commissionRecordsResult,
         othersRecordsResult,
         habukLinesResult,
+        leaveRecordsResult,
       ] = await Promise.all([
         // Monthly work logs for OFFICE workers (from GT schema)
         client.query(`
@@ -426,13 +427,23 @@ export default function (pool) {
 
         // GT Daily Lori Habuk saved trip lines for the month (DRIVER pay source)
         client.query(`
-          SELECT l.employee_id, ln.pay_code_id, ln.quantity, ln.rate_used,
+          SELECT l.employee_id, to_char(l.log_date, 'YYYY-MM-DD') AS log_date,
+                 ln.pay_code_id, ln.quantity, ln.rate_used,
                  ln.amount, ln.source_type, ln.rental_id, ln.description,
                  pc.pay_type, pc.rate_unit
           FROM greentarget.daily_lori_habuk_logs l
           JOIN greentarget.daily_lori_habuk_lines ln ON ln.log_id = l.id
           LEFT JOIN pay_codes pc ON ln.pay_code_id = pc.id
           WHERE l.log_date >= $1 AND l.log_date <= $2 AND l.status = 'Submitted'
+        `, [startDate, endDate]),
+
+        // GT approved leave for the month (GT leave ledger). amount_paid adds to
+        // gross (and EPF base); DRIVER trip pay on a leave day is excluded.
+        client.query(`
+          SELECT employee_id, to_char(leave_date, 'YYYY-MM-DD') AS leave_date,
+                 leave_type, CAST(amount_paid AS NUMERIC(10,2)) AS amount_paid
+          FROM greentarget.leave_records
+          WHERE leave_date >= $1 AND leave_date <= $2 AND status = 'approved'
         `, [startDate, endDate]),
       ]);
 
@@ -482,6 +493,15 @@ export default function (pool) {
           habukLinesByDriver[r.employee_id] = [];
         }
         habukLinesByDriver[r.employee_id].push(r);
+      });
+
+      // GT approved leave grouped by employee (amount_paid adds to gross)
+      const leaveByEmployee = {};
+      leaveRecordsResult.rows.forEach((r) => {
+        if (!leaveByEmployee[r.employee_id]) {
+          leaveByEmployee[r.employee_id] = [];
+        }
+        leaveByEmployee[r.employee_id].push(r);
       });
 
       // Build job pay codes map
@@ -564,6 +584,7 @@ export default function (pool) {
                 amount: Math.round(parseFloat(line.amount) * 100) / 100,
                 job_type: "DRIVER",
                 source_employee_id: employeeId,
+                source_date: line.log_date || null,
                 is_manual: false,
                 rental_id: line.rental_id || null,
                 work_log_type: "daily_habuk",
@@ -639,22 +660,42 @@ export default function (pool) {
             });
           }
 
-          // Calculate gross pay in integer cents to avoid float drift
-          const grossPayCents = combinedItems.reduce(
-            (sum, item) => sum + Math.round(item.amount * 100),
+          // Leave (GT ledger): amount_paid adds to gross + EPF base; a DRIVER's
+          // trip pay on a leave day is excluded (the day is paid via leave),
+          // mirroring TH/JP.
+          const empLeaveRecords = leaveByEmployee[employeeId] || [];
+          const leaveGrossCents = empLeaveRecords.reduce(
+            (sum, r) => sum + Math.round(parseFloat(r.amount_paid) * 100),
             0
           );
+          const leaveDateSet = new Set(
+            empLeaveRecords.map((r) => `${r.employee_id}|${r.leave_date}`)
+          );
+          const isLeaveDayItem = (item) =>
+            item.job_type === "DRIVER" &&
+            item.source_date &&
+            leaveDateSet.has(`${item.source_employee_id}|${item.source_date}`);
+          const payableItems = combinedItems.filter((item) => !isLeaveDayItem(item));
+
+          // Calculate gross pay in integer cents to avoid float drift
+          const grossPayCents =
+            leaveGrossCents +
+            payableItems.reduce(
+              (sum, item) => sum + Math.round(item.amount * 100),
+              0
+            );
           const grossPay = grossPayCents / 100;
 
           // Group items by pay type for EPF calculation (EPF base excludes Overtime)
           const groupedItems = { Base: [], Tambahan: [], Overtime: [] };
-          combinedItems.forEach((item) => {
+          payableItems.forEach((item) => {
             const type = item.pay_type || "Tambahan";
             if (!groupedItems[type]) groupedItems[type] = [];
             groupedItems[type].push(item);
           });
 
           const epfGrossPayCents =
+            leaveGrossCents +
             groupedItems.Base.reduce((s, i) => s + Math.round(i.amount * 100), 0) +
             groupedItems.Tambahan.reduce((s, i) => s + Math.round(i.amount * 100), 0);
           const epfGrossPay = epfGrossPayCents / 100;
@@ -746,8 +787,8 @@ export default function (pool) {
             employeePayrollId = insertResult.rows[0].id;
           }
 
-          // Insert payroll items
-          const nonManualItems = combinedItems.filter((item) => !item.is_manual);
+          // Insert payroll items (leave-day driver items already excluded)
+          const nonManualItems = payableItems.filter((item) => !item.is_manual);
           for (const item of nonManualItems) {
             await client.query(
               `INSERT INTO greentarget.payroll_items

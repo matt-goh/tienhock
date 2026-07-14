@@ -20,6 +20,21 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-14",
+    ms: "Green Target kini mempunyai sistem cuti seperti syarikat lain. Anda boleh merekod Cuti Tahunan, Cuti Sakit, Cuti Umum dan Cuti Rawatan untuk pekerja Pejabat (log bulanan) dan Pemandu (Lori Habuk harian), dengan semakan baki cuti semasa merekod. Bayaran cuti ditambah ke dalam gaji kasar semasa memproses gaji dan dipaparkan pada slip gaji, dan halaman Laporan Cuti baharu menunjukkan baki serta penggunaan cuti setiap pekerja.",
+    en: "Green Target now has a leave system like the other companies. You can record Annual, Sick, Public Holiday and Hospital leave for Office staff (monthly log) and Drivers (daily Lori Habuk), with balance checks while recording. Leave pay is added to gross pay during payroll processing and shown on the payslip, and a new Cuti Report page shows each employee's leave balances and usage.",
+  },
+  {
+    date: "2026-07-14",
+    ms: "Catatan jurnal yang dijana sistem kini boleh disunting terus — jualan (invois), belian, resit, bayaran pembekal, nota kredit/debit/bayaran balik dan baucar gaji. Sebaik sahaja anda menyuntingnya, jurnal itu ditandakan \"Manual\" dan dokumen sumbernya tidak lagi menulis gantinya secara automatik apabila sumber itu disunting — anda menguruskannya sendiri. Membatalkan dokumen sumber masih membatalkan jurnal. Jurnal import lama (IMP) kekal tidak boleh disunting.",
+    en: "System-generated journal entries can now be edited directly — sales (invoice), purchases, receipts, supplier payments, credit/debit/refund notes and payroll vouchers. Once you edit one, it is marked \"Manual\" and its source document no longer overwrites it automatically when the source is edited — you manage it yourself. Cancelling the source document still cancels the journal. Legacy import (IMP) journals remain non-editable.",
+  },
+  {
+    date: "2026-07-14",
+    ms: "Membetulkan ralat pada halaman Jelly Polly yang menghalang pemilihan jenis cuti untuk pekerja (\"Gagal mengambil baki cuti\"). Baki cuti Jelly Polly kini dipaparkan dengan betul dan cuti boleh direkodkan seperti biasa.",
+    en: "Fixed an error on Jelly Polly pages that blocked selecting a leave type for employees (\"Failed to fetch leave balances\"). Jelly Polly leave balances now load correctly and leave can be recorded as normal.",
+  },
+  {
+    date: "2026-07-14",
     ms: "Nama Tapak kini pilihan untuk lokasi pelanggan Green Target. Borang pendaftaran awam hanya meminta alamat, manakala staf boleh menyimpan lokasi tanpa Tapak atau menambah nama Tapak kemudian jika diperlukan.",
     en: "Site names are now optional for Green Target customer locations. The public registration form only asks for an address, while staff can save a location without a Site or add one later when needed.",
   },

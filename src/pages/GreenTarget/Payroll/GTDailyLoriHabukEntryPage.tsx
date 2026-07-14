@@ -21,6 +21,7 @@ import { FormCombobox, SelectOption } from "../../../components/FormComponents";
 import { useJobPayCodeMappings } from "../../../utils/catalogue/useJobPayCodeMappings";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
+import GTLeaveSection from "./GTLeaveSection";
 
 const API_BASE = "/greentarget/api/daily-lori-habuk";
 
@@ -170,6 +171,17 @@ const GTDailyLoriHabukEntryPage: React.FC = () => {
     const d = new Date(`${selectedDate}T00:00:00`);
     return { start: d, end: d };
   }, [selectedDate]);
+
+  const [leaveYear, leaveMonth] = useMemo(() => {
+    const [y, m] = selectedDate.split("-").map(Number);
+    return [y, m];
+  }, [selectedDate]);
+
+  const driverEmployees = useMemo(
+    () =>
+      entries.map((e) => ({ id: e.employee_id, name: e.employee_name })),
+    [entries]
+  );
 
   const updateEntryLines = (
     employeeId: string,
@@ -549,6 +561,19 @@ const GTDailyLoriHabukEntryPage: React.FC = () => {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Leave & Absence Recording for DRIVER staff on the selected date */}
+      {!isLoading && entries.length > 0 && (
+        <GTLeaveSection
+          employees={driverEmployees}
+          year={leaveYear}
+          month={leaveMonth}
+          mode="daily"
+          fixedDate={selectedDate}
+          loadEndpoint={`${API_BASE}/leave?date=${selectedDate}`}
+          saveEndpoint={`${API_BASE}/leave`}
+        />
       )}
 
       <ConfirmationDialog

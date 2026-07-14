@@ -684,8 +684,17 @@ export default function (pool) {
         });
       }
 
-      // Update the journal entry
-      if (invoice.journal_entry_id) {
+      // Update the journal entry. A hand-edited (detached) journal is human-owned,
+      // so skip the rebuild and leave its lines untouched.
+      const purJournalDetached = invoice.journal_entry_id
+        ? (
+            await client.query(
+              "SELECT manual_override FROM journal_entries WHERE id = $1",
+              [invoice.journal_entry_id]
+            )
+          ).rows[0]?.manual_override === true
+        : false;
+      if (invoice.journal_entry_id && !purJournalDetached) {
         // Delete existing journal lines
         await client.query(
           "DELETE FROM journal_entry_lines WHERE journal_entry_id = $1",

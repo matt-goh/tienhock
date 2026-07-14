@@ -1,5 +1,5 @@
 // src/pages/GreenTarget/Payroll/GTMonthlyLogEntryPage.tsx
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Button from "../../../components/Button";
 import BackButton from "../../../components/BackButton";
@@ -17,6 +17,9 @@ import ManageActivitiesModal, {
 } from "../../../components/Payroll/ManageActivitiesModal";
 import { calculateActivityAmount } from "../../../utils/payroll/calculateActivityAmount";
 import { IconClock, IconRefresh, IconListCheck } from "@tabler/icons-react";
+import GTLeaveSection, {
+  GTLeaveSectionHandle,
+} from "./GTLeaveSection";
 
 const GT_OFFICE_JOB = "OFFICE";
 
@@ -110,6 +113,14 @@ const GTMonthlyLogEntryPage: React.FC = () => {
   // Activities modal
   const [showActivitiesModal, setShowActivitiesModal] = useState(false);
   const [activeEmployeeId, setActiveEmployeeId] = useState<string | null>(null);
+
+  // Leave section
+  const leaveSectionRef = useRef<GTLeaveSectionHandle>(null);
+  const leaveEmployees = useMemo(
+    () =>
+      gtEmployees.map((e) => ({ id: e.employee_id, name: e.employee_name })),
+    [gtEmployees]
+  );
 
   const selectedMonthDate = useMemo(
     () => new Date(formData.logYear, formData.logMonth - 1, 1),
@@ -371,6 +382,11 @@ const GTMonthlyLogEntryPage: React.FC = () => {
 
     setIsSaving(true);
     try {
+      const leavePayload = leaveSectionRef.current?.getLeavePayload() || {
+        leaveEntries: [],
+        updatedLeaveEntries: [],
+        deletedLeaveIds: [],
+      };
       const payload = {
         logMonth: formData.logMonth,
         logYear: formData.logYear,
@@ -394,6 +410,9 @@ const GTMonthlyLogEntryPage: React.FC = () => {
               isManuallyAdded: false,
             })),
         })),
+        leaveEntries: leavePayload.leaveEntries,
+        updatedLeaveEntries: leavePayload.updatedLeaveEntries,
+        deletedLeaveIds: leavePayload.deletedLeaveIds,
       };
 
       if (existingWorkLog) {
@@ -696,6 +715,17 @@ const GTMonthlyLogEntryPage: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Leave & Absence Recording (saved with the monthly log) */}
+          <GTLeaveSection
+            ref={leaveSectionRef}
+            employees={leaveEmployees}
+            year={formData.logYear}
+            month={formData.logMonth}
+            mode="monthly"
+            loadEndpoint={`/greentarget/api/monthly-work-logs/leave/${formData.logYear}/${formData.logMonth}?section=OFFICE`}
+            disabled={isSaving}
+          />
         </>
       )}
 
