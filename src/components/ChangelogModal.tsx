@@ -20,6 +20,21 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-14",
+    ms: "Catatan jurnal manual kini boleh disimpan semula selepas akaun pada barisnya diubah, termasuk pertukaran daripada BANK_PBB kepada akaun lain.",
+    en: "Manual journal entries can now be saved after changing the account on one of their lines, including changing BANK_PBB to another account.",
+  },
+  {
+    date: "2026-07-14",
+    ms: "Harga seunit bagi Stok Kilang pada halaman Stok Bahan kini boleh diubah terus, sama seperti kuantiti. Harga ini disimpan untuk halaman itu sahaja mengikut bulan; jika tidak diubah, ia masih diambil daripada harga produk seperti biasa. Nilai stok dikira semula secara automatik apabila harga diubah.",
+    en: "The unit price for Stock Kilang on the Material Stock page can now be edited directly, just like the quantity. This price is stored for that page only per month; if left unchanged, it is still taken from the product price as before. The stock value recalculates automatically when the price is changed.",
+  },
+  {
+    date: "2026-07-14",
+    ms: "Bahagian e-Invois pada borang pendaftaran pelanggan Green Target kini memaparkan No. ID selepas Jenis ID supaya maklumat pengenalan boleh disemak dalam urutan yang betul. E-mel kini pilihan, manakala negeri ditetapkan secara automatik kepada Sabah.",
+    en: "The e-Invoice section of the Green Target customer registration form now shows ID Number after ID Type so identity details can be reviewed in the correct order. Email is now optional, while the state is set automatically to Sabah.",
+  },
+  {
+    date: "2026-07-14",
     ms: "Pengesahan cek tertunda Jelly Polly kini menggunakan Tarikh Penjelasan yang bermula pada hari ini dan boleh diubah kepada tarikh sebenar pada penyata bank. Tarikh cek diterima kekal dalam sejarah bayaran, manakala penyata penghutang menggunakan tarikh penjelasan. Butang Sahkan dan Batal pada Pengurusan Bayaran Jelly Polly kini mengemas kini bayaran Jelly Polly yang betul.",
     en: "Jelly Polly pending-cheque confirmation now uses a Clearance Date picker starting on today, which can be changed to the actual bank-statement date. The cheque-received date remains in payment history, while debtor statements use the clearance date. Confirm and Cancel in Jelly Polly Payment Management now update the correct Jelly Polly payment.",
   },

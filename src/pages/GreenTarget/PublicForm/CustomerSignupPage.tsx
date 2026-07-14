@@ -1,5 +1,6 @@
 // Public (unauthenticated), mobile-first Green Target customer registration form.
-// Served on greentarget.tienhock.com and at /greentarget-form for dev/testing.
+// Served on greentarget.tienhock.com and at /greentarget-form.
+// A Vite development-only route renders this component with previewMode enabled.
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import {
   IconCheck,
@@ -36,34 +37,19 @@ interface SignupErrorResponse {
   message?: string;
 }
 
+interface CustomerSignupPageProps {
+  previewMode?: boolean;
+}
+
 const QR_IMAGE_PATH = "/greentarget-duitnow-qr.jpg";
 const MAX_LOCATIONS = 20;
+const SABAH_STATE_CODE = "12";
 
 const ID_TYPE_OPTIONS: SelectOption[] = [
   { id: "BRN", name: "BRN" },
   { id: "NRIC", name: "NRIC" },
   { id: "PASSPORT", name: "PASSPORT" },
   { id: "ARMY", name: "ARMY" },
-];
-
-const STATE_OPTIONS: SelectOption[] = [
-  { id: "01", name: "JOHOR" },
-  { id: "02", name: "KEDAH" },
-  { id: "03", name: "KELANTAN" },
-  { id: "04", name: "MELAKA" },
-  { id: "05", name: "NEGERI SEMBILAN" },
-  { id: "06", name: "PAHANG" },
-  { id: "07", name: "PULAU PINANG" },
-  { id: "08", name: "PERAK" },
-  { id: "09", name: "PERLIS" },
-  { id: "10", name: "SELANGOR" },
-  { id: "11", name: "TERENGGANU" },
-  { id: "12", name: "SABAH" },
-  { id: "13", name: "SARAWAK" },
-  { id: "14", name: "WILAYAH PERSEKUTUAN KUALA LUMPUR" },
-  { id: "15", name: "WILAYAH PERSEKUTUAN LABUAN" },
-  { id: "16", name: "WILAYAH PERSEKUTUAN PUTRAJAYA" },
-  { id: "17", name: "NOT APPLICABLE" },
 ];
 
 const inputClassName =
@@ -75,7 +61,9 @@ const createBlankLocation = (clientId: number): SignupLocation => ({
   address: "",
 });
 
-const CustomerSignupPage = (): JSX.Element => {
+const CustomerSignupPage = ({
+  previewMode = false,
+}: CustomerSignupPageProps): JSX.Element => {
   const [lang, setLang] = useState<FormLanguage>("ms");
   const t = translations[lang];
   const nextLocationId = useRef<number>(1);
@@ -91,14 +79,15 @@ const CustomerSignupPage = (): JSX.Element => {
   const [idType, setIdType] = useState<IdentityType | "">("");
   const [tinNumber, setTinNumber] = useState<string>("");
   const [email, setEmail] = useState<string>("");
-  const [state, setState] = useState<string>("12");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [submitted, setSubmitted] = useState<boolean>(false);
 
   useEffect((): void => {
-    document.title = `${t.title} | Green Target`;
-  }, [t.title]);
+    document.title = previewMode
+      ? `${t.title} UI Preview | Green Target`
+      : `${t.title} | Green Target`;
+  }, [previewMode, t.title]);
 
   const paymentOptions: { value: PaymentMethod; label: string }[] = [
     { value: "cash", label: t.paymentCash },
@@ -117,7 +106,6 @@ const CustomerSignupPage = (): JSX.Element => {
     setIdType("");
     setTinNumber("");
     setEmail("");
-    setState("12");
     setError(null);
     setSubmitted(false);
   };
@@ -214,13 +202,14 @@ const CustomerSignupPage = (): JSX.Element => {
     }
     if (
       einvoiceRequested &&
-      (!idType || !tinNumber.trim() || !email.trim() || !state)
+      (!idType || !idNumber.trim() || !tinNumber.trim())
     ) {
       setError(t.einvoiceFieldsRequired);
       return;
     }
     if (
       einvoiceRequested &&
+      email.trim() &&
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
     ) {
       setError(t.invalidEmail);
@@ -243,8 +232,8 @@ const CustomerSignupPage = (): JSX.Element => {
             einvoice_requested: einvoiceRequested,
             id_type: einvoiceRequested ? idType : null,
             tin_number: einvoiceRequested ? tinNumber.trim() : null,
-            email: einvoiceRequested ? email.trim() : null,
-            state: einvoiceRequested ? state : null,
+            email: einvoiceRequested && email.trim() ? email.trim() : null,
+            state: einvoiceRequested ? SABAH_STATE_CODE : null,
           }),
         }
       );
@@ -267,15 +256,19 @@ const CustomerSignupPage = (): JSX.Element => {
     }
   };
 
+  const handlePreviewSubmit = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+  };
+
   const LanguageSwitcher = (): JSX.Element => (
-    <div className="flex items-center gap-1 rounded-full bg-white/15 p-1 text-sm lg:mt-12 lg:self-start">
+    <div className="flex shrink-0 items-center gap-1 self-end whitespace-nowrap rounded-full bg-white/15 p-1 text-sm sm:self-auto lg:mt-12 lg:self-start">
       {(Object.keys(LANGUAGE_LABELS) as FormLanguage[]).map(
         (code: FormLanguage) => (
           <button
             key={code}
             type="button"
             onClick={(): void => setLang(code)}
-            className={`rounded-full px-3 py-1 font-medium transition-colors ${
+            className={`whitespace-nowrap rounded-full px-2.5 py-1 font-medium transition-colors sm:px-3 ${
               lang === code
                 ? "bg-white text-green-800 shadow-sm"
                 : "text-white hover:bg-white/15"
@@ -317,8 +310,8 @@ const CustomerSignupPage = (): JSX.Element => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-50 to-gray-100 px-0 py-0 sm:px-5 sm:py-8 lg:px-8 lg:py-8 xl:px-12">
-      <div className="mx-auto max-w-2xl overflow-hidden bg-white shadow-xl sm:rounded-3xl lg:grid lg:max-w-7xl lg:grid-cols-[280px_minmax(0,1fr)] lg:rounded-[2rem] xl:grid-cols-[320px_minmax(0,1fr)]">
+    <div className="min-h-screen bg-gradient-to-b from-green-50 to-gray-100 px-0 py-0 sm:px-5 sm:py-8 lg:px-8 lg:py-8 xl:px-12 2xl:px-6">
+      <div className="mx-auto max-w-2xl overflow-hidden bg-white shadow-xl sm:rounded-3xl lg:grid lg:max-w-7xl lg:grid-cols-[280px_minmax(0,1fr)] lg:rounded-[2rem] xl:grid-cols-[320px_minmax(0,1fr)] 2xl:max-w-[1500px] 2xl:grid-cols-[340px_minmax(0,1fr)]">
         <header className="bg-gradient-to-br from-green-800 to-green-600 px-5 py-5 text-white sm:px-8 lg:relative lg:flex lg:min-h-full lg:overflow-hidden lg:px-8 lg:py-10">
           <span
             aria-hidden="true"
@@ -328,8 +321,8 @@ const CustomerSignupPage = (): JSX.Element => {
             aria-hidden="true"
             className="hidden lg:absolute lg:-bottom-24 lg:-left-24 lg:block lg:h-72 lg:w-72 lg:rounded-full lg:border lg:border-white/10"
           />
-          <div className="flex items-center justify-between gap-4 lg:relative lg:z-10 lg:flex-1 lg:flex-col lg:items-stretch lg:justify-start">
-            <div className="flex min-w-0 items-center gap-3 lg:flex-col lg:items-start lg:gap-5">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-4 lg:relative lg:z-10 lg:flex-1 lg:flex-col lg:items-stretch lg:justify-start">
+            <div className="flex shrink-0 items-center gap-3 lg:flex-col lg:items-start lg:gap-5">
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white p-1 shadow-sm lg:h-24 lg:w-24 lg:rounded-3xl lg:p-2">
                 <GreenTargetLogo
                   width={48}
@@ -337,8 +330,8 @@ const CustomerSignupPage = (): JSX.Element => {
                   className="lg:h-20 lg:w-20"
                 />
               </div>
-              <div className="min-w-0">
-                <p className="truncate text-lg font-bold tracking-wide lg:text-2xl">
+              <div>
+                <p className="whitespace-nowrap text-lg font-bold tracking-wide lg:text-2xl">
                   Green Target
                 </p>
                 <p className="text-xs text-green-100 lg:mt-1 lg:text-sm">
@@ -388,6 +381,14 @@ const CustomerSignupPage = (): JSX.Element => {
         </header>
 
         <main className="px-5 pb-14 pt-6 sm:px-8 lg:px-10 lg:pb-12 lg:pt-10 xl:px-12">
+          {previewMode && (
+            <div
+              role="status"
+              className="mb-5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900"
+            >
+              Development UI preview — submissions are disabled.
+            </div>
+          )}
           {submitted ? (
             <div className="flex min-h-[420px] flex-col items-center justify-center text-center lg:min-h-[calc(100vh-8rem)]">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
@@ -408,7 +409,7 @@ const CustomerSignupPage = (): JSX.Element => {
             </div>
           ) : (
             <form
-              onSubmit={handleSubmit}
+              onSubmit={previewMode ? handlePreviewSubmit : handleSubmit}
               className="space-y-6 lg:grid lg:grid-cols-[minmax(0,1.08fr)_minmax(300px,0.92fr)] lg:items-start lg:gap-x-6 lg:gap-y-6 lg:space-y-0"
             >
               <div className="lg:col-span-2">
@@ -509,7 +510,7 @@ const CustomerSignupPage = (): JSX.Element => {
                         </button>
                       )}
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-[180px_1fr] lg:grid-cols-1 2xl:grid-cols-[180px_1fr]">
+                    <div className="grid gap-3 sm:grid-cols-[180px_1fr] lg:grid-cols-1">
                       <div>
                         <label className="mb-1.5 block text-sm font-semibold text-gray-700">
                           {t.siteLabel} <RequiredMark />
@@ -560,10 +561,11 @@ const CustomerSignupPage = (): JSX.Element => {
                   checked={einvoiceRequested}
                   onChange={setEinvoiceRequested}
                   checkedColor="text-green-700"
+                  uncheckedColor="text-green-700 hover:!text-green-800 dark:!text-green-700 dark:hover:!text-green-800"
                   ariaLabel={t.einvoiceRequestLabel}
                   label={t.einvoiceRequestLabel}
-                  className="items-start"
-                  buttonClassName="mt-0.5 rounded"
+                  className="items-start [&_span]:!text-green-950 [&_span]:hover:!text-green-800"
+                  buttonClassName="mt-0.5 rounded hover:!bg-green-100 dark:hover:!bg-green-100"
                 />
                 <p className="ml-7 mt-1 text-xs text-green-800">
                   {t.einvoiceRequestHint}
@@ -597,6 +599,22 @@ const CustomerSignupPage = (): JSX.Element => {
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                          {t.einvoiceIdLabel} <RequiredMark />
+                        </label>
+                        <input
+                          type="text"
+                          value={idNumber}
+                          onChange={(event): void =>
+                            setIdNumber(event.target.value)
+                          }
+                          placeholder={t.einvoiceIdPlaceholder}
+                          maxLength={50}
+                          required={einvoiceRequested}
+                          className={inputClassName}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-semibold text-gray-700">
                           {t.tinLabel} <RequiredMark />
                         </label>
                         <input
@@ -613,7 +631,10 @@ const CustomerSignupPage = (): JSX.Element => {
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                          {t.emailLabel} <RequiredMark />
+                          {t.emailLabel}{" "}
+                          <span className="font-normal text-gray-500">
+                            {t.optionalLabel}
+                          </span>
                         </label>
                         <input
                           type="email"
@@ -621,28 +642,9 @@ const CustomerSignupPage = (): JSX.Element => {
                           onChange={(event): void => setEmail(event.target.value)}
                           placeholder={t.emailPlaceholder}
                           maxLength={255}
-                          required={einvoiceRequested}
                           autoComplete="email"
                           className={inputClassName}
                         />
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                          {t.stateLabel} <RequiredMark />
-                        </label>
-                        <select
-                          value={state}
-                          onChange={(event): void => setState(event.target.value)}
-                          required={einvoiceRequested}
-                          className={inputClassName}
-                        >
-                          <option value="">{t.statePlaceholder}</option>
-                          {STATE_OPTIONS.map((option: SelectOption) => (
-                            <option key={option.id} value={option.id}>
-                              {option.name}
-                            </option>
-                          ))}
-                        </select>
                       </div>
                     </div>
                   </div>

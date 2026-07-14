@@ -8,9 +8,7 @@ import GTEInvoiceApiClientFactory from "../../utils/greenTarget/einvoice/GTEInvo
 const PAYMENT_METHODS = ["cash", "online", "qr"];
 const MAX_SIGNUP_LOCATIONS = 20;
 const ID_TYPES = ["BRN", "NRIC", "PASSPORT", "ARMY"];
-const STATE_CODES = new Set(
-  Array.from({ length: 17 }, (_, index) => String(index + 1).padStart(2, "0"))
-);
+const GT_STATE_CODE = "12";
 const PAYMENT_LABELS = {
   cash: "Tunai",
   online: "Online Transfer",
@@ -116,7 +114,6 @@ export default function (pool, myInvoisConfig) {
     const tin_number = String(req.body.tin_number || "").trim();
     const id_type = String(req.body.id_type || "").trim().toUpperCase();
     const email = String(req.body.email || "").trim();
-    const state = String(req.body.state || "").trim();
 
     if (!name) {
       return res.status(400).json({ message: "Name is required" });
@@ -153,13 +150,13 @@ export default function (pool, myInvoisConfig) {
 
     let einvoiceValidatedAt = null;
     if (einvoice_requested) {
-      if (!ID_TYPES.includes(id_type) || !tin_number || !email || !STATE_CODES.has(state)) {
+      if (!ID_TYPES.includes(id_type) || !id_number || !tin_number) {
         return res.status(400).json({
           code: "EINVOICE_FIELDS_REQUIRED",
-          message: "Complete all e-Invoice fields before submitting",
+          message: "Complete the e-Invoice ID Type, ID Number and TIN",
         });
       }
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return res.status(400).json({
           code: "INVALID_EMAIL",
           message: "Enter a valid e-mail address",
@@ -215,8 +212,8 @@ export default function (pool, myInvoisConfig) {
           einvoice_requested,
           einvoice_requested ? tin_number : null,
           einvoice_requested ? id_type : null,
-          einvoice_requested ? email : null,
-          einvoice_requested ? state : null,
+          einvoice_requested && email ? email : null,
+          einvoice_requested ? GT_STATE_CODE : null,
           einvoiceValidatedAt,
         ]
       );
@@ -298,8 +295,6 @@ export default function (pool, myInvoisConfig) {
         (!signup.tin_number ||
           !signup.id_type ||
           !signup.id_number ||
-          !signup.email ||
-          !signup.state ||
           !signup.einvoice_validated_at)
       ) {
         await client.query("ROLLBACK");
@@ -320,8 +315,8 @@ export default function (pool, myInvoisConfig) {
           signup.id_number || null,
           signup.einvoice_requested ? signup.tin_number : null,
           signup.einvoice_requested ? signup.id_type : null,
-          signup.einvoice_requested ? signup.email : null,
-          signup.einvoice_requested ? signup.state : "12",
+          signup.einvoice_requested ? signup.email || null : null,
+          GT_STATE_CODE,
           additionalInfo,
         ]
       );

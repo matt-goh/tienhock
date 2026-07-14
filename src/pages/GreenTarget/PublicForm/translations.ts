@@ -39,12 +39,13 @@ type FormStrings = {
   einvoiceTitle: string;
   idTypeLabel: string;
   idTypePlaceholder: string;
+  einvoiceIdLabel: string;
+  einvoiceIdPlaceholder: string;
   tinLabel: string;
   tinPlaceholder: string;
   emailLabel: string;
   emailPlaceholder: string;
-  stateLabel: string;
-  statePlaceholder: string;
+  optionalLabel: string;
   submit: string;
   submitting: string;
   nameRequired: string;
@@ -96,12 +97,13 @@ export const translations: Record<FormLanguage, FormStrings> = {
     einvoiceTitle: "Maklumat e-Invois",
     idTypeLabel: "Jenis ID",
     idTypePlaceholder: "Pilih jenis ID",
+    einvoiceIdLabel: "No. ID",
+    einvoiceIdPlaceholder: "Masukkan nombor pengenalan",
     tinLabel: "No. TIN",
     tinPlaceholder: "Contoh: C21636482050",
     emailLabel: "E-mel",
     emailPlaceholder: "nama@syarikat.com",
-    stateLabel: "Negeri",
-    statePlaceholder: "Pilih negeri",
+    optionalLabel: "(Pilihan)",
     submit: "Hantar",
     submitting: "Mengesah dan menghantar...",
     nameRequired: "Sila isi nama penuh atau nama syarikat.",
@@ -109,7 +111,7 @@ export const translations: Record<FormLanguage, FormStrings> = {
     phoneRequired: "Sila isi nombor telefon.",
     locationRequired: "Sila isi tapak dan alamat untuk setiap lokasi.",
     paymentRequired: "Sila pilih kaedah pembayaran.",
-    einvoiceFieldsRequired: "Sila lengkapkan semua maklumat e-Invois.",
+    einvoiceFieldsRequired: "Sila lengkapkan Jenis ID, No. ID dan No. TIN.",
     invalidEmail: "Sila masukkan alamat e-mel yang sah.",
     invalidEinvoiceIdentity: "No. TIN dan maklumat pengenalan tidak dapat disahkan.",
     einvoiceUnavailable:
@@ -151,12 +153,13 @@ export const translations: Record<FormLanguage, FormStrings> = {
     einvoiceTitle: "e-Invoice Information",
     idTypeLabel: "ID Type",
     idTypePlaceholder: "Select an ID type",
+    einvoiceIdLabel: "ID Number",
+    einvoiceIdPlaceholder: "Enter an ID number",
     tinLabel: "TIN No.",
     tinPlaceholder: "e.g. C21636482050",
     emailLabel: "Email",
     emailPlaceholder: "name@company.com",
-    stateLabel: "State",
-    statePlaceholder: "Select a state",
+    optionalLabel: "(Optional)",
     submit: "Submit",
     submitting: "Validating and submitting...",
     nameRequired: "Please enter a full name or company name.",
@@ -164,7 +167,7 @@ export const translations: Record<FormLanguage, FormStrings> = {
     phoneRequired: "Please enter a telephone number.",
     locationRequired: "Please enter a site and address for every location.",
     paymentRequired: "Please select a payment method.",
-    einvoiceFieldsRequired: "Please complete all e-Invoice information.",
+    einvoiceFieldsRequired: "Please enter an ID Type, ID Number and TIN No.",
     invalidEmail: "Please enter a valid email address.",
     invalidEinvoiceIdentity: "The TIN and identity details could not be verified.",
     einvoiceUnavailable:
@@ -205,12 +208,13 @@ export const translations: Record<FormLanguage, FormStrings> = {
     einvoiceTitle: "电子发票资料",
     idTypeLabel: "证件类型",
     idTypePlaceholder: "请选择证件类型",
+    einvoiceIdLabel: "证件号码",
+    einvoiceIdPlaceholder: "请输入证件号码",
     tinLabel: "税务识别号码（TIN）",
     tinPlaceholder: "例如：C21636482050",
     emailLabel: "电子邮箱",
     emailPlaceholder: "name@company.com",
-    stateLabel: "州属",
-    statePlaceholder: "请选择州属",
+    optionalLabel: "（选填）",
     submit: "提交",
     submitting: "正在验证并提交...",
     nameRequired: "请输入全名或公司名称。",
@@ -218,7 +222,7 @@ export const translations: Record<FormLanguage, FormStrings> = {
     phoneRequired: "请输入电话号码。",
     locationRequired: "请为每个地点填写地点名称和地址。",
     paymentRequired: "请选择付款方式。",
-    einvoiceFieldsRequired: "请填写所有电子发票资料。",
+    einvoiceFieldsRequired: "请填写证件类型、证件号码和税务识别号码。",
     invalidEmail: "请输入有效的电子邮箱地址。",
     invalidEinvoiceIdentity: "无法验证 TIN 和身份证明资料。",
     einvoiceUnavailable: "电子发票验证暂时无法使用，请稍后再试。",
