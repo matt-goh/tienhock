@@ -517,7 +517,7 @@ export default function (pool) {
             display_reference: row.payment_reference || null,
             cheque_reference: req.body?.cheque_reference || null,
             received_date: toLocalDateString(usable[0].payment_date),
-            posting_date: req.body?.posting_date || toLocalDateString(new Date()),
+            posting_date: req.body?.posting_date,
             notes: usable[0].notes || null,
             allocations,
           },

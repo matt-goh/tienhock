@@ -36,10 +36,10 @@ const router = Router();
               'payment_id', p.payment_id,
               'payment_method', p.payment_method,
               'payment_reference', p.payment_reference,
-              'date', p.payment_date,
+              'date', COALESCE(p.posting_date, p.payment_date::date),
               'amount', p.amount_paid,
               'status', p.status
-            ) ORDER BY p.payment_date
+            ) ORDER BY COALESCE(p.posting_date, p.payment_date::date)
           ) as payments
         FROM jellypolly.payments p
         WHERE p.status NOT IN ('cancelled', 'pending')
@@ -189,6 +189,14 @@ const router = Router();
         59,
         999
       ).getTime();
+      const startOfMonthDate = `${yearInt}-${String(monthInt).padStart(
+        2,
+        "0"
+      )}-01`;
+      const endOfMonthDate = `${yearInt}-${String(monthInt).padStart(
+        2,
+        "0"
+      )}-${String(endOfMonth.getDate()).padStart(2, "0")}`;
 
       const statementDate = endOfMonth.toLocaleDateString("en-GB", {
         day: "2-digit",
@@ -223,9 +231,9 @@ const router = Router();
              JOIN jellypolly.invoices i ON p.invoice_id = i.id
              WHERE i.customerid = $1
                AND p.status NOT IN ('cancelled', 'pending')
-               AND p.payment_date < $3)
+               AND COALESCE(p.posting_date, p.payment_date::date) < $3::date)
           AS previous_balance`,
-        [customerId, startOfMonthTs, startOfMonth.toISOString()]
+        [customerId, startOfMonthTs, startOfMonthDate]
       );
       const previousBalance = parseFloat(
         previousBalanceResult.rows[0]?.previous_balance || 0
@@ -245,30 +253,21 @@ const router = Router();
         [customerId, startOfMonthTs, endOfMonthTs]
       );
 
-      const endOfMonthEndOfDay = new Date(
-        yearInt,
-        monthInt,
-        0,
-        23,
-        59,
-        59,
-        999
-      );
       const paymentsResult = await pool.query(
         `SELECT
            p.payment_id,
            p.invoice_id,
-           p.payment_date,
+           COALESCE(p.posting_date, p.payment_date::date) AS payment_date,
            p.amount_paid,
            p.payment_reference
          FROM jellypolly.payments p
          JOIN jellypolly.invoices i ON p.invoice_id = i.id
          WHERE i.customerid = $1
            AND p.status NOT IN ('cancelled', 'pending')
-           AND p.payment_date >= $2
-           AND p.payment_date <= $3
-         ORDER BY p.payment_date ASC`,
-        [customerId, startOfMonth.toISOString(), endOfMonthEndOfDay.toISOString()]
+           AND COALESCE(p.posting_date, p.payment_date::date) >= $2::date
+           AND COALESCE(p.posting_date, p.payment_date::date) <= $3::date
+         ORDER BY COALESCE(p.posting_date, p.payment_date::date) ASC`,
+        [customerId, startOfMonthDate, endOfMonthDate]
       );
 
       const transactions = [];
@@ -407,6 +406,14 @@ const router = Router();
         59,
         999
       ).getTime();
+      const startOfMonthDate = `${yearInt}-${String(monthInt).padStart(
+        2,
+        "0"
+      )}-01`;
+      const endOfMonthDate = `${yearInt}-${String(monthInt).padStart(
+        2,
+        "0"
+      )}-${String(endOfMonth.getDate()).padStart(2, "0")}`;
 
       const statementDate = endOfMonth.toLocaleDateString("en-GB", {
         day: "2-digit",
@@ -446,8 +453,8 @@ const router = Router();
           JOIN jellypolly.invoices i ON c.id = i.customerid
           JOIN jellypolly.payments p ON i.id = p.invoice_id
           WHERE p.status NOT IN ('cancelled', 'pending')
-            AND p.payment_date >= $2
-            AND p.payment_date <= $3
+            AND COALESCE(p.posting_date, p.payment_date::date) >= $2::date
+            AND COALESCE(p.posting_date, p.payment_date::date) <= $3::date
           GROUP BY c.id
         ),
         customer_summary AS (
@@ -495,8 +502,8 @@ const router = Router();
         ORDER BY cs.customer_id ASC`,
         [
           endOfMonthTs,
-          startOfMonth.toISOString(),
-          new Date(yearInt, monthInt, 0, 23, 59, 59, 999).toISOString(),
+          startOfMonthDate,
+          endOfMonthDate,
           startOfMonthTs,
           startOfMonth,
           endOfMonth,

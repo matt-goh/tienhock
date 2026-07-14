@@ -3,6 +3,8 @@ import { Router } from "express";
 
 const LEGACY_IMPORT_ENTRY_TYPE = "IMP";
 const LEGACY_IMPORT_SOURCE_TYPE = "legacy_import";
+// Entry types that carry a cheque number: Cash Payment (C) and Bank Payment (B)
+const CHEQUE_NO_ENTRY_TYPES = ["C", "B"];
 
 const LEGACY_IMPORT_SQL =
   `(je.entry_type = '${LEGACY_IMPORT_ENTRY_TYPE}' OR ` +
@@ -523,9 +525,11 @@ export default function (pool) {
       });
     }
 
-    // Cheque number only applies to Cash Payment (C) entries
+    // Cheque number applies to Cash Payment (C) and Bank Payment (B) entries
     const normalizedChequeNo =
-      entry_type === "C" && cheque_no && String(cheque_no).trim()
+      CHEQUE_NO_ENTRY_TYPES.includes(entry_type) &&
+      cheque_no &&
+      String(cheque_no).trim()
         ? String(cheque_no).trim()
         : null;
 
@@ -658,9 +662,11 @@ export default function (pool) {
       });
     }
 
-    // Cheque number only applies to Cash Payment (C) entries
+    // Cheque number applies to Cash Payment (C) and Bank Payment (B) entries
     const normalizedChequeNo =
-      entry_type === "C" && cheque_no && String(cheque_no).trim()
+      CHEQUE_NO_ENTRY_TYPES.includes(entry_type) &&
+      cheque_no &&
+      String(cheque_no).trim()
         ? String(cheque_no).trim()
         : null;
 
@@ -767,7 +773,15 @@ export default function (pool) {
         UPDATE journal_entries
         SET reference_no = $1, entry_type = $2, entry_date = $3,
             description = $4, total_debit = $5, total_credit = $6,
-            cheque_no = $7, updated_by = $8, updated_at = CURRENT_TIMESTAMP
+            cheque_no = $7,
+            display_reference = CASE
+              WHEN source_type IS NULL
+                AND display_reference IS NOT NULL
+                AND reference_no IS DISTINCT FROM $1
+              THEN $1
+              ELSE display_reference
+            END,
+            updated_by = $8, updated_at = CURRENT_TIMESTAMP
         WHERE id = $9
       `;
 
@@ -1003,6 +1017,21 @@ export default function (pool) {
         });
       }
 
+      // Adjustment documents (Credit/Debit/Refund Notes) reference this journal
+      // via journal_entry_id (a NO ACTION FK that would otherwise block the
+      // delete). Staff monitor these journals and documents directly, so detach
+      // the link from any owning document — active or cancelled — before removing
+      // the journal. A later cancellation of that document safely skips the
+      // already-removed journal (cancelAdjustmentJournalEntry no-ops on NULL).
+      await client.query(
+        "UPDATE adjustment_documents SET journal_entry_id = NULL WHERE journal_entry_id = $1",
+        [id]
+      );
+      await client.query(
+        "UPDATE jellypolly.adjustment_documents SET journal_entry_id = NULL WHERE journal_entry_id = $1",
+        [id]
+      );
+
       // Lines will be deleted by CASCADE
       await client.query("DELETE FROM journal_entries WHERE id = $1", [id]);
 
@@ -1012,6 +1041,18 @@ export default function (pool) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Error deleting journal entry:", error);
+      // A foreign-key violation means another source record (invoice, receipt,
+      // payment, bank-in, supplier/purchase invoice, RV) still owns this journal.
+      // Surface a clean message instead of the raw constraint error.
+      if (error.code === "23503") {
+        return res.status(400).json({
+          message: "Cannot delete this journal entry",
+          detail:
+            "This journal is linked to another record (such as an invoice, receipt, payment, or bank-in) and is managed through that source document.",
+          suggestion:
+            "Cancel or remove the source document, and its journal will be handled automatically.",
+        });
+      }
       res.status(500).json({
         message: "Error deleting journal entry",
         error: error.message,

@@ -12,13 +12,22 @@ import {
 } from "../../../components/FormComponents";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import LocationFormModal from "../../../components/GreenTarget/LocationFormModal";
-import { IconMap, IconMapPin, IconTrash, IconPhone } from "@tabler/icons-react";
+import {
+  IconBuilding,
+  IconFileInvoice,
+  IconInfoCircle,
+  IconMap,
+  IconMapPin,
+  IconPhone,
+  IconPlus,
+  IconTrash,
+} from "@tabler/icons-react";
 import { validateCustomerIdentity } from "../../../utils/greenTarget/customerValidation";
 
 interface CustomerLocation {
   location_id?: number;
   customer_id: number;
+  site?: string;
   address: string;
   phone_number?: string;
 }
@@ -72,9 +81,11 @@ const CustomerFormPage: React.FC = () => {
 
   const [locations, setLocations] = useState<CustomerLocation[]>([]);
   const [newLocation, setNewLocation] = useState<{
+    site: string;
     address: string;
     phone_number: string;
   }>({
+    site: "",
     address: "",
     phone_number: "",
   });
@@ -83,11 +94,6 @@ const CustomerFormPage: React.FC = () => {
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [loading, setLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
-  const [isLocationInputFocused, setIsLocationInputFocused] = useState(false);
-  const [isPhoneInputFocused, setIsPhoneInputFocused] = useState(false);
-  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
-  const [selectedLocation, setSelectedLocation] =
-    useState<CustomerLocation | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const idTypeOptions = [
@@ -134,12 +140,20 @@ const CustomerFormPage: React.FC = () => {
     setIsFormChanged(hasChanged);
   }, [formData, locations, initialFormData]);
 
-  const fetchCustomerDetails = async (customerId: number) => {
+  const fetchCustomerDetails = async (customerId: number): Promise<void> => {
     try {
       setLoading(true);
       const data = await greenTargetApi.getCustomer(customerId);
 
-      const formattedData = {
+      const fetchedLocations: CustomerLocation[] = (data.locations || []).map(
+        (location: CustomerLocation) => ({
+          ...location,
+          site: location.site || "",
+          phone_number: location.phone_number || "",
+        })
+      );
+
+      const formattedData: Customer = {
         customer_id: data.customer_id,
         name: data.name,
         phone_number: data.phone_number || "",
@@ -151,12 +165,13 @@ const CustomerFormPage: React.FC = () => {
         id_number: data.id_number || "",
         state: data.state || "12",
         additional_info: data.additional_info || "",
+        locations: fetchedLocations,
       };
 
       setFormData(formattedData);
       setInitialFormData(formattedData);
 
-      setLocations(data.locations || []);
+      setLocations(fetchedLocations);
       setError(null);
     } catch (err) {
       setError("Failed to fetch customer details. Please try again later.");
@@ -168,7 +183,7 @@ const CustomerFormPage: React.FC = () => {
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
+  ): void => {
     const { name, value } = e.target;
     setFormData((prevData) => ({
       ...prevData,
@@ -176,7 +191,7 @@ const CustomerFormPage: React.FC = () => {
     }));
   };
 
-  const handleListboxChange = (name: keyof Customer, value: string) => {
+  const handleListboxChange = (name: keyof Customer, value: string): void => {
     setFormData((prevData) => ({
       ...prevData,
       [name]: value,
@@ -184,8 +199,8 @@ const CustomerFormPage: React.FC = () => {
   };
 
   const handleLocationInputChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ): void => {
     const { name, value } = e.target;
     setNewLocation((prev) => ({
       ...prev,
@@ -193,7 +208,7 @@ const CustomerFormPage: React.FC = () => {
     }));
   };
 
-  const handleBackClick = () => {
+  const handleBackClick = (): void => {
     if (isFormChanged) {
       setShowBackConfirmation(true);
     } else {
@@ -201,12 +216,16 @@ const CustomerFormPage: React.FC = () => {
     }
   };
 
-  const handleConfirmBack = () => {
+  const handleConfirmBack = (): void => {
     setShowBackConfirmation(false);
     navigate("/greentarget/customers");
   };
 
-  const handleAddLocation = () => {
+  const handleAddLocation = (): void => {
+    if (!newLocation.site.trim()) {
+      toast.error("Please enter a site name");
+      return;
+    }
     if (!newLocation.address.trim()) {
       toast.error("Please enter a location address");
       return;
@@ -214,39 +233,65 @@ const CustomerFormPage: React.FC = () => {
 
     const newLocationObj: CustomerLocation = {
       customer_id: formData.customer_id || 0,
+      site: newLocation.site.trim(),
       address: newLocation.address.trim(),
       // Use custom phone number if provided, otherwise use customer's phone number
       phone_number: newLocation.phone_number.trim() || formData.phone_number,
     };
 
     setLocations([...locations, newLocationObj]);
-    setNewLocation({ address: "", phone_number: "" });
+    setNewLocation({ site: "", address: "", phone_number: "" });
   };
 
-  const handleRemoveLocation = (index: number) => {
+  const handleLocationChange = (
+    index: number,
+    field: "site" | "address" | "phone_number",
+    value: string
+  ): void => {
+    setLocations((currentLocations: CustomerLocation[]) =>
+      currentLocations.map((location: CustomerLocation, locationIndex: number) =>
+        locationIndex === index ? { ...location, [field]: value } : location
+      )
+    );
+  };
+
+  const handleRemoveLocation = (index: number): void => {
     const updatedLocations = [...locations];
     updatedLocations.splice(index, 1);
     setLocations(updatedLocations);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
 
     if (!formData.name) {
       toast.error("Customer name is required");
       return;
     }
+    if (locations.some((location: CustomerLocation) => !location.address.trim())) {
+      toast.error("Every location must have an address");
+      return;
+    }
+    if (
+      locations.some(
+        (location: CustomerLocation) =>
+          !location.location_id && !location.site?.trim()
+      )
+    ) {
+      toast.error("Every new location must have a site name");
+      return;
+    }
 
     setIsSaving(true);
 
     try {
-      // Check if any of the validation fields has input
+      // ID number is a core customer field. Only ID Type or TIN opts the
+      // customer into e-Invoice identity validation.
       const hasIdType = formData.id_type && formData.id_type !== "Select";
       const hasIdNumber = Boolean(formData.id_number);
       const hasTinNumber = Boolean(formData.tin_number);
 
-      // If any field has input, all fields are required
-      if (hasIdType || hasIdNumber || hasTinNumber) {
+      if (hasIdType || hasTinNumber) {
         if (!hasIdType) {
           toast.error(
             "ID Type is required when entering e-Invoice information"
@@ -293,7 +338,10 @@ const CustomerFormPage: React.FC = () => {
             name: formData.name,
             phone_number: formData.phone_number || null,
             tin_number: formData.tin_number,
-            id_type: formData.id_type,
+            id_type:
+              formData.id_type && formData.id_type !== "Select"
+                ? formData.id_type
+                : null,
             id_number: formData.id_number,
             email: formData.email,
             state: formData.state,
@@ -306,11 +354,14 @@ const CustomerFormPage: React.FC = () => {
           name: formData.name,
           phone_number: formData.phone_number || null,
           tin_number: formData.tin_number,
-          id_type: formData.id_type,
+            id_type:
+              formData.id_type && formData.id_type !== "Select"
+                ? formData.id_type
+                : null,
           id_number: formData.id_number,
-          email: formData.email,
-          state: formData.state,
-          additional_info: formData.additional_info,
+            email: formData.email,
+            state: formData.state,
+            additional_info: formData.additional_info,
         });
       }
 
@@ -344,15 +395,17 @@ const CustomerFormPage: React.FC = () => {
           if (location.location_id) {
             // Update existing location
             await greenTargetApi.updateLocation(location.location_id, {
-              address: location.address,
-              phone_number: location.phone_number,
+              site: location.site?.trim() || null,
+              address: location.address.trim(),
+              phone_number: location.phone_number?.trim() || null,
             });
           } else {
             // Add new location
             await greenTargetApi.createLocation({
               customer_id: customerId,
-              address: location.address,
-              phone_number: location.phone_number,
+              site: location.site?.trim() || null,
+              address: location.address.trim(),
+              phone_number: location.phone_number?.trim() || null,
             });
           }
         }
@@ -373,7 +426,7 @@ const CustomerFormPage: React.FC = () => {
     }
   };
 
-  const handleDeleteCustomer = async () => {
+  const handleDeleteCustomer = async (): Promise<void> => {
     try {
       setIsSaving(true);
 
@@ -434,7 +487,7 @@ const CustomerFormPage: React.FC = () => {
     label: string,
     type: string = "text",
     placeholder: string = ""
-  ) => {
+  ): JSX.Element => {
     const value = formData[name]?.toString() || "";
 
     // Determine if this field should have verification capability
@@ -469,7 +522,7 @@ const CustomerFormPage: React.FC = () => {
     name: keyof Customer,
     label: string,
     options: SelectOption[]
-  ) => {
+  ): JSX.Element => {
     const value = formData[name]?.toString() || "";
 
     return (
@@ -487,7 +540,7 @@ const CustomerFormPage: React.FC = () => {
     name: keyof Customer,
     label: string,
     placeholder: string = ""
-  ) => {
+  ): JSX.Element => {
     const value = formData[name]?.toString() || "";
 
     return (
@@ -504,8 +557,8 @@ const CustomerFormPage: React.FC = () => {
           value={value}
           onChange={handleInputChange}
           placeholder={placeholder}
-          rows={4}
-          className="block w-full h-[10rem] px-3 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 rounded-lg shadow-sm
+          rows={3}
+          className="block w-full px-3 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 rounded-lg shadow-sm
                      focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 dark:focus:border-sky-500 sm:text-sm"
         />
       </div>
@@ -525,322 +578,312 @@ const CustomerFormPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-3">
-      <div className="bg-white dark:bg-gray-800 rounded-lg">
-        <div className="justify-between flex px-6 py-3 border-b border-default-200 dark:border-gray-700">
-          <div className="flex items-center gap-4">
+    <div className="space-y-4 pb-6">
+      <div className="rounded-xl border border-default-200 bg-white px-4 py-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:px-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-4">
             <BackButton onClick={handleBackClick} />
-            <div className="h-6 w-px bg-default-300"></div>
-            <div>
-              <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
-                {isEditMode ? "Edit Customer" : "Add New Customer"}
+            <div className="hidden h-8 w-px bg-default-200 dark:bg-gray-700 sm:block" />
+            <div className="min-w-0">
+              <h1 className="truncate text-xl font-bold text-default-900 dark:text-gray-100">
+                {isEditMode ? formData.name || "Edit Customer" : "Add Customer"}
               </h1>
-              <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
+              <p className="mt-0.5 text-sm text-default-500 dark:text-gray-400">
                 {isEditMode
-                  ? 'Edit customer information here. Click "Save" when you\'re done.'
-                  : 'Enter new customer information here. Click "Save" when you\'re done.'}
+                  ? `Customer #${formData.customer_id}`
+                  : "Create a Green Target customer and their service locations."}
               </p>
             </div>
           </div>
           {isEditMode && (
-            <div className="space-y-2 text-right">
-              <div className="flex items-center space-x-2">
-                <span
-                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                    formData.has_active_rental
-                      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                      : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
-                  }`}
-                >
-                  {formData.has_active_rental ? "Active" : "Inactive"}
-                </span>
-                <label className="text-sm font-medium text-default-700 dark:text-gray-200">
-                  Last Activity
-                </label>
-              </div>
-              <div>
-                {formData.last_activity_date ? (
-                  <span className="text-default-500 dark:text-gray-400">
-                    {new Date(formData.last_activity_date).toLocaleDateString(
+            <div className="flex items-center gap-3 sm:justify-end">
+              <span
+                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                  formData.has_active_rental
+                    ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                    : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                }`}
+              >
+                {formData.has_active_rental ? "Active rental" : "No active rental"}
+              </span>
+              <div className="text-right text-xs text-default-500 dark:text-gray-400">
+                <div className="font-medium text-default-700 dark:text-gray-200">
+                  Last activity
+                </div>
+                {formData.last_activity_date
+                  ? new Date(formData.last_activity_date).toLocaleDateString(
                       "en-GB",
-                      {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      }
-                    )}
-                  </span>
-                ) : (
-                  <span className="text-default-500 dark:text-gray-400 italic">
-                    No activity recorded
-                  </span>
-                )}
+                      { year: "numeric", month: "short", day: "numeric" }
+                    )
+                  : "Not recorded"}
               </div>
             </div>
           )}
         </div>
-        <form onSubmit={handleSubmit} className="px-6">
-          <div className="mt-4 space-y-6">
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              {renderInput("name", "Customer Name")}
-              {renderInput("phone_number", "Phone Number", "tel")}
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <section className="rounded-xl border border-default-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-6">
+          <div className="mb-5 flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
+              <IconBuilding size={21} />
+            </span>
+            <div>
+              <h2 className="font-semibold text-default-900 dark:text-gray-100">
+                Customer information
+              </h2>
+              <p className="text-sm text-default-500 dark:text-gray-400">
+                Main contact details used across rentals, invoices and statements.
+              </p>
             </div>
+          </div>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            {renderInput("name", "Customer Name")}
+            {renderInput("phone_number", "Phone Number", "tel")}
+          </div>
+          <div className="mt-5">
             {renderTextArea(
               "additional_info",
               "Additional Notes (optional)",
-              "Enter additional customer information here. This will appear in the customer's statement header."
+              "Notes shown in the customer statement header."
             )}
+          </div>
+        </section>
 
-            {/* Locations Section */}
-            <div className="border-t border-default-200 dark:border-gray-700 pt-4 mt-4">
-              <h2 className="text-lg font-medium text-default-900 dark:text-gray-100 mb-4">
-                Customer Locations
-              </h2>
-
-              <div className="mb-4">
-                <div className="flex flex-row space-x-2 w-full">
-                  {/* Location input - 70% width */}
-                  <div
-                    className={`flex flex-grow w-[70%] border rounded-lg p-1.5 bg-white dark:bg-gray-700 ${
-                      isLocationInputFocused
-                        ? "border-default-500 dark:border-gray-500"
-                        : "border-default-300 dark:border-gray-600"
-                    }`}
-                  >
-                    <div className="flex relative w-[85%]">
-                      <span className="absolute inset-y-0 left-2 flex items-center text-default-400">
-                        <IconMapPin size={18} />
-                      </span>
-                      <input
-                        type="text"
-                        name="address"
-                        value={newLocation.address}
-                        onChange={handleLocationInputChange}
-                        onFocus={() => setIsLocationInputFocused(true)}
-                        onBlur={() => setIsLocationInputFocused(false)}
-                        placeholder="Enter location address"
-                        className="w-full pl-10 pr-3 py-2 border-0 bg-transparent text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 focus:outline-none"
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      onClick={handleAddLocation}
-                      variant="default"
-                      color="sky"
-                      size="sm"
-                      className="w-[15%]"
-                      title="Add Location"
-                    >
-                      Add Location
-                    </Button>
-                  </div>
-
-                  {/* Phone input - 30% width */}
-                  <div
-                    className={`flex w-[30%] border rounded-lg p-1.5 bg-white dark:bg-gray-700 ${
-                      isPhoneInputFocused
-                        ? "border-default-500 dark:border-gray-500"
-                        : "border-default-300 dark:border-gray-600"
-                    }`}
-                  >
-                    <div className="flex relative w-full">
-                      <span className="absolute inset-y-0 left-2 flex items-center text-default-400">
-                        <IconPhone size={18} />
-                      </span>
-                      <input
-                        type="tel"
-                        name="phone_number"
-                        value={newLocation.phone_number}
-                        onChange={handleLocationInputChange}
-                        onFocus={() => setIsPhoneInputFocused(true)}
-                        onBlur={() => setIsPhoneInputFocused(false)}
-                        placeholder={`Optional phone number (default: ${
-                          formData.phone_number || "none"
-                        })`}
-                        className="w-full pl-10 pr-3 py-2 border-0 bg-transparent text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Add Location Button - Below the inputs */}
-                <div className="mt-2 flex justify-end"></div>
+        <section className="rounded-xl border border-default-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-6">
+          <div className="mb-5 flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                <IconMapPin size={21} />
+              </span>
+              <div>
+                <h2 className="font-semibold text-default-900 dark:text-gray-100">
+                  Service locations
+                </h2>
+                <p className="text-sm text-default-500 dark:text-gray-400">
+                  Site is appended after the address on individual e-Invoices.
+                </p>
               </div>
-
-              {locations.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {locations.map((location, index) => (
-                    <div
-                      key={index}
-                      className="flex justify-between items-center bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 p-4 rounded-lg hover:shadow-sm transition-all duration-200 hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800/75 active:bg-default-200/75"
-                      onClick={() => {
-                        setSelectedLocation(location);
-                        setIsLocationModalOpen(true);
-                      }}
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center">
-                            <span className="flex h-8 w-8 items-center justify-center bg-sky-100 dark:bg-sky-900/50 text-sky-600 dark:text-sky-400 rounded-full mr-3">
-                              <IconMapPin size={16} />
-                            </span>
-                            <span className="font-medium">
-                              {location.address}
-                            </span>
-                          </div>
-                          {/* Only show phone if it's different from the customer's default */}
-                          {location.phone_number &&
-                            location.phone_number !== formData.phone_number && (
-                              <div className="flex items-center px-2 text-default-600 dark:text-gray-300 text-sm">
-                                <IconPhone size={14} className="mr-1" />
-                                {location.phone_number}
-                              </div>
-                            )}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemoveLocation(index);
-                            }}
-                            className="p-1.5 rounded-full text-default-400 dark:text-gray-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors"
-                            title="Remove location"
-                          >
-                            <IconTrash size={18} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="border-2 border-dashed border-default-200 dark:border-gray-700 rounded-lg p-6 text-center">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-default-100 dark:bg-gray-800">
-                    <IconMap
-                      size={24}
-                      className="text-default-600 dark:text-gray-300"
-                    />
-                  </div>
-                  <h3 className="mt-3 text-sm font-medium text-default-900 dark:text-gray-100">
-                    No locations
-                  </h3>
-                  <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
-                    Add location for this customer.
-                  </p>
-                </div>
-              )}
             </div>
+            <span className="shrink-0 rounded-full bg-default-100 px-2.5 py-1 text-xs font-semibold text-default-600 dark:bg-gray-700 dark:text-gray-300">
+              {locations.length} {locations.length === 1 ? "location" : "locations"}
+            </span>
+          </div>
 
-            {/* e-Invoice fields */}
-            <div className="border-t border-default-200 dark:border-gray-700 pt-6 mt-6">
-              <h2 className="text-lg font-medium text-default-900 dark:text-gray-100 mb-4">
-                e-Invoice Information{" "}
-                <span className="text-sm font-medium text-default-400 dark:text-gray-500">
-                  (optional)
-                </span>
-              </h2>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-                {renderListbox("id_type", "ID Type", idTypeOptions)}
-                {renderInput("id_number", "ID Number", "text")}
-                {renderInput(
-                  "tin_number",
-                  "TIN Number",
-                  "text",
-                  "C21636482050"
-                )}
+          <div className="rounded-xl border border-dashed border-default-300 bg-default-50 p-3 dark:border-gray-600 dark:bg-gray-900/30">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-[180px_minmax(260px,1fr)_240px_auto] lg:items-end">
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-default-500 dark:text-gray-400">
+                  Site
+                </label>
+                <input
+                  type="text"
+                  name="site"
+                  value={newLocation.site}
+                  onChange={handleLocationInputChange}
+                  placeholder="e.g. Kolombong"
+                  maxLength={100}
+                  className="h-10 w-full rounded-lg border border-default-300 bg-white px-3 text-sm text-default-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                />
               </div>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 mt-4">
-                {renderInput("email", "Email", "email")}
-                {renderListbox("state", "State", stateOptions)}
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-default-500 dark:text-gray-400">
+                  Address
+                </label>
+                <input
+                  type="text"
+                  name="address"
+                  value={newLocation.address}
+                  onChange={handleLocationInputChange}
+                  placeholder="Full service address"
+                  maxLength={255}
+                  className="h-10 w-full rounded-lg border border-default-300 bg-white px-3 text-sm text-default-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                />
               </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-default-500 dark:text-gray-400">
+                  Location phone (optional)
+                </label>
+                <input
+                  type="tel"
+                  name="phone_number"
+                  value={newLocation.phone_number}
+                  onChange={handleLocationInputChange}
+                  placeholder={formData.phone_number || "Customer phone"}
+                  maxLength={20}
+                  className="h-10 w-full rounded-lg border border-default-300 bg-white px-3 text-sm text-default-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                />
+              </div>
+              <Button
+                type="button"
+                onClick={handleAddLocation}
+                variant="outline"
+                color="sky"
+                icon={IconPlus}
+                className="h-10 justify-center"
+              >
+                Add
+              </Button>
             </div>
           </div>
 
-          <div className="mt-4 py-3 text-right">
+          {locations.length > 0 ? (
+            <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-2">
+              {locations.map((location: CustomerLocation, index: number) => (
+                <div
+                  key={location.location_id || `new-${index}`}
+                  className="rounded-xl border border-default-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800/60"
+                >
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                        <IconMapPin size={17} />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-default-900 dark:text-gray-100">
+                          {location.site || "Site not set"}
+                        </p>
+                        {location.location_id && (
+                          <p className="text-xs text-default-400">
+                            Location #{location.location_id}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(): void => handleRemoveLocation(index)}
+                      className="rounded-lg p-2 text-default-400 transition hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/20 dark:hover:text-rose-300"
+                      title="Remove location"
+                      aria-label={`Remove location ${index + 1}`}
+                    >
+                      <IconTrash size={18} />
+                    </button>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-[150px_1fr]">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-default-500 dark:text-gray-400">
+                        Site
+                      </label>
+                      <input
+                        type="text"
+                        value={location.site || ""}
+                        onChange={(event): void =>
+                          handleLocationChange(index, "site", event.target.value)
+                        }
+                        maxLength={100}
+                        placeholder="Site name"
+                        className="w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 outline-none focus:border-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-default-500 dark:text-gray-400">
+                        Address
+                      </label>
+                      <input
+                        type="text"
+                        value={location.address}
+                        onChange={(event): void =>
+                          handleLocationChange(index, "address", event.target.value)
+                        }
+                        maxLength={255}
+                        className="w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 outline-none focus:border-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <label className="mb-1 flex items-center gap-1 text-xs font-medium text-default-500 dark:text-gray-400">
+                      <IconPhone size={13} /> Location phone (optional)
+                    </label>
+                    <input
+                      type="tel"
+                      value={location.phone_number || ""}
+                      onChange={(event): void =>
+                        handleLocationChange(index, "phone_number", event.target.value)
+                      }
+                      maxLength={20}
+                      placeholder={`Uses ${formData.phone_number || "customer phone"} when blank`}
+                      className="w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 outline-none focus:border-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 rounded-xl border-2 border-dashed border-default-200 p-8 text-center dark:border-gray-700">
+              <IconMap size={28} className="mx-auto text-default-400" />
+              <p className="mt-2 text-sm font-medium text-default-700 dark:text-gray-200">
+                No service locations yet
+              </p>
+              <p className="text-xs text-default-500 dark:text-gray-400">
+                Add a site and address above.
+              </p>
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-xl border border-default-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-6">
+          <div className="mb-5 flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+              <IconFileInvoice size={21} />
+            </span>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="font-semibold text-default-900 dark:text-gray-100">
+                  e-Invoice information
+                </h2>
+                <span className="rounded-full bg-default-100 px-2 py-0.5 text-xs font-medium text-default-500 dark:bg-gray-700 dark:text-gray-300">
+                  Optional
+                </span>
+              </div>
+              <p className="text-sm text-default-500 dark:text-gray-400">
+                If any identity field is entered, ID Type, ID Number and TIN are validated together.
+              </p>
+            </div>
+          </div>
+          <div className="mb-5 flex items-start gap-2 rounded-lg bg-sky-50 p-3 text-sm text-sky-800 dark:bg-sky-900/20 dark:text-sky-200">
+            <IconInfoCircle size={18} className="mt-0.5 shrink-0" />
+            Existing verified identity details are not revalidated unless they change.
+          </div>
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+            {renderListbox("id_type", "ID Type", idTypeOptions)}
+            {renderInput("id_number", "ID Number", "text")}
+            {renderInput("tin_number", "TIN Number", "text", "C21636482050")}
+          </div>
+          <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
+            {renderInput("email", "Email", "email")}
+            {renderListbox("state", "State", stateOptions)}
+          </div>
+        </section>
+
+        <div className="sticky bottom-0 z-[5] flex flex-col-reverse gap-3 rounded-xl border border-default-200 bg-white/95 p-3 shadow-lg backdrop-blur dark:border-gray-700 dark:bg-gray-800/95 sm:flex-row sm:items-center sm:justify-between">
+          <div>
             {isEditMode && (
               <Button
                 type="button"
                 color="rose"
                 variant="outline"
-                onClick={() => setIsDeleteDialogOpen(true)}
-                className="mr-3"
+                onClick={(): void => setIsDeleteDialogOpen(true)}
               >
-                Delete
+                Delete Customer
               </Button>
             )}
+          </div>
+          <div className="flex items-center justify-end gap-3">
+            <Button type="button" variant="outline" onClick={handleBackClick}>
+              Cancel
+            </Button>
             <Button
               type="submit"
               variant="boldOutline"
               size="lg"
               disabled={isSaving || !isFormChanged}
             >
-              {isSaving ? "Saving..." : "Save"}
+              {isSaving ? "Saving..." : "Save Customer"}
             </Button>
           </div>
-        </form>
-      </div>
-
-      <LocationFormModal
-        isOpen={isLocationModalOpen}
-        onClose={() => {
-          setIsLocationModalOpen(false);
-          setSelectedLocation(null);
-        }}
-        onSubmit={async (locationData) => {
-          if (selectedLocation) {
-            try {
-              // First update location in the backend
-              if (selectedLocation.location_id) {
-                // Update existing location in backend
-                await greenTargetApi.updateLocation(
-                  selectedLocation.location_id,
-                  {
-                    address: locationData.address,
-                    phone_number: locationData.phone_number,
-                  }
-                );
-
-                // Then update in local state using location_id for reliable comparison
-                const updatedLocations = locations.map((loc) =>
-                  loc.location_id === selectedLocation.location_id
-                    ? {
-                        ...loc,
-                        address: locationData.address,
-                        phone_number: locationData.phone_number,
-                      }
-                    : loc
-                );
-                setLocations(updatedLocations);
-
-                toast.success("Location updated successfully");
-              } else {
-                // This is a new location that hasn't been saved to backend yet
-                // Just update it in local state using array index
-                const locationIndex = locations.findIndex(
-                  (loc) => loc === selectedLocation
-                );
-                if (locationIndex !== -1) {
-                  const updatedLocations = [...locations];
-                  updatedLocations[locationIndex] = {
-                    ...updatedLocations[locationIndex],
-                    address: locationData.address,
-                    phone_number: locationData.phone_number,
-                  };
-                  setLocations(updatedLocations);
-                }
-              }
-            } catch (error) {
-              console.error("Error updating location:", error);
-              toast.error("Failed to update location");
-            }
-          }
-
-          setIsLocationModalOpen(false);
-          setSelectedLocation(null);
-        }}
-        initialData={selectedLocation || undefined}
-        customerPhoneNumber={formData.phone_number}
-        customerId={formData.customer_id}
-      />
+        </div>
+      </form>
       <ConfirmationDialog
         isOpen={showBackConfirmation}
         onClose={() => setShowBackConfirmation(false)}

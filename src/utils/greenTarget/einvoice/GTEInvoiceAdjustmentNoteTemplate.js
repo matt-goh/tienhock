@@ -7,6 +7,7 @@
 // Defaults supplierInfo to GREENTARGET_INFO.
 import { GREENTARGET_INFO } from "../../invoice/einvoice/companyInfo.js";
 import { formatAdjustmentDocId } from "../../adjustments/formatDocId.js";
+import { buildGTBillingAddressLines } from "./GTBillingAddress.js";
 
 const TYPE_CODE = {
   credit_note: "02",
@@ -283,6 +284,10 @@ export async function GTEInvoiceAdjustmentNoteTemplate(
   }));
 
   const totals = calculateTaxAndTotals({ lines });
+  const billingAddressLines = buildGTBillingAddressLines(
+    customerData.address,
+    customerData.sites || customerData.site
+  );
 
   let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
@@ -394,13 +399,13 @@ export async function GTEInvoiceAdjustmentNoteTemplate(
         <cbc:PostalZone></cbc:PostalZone>
         <cbc:CountrySubentityCode>${escapeXml(customerData.state || "")}</cbc:CountrySubentityCode>
         <cac:AddressLine>
-          <cbc:Line>${escapeXml(customerData.address || "")}</cbc:Line>
+          <cbc:Line>${escapeXml(billingAddressLines[0])}</cbc:Line>
         </cac:AddressLine>
         <cac:AddressLine>
-          <cbc:Line></cbc:Line>
+          <cbc:Line>${escapeXml(billingAddressLines[1])}</cbc:Line>
         </cac:AddressLine>
         <cac:AddressLine>
-          <cbc:Line></cbc:Line>
+          <cbc:Line>${escapeXml(billingAddressLines[2])}</cbc:Line>
         </cac:AddressLine>
         <cac:Country>
           <cbc:IdentificationCode listID="ISO3166-1" listAgencyID="6">MYS</cbc:IdentificationCode>

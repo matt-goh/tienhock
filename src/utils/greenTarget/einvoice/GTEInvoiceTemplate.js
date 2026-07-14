@@ -1,5 +1,7 @@
 // src/utils/greenTarget/einvoice/GTEInvoiceTemplate.js
 import { GREENTARGET_INFO } from "../../../utils/invoice/einvoice/companyInfo.js";
+import { format } from "date-fns";
+import { buildGTBillingAddressLines } from "./GTBillingAddress.js";
 
 // Helper function to format phone number
 function formatPhoneNumber(phone) {
@@ -30,8 +32,7 @@ const formatAmount = (amount) => {
 const formatDate = (dateStr) => {
   if (!dateStr) {
     console.warn("No date provided, using current date");
-    const today = new Date();
-    return today.toISOString().split("T")[0];
+    return format(new Date(), "yyyy-MM-dd");
   }
 
   try {
@@ -60,16 +61,14 @@ const formatDate = (dateStr) => {
     // Try parsing as ISO date
     const date = new Date(dateStr);
     if (!isNaN(date.getTime())) {
-      return date.toISOString().split("T")[0];
+      return format(date, "yyyy-MM-dd");
     }
 
     console.warn("Failed to parse date:", dateStr);
-    const today = new Date();
-    return today.toISOString().split("T")[0];
+    return format(new Date(), "yyyy-MM-dd");
   } catch (error) {
     console.error("Error parsing date:", error, "for date string:", dateStr);
-    const today = new Date();
-    return today.toISOString().split("T")[0];
+    return format(new Date(), "yyyy-MM-dd");
   }
 };
 
@@ -116,7 +115,7 @@ export async function GTEInvoiceTemplate(invoiceData, customerData) {
     const invoiceDate = new Date(timestamp);
 
     // Format the date using our robust date formatter (YYYY-MM-DD)
-    const formattedDate = formatDate(invoiceDate.toISOString().split("T")[0]);
+    const formattedDate = formatDate(invoiceData.date_issued);
 
     // Get time in UTC (since we're using Z suffix which means UTC)
     const hours = invoiceDate.getUTCHours().toString().padStart(2, "0");
@@ -135,6 +134,11 @@ export async function GTEInvoiceTemplate(invoiceData, customerData) {
         invoiceNo: invoiceData.invoice_number,
       };
     }
+
+    const billingAddressLines = buildGTBillingAddressLines(
+      customerData.address,
+      customerData.sites || customerData.site
+    );
 
     // Calculate total amounts
     const subtotal = formatAmount(invoiceData.amount_before_tax);
@@ -269,13 +273,13 @@ export async function GTEInvoiceTemplate(invoiceData, customerData) {
           customerData.state || ""
         )}</cbc:CountrySubentityCode>
         <cac:AddressLine>
-          <cbc:Line>${escapeXml(customerData.address || "")}</cbc:Line>
+          <cbc:Line>${escapeXml(billingAddressLines[0])}</cbc:Line>
         </cac:AddressLine>
         <cac:AddressLine>
-          <cbc:Line></cbc:Line>
+          <cbc:Line>${escapeXml(billingAddressLines[1])}</cbc:Line>
         </cac:AddressLine>
         <cac:AddressLine>
-          <cbc:Line></cbc:Line>
+          <cbc:Line>${escapeXml(billingAddressLines[2])}</cbc:Line>
         </cac:AddressLine>
         <cac:Country>
           <cbc:IdentificationCode listID="ISO3166-1" listAgencyID="6">MYS</cbc:IdentificationCode>

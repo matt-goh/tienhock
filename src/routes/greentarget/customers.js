@@ -20,6 +20,18 @@ export default function (pool) {
         c.email,
         c.state,
         c.additional_info,
+        COALESCE((
+          SELECT json_agg(
+            json_build_object(
+              'location_id', l.location_id,
+              'site', l.site,
+              'address', l.address
+            )
+            ORDER BY COALESCE(l.site, ''), l.address
+          )
+          FROM greentarget.locations l
+          WHERE l.customer_id = c.customer_id
+        ), '[]'::json) AS locations,
         EXISTS (
           SELECT 1 FROM greentarget.rentals r 
           WHERE r.customer_id = c.customer_id AND r.date_picked IS NULL

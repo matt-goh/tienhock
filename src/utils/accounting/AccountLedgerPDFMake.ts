@@ -135,8 +135,16 @@ const buildDocDefinition = (
     { text: "", style: "td" },
     { text: "BALANCE BROUGHT FORWARD", style: "tdBold", colSpan: 2 },
     {},
-    { text: "", style: "td" },
-    { text: "", style: "td" },
+    {
+      text: data.opening_balance > 0 ? fmt(data.opening_balance) : "",
+      style: "tdBold",
+      alignment: "right",
+    },
+    {
+      text: data.opening_balance < 0 ? fmt(Math.abs(data.opening_balance)) : "",
+      style: "tdBold",
+      alignment: "right",
+    },
     { text: fmtBalance(data.opening_balance), style: "tdBold", alignment: "right" },
   ];
 

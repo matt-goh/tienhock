@@ -98,12 +98,10 @@ const buildRow = (ep, items, deductions, midMonthAmount) => {
   row.setengah_bulan = Number(midMonthAmount) || 0;
   const jumlah = row.gaji_bersih - row.setengah_bulan;
   row.jumlah = jumlah;
-  row.setelah_digenapkan =
-    ep.setelah_digenapkan != null
-      ? Number(ep.setelah_digenapkan)
-      : Math.ceil(jumlah);
-  row.digenapkan =
-    ep.digenapkan != null ? Number(ep.digenapkan) : row.setelah_digenapkan - jumlah;
+  // Derive rounding from the live, non-cancelled advance amount so historical
+  // payroll rows cannot keep a cancelled advance in report totals.
+  row.setelah_digenapkan = Math.ceil(jumlah);
+  row.digenapkan = row.setelah_digenapkan - jumlah;
   for (const k of TOTAL_KEYS) row[k] = round2(row[k]);
   return row;
 };
@@ -156,7 +154,9 @@ export default function (pool) {
       ),
       pool.query(
         `SELECT employee_id, month, amount
-         FROM greentarget.mid_month_payrolls WHERE year = $1`,
+         FROM greentarget.mid_month_payrolls
+         WHERE year = $1
+           AND LOWER(COALESCE(status, '')) <> 'cancelled'`,
         [year]
       ),
     ]);

@@ -71,6 +71,10 @@ interface JournalEntryFormData {
 
 const LAST_ENTRY_TYPE_KEY = "journalEntryLastType";
 const LEGACY_IMPORT_ENTRY_TYPE: JournalEntryType = "IMP";
+// Entry types that expose the Cheque No field. Cash Payment (C) pre-fills the
+// next sequential cheque number; Bank Payment (B) pre-fills the static "PBE".
+const CHEQUE_NO_ENTRY_TYPES: JournalEntryType[] = ["C", "B"];
+const BANK_PAYMENT_CHEQUE_PREFILL = "PBE";
 const HEADER_FIELD_CLASSNAME: string =
   "h-[38px] w-full px-3 text-sm border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 rounded-lg focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:cursor-not-allowed";
 const HEADER_LISTBOX_CLASSNAME: string =
@@ -912,9 +916,14 @@ const JournalEntryPage: React.FC = () => {
         // Create mode - fetch next reference
         if (isCreateMode) {
           await fetchNextReference(formData.entry_type);
-          // Cached last type may be Cash Payment - pre-fill its cheque number too
+          // Cached last type may already use a cheque number - pre-fill it too
           if (formData.entry_type === "C") {
             await fetchNextChequeNo();
+          } else if (formData.entry_type === "B") {
+            setFormData((prev) => ({
+              ...prev,
+              cheque_no: BANK_PAYMENT_CHEQUE_PREFILL,
+            }));
           }
         }
         initialFormDataRef.current = JSON.parse(JSON.stringify(formData));
@@ -944,11 +953,16 @@ const JournalEntryPage: React.FC = () => {
     } catch (e) {
       console.error("Error caching last entry type:", e);
     }
-    // Clear the cheque number when switching away from Cash Payment
+    // Preserve/prefill the cheque number per type; clear it for other types
     setFormData((prev) => ({
       ...prev,
       entry_type: newType,
-      cheque_no: newType === "C" ? prev.cheque_no : "",
+      cheque_no:
+        newType === "C"
+          ? prev.cheque_no
+          : newType === "B"
+          ? BANK_PAYMENT_CHEQUE_PREFILL
+          : "",
     }));
 
     // Only fetch new reference if creating new entry
@@ -1147,10 +1161,9 @@ const JournalEntryPage: React.FC = () => {
         entry_type: formData.entry_type,
         entry_date: formData.entry_date,
         description: formData.description.trim() || undefined,
-        cheque_no:
-          formData.entry_type === "C"
-            ? formData.cheque_no.trim() || undefined
-            : undefined,
+        cheque_no: CHEQUE_NO_ENTRY_TYPES.includes(formData.entry_type)
+          ? formData.cheque_no.trim() || undefined
+          : undefined,
         lines,
       };
 
@@ -1368,8 +1381,8 @@ const JournalEntryPage: React.FC = () => {
                   />
                 </div>
 
-                {/* Cheque Number - Cash Payment (C) entries only */}
-                {formData.entry_type === "C" && (
+                {/* Cheque Number - Cash Payment (C) / Bank Payment (B) entries */}
+                {CHEQUE_NO_ENTRY_TYPES.includes(formData.entry_type) && (
                   <div>
                     <label className="block text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wide mb-1.5">
                       Cheque No
