@@ -122,6 +122,21 @@ export async function syncSalesJournalEntry(client, invoice, createdBy = null) {
     return journalEntryId;
   }
 
+  // Human-owned journal: once staff have edited this invoice's sales journal
+  // directly (manual_override = true), the system stops rebuilding its lines,
+  // amounts, description AND its auto-collection row — they own it end to end.
+  // Cancellation still cascades (handled above, and via cancelSalesJournalEntry
+  // on invoice cancel), so a cancelled invoice never leaves a live journal.
+  if (journalEntryId) {
+    const lock = await client.query(
+      `SELECT manual_override FROM journal_entries WHERE id = $1`,
+      [journalEntryId]
+    );
+    if (lock.rows[0]?.manual_override) {
+      return journalEntryId;
+    }
+  }
+
   const amount = round2(inv.totalamountpayable);
   const isCash = inv.paymenttype === "CASH";
   const customerId = inv.customerid ? String(inv.customerid) : "";

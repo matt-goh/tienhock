@@ -1128,6 +1128,7 @@ export interface JournalEntry {
   is_legacy_import?: boolean;
   source_type?: string | null;
   source_id?: string | null;
+  manual_override?: boolean; // true = hand-edited sales journal, detached from its invoice's sync
   entry_date: string; // ISO date string
   description?: string;
   total_debit: number;

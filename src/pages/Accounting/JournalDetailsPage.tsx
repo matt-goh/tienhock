@@ -393,6 +393,14 @@ const JournalDetailsPage: React.FC = () => {
                       Legacy
                     </span>
                   )}
+                  {entry.manual_override && (
+                    <span
+                      className="inline-flex rounded bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300"
+                      title="Edited by hand — the invoice no longer updates this journal automatically."
+                    >
+                      Manual
+                    </span>
+                  )}
                 </div>
                 <p className="mt-0.5 text-sm text-default-500 dark:text-gray-400">
                   {getEntryTypeName(displayEntryType)} |{" "}
