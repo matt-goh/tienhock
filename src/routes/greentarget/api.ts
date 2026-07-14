@@ -82,6 +82,8 @@ export const greenTargetApi = {
   },
   updateCustomerSignupStatus: (id: number, status: "pending" | "rejected") =>
     api.patch(`/greentarget/api/customer-signups/${id}`, { status }),
+  deleteRejectedCustomerSignup: (id: number) =>
+    api.delete(`/greentarget/api/customer-signups/${id}`),
 
   // Dumpster endpoints
   getDumpsters: () => api.get("/greentarget/api/dumpsters"),

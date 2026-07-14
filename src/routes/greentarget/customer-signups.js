@@ -111,6 +111,14 @@ export default function (pool, myInvoisConfig) {
     }
     const locations = normalizeLocations(req.body.locations);
     const einvoice_requested = req.body.einvoice_requested === true;
+    // Cached forms from before this field was separated still send only id_number.
+    const rawEinvoiceIdNumber = Object.prototype.hasOwnProperty.call(
+      req.body,
+      "einvoice_id_number"
+    )
+      ? req.body.einvoice_id_number
+      : req.body.id_number;
+    const einvoice_id_number = String(rawEinvoiceIdNumber || "").trim();
     const tin_number = String(req.body.tin_number || "").trim();
     const id_type = String(req.body.id_type || "").trim().toUpperCase();
     const email = String(req.body.email || "").trim();
@@ -138,6 +146,7 @@ export default function (pool, myInvoisConfig) {
     if (
       name.length > 255 ||
       id_number.length > 50 ||
+      einvoice_id_number.length > 50 ||
       phone_number.length > 20 ||
       locations.some(
         (location) => location.site.length > 100 || location.address.length > 255
@@ -150,7 +159,7 @@ export default function (pool, myInvoisConfig) {
 
     let einvoiceValidatedAt = null;
     if (einvoice_requested) {
-      if (!ID_TYPES.includes(id_type) || !id_number || !tin_number) {
+      if (!ID_TYPES.includes(id_type) || !einvoice_id_number || !tin_number) {
         return res.status(400).json({
           code: "EINVOICE_FIELDS_REQUIRED",
           message: "Complete the e-Invoice ID Type, ID Number and TIN",
@@ -175,7 +184,7 @@ export default function (pool, myInvoisConfig) {
           `/api/v1.0/taxpayer/validate/${encodeURIComponent(
             tin_number
           )}?idType=${encodeURIComponent(id_type)}&idValue=${encodeURIComponent(
-            id_number
+            einvoice_id_number
           )}`
         );
         einvoiceValidatedAt = new Date();
@@ -197,9 +206,9 @@ export default function (pool, myInvoisConfig) {
       const result = await pool.query(
         `INSERT INTO greentarget.customer_signups
            (name, id_number, phone_number, address, payment_method, submitted_ip,
-            locations, einvoice_requested, tin_number, id_type, email, state,
-            einvoice_validated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13)
+            locations, einvoice_requested, einvoice_id_number, tin_number, id_type,
+            email, state, einvoice_validated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14)
          RETURNING signup_id`,
         [
           name,
@@ -210,6 +219,7 @@ export default function (pool, myInvoisConfig) {
           ip || null,
           JSON.stringify(locations),
           einvoice_requested,
+          einvoice_requested ? einvoice_id_number : null,
           einvoice_requested ? tin_number : null,
           einvoice_requested ? id_type : null,
           einvoice_requested && email ? email : null,
@@ -294,7 +304,7 @@ export default function (pool, myInvoisConfig) {
         signup.einvoice_requested &&
         (!signup.tin_number ||
           !signup.id_type ||
-          !signup.id_number ||
+          !signup.einvoice_id_number ||
           !signup.einvoice_validated_at)
       ) {
         await client.query("ROLLBACK");
@@ -312,7 +322,9 @@ export default function (pool, myInvoisConfig) {
         [
           signup.name,
           signup.phone_number || null,
-          signup.id_number || null,
+          signup.einvoice_requested
+            ? signup.einvoice_id_number
+            : signup.id_number || null,
           signup.einvoice_requested ? signup.tin_number : null,
           signup.einvoice_requested ? signup.id_type : null,
           signup.einvoice_requested ? signup.email || null : null,
@@ -410,6 +422,46 @@ export default function (pool, myInvoisConfig) {
       console.error("Error updating Green Target customer signup:", error);
       res.status(500).json({
         message: "Error updating signup",
+        error: error.message,
+      });
+    }
+  });
+
+  // Staff: permanently delete a rejected signup only
+  router.delete("/:id", requireStaffSession, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      const result = await pool.query(
+        `DELETE FROM greentarget.customer_signups
+         WHERE signup_id = $1
+           AND status = 'rejected'
+         RETURNING signup_id`,
+        [id]
+      );
+
+      if (result.rows.length === 0) {
+        const existing = await pool.query(
+          `SELECT status
+           FROM greentarget.customer_signups
+           WHERE signup_id = $1`,
+          [id]
+        );
+
+        if (existing.rows.length === 0) {
+          return res.status(404).json({ message: "Signup not found" });
+        }
+
+        return res.status(409).json({
+          message: "Only rejected signup requests can be deleted",
+        });
+      }
+
+      res.json({ message: "Rejected signup deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting Green Target customer signup:", error);
+      res.status(500).json({
+        message: "Error deleting signup",
         error: error.message,
       });
     }
