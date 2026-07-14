@@ -41,6 +41,16 @@ export interface GTPayslipDeduction {
   } | null;
 }
 
+export interface GTPayslipLeaveRecord {
+  id?: number;
+  employee_id?: string;
+  leave_date?: string;
+  date?: string;
+  leave_type: string;
+  days_taken?: number;
+  amount_paid: number;
+}
+
 export interface GTPayslipInput {
   id?: number;
   monthly_payroll_id?: number;
@@ -56,6 +66,7 @@ export interface GTPayslipInput {
   month?: number;
   items?: GTPayslipItem[];
   deductions?: GTPayslipDeduction[];
+  leave_records?: GTPayslipLeaveRecord[];
 }
 
 export interface GTPayslipResult {
@@ -151,7 +162,14 @@ export const buildGTPayslipPayroll = (
         employer_rate: d.rate_info?.employer_rate ?? "0%",
       },
     })),
-    leave_records: [],
+    leave_records: (payroll.leave_records || []).map((r) => ({
+      date: r.date || r.leave_date || "",
+      employee_id: r.employee_id,
+      leave_type: r.leave_type,
+      days_taken: Number(r.days_taken) || 0,
+      amount_paid: Number(r.amount_paid) || 0,
+      work_log_type: null,
+    })),
     commission_records,
     others_records,
   };

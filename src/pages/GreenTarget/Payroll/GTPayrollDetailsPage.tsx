@@ -105,6 +105,17 @@ interface GTEmployeePayroll {
   deductions: Deduction[];
   pinjam_records?: GTPinjamRecord[];
   mid_month_payroll?: GTMidMonthAdvance | null;
+  leave_records?: GTLeaveRecord[];
+}
+
+interface GTLeaveRecord {
+  id: number;
+  employee_id: string;
+  leave_date: string;
+  leave_type: string;
+  days_taken: number;
+  amount_paid: number;
+  status?: string;
 }
 
 interface GTPayslipStaffDetails {
@@ -481,6 +492,13 @@ const GTPayrollDetailsPage: React.FC = () => {
       0
     );
 
+  const leaveRecords: GTLeaveRecord[] = payroll.leave_records || [];
+  const leaveTotal: number = leaveRecords.reduce(
+    (sum: number, record: GTLeaveRecord): number =>
+      sum + parsePayrollAmount(record.amount_paid),
+    0
+  );
+
   const midMonthAmount: number = parsePayrollAmount(
     payroll.mid_month_payroll?.amount
   );
@@ -713,6 +731,16 @@ const GTPayrollDetailsPage: React.FC = () => {
                   </span>
                   <span className="font-medium text-default-800 dark:text-gray-100">
                     {formatCurrency(commissionAdvanceTotal)}
+                  </span>
+                </div>
+              )}
+              {leaveTotal > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-default-600 dark:text-gray-300">
+                    Cuti (Leave)
+                  </span>
+                  <span className="font-medium text-default-800 dark:text-gray-100">
+                    {formatCurrency(leaveTotal)}
                   </span>
                 </div>
               )}
