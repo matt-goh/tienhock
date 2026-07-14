@@ -1,5 +1,11 @@
 // src/pages/Accounting/JournalDetailsPage.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useLayoutEffect,
+} from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
@@ -62,6 +68,20 @@ const JournalDetailsPage: React.FC = () => {
   const [entry, setEntry] = useState<JournalEntry | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Sticky header: measure the card header so the table column header can
+  // stack directly beneath it when scrolled.
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [headerHeight, setHeaderHeight] = useState<number>(0);
+
+  useLayoutEffect(() => {
+    const measure = (): void => {
+      if (headerRef.current) setHeaderHeight(headerRef.current.offsetHeight);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [entry]);
 
   // Dialog states
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -348,7 +368,10 @@ const JournalDetailsPage: React.FC = () => {
     <div className="space-y-3">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-default-200 dark:border-gray-700">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-default-200 dark:border-gray-700">
+        <div
+          ref={headerRef}
+          className="sticky top-0 z-30 px-6 py-4 border-b border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-t-lg"
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <BackButton onClick={handleBack} />
@@ -448,26 +471,44 @@ const JournalDetailsPage: React.FC = () => {
 
         {/* Line Items */}
         <div className="p-6">
-          <div className="overflow-hidden rounded-lg border border-default-200 dark:border-gray-700">
+          <div className="rounded-lg border border-default-200 dark:border-gray-700">
             <table className="min-w-full">
               <thead>
                 <tr className="bg-default-100 dark:bg-gray-900/50">
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-12">
+                  <th
+                    style={{ top: headerHeight }}
+                    className="sticky z-20 bg-default-100 dark:bg-gray-800 px-4 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-12 rounded-tl-lg"
+                  >
                     #
                   </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider">
+                  <th
+                    style={{ top: headerHeight }}
+                    className="sticky z-20 bg-default-100 dark:bg-gray-800 px-4 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider"
+                  >
                     Account
                   </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-48">
+                  <th
+                    style={{ top: headerHeight }}
+                    className="sticky z-20 bg-default-100 dark:bg-gray-800 px-4 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-48"
+                  >
                     Reference
                   </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider">
+                  <th
+                    style={{ top: headerHeight }}
+                    className="sticky z-20 bg-default-100 dark:bg-gray-800 px-4 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider"
+                  >
                     Particulars
                   </th>
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-32">
+                  <th
+                    style={{ top: headerHeight }}
+                    className="sticky z-20 bg-default-100 dark:bg-gray-800 px-4 py-2.5 text-right text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-32"
+                  >
                     Debit ($)
                   </th>
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-32">
+                  <th
+                    style={{ top: headerHeight }}
+                    className="sticky z-20 bg-default-100 dark:bg-gray-800 px-4 py-2.5 text-right text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-32 rounded-tr-lg"
+                  >
                     Credit ($)
                   </th>
                 </tr>
@@ -520,14 +561,14 @@ const JournalDetailsPage: React.FC = () => {
                 <tr className="bg-default-100 dark:bg-gray-900/50 font-semibold">
                   <td
                     colSpan={4}
-                    className="px-4 py-2.5 text-sm text-right text-default-700 dark:text-gray-300"
+                    className="px-4 py-2.5 text-sm text-right text-default-700 dark:text-gray-300 rounded-bl-lg"
                   >
                     Total
                   </td>
                   <td className="px-4 py-2.5 text-sm text-right text-default-900 dark:text-gray-100">
                     {formatAmount(entry.total_debit)}
                   </td>
-                  <td className="px-4 py-2.5 text-sm text-right text-default-900 dark:text-gray-100">
+                  <td className="px-4 py-2.5 text-sm text-right text-default-900 dark:text-gray-100 rounded-br-lg">
                     {formatAmount(entry.total_credit)}
                   </td>
                 </tr>
