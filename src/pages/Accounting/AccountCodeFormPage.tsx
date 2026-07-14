@@ -1,5 +1,5 @@
 // src/pages/Accounting/AccountCodeFormPage.tsx
-import React, { useState, useEffect, useRef, useCallback, useMemo, Fragment } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
@@ -18,8 +18,14 @@ import {
 } from "../../components/FormComponents";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
-import { IconFolder, IconChevronDown, IconCheck, IconSearch } from "@tabler/icons-react";
-import { Listbox, ListboxButton, ListboxOptions, ListboxOption, Transition } from "@headlessui/react";
+import AccountCodeCombobox from "../../components/Accounting/AccountCodeCombobox";
+import Checkbox from "../../components/Checkbox";
+import {
+  IconChevronRight,
+  IconFile,
+  IconFolder,
+  IconLock,
+} from "@tabler/icons-react";
 import clsx from "clsx";
 
 interface AccountCodeFormData {
@@ -53,11 +59,6 @@ const AccountCodeFormPage: React.FC = () => {
     () => allLedgerTypes.filter((lt) => lt.is_active),
     [allLedgerTypes]
   );
-  const parentAccounts = useMemo(
-    () => allAccountCodes.filter((a) => a.is_active),
-    [allAccountCodes]
-  );
-
   // Form state
   const [formData, setFormData] = useState<AccountCodeFormData>({
     code: "",
@@ -70,7 +71,7 @@ const AccountCodeFormPage: React.FC = () => {
   });
 
   // Additional state for edit mode
-  const [childrenCount, setChildrenCount] = useState(0);
+  const [childAccounts, setChildAccounts] = useState<AccountCode[]>([]);
   const [isSystem, setIsSystem] = useState(false);
 
   // Initial form data reference for change detection
@@ -80,28 +81,28 @@ const AccountCodeFormPage: React.FC = () => {
   const [pageLoading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isFormChanged, setIsFormChanged] = useState(false);
-  const [showBackConfirmation, setShowBackConfirmation] = useState(false);
+  const [pendingNavigationPath, setPendingNavigationPath] = useState<string | null>(
+    null
+  );
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Parent account listbox state
-  const [parentSearchQuery, setParentSearchQuery] = useState("");
-  const [parentLoadedCount, setParentLoadedCount] = useState(50);
-  const PARENT_LOAD_INCREMENT = 50;
 
   // Combined loading state (page + cache)
   const loading = pageLoading || ledgerTypesLoading || accountCodesLoading;
 
   // Fetch account data for editing
-  const fetchAccountData = useCallback(async () => {
+  const fetchAccountData = useCallback(async (): Promise<void> => {
     if (!code) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      const response = await api.get(`/api/account-codes/${code}`);
-      const accountData = response as AccountCode & { children_count?: number };
+      const [accountData, fetchedChildAccounts]: [AccountCode, AccountCode[]] =
+        await Promise.all([
+          api.get<AccountCode>(`/api/account-codes/${code}`),
+          api.get<AccountCode[]>(`/api/account-codes/children/${code}`),
+        ]);
 
       const fetchedFormData: AccountCodeFormData = {
         code: accountData.code,
@@ -115,7 +116,7 @@ const AccountCodeFormPage: React.FC = () => {
 
       setFormData(fetchedFormData);
       initialFormDataRef.current = { ...fetchedFormData };
-      setChildrenCount(accountData.children_count || 0);
+      setChildAccounts(fetchedChildAccounts);
       setIsSystem(accountData.is_system);
     } catch (err: any) {
       console.error("Error fetching account data:", err);
@@ -152,6 +153,8 @@ const AccountCodeFormPage: React.FC = () => {
     setIsFormChanged(hasChanges);
   }, [formData]);
 
+  const hasChildAccounts: boolean = childAccounts.length > 0;
+
   // Handlers
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
@@ -171,25 +174,22 @@ const AccountCodeFormPage: React.FC = () => {
     }));
   };
 
-  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: checked,
-    }));
-  };
-
-  const handleBackClick = () => {
+  const requestNavigation = (path: string): void => {
     if (isFormChanged) {
-      setShowBackConfirmation(true);
+      setPendingNavigationPath(path);
     } else {
-      navigate("/accounting/account-codes");
+      navigate(path);
     }
   };
 
-  const handleConfirmBack = () => {
-    setShowBackConfirmation(false);
-    navigate("/accounting/account-codes");
+  const handleBackClick = (): void => {
+    requestNavigation("/accounting/account-codes");
+  };
+
+  const handleConfirmNavigation = (): void => {
+    const targetPath: string | null = pendingNavigationPath;
+    setPendingNavigationPath(null);
+    if (targetPath) navigate(targetPath);
   };
 
   // Form validation
@@ -267,7 +267,7 @@ const AccountCodeFormPage: React.FC = () => {
       toast.error("Cannot delete system account code");
       return;
     }
-    if (childrenCount > 0) {
+    if (hasChildAccounts) {
       toast.error(
         "Cannot delete account with child accounts. Delete or reassign children first."
       );
@@ -305,48 +305,40 @@ const AccountCodeFormPage: React.FC = () => {
     })),
   ];
 
-  // Parent account options with search and load more
-  const allParentAccountOptions: SelectOption[] = useMemo(() => [
-    { id: "", name: "None (Top Level)" },
-    ...parentAccounts
-      .filter((a) => a.code !== formData.code) // Exclude self
-      .map((a) => ({
-        id: a.code,
-        name: `${a.code} - ${a.description}`,
-      })),
-  ], [parentAccounts, formData.code]);
+  // An account cannot be moved beneath one of its own descendants.
+  const unavailableParentCodes: Set<string> = useMemo(() => {
+    const currentCode: string = formData.code.trim().toUpperCase();
+    if (!currentCode) return new Set<string>();
 
-  // Filtered parent accounts based on search query
-  const filteredParentOptions = useMemo(() => {
-    if (!parentSearchQuery.trim()) {
-      return allParentAccountOptions;
+    const childCodesByParent: Map<string, string[]> = new Map<string, string[]>();
+    allAccountCodes.forEach((account: AccountCode): void => {
+      if (!account.parent_code) return;
+      const childCodes: string[] = childCodesByParent.get(account.parent_code) || [];
+      childCodes.push(account.code);
+      childCodesByParent.set(account.parent_code, childCodes);
+    });
+
+    const unavailableCodes: Set<string> = new Set<string>([currentCode]);
+    const pendingCodes: string[] = [currentCode];
+    while (pendingCodes.length > 0) {
+      const parentCode: string | undefined = pendingCodes.pop();
+      if (!parentCode) continue;
+
+      const childCodes: string[] = childCodesByParent.get(parentCode) || [];
+      childCodes.forEach((childCode: string): void => {
+        if (!unavailableCodes.has(childCode)) {
+          unavailableCodes.add(childCode);
+          pendingCodes.push(childCode);
+        }
+      });
     }
-    const query = parentSearchQuery.toLowerCase();
-    return allParentAccountOptions.filter(
-      (opt) => opt.name.toLowerCase().includes(query)
-    );
-  }, [allParentAccountOptions, parentSearchQuery]);
 
-  // Paginated parent accounts for display
-  const displayedParentOptions = useMemo(() => {
-    return filteredParentOptions.slice(0, parentLoadedCount);
-  }, [filteredParentOptions, parentLoadedCount]);
+    return unavailableCodes;
+  }, [allAccountCodes, formData.code]);
 
-  const hasMoreParentOptions = displayedParentOptions.length < filteredParentOptions.length;
-  const remainingParentCount = filteredParentOptions.length - displayedParentOptions.length;
-
-  const handleParentLoadMore = () => {
-    setParentLoadedCount((prev) => prev + PARENT_LOAD_INCREMENT);
-  };
-
-  // Reset loaded count when search query changes
-  useEffect(() => {
-    setParentLoadedCount(50);
-  }, [parentSearchQuery]);
-
-  // Get selected parent option for display
-  const selectedParentOption = allParentAccountOptions.find(
-    (opt) => opt.id === formData.parent_code
+  const canSelectParentAccount = useCallback(
+    (account: AccountCode): boolean => !unavailableParentCodes.has(account.code),
+    [unavailableParentCodes]
   );
 
   // Render
@@ -384,8 +376,8 @@ const AccountCodeFormPage: React.FC = () => {
               </h1>
               <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
                 {isEditMode
-                  ? `Editing account ${formData.code}`
-                  : "Create a new account in the chart of accounts"}
+                  ? `Menyunting akaun ${formData.code}`
+                  : "Cipta akaun baharu dalam carta akaun"}
               </p>
             </div>
           </div>
@@ -455,122 +447,26 @@ const AccountCodeFormPage: React.FC = () => {
                     className={FORM_LISTBOX_SURFACE_CLASSNAME}
                   />
 
-                  {/* Parent Account - Custom listbox with search and load more */}
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="parent_code-button"
-                      className="block text-sm font-medium text-default-700 dark:text-gray-300"
-                    >
-                      Parent Account
-                    </label>
-                    <Listbox
+                  {/* Parent Account */}
+                  <div>
+                    <AccountCodeCombobox
+                      label="Parent Account"
                       value={formData.parent_code}
-                      onChange={(value) => handleListboxChange("parent_code", value)}
+                      onChange={(value: string): void =>
+                        handleListboxChange("parent_code", value)
+                      }
                       disabled={isSaving}
-                      name="parent_code"
-                    >
-                      <div className="relative">
-                        <ListboxButton
-                          id="parent_code-button"
-                          className={clsx(
-                            "relative w-full cursor-pointer rounded-lg border border-default-300 dark:border-gray-600 bg-white py-2 pl-3 pr-10 text-left text-default-900 dark:text-gray-100",
-                            FIELD_SURFACE_CLASSNAME,
-                            "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
-                            isSaving ? "bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed" : ""
-                          )}
-                        >
-                          <span className="block truncate">
-                            {selectedParentOption?.name || "Select parent account..."}
-                          </span>
-                          <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                            <IconChevronDown size={20} className="text-gray-400" aria-hidden="true" />
-                          </span>
-                        </ListboxButton>
-                        <Transition
-                          as={Fragment}
-                          leave="transition ease-in duration-100"
-                          leaveFrom="opacity-100"
-                          leaveTo="opacity-0"
-                          afterLeave={() => setParentSearchQuery("")}
-                        >
-                          <ListboxOptions className="absolute z-10 w-full rounded-md bg-white dark:bg-gray-800 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm mt-1 flex flex-col">
-                            {/* Search Input */}
-                            <div className="flex-shrink-0 bg-white dark:bg-gray-800 px-2 py-2 border-b border-gray-200 dark:border-gray-700 rounded-t-md">
-                              <div className="relative">
-                                <IconSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                <input
-                                  type="text"
-                                  value={parentSearchQuery}
-                                  onChange={(e) => setParentSearchQuery(e.target.value)}
-                                  placeholder="Search accounts..."
-                                  className={clsx(
-                                    "w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 bg-white text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-md focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500",
-                                    FIELD_SURFACE_CLASSNAME
-                                  )}
-                                  onClick={(e) => e.stopPropagation()}
-                                  onKeyDown={(e) => e.stopPropagation()}
-                                />
-                              </div>
-                            </div>
-
-                            {/* Options - Scrollable Container */}
-                            <div className="max-h-52 overflow-auto py-1">
-                              {displayedParentOptions.length === 0 ? (
-                                <div className="py-2 px-3 text-sm text-gray-500 dark:text-gray-400">
-                                  No accounts found
-                                </div>
-                              ) : (
-                                displayedParentOptions.map((option) => (
-                                  <ListboxOption
-                                    key={option.id}
-                                    className={({ active }) =>
-                                      clsx(
-                                        "relative cursor-pointer select-none py-2 pl-3 pr-10",
-                                        active ? "bg-sky-100 text-sky-900 dark:bg-sky-900/50 dark:text-sky-200" : "text-gray-900 dark:text-gray-100"
-                                      )
-                                    }
-                                    value={option.id.toString()}
-                                  >
-                                    {({ selected }) => (
-                                      <>
-                                        <span className={clsx("block truncate", selected ? "font-medium" : "font-normal")}>
-                                          {option.name}
-                                        </span>
-                                        {selected && (
-                                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
-                                            <IconCheck size={20} aria-hidden="true" />
-                                          </span>
-                                        )}
-                                      </>
-                                    )}
-                                  </ListboxOption>
-                                ))
-                              )}
-
-                              {/* Load More Button */}
-                              {hasMoreParentOptions && (
-                                <div className="border-t border-gray-200 dark:border-gray-700 p-2 mt-1">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      handleParentLoadMore();
-                                    }}
-                                    className="w-full text-center py-1.5 px-4 text-sm font-medium text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/30 rounded-md hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors duration-200 flex items-center justify-center"
-                                  >
-                                    <IconChevronDown size={16} className="mr-1.5" />
-                                    <span>
-                                      Load More Accounts ({remainingParentCount} remaining)
-                                    </span>
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </ListboxOptions>
-                        </Transition>
-                      </div>
-                    </Listbox>
+                      placeholder="Search parent account..."
+                      filter={canSelectParentAccount}
+                      hierarchical
+                      allowEmpty
+                      emptyLabel="No parent (Top level)"
+                      className="[&_input]:shadow-none dark:[&_input]:!bg-gray-900/50"
+                    />
+                    <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
+                      Akaun peringkat teratas dipaparkan dahulu. Kembangkan folder untuk melihat
+                      akaun anak di bawahnya.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -581,7 +477,7 @@ const AccountCodeFormPage: React.FC = () => {
                   Additional Settings
                 </h3>
 
-                <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
                   {/* Sort Order */}
                   <div className={FORM_INPUT_SURFACE_CLASSNAME}>
                     <FormInput
@@ -597,31 +493,51 @@ const AccountCodeFormPage: React.FC = () => {
                   </div>
 
                   {/* Active Status */}
-                  <div className="flex items-center pt-8">
-                    <label className="flex items-center space-x-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        name="is_active"
-                        checked={formData.is_active}
-                        onChange={handleCheckboxChange}
-                        disabled={isSaving || isSystem}
-                        className="w-4 h-4 rounded border-default-300 text-sky-600 focus:ring-sky-500"
-                      />
-                      <span className="text-sm text-default-700 dark:text-gray-300">
-                        Active Account
-                      </span>
-                    </label>
+                  <div className="rounded-lg border border-default-200 bg-default-50/60 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/30">
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">
+                      Account Status
+                    </p>
+                    <Checkbox
+                      checked={formData.is_active}
+                      onChange={(checked: boolean): void =>
+                        setFormData(
+                          (previousData: AccountCodeFormData): AccountCodeFormData => ({
+                            ...previousData,
+                            is_active: checked,
+                          })
+                        )
+                      }
+                      disabled={isSaving || isSystem}
+                      label="Active Account"
+                      size={18}
+                      checkedColor="text-sky-600 dark:text-sky-400"
+                      ariaLabel="Active account"
+                    />
+                    <p className="mt-1 pl-7 text-xs text-default-500 dark:text-gray-400">
+                      {isSystem
+                        ? "Akaun sistem mesti kekal aktif."
+                        : "Akaun tidak aktif kekal dalam rekod sedia ada tetapi tidak boleh dipilih untuk catatan baharu."}
+                    </p>
                   </div>
-
-                  {/* System Account Indicator */}
-                  {isSystem && (
-                    <div className="flex items-center pt-8">
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
-                        System Account
-                      </span>
-                    </div>
-                  )}
                 </div>
+
+                {/* System Account Indicator */}
+                {isSystem && (
+                  <div className="flex items-start gap-3 rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 dark:border-purple-800/60 dark:bg-purple-900/20">
+                    <IconLock
+                      size={18}
+                      className="mt-0.5 flex-shrink-0 text-purple-600 dark:text-purple-400"
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-purple-800 dark:text-purple-200">
+                        System Account
+                      </p>
+                      <p className="mt-0.5 text-xs text-purple-700 dark:text-purple-300">
+                        Akaun ini dilindungi dan tidak boleh dinyahaktifkan atau dipadam.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Notes */}
                 <div>
@@ -640,7 +556,7 @@ const AccountCodeFormPage: React.FC = () => {
                       setFormData((prev) => ({ ...prev, notes: e.target.value }))
                     }
                     disabled={isSaving}
-                    placeholder="Optional notes about this account..."
+                    placeholder="Catatan pilihan tentang akaun ini..."
                     className={clsx(
                       "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 bg-white text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:text-gray-500 dark:disabled:text-gray-400 disabled:cursor-not-allowed",
                       FIELD_SURFACE_CLASSNAME
@@ -649,26 +565,95 @@ const AccountCodeFormPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Info Section for Edit Mode */}
+              {/* Child Accounts */}
               {isEditMode && (
-                <div className="p-4 bg-default-50 dark:bg-gray-900/50 rounded-lg border border-default-200 dark:border-gray-700">
-                  <h4 className="text-sm font-medium text-default-700 dark:text-gray-300 mb-2">
-                    Account Information
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-default-500 dark:text-gray-400">Child Accounts: </span>
-                      <span className="font-medium text-default-700 dark:text-gray-300">
-                        {childrenCount}
+                <div className="overflow-hidden rounded-lg border border-default-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-default-200 bg-default-50/70 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/30">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                        <IconFolder size={19} />
                       </span>
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-semibold text-default-800 dark:text-gray-100">
+                          Direct Child Accounts
+                        </h4>
+                        <p className="truncate text-xs text-default-500 dark:text-gray-400">
+                          Akaun yang menggunakan {formData.code} sebagai akaun induk
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-default-500 dark:text-gray-400">System Account: </span>
-                      <span className="font-medium text-default-700 dark:text-gray-300">
-                        {isSystem ? "Yes" : "No"}
-                      </span>
-                    </div>
+                    <span className="rounded-full bg-default-200 px-2.5 py-1 text-xs font-medium text-default-700 dark:bg-gray-700 dark:text-gray-200">
+                      {childAccounts.length} {childAccounts.length === 1 ? "account" : "accounts"}
+                    </span>
                   </div>
+
+                  {childAccounts.length === 0 ? (
+                    <div className="px-4 py-8 text-center">
+                      <IconFile
+                        size={28}
+                        className="mx-auto text-default-300 dark:text-gray-600"
+                      />
+                      <p className="mt-2 text-sm font-medium text-default-600 dark:text-gray-300">
+                        Tiada akaun anak
+                      </p>
+                      <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
+                        Akaun yang memilih {formData.code} sebagai akaun induk akan dipaparkan di
+                        sini.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="max-h-80 divide-y divide-default-100 overflow-y-auto dark:divide-gray-700">
+                      {childAccounts.map((childAccount: AccountCode) => (
+                        <button
+                          key={childAccount.code}
+                          type="button"
+                          onClick={(): void =>
+                            requestNavigation(
+                              `/accounting/account-codes/${childAccount.code}`
+                            )
+                          }
+                          disabled={isSaving}
+                          className="group flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-sky-900/20"
+                        >
+                          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-default-100 text-default-500 group-hover:bg-sky-100 group-hover:text-sky-600 dark:bg-gray-700 dark:text-gray-400 dark:group-hover:bg-sky-900/40 dark:group-hover:text-sky-400">
+                            <IconFile size={16} />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="flex flex-wrap items-center gap-2">
+                              <span className="font-mono text-sm font-semibold text-sky-700 dark:text-sky-400">
+                                {childAccount.code}
+                              </span>
+                              {childAccount.ledger_type && (
+                                <span className="rounded bg-default-100 px-1.5 py-0.5 text-[10px] font-medium text-default-600 dark:bg-gray-700 dark:text-gray-300">
+                                  {childAccount.ledger_type}
+                                </span>
+                              )}
+                              <span
+                                className={clsx(
+                                  "rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+                                  childAccount.is_active
+                                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                                    : "bg-default-200 text-default-600 dark:bg-gray-700 dark:text-gray-400"
+                                )}
+                              >
+                                {childAccount.is_active ? "Active" : "Inactive"}
+                              </span>
+                            </span>
+                            <span
+                              className="mt-0.5 block truncate text-xs text-default-600 dark:text-gray-400"
+                              title={childAccount.description}
+                            >
+                              {childAccount.description}
+                            </span>
+                          </span>
+                          <IconChevronRight
+                            size={17}
+                            className="flex-shrink-0 text-default-300 transition-transform group-hover:translate-x-0.5 group-hover:text-sky-500 dark:text-gray-600 dark:group-hover:text-sky-400"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -681,7 +666,7 @@ const AccountCodeFormPage: React.FC = () => {
                   color="rose"
                   variant="outline"
                   onClick={handleDeleteClick}
-                  disabled={isSaving || childrenCount > 0}
+                  disabled={isSaving || hasChildAccounts}
                 >
                   Delete Account
                 </Button>
@@ -710,16 +695,16 @@ const AccountCodeFormPage: React.FC = () => {
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={handleConfirmDelete}
         title="Delete Account Code"
-        message={`Are you sure you want to delete account "${formData.code}"? This action cannot be undone.`}
+        message={`Adakah anda pasti mahu memadam akaun "${formData.code}"? Tindakan ini tidak boleh dibatalkan.`}
         confirmButtonText="Delete"
       />
 
       <ConfirmationDialog
-        isOpen={showBackConfirmation}
-        onClose={() => setShowBackConfirmation(false)}
-        onConfirm={handleConfirmBack}
+        isOpen={pendingNavigationPath !== null}
+        onClose={() => setPendingNavigationPath(null)}
+        onConfirm={handleConfirmNavigation}
         title="Discard Changes"
-        message="You have unsaved changes. Are you sure you want to go back? All changes will be lost."
+        message="Anda mempunyai perubahan yang belum disimpan. Adakah anda pasti mahu meninggalkan akaun ini? Semua perubahan akan hilang."
         confirmButtonText="Discard"
       />
     </div>
