@@ -171,8 +171,14 @@ const JournalEntryListPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
 
-  // Filters - load search, date range, and pill selections from cache initially
+  // Filters - load search, date range, and pill selections from cache initially.
+  // searchInput is what the user types; searchTerm is the committed value that
+  // actually triggers the fetch (committed on blur / Enter to avoid firing an
+  // API call on every keystroke).
   const [searchTerm, setSearchTerm] = useState<string>(
+    () => loadCachedFilters().search
+  );
+  const [searchInput, setSearchInput] = useState<string>(
     () => loadCachedFilters().search
   );
   const [selectedTypes, setSelectedTypes] = useState<string[]>(
@@ -188,6 +194,7 @@ const JournalEntryListPage: React.FC = () => {
     if (!initialized) {
       const initialState = getInitialStateFromParams(searchParams);
       setSearchTerm(initialState.search);
+      setSearchInput(initialState.search);
       setSelectedTypes(initialState.types);
       setSelectedStatuses(initialState.statuses);
       setDateRange(initialState.dateRange);
@@ -363,6 +370,14 @@ const JournalEntryListPage: React.FC = () => {
     }
   };
 
+  // Commit the typed search value, triggering a fetch only when it changed
+  const commitSearch = () => {
+    if (searchInput !== searchTerm) {
+      setSearchTerm(searchInput);
+      setPage(1);
+    }
+  };
+
   const toggleType = (code: string) => {
     setSelectedTypes((prev) =>
       prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
@@ -395,6 +410,7 @@ const JournalEntryListPage: React.FC = () => {
     searchTerm !== "" || selectedTypes.length > 0 || selectedStatuses.length > 0;
 
   const clearFilters = () => {
+    setSearchInput("");
     setSearchTerm("");
     setSelectedTypes([]);
     setSelectedStatuses([]);
@@ -470,15 +486,19 @@ const JournalEntryListPage: React.FC = () => {
             type="text"
             placeholder="Search reference or description..."
             className="w-full h-[40px] rounded-lg border border-default-300 dark:border-gray-600 pl-9 pr-8 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 text-default-800 dark:text-gray-100"
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setPage(1);
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onBlur={() => commitSearch()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.currentTarget.blur();
+              }
             }}
           />
-          {searchTerm && (
+          {searchInput && (
             <button
               onClick={() => {
+                setSearchInput("");
                 setSearchTerm("");
                 setPage(1);
               }}
