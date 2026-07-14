@@ -9,6 +9,21 @@ import {
   dateRowToYmd,
 } from "./driverTripRules.js";
 
+const VALID_LEAVE_TYPES = new Set([
+  "cuti_umum",
+  "cuti_sakit",
+  "cuti_tahunan",
+  "cuti_rawatan",
+]);
+
+const parseLeaveAmount = (amount) => {
+  const parsedAmount = Number(amount || 0);
+  if (!Number.isFinite(parsedAmount) || parsedAmount < 0) {
+    return null;
+  }
+  return Math.round(parsedAmount * 100) / 100;
+};
+
 export default function (pool) {
   const router = Router();
 
@@ -316,6 +331,145 @@ export default function (pool) {
         message: "Error deleting daily lori habuk",
         error: error.message,
       });
+    }
+  });
+
+  /**
+   * GET /greentarget/api/daily-lori-habuk/leave?date=YYYY-MM-DD
+   * Returns the day's leave records for DRIVER staff (GT leave ledger).
+   */
+  router.get("/leave", async (req, res) => {
+    const { date } = req.query;
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res
+        .status(400)
+        .json({ message: "A valid ?date=YYYY-MM-DD is required" });
+    }
+    try {
+      const result = await pool.query(
+        `SELECT lr.*, CAST(lr.amount_paid AS NUMERIC(10, 2)) as amount_paid,
+                s.name as employee_name, s.job as employee_jobs
+         FROM greentarget.leave_records lr
+         LEFT JOIN public.staffs s ON lr.employee_id = s.id
+         WHERE lr.leave_date = $1
+           AND lr.employee_id IN (
+             SELECT employee_id FROM greentarget.payroll_employees WHERE job_type = 'DRIVER'
+           )
+         ORDER BY s.name`,
+        [date]
+      );
+      res.json(
+        result.rows.map((record) => ({
+          ...record,
+          amount_paid: parseFloat(record.amount_paid),
+        }))
+      );
+    } catch (error) {
+      console.error("Error fetching daily lori habuk leave:", error);
+      res.status(500).json({
+        message: "Error fetching leave records",
+        error: error.message,
+      });
+    }
+  });
+
+  /**
+   * POST /greentarget/api/daily-lori-habuk/leave
+   * Batch save the DRIVER leave section for one date (GT leave ledger; no
+   * work-log link). Mirrors the office monthly save semantics.
+   * Body: { date, leaveEntries: [{employeeId, leaveType, amount_paid, isNew}],
+   *         updatedLeaveEntries: [{id, amount_paid}], deletedLeaveIds: [id], created_by }
+   */
+  router.post("/leave", async (req, res) => {
+    const {
+      date,
+      leaveEntries = [],
+      updatedLeaveEntries = [],
+      deletedLeaveIds = [],
+      created_by,
+    } = req.body;
+
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res
+        .status(400)
+        .json({ message: "A valid date (YYYY-MM-DD) is required" });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // Delete removed leave records
+      if (Array.isArray(deletedLeaveIds) && deletedLeaveIds.length > 0) {
+        for (const leaveId of deletedLeaveIds) {
+          await client.query(
+            "DELETE FROM greentarget.leave_records WHERE id = $1",
+            [leaveId]
+          );
+        }
+      }
+
+      // Insert new leave records
+      if (Array.isArray(leaveEntries) && leaveEntries.length > 0) {
+        for (const leave of leaveEntries) {
+          if (leave.isNew === false) continue;
+          const { employeeId, leaveType, amount_paid } = leave;
+          const leaveAmount = parseLeaveAmount(amount_paid);
+
+          if (!employeeId || !VALID_LEAVE_TYPES.has(leaveType) || leaveAmount === null) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+              message: `Invalid leave entry for ${employeeId || "unknown employee"}`,
+            });
+          }
+
+          const existingLeave = await client.query(
+            `SELECT id FROM greentarget.leave_records WHERE employee_id = $1 AND leave_date = $2`,
+            [employeeId, date]
+          );
+
+          if (existingLeave.rows.length === 0) {
+            await client.query(
+              `INSERT INTO greentarget.leave_records (
+                employee_id, leave_date, leave_type, days_taken, status, amount_paid, created_by
+              ) VALUES ($1, $2, $3, $4, 'approved', $5, $6)`,
+              [employeeId, date, leaveType, 1.0, leaveAmount, created_by || null]
+            );
+          }
+        }
+      }
+
+      // Update existing saved leave amounts
+      if (Array.isArray(updatedLeaveEntries) && updatedLeaveEntries.length > 0) {
+        for (const leave of updatedLeaveEntries) {
+          const { id: leaveId, amount_paid } = leave;
+          const leaveAmount = parseLeaveAmount(amount_paid);
+
+          if (!leaveId || leaveAmount === null) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+              message: "Leave amount must be a non-negative number",
+            });
+          }
+
+          await client.query(
+            "UPDATE greentarget.leave_records SET amount_paid = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+            [leaveAmount, leaveId]
+          );
+        }
+      }
+
+      await client.query("COMMIT");
+      res.json({ message: "Driver leave saved successfully" });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error saving daily lori habuk leave:", error);
+      res.status(500).json({
+        message: "Error saving leave records",
+        error: error.message,
+      });
+    } finally {
+      client.release();
     }
   });
 

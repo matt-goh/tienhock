@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-14",
+    ms: "Green Target kini mempunyai sistem cuti seperti syarikat lain. Anda boleh merekod Cuti Tahunan, Cuti Sakit, Cuti Umum dan Cuti Rawatan untuk pekerja Pejabat (log bulanan) dan Pemandu (Lori Habuk harian), dengan semakan baki cuti semasa merekod. Bayaran cuti ditambah ke dalam gaji kasar semasa memproses gaji dan dipaparkan pada slip gaji, dan halaman Laporan Cuti baharu menunjukkan baki serta penggunaan cuti setiap pekerja.",
+    en: "Green Target now has a leave system like the other companies. You can record Annual, Sick, Public Holiday and Hospital leave for Office staff (monthly log) and Drivers (daily Lori Habuk), with balance checks while recording. Leave pay is added to gross pay during payroll processing and shown on the payslip, and a new Cuti Report page shows each employee's leave balances and usage.",
+  },
+  {
+    date: "2026-07-14",
     ms: "Catatan jurnal Jualan (invois) kini boleh disunting terus. Sebaik sahaja anda menyuntingnya, jurnal itu ditandakan \"Manual\" dan invois tidak lagi menulis gantinya secara automatik apabila invois disunting, ditukar tarikh atau jenis bayaran — anda menguruskannya sendiri. Membatalkan invois masih membatalkan jurnal. Jurnal lain yang dijana sistem (resit, belian, baucar gaji) kekal terkunci pada sumbernya.",
     en: "Sales (invoice) journal entries can now be edited directly. Once you edit one, it is marked \"Manual\" and the invoice no longer overwrites it automatically when the invoice is edited, re-dated or has its payment type changed — you manage it yourself. Cancelling the invoice still cancels the journal. Other system-generated journals (receipts, purchases, payroll vouchers) stay locked to their source.",
   },

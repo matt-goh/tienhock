@@ -105,6 +105,7 @@ import greenTargetIncentivesRouter from "./greentarget/incentives.js";
 import greenTargetOthersRecordsRouter from "./greentarget/others-records.js";
 import greenTargetDailyLoriHabukRouter from "./greentarget/daily-lori-habuk.js";
 import greenTargetSalaryReportRouter from "./greentarget/salary-report.js";
+import greenTargetLeaveManagementRouter from "./greentarget/leave-management.js";
 import greenTargetECarumanRouter from "./greentarget/e-caruman.js";
 import greenTargetCustomerSignupsRouter from "./greentarget/customer-signups.js";
 
@@ -320,6 +321,10 @@ export default function setupRoutes(app, pool) {
   app.use(
     "/greentarget/api/salary-report",
     greenTargetSalaryReportRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/leave-management",
+    greenTargetLeaveManagementRouter(pool)
   );
   app.use("/greentarget/api/e-caruman", greenTargetECarumanRouter(pool));
   app.use(
