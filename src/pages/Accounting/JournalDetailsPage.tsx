@@ -335,28 +335,15 @@ const JournalDetailsPage: React.FC = () => {
     );
   }
 
-  // System-generated journals are owned by their source record (payment, purchase,
-  // payroll voucher…) and cannot be edited line-by-line. Migration journals are
-  // also immutable and cannot be cancelled from the app.
-  const SYSTEM_ENTRY_TYPES: string[] = [
-    "REC",
-    "PUR",
-    "GP",
-    "PAY",
-    "CN",
-    "JVDR",
-    "JVSL",
-    "IMP",
-  ];
+  // Any active, non-migration journal is editable. Editing a system-owned journal
+  // (sales/purchase/receipt/payment/adjustment/voucher) DETACHES it from its source
+  // on the server — it then shows the "Manual" badge and is managed by hand.
+  // Migration (IMP) journals stay immutable and cannot be edited or cancelled.
   const isLegacyImport: boolean = isLegacyImportEntry(entry);
   const visibleReference: string = getVisibleReference(entry);
   const displayEntryType: string = getDisplayEntryType(entry);
-  const isSystemGenerated: boolean =
-    SYSTEM_ENTRY_TYPES.includes(entry.entry_type as string) ||
-    ((entry.entry_type as string) === "B" &&
-      (entry.description || "").startsWith("PRP:"));
   const canEdit: boolean =
-    entry.status !== "cancelled" && !isLegacyImport && !isSystemGenerated;
+    entry.status !== "cancelled" && !isLegacyImport;
   const canCancel: boolean = entry.status !== "cancelled" && !isLegacyImport;
   const canDelete: boolean = !isLegacyImport;
   const canPrintVoucher: boolean =

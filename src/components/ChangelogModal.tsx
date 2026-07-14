@@ -25,8 +25,8 @@ const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   },
   {
     date: "2026-07-14",
-    ms: "Catatan jurnal Jualan (invois) kini boleh disunting terus. Sebaik sahaja anda menyuntingnya, jurnal itu ditandakan \"Manual\" dan invois tidak lagi menulis gantinya secara automatik apabila invois disunting, ditukar tarikh atau jenis bayaran — anda menguruskannya sendiri. Membatalkan invois masih membatalkan jurnal. Jurnal lain yang dijana sistem (resit, belian, baucar gaji) kekal terkunci pada sumbernya.",
-    en: "Sales (invoice) journal entries can now be edited directly. Once you edit one, it is marked \"Manual\" and the invoice no longer overwrites it automatically when the invoice is edited, re-dated or has its payment type changed — you manage it yourself. Cancelling the invoice still cancels the journal. Other system-generated journals (receipts, purchases, payroll vouchers) stay locked to their source.",
+    ms: "Catatan jurnal yang dijana sistem kini boleh disunting terus — jualan (invois), belian, resit, bayaran pembekal, nota kredit/debit/bayaran balik dan baucar gaji. Sebaik sahaja anda menyuntingnya, jurnal itu ditandakan \"Manual\" dan dokumen sumbernya tidak lagi menulis gantinya secara automatik apabila sumber itu disunting — anda menguruskannya sendiri. Membatalkan dokumen sumber masih membatalkan jurnal. Jurnal import lama (IMP) kekal tidak boleh disunting.",
+    en: "System-generated journal entries can now be edited directly — sales (invoice), purchases, receipts, supplier payments, credit/debit/refund notes and payroll vouchers. Once you edit one, it is marked \"Manual\" and its source document no longer overwrites it automatically when the source is edited — you manage it yourself. Cancelling the source document still cancels the journal. Legacy import (IMP) journals remain non-editable.",
   },
   {
     date: "2026-07-14",
