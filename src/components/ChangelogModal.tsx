@@ -20,8 +20,28 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-14",
+    ms: "Pelanggan Green Target kini boleh mempunyai nama Tapak bagi setiap lokasi. Semua nama Tapak berbeza daripada sewaan dalam satu invois disertakan selepas alamat bil pada e-Invois jualan individu dan nota pelarasannya. Borang pendaftaran awam kini menerima beberapa lokasi, mewajibkan maklumat asas, menggunakan logo Green Target, serta menyembunyikan maklumat e-Invois sehingga pelanggan memilih untuk memerlukannya; maklumat pengenalan e-Invois disahkan sebelum permintaan diterima. Senarai pilihan e-Invois pada borang pelanggan juga kekal di atas bar tindakan supaya semua pilihan boleh dipilih.",
+    en: "Green Target customers can now have a Site name for each location. Every distinct Site from the rentals on an invoice is included after the billing address on individual sales e-Invoices and their adjustment notes. The public registration form now accepts multiple locations, requires the basic details, uses the Green Target logo, and hides e-Invoice information until the customer says they need it; e-Invoice identity details are verified before the request is accepted. E-Invoice selection lists on the customer form also remain above the action bar so every option can be selected.",
+  },
+  {
+    date: "2026-07-14",
+    ms: "Halaman Bayaran Green Target kini menggunakan susun atur yang lebih kemas dan mesra telefon, menunjukkan invois aktif serta tertunggak untuk bayaran, dan membolehkan tempoh carian invois ditukar. Amaun yang tidak sah diterangkan sebelum dihantar, manakala amaun melebihi baki disekat kerana Green Target tidak menyimpan lebihan itu sebagai kredit pelanggan. Bayaran cek tertunda juga boleh dibatalkan tanpa mengubah baki invois.",
+    en: "Green Target Payments now uses a cleaner, mobile-friendly layout, includes both active and overdue invoices for payment, and lets users change the invoice search period. Invalid amounts are explained before submission, while amounts above the outstanding balance are blocked because Green Target does not store the excess as customer credit. Pending cheque payments can also be cancelled without changing the invoice balance.",
+  },
+  {
+    date: "2026-07-14",
+    ms: "Halaman senarai dan butiran Gaji Green Target kini menggunakan susun atur moden dengan carian pekerja, paparan Kumpulan atau Terkini, pilihan cetakan slip gaji, serta pecahan pendapatan dan potongan yang lebih jelas. Jumlah Digenapkan digunakan secara konsisten, dan cetakan slip gaji Green Target kini mengambil bayaran pertengahan bulan yang betul tanpa tersalah mengambil rekod syarikat lain. Bayaran pertengahan bulan yang dibatalkan tidak lagi ditolak daripada gaji atau laporan, dan item gaji manual kekal termasuk dalam jumlah apabila gaji diproses semula. Pautan pantas Driver Habuk kini tersedia bersebelahan Office Entry, manakala butang muat turun semua PDF telah dibuang; pilihan cetakan slip gaji kekal tersedia.",
+    en: "Green Target Payroll list and details pages now use a modern layout with employee search, Groups or Recent views, selectable payslip printing, and clearer earnings and deduction breakdowns. Rounded Pay is used consistently, and Green Target payslip printing now includes the correct mid-month payment without accidentally loading another company's payroll record. Cancelled mid-month payments are no longer deducted from payroll or reports, and manual payroll items remain included in totals when payroll is reprocessed. A Driver Habuk shortcut is now available beside Office Entry, while the download-all-PDFs button has been removed; payslip printing options remain available.",
+  },
+  {
+    date: "2026-07-14",
     ms: "Lejar Akaun kini memaparkan Baki Bawa Ke Hadapan dalam lajur Debit atau Kredit (mengikut sama ada baki itu debit atau kredit), selain lajur Baki, pada paparan skrin dan cetakan PDF — mengikut amalan perakaunan lejar biasa.",
     en: "The Account Ledger now shows the Balance Brought Forward in the Debit or Credit column (depending on whether it is a debit or credit balance), in addition to the Balance column, both on screen and in the printed PDF — following standard ledger accounting practice.",
+  },
+  {
+    date: "2026-07-14",
+    ms: "Catatan jurnal jenis Bank Payment kini mempunyai medan Cheque No seperti Cash Payment, dengan nilai lalai \"PBE\".",
+    en: "Bank Payment journal entries now have a Cheque No field like Cash Payment, pre-filled with the default value \"PBE\".",
   },
   {
     date: "2026-07-14",

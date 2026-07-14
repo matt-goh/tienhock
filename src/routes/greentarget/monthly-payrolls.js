@@ -159,8 +159,9 @@ export default function (pool) {
       const epIds = employeePayrollsResult.rows.map((ep) => ep.id);
       let itemsByEp = {};
       let deductionsByEp = {};
+      let midMonthByEmployee = {};
       if (epIds.length > 0) {
-        const [itemsResult, deductionsResult] = await Promise.all([
+        const [itemsResult, deductionsResult, midMonthResult] = await Promise.all([
           pool.query(
             `SELECT pi.id, pi.employee_payroll_id, pi.pay_code_id, pi.description,
                     pi.rate, pi.rate_unit, pi.quantity, pi.amount, pi.is_manual,
@@ -182,6 +183,14 @@ export default function (pool) {
              ORDER BY pd.deduction_type`,
             [epIds]
           ),
+          pool.query(
+            `SELECT employee_id, SUM(amount) AS amount
+             FROM greentarget.mid_month_payrolls
+             WHERE year = $1 AND month = $2
+               AND LOWER(COALESCE(status, '')) <> 'cancelled'
+             GROUP BY employee_id`,
+            [payrollResult.rows[0].year, payrollResult.rows[0].month]
+          ),
         ]);
         for (const item of itemsResult.rows) {
           (itemsByEp[item.employee_payroll_id] ||= []).push({
@@ -200,18 +209,27 @@ export default function (pool) {
             wage_amount: parseFloat(d.wage_amount),
           });
         }
+        for (const midMonth of midMonthResult.rows) {
+          midMonthByEmployee[midMonth.employee_id] = parseFloat(midMonth.amount);
+        }
       }
 
-      const employeePayrolls = employeePayrollsResult.rows.map((ep) => ({
-        ...ep,
-        gross_pay: parseFloat(ep.gross_pay),
-        net_pay: parseFloat(ep.net_pay),
-        digenapkan: ep.digenapkan != null ? parseFloat(ep.digenapkan) : 0,
-        setelah_digenapkan:
-          ep.setelah_digenapkan != null ? parseFloat(ep.setelah_digenapkan) : null,
-        items: itemsByEp[ep.id] || [],
-        deductions: deductionsByEp[ep.id] || [],
-      }));
+      const employeePayrolls = employeePayrollsResult.rows.map((ep) => {
+        const netPay = parseFloat(ep.net_pay);
+        const jumlah = netPay - (midMonthByEmployee[ep.employee_id] || 0);
+        const setelahDigenapkan = Math.ceil(jumlah);
+        const digenapkan = Math.round((setelahDigenapkan - jumlah) * 100) / 100;
+
+        return {
+          ...ep,
+          gross_pay: parseFloat(ep.gross_pay),
+          net_pay: netPay,
+          digenapkan,
+          setelah_digenapkan: setelahDigenapkan,
+          items: itemsByEp[ep.id] || [],
+          deductions: deductionsByEp[ep.id] || [],
+        };
+      });
 
       res.json({
         ...payrollResult.rows[0],
@@ -313,6 +331,7 @@ export default function (pool) {
 
       const [
         monthlyLogsResult,
+        manualItemsResult,
         staffsResult,
         jobPayCodesResult,
         contributionRates,
@@ -342,6 +361,18 @@ export default function (pool) {
           GROUP BY mwl.id, mwl.log_month, mwl.log_year, mwle.employee_id, mwle.job_id,
             mwle.total_hours, mwle.overtime_hours
         `, [month, year]),
+
+        // Existing manual items must remain part of gross/net/statutory totals
+        // when a processed payroll is run again. The rows themselves are kept
+        // in place and are not reinserted below.
+        client.query(`
+          SELECT ep.employee_id, pi.pay_code_id, pi.description, pi.rate,
+                 pi.rate_unit, pi.quantity, pi.amount, pc.pay_type
+          FROM greentarget.employee_payrolls ep
+          JOIN greentarget.payroll_items pi ON pi.employee_payroll_id = ep.id
+          LEFT JOIN public.pay_codes pc ON pc.id = pi.pay_code_id
+          WHERE ep.monthly_payroll_id = $1 AND pi.is_manual = true
+        `, [id]),
 
         // Staff data
         client.query(`
@@ -373,6 +404,7 @@ export default function (pool) {
           SELECT employee_id, amount
           FROM greentarget.mid_month_payrolls
           WHERE year = $1 AND month = $2
+            AND LOWER(COALESCE(status, '')) <> 'cancelled'
         `, [year, month]),
 
         // GT Bonus / Others (Advance) records for the month (commission_records)
@@ -410,6 +442,22 @@ export default function (pool) {
       const midMonthMap = new Map(
         midMonthResult.rows.map((r) => [r.employee_id, parseFloat(r.amount)])
       );
+
+      // Preserve existing manual items in reprocessing calculations. Non-manual
+      // source rows are rebuilt below, while these database rows stay untouched.
+      const manualItemsByEmployee = {};
+      manualItemsResult.rows.forEach((item) => {
+        if (!manualItemsByEmployee[item.employee_id]) {
+          manualItemsByEmployee[item.employee_id] = [];
+        }
+        manualItemsByEmployee[item.employee_id].push({
+          ...item,
+          rate: parseFloat(item.rate),
+          quantity: parseFloat(item.quantity),
+          amount: parseFloat(item.amount),
+          is_manual: true,
+        });
+      });
 
       // GT earning add-ons grouped by employee (Bonus/Advance + Kerja Luar OT)
       const commissionsByEmployee = {};
@@ -544,6 +592,12 @@ export default function (pool) {
                 });
               }
             }
+          }
+
+          // Manual items survive reprocessing and must participate in the same
+          // gross/statutory/net calculation as newly rebuilt source items.
+          for (const manualItem of manualItemsByEmployee[employeeId] || []) {
+            combinedItems.push(manualItem);
           }
 
           // Earning add-ons: Bonus / Others (Advance) (commission_records) and

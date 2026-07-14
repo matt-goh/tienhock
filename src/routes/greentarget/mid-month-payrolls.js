@@ -4,6 +4,46 @@
 // Tien Hock lists and reports.
 import { Router } from "express";
 
+/**
+ * Keep an already-processed employee payroll's rounded total aligned with the
+ * current non-cancelled mid-month advance. Pending and Paid records both count;
+ * legacy null/unknown statuses remain active unless explicitly Cancelled.
+ *
+ * @param {import("pg").PoolClient} client
+ * @param {string} employeeId
+ * @param {number} year
+ * @param {number} month
+ * @returns {Promise<void>}
+ */
+const syncProcessedPayrollRounding = async (
+  client,
+  employeeId,
+  year,
+  month
+) => {
+  await client.query(
+    `WITH active_advance AS (
+       SELECT COALESCE(SUM(amount), 0)::numeric AS amount
+       FROM greentarget.mid_month_payrolls
+       WHERE employee_id = $1 AND year = $2 AND month = $3
+         AND LOWER(COALESCE(status, '')) <> 'cancelled'
+     )
+     UPDATE greentarget.employee_payrolls ep
+     SET setelah_digenapkan = CEIL(COALESCE(ep.net_pay, 0) - active_advance.amount),
+         digenapkan = ROUND(
+           CEIL(COALESCE(ep.net_pay, 0) - active_advance.amount)
+             - (COALESCE(ep.net_pay, 0) - active_advance.amount),
+           2
+         )
+     FROM greentarget.monthly_payrolls mp, active_advance
+     WHERE ep.monthly_payroll_id = mp.id
+       AND ep.employee_id = $1
+       AND mp.year = $2
+       AND mp.month = $3`,
+    [employeeId, year, month]
+  );
+};
+
 export default function (pool) {
   const router = Router();
 
@@ -200,15 +240,19 @@ export default function (pool) {
       });
     }
 
+    const client = await pool.connect();
     try {
+      await client.query("BEGIN");
+
       // Check if mid-month payroll already exists for this employee/month
-      const existingResult = await pool.query(
+      const existingResult = await client.query(
         `SELECT id FROM greentarget.mid_month_payrolls
          WHERE employee_id = $1 AND year = $2 AND month = $3`,
         [employee_id, year, month]
       );
 
       if (existingResult.rows.length > 0) {
+        await client.query("ROLLBACK");
         return res.status(409).json({
           message:
             "Mid-month payroll already exists for this employee and month",
@@ -225,7 +269,7 @@ export default function (pool) {
         RETURNING *
       `;
 
-      const insertResult = await pool.query(insertQuery, [
+      const insertResult = await client.query(insertQuery, [
         employee_id,
         year,
         month,
@@ -236,11 +280,20 @@ export default function (pool) {
         created_by || null,
       ]);
 
+      await syncProcessedPayrollRounding(
+        client,
+        employee_id,
+        Number(year),
+        Number(month)
+      );
+
       // Get employee name for response
-      const employeeResult = await pool.query(
+      const employeeResult = await client.query(
         `SELECT name, payment_preference FROM public.staffs WHERE id = $1`,
         [employee_id]
       );
+
+      await client.query("COMMIT");
 
       res.status(201).json({
         message: "Mid-month payroll created successfully",
@@ -253,11 +306,14 @@ export default function (pool) {
         },
       });
     } catch (error) {
+      await client.query("ROLLBACK");
       console.error("Error creating GT mid-month payroll:", error);
       res.status(500).json({
         message: "Error creating GT mid-month payroll",
         error: error.message,
       });
+    } finally {
+      client.release();
     }
   });
 
@@ -266,14 +322,18 @@ export default function (pool) {
     const { id } = req.params;
     const { amount, payment_method, status, notes, paid_at } = req.body;
 
+    const client = await pool.connect();
     try {
+      await client.query("BEGIN");
+
       // Check if payroll exists
-      const checkResult = await pool.query(
-        `SELECT * FROM greentarget.mid_month_payrolls WHERE id = $1`,
+      const checkResult = await client.query(
+        `SELECT * FROM greentarget.mid_month_payrolls WHERE id = $1 FOR UPDATE`,
         [id]
       );
 
       if (checkResult.rows.length === 0) {
+        await client.query("ROLLBACK");
         return res.status(404).json({ message: "Mid-month payroll not found" });
       }
 
@@ -318,6 +378,7 @@ export default function (pool) {
       }
 
       if (updateFields.length === 0) {
+        await client.query("ROLLBACK");
         return res.status(400).json({ message: "No fields to update" });
       }
 
@@ -329,28 +390,41 @@ export default function (pool) {
         RETURNING *
       `;
 
-      const updateResult = await pool.query(updateQuery, values);
+      const updateResult = await client.query(updateQuery, values);
+      const updatedPayroll = updateResult.rows[0];
+
+      await syncProcessedPayrollRounding(
+        client,
+        updatedPayroll.employee_id,
+        Number(updatedPayroll.year),
+        Number(updatedPayroll.month)
+      );
 
       // Get employee name for response
-      const employeeResult = await pool.query(
+      const employeeResult = await client.query(
         `SELECT name FROM public.staffs WHERE id = $1`,
-        [updateResult.rows[0].employee_id]
+        [updatedPayroll.employee_id]
       );
+
+      await client.query("COMMIT");
 
       res.json({
         message: "Mid-month payroll updated successfully",
         payroll: {
-          ...updateResult.rows[0],
-          amount: parseFloat(updateResult.rows[0].amount),
+          ...updatedPayroll,
+          amount: parseFloat(updatedPayroll.amount),
           employee_name: employeeResult.rows[0]?.name || null,
         },
       });
     } catch (error) {
+      await client.query("ROLLBACK");
       console.error("Error updating GT mid-month payroll:", error);
       res.status(500).json({
         message: "Error updating GT mid-month payroll",
         error: error.message,
       });
+    } finally {
+      client.release();
     }
   });
 
@@ -365,7 +439,10 @@ export default function (pool) {
       });
     }
 
+    const client = await pool.connect();
     try {
+      await client.query("BEGIN");
+
       const updateFields = ["status = $1"];
 
       // If marking as paid, set paid_at timestamp
@@ -382,25 +459,38 @@ export default function (pool) {
         RETURNING *
       `;
 
-      const result = await pool.query(query, [status, id]);
+      const result = await client.query(query, [status, id]);
 
       if (result.rows.length === 0) {
+        await client.query("ROLLBACK");
         return res.status(404).json({ message: "Mid-month payroll not found" });
       }
+
+      const updatedPayroll = result.rows[0];
+      await syncProcessedPayrollRounding(
+        client,
+        updatedPayroll.employee_id,
+        Number(updatedPayroll.year),
+        Number(updatedPayroll.month)
+      );
+      await client.query("COMMIT");
 
       res.json({
         message: "Payment status updated successfully",
         payroll: {
-          ...result.rows[0],
-          amount: parseFloat(result.rows[0].amount),
+          ...updatedPayroll,
+          amount: parseFloat(updatedPayroll.amount),
         },
       });
     } catch (error) {
+      await client.query("ROLLBACK");
       console.error("Error updating GT payment status:", error);
       res.status(500).json({
         message: "Error updating GT payment status",
         error: error.message,
       });
+    } finally {
+      client.release();
     }
   });
 
@@ -408,29 +498,45 @@ export default function (pool) {
   router.delete("/:id", async (req, res) => {
     const { id } = req.params;
 
+    const client = await pool.connect();
     try {
-      const result = await pool.query(
+      await client.query("BEGIN");
+
+      const result = await client.query(
         `DELETE FROM greentarget.mid_month_payrolls WHERE id = $1 RETURNING *`,
         [id]
       );
 
       if (result.rows.length === 0) {
+        await client.query("ROLLBACK");
         return res.status(404).json({ message: "Mid-month payroll not found" });
       }
+
+      const deletedPayroll = result.rows[0];
+      await syncProcessedPayrollRounding(
+        client,
+        deletedPayroll.employee_id,
+        Number(deletedPayroll.year),
+        Number(deletedPayroll.month)
+      );
+      await client.query("COMMIT");
 
       res.json({
         message: "Mid-month payroll deleted successfully",
         deleted_payroll: {
-          ...result.rows[0],
-          amount: parseFloat(result.rows[0].amount),
+          ...deletedPayroll,
+          amount: parseFloat(deletedPayroll.amount),
         },
       });
     } catch (error) {
+      await client.query("ROLLBACK");
       console.error("Error deleting GT mid-month payroll:", error);
       res.status(500).json({
         message: "Error deleting GT mid-month payroll",
         error: error.message,
       });
+    } finally {
+      client.release();
     }
   });
 

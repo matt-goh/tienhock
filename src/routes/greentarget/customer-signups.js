@@ -1,10 +1,16 @@
 // src/routes/greentarget/customer-signups.js
-// Public (unauthenticated) Green Target customer registration form + staff review queue.
-// The public POST is served on greentarget.tienhock.com; all other GT routes are
-// already unauthenticated at the Express layer, so staff endpoints live here too.
+// Public Green Target customer registration form + authenticated staff review queue.
+// Only the root POST stays unauthenticated for greentarget.tienhock.com.
 import { Router } from "express";
+import { authMiddleware } from "../../middleware/auth.js";
+import GTEInvoiceApiClientFactory from "../../utils/greenTarget/einvoice/GTEInvoiceApiClientFactory.js";
 
 const PAYMENT_METHODS = ["cash", "online", "qr"];
+const MAX_SIGNUP_LOCATIONS = 20;
+const ID_TYPES = ["BRN", "NRIC", "PASSPORT", "ARMY"];
+const STATE_CODES = new Set(
+  Array.from({ length: 17 }, (_, index) => String(index + 1).padStart(2, "0"))
+);
 const PAYMENT_LABELS = {
   cash: "Tunai",
   online: "Online Transfer",
@@ -49,8 +55,25 @@ const isRateLimited = (ip) => {
   return false;
 };
 
-export default function (pool) {
+/**
+ * @param {unknown} value
+ * @returns {{ site: string, address: string }[]}
+ */
+const normalizeLocations = (value) => {
+  if (!Array.isArray(value)) return [];
+
+  return value.map((location) => ({
+    site: String(location?.site || "").trim(),
+    address: String(location?.address || "").trim(),
+  }));
+};
+
+export default function (pool, myInvoisConfig) {
   const router = Router();
+  const requireStaffSession = authMiddleware(pool);
+  const apiClient = myInvoisConfig
+    ? GTEInvoiceApiClientFactory.getInstance(myInvoisConfig)
+    : null;
 
   // Public: submit a signup request
   router.post("/", async (req, res) => {
@@ -61,35 +84,140 @@ export default function (pool) {
       });
     }
 
-    const name = (req.body.name || "").trim();
-    const id_number = (req.body.id_number || "").trim();
-    const phone_number = (req.body.phone_number || "").trim();
-    const address = (req.body.address || "").trim();
-    const payment_method = (req.body.payment_method || "").trim();
+    const name = String(req.body.name || "").trim();
+    const id_number = String(req.body.id_number || "").trim();
+    const phone_number = String(req.body.phone_number || "").trim();
+    const payment_method = String(req.body.payment_method || "").trim();
+    if (
+      !Array.isArray(req.body.locations) ||
+      req.body.locations.length === 0 ||
+      req.body.locations.length > MAX_SIGNUP_LOCATIONS
+    ) {
+      return res.status(400).json({
+        message: `Provide between 1 and ${MAX_SIGNUP_LOCATIONS} locations`,
+      });
+    }
+    if (
+      req.body.locations.some(
+        (location) =>
+          typeof location !== "object" ||
+          location === null ||
+          Array.isArray(location) ||
+          typeof location.site !== "string" ||
+          typeof location.address !== "string"
+      )
+    ) {
+      return res.status(400).json({
+        message: "Every location must contain a text site and address",
+      });
+    }
+    const locations = normalizeLocations(req.body.locations);
+    const einvoice_requested = req.body.einvoice_requested === true;
+    const tin_number = String(req.body.tin_number || "").trim();
+    const id_type = String(req.body.id_type || "").trim().toUpperCase();
+    const email = String(req.body.email || "").trim();
+    const state = String(req.body.state || "").trim();
 
     if (!name) {
       return res.status(400).json({ message: "Name is required" });
     }
+    if (!id_number) {
+      return res.status(400).json({ message: "IC or company number is required" });
+    }
+    if (!phone_number) {
+      return res.status(400).json({ message: "Phone number is required" });
+    }
+    if (locations.length === 0) {
+      return res.status(400).json({ message: "At least one location is required" });
+    }
+    if (locations.some((location) => !location.site || !location.address)) {
+      return res.status(400).json({
+        message: "A site and address are required for every location",
+      });
+    }
     if (!PAYMENT_METHODS.includes(payment_method)) {
       return res.status(400).json({ message: "A valid payment method is required" });
     }
-    if (name.length > 255 || id_number.length > 50 || phone_number.length > 30 || address.length > 500) {
+    if (
+      name.length > 255 ||
+      id_number.length > 50 ||
+      phone_number.length > 20 ||
+      locations.some(
+        (location) => location.site.length > 100 || location.address.length > 255
+      ) ||
+      tin_number.length > 20 ||
+      email.length > 255
+    ) {
       return res.status(400).json({ message: "One or more fields exceed the maximum length" });
+    }
+
+    let einvoiceValidatedAt = null;
+    if (einvoice_requested) {
+      if (!ID_TYPES.includes(id_type) || !tin_number || !email || !STATE_CODES.has(state)) {
+        return res.status(400).json({
+          code: "EINVOICE_FIELDS_REQUIRED",
+          message: "Complete all e-Invoice fields before submitting",
+        });
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({
+          code: "INVALID_EMAIL",
+          message: "Enter a valid e-mail address",
+        });
+      }
+      if (!apiClient) {
+        return res.status(503).json({
+          code: "EINVOICE_VALIDATION_UNAVAILABLE",
+          message: "e-Invoice validation is temporarily unavailable",
+        });
+      }
+
+      try {
+        await apiClient.makeApiCall(
+          "GET",
+          `/api/v1.0/taxpayer/validate/${encodeURIComponent(
+            tin_number
+          )}?idType=${encodeURIComponent(id_type)}&idValue=${encodeURIComponent(
+            id_number
+          )}`
+        );
+        einvoiceValidatedAt = new Date();
+      } catch (error) {
+        const status = Number(error?.status || 500);
+        const isInvalidIdentity = status === 400 || status === 404;
+        return res.status(isInvalidIdentity ? 422 : 503).json({
+          code: isInvalidIdentity
+            ? "EINVOICE_IDENTITY_INVALID"
+            : "EINVOICE_VALIDATION_UNAVAILABLE",
+          message: isInvalidIdentity
+            ? "The TIN and identity number could not be verified"
+            : "e-Invoice validation is temporarily unavailable",
+        });
+      }
     }
 
     try {
       const result = await pool.query(
         `INSERT INTO greentarget.customer_signups
-           (name, id_number, phone_number, address, payment_method, submitted_ip)
-         VALUES ($1, $2, $3, $4, $5, $6)
+           (name, id_number, phone_number, address, payment_method, submitted_ip,
+            locations, einvoice_requested, tin_number, id_type, email, state,
+            einvoice_validated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13)
          RETURNING signup_id`,
         [
           name,
-          id_number || null,
-          phone_number || null,
-          address || null,
+          id_number,
+          phone_number,
+          locations[0].address,
           payment_method,
           ip || null,
+          JSON.stringify(locations),
+          einvoice_requested,
+          einvoice_requested ? tin_number : null,
+          einvoice_requested ? id_type : null,
+          einvoice_requested ? email : null,
+          einvoice_requested ? state : null,
+          einvoiceValidatedAt,
         ]
       );
 
@@ -107,11 +235,12 @@ export default function (pool) {
   });
 
   // Staff: list signups (optional status filter)
-  router.get("/", async (req, res) => {
+  router.get("/", requireStaffSession, async (req, res) => {
     const { status } = req.query;
     try {
       let query = `
-        SELECT signup_id, name, id_number, phone_number, address,
+        SELECT signup_id, name, id_number, phone_number, address, locations,
+               einvoice_requested,
                payment_method, status, customer_id,
                submitted_at, processed_at, processed_by
         FROM greentarget.customer_signups
@@ -135,9 +264,9 @@ export default function (pool) {
   });
 
   // Staff: convert a pending signup into a real customer (+ location for the address)
-  router.post("/:id/convert", async (req, res) => {
+  router.post("/:id/convert", requireStaffSession, async (req, res) => {
     const { id } = req.params;
-    const { staffId } = req.body;
+    const staffId = req.session?.staff_id || null;
     const client = await pool.connect();
 
     try {
@@ -164,27 +293,58 @@ export default function (pool) {
       const paymentLabel = PAYMENT_LABELS[signup.payment_method] || signup.payment_method;
       const additionalInfo = `Kaedah pembayaran: ${paymentLabel} (borang pendaftaran awam)`;
 
+      if (
+        signup.einvoice_requested &&
+        (!signup.tin_number ||
+          !signup.id_type ||
+          !signup.id_number ||
+          !signup.email ||
+          !signup.state ||
+          !signup.einvoice_validated_at)
+      ) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({
+          message: "The signup's e-Invoice details are incomplete or unverified",
+        });
+      }
+
       const customerResult = await client.query(
         `INSERT INTO greentarget.customers
-           (name, phone_number, id_number, state, additional_info)
-         VALUES ($1, $2, $3, $4, $5)
+           (name, phone_number, id_number, tin_number, id_type, email, state,
+            additional_info)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING *`,
         [
           signup.name,
           signup.phone_number || null,
           signup.id_number || null,
-          "12",
+          signup.einvoice_requested ? signup.tin_number : null,
+          signup.einvoice_requested ? signup.id_type : null,
+          signup.einvoice_requested ? signup.email : null,
+          signup.einvoice_requested ? signup.state : "12",
           additionalInfo,
         ]
       );
 
       const customer = customerResult.rows[0];
 
-      if (signup.address) {
+      const signupLocations = normalizeLocations(signup.locations);
+      if (signupLocations.length === 0 && signup.address) {
+        signupLocations.push({ site: "", address: String(signup.address).trim() });
+      }
+
+      for (const location of signupLocations) {
+        if (!location.address) continue;
         await client.query(
-          `INSERT INTO greentarget.locations (customer_id, address, phone_number)
-           VALUES ($1, $2, $3)`,
-          [customer.customer_id, signup.address, signup.phone_number || null]
+          `INSERT INTO greentarget.locations
+             (customer_id, site, address, phone_number)
+           VALUES ($1, $2, $3, $4)`,
+          [
+            customer.customer_id,
+            location.site || null,
+            location.address,
+            signup.phone_number || null,
+          ]
         );
       }
 
@@ -192,7 +352,7 @@ export default function (pool) {
         `UPDATE greentarget.customer_signups
          SET status = 'processed', processed_at = NOW(), processed_by = $1, customer_id = $2
          WHERE signup_id = $3`,
-        [staffId || null, customer.customer_id, id]
+        [staffId, customer.customer_id, id]
       );
 
       await client.query("COMMIT");
@@ -214,7 +374,7 @@ export default function (pool) {
   });
 
   // Staff: update signup status (reject / restore to pending)
-  router.patch("/:id", async (req, res) => {
+  router.patch("/:id", requireStaffSession, async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
@@ -223,26 +383,29 @@ export default function (pool) {
     }
 
     try {
-      const existing = await pool.query(
-        `SELECT status FROM greentarget.customer_signups WHERE signup_id = $1`,
-        [id]
-      );
-      if (existing.rows.length === 0) {
-        return res.status(404).json({ message: "Signup not found" });
-      }
-      if (existing.rows[0].status === "processed") {
-        return res.status(409).json({
-          message: "Cannot change the status of a processed signup",
-        });
-      }
-
       const result = await pool.query(
         `UPDATE greentarget.customer_signups
          SET status = $1
          WHERE signup_id = $2
-         RETURNING *`,
+           AND status IS DISTINCT FROM 'processed'
+         RETURNING signup_id, status`,
         [status, id]
       );
+
+      if (result.rows.length === 0) {
+        const existing = await pool.query(
+          `SELECT status
+             FROM greentarget.customer_signups
+            WHERE signup_id = $1`,
+          [id]
+        );
+        if (existing.rows.length === 0) {
+          return res.status(404).json({ message: "Signup not found" });
+        }
+        return res.status(409).json({
+          message: "Cannot change the status of a processed signup",
+        });
+      }
 
       res.json({
         message: "Signup updated successfully",
