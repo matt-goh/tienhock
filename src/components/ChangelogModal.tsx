@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-14",
+    ms: "Membetulkan ralat pada halaman Jelly Polly yang menghalang pemilihan jenis cuti untuk pekerja (\"Gagal mengambil baki cuti\"). Baki cuti Jelly Polly kini dipaparkan dengan betul dan cuti boleh direkodkan seperti biasa.",
+    en: "Fixed an error on Jelly Polly pages that blocked selecting a leave type for employees (\"Failed to fetch leave balances\"). Jelly Polly leave balances now load correctly and leave can be recorded as normal.",
+  },
+  {
+    date: "2026-07-14",
     ms: "Nama Tapak kini pilihan untuk lokasi pelanggan Green Target. Borang pendaftaran awam hanya meminta alamat, manakala staf boleh menyimpan lokasi tanpa Tapak atau menambah nama Tapak kemudian jika diperlukan.",
     en: "Site names are now optional for Green Target customer locations. The public registration form only asks for an address, while staff can save a location without a Site or add one later when needed.",
   },
