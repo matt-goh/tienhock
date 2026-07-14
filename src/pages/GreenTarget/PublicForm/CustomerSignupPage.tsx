@@ -23,7 +23,6 @@ type IdentityType = "BRN" | "NRIC" | "PASSPORT" | "ARMY";
 
 interface SignupLocation {
   clientId: number;
-  site: string;
   address: string;
 }
 
@@ -57,7 +56,6 @@ const inputClassName =
 
 const createBlankLocation = (clientId: number): SignupLocation => ({
   clientId,
-  site: "",
   address: "",
 });
 
@@ -127,15 +125,11 @@ const CustomerSignupPage = ({
     setEinvoiceIdNumberEdited(true);
   };
 
-  const updateLocation = (
-    clientId: number,
-    field: "site" | "address",
-    value: string
-  ): void => {
+  const updateLocationAddress = (clientId: number, value: string): void => {
     setLocations((currentLocations: SignupLocation[]) =>
       currentLocations.map((location: SignupLocation) =>
         location.clientId === clientId
-          ? { ...location, [field]: value }
+          ? { ...location, address: value }
           : location
       )
     );
@@ -187,7 +181,6 @@ const CustomerSignupPage = ({
     setError(null);
 
     const normalizedLocations = locations.map((location: SignupLocation) => ({
-      site: location.site.trim(),
       address: location.address.trim(),
     }));
 
@@ -206,8 +199,7 @@ const CustomerSignupPage = ({
     if (
       normalizedLocations.length === 0 ||
       normalizedLocations.some(
-        (location: { site: string; address: string }) =>
-          !location.site || !location.address
+        (location: { address: string }) => !location.address
       )
     ) {
       setError(t.locationRequired);
@@ -532,47 +524,24 @@ const CustomerSignupPage = ({
                         </button>
                       )}
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-[180px_1fr] lg:grid-cols-1">
-                      <div>
-                        <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                          {t.siteLabel} <RequiredMark />
-                        </label>
-                        <input
-                          type="text"
-                          value={location.site}
-                          onChange={(event): void =>
-                            updateLocation(
-                              location.clientId,
-                              "site",
-                              event.target.value
-                            )
-                          }
-                          placeholder={t.sitePlaceholder}
-                          maxLength={100}
-                          required
-                          className={inputClassName}
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                          {t.addressLabel} <RequiredMark />
-                        </label>
-                        <textarea
-                          value={location.address}
-                          onChange={(event): void =>
-                            updateLocation(
-                              location.clientId,
-                              "address",
-                              event.target.value
-                            )
-                          }
-                          placeholder={t.addressPlaceholder}
-                          maxLength={255}
-                          rows={2}
-                          required
-                          className={`${inputClassName} resize-y`}
-                        />
-                      </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                        {t.addressLabel} <RequiredMark />
+                      </label>
+                      <textarea
+                        value={location.address}
+                        onChange={(event): void =>
+                          updateLocationAddress(
+                            location.clientId,
+                            event.target.value
+                          )
+                        }
+                        placeholder={t.addressPlaceholder}
+                        maxLength={255}
+                        rows={2}
+                        required
+                        className={`${inputClassName} resize-y`}
+                      />
                     </div>
                   </div>
                 ))}
