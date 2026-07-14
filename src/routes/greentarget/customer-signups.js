@@ -101,12 +101,12 @@ export default function (pool, myInvoisConfig) {
           typeof location !== "object" ||
           location === null ||
           Array.isArray(location) ||
-          typeof location.site !== "string" ||
+          (location.site != null && typeof location.site !== "string") ||
           typeof location.address !== "string"
       )
     ) {
       return res.status(400).json({
-        message: "Every location must contain a text site and address",
+        message: "Every location must contain a text address",
       });
     }
     const locations = normalizeLocations(req.body.locations);
@@ -135,9 +135,9 @@ export default function (pool, myInvoisConfig) {
     if (locations.length === 0) {
       return res.status(400).json({ message: "At least one location is required" });
     }
-    if (locations.some((location) => !location.site || !location.address)) {
+    if (locations.some((location) => !location.address)) {
       return res.status(400).json({
-        message: "A site and address are required for every location",
+        message: "An address is required for every location",
       });
     }
     if (!PAYMENT_METHODS.includes(payment_method)) {
