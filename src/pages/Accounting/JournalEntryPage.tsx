@@ -1306,7 +1306,13 @@ const JournalEntryPage: React.FC = () => {
           <form onSubmit={handleSubmit} noValidate>
             {/* Entry Header - Horizontal Row */}
             <div className="px-6 py-4 border-b border-default-200 dark:border-gray-700 bg-default-50/50 dark:bg-gray-900/30">
-              <div className="grid grid-cols-4 gap-4">
+              <div
+                className={`grid grid-cols-4 gap-4 ${
+                  CHEQUE_NO_ENTRY_TYPES.includes(formData.entry_type)
+                    ? "lg:grid-cols-5"
+                    : ""
+                }`}
+              >
                 {/* Reference Number */}
                 <div>
                   <label className="block text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wide mb-1.5">
