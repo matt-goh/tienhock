@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-14",
+    ms: "Catatan jurnal Jualan (invois) kini boleh disunting terus. Sebaik sahaja anda menyuntingnya, jurnal itu ditandakan \"Manual\" dan invois tidak lagi menulis gantinya secara automatik apabila invois disunting, ditukar tarikh atau jenis bayaran — anda menguruskannya sendiri. Membatalkan invois masih membatalkan jurnal. Jurnal lain yang dijana sistem (resit, belian, baucar gaji) kekal terkunci pada sumbernya.",
+    en: "Sales (invoice) journal entries can now be edited directly. Once you edit one, it is marked \"Manual\" and the invoice no longer overwrites it automatically when the invoice is edited, re-dated or has its payment type changed — you manage it yourself. Cancelling the invoice still cancels the journal. Other system-generated journals (receipts, purchases, payroll vouchers) stay locked to their source.",
+  },
+  {
+    date: "2026-07-14",
     ms: "Membetulkan ralat pada halaman Jelly Polly yang menghalang pemilihan jenis cuti untuk pekerja (\"Gagal mengambil baki cuti\"). Baki cuti Jelly Polly kini dipaparkan dengan betul dan cuti boleh direkodkan seperti biasa.",
     en: "Fixed an error on Jelly Polly pages that blocked selecting a leave type for employees (\"Failed to fetch leave balances\"). Jelly Polly leave balances now load correctly and leave can be recorded as normal.",
   },
