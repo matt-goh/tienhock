@@ -280,7 +280,7 @@ export default function (pool) {
       const payrollData = payrollResult.rows[0];
 
       // Get all data in parallel for efficiency
-      const [itemsResult, deductionsResult, pinjamResult, midMonthResult] =
+      const [itemsResult, deductionsResult, pinjamResult, midMonthResult, leaveResult] =
         await Promise.all([
           // Get payroll items
           pool.query(`
@@ -318,6 +318,20 @@ export default function (pool) {
             FROM greentarget.mid_month_payrolls
             WHERE employee_id = $1 AND year = $2 AND month = $3
               AND LOWER(COALESCE(status, '')) <> 'cancelled'
+          `, [payrollData.employee_id, payrollData.year, payrollData.month]),
+
+          // Get approved leave for this employee/month (folded into gross by the
+          // processor; shown on the payslip)
+          pool.query(`
+            SELECT id, employee_id, to_char(leave_date, 'YYYY-MM-DD') AS leave_date,
+                   leave_type, days_taken,
+                   CAST(amount_paid AS NUMERIC(10, 2)) AS amount_paid, status
+            FROM greentarget.leave_records
+            WHERE employee_id = $1
+              AND EXTRACT(YEAR FROM leave_date) = $2
+              AND EXTRACT(MONTH FROM leave_date) = $3
+              AND status = 'approved'
+            ORDER BY leave_date
           `, [payrollData.employee_id, payrollData.year, payrollData.month]),
         ]);
 
@@ -359,6 +373,11 @@ export default function (pool) {
         mid_month_payroll: midMonthRow
           ? { ...midMonthRow, amount: parseFloat(midMonthRow.amount) }
           : null,
+        leave_records: leaveResult.rows.map((record) => ({
+          ...record,
+          days_taken: parseFloat(record.days_taken),
+          amount_paid: parseFloat(record.amount_paid),
+        })),
       };
 
       res.json(response);

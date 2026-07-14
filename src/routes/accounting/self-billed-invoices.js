@@ -1043,6 +1043,15 @@ async function updateGPJournalEntry(
     return createGPJournalEntry(client, invoice, lines, supplierName, staffId);
   }
 
+  // A hand-edited (detached) journal is human-owned — leave its lines untouched.
+  const lock = await client.query(
+    `SELECT manual_override FROM journal_entries WHERE id = $1`,
+    [invoice.journal_entry_id]
+  );
+  if (lock.rows[0]?.manual_override) {
+    return invoice.journal_entry_id;
+  }
+
   const accountCode = await validateAccountCode(client, invoice.account_code);
 
   const totalAmount = Math.round(

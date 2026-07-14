@@ -1,12 +1,13 @@
-// src/routes/payroll/leave-management.js
+// src/routes/greentarget/leave-management.js
+// GT leave management — ported from src/routes/jellypolly/leave-management.js.
+// GT keeps its OWN leave ledger (greentarget.leave_records +
+// greentarget.employee_leave_balances) isolated from TH/JP, but GT staff live in
+// public.staffs, so sibling aggregation and the staff joins run on public.staffs.
+// The cuti-tahunan "advance" union reads greentarget.commission_records flagged
+// is_advance = true (GT has no location_code). Packing-cuti endpoints are TH/JP
+// only and are intentionally omitted here.
 import { Router } from "express";
 
-const PACKING_CUTI_NOTE_PREFIX = "PACKING_CUTI";
-const PACKING_CUTI_JOB_TYPES = new Set(["MEE_PACKING", "BH_PACKING"]);
-const PACKING_PRODUCT_TYPES = {
-  MEE_PACKING: "MEE",
-  BH_PACKING: "BH",
-};
 const VALID_LEAVE_TYPES = new Set([
   "cuti_umum",
   "cuti_sakit",
@@ -70,8 +71,8 @@ const calculateLeaveAllocation = (yearsOfService) => {
 const getSiblingIds = async (client, employeeId) => {
   const result = await client.query(
     `SELECT id, date_joined
-       FROM jellypolly.staffs
-      WHERE name = (SELECT name FROM jellypolly.staffs WHERE id = $1)
+       FROM public.staffs
+      WHERE name = (SELECT name FROM public.staffs WHERE id = $1)
       ORDER BY date_joined ASC, id ASC`,
     [employeeId],
   );
@@ -95,260 +96,11 @@ const getCutiUmumTotal = async (client, year) => {
 
 const getCutiTahunanAdvanceDaysExpression = () => "1::numeric";
 
-const getPackingCutiNote = (jobType) => `${PACKING_CUTI_NOTE_PREFIX}:${jobType}`;
-
-const isValidDateString = (date) => /^\d{4}-\d{2}-\d{2}$/.test(date || "");
-
-const createRequestError = (message) => {
-  const error = new Error(message);
-  error.status = 400;
-  return error;
-};
-
 export default function (pool) {
   const router = Router();
 
-  router.get("/packing-cuti", async (req, res) => {
-    const { job_type, date } = req.query;
-
-    if (!PACKING_CUTI_JOB_TYPES.has(job_type)) {
-      return res.status(400).json({ message: "Invalid packing job type" });
-    }
-
-    if (!isValidDateString(date)) {
-      return res.status(400).json({ message: "date must be YYYY-MM-DD" });
-    }
-
-    try {
-      const note = getPackingCutiNote(job_type);
-      const [workersResult, entriesResult] = await Promise.all([
-        pool.query(
-          `
-            SELECT id, name, job
-            FROM jellypolly.staffs
-            WHERE job::jsonb ? $1
-              AND (date_resigned IS NULL OR date_resigned > CURRENT_DATE)
-            ORDER BY name ASC
-          `,
-          [job_type],
-        ),
-        pool.query(
-          `
-            SELECT
-              lr.id,
-              lr.employee_id,
-              s.name as employee_name,
-              to_char(lr.leave_date, 'YYYY-MM-DD') as leave_date,
-              lr.leave_type,
-              lr.days_taken,
-              lr.amount_paid,
-              lr.status,
-              lr.notes
-            FROM jellypolly.leave_records lr
-            JOIN jellypolly.staffs s ON s.id = lr.employee_id
-            WHERE lr.leave_date = $1
-              AND lr.status = 'approved'
-              AND lr.notes = $2
-            ORDER BY s.name ASC
-          `,
-          [date, note],
-        ),
-      ]);
-
-      res.json({
-        job_type,
-        date,
-        workers: workersResult.rows,
-        entries: entriesResult.rows.map((entry) => ({
-          ...entry,
-          days_taken: parseFloat(entry.days_taken || 0),
-          amount_paid: parseFloat(entry.amount_paid || 0),
-        })),
-      });
-    } catch (error) {
-      console.error("Error fetching packing cuti entries:", error);
-      res.status(500).json({
-        message: "Error fetching packing cuti entries",
-        error: error.message,
-      });
-    }
-  });
-
-  router.post("/packing-cuti/batch", async (req, res) => {
-    const { job_type, date, entries, created_by } = req.body;
-
-    if (!PACKING_CUTI_JOB_TYPES.has(job_type)) {
-      return res.status(400).json({ message: "Invalid packing job type" });
-    }
-
-    if (!isValidDateString(date)) {
-      return res.status(400).json({ message: "date must be YYYY-MM-DD" });
-    }
-
-    if (!Array.isArray(entries)) {
-      return res.status(400).json({ message: "entries must be an array" });
-    }
-
-    const normalizedEntries = [];
-    const seenEmployeeIds = new Set();
-    for (const entry of entries) {
-      const employeeId = String(entry.employee_id || "").trim();
-      const leaveType = entry.leave_type;
-      const amountPaid = Number(entry.amount_paid);
-
-      if (!employeeId) {
-        return res.status(400).json({ message: "employee_id is required" });
-      }
-
-      if (seenEmployeeIds.has(employeeId)) {
-        return res.status(400).json({
-          message: `Duplicate cuti entry for ${employeeId}`,
-        });
-      }
-
-      if (!VALID_LEAVE_TYPES.has(leaveType)) {
-        return res.status(400).json({
-          message: `Invalid leave type for ${employeeId}`,
-        });
-      }
-
-      if (!Number.isFinite(amountPaid) || amountPaid < 0) {
-        return res.status(400).json({
-          message: `Invalid leave amount for ${employeeId}`,
-        });
-      }
-
-      seenEmployeeIds.add(employeeId);
-      normalizedEntries.push({
-        employee_id: employeeId,
-        leave_type: leaveType,
-        amount_paid: Math.round(amountPaid * 100) / 100,
-      });
-    }
-
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
-
-      const note = getPackingCutiNote(job_type);
-      const employeeIds = normalizedEntries.map((entry) => entry.employee_id);
-
-      if (employeeIds.length > 0) {
-        const workerResult = await client.query(
-          `
-            SELECT id
-            FROM jellypolly.staffs
-            WHERE id = ANY($1::text[])
-              AND job::jsonb ? $2
-              AND (date_resigned IS NULL OR date_resigned > CURRENT_DATE)
-          `,
-          [employeeIds, job_type],
-        );
-        const validWorkerIds = new Set(workerResult.rows.map((row) => row.id));
-        const invalidEmployeeIds = employeeIds.filter(
-          (employeeId) => !validWorkerIds.has(employeeId),
-        );
-
-        if (invalidEmployeeIds.length > 0) {
-          throw createRequestError(
-            `Invalid ${job_type} worker(s): ${invalidEmployeeIds.join(", ")}`,
-          );
-        }
-
-        const existingLeaveResult = await client.query(
-          `
-            SELECT employee_id
-            FROM jellypolly.leave_records
-            WHERE employee_id = ANY($1::text[])
-              AND leave_date = $2
-              AND status = 'approved'
-              AND COALESCE(notes, '') <> $3
-          `,
-          [employeeIds, date, note],
-        );
-
-        if (existingLeaveResult.rows.length > 0) {
-          throw createRequestError(
-            `Existing leave already recorded for: ${existingLeaveResult.rows
-              .map((row) => row.employee_id)
-              .join(", ")}`,
-          );
-        }
-
-        const productType = PACKING_PRODUCT_TYPES[job_type];
-        const productionConflictResult = await client.query(
-          `
-            SELECT DISTINCT pe.worker_id, p.description as product_description
-            FROM jellypolly.production_entries pe
-            JOIN products p ON p.id = pe.product_id
-            WHERE pe.worker_id = ANY($1::text[])
-              AND pe.entry_date = $2
-              AND pe.bags_packed > 0
-              AND p.type = $3
-          `,
-          [employeeIds, date, productType],
-        );
-
-        if (productionConflictResult.rows.length > 0) {
-          throw createRequestError(
-            `Production already recorded for: ${productionConflictResult.rows
-              .map((row) => row.worker_id)
-              .join(", ")}`,
-          );
-        }
-      }
-
-      await client.query(
-        `
-          DELETE FROM jellypolly.leave_records
-          WHERE leave_date = $1
-            AND notes = $2
-        `,
-        [date, note],
-      );
-
-      const savedEntries = [];
-      for (const entry of normalizedEntries) {
-        const result = await client.query(
-          `
-            INSERT INTO jellypolly.leave_records (
-              employee_id, leave_date, leave_type, work_log_id, days_taken,
-              amount_paid, status, notes, created_by
-            )
-            VALUES ($1, $2, $3, NULL, 1.0, $4, 'approved', $5, $6)
-            RETURNING *
-          `,
-          [
-            entry.employee_id,
-            date,
-            entry.leave_type,
-            entry.amount_paid,
-            note,
-            created_by || null,
-          ],
-        );
-        savedEntries.push(result.rows[0]);
-      }
-
-      await client.query("COMMIT");
-      res.json({
-        message: "Packing cuti entries saved successfully",
-        entries: savedEntries,
-      });
-    } catch (error) {
-      await client.query("ROLLBACK");
-      console.error("Error saving packing cuti entries:", error);
-      res.status(error.status || 500).json({
-        message: error.message || "Error saving packing cuti entries",
-        error: error.message,
-      });
-    } finally {
-      client.release();
-    }
-  });
-
   /**
-   * GET /api/leave-management/balances/batch?employeeIds=EMP1,EMP2&year=2024
+   * GET /greentarget/api/leave-management/balances/batch?employeeIds=EMP1,EMP2&year=2024
    * Gets or creates leave balances for multiple employees for a given year.
    */
   router.get("/balances/batch", async (req, res) => {
@@ -390,7 +142,7 @@ export default function (pool) {
           let cached = canonicalCache.get(canonicalId);
           if (!cached) {
             let balanceResult = await client.query(
-              `SELECT * FROM jellypolly.employee_leave_balances
+              `SELECT * FROM greentarget.employee_leave_balances
                 WHERE employee_id = ANY($1::text[]) AND year = $2
                 ORDER BY CASE WHEN employee_id = $3 THEN 0 ELSE 1 END, id ASC
                 LIMIT 1`,
@@ -407,14 +159,14 @@ export default function (pool) {
 
               balanceResult = await client.query(
                 `WITH inserted AS (
-                   INSERT INTO jellypolly.employee_leave_balances (employee_id, year, cuti_tahunan_total, cuti_sakit_total, cuti_rawatan_total)
+                   INSERT INTO greentarget.employee_leave_balances (employee_id, year, cuti_tahunan_total, cuti_sakit_total, cuti_rawatan_total)
                    VALUES ($1, $2, $3, $4, $5)
                    ON CONFLICT (employee_id, year) DO NOTHING
                    RETURNING *
                  )
                  SELECT * FROM inserted
                  UNION ALL
-                 SELECT * FROM jellypolly.employee_leave_balances
+                 SELECT * FROM greentarget.employee_leave_balances
                   WHERE employee_id = $1 AND year = $2
                  LIMIT 1;`,
                 [
@@ -431,7 +183,7 @@ export default function (pool) {
               `SELECT leave_type, SUM(total_taken) as total_taken
                  FROM (
                    SELECT leave_type, SUM(days_taken)::numeric as total_taken
-                     FROM jellypolly.leave_records
+                     FROM greentarget.leave_records
                     WHERE employee_id = ANY($1::text[])
                       AND EXTRACT(YEAR FROM leave_date) = $2
                       AND status = 'approved'
@@ -441,7 +193,7 @@ export default function (pool) {
 
                    SELECT 'cuti_tahunan' as leave_type,
                           SUM(${getCutiTahunanAdvanceDaysExpression()}) as total_taken
-                     FROM jellypolly.commission_records cr
+                     FROM greentarget.commission_records cr
                     WHERE cr.employee_id = ANY($1::text[])
                       AND EXTRACT(YEAR FROM cr.commission_date) = $2
                       AND cr.is_advance = true
@@ -488,7 +240,7 @@ export default function (pool) {
   });
 
   /**
-   * GET /api/leave-management/balances/:employeeId/:year
+   * GET /greentarget/api/leave-management/balances/:employeeId/:year
    * Gets or creates leave balances for an employee for a given year.
    */
   router.get("/balances/:employeeId/:year", async (req, res) => {
@@ -511,7 +263,7 @@ export default function (pool) {
 
         // Prefer the canonical sibling's balance row; fall back to any sibling's.
         let balanceResult = await client.query(
-          `SELECT * FROM jellypolly.employee_leave_balances
+          `SELECT * FROM greentarget.employee_leave_balances
             WHERE employee_id = ANY($1::text[]) AND year = $2
             ORDER BY CASE WHEN employee_id = $3 THEN 0 ELSE 1 END, id ASC
             LIMIT 1`,
@@ -526,14 +278,14 @@ export default function (pool) {
 
           balanceResult = await client.query(
             `WITH inserted AS (
-               INSERT INTO jellypolly.employee_leave_balances (employee_id, year, cuti_tahunan_total, cuti_sakit_total, cuti_rawatan_total)
+               INSERT INTO greentarget.employee_leave_balances (employee_id, year, cuti_tahunan_total, cuti_sakit_total, cuti_rawatan_total)
                VALUES ($1, $2, $3, $4, $5)
                ON CONFLICT (employee_id, year) DO NOTHING
                RETURNING *
              )
              SELECT * FROM inserted
              UNION ALL
-             SELECT * FROM jellypolly.employee_leave_balances
+             SELECT * FROM greentarget.employee_leave_balances
               WHERE employee_id = $1 AND year = $2
              LIMIT 1;`,
             [
@@ -553,7 +305,7 @@ export default function (pool) {
           `SELECT leave_type, SUM(total_taken) as total_taken
              FROM (
                SELECT leave_type, SUM(days_taken)::numeric as total_taken
-                 FROM jellypolly.leave_records
+                 FROM greentarget.leave_records
                 WHERE employee_id = ANY($1::text[])
                   AND EXTRACT(YEAR FROM leave_date) = $2
                   AND status = 'approved'
@@ -563,7 +315,7 @@ export default function (pool) {
 
                SELECT 'cuti_tahunan' as leave_type,
                       SUM(${getCutiTahunanAdvanceDaysExpression()}) as total_taken
-                 FROM jellypolly.commission_records cr
+                 FROM greentarget.commission_records cr
                 WHERE cr.employee_id = ANY($1::text[])
                   AND EXTRACT(YEAR FROM cr.commission_date) = $2
                   AND cr.is_advance = true
@@ -602,7 +354,7 @@ export default function (pool) {
   });
 
   /**
-   * GET /api/leave-management/records/:employeeId
+   * GET /greentarget/api/leave-management/records/:employeeId/:year
    * Gets all leave records for an employee for a given year.
    */
   router.get("/records/:employeeId/:year", async (req, res) => {
@@ -621,7 +373,7 @@ export default function (pool) {
              FROM (
                SELECT id, employee_id, leave_date, leave_type, days_taken,
                       amount_paid, status, notes, created_by, created_at, updated_at
-                 FROM jellypolly.leave_records
+                 FROM greentarget.leave_records
                 WHERE employee_id = ANY($1::text[])
                   AND EXTRACT(YEAR FROM leave_date) = $2
 
@@ -638,7 +390,7 @@ export default function (pool) {
                       cr.created_by,
                       cr.created_at,
                       NULL::timestamp as updated_at
-                 FROM jellypolly.commission_records cr
+                 FROM greentarget.commission_records cr
                 WHERE cr.employee_id = ANY($1::text[])
                   AND EXTRACT(YEAR FROM cr.commission_date) = $2
                   AND cr.is_advance = true
@@ -660,7 +412,7 @@ export default function (pool) {
   });
 
   /**
-   * POST /api/leave-management/records
+   * POST /greentarget/api/leave-management/records
    * Creates a new leave record.
    */
   router.post("/records", async (req, res) => {
@@ -678,8 +430,8 @@ export default function (pool) {
 
     try {
       const query = `
-        INSERT INTO jellypolly.leave_records (
-          employee_id, leave_date, leave_type, work_log_id, days_taken, 
+        INSERT INTO greentarget.leave_records (
+          employee_id, leave_date, leave_type, work_log_id, days_taken,
           amount_paid, status, notes, created_by
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *;
@@ -706,7 +458,7 @@ export default function (pool) {
   });
 
   /**
-   * PUT /api/leave-management/records/:id
+   * PUT /greentarget/api/leave-management/records/:id
    * Updates an existing leave record.
    */
   router.put("/records/:id", async (req, res) => {
@@ -716,7 +468,7 @@ export default function (pool) {
 
     try {
       const query = `
-        UPDATE jellypolly.leave_records
+        UPDATE greentarget.leave_records
         SET leave_date = $1, leave_type = $2, days_taken = $3, amount_paid = $4,
             status = $5, notes = $6, updated_at = CURRENT_TIMESTAMP
         WHERE id = $7
@@ -745,14 +497,14 @@ export default function (pool) {
   });
 
   /**
-   * DELETE /api/leave-management/records/:id
+   * DELETE /greentarget/api/leave-management/records/:id
    * Deletes a leave record.
    */
   router.delete("/records/:id", async (req, res) => {
     const { id } = req.params;
     try {
       const result = await pool.query(
-        "DELETE FROM jellypolly.leave_records WHERE id = $1 RETURNING *",
+        "DELETE FROM greentarget.leave_records WHERE id = $1 RETURNING *",
         [id]
       );
       if (result.rows.length === 0) {
@@ -769,7 +521,7 @@ export default function (pool) {
   });
 
   /**
-   * GET /api/leave-management/summary/:employeeId/:year/:month
+   * GET /greentarget/api/leave-management/summary/:employeeId/:year/:month
    * Get monthly leave summary for an employee.
    */
   router.get("/summary/:employeeId/:year/:month", async (req, res) => {
@@ -791,7 +543,7 @@ export default function (pool) {
              amount_paid
            FROM (
              SELECT leave_date, leave_type, days_taken, amount_paid
-               FROM jellypolly.leave_records
+               FROM greentarget.leave_records
               WHERE employee_id = ANY($1::text[])
                 AND EXTRACT(YEAR FROM leave_date) = $2
                 AND EXTRACT(MONTH FROM leave_date) = $3
@@ -803,7 +555,7 @@ export default function (pool) {
                     'cuti_tahunan' as leave_type,
                     ${getCutiTahunanAdvanceDaysExpression()} as days_taken,
                     cr.amount as amount_paid
-               FROM jellypolly.commission_records cr
+               FROM greentarget.commission_records cr
               WHERE cr.employee_id = ANY($1::text[])
                 AND EXTRACT(YEAR FROM cr.commission_date) = $2
                 AND EXTRACT(MONTH FROM cr.commission_date) = $3
@@ -826,7 +578,7 @@ export default function (pool) {
   });
 
   /**
-   * POST /api/leave-management/batch-reports
+   * POST /greentarget/api/leave-management/batch-reports
    * Get batch leave reports for multiple employees
    */
   router.post("/batch-reports", async (req, res) => {
@@ -857,7 +609,7 @@ export default function (pool) {
         // multi-ID employees share a single entitlement bucket.
         const query = `
           WITH requested AS (
-            SELECT id FROM jellypolly.staffs WHERE id = ANY($1::text[])
+            SELECT id FROM public.staffs WHERE id = ANY($1::text[])
           ),
           name_groups AS (
             -- For each requested ID, find all sibling IDs sharing the name.
@@ -868,8 +620,8 @@ export default function (pool) {
               MIN(sib.date_joined) AS senior_joined,
               (ARRAY_AGG(sib.id ORDER BY sib.date_joined ASC, sib.id ASC))[1] AS canonical_id
             FROM requested r
-            JOIN jellypolly.staffs s ON s.id = r.id
-            JOIN jellypolly.staffs sib ON sib.name = s.name
+            JOIN public.staffs s ON s.id = r.id
+            JOIN public.staffs sib ON sib.name = s.name
             GROUP BY r.id, s.name
           ),
           employee_info AS (
@@ -885,7 +637,7 @@ export default function (pool) {
               ng.sibling_ids,
               ng.canonical_id
             FROM name_groups ng
-            JOIN jellypolly.staffs canon ON canon.id = ng.canonical_id
+            JOIN public.staffs canon ON canon.id = ng.canonical_id
           ),
           leave_balances AS (
             -- One balance row per requested ID; prefer the canonical sibling's row.
@@ -895,7 +647,7 @@ export default function (pool) {
               lb.cuti_sakit_total,
               lb.cuti_rawatan_total
             FROM employee_info ei
-            JOIN jellypolly.employee_leave_balances lb
+            JOIN greentarget.employee_leave_balances lb
               ON lb.employee_id = ANY(ei.sibling_ids) AND lb.year = $2
             ORDER BY ei.id,
                      CASE WHEN lb.employee_id = ei.canonical_id THEN 0 ELSE 1 END,
@@ -917,7 +669,7 @@ export default function (pool) {
               lr.days_taken,
               lr.amount_paid
             FROM employee_info ei
-            JOIN jellypolly.leave_records lr ON lr.employee_id = ANY(ei.sibling_ids)
+            JOIN greentarget.leave_records lr ON lr.employee_id = ANY(ei.sibling_ids)
             WHERE EXTRACT(YEAR FROM lr.leave_date) = $2
               AND lr.status = 'approved'
 
@@ -930,7 +682,7 @@ export default function (pool) {
               ${getCutiTahunanAdvanceDaysExpression()} AS days_taken,
               cr.amount AS amount_paid
             FROM employee_info ei
-            JOIN jellypolly.commission_records cr ON cr.employee_id = ANY(ei.sibling_ids)
+            JOIN greentarget.commission_records cr ON cr.employee_id = ANY(ei.sibling_ids)
             WHERE EXTRACT(YEAR FROM cr.commission_date) = $2
               AND cr.is_advance = true
           ),

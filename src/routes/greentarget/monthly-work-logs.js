@@ -4,6 +4,26 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
 
+  const parseLeaveAmount = (amount) => {
+    const parsedAmount = Number(amount || 0);
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 0) {
+      return null;
+    }
+    return Math.round(parsedAmount * 100) / 100;
+  };
+
+  // GT staff assigned to a payroll section (OFFICE) — used to scope the
+  // monthly leave list to the page's staff, mirroring TH/JP.
+  const getSectionEmployeeIds = async (section) => {
+    const sectionKey = Array.isArray(section) ? section[0] : section;
+    if (!sectionKey) return [];
+    const result = await pool.query(
+      `SELECT DISTINCT employee_id FROM greentarget.payroll_employees WHERE job_type = $1`,
+      [sectionKey]
+    );
+    return result.rows.map((r) => r.employee_id);
+  };
+
   // Get monthly work logs with filtering
   router.get("/", async (req, res) => {
     const {
@@ -188,6 +208,8 @@ export default function (pool) {
       contextData,
       status,
       employeeEntries,
+      leaveEntries,
+      updatedLeaveEntries,
     } = req.body;
 
     if (!employeeEntries || employeeEntries.length === 0) {
@@ -285,6 +307,60 @@ export default function (pool) {
         }
       }
 
+      // Insert new leave records (GT leave ledger, no work-log link — same as
+      // TH/JP monthly leave)
+      if (leaveEntries && Array.isArray(leaveEntries) && leaveEntries.length > 0) {
+        for (const leave of leaveEntries) {
+          const { employeeId, leaveDate, leaveType, amount_paid } = leave;
+          const leaveAmount = parseLeaveAmount(amount_paid);
+
+          if (leaveAmount === null) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+              message: "Leave amount must be a non-negative number",
+            });
+          }
+
+          const existingLeave = await client.query(
+            `SELECT id FROM greentarget.leave_records WHERE employee_id = $1 AND leave_date = $2`,
+            [employeeId, leaveDate]
+          );
+
+          if (existingLeave.rows.length === 0) {
+            await client.query(
+              `INSERT INTO greentarget.leave_records (
+                employee_id, leave_date, leave_type, days_taken, status, amount_paid
+              ) VALUES ($1, $2, $3, $4, 'approved', $5)`,
+              [employeeId, leaveDate, leaveType, 1.0, leaveAmount]
+            );
+          }
+        }
+      }
+
+      // Update existing saved leave amounts if any
+      if (
+        updatedLeaveEntries &&
+        Array.isArray(updatedLeaveEntries) &&
+        updatedLeaveEntries.length > 0
+      ) {
+        for (const leave of updatedLeaveEntries) {
+          const { id: leaveId, amount_paid } = leave;
+          const leaveAmount = parseLeaveAmount(amount_paid);
+
+          if (!leaveId || leaveAmount === null) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+              message: "Leave amount must be a non-negative number",
+            });
+          }
+
+          await client.query(
+            "UPDATE greentarget.leave_records SET amount_paid = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+            [leaveAmount, leaveId]
+          );
+        }
+      }
+
       await client.query("COMMIT");
 
       res.status(201).json({
@@ -313,6 +389,9 @@ export default function (pool) {
       contextData,
       status,
       employeeEntries,
+      leaveEntries,
+      updatedLeaveEntries,
+      deletedLeaveIds,
     } = req.body;
 
     if (!employeeEntries || employeeEntries.length === 0) {
@@ -412,6 +491,75 @@ export default function (pool) {
         }
       }
 
+      // Delete specified leave records
+      if (
+        deletedLeaveIds &&
+        Array.isArray(deletedLeaveIds) &&
+        deletedLeaveIds.length > 0
+      ) {
+        for (const leaveId of deletedLeaveIds) {
+          await client.query(
+            "DELETE FROM greentarget.leave_records WHERE id = $1",
+            [leaveId]
+          );
+        }
+      }
+
+      // Insert new leave records (isNew only, same as TH/JP)
+      if (leaveEntries && Array.isArray(leaveEntries) && leaveEntries.length > 0) {
+        for (const leave of leaveEntries) {
+          if (leave.isNew) {
+            const { employeeId, leaveDate, leaveType, amount_paid } = leave;
+            const leaveAmount = parseLeaveAmount(amount_paid);
+
+            if (leaveAmount === null) {
+              await client.query("ROLLBACK");
+              return res.status(400).json({
+                message: "Leave amount must be a non-negative number",
+              });
+            }
+
+            const existingLeave = await client.query(
+              `SELECT id FROM greentarget.leave_records WHERE employee_id = $1 AND leave_date = $2`,
+              [employeeId, leaveDate]
+            );
+
+            if (existingLeave.rows.length === 0) {
+              await client.query(
+                `INSERT INTO greentarget.leave_records (
+                  employee_id, leave_date, leave_type, days_taken, status, amount_paid
+                ) VALUES ($1, $2, $3, $4, 'approved', $5)`,
+                [employeeId, leaveDate, leaveType, 1.0, leaveAmount]
+              );
+            }
+          }
+        }
+      }
+
+      // Update existing saved leave amounts if any
+      if (
+        updatedLeaveEntries &&
+        Array.isArray(updatedLeaveEntries) &&
+        updatedLeaveEntries.length > 0
+      ) {
+        for (const leave of updatedLeaveEntries) {
+          const { id: leaveId, amount_paid } = leave;
+          const leaveAmount = parseLeaveAmount(amount_paid);
+
+          if (!leaveId || leaveAmount === null) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+              message: "Leave amount must be a non-negative number",
+            });
+          }
+
+          await client.query(
+            "UPDATE greentarget.leave_records SET amount_paid = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+            [leaveAmount, leaveId]
+          );
+        }
+      }
+
       await client.query("COMMIT");
 
       res.json({
@@ -472,6 +620,54 @@ export default function (pool) {
       });
     } finally {
       client.release();
+    }
+  });
+
+  // Leave records for a month, scoped to the GT section's assigned staff
+  // (mirrors TH/JP's /leave/:year/:month)
+  router.get("/leave/:year/:month", async (req, res) => {
+    const { year, month } = req.params;
+    const { section } = req.query;
+
+    try {
+      let query = `
+        SELECT
+          lr.*,
+          CAST(lr.amount_paid AS NUMERIC(10, 2)) as amount_paid,
+          s.name as employee_name,
+          s.job as employee_jobs
+        FROM greentarget.leave_records lr
+        LEFT JOIN public.staffs s ON lr.employee_id = s.id
+        WHERE EXTRACT(MONTH FROM lr.leave_date) = $1
+          AND EXTRACT(YEAR FROM lr.leave_date) = $2
+      `;
+      const values = [parseInt(month), parseInt(year)];
+
+      if (section) {
+        const sectionEmployeeIds = await getSectionEmployeeIds(section);
+        if (sectionEmployeeIds.length === 0) {
+          return res.json([]);
+        }
+        query += ` AND lr.employee_id = ANY($3)`;
+        values.push(sectionEmployeeIds);
+      }
+
+      query += ` ORDER BY lr.leave_date, s.name`;
+
+      const result = await pool.query(query, values);
+
+      res.json(
+        result.rows.map((record) => ({
+          ...record,
+          amount_paid: parseFloat(record.amount_paid),
+        }))
+      );
+    } catch (error) {
+      console.error("Error fetching GT leave records:", error);
+      res.status(500).json({
+        message: "Error fetching leave records",
+        error: error.message,
+      });
     }
   });
 
