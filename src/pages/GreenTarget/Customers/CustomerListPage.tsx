@@ -444,12 +444,20 @@ const CustomerListPage = (): JSX.Element => {
                                   className="mt-0.5 shrink-0 text-emerald-600"
                                 />
                                 <div className="min-w-0">
-                                  <span className="font-semibold text-default-800 dark:text-gray-100">
-                                    {location.site || "Site not set"}
-                                  </span>
-                                  <span className="text-default-500 dark:text-gray-400">
-                                    {` — ${location.address}`}
-                                  </span>
+                                  {location.site ? (
+                                    <>
+                                      <span className="font-semibold text-default-800 dark:text-gray-100">
+                                        {location.site}
+                                      </span>
+                                      <span className="text-default-500 dark:text-gray-400">
+                                        {` — ${location.address}`}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="text-default-700 dark:text-gray-200">
+                                      {location.address}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             )
