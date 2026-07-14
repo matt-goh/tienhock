@@ -222,10 +222,6 @@ const CustomerFormPage: React.FC = () => {
   };
 
   const handleAddLocation = (): void => {
-    if (!newLocation.site.trim()) {
-      toast.error("Please enter a site name");
-      return;
-    }
     if (!newLocation.address.trim()) {
       toast.error("Please enter a location address");
       return;
@@ -272,16 +268,6 @@ const CustomerFormPage: React.FC = () => {
       toast.error("Every location must have an address");
       return;
     }
-    if (
-      locations.some(
-        (location: CustomerLocation) =>
-          !location.location_id && !location.site?.trim()
-      )
-    ) {
-      toast.error("Every new location must have a site name");
-      return;
-    }
-
     setIsSaving(true);
 
     try {
@@ -661,7 +647,8 @@ const CustomerFormPage: React.FC = () => {
                   Service locations
                 </h2>
                 <p className="text-sm text-default-500 dark:text-gray-400">
-                  Site is appended after the address on individual e-Invoices.
+                  Site is optional and is appended after the address on individual
+                  e-Invoices when provided.
                 </p>
               </div>
             </div>
@@ -674,7 +661,7 @@ const CustomerFormPage: React.FC = () => {
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-[180px_minmax(260px,1fr)_240px_auto] lg:items-end">
               <div>
                 <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-default-500 dark:text-gray-400">
-                  Site
+                  Site (optional)
                 </label>
                 <input
                   type="text"
@@ -763,7 +750,7 @@ const CustomerFormPage: React.FC = () => {
                   <div className="grid gap-3 sm:grid-cols-[150px_1fr]">
                     <div>
                       <label className="mb-1 block text-xs font-medium text-default-500 dark:text-gray-400">
-                        Site
+                        Site (optional)
                       </label>
                       <input
                         type="text"
@@ -816,7 +803,7 @@ const CustomerFormPage: React.FC = () => {
                 No service locations yet
               </p>
               <p className="text-xs text-default-500 dark:text-gray-400">
-                Add a site and address above.
+                Add an address above. Site can be added when needed.
               </p>
             </div>
           )}

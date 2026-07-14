@@ -20,8 +20,6 @@ type FormStrings = {
   phonePlaceholder: string;
   locationsTitle: string;
   locationLabel: string;
-  siteLabel: string;
-  sitePlaceholder: string;
   addressLabel: string;
   addressPlaceholder: string;
   addLocation: string;
@@ -76,8 +74,6 @@ export const translations: Record<FormLanguage, FormStrings> = {
     phonePlaceholder: "Contoh: 0123456789",
     locationsTitle: "Lokasi",
     locationLabel: "Lokasi",
-    siteLabel: "Tapak",
-    sitePlaceholder: "Contoh: Kolombong",
     addressLabel: "Alamat",
     addressPlaceholder: "Masukkan alamat penuh",
     addLocation: "Tambah lokasi",
@@ -109,7 +105,7 @@ export const translations: Record<FormLanguage, FormStrings> = {
     nameRequired: "Sila isi nama penuh atau nama syarikat.",
     idRequired: "Sila isi No. IC atau No. Syarikat.",
     phoneRequired: "Sila isi nombor telefon.",
-    locationRequired: "Sila isi tapak dan alamat untuk setiap lokasi.",
+    locationRequired: "Sila isi alamat untuk setiap lokasi.",
     paymentRequired: "Sila pilih kaedah pembayaran.",
     einvoiceFieldsRequired: "Sila lengkapkan Jenis ID, No. ID dan No. TIN.",
     invalidEmail: "Sila masukkan alamat e-mel yang sah.",
@@ -133,8 +129,6 @@ export const translations: Record<FormLanguage, FormStrings> = {
     phonePlaceholder: "e.g. 0123456789",
     locationsTitle: "Locations",
     locationLabel: "Location",
-    siteLabel: "Site",
-    sitePlaceholder: "e.g. Kolombong",
     addressLabel: "Address",
     addressPlaceholder: "Enter the full address",
     addLocation: "Add location",
@@ -165,7 +159,7 @@ export const translations: Record<FormLanguage, FormStrings> = {
     nameRequired: "Please enter a full name or company name.",
     idRequired: "Please enter an IC or company number.",
     phoneRequired: "Please enter a telephone number.",
-    locationRequired: "Please enter a site and address for every location.",
+    locationRequired: "Please enter an address for every location.",
     paymentRequired: "Please select a payment method.",
     einvoiceFieldsRequired: "Please enter an ID Type, ID Number and TIN No.",
     invalidEmail: "Please enter a valid email address.",
@@ -189,8 +183,6 @@ export const translations: Record<FormLanguage, FormStrings> = {
     phonePlaceholder: "例如：0123456789",
     locationsTitle: "地点",
     locationLabel: "地点",
-    siteLabel: "地点名称",
-    sitePlaceholder: "例如：Kolombong",
     addressLabel: "地址",
     addressPlaceholder: "请输入完整地址",
     addLocation: "添加地点",
@@ -220,7 +212,7 @@ export const translations: Record<FormLanguage, FormStrings> = {
     nameRequired: "请输入全名或公司名称。",
     idRequired: "请输入身份证号码或公司注册号码。",
     phoneRequired: "请输入电话号码。",
-    locationRequired: "请为每个地点填写地点名称和地址。",
+    locationRequired: "请为每个地点填写地址。",
     paymentRequired: "请选择付款方式。",
     einvoiceFieldsRequired: "请填写证件类型、证件号码和税务识别号码。",
     invalidEmail: "请输入有效的电子邮箱地址。",
