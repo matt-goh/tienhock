@@ -17,6 +17,7 @@ interface ConfirmationDialogProps {
   confirmButtonText?: string;
   variant?: "danger" | "success" | "default";
   hideCancelButton?: boolean;
+  allowContentOverflow?: boolean;
 }
 
 const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
@@ -28,6 +29,7 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   confirmButtonText = "Confirm",
   variant = "danger",
   hideCancelButton = false,
+  allowContentOverflow = false,
 }) => {
   // Define button styles based on variant
   const buttonStyles = {
@@ -74,7 +76,9 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
             leaveTo="opacity-0 scale-95"
           >
             <DialogPanel
-              className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-gray-800 border border-transparent dark:border-gray-700 shadow-xl rounded-2xl"
+              className={`inline-block w-full max-w-md p-6 my-8 text-left align-middle transition-all transform bg-white dark:bg-gray-800 border border-transparent dark:border-gray-700 shadow-xl rounded-2xl ${
+                allowContentOverflow ? "overflow-visible" : "overflow-hidden"
+              }`}
               onClick={(e) => e.stopPropagation()}
             >
               <DialogTitle

@@ -324,7 +324,7 @@ export default function setupRoutes(app, pool) {
   app.use("/greentarget/api/e-caruman", greenTargetECarumanRouter(pool));
   app.use(
     "/greentarget/api/customer-signups",
-    greenTargetCustomerSignupsRouter(pool)
+    greenTargetCustomerSignupsRouter(pool, myInvoisGTConfig)
   );
 
   // Jellypolly routes

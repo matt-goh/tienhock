@@ -280,6 +280,7 @@ const PaymentPage: React.FC = () => {
           onCancellationError={setPaymentCancellationError}
           onAddPaymentToGroup={handleAddPaymentToGroup}
           onViewPaymentGroup={setSelectedReceiptId}
+          requiresClearanceDate
         />
       )}
 

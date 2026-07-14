@@ -1,20 +1,16 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  IconCash,
-  IconPlus,
-  IconSearch,
-} from "@tabler/icons-react";
+import { format } from "date-fns";
+import { IconPlus, IconSearch } from "@tabler/icons-react";
+import toast from "react-hot-toast";
 import Button from "../../../components/Button";
+import GreenTargetPaymentForm from "../../../components/GreenTarget/GreenTargetPaymentForm";
+import GreenTargetPaymentTable from "../../../components/GreenTarget/GreenTargetPaymentTable";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import StyledListbox from "../../../components/StyledListbox";
 import TimeNavigator from "../../../components/TimeNavigator";
 import { greenTargetApi } from "../../../routes/greentarget/api";
-import toast from "react-hot-toast";
-import { Payment } from "../../../types/types";
 import { GreenTargetPayment } from "../../../types/greenTargetTypes";
-import GreenTargetPaymentTable from "../../../components/GreenTarget/GreenTargetPaymentTable";
-import GreenTargetPaymentForm from "../../../components/GreenTarget/GreenTargetPaymentForm";
-import StyledListbox from "../../../components/StyledListbox";
 
 interface PaymentFilters {
   dateRange: {
@@ -29,44 +25,35 @@ interface PaymentFilters {
 const GreenTargetPaymentPage: React.FC = () => {
   const navigate = useNavigate();
   const [payments, setPayments] = useState<GreenTargetPayment[]>([]);
-  const [sortedPayments, setSortedPayments] = useState<GreenTargetPayment[]>(
-    []
-  );
-  const [loading, setLoading] = useState(true);
-  const [showPaymentForm, setShowPaymentForm] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [showPaymentForm, setShowPaymentForm] = useState<boolean>(false);
+  const [selectedPayment, setSelectedPayment] =
+    useState<GreenTargetPayment | null>(null);
 
   const [filters, setFilters] = useState<PaymentFilters>(() => {
-    const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const end = new Date(
-      new Date().getFullYear(),
-      new Date().getMonth() + 1,
-      0
-    );
-    end.setHours(23, 59, 59, 999); // Set to end of day
+    const now: Date = new Date();
+    const start: Date = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end: Date = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    end.setHours(23, 59, 59, 999);
 
     return {
-      dateRange: {
-        start,
-        end,
-      },
+      dateRange: { start, end },
       paymentMethod: null,
-      status: "active", // Default to active payments
+      status: "active",
       searchTerm: "",
     };
   });
 
-  // Fetch payments
-  const fetchPayments = useCallback(async () => {
+  const fetchPayments = useCallback(async (): Promise<void> => {
     setLoading(true);
     try {
-      // For now, fetch all payments and filter client-side
-      // Backend doesn't support all filter parameters yet
-      const response = await greenTargetApi.getPayments({
+      // GT's payment endpoint does not support the page filters yet, so keep
+      // the complete result locally and filter it below.
+      const response = (await greenTargetApi.getPayments({
         includeCancelled: true,
-      });
-      setPayments(response);
-    } catch (error) {
+      })) as GreenTargetPayment[];
+      setPayments(Array.isArray(response) ? response : []);
+    } catch (error: unknown) {
       console.error("Error fetching payments:", error);
       toast.error("Failed to fetch payments");
     } finally {
@@ -74,104 +61,120 @@ const GreenTargetPaymentPage: React.FC = () => {
     }
   }, []);
 
-  // Client-side filtering and sorting
-  const filteredAndSortedPayments = useMemo(() => {
-    let filtered = [...payments];
+  const filteredAndSortedPayments = useMemo<GreenTargetPayment[]>(() => {
+    let filtered: GreenTargetPayment[] = [...payments];
 
-    // Filter by date range
     if (filters.dateRange.start && filters.dateRange.end) {
-      const startTime = filters.dateRange.start.getTime();
-      const endTime = filters.dateRange.end.getTime() + 24 * 60 * 60 * 1000 - 1; // End of day
+      const startDate: string = format(
+        filters.dateRange.start,
+        "yyyy-MM-dd"
+      );
+      const endDate: string = format(filters.dateRange.end, "yyyy-MM-dd");
 
-      filtered = filtered.filter((payment) => {
-        const paymentTime = new Date(payment.payment_date).getTime();
-        return paymentTime >= startTime && paymentTime <= endTime;
+      filtered = filtered.filter((payment: GreenTargetPayment): boolean => {
+        const paymentDate: string = format(
+          new Date(payment.payment_date),
+          "yyyy-MM-dd"
+        );
+        return paymentDate >= startDate && paymentDate <= endDate;
       });
     }
 
-    // Filter by payment method
     if (filters.paymentMethod) {
       filtered = filtered.filter(
-        (payment) => payment.payment_method === filters.paymentMethod
+        (payment: GreenTargetPayment): boolean =>
+          payment.payment_method === filters.paymentMethod
       );
     }
 
-    // Filter by status
     if (filters.status) {
       if (filters.status === "active") {
-        // Include both active (null, undefined, or 'active') and pending payments when 'active' is selected
         filtered = filtered.filter(
-          (payment) =>
+          (payment: GreenTargetPayment): boolean =>
             !payment.status ||
             payment.status === "active" ||
-            payment.status === "pending" ||
-            payment.status === "overpaid"
+            payment.status === "pending"
         );
       } else {
         filtered = filtered.filter(
-          (payment) => payment.status === filters.status
+          (payment: GreenTargetPayment): boolean =>
+            payment.status === filters.status
         );
       }
     }
 
-    // Filter by search term
-    if (filters.searchTerm) {
-      const searchLower = filters.searchTerm.toLowerCase();
+    const normalizedSearchTerm: string = filters.searchTerm.trim().toLowerCase();
+    if (normalizedSearchTerm) {
       filtered = filtered.filter(
-        (payment) =>
-          payment.invoice_id?.toString().toLowerCase().includes(searchLower) ||
-          payment.payment_reference?.toLowerCase().includes(searchLower) ||
-          payment.internal_reference?.toLowerCase().includes(searchLower) ||
-          payment.amount_paid?.toString().includes(searchLower) ||
-          payment.customer_name?.toLowerCase().includes(searchLower)
+        (payment: GreenTargetPayment): boolean =>
+          String(payment.invoice_id)
+            .toLowerCase()
+            .includes(normalizedSearchTerm) ||
+          payment.payment_reference
+            ?.toLowerCase()
+            .includes(normalizedSearchTerm) ||
+          payment.internal_reference
+            ?.toLowerCase()
+            .includes(normalizedSearchTerm) ||
+          String(payment.amount_paid).includes(normalizedSearchTerm) ||
+          payment.customer_name?.toLowerCase().includes(normalizedSearchTerm) ||
+          false
       );
     }
 
-    // Sort payments with pending status at the top, then by date
-    return filtered.sort((a, b) => {
-      // First priority: pending status
-      if (a.status === "pending" && b.status !== "pending") return -1;
-      if (a.status !== "pending" && b.status === "pending") return 1;
+    return filtered.sort(
+      (firstPayment: GreenTargetPayment, secondPayment: GreenTargetPayment): number => {
+        if (
+          firstPayment.status === "pending" &&
+          secondPayment.status !== "pending"
+        ) {
+          return -1;
+        }
+        if (
+          firstPayment.status !== "pending" &&
+          secondPayment.status === "pending"
+        ) {
+          return 1;
+        }
 
-      // Second priority: sort by payment date (newest first)
-      const dateA = new Date(a.payment_date).getTime();
-      const dateB = new Date(b.payment_date).getTime();
-      return dateB - dateA;
-    });
-  }, [payments, filters]);
+        const firstDate: string = format(
+          new Date(firstPayment.payment_date),
+          "yyyy-MM-dd"
+        );
+        const secondDate: string = format(
+          new Date(secondPayment.payment_date),
+          "yyyy-MM-dd"
+        );
+        return secondDate.localeCompare(firstDate);
+      }
+    );
+  }, [filters, payments]);
 
-  // Update sorted payments when filters change
-  useEffect(() => {
-    setSortedPayments(filteredAndSortedPayments);
-  }, [filteredAndSortedPayments]);
+  useEffect((): void => {
+    void fetchPayments();
+  }, [fetchPayments]);
 
-  useEffect(() => {
-    fetchPayments();
-  }, []); // Only fetch once on mount
-
-  // Unified Time Navigator change handler. Handles day, month, and custom-range
-  // selections from the single TimeNavigator control.
   const handleTimeNavigatorChange = useCallback(
-    (range: { start: Date; end: Date }) => {
-      setFilters((prev) => ({
-        ...prev,
+    (range: { start: Date; end: Date }): void => {
+      setFilters((previousFilters: PaymentFilters): PaymentFilters => ({
+        ...previousFilters,
         dateRange: { start: range.start, end: range.end },
       }));
     },
     []
   );
 
-  const handleNewPayment = () => {
+  const handleNewPayment = (): void => {
     setSelectedPayment(null);
     setShowPaymentForm(true);
   };
 
-  const handlePaymentCreated = () => {
+  const handlePaymentCreated = (): void => {
     setShowPaymentForm(false);
-    fetchPayments();
+    void fetchPayments();
   };
 
-  const handleViewPayment = (payment: GreenTargetPayment) => {
+  const handleViewPayment = (payment: GreenTargetPayment): void => {
     navigate(`/greentarget/invoices/${payment.invoice_id}`, {
       state: { scrollToPayments: true },
     });
@@ -179,111 +182,112 @@ const GreenTargetPaymentPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-          <IconCash size={28} className="text-gray-700 dark:text-gray-200" />
-          Payment Management
-        </h1>
-        <Button onClick={handleNewPayment} icon={IconPlus} size="md">
-          New Payment
-        </Button>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-4">
-        <div className="p-4">
-          <div className="flex flex-wrap items-center gap-4">
-            {/* Search */}
-            <div className="relative flex-1 min-w-[200px]">
+      <div className="mb-4 rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="p-3 sm:p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative w-full min-w-0 flex-1 sm:w-auto sm:min-w-[220px]">
               <IconSearch
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
                 size={18}
               />
               <input
                 type="text"
                 placeholder="Search"
-                title="Search payments by invoice, reference, or amount"
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-full focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                title="Search payments by invoice, reference, customer, or amount"
+                className="h-[40px] w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 text-default-900 placeholder:text-default-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder:text-gray-400"
                 value={filters.searchTerm}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    searchTerm: e.target.value,
-                  }))
+                onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
+                  setFilters(
+                    (previousFilters: PaymentFilters): PaymentFilters => ({
+                      ...previousFilters,
+                      searchTerm: event.target.value,
+                    })
+                  )
                 }
               />
             </div>
 
-            {/* Time Navigator */}
-            <div className="w-full sm:w-auto">
+            <div className="w-full min-w-0 sm:w-auto">
               <TimeNavigator
                 range={filters.dateRange}
                 onChange={handleTimeNavigatorChange}
+                className="max-w-full"
               />
             </div>
 
-            {/* Payment Method Filter */}
-            <StyledListbox
-              value={filters.paymentMethod || ""}
-              onChange={(value) => {
-                setFilters((prev) => ({
-                  ...prev,
-                  paymentMethod: value === "" ? null : String(value),
-                }));
-              }}
-              options={[
-                { id: "", name: "All Methods" },
-                { id: "cash", name: "Cash" },
-                { id: "cheque", name: "Cheque" },
-                { id: "bank_transfer", name: "Bank Transfer" },
-                { id: "online", name: "Online" },
-              ]}
-              className="w-full sm:w-40"
-              placeholder="All Methods"
-            />
+            <div className="w-[calc(50%-0.375rem)] min-w-[130px] sm:w-40">
+              <StyledListbox
+                value={filters.paymentMethod || ""}
+                onChange={(value: string | number): void =>
+                  setFilters(
+                    (previousFilters: PaymentFilters): PaymentFilters => ({
+                      ...previousFilters,
+                      paymentMethod: value === "" ? null : String(value),
+                    })
+                  )
+                }
+                options={[
+                  { id: "", name: "All Methods" },
+                  { id: "cash", name: "Cash" },
+                  { id: "cheque", name: "Cheque" },
+                  { id: "bank_transfer", name: "Bank Transfer" },
+                  { id: "online", name: "Online" },
+                ]}
+                placeholder="All Methods"
+                rounded="lg"
+              />
+            </div>
 
-            {/* Status Filter */}
-            <StyledListbox
-              value={filters.status || ""}
-              onChange={(value) => {
-                setFilters((prev) => ({
-                  ...prev,
-                  status: value === "" ? null : String(value),
-                }));
-              }}
-              options={[
-                { id: "", name: "All Status" },
-                { id: "active", name: "Active" },
-                { id: "pending", name: "Pending" },
-                { id: "overpaid", name: "Overpaid" },
-                { id: "cancelled", name: "Cancelled" },
-              ]}
-              className="w-full sm:w-40"
-              placeholder="All Status"
-            />
+            <div className="w-[calc(50%-0.375rem)] min-w-[130px] sm:w-40">
+              <StyledListbox
+                value={filters.status || ""}
+                onChange={(value: string | number): void =>
+                  setFilters(
+                    (previousFilters: PaymentFilters): PaymentFilters => ({
+                      ...previousFilters,
+                      status: value === "" ? null : String(value),
+                    })
+                  )
+                }
+                options={[
+                  { id: "", name: "All Status" },
+                  { id: "active", name: "Active" },
+                  { id: "pending", name: "Pending" },
+                  { id: "cancelled", name: "Cancelled" },
+                ]}
+                placeholder="All Status"
+                rounded="lg"
+              />
+            </div>
+
+            <Button
+              onClick={handleNewPayment}
+              icon={IconPlus}
+              size="md"
+              className="w-full whitespace-nowrap sm:w-auto"
+            >
+              New Payment
+            </Button>
           </div>
         </div>
       </div>
 
-      {/* Payments Table */}
       {loading ? (
-        <div className="flex justify-center items-center h-64">
+        <div className="flex h-64 items-center justify-center">
           <LoadingSpinner />
         </div>
       ) : (
         <GreenTargetPaymentTable
-          payments={sortedPayments}
+          payments={filteredAndSortedPayments}
           onViewPayment={handleViewPayment}
           onRefresh={fetchPayments}
         />
       )}
 
-      {/* Payment Form Modal */}
       {showPaymentForm && (
         <GreenTargetPaymentForm
           payment={selectedPayment}
-          onClose={() => setShowPaymentForm(false)}
+          onClose={(): void => setShowPaymentForm(false)}
           onSuccess={handlePaymentCreated}
           dateRange={filters.dateRange}
         />

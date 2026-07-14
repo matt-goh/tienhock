@@ -22,7 +22,7 @@ export default function (pool) {
         queryParams.push(customer_id);
       }
 
-      query += " ORDER BY c.name, l.address";
+      query += " ORDER BY c.name, COALESCE(l.site, ''), l.address";
 
       const result = await pool.query(query, queryParams);
       res.json(result.rows);
@@ -37,12 +37,20 @@ export default function (pool) {
 
   // Create a new location
   router.post("/", async (req, res) => {
-    const { customer_id, address, phone_number } = req.body;
+    const customer_id = req.body.customer_id;
+    const site = String(req.body.site || "").trim();
+    const address = String(req.body.address || "").trim();
+    const phone_number = String(req.body.phone_number || "").trim();
 
     if (!customer_id || !address) {
       return res
         .status(400)
         .json({ message: "Customer ID and address are required" });
+    }
+    if (site.length > 100 || address.length > 255 || phone_number.length > 20) {
+      return res.status(400).json({
+        message: "Site, address, or phone number exceeds the maximum length",
+      });
     }
 
     try {
@@ -59,16 +67,17 @@ export default function (pool) {
         return res.status(404).json({ message: "Customer not found" });
       }
 
-      // Then create the location - modify this query to include phone_number
+      // Then create the location.
       const locationQuery = `
-      INSERT INTO greentarget.locations (customer_id, address, phone_number)
-      VALUES ($1, $2, $3)
+      INSERT INTO greentarget.locations (customer_id, site, address, phone_number)
+      VALUES ($1, $2, $3, $4)
       RETURNING *
     `;
       const locationResult = await pool.query(locationQuery, [
         customer_id,
+        site || null,
         address,
-        phone_number,
+        phone_number || null,
       ]);
 
       res.status(201).json({
@@ -87,16 +96,32 @@ export default function (pool) {
   // Update a location
   router.put("/:id", async (req, res) => {
     const { id } = req.params;
-    const { address, phone_number } = req.body;
+    const site = String(req.body.site || "").trim();
+    const address = String(req.body.address || "").trim();
+    const phone_number = String(req.body.phone_number || "").trim();
+
+    if (!address) {
+      return res.status(400).json({ message: "Address is required" });
+    }
+    if (site.length > 100 || address.length > 255 || phone_number.length > 20) {
+      return res.status(400).json({
+        message: "Site, address, or phone number exceeds the maximum length",
+      });
+    }
 
     try {
       const query = `
         UPDATE greentarget.locations
-        SET address = $1, phone_number = $2
-        WHERE location_id = $3
+        SET site = $1, address = $2, phone_number = $3
+        WHERE location_id = $4
         RETURNING *
       `;
-      const result = await pool.query(query, [address, phone_number, id]);
+      const result = await pool.query(query, [
+        site || null,
+        address,
+        phone_number || null,
+        id,
+      ]);
 
       if (result.rows.length === 0) {
         return res.status(404).json({ message: "Location not found" });

@@ -297,11 +297,11 @@ const HomePage: React.FC = () => {
     }
 
     return (
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {groups.map((itemGroup: NavigationGroup) => (
           <div key={itemGroup.name} className="space-y-0.5">
             {shouldShowGroupHeaders && (
-              <p className="px-2.5 pt-1 text-[11px] font-semibold text-gray-400 dark:text-gray-500">
+              <p className="px-2.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                 {itemGroup.name}
               </p>
             )}
@@ -314,6 +314,9 @@ const HomePage: React.FC = () => {
     );
   };
 
+  // Masonry card for one category. Cards flow through a CSS multi-column
+  // container and are kept intact via break-inside-avoid, so short cards pack
+  // under tall ones instead of stretching to fill a stretched grid row.
   const renderCategoryCard = (
     section: CompanySection,
     category: NavigationItem
@@ -323,7 +326,7 @@ const HomePage: React.FC = () => {
     return (
       <div
         key={category.name}
-        className="flex flex-col rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 hover:bg-white dark:hover:bg-gray-800 hover:shadow-sm hover:border-gray-200 dark:hover:border-gray-600 transition-all duration-200"
+        className="mb-4 break-inside-avoid rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 hover:bg-white dark:hover:bg-gray-800 hover:shadow-sm hover:border-gray-200 dark:hover:border-gray-600 transition-all duration-200"
       >
         <div className="flex items-start gap-3 p-3 pb-2">
           {Icon && (
@@ -343,9 +346,7 @@ const HomePage: React.FC = () => {
           </div>
         </div>
         <div className="mx-3 border-t border-gray-100 dark:border-gray-700" />
-        <div className="p-2 flex-grow">
-          {renderGroupedSubItems(section, category)}
-        </div>
+        <div className="p-2">{renderGroupedSubItems(section, category)}</div>
       </div>
     );
   };
@@ -422,7 +423,7 @@ const HomePage: React.FC = () => {
 
             <div className="p-4">
               {shouldUseCategoryLayout ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-x-4">
                   {section.items.map((category: NavigationItem) =>
                     renderCategoryCard(section, category)
                   )}

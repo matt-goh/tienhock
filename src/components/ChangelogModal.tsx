@@ -20,6 +20,51 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-14",
+    ms: "Pengesahan cek tertunda Jelly Polly kini menggunakan Tarikh Penjelasan yang bermula pada hari ini dan boleh diubah kepada tarikh sebenar pada penyata bank. Tarikh cek diterima kekal dalam sejarah bayaran, manakala penyata penghutang menggunakan tarikh penjelasan. Butang Sahkan dan Batal pada Pengurusan Bayaran Jelly Polly kini mengemas kini bayaran Jelly Polly yang betul.",
+    en: "Jelly Polly pending-cheque confirmation now uses a Clearance Date picker starting on today, which can be changed to the actual bank-statement date. The cheque-received date remains in payment history, while debtor statements use the clearance date. Confirm and Cancel in Jelly Polly Payment Management now update the correct Jelly Polly payment.",
+  },
+  {
+    date: "2026-07-14",
+    ms: "Apabila Nombor Rujukan catatan jurnal manual diubah, Nombor Jurnal pada Lejar Akaun kini turut dikemas kini. PCE008/06 tidak lagi dipaparkan sebagai PV008/06 dalam lejar BANK_PBB; amaun, tarikh dan akaunnya tidak diubah.",
+    en: "When a manual journal's Reference No. is changed, its Journal No. in Account Ledger now stays in sync. PCE008/06 no longer appears as PV008/06 in the BANK_PBB ledger; its amount, date, and accounts are unchanged.",
+  },
+  {
+    date: "2026-07-14",
+    ms: "Memadam catatan jurnal kini berjaya walaupun ia dipautkan kepada Nota Kredit, Debit atau Bayaran Balik — pautan ke nota itu dibuang secara automatik. Bagi jurnal yang dipautkan kepada rekod lain (invois, resit, bayaran, atau kemasukan bank), penjelasan yang jelas ditunjukkan dan bukannya ralat pangkalan data.",
+    en: "Deleting a journal entry now works even when it is linked to a Credit, Debit, or Refund Note — the link to the note is cleared automatically. Journals linked to other records (invoices, receipts, payments, or bank-ins) still show a clear explanation instead of a database error.",
+  },
+  {
+    date: "2026-07-14",
+    ms: "Semasa mengesahkan bayaran cek Tien Hock yang tertunda, Tarikh Penjelasan diperlukan. Di Pengurusan Bayaran, pemilih tarikh bermula pada hari ini; ubahnya kepada tarikh sebenar pada penyata bank jika berbeza. Lejar akaun, laporan bank dan pengumuran penghutang menggunakan tarikh penjelasan itu. Empat cek HAPSENG dan TETAP JAYA berjumlah RM39,090.10 yang diterima pada Jun telah dipindahkan ke 7 dan 10 Julai.",
+    en: "A Clearance Date is required when confirming a pending Tien Hock cheque payment. In Payment Management, the date picker starts on today; change it to the actual bank-statement date when different. Account ledgers, bank reports, and debtor aging use that clearance date. Four HAPSENG and TETAP JAYA cheques totalling RM39,090.10 that were received in June have been moved to 7 and 10 July.",
+  },
+  {
+    date: "2026-07-14",
+    ms: "Pelanggan Green Target kini boleh mempunyai nama Tapak bagi setiap lokasi. Semua nama Tapak berbeza daripada sewaan dalam satu invois disertakan selepas alamat bil pada e-Invois jualan individu dan nota pelarasannya. Borang pendaftaran awam kini menerima beberapa lokasi, mewajibkan maklumat asas, menggunakan logo Green Target, serta menyembunyikan maklumat e-Invois sehingga pelanggan memilih untuk memerlukannya; maklumat pengenalan e-Invois disahkan sebelum permintaan diterima. Senarai pilihan e-Invois pada borang pelanggan juga kekal di atas bar tindakan supaya semua pilihan boleh dipilih.",
+    en: "Green Target customers can now have a Site name for each location. Every distinct Site from the rentals on an invoice is included after the billing address on individual sales e-Invoices and their adjustment notes. The public registration form now accepts multiple locations, requires the basic details, uses the Green Target logo, and hides e-Invoice information until the customer says they need it; e-Invoice identity details are verified before the request is accepted. E-Invoice selection lists on the customer form also remain above the action bar so every option can be selected.",
+  },
+  {
+    date: "2026-07-14",
+    ms: "Halaman Bayaran Green Target kini menggunakan susun atur yang lebih kemas dan mesra telefon, menunjukkan invois aktif serta tertunggak untuk bayaran, dan membolehkan tempoh carian invois ditukar. Amaun yang tidak sah diterangkan sebelum dihantar, manakala amaun melebihi baki disekat kerana Green Target tidak menyimpan lebihan itu sebagai kredit pelanggan. Bayaran cek tertunda juga boleh dibatalkan tanpa mengubah baki invois.",
+    en: "Green Target Payments now uses a cleaner, mobile-friendly layout, includes both active and overdue invoices for payment, and lets users change the invoice search period. Invalid amounts are explained before submission, while amounts above the outstanding balance are blocked because Green Target does not store the excess as customer credit. Pending cheque payments can also be cancelled without changing the invoice balance.",
+  },
+  {
+    date: "2026-07-14",
+    ms: "Halaman senarai dan butiran Gaji Green Target kini menggunakan susun atur moden dengan carian pekerja, paparan Kumpulan atau Terkini, pilihan cetakan slip gaji, serta pecahan pendapatan dan potongan yang lebih jelas. Jumlah Digenapkan digunakan secara konsisten, dan cetakan slip gaji Green Target kini mengambil bayaran pertengahan bulan yang betul tanpa tersalah mengambil rekod syarikat lain. Bayaran pertengahan bulan yang dibatalkan tidak lagi ditolak daripada gaji atau laporan, dan item gaji manual kekal termasuk dalam jumlah apabila gaji diproses semula. Pautan pantas Driver Habuk kini tersedia bersebelahan Office Entry, manakala butang muat turun semua PDF telah dibuang; pilihan cetakan slip gaji kekal tersedia.",
+    en: "Green Target Payroll list and details pages now use a modern layout with employee search, Groups or Recent views, selectable payslip printing, and clearer earnings and deduction breakdowns. Rounded Pay is used consistently, and Green Target payslip printing now includes the correct mid-month payment without accidentally loading another company's payroll record. Cancelled mid-month payments are no longer deducted from payroll or reports, and manual payroll items remain included in totals when payroll is reprocessed. A Driver Habuk shortcut is now available beside Office Entry, while the download-all-PDFs button has been removed; payslip printing options remain available.",
+  },
+  {
+    date: "2026-07-14",
+    ms: "Lejar Akaun kini memaparkan Baki Bawa Ke Hadapan dalam lajur Debit atau Kredit (mengikut sama ada baki itu debit atau kredit), selain lajur Baki, pada paparan skrin dan cetakan PDF — mengikut amalan perakaunan lejar biasa.",
+    en: "The Account Ledger now shows the Balance Brought Forward in the Debit or Credit column (depending on whether it is a debit or credit balance), in addition to the Balance column, both on screen and in the printed PDF — following standard ledger accounting practice.",
+  },
+  {
+    date: "2026-07-14",
+    ms: "Catatan jurnal jenis Bank Payment kini mempunyai medan Cheque No seperti Cash Payment, dengan nilai lalai \"PBE\".",
+    en: "Bank Payment journal entries now have a Cheque No field like Cash Payment, pre-filled with the default value \"PBE\".",
+  },
+  {
+    date: "2026-07-14",
     ms: "Halaman Stok Bahan kini mengingati bulan yang dipilih dan kedudukan skrol, jadi apabila anda keluar dan kembali ke halaman itu, ia akan berada di tempat yang sama seperti sebelumnya.",
     en: "The Material Stock page now remembers the selected month and your scroll position, so when you leave and return to the page it stays where you left off.",
   },

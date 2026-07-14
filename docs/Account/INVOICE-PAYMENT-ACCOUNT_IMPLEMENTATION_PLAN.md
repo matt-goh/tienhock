@@ -376,7 +376,7 @@ Miscellaneous non-sales RV receipts such as worker repayments or vendor refunds 
 
 - Replace the current frontend loop with one atomic backend request containing header plus allocations.
 - Support cash, cheque, bank transfer, and online methods already present in the app.
-- Store `received_date` separately from nullable `cleared_at`/accounting posting date. A pending cheque has no journal or balance effect; confirmation preserves when it was received and posts on the actual clearance date.
+- Store `received_date` separately from nullable `cleared_at`/accounting posting date. A pending cheque has no journal or balance effect; confirmation preserves when it was received and posts on the actual clearance date. The confirmation UI must show and submit that date; Payment Management defaults its local-date picker to today for convenience, and the user changes it to the actual bank-statement date when different. The backend must never silently substitute the received date or server date.
 - Support one/many invoices, one/many customers where business data requires it, partial allocations, and one unapplied excess.
 - Show invoice balance as of the receipt transaction, not only today's mutable balance.
 - Validate totals in the transaction: received total = allocated total + unapplied excess.
@@ -384,6 +384,7 @@ Miscellaneous non-sales RV receipts such as worker repayments or vendor refunds 
 - A physical-cash receipt's unbanked amount is its entire debit to CH_REV2, including any customer-owned unapplied excess. RV availability must not strand the excess outside the cash bank-in workflow.
 - Applying a `CUST_DEP` overpayment to a later invoice posts DR that customer's `CUST_DEP` balance / CR the same customer's debtor account. Applying an existing CN-created debtor credit to another open invoice of the same customer is an open-item allocation within the same debtor account and creates no second revenue journal. If no application UI is shipped in this project, keep these balances refundable only and state that limitation explicitly rather than silently consuming them.
 - Pending cheque confirmation must identify the exact receipt header, not every payment anywhere that happens to share `payment_reference`.
+- Jelly Polly keeps its separate per-invoice payment model and creates no shared-ledger receipt journal, but follows the same date contract: `payment_date` remains the received/history date, nullable `posting_date` is set to the actual clearance date on confirmation, and debtor statements use the posting date. Its shared payment UI must call `/jellypolly/api/payments`, never Tien Hock's `/api/payments`.
 - Confirmation, cancellation, and correction must be idempotent and audit-safe.
 - Prevent cancellation of a cash receipt already allocated to a posted bank-in until the dependent bank-in is cancelled/reversed first.
 - Prevent invoice/payment-type edits that would orphan bank-in allocations. Either implement a fully reconciled conversion or block it with a clear explanation.

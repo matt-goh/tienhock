@@ -1,41 +1,104 @@
-// src/pages/GreenTarget/PublicForm/CustomerSignupPage.tsx
 // Public (unauthenticated), mobile-first Green Target customer registration form.
 // Served on greentarget.tienhock.com and at /greentarget-form for dev/testing.
-// Self-contained: no Navbar, no auth context, no shared app form components.
-import { useEffect, useState, FormEvent } from "react";
-import { IconCheck, IconDownload } from "@tabler/icons-react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
+import {
+  IconCheck,
+  IconDownload,
+  IconMapPin,
+  IconPlus,
+  IconTrash,
+} from "@tabler/icons-react";
 import { API_BASE_URL } from "../../../configs/config";
+import Checkbox from "../../../components/Checkbox";
+import GreenTargetLogo from "../../../utils/GreenTargetLogo";
 import {
   translations,
   LANGUAGE_LABELS,
-  FormLanguage,
+  type FormLanguage,
 } from "./translations";
 
 type PaymentMethod = "cash" | "online" | "qr";
+type IdentityType = "BRN" | "NRIC" | "PASSPORT" | "ARMY";
+
+interface SignupLocation {
+  clientId: number;
+  site: string;
+  address: string;
+}
+
+interface SelectOption {
+  id: string;
+  name: string;
+}
+
+interface SignupErrorResponse {
+  code?: string;
+  message?: string;
+}
 
 const QR_IMAGE_PATH = "/greentarget-duitnow-qr.jpg";
+const MAX_LOCATIONS = 20;
 
-// The form is served by Cloudflare Pages (greentarget.tienhock.com) while the API
-// lives at api.tienhock.com (Cloudflare Tunnel) — always a cross-origin call, so
-// use the configured API base (prod: https://api.tienhock.com, dev: localhost:5000).
+const ID_TYPE_OPTIONS: SelectOption[] = [
+  { id: "BRN", name: "BRN" },
+  { id: "NRIC", name: "NRIC" },
+  { id: "PASSPORT", name: "PASSPORT" },
+  { id: "ARMY", name: "ARMY" },
+];
 
-const CustomerSignupPage = () => {
+const STATE_OPTIONS: SelectOption[] = [
+  { id: "01", name: "JOHOR" },
+  { id: "02", name: "KEDAH" },
+  { id: "03", name: "KELANTAN" },
+  { id: "04", name: "MELAKA" },
+  { id: "05", name: "NEGERI SEMBILAN" },
+  { id: "06", name: "PAHANG" },
+  { id: "07", name: "PULAU PINANG" },
+  { id: "08", name: "PERAK" },
+  { id: "09", name: "PERLIS" },
+  { id: "10", name: "SELANGOR" },
+  { id: "11", name: "TERENGGANU" },
+  { id: "12", name: "SABAH" },
+  { id: "13", name: "SARAWAK" },
+  { id: "14", name: "WILAYAH PERSEKUTUAN KUALA LUMPUR" },
+  { id: "15", name: "WILAYAH PERSEKUTUAN LABUAN" },
+  { id: "16", name: "WILAYAH PERSEKUTUAN PUTRAJAYA" },
+  { id: "17", name: "NOT APPLICABLE" },
+];
+
+const inputClassName =
+  "w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-gray-900 shadow-sm outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-500/20 lg:py-3";
+
+const createBlankLocation = (clientId: number): SignupLocation => ({
+  clientId,
+  site: "",
+  address: "",
+});
+
+const CustomerSignupPage = (): JSX.Element => {
   const [lang, setLang] = useState<FormLanguage>("ms");
   const t = translations[lang];
+  const nextLocationId = useRef<number>(1);
+
+  const [name, setName] = useState<string>("");
+  const [idNumber, setIdNumber] = useState<string>("");
+  const [phone, setPhone] = useState<string>("");
+  const [locations, setLocations] = useState<SignupLocation[]>([
+    createBlankLocation(0),
+  ]);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | "">("");
+  const [einvoiceRequested, setEinvoiceRequested] = useState<boolean>(false);
+  const [idType, setIdType] = useState<IdentityType | "">("");
+  const [tinNumber, setTinNumber] = useState<string>("");
+  const [email, setEmail] = useState<string>("");
+  const [state, setState] = useState<string>("12");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [submitted, setSubmitted] = useState<boolean>(false);
 
   useEffect((): void => {
     document.title = `${t.title} | Green Target`;
   }, [t.title]);
-
-  const [name, setName] = useState("");
-  const [idNumber, setIdNumber] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | "">("");
-
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
 
   const paymentOptions: { value: PaymentMethod; label: string }[] = [
     { value: "cash", label: t.paymentCash },
@@ -43,26 +106,124 @@ const CustomerSignupPage = () => {
     { value: "qr", label: t.paymentQr },
   ];
 
-  const resetForm = () => {
+  const resetForm = (): void => {
+    nextLocationId.current = 1;
     setName("");
     setIdNumber("");
     setPhone("");
-    setAddress("");
+    setLocations([createBlankLocation(0)]);
     setPaymentMethod("");
+    setEinvoiceRequested(false);
+    setIdType("");
+    setTinNumber("");
+    setEmail("");
+    setState("12");
     setError(null);
     setSubmitted(false);
   };
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  const updateLocation = (
+    clientId: number,
+    field: "site" | "address",
+    value: string
+  ): void => {
+    setLocations((currentLocations: SignupLocation[]) =>
+      currentLocations.map((location: SignupLocation) =>
+        location.clientId === clientId
+          ? { ...location, [field]: value }
+          : location
+      )
+    );
+  };
+
+  const addLocation = (): void => {
+    if (locations.length >= MAX_LOCATIONS) return;
+    const clientId = nextLocationId.current;
+    nextLocationId.current += 1;
+    setLocations((currentLocations: SignupLocation[]) => [
+      ...currentLocations,
+      createBlankLocation(clientId),
+    ]);
+  };
+
+  const removeLocation = (clientId: number): void => {
+    setLocations((currentLocations: SignupLocation[]) =>
+      currentLocations.length === 1
+        ? currentLocations
+        : currentLocations.filter(
+            (location: SignupLocation) => location.clientId !== clientId
+          )
+    );
+  };
+
+  const getResponseError = (
+    status: number,
+    responseBody: SignupErrorResponse
+  ): string => {
+    if (status === 429) return t.rateLimited;
+
+    switch (responseBody.code) {
+      case "EINVOICE_FIELDS_REQUIRED":
+        return t.einvoiceFieldsRequired;
+      case "INVALID_EMAIL":
+        return t.invalidEmail;
+      case "EINVOICE_IDENTITY_INVALID":
+        return t.invalidEinvoiceIdentity;
+      case "EINVOICE_VALIDATION_UNAVAILABLE":
+        return t.einvoiceUnavailable;
+      default:
+        return t.submitError;
+    }
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+    if (submitting) return;
     setError(null);
+
+    const normalizedLocations = locations.map((location: SignupLocation) => ({
+      site: location.site.trim(),
+      address: location.address.trim(),
+    }));
 
     if (!name.trim()) {
       setError(t.nameRequired);
       return;
     }
+    if (!idNumber.trim()) {
+      setError(t.idRequired);
+      return;
+    }
+    if (!phone.trim()) {
+      setError(t.phoneRequired);
+      return;
+    }
+    if (
+      normalizedLocations.length === 0 ||
+      normalizedLocations.some(
+        (location: { site: string; address: string }) =>
+          !location.site || !location.address
+      )
+    ) {
+      setError(t.locationRequired);
+      return;
+    }
     if (!paymentMethod) {
       setError(t.paymentRequired);
+      return;
+    }
+    if (
+      einvoiceRequested &&
+      (!idType || !tinNumber.trim() || !email.trim() || !state)
+    ) {
+      setError(t.einvoiceFieldsRequired);
+      return;
+    }
+    if (
+      einvoiceRequested &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+    ) {
+      setError(t.invalidEmail);
       return;
     }
 
@@ -77,63 +238,71 @@ const CustomerSignupPage = () => {
             name: name.trim(),
             id_number: idNumber.trim(),
             phone_number: phone.trim(),
-            address: address.trim(),
+            locations: normalizedLocations,
             payment_method: paymentMethod,
+            einvoice_requested: einvoiceRequested,
+            id_type: einvoiceRequested ? idType : null,
+            tin_number: einvoiceRequested ? tinNumber.trim() : null,
+            email: einvoiceRequested ? email.trim() : null,
+            state: einvoiceRequested ? state : null,
           }),
         }
       );
 
-      if (response.status === 429) {
-        setError(t.rateLimited);
-        return;
-      }
+      const responseBody: SignupErrorResponse = await response
+        .json()
+        .catch((): SignupErrorResponse => ({}));
+
       if (!response.ok) {
-        setError(t.submitError);
+        setError(getResponseError(response.status, responseBody));
         return;
       }
 
       setSubmitted(true);
-    } catch (err) {
+    } catch (submitError: unknown) {
+      console.error("Error submitting Green Target signup:", submitError);
       setError(t.submitError);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const LanguageSwitcher = () => (
-    <div className="flex items-center gap-1 rounded-full bg-white/20 p-1 text-sm">
-      {(Object.keys(LANGUAGE_LABELS) as FormLanguage[]).map((code) => (
-        <button
-          key={code}
-          type="button"
-          onClick={() => setLang(code)}
-          className={`rounded-full px-3 py-1 font-medium transition-colors ${
-            lang === code
-              ? "bg-white text-green-700"
-              : "text-white hover:bg-white/20"
-          }`}
-        >
-          {LANGUAGE_LABELS[code]}
-        </button>
-      ))}
+  const LanguageSwitcher = (): JSX.Element => (
+    <div className="flex items-center gap-1 rounded-full bg-white/15 p-1 text-sm lg:mt-12 lg:self-start">
+      {(Object.keys(LANGUAGE_LABELS) as FormLanguage[]).map(
+        (code: FormLanguage) => (
+          <button
+            key={code}
+            type="button"
+            onClick={(): void => setLang(code)}
+            className={`rounded-full px-3 py-1 font-medium transition-colors ${
+              lang === code
+                ? "bg-white text-green-800 shadow-sm"
+                : "text-white hover:bg-white/15"
+            }`}
+          >
+            {LANGUAGE_LABELS[code]}
+          </button>
+        )
+      )}
     </div>
   );
 
-  const QrBlock = () => (
-    <div className="mt-4 flex flex-col items-center rounded-xl border border-green-200 bg-green-50 p-4">
+  const QrBlock = (): JSX.Element => (
+    <div className="mt-4 flex flex-col items-center rounded-2xl border border-green-200 bg-green-50 p-4">
       <img
         src={QR_IMAGE_PATH}
         alt="DuitNow QR"
-        className="w-56 max-w-full rounded-lg bg-white p-2 shadow-sm"
+        className="w-56 max-w-full rounded-xl bg-white p-2 shadow-sm"
       />
-      <p className="mt-2 text-center text-sm font-medium text-green-800">
+      <p className="mt-2 text-center text-sm font-semibold text-green-900">
         {t.qrCompany}
       </p>
       <p className="mt-1 text-center text-xs text-green-700">{t.qrHint}</p>
       <a
         href={QR_IMAGE_PATH}
         download="greentarget-duitnow-qr.jpg"
-        className="mt-3 inline-flex items-center gap-2 rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-700"
+        className="mt-3 inline-flex items-center gap-2 rounded-full bg-green-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-800"
       >
         <IconDownload size={18} />
         {t.downloadQr}
@@ -141,159 +310,395 @@ const CustomerSignupPage = () => {
     </div>
   );
 
+  const RequiredMark = (): JSX.Element => (
+    <span className="text-red-500" aria-hidden="true">
+      *
+    </span>
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-md">
-        {/* Header */}
-        <div className="bg-green-700 px-5 pb-6 pt-5 text-white">
-          <div className="flex items-center justify-between">
-            <span className="text-lg font-bold tracking-wide">Green Target</span>
+    <div className="min-h-screen bg-gradient-to-b from-green-50 to-gray-100 px-0 py-0 sm:px-5 sm:py-8 lg:px-8 lg:py-8 xl:px-12">
+      <div className="mx-auto max-w-2xl overflow-hidden bg-white shadow-xl sm:rounded-3xl lg:grid lg:max-w-7xl lg:grid-cols-[280px_minmax(0,1fr)] lg:rounded-[2rem] xl:grid-cols-[320px_minmax(0,1fr)]">
+        <header className="bg-gradient-to-br from-green-800 to-green-600 px-5 py-5 text-white sm:px-8 lg:relative lg:flex lg:min-h-full lg:overflow-hidden lg:px-8 lg:py-10">
+          <span
+            aria-hidden="true"
+            className="hidden lg:absolute lg:-right-20 lg:-top-20 lg:block lg:h-64 lg:w-64 lg:rounded-full lg:bg-white/5"
+          />
+          <span
+            aria-hidden="true"
+            className="hidden lg:absolute lg:-bottom-24 lg:-left-24 lg:block lg:h-72 lg:w-72 lg:rounded-full lg:border lg:border-white/10"
+          />
+          <div className="flex items-center justify-between gap-4 lg:relative lg:z-10 lg:flex-1 lg:flex-col lg:items-stretch lg:justify-start">
+            <div className="flex min-w-0 items-center gap-3 lg:flex-col lg:items-start lg:gap-5">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white p-1 shadow-sm lg:h-24 lg:w-24 lg:rounded-3xl lg:p-2">
+                <GreenTargetLogo
+                  width={48}
+                  height={48}
+                  className="lg:h-20 lg:w-20"
+                />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-lg font-bold tracking-wide lg:text-2xl">
+                  Green Target
+                </p>
+                <p className="text-xs text-green-100 lg:mt-1 lg:text-sm">
+                  Waste Treatment
+                </p>
+              </div>
+            </div>
+
+            <div aria-hidden="true" className="hidden lg:block lg:pt-14">
+              <div className="lg:h-px lg:w-14 lg:bg-green-300/70" />
+              <h2 className="lg:mt-6 lg:text-3xl lg:font-bold lg:leading-tight">
+                {t.title}
+              </h2>
+              <p className="lg:mt-3 lg:text-sm lg:leading-6 lg:text-green-100">
+                {t.subtitle}
+              </p>
+
+              <div className="lg:mt-10 lg:space-y-5">
+                <div className="lg:flex lg:items-center lg:gap-3">
+                  <span className="lg:flex lg:h-8 lg:w-8 lg:shrink-0 lg:items-center lg:justify-center lg:rounded-full lg:border lg:border-white/30 lg:text-xs lg:font-bold">
+                    01
+                  </span>
+                  <span className="lg:text-sm lg:font-medium lg:text-green-50">
+                    {t.nameLabel}
+                  </span>
+                </div>
+                <div className="lg:flex lg:items-center lg:gap-3">
+                  <span className="lg:flex lg:h-8 lg:w-8 lg:shrink-0 lg:items-center lg:justify-center lg:rounded-full lg:border lg:border-white/30 lg:text-xs lg:font-bold">
+                    02
+                  </span>
+                  <span className="lg:text-sm lg:font-medium lg:text-green-50">
+                    {t.locationsTitle}
+                  </span>
+                </div>
+                <div className="lg:flex lg:items-center lg:gap-3">
+                  <span className="lg:flex lg:h-8 lg:w-8 lg:shrink-0 lg:items-center lg:justify-center lg:rounded-full lg:border lg:border-white/30 lg:text-xs lg:font-bold">
+                    03
+                  </span>
+                  <span className="lg:text-sm lg:font-medium lg:text-green-50">
+                    {t.paymentLabel}
+                  </span>
+                </div>
+              </div>
+            </div>
             <LanguageSwitcher />
           </div>
-        </div>
+        </header>
 
-        <div className="px-5 pb-16">
+        <main className="px-5 pb-14 pt-6 sm:px-8 lg:px-10 lg:pb-12 lg:pt-10 xl:px-12">
           {submitted ? (
-            <div className="mt-10 flex flex-col items-center text-center">
+            <div className="flex min-h-[420px] flex-col items-center justify-center text-center lg:min-h-[calc(100vh-8rem)]">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-                <IconCheck size={36} className="text-green-600" />
+                <IconCheck size={36} className="text-green-700" />
               </div>
-              <h1 className="mt-4 text-xl font-bold text-gray-800">
+              <h1 className="mt-4 text-2xl font-bold text-gray-900">
                 {t.successTitle}
               </h1>
-              <p className="mt-1 text-gray-600">{t.successMessage}</p>
+              <p className="mt-2 text-gray-600">{t.successMessage}</p>
               {paymentMethod === "qr" && <QrBlock />}
               <button
                 type="button"
                 onClick={resetForm}
-                className="mt-6 rounded-full border border-green-600 px-5 py-2 text-sm font-semibold text-green-700 transition-colors hover:bg-green-50"
+                className="mt-7 rounded-full border border-green-700 px-5 py-2.5 text-sm font-semibold text-green-800 transition-colors hover:bg-green-50"
               >
                 {t.submitAnother}
               </button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-              <div>
-                <h1 className="text-xl font-bold text-gray-800">{t.title}</h1>
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-6 lg:grid lg:grid-cols-[minmax(0,1.08fr)_minmax(300px,0.92fr)] lg:items-start lg:gap-x-6 lg:gap-y-6 lg:space-y-0"
+            >
+              <div className="lg:col-span-2">
+                <h1 className="text-2xl font-bold text-gray-900">{t.title}</h1>
                 <p className="mt-1 text-sm text-gray-500">{t.subtitle}</p>
               </div>
 
-              {/* Name (required) */}
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  {t.nameLabel}{" "}
-                  <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder={t.namePlaceholder}
-                  maxLength={255}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-gray-900 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-                />
-              </div>
+              <section className="grid gap-4 rounded-2xl border border-gray-200 bg-gray-50/70 p-4 sm:grid-cols-2 lg:col-span-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] lg:p-5">
+                <div className="sm:col-span-2 lg:col-span-1">
+                  <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                    {t.nameLabel} <RequiredMark />
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(event): void => setName(event.target.value)}
+                    placeholder={t.namePlaceholder}
+                    maxLength={255}
+                    required
+                    autoComplete="name"
+                    className={inputClassName}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                    {t.idLabel} <RequiredMark />
+                  </label>
+                  <input
+                    type="text"
+                    value={idNumber}
+                    onChange={(event): void => setIdNumber(event.target.value)}
+                    placeholder={t.idPlaceholder}
+                    maxLength={50}
+                    required
+                    className={inputClassName}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                    {t.phoneLabel} <RequiredMark />
+                  </label>
+                  <input
+                    type="tel"
+                    inputMode="tel"
+                    value={phone}
+                    onChange={(event): void => setPhone(event.target.value)}
+                    placeholder={t.phonePlaceholder}
+                    maxLength={20}
+                    required
+                    autoComplete="tel"
+                    className={inputClassName}
+                  />
+                </div>
+              </section>
 
-              {/* IC / Company No. */}
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  {t.idLabel}{" "}
-                  <span className="text-xs font-normal text-gray-400">
-                    ({t.optional})
-                  </span>
-                </label>
-                <input
-                  type="text"
-                  value={idNumber}
-                  onChange={(e) => setIdNumber(e.target.value)}
-                  placeholder={t.idPlaceholder}
-                  maxLength={50}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-gray-900 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-                />
-              </div>
+              <section className="space-y-3 lg:col-start-1 lg:row-span-5 lg:row-start-3 lg:rounded-3xl lg:border lg:border-gray-200 lg:bg-gray-50/70 lg:p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-base font-bold text-gray-900">
+                      {t.locationsTitle}
+                    </h2>
+                    <p className="text-xs text-gray-500">
+                      {locations.length} {t.locationLabel.toLowerCase()}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addLocation}
+                    disabled={locations.length >= MAX_LOCATIONS}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-green-700 px-3 py-2 text-sm font-semibold text-green-800 transition-colors hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <IconPlus size={17} />
+                    {t.addLocation}
+                  </button>
+                </div>
 
-              {/* Phone */}
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  {t.phoneLabel}{" "}
-                  <span className="text-xs font-normal text-gray-400">
-                    ({t.optional})
-                  </span>
-                </label>
-                <input
-                  type="tel"
-                  inputMode="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder={t.phonePlaceholder}
-                  maxLength={30}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-gray-900 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-                />
-              </div>
+                {locations.map((location: SignupLocation, index: number) => (
+                  <div
+                    key={location.clientId}
+                    className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
+                  >
+                    <div className="mb-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm font-bold text-gray-800">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 text-green-700">
+                          <IconMapPin size={17} />
+                        </span>
+                        {t.locationLabel} {index + 1}
+                      </div>
+                      {locations.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={(): void => removeLocation(location.clientId)}
+                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+                          aria-label={`${t.removeLocation} ${index + 1}`}
+                        >
+                          <IconTrash size={16} />
+                          {t.removeLocation}
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-[180px_1fr] lg:grid-cols-1 2xl:grid-cols-[180px_1fr]">
+                      <div>
+                        <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                          {t.siteLabel} <RequiredMark />
+                        </label>
+                        <input
+                          type="text"
+                          value={location.site}
+                          onChange={(event): void =>
+                            updateLocation(
+                              location.clientId,
+                              "site",
+                              event.target.value
+                            )
+                          }
+                          placeholder={t.sitePlaceholder}
+                          maxLength={100}
+                          required
+                          className={inputClassName}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                          {t.addressLabel} <RequiredMark />
+                        </label>
+                        <textarea
+                          value={location.address}
+                          onChange={(event): void =>
+                            updateLocation(
+                              location.clientId,
+                              "address",
+                              event.target.value
+                            )
+                          }
+                          placeholder={t.addressPlaceholder}
+                          maxLength={255}
+                          rows={2}
+                          required
+                          className={`${inputClassName} resize-y`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </section>
 
-              {/* Address */}
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  {t.addressLabel}{" "}
-                  <span className="text-xs font-normal text-gray-400">
-                    ({t.optional})
-                  </span>
-                </label>
-                <textarea
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder={t.addressPlaceholder}
-                  maxLength={500}
-                  rows={3}
-                  className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2.5 text-gray-900 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+              <section className="rounded-2xl border border-green-200 bg-green-50/60 p-4 lg:col-start-2 lg:row-start-3 lg:p-5">
+                <Checkbox
+                  checked={einvoiceRequested}
+                  onChange={setEinvoiceRequested}
+                  checkedColor="text-green-700"
+                  ariaLabel={t.einvoiceRequestLabel}
+                  label={t.einvoiceRequestLabel}
+                  className="items-start"
+                  buttonClassName="mt-0.5 rounded"
                 />
-              </div>
+                <p className="ml-7 mt-1 text-xs text-green-800">
+                  {t.einvoiceRequestHint}
+                </p>
 
-              {/* Payment method */}
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  {t.paymentLabel} <span className="text-red-500">*</span>
+                {einvoiceRequested && (
+                  <div className="mt-4 border-t border-green-200 pt-4">
+                    <h2 className="mb-3 text-sm font-bold text-green-950">
+                      {t.einvoiceTitle}
+                    </h2>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                      <div>
+                        <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                          {t.idTypeLabel} <RequiredMark />
+                        </label>
+                        <select
+                          value={idType}
+                          onChange={(event): void =>
+                            setIdType(event.target.value as IdentityType | "")
+                          }
+                          required={einvoiceRequested}
+                          className={inputClassName}
+                        >
+                          <option value="">{t.idTypePlaceholder}</option>
+                          {ID_TYPE_OPTIONS.map((option: SelectOption) => (
+                            <option key={option.id} value={option.id}>
+                              {option.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                          {t.tinLabel} <RequiredMark />
+                        </label>
+                        <input
+                          type="text"
+                          value={tinNumber}
+                          onChange={(event): void =>
+                            setTinNumber(event.target.value)
+                          }
+                          placeholder={t.tinPlaceholder}
+                          maxLength={20}
+                          required={einvoiceRequested}
+                          className={inputClassName}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                          {t.emailLabel} <RequiredMark />
+                        </label>
+                        <input
+                          type="email"
+                          value={email}
+                          onChange={(event): void => setEmail(event.target.value)}
+                          placeholder={t.emailPlaceholder}
+                          maxLength={255}
+                          required={einvoiceRequested}
+                          autoComplete="email"
+                          className={inputClassName}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                          {t.stateLabel} <RequiredMark />
+                        </label>
+                        <select
+                          value={state}
+                          onChange={(event): void => setState(event.target.value)}
+                          required={einvoiceRequested}
+                          className={inputClassName}
+                        >
+                          <option value="">{t.statePlaceholder}</option>
+                          {STATE_OPTIONS.map((option: SelectOption) => (
+                            <option key={option.id} value={option.id}>
+                              {option.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </section>
+
+              <section className="lg:col-start-2 lg:row-start-4 lg:rounded-2xl lg:border lg:border-gray-200 lg:bg-white lg:p-5 lg:shadow-sm">
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  {t.paymentLabel} <RequiredMark />
                 </label>
                 <div className="grid grid-cols-3 gap-2">
-                  {paymentOptions.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setPaymentMethod(opt.value)}
-                      className={`rounded-lg border px-2 py-3 text-sm font-medium transition-colors ${
-                        paymentMethod === opt.value
-                          ? "border-green-600 bg-green-50 text-green-700 ring-1 ring-green-600"
-                          : "border-gray-300 bg-white text-gray-700 hover:border-green-400"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
+                  {paymentOptions.map(
+                    (option: { value: PaymentMethod; label: string }) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={(): void => setPaymentMethod(option.value)}
+                        className={`rounded-xl border px-2 py-3 text-sm font-semibold transition ${
+                          paymentMethod === option.value
+                            ? "border-green-700 bg-green-50 text-green-800 ring-1 ring-green-700"
+                            : "border-gray-300 bg-white text-gray-700 hover:border-green-500"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    )
+                  )}
                 </div>
                 {paymentMethod === "qr" && <QrBlock />}
-              </div>
+              </section>
 
-              {/* Same-day payment note */}
-              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
-                <p className="text-sm font-medium text-red-700">
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 lg:col-start-2 lg:row-start-5">
+                <p className="text-sm font-semibold text-red-700">
                   {t.paymentNote}
                 </p>
               </div>
 
               {error && (
-                <p className="text-sm font-medium text-red-600">{error}</p>
+                <div
+                  role="alert"
+                  className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 lg:col-start-2"
+                >
+                  {error}
+                </div>
               )}
 
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full rounded-full bg-green-600 py-3 text-base font-semibold text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full rounded-full bg-green-700 py-3.5 text-base font-bold text-white shadow-sm transition-colors hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-60 lg:col-start-2"
               >
                 {submitting ? t.submitting : t.submit}
               </button>
             </form>
           )}
-        </div>
+        </main>
       </div>
     </div>
   );

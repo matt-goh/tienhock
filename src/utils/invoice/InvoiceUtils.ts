@@ -373,24 +373,48 @@ export const createPayment = async (
 };
 
 // CONFIRM Payment (mark pending payment as paid)
+interface ConfirmPaymentRequest {
+  bank_account?: string;
+  posting_date?: string;
+}
+
+interface ConfirmPaymentResponse {
+  message: string;
+  payments?: Payment[];
+  payment?: Payment;
+}
+
 export const confirmPayment = async (
   paymentId: number,
-  bank_account?: string
+  bank_account?: string,
+  postingDate?: string,
+  apiEndpoint: string = "/api/payments"
 ): Promise<Payment[]> => {
   try {
-    const response: { message: string; payments: Payment[] } = await api.put<{
-      message: string;
-      payments: Payment[];
-    }>(`/api/payments/${paymentId}/confirm`, { bank_account });
-    // The backend now returns { message: string, payments: Payment[] }
-    if (!response || !response.payments || !Array.isArray(response.payments)) {
+    const request: ConfirmPaymentRequest = {
+      bank_account,
+      posting_date: postingDate,
+    };
+    const response: ConfirmPaymentResponse =
+      await api.put<ConfirmPaymentResponse>(
+        `${apiEndpoint}/${paymentId}/confirm`,
+        request
+      );
+    const confirmedPayments: Payment[] | null = Array.isArray(
+      response?.payments
+    )
+      ? response.payments
+      : response?.payment
+      ? [response.payment]
+      : null;
+    if (!confirmedPayments || confirmedPayments.length === 0) {
       throw new Error("Invalid response received after confirming payment(s).");
     }
     await refreshCreditsCache(); // Refresh customer cache
 
     // The calling component will handle the success toast.
 
-    return response.payments;
+    return confirmedPayments;
   } catch (error: unknown) {
     console.error(`Error confirming payment ${paymentId}:`, error);
     const errorMessage =
@@ -471,13 +495,19 @@ export const getPaymentCancellationErrorData = (
 };
 
 // CANCEL Payment
+interface CancelPaymentOptions {
+  showErrorToast?: boolean;
+  apiEndpoint?: string;
+}
+
 export const cancelPayment = async (
   paymentId: number,
   reason?: string,
-  options: { showErrorToast?: boolean } = {}
+  options: CancelPaymentOptions = {}
 ): Promise<Payment> => {
   try {
-    const response = await api.put(`/api/payments/${paymentId}/cancel`, {
+    const apiEndpoint: string = options.apiEndpoint || "/api/payments";
+    const response = await api.put(`${apiEndpoint}/${paymentId}/cancel`, {
       reason,
     });
     if (!response || !response.payment) {
