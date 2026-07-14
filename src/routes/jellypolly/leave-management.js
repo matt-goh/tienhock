@@ -1,7 +1,6 @@
 // src/routes/payroll/leave-management.js
 import { Router } from "express";
 
-const CUTI_TAHUNAN_ADVANCE_LOCATION_CODE = "23";
 const PACKING_CUTI_NOTE_PREFIX = "PACKING_CUTI";
 const PACKING_CUTI_JOB_TYPES = new Set(["MEE_PACKING", "BH_PACKING"]);
 const PACKING_PRODUCT_TYPES = {
@@ -445,11 +444,11 @@ export default function (pool) {
                      FROM jellypolly.commission_records cr
                     WHERE cr.employee_id = ANY($1::text[])
                       AND EXTRACT(YEAR FROM cr.commission_date) = $2
-                      AND cr.location_code = $3
+                      AND cr.is_advance = true
                  ) leave_sources
                 WHERE total_taken IS NOT NULL
                 GROUP BY leave_type;`,
-              [siblingIds, parseInt(year), CUTI_TAHUNAN_ADVANCE_LOCATION_CODE]
+              [siblingIds, parseInt(year)]
             );
 
             const takenLeave = takenLeaveResult.rows.reduce((acc, row) => {
@@ -567,11 +566,11 @@ export default function (pool) {
                  FROM jellypolly.commission_records cr
                 WHERE cr.employee_id = ANY($1::text[])
                   AND EXTRACT(YEAR FROM cr.commission_date) = $2
-                  AND cr.location_code = $3
+                  AND cr.is_advance = true
              ) leave_sources
             WHERE total_taken IS NOT NULL
             GROUP BY leave_type;`,
-          [siblingIds, parseInt(year), CUTI_TAHUNAN_ADVANCE_LOCATION_CODE]
+          [siblingIds, parseInt(year)]
         );
 
         const takenLeave = takenLeaveResult.rows.reduce((acc, row) => {
@@ -642,10 +641,10 @@ export default function (pool) {
                  FROM jellypolly.commission_records cr
                 WHERE cr.employee_id = ANY($1::text[])
                   AND EXTRACT(YEAR FROM cr.commission_date) = $2
-                  AND cr.location_code = $3
+                  AND cr.is_advance = true
              ) leave_sources
             ORDER BY leave_date DESC`,
-          [siblingIds, parseInt(year), CUTI_TAHUNAN_ADVANCE_LOCATION_CODE]
+          [siblingIds, parseInt(year)]
         );
         res.json(result.rows);
       } finally {
@@ -808,15 +807,10 @@ export default function (pool) {
               WHERE cr.employee_id = ANY($1::text[])
                 AND EXTRACT(YEAR FROM cr.commission_date) = $2
                 AND EXTRACT(MONTH FROM cr.commission_date) = $3
-                AND cr.location_code = $4
+                AND cr.is_advance = true
            ) leave_sources
            ORDER BY leave_date ASC;`,
-          [
-            siblingIds,
-            parseInt(year),
-            parseInt(month),
-            CUTI_TAHUNAN_ADVANCE_LOCATION_CODE,
-          ]
+          [siblingIds, parseInt(year), parseInt(month)]
         );
         res.json(result.rows);
       } finally {
@@ -938,7 +932,7 @@ export default function (pool) {
             FROM employee_info ei
             JOIN jellypolly.commission_records cr ON cr.employee_id = ANY(ei.sibling_ids)
             WHERE EXTRACT(YEAR FROM cr.commission_date) = $2
-              AND cr.location_code = $3
+              AND cr.is_advance = true
           ),
           leave_taken AS (
             SELECT
@@ -992,11 +986,7 @@ export default function (pool) {
           ORDER BY ei.name
         `;
 
-        const result = await client.query(query, [
-          employeeIds,
-          year,
-          CUTI_TAHUNAN_ADVANCE_LOCATION_CODE,
-        ]);
+        const result = await client.query(query, [employeeIds, year]);
 
         // Process the results to match the expected frontend format
         const employees = result.rows.map((row) => {
