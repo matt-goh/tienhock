@@ -1020,7 +1020,11 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
       const original: StockKilangItem | undefined = originalStockKilangMap.get(
         item.product_id
       );
-      return !original || item.quantity !== original.quantity;
+      return (
+        !original ||
+        item.quantity !== original.quantity ||
+        item.unit_cost !== original.unit_cost
+      );
     },
     [originalStockKilangMap]
   );
@@ -1047,7 +1051,11 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
 
     return stockKilang.some((item: StockKilangItem) => {
       const original: StockKilangItem | undefined = originalMap.get(item.product_id);
-      return !original || item.quantity !== original.quantity;
+      return (
+        !original ||
+        item.quantity !== original.quantity ||
+        item.unit_cost !== original.unit_cost
+      );
     });
   }, [activeTab, stockKilang, originalStockKilang]);
 
@@ -1320,6 +1328,22 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
           ...item,
           quantity,
           value: quantity * item.unit_cost,
+        };
+      })
+    );
+  };
+
+  const handleStockKilangUnitCostChange = (productId: string, value: string): void => {
+    const unitCost: number = makeNumber(value);
+
+    setStockKilang((prev: StockKilangItem[]) =>
+      prev.map((item: StockKilangItem) => {
+        if (item.product_id !== productId) return item;
+
+        return {
+          ...item,
+          unit_cost: unitCost,
+          value: item.quantity * unitCost,
         };
       })
     );
@@ -1829,15 +1853,15 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
       let stockKilangSaved = false;
 
       if (hasStockKilangUnsavedChanges) {
-        const stockKilangEntries: StockKilangSaveEntry[] = stockKilang
-          .map((item: StockKilangItem) => ({
+        // Send every row (including zero-quantity price overrides); the backend
+        // keeps only rows with a quantity or a non-default unit cost.
+        const stockKilangEntries: StockKilangSaveEntry[] = stockKilang.map(
+          (item: StockKilangItem) => ({
             product_id: item.product_id,
             quantity: item.quantity,
             unit_cost: item.unit_cost,
-          }))
-          .filter(
-            (entry: StockKilangSaveEntry) => entry.quantity !== 0
-          );
+          })
+        );
 
         await api.post("/api/materials/stock-kilang/batch", {
           year,
@@ -3379,8 +3403,11 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                           (value) => handleStockKilangQuantityChange(item.product_id, value)
                         )}
                       </td>
-                      <td className="px-2 py-1.5 text-right font-mono text-sm text-default-500 dark:text-gray-400">
-                        {formatNumber(item.unit_cost)}
+                      <td className="px-1 py-1">
+                        {renderUnitCostInput(
+                          item.unit_cost,
+                          (value) => handleStockKilangUnitCostChange(item.product_id, value)
+                        )}
                       </td>
                       <td className="px-2 py-1.5 text-right">
                         <span className="font-mono text-sm font-medium text-emerald-600 dark:text-emerald-400">

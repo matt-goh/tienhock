@@ -6,12 +6,15 @@ import {
   IconMoon,
   IconDatabaseExport,
   IconHistory,
+  IconExternalLink,
 } from "@tabler/icons-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useState, useRef, useEffect } from "react";
 import BackupModal from "../BackupModal";
 import ChangelogModal from "../ChangelogModal";
+
+const GT_SIGNUP_PREVIEW_PATH = "/greentarget/dev/customer-signup-preview";
 
 export default function NavbarUserMenu() {
   const { user, logout } = useAuth();
@@ -21,6 +24,8 @@ export default function NavbarUserMenu() {
   const [isChangelogOpen, setIsChangelogOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const canAccessSignupPreview: boolean =
+    import.meta.env.DEV && user?.id === "MATTHEW";
 
   // Handle hover open/close
   const handleMouseEnter = () => {
@@ -73,6 +78,11 @@ export default function NavbarUserMenu() {
     }, 0);
   };
 
+  const handleSignupPreviewClick = (): void => {
+    setIsOpen(false);
+    window.open(GT_SIGNUP_PREVIEW_PATH, "_blank", "noopener,noreferrer");
+  };
+
   return (
     <>
       <div
@@ -118,6 +128,19 @@ export default function NavbarUserMenu() {
                   />
                 </Switch>
               </div>
+
+              {canAccessSignupPreview && (
+                <button
+                  className="h-9 group flex w-full items-center rounded-md px-2 text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 transition-colors duration-200"
+                  onClick={handleSignupPreviewClick}
+                >
+                  <IconExternalLink
+                    className="mr-2 h-5 w-5"
+                    stroke={1.5}
+                  />
+                  Customer Signup Preview
+                </button>
+              )}
 
               {/* Changelog Option */}
               <button
