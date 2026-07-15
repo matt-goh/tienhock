@@ -23,6 +23,16 @@ interface EditRatesState {
   is_default: boolean;
 }
 
+// Only a blank field means "inherit the default rate". 0 is a real override —
+// e.g. a salesman record that must not earn commission — so it has to survive
+// as 0 rather than collapse into null.
+const parseRateOverride = (value: string): number | null => {
+  const trimmedValue = value.trim();
+  if (trimmedValue === "") return null;
+  const numericValue = Number(trimmedValue);
+  return Number.isFinite(numericValue) ? numericValue : NaN;
+};
+
 interface EditEmployeePayCodeRatesModalProps {
   // API base for pay-code endpoints (JP passes /jellypolly/api)
   apiBase?: string;
@@ -116,14 +126,18 @@ const EditEmployeePayCodeRatesModal: React.FC<
     setIsSaving(true);
     setError(null);
 
-    const newBiasa =
-      editRates.biasa.trim() === ""
-        ? null
-        : parseFloat(editRates.biasa) || null;
-    const newAhad =
-      editRates.ahad.trim() === "" ? null : parseFloat(editRates.ahad) || null;
-    const newUmum =
-      editRates.umum.trim() === "" ? null : parseFloat(editRates.umum) || null;
+    const newBiasa = parseRateOverride(editRates.biasa);
+    const newAhad = parseRateOverride(editRates.ahad);
+    const newUmum = parseRateOverride(editRates.umum);
+
+    const hasInvalidRate = [newBiasa, newAhad, newUmum].some(
+      (rate: number | null): boolean => rate !== null && !Number.isFinite(rate)
+    );
+    if (hasInvalidRate) {
+      setError("Invalid rate value. Rates must be valid numbers.");
+      setIsSaving(false);
+      return;
+    }
 
     if (
       (newBiasa !== null && newBiasa < 0) ||
@@ -286,6 +300,7 @@ const EditEmployeePayCodeRatesModal: React.FC<
                         </div>
                       </div>
                       <PayRateScheduleManager
+                        apiBase={apiBase}
                         scope="employee"
                         payCodeId={payCodeDetail.id}
                         employeeId={employeeId}
