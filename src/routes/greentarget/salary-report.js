@@ -72,8 +72,27 @@ const columnForItem = (item) => {
   return "gaji";
 };
 
+// Commission/bonus advances (is_advance rows, stored as work_log_type='advance'
+// items) are already deducted from net_pay by the GT payroll processor. Summing
+// them back out here reproduces its commissionAdvanceCents.
+const advanceTotalOf = (items) =>
+  round2(
+    items.reduce(
+      (sum, item) =>
+        item.work_log_type === "advance" ? sum + (Number(item.amount) || 0) : sum,
+      0
+    )
+  );
+
 // Build the per-employee column row from its items / deductions / mid-month.
-const buildRow = (ep, items, deductions, midMonthAmount, leaveAmount = 0) => {
+const buildRow = (
+  ep,
+  items,
+  deductions,
+  midMonthAmount,
+  leaveAmount = 0,
+  advanceTotal = 0
+) => {
   const row = emptyTotals();
   for (const item of items) {
     row[columnForItem(item)] += Number(item.amount) || 0;
@@ -98,7 +117,11 @@ const buildRow = (ep, items, deductions, midMonthAmount, leaveAmount = 0) => {
       row.pcb += emp;
     }
   }
-  row.gaji_bersih = Number(ep.net_pay) || 0;
+  // GAJI BERSIH / JUMLAH / S.DIGENAP show the TOTAL earned salary, adding back
+  // advances already paid out, so the report reflects full salary rather than
+  // cash-in-hand (same convention as TH). The Bank/Pinjam tabs subtract the
+  // advance again via gaji_genap to get the actual take-home.
+  row.gaji_bersih = (Number(ep.net_pay) || 0) + advanceTotal;
   row.setengah_bulan = Number(midMonthAmount) || 0;
   const jumlah = row.gaji_bersih - row.setengah_bulan;
   row.jumlah = jumlah;
@@ -130,7 +153,8 @@ export default function (pool) {
     const eps = await pool.query(
       `SELECT ep.id, ep.monthly_payroll_id, ep.employee_id, ep.job_type,
               ep.gross_pay, ep.net_pay, ep.digenapkan, ep.setelah_digenapkan,
-              s.name as employee_name
+              s.name as employee_name,
+              s.ic_no, s.bank_account_number, s.payment_preference
        FROM greentarget.employee_payrolls ep
        LEFT JOIN public.staffs s ON ep.employee_id = s.id
        WHERE ep.monthly_payroll_id = ANY($1)`,
@@ -139,7 +163,7 @@ export default function (pool) {
     const epIds = eps.rows.map((e) => e.id);
     if (epIds.length === 0) return [];
 
-    const [items, deds, mid, leave] = await Promise.all([
+    const [items, deds, mid, leave, pinjam] = await Promise.all([
       pool.query(
         `SELECT pi.employee_payroll_id, pi.amount, pi.work_log_type,
                 pc.pay_type, pc.report_column
@@ -172,6 +196,17 @@ export default function (pool) {
          GROUP BY employee_id, EXTRACT(MONTH FROM leave_date)`,
         [year]
       ),
+      // Monthly pinjam for the Pinjam/Bank tabs. mid_month pinjam is excluded:
+      // it is settled against the mid-month advance, not the month-end pay.
+      pool.query(
+        `SELECT employee_id, month,
+                CAST(amount AS NUMERIC(10,2)) AS amount,
+                COALESCE(NULLIF(btrim(description), ''), 'Pinjam') AS description
+         FROM greentarget.pinjam_records
+         WHERE year = $1 AND pinjam_type = 'monthly'
+         ORDER BY amount DESC`,
+        [year]
+      ),
     ]);
 
     const itemsByEp = {};
@@ -193,15 +228,38 @@ export default function (pool) {
       leaveByEmpMonth[`${l.employee_id}_${l.month}`] = Number(l.amount);
     });
 
+    const pinjamByEmpMonth = {};
+    pinjam.rows.forEach((p) => {
+      const key = `${p.employee_id}_${p.month}`;
+      if (!pinjamByEmpMonth[key]) {
+        pinjamByEmpMonth[key] = { total: 0, details: [] };
+      }
+      pinjamByEmpMonth[key].total = round2(
+        pinjamByEmpMonth[key].total + (Number(p.amount) || 0)
+      );
+      pinjamByEmpMonth[key].details.push({
+        description: p.description,
+        amount: Number(p.amount) || 0,
+      });
+    });
+
     return eps.rows.map((ep) => {
       const month = monthByMp[ep.monthly_payroll_id];
+      const epItems = itemsByEp[ep.id] || [];
+      const advanceTotal = advanceTotalOf(epItems);
       const row = buildRow(
         ep,
-        itemsByEp[ep.id] || [],
+        epItems,
         dedsByEp[ep.id] || [],
         midByEmpMonth[`${ep.employee_id}_${month}`] || 0,
-        leaveByEmpMonth[`${ep.employee_id}_${month}`] || 0
+        leaveByEmpMonth[`${ep.employee_id}_${month}`] || 0,
+        advanceTotal
       );
+      const pinjamEntry = pinjamByEmpMonth[`${ep.employee_id}_${month}`];
+      // Bank/Pinjam show the remaining gaji/genap after advances already paid.
+      // It reconciles with the Salary tab: gaji_genap + advances = setelah_digenapkan.
+      const gajiGenap = round2(row.setelah_digenapkan - advanceTotal);
+      const totalPinjam = pinjamEntry ? pinjamEntry.total : 0;
       return {
         month,
         job_type: ep.job_type || "OTHER",
@@ -209,6 +267,13 @@ export default function (pool) {
         employee_name: ep.employee_name || ep.employee_id,
         ep_id: ep.id,
         row,
+        ic_no: ep.ic_no || null,
+        bank_account_number: ep.bank_account_number || null,
+        payment_preference: ep.payment_preference || null,
+        gaji_genap: gajiGenap,
+        total_pinjam: totalPinjam,
+        pinjam_details: pinjamEntry ? pinjamEntry.details : [],
+        final_total: round2(gajiGenap - totalPinjam),
       };
     });
   };
@@ -249,7 +314,66 @@ export default function (pool) {
       const locations = Object.values(groups).sort(
         (a, b) => groupRank(a.location) - groupRank(b.location)
       );
-      res.json({ year, month, locations, grand_totals: grand });
+
+      // Employee / Bank / Pinjam tabs list each person once, sorted by name.
+      // GT payroll rows are already one per employee per month.
+      const byName = [...rows].sort((a, b) =>
+        (a.employee_name || "").localeCompare(b.employee_name || "")
+      );
+
+      const pinjamData = byName.map((r, index) => ({
+        no: index + 1,
+        staff_id: r.employee_id,
+        staff_name: r.employee_name,
+        payment_preference: r.payment_preference,
+        gaji_genap: r.gaji_genap,
+        total_pinjam: r.total_pinjam,
+        pinjam_details: r.pinjam_details,
+        final_total: r.final_total,
+        net_pay: r.row.gaji_bersih,
+        mid_month_amount: r.row.setengah_bulan,
+      }));
+
+      res.json({
+        year,
+        month,
+        locations,
+        grand_totals: grand,
+        // Pinjam tab
+        data: pinjamData,
+        total_records: pinjamData.length,
+        summary: {
+          total_gaji_genap: round2(
+            pinjamData.reduce((sum, r) => sum + r.gaji_genap, 0)
+          ),
+          total_pinjam: round2(
+            pinjamData.reduce((sum, r) => sum + r.total_pinjam, 0)
+          ),
+          total_final: round2(
+            pinjamData.reduce((sum, r) => sum + r.final_total, 0)
+          ),
+        },
+        // Employee tab
+        employees: byName.map((r, index) => ({
+          no: index + 1,
+          employee_payroll_id: r.ep_id,
+          staff_id: r.employee_id,
+          staff_name: r.employee_name,
+          ...r.row,
+        })),
+        employees_grand_totals: grand,
+        // Bank tab — only people with money to pay out this month.
+        bank_data: byName
+          .filter((r) => r.final_total > 0)
+          .map((r, index) => ({
+            no: index + 1,
+            staff_name: r.employee_name,
+            icNo: r.ic_no || "N/A",
+            bankAccountNumber: r.bank_account_number || "N/A",
+            total: r.final_total,
+            payment_preference: r.payment_preference,
+          })),
+      });
     } catch (error) {
       console.error("Error building GT salary report:", error);
       res.status(500).json({

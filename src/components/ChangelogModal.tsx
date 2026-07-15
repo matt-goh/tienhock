@@ -20,6 +20,16 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-15",
+    ms: "Laporan Gaji Jelly Polly dan Green Target kini sama seperti Tien Hock. Empat tab baharu ditambah: Employee (senarai rata semua pekerja dengan jumlah keseluruhan), Bank (nama, No. K/P dan nombor akaun bank untuk pembayaran bulan itu), Pinjam (gaji/genap tolak pinjam bulan itu, dengan setiap pinjam dipaparkan pada baris pekerja dan ringkasan \"Pinjam by Type\"), dan Cuti (hari diambil/kelayakan serta amaun bagi setiap jenis cuti). Semua tab boleh dicetak dan dimuat turun sebagai PDF, dan tab Pinjam mempunyai butang \"Breakdown\" untuk mencetak senarai pekerja mengikut jenis pinjam. Susun atur halaman kini mengikut Tien Hock. Pinjam jenis mid-month tidak dimasukkan kerana ia sudah ditolak daripada pendahuluan pertengahan bulan.",
+    en: "The Jelly Polly and Green Target Salary Reports now match Tien Hock. Four new tabs were added: Employee (a flat list of every staff with grand totals), Bank (name, IC No. and bank account number for that month's payments), Pinjam (gaji/genap less that month's pinjam, with each pinjam shown on the staff's row and a \"Pinjam by Type\" summary), and Cuti (days taken/entitlement and amount for each leave type). Every tab can be printed and downloaded as a PDF, and the Pinjam tab has a \"Breakdown\" button that prints the staff behind each pinjam type. The page layout now follows Tien Hock. Mid-month pinjam is not included, as it is already deducted from the mid-month advance.",
+  },
+  {
+    date: "2026-07-15",
+    ms: "Jelly Polly dan Green Target: lajur GAJI BERSIH, JUMLAH dan SETELAH DIGENAPKAN dalam Laporan Gaji kini menunjukkan jumlah gaji yang diperoleh sepenuhnya, termasuk bonus/komisen yang telah dibayar awal (advance) — sama seperti Tien Hock. Sebelum ini advance sudah ditolak daripada angka tersebut. Tab Bank dan Pinjam pula menunjukkan wang sebenar yang akan diterima pekerja (selepas tolak advance), jadi angka pembayaran tidak berubah. Ini hanya memberi kesan kepada pekerja yang mempunyai rekod advance.",
+    en: "Jelly Polly and Green Target: the GAJI BERSIH, JUMLAH and SETELAH DIGENAPKAN columns in the Salary Report now show the full salary earned, including any bonus/commission already paid out as an advance — the same as Tien Hock. Previously the advance was already subtracted from those figures. The Bank and Pinjam tabs still show the actual money the staff will receive (after the advance), so payment amounts are unchanged. This only affects staff who have advance records.",
+  },
+  {
+    date: "2026-07-15",
     ms: "Membetulkan bilangan hari cuti pada slip gaji. Cuti sehari dicetak sebagai \"01.0 Hari\", dan dua hari cuti jenis yang sama dicetak sebagai \"01.01.0 Hari\" dengan jumlah bayaran yang salah. Kini ia dicetak dengan betul sebagai \"1 Hari\" dan \"2 Hari\", untuk semua jenis cuti dan semua syarikat.",
     en: "Fixed the number of leave days shown on payslips. One day of leave printed as \"01.0 Hari\", and two days of the same leave type printed as \"01.01.0 Hari\" with an incorrect total amount. They now print correctly as \"1 Hari\" and \"2 Hari\", for every leave type and all companies.",
   },

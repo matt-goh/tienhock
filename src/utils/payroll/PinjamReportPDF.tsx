@@ -496,6 +496,9 @@ export interface PinjamReportPDFData {
     total_pinjam: number;
     total_final: number;
   };
+  // Optional company header (default Tien Hock); Green Target passes its own.
+  companyName?: string;
+  logoSrc?: string;
 }
 
 // PDF Components
@@ -545,7 +548,10 @@ const PinjamRow: React.FC<{
 const PinjamReportPDF: React.FC<{
   data: PinjamReportPDFData;
   companyName?: string;
-}> = ({ data, companyName = TIENHOCK_INFO.name }) => {
+}> = ({ data, companyName }) => {
+  const resolvedCompanyName =
+    companyName ?? data.companyName ?? TIENHOCK_INFO.name;
+  const resolvedLogo = data.logoSrc ?? TienHockLogo;
   const reportTitle = `${getMonthName(data.month)} ${data.year} Pinjam Report`;
   const pinjamByType = aggregatePinjamByType(data.data);
 
@@ -554,9 +560,9 @@ const PinjamReportPDF: React.FC<{
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
-          <Image src={TienHockLogo} style={styles.logo} />
+          <Image src={resolvedLogo} style={styles.logo} />
           <View style={styles.headerTextContainer}>
-            <Text style={styles.companyName}>{companyName}</Text>
+            <Text style={styles.companyName}>{resolvedCompanyName}</Text>
             <Text style={styles.reportTitle}>{reportTitle}</Text>
           </View>
         </View>
@@ -652,7 +658,10 @@ const PinjamReportPDF: React.FC<{
 const PinjamBreakdownPDF: React.FC<{
   data: PinjamReportPDFData;
   companyName?: string;
-}> = ({ data, companyName = TIENHOCK_INFO.name }) => {
+}> = ({ data, companyName }) => {
+  const resolvedCompanyName =
+    companyName ?? data.companyName ?? TIENHOCK_INFO.name;
+  const resolvedLogo = data.logoSrc ?? TienHockLogo;
   const reportTitle = `${getMonthName(data.month)} ${data.year} Pinjam Breakdown`;
   const pinjamByType = aggregatePinjamByType(data.data);
   const contributorsByType = aggregatePinjamContributorsByType(data.data);
@@ -663,9 +672,9 @@ const PinjamBreakdownPDF: React.FC<{
     >
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
-          <Image src={TienHockLogo} style={styles.logo} />
+          <Image src={resolvedLogo} style={styles.logo} />
           <View style={styles.headerTextContainer}>
-            <Text style={styles.companyName}>{companyName}</Text>
+            <Text style={styles.companyName}>{resolvedCompanyName}</Text>
             <Text style={styles.reportTitle}>{reportTitle}</Text>
           </View>
         </View>
