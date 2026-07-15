@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-15",
+    ms: "Pada bahagian Kod Gaji dalam halaman pekerja, butang \"Clear All\" kini dinamakan \"Clear All Default\" supaya lebih jelas fungsinya. Satu butang baharu \"Clear All Customized Rates\" juga ditambah pada bahagian Kod Gaji Khusus Pekerja — ia mengembalikan semua kadar khas pekerja itu kepada kadar asal sekali gus. Butang ini hanya muncul apabila ada kadar khas, dan ia menunjukkan berapa banyak yang akan dikosongkan sebelum anda mengesahkan.",
+    en: "In the Pay Codes section of a staff page, the \"Clear All\" button is now named \"Clear All Default\" so its purpose is clearer. A new \"Clear All Customized Rates\" button has also been added to the Employee-Specific Pay Codes section — it resets all of that staff's customized rates back to the default rate at once. The button only appears when there are customized rates, and it shows how many will be cleared before you confirm.",
+  },
+  {
+    date: "2026-07-15",
     ms: "Kadar RM0.00 kini boleh disimpan sebagai kadar khas (override) bagi kod gaji pekerja dan kerja. Sebelum ini menaip 0 dianggap kosong, jadi sistem kembali kepada kadar asal dan memaparkan \"No changes detected\". Ini berguna apabila seseorang tidak sepatutnya menerima kod gaji itu langsung — contohnya rekod salesman \"KILANG ICE-POLLY\" yang tidak sepatutnya menerima komisen. Garis masa perubahan kadar (Rate timeline) bagi Jelly Polly juga kini disimpan pada katalog Jelly Polly yang betul; sebelum ini ia gagal disimpan.",
     en: "A rate of RM0.00 can now be saved as an override on employee and job pay codes. Previously typing 0 was treated as blank, so the system fell back to the original rate and showed \"No changes detected\". This is useful when someone should not earn a pay code at all — for example the \"KILANG ICE-POLLY\" salesman record, which should not earn commission. The Rate timeline for Jelly Polly now also saves to the correct Jelly Polly catalogue; previously it failed to save.",
   },
