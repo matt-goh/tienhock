@@ -24,6 +24,11 @@ const CHANGELOG_ENTRIES: ChangelogEntry[] = [
     en: "A rate of RM0.00 can now be saved as an override on employee and job pay codes. Previously typing 0 was treated as blank, so the system fell back to the original rate and showed \"No changes detected\". This is useful when someone should not earn a pay code at all — for example the \"KILANG ICE-POLLY\" salesman record, which should not earn commission. The Rate timeline for Jelly Polly now also saves to the correct Jelly Polly catalogue; previously it failed to save.",
   },
   {
+    date: "2026-07-15",
+    ms: "Halaman Jelly Polly Mesin Plastik Harian kini mempunyai bahagian Cuti. Anda boleh merekod Cuti Tahunan, Cuti Sakit dan Cuti Rawatan untuk pekerja plastik pada tarikh yang dipaparkan (Cuti Umum hanya pada hari cuti umum), dengan semakan baki cuti semasa merekod. Bayaran cuti ditambah ke dalam gaji kasar semasa memproses gaji.",
+    en: "The Jelly Polly Daily Machine Plastic page now has a Leave section. You can record Annual, Sick and Hospital leave for plastic staff on the date being shown (Public Holiday leave only on a public holiday), with balance checks while recording. Leave pay is added to gross pay during payroll processing.",
+  },
+  {
     date: "2026-07-14",
     ms: "Green Target kini mempunyai sistem cuti seperti syarikat lain. Anda boleh merekod Cuti Tahunan, Cuti Sakit, Cuti Umum dan Cuti Rawatan untuk pekerja Pejabat (log bulanan) dan Pemandu (Lori Habuk harian), dengan semakan baki cuti semasa merekod. Bayaran cuti ditambah ke dalam gaji kasar semasa memproses gaji dan dipaparkan pada slip gaji, dan halaman Laporan Cuti baharu menunjukkan baki serta penggunaan cuti setiap pekerja.",
     en: "Green Target now has a leave system like the other companies. You can record Annual, Sick, Public Holiday and Hospital leave for Office staff (monthly log) and Drivers (daily Lori Habuk), with balance checks while recording. Leave pay is added to gross pay during payroll processing and shown on the payslip, and a new Cuti Report page shows each employee's leave balances and usage.",
