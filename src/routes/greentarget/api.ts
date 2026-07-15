@@ -94,7 +94,33 @@ export const greenTargetApi = {
   deleteDumpster: (id: any) => api.delete(`/greentarget/api/dumpsters/${id}`),
 
   // Rental endpoints
-  getRentals: () => api.get("/greentarget/api/rentals"),
+  // Omit `page` to get the plain array; pass it for a { data, pagination } response.
+  getRentals: (
+    filters: {
+      customer_id?: string | number;
+      location_id?: string | number;
+      tong_no?: string;
+      active_only?: boolean;
+      search?: string;
+      start_date?: string;
+      end_date?: string;
+      page?: number;
+      limit?: number;
+    } = {}
+  ) => {
+    const queryParams = new URLSearchParams();
+
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        queryParams.append(key, value.toString());
+      }
+    });
+
+    const queryString = queryParams.toString();
+    return api.get(
+      `/greentarget/api/rentals${queryString ? `?${queryString}` : ""}`
+    );
+  },
   getRental: (id: any) => api.get(`/greentarget/api/rentals/${id}`),
   createRental: (data: any) => api.post("/greentarget/api/rentals", data),
   updateRental: (id: any, data: any) =>

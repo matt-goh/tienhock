@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-16",
+    ms: "Halaman Rental dan Invois Green Target kini memuatkan satu halaman pada satu masa, jadi ia dibuka dengan lebih pantas walaupun rekod semakin banyak. Carian dan penapis kini mencari semua rekod, bukan hanya yang dipaparkan: taip carian anda kemudian tekan Enter atau klik di luar kotak untuk mencarinya. Halaman Rental kini mempunyai penapis tarikh mengikut tarikh letak, dan dibuka dengan 30 hari terakhir. Rental yang diletak lebih 30 hari lalu tidak dipaparkan pada mulanya walaupun ia masih aktif — pilih julat tarikh yang lebih luas atau klik butang \"X\" untuk melihat semua tarikh. Carian invois kini turut menemui pemandu, no. tong dan alamat lokasi rental berkaitan. Pilihan invois kini dikosongkan apabila anda menukar halaman atau penapis.",
+    en: "The Green Target Rentals and Invoices pages now load one page at a time, so they open faster as records grow. Search and filters now look through every record instead of only the ones on screen: type your search then press Enter or click outside the box to run it. The Rentals page now has a date filter by placement date, and opens on the last 30 days. Rentals placed more than 30 days ago are not shown at first even if they are still active — pick a wider date range or click the \"X\" button to see all dates. Invoice search now also finds the driver, dumpster no. and location address of the linked rentals. Invoice selection is now cleared when you change page or filters.",
+  },
+  {
+    date: "2026-07-16",
     ms: "Tab Pinjam dalam Laporan Gaji Jelly Polly dan Green Target kini juga mempunyai pilihan Month-End dan Mid-Month. Paparan Mid-Month menunjukkan amaun 1/2 Bulan, setiap pinjam pertengahan bulan dan baki pekerja selepas pinjam. Jumlah pada skrin serta PDF biasa dan Breakdown mengikut paparan yang dipilih.",
     en: "The Pinjam tab in the Jelly Polly and Green Target Salary Reports now also has Month-End and Mid-Month views. The Mid-Month view shows the 1/2 Bulan amount, each mid-month pinjam and the staff's remaining balance. On-screen totals, the regular PDF and the Breakdown PDF all follow the selected view.",
   },
