@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-15",
+    ms: "Membetulkan bilangan hari cuti pada slip gaji. Cuti sehari dicetak sebagai \"01.0 Hari\", dan dua hari cuti jenis yang sama dicetak sebagai \"01.01.0 Hari\" dengan jumlah bayaran yang salah. Kini ia dicetak dengan betul sebagai \"1 Hari\" dan \"2 Hari\", untuk semua jenis cuti dan semua syarikat.",
+    en: "Fixed the number of leave days shown on payslips. One day of leave printed as \"01.0 Hari\", and two days of the same leave type printed as \"01.01.0 Hari\" with an incorrect total amount. They now print correctly as \"1 Hari\" and \"2 Hari\", for every leave type and all companies.",
+  },
+  {
+    date: "2026-07-15",
     ms: "Pada bahagian Kod Gaji dalam halaman pekerja, butang \"Clear All\" kini dinamakan \"Clear All Default\" supaya lebih jelas fungsinya. Satu butang baharu \"Clear All Customized Rates\" juga ditambah pada bahagian Kod Gaji Khusus Pekerja — ia mengembalikan semua kadar khas pekerja itu kepada kadar asal sekali gus. Butang ini hanya muncul apabila ada kadar khas, dan ia menunjukkan berapa banyak yang akan dikosongkan sebelum anda mengesahkan.",
     en: "In the Pay Codes section of a staff page, the \"Clear All\" button is now named \"Clear All Default\" so its purpose is clearer. A new \"Clear All Customized Rates\" button has also been added to the Employee-Specific Pay Codes section — it resets all of that staff's customized rates back to the default rate at once. The button only appears when there are customized rates, and it shows how many will be cleared before you confirm.",
   },
