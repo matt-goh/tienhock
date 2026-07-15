@@ -244,10 +244,19 @@ export default function (pool, defaultConfig) {
       status,
       consolidated_only,
       exclude_consolidated,
+      search,
+      page,
+      limit,
     } = req.query;
 
+    // Pagination is opt-in. Callers that don't ask for a page (statement modal,
+    // payment form, auto-consolidation) still get the plain array they expect.
+    const paginate = page !== undefined;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const pageLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 12));
+
     try {
-      let query = `
+      const selectClause = `
         SELECT i.*,
               c.name as customer_name,
               c.phone_number as customer_phone_number,
@@ -317,41 +326,52 @@ export default function (pool, defaultConfig) {
                 LEFT JOIN greentarget.adjustment_documents p2 ON a.paired_with_id = p2.id
                 WHERE a.original_invoice_id = i.invoice_id
               ) as adjustment_docs
+      `;
+
+      // The count query reuses this; the payments join below is only needed to
+      // aggregate amount_paid, and no filter references it.
+      const fromClause = `
         FROM greentarget.invoices i
         JOIN greentarget.customers c ON i.customer_id = c.customer_id
+      `;
+      const dataFromClause = `
+        ${fromClause}
         -- LEFT JOIN ensures invoices without payments are included
         LEFT JOIN greentarget.payments p ON i.invoice_id = p.invoice_id
+      `;
+
+      let whereClause = `
         WHERE (i.is_consolidated IS NOT TRUE OR i.is_consolidated IS NULL)
         AND i.type != 'consolidated'
       `;
 
-      const queryParams = [];
+      const filterParams = [];
       let paramCounter = 1;
 
       if (customer_id) {
-        query += ` AND i.customer_id = $${paramCounter}`;
-        queryParams.push(customer_id);
+        whereClause += ` AND i.customer_id = $${paramCounter}`;
+        filterParams.push(customer_id);
         paramCounter++;
       }
 
       if (start_date) {
         // Ensure date format compatibility or cast if needed
-        query += ` AND i.date_issued >= $${paramCounter}`;
-        queryParams.push(start_date);
+        whereClause += ` AND i.date_issued >= $${paramCounter}`;
+        filterParams.push(start_date);
         paramCounter++;
       }
 
       if (end_date) {
         // Ensure date format compatibility or cast if needed
-        query += ` AND i.date_issued <= $${paramCounter}`;
-        queryParams.push(end_date);
+        whereClause += ` AND i.date_issued <= $${paramCounter}`;
+        filterParams.push(end_date);
         paramCounter++;
       }
 
       if (consolidated_only === "true") {
         // Check if this invoice is referenced in any consolidated invoice
-        query += ` AND EXISTS (
-          SELECT 1 FROM greentarget.invoices con 
+        whereClause += ` AND EXISTS (
+          SELECT 1 FROM greentarget.invoices con
           WHERE con.is_consolidated = true
           AND con.status != 'cancelled'
           AND con.consolidated_invoices ? i.invoice_number
@@ -360,8 +380,8 @@ export default function (pool, defaultConfig) {
 
       if (exclude_consolidated === "true") {
         // Check that this invoice is NOT referenced in any consolidated invoice
-        query += ` AND NOT EXISTS (
-          SELECT 1 FROM greentarget.invoices con 
+        whereClause += ` AND NOT EXISTS (
+          SELECT 1 FROM greentarget.invoices con
           WHERE con.is_consolidated = true
           AND con.status != 'cancelled'
           AND con.consolidated_invoices ? i.invoice_number
@@ -375,23 +395,64 @@ export default function (pool, defaultConfig) {
           .map((s) => s.trim())
           .filter((s) => s); // Remove empty strings
         if (statuses.length > 0) {
-          query += ` AND i.status = ANY($${paramCounter}::varchar[])`;
-          queryParams.push(statuses);
+          whereClause += ` AND i.status = ANY($${paramCounter}::varchar[])`;
+          filterParams.push(statuses);
           paramCounter++;
         }
       }
       // *** END Added Status Filter ***
 
+      if (search) {
+        const searchParam = `$${paramCounter}`;
+        filterParams.push(`%${search}%`);
+        paramCounter++;
+        // Driver / dumpster / location live on the linked rentals, not on the
+        // invoice row, so they are matched through invoice_rentals.
+        whereClause += ` AND (
+          i.invoice_number ILIKE ${searchParam} OR
+          c.name ILIKE ${searchParam} OR
+          c.phone_number ILIKE ${searchParam} OR
+          EXISTS (
+            SELECT 1
+            FROM greentarget.invoice_rentals ir3
+            JOIN greentarget.rentals r3 ON ir3.rental_id = r3.rental_id
+            LEFT JOIN greentarget.locations l3 ON r3.location_id = l3.location_id
+            WHERE ir3.invoice_id = i.invoice_id
+            AND (
+              r3.driver ILIKE ${searchParam} OR
+              r3.tong_no ILIKE ${searchParam} OR
+              l3.address ILIKE ${searchParam} OR
+              l3.phone_number ILIKE ${searchParam} OR
+              CAST(r3.rental_id AS TEXT) ILIKE ${searchParam}
+            )
+          )
+        )`;
+      }
+
       // Group by all non-aggregated columns from invoices and customers only
       // Rental information is aggregated, so don't group by rental/location columns
-      query += `
-        GROUP BY i.invoice_id, c.customer_id
-      `;
+      const groupByClause = ` GROUP BY i.invoice_id, c.customer_id `;
 
       // Add ordering - consider making this dynamic based on query params
-      query += " ORDER BY i.date_issued DESC, i.invoice_id DESC";
+      const orderClause = " ORDER BY i.date_issued DESC, i.invoice_id DESC";
 
-      const result = await pool.query(query, queryParams);
+      let dataQuery = `${selectClause} ${dataFromClause} ${whereClause} ${groupByClause} ${orderClause}`;
+      const dataParams = [...filterParams];
+
+      if (paginate) {
+        dataQuery += ` LIMIT $${paramCounter++} OFFSET $${paramCounter++}`;
+        dataParams.push(pageLimit, (pageNum - 1) * pageLimit);
+      }
+
+      const [countResult, result] = await Promise.all([
+        paginate
+          ? pool.query(
+              `SELECT COUNT(DISTINCT i.invoice_id) ${fromClause} ${whereClause}`,
+              filterParams
+            )
+          : Promise.resolve(null),
+        pool.query(dataQuery, dataParams),
+      ]);
 
       // Use the stored balance_due from the DB - it is maintained atomically
       // by payments, cancellations, and adjustment documents (CN/DN/RN).
@@ -418,7 +479,21 @@ export default function (pool, defaultConfig) {
         };
       });
 
-      res.json(invoicesWithBalance);
+      if (!paginate) {
+        return res.json(invoicesWithBalance);
+      }
+
+      const total = parseInt(countResult.rows[0].count, 10);
+
+      res.json({
+        data: invoicesWithBalance,
+        pagination: {
+          page: pageNum,
+          limit: pageLimit,
+          total,
+          totalPages: Math.max(1, Math.ceil(total / pageLimit)),
+        },
+      });
     } catch (error) {
       console.error("Error fetching Green Target invoices:", error);
       res.status(500).json({

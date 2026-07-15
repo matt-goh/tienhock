@@ -4,10 +4,19 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
 
+  // Local (Asia/Kuala_Lumpur) yyyy-MM-dd. Deriving this from toISOString() would
+  // return the UTC date and shift a day back before 08:00 local time.
+  const localToday = () => {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${now.getFullYear()}-${month}-${day}`;
+  };
+
   const updateExpiredRentals = async (pool) => {
     const client = await pool.connect();
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const today = localToday();
 
       // Get all rentals with pickup dates that have passed
       const expiredRentalsQuery = `
@@ -60,10 +69,26 @@ export default function (pool) {
   // Get all rentals (with optional filters)
   router.get("/", async (req, res) => {
     await updateExpiredRentals(pool);
-    const { customer_id, location_id, tong_no, active_only } = req.query;
+    const {
+      customer_id,
+      location_id,
+      tong_no,
+      active_only,
+      search,
+      start_date,
+      end_date,
+      page,
+      limit,
+    } = req.query;
+
+    // Pagination is opt-in. Callers that don't ask for a page (dumpster list,
+    // dumpster form, invoice form/details) still get the plain array they expect.
+    const paginate = page !== undefined;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const pageLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 12));
 
     try {
-      let query = `
+      const selectClause = `
                     SELECT r.*,
             c.name as customer_name,
             c.phone_number as customer_phone_number,
@@ -89,43 +114,108 @@ export default function (pool) {
                 END
               LIMIT 1) as invoice_info,
             (SELECT COUNT(*) FROM greentarget.rental_addons ra WHERE ra.rental_id = r.rental_id) as addon_count
+      `;
+
+      const fromClause = `
       FROM greentarget.rentals r
       JOIN greentarget.customers c ON r.customer_id = c.customer_id
       LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
       JOIN greentarget.dumpsters d ON r.tong_no = d.tong_no
       LEFT JOIN greentarget.pickup_destinations pd ON r.pickup_destination = pd.code
-      WHERE 1=1
       `;
 
-      const queryParams = [];
+      let whereClause = "WHERE 1=1";
+      const filterParams = [];
       let paramCounter = 1;
 
       if (customer_id) {
-        query += ` AND r.customer_id = $${paramCounter}`;
-        queryParams.push(customer_id);
+        whereClause += ` AND r.customer_id = $${paramCounter}`;
+        filterParams.push(customer_id);
         paramCounter++;
       }
 
       if (location_id) {
-        query += ` AND r.location_id = $${paramCounter}`;
-        queryParams.push(location_id);
+        whereClause += ` AND r.location_id = $${paramCounter}`;
+        filterParams.push(location_id);
         paramCounter++;
       }
 
       if (tong_no) {
-        query += ` AND r.tong_no = $${paramCounter}`;
-        queryParams.push(tong_no);
+        whereClause += ` AND r.tong_no = $${paramCounter}`;
+        filterParams.push(tong_no);
         paramCounter++;
       }
 
       if (active_only === "true") {
-        query += ` AND r.date_picked IS NULL`;
+        // A rental stays active until its pickup date has passed, so a
+        // future-dated pickup still counts as active.
+        whereClause += ` AND (r.date_picked IS NULL OR r.date_picked > $${paramCounter}::date)`;
+        filterParams.push(localToday());
+        paramCounter++;
       }
 
-      query += " ORDER BY r.date_placed DESC";
+      if (start_date) {
+        whereClause += ` AND r.date_placed >= $${paramCounter}::date`;
+        filterParams.push(start_date);
+        paramCounter++;
+      }
 
-      const result = await pool.query(query, queryParams);
-      res.json(result.rows);
+      if (end_date) {
+        whereClause += ` AND r.date_placed <= $${paramCounter}::date`;
+        filterParams.push(end_date);
+        paramCounter++;
+      }
+
+      if (search) {
+        const searchParam = `$${paramCounter}`;
+        filterParams.push(`%${search}%`);
+        paramCounter++;
+        whereClause += ` AND (
+          c.name ILIKE ${searchParam} OR
+          l.address ILIKE ${searchParam} OR
+          r.driver ILIKE ${searchParam} OR
+          r.tong_no ILIKE ${searchParam} OR
+          CAST(r.rental_id AS TEXT) ILIKE ${searchParam}
+        )`;
+      }
+
+      // rental_id breaks ties so paging never repeats or skips a row.
+      const orderClause = " ORDER BY r.date_placed DESC, r.rental_id DESC";
+
+      if (!paginate) {
+        const result = await pool.query(
+          `${selectClause} ${fromClause} ${whereClause} ${orderClause}`,
+          filterParams
+        );
+        return res.json(result.rows);
+      }
+
+      const dataQuery = `${selectClause} ${fromClause} ${whereClause} ${orderClause} LIMIT $${paramCounter++} OFFSET $${paramCounter++}`;
+      const dataParams = [
+        ...filterParams,
+        pageLimit,
+        (pageNum - 1) * pageLimit,
+      ];
+
+      const [countResult, dataResult] = await Promise.all([
+        pool.query(
+          `SELECT COUNT(DISTINCT r.rental_id) ${fromClause} ${whereClause}`,
+          filterParams
+        ),
+        pool.query(dataQuery, dataParams),
+      ]);
+
+      const total = parseInt(countResult.rows[0].count, 10);
+
+      res.json({
+        data: dataResult.rows,
+        pagination: {
+          page: pageNum,
+          limit: pageLimit,
+          total,
+          totalPages: Math.max(1, Math.ceil(total / pageLimit)),
+        },
+      });
     } catch (error) {
       console.error("Error fetching Green Target rentals:", error);
       res.status(500).json({
@@ -151,7 +241,7 @@ export default function (pool) {
         );
       }
 
-      const currentDate = new Date().toISOString().split("T")[0];
+      const currentDate = localToday();
       const date_picked = req.body.date_picked || null;
 
       // FIXED: Properly cast dates and use DATE type for the far future date
@@ -306,7 +396,7 @@ export default function (pool) {
       }
 
       const currentRental = currentRentalResult.rows[0];
-      const currentDate = new Date().toISOString().split("T")[0];
+      const currentDate = localToday();
 
       // Validate dates if provided
       if (date_placed && date_picked && date_placed > date_picked) {
@@ -436,7 +526,7 @@ export default function (pool) {
         if (date_picked && !currentRental.date_picked) {
           // Only update to Available if there are no other active rentals for this dumpster
           // and the pickup date is not in the future
-          const today = new Date().toISOString().split("T")[0];
+          const today = localToday();
 
           // Only mark as Available if the pickup date is today or in the past
           if (date_picked <= today) {
@@ -656,7 +746,7 @@ export default function (pool) {
       const deleteResult = await client.query(deleteQuery, [rental_id]);
 
       // Check if there are any other active rentals for this dumpster
-      const currentDate = new Date().toISOString().split("T")[0];
+      const currentDate = localToday();
       const activeRentalsQuery = `
       SELECT COUNT(*) FROM greentarget.rentals 
       WHERE tong_no = $1 
