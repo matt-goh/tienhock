@@ -32,7 +32,32 @@ import { api } from "../../../routes/utils/api";
 import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
 import { groupStaffsByName } from "../../../utils/payroll/groupStaffsByName";
 import { Employee } from "../../../types/types";
+import {
+  PinjamBreakdownCard,
+  PinjamReportTable,
+} from "../../../components/Payroll/CompanySalaryReportTables";
+import type {
+  PinjamDetail,
+  PinjamReportData,
+} from "../../../utils/payroll/PinjamReportPDF";
 import toast from "react-hot-toast";
+
+type MidMonthSubview = "summary" | "pinjam";
+
+interface MidMonthPinjamBucket {
+  total_amount?: number | string;
+  detail_rows?: PinjamDetail[];
+}
+
+interface MidMonthPinjamSummaryEntry {
+  employee_id?: string;
+  mid_month?: MidMonthPinjamBucket;
+}
+
+interface MidMonthPinjamData {
+  totalAmount: number;
+  details: PinjamDetail[];
+}
 
 const MidMonthPayrollPage: React.FC = () => {
   // Get initial values from URL params or defaults
@@ -75,7 +100,11 @@ const MidMonthPayrollPage: React.FC = () => {
   );
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [pinjamByEmp, setPinjamByEmp] = useState<Record<string, number>>({});
+  const [pinjamByEmp, setPinjamByEmp] = useState<
+    Record<string, MidMonthPinjamData>
+  >({});
+  const [activeSubview, setActiveSubview] =
+    useState<MidMonthSubview>("summary");
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isGeneratingExport, setIsGeneratingExport] = useState(false);
   const [isPrintDropdownOpen, setIsPrintDropdownOpen] = useState(false);
@@ -133,14 +162,27 @@ const MidMonthPayrollPage: React.FC = () => {
       ]);
       setPayrolls(payrollsResponse.payrolls);
 
-      const pinjamMap: Record<string, number> = {};
+      const pinjamMap: Record<string, MidMonthPinjamData> = {};
       if (Array.isArray(pinjamSummary)) {
-        pinjamSummary.forEach((entry: any) => {
-          const amount = Number(entry?.mid_month?.total_amount ?? 0);
-          if (entry?.employee_id) {
-            pinjamMap[entry.employee_id] = amount;
+        (pinjamSummary as MidMonthPinjamSummaryEntry[]).forEach(
+          (entry: MidMonthPinjamSummaryEntry): void => {
+            if (!entry.employee_id) return;
+            const detailRows: PinjamDetail[] = Array.isArray(
+              entry.mid_month?.detail_rows
+            )
+              ? entry.mid_month.detail_rows.map(
+                  (detail: PinjamDetail): PinjamDetail => ({
+                    description: detail.description,
+                    amount: Number(detail.amount) || 0,
+                  })
+                )
+              : [];
+            pinjamMap[entry.employee_id] = {
+              totalAmount: Number(entry.mid_month?.total_amount ?? 0),
+              details: detailRows,
+            };
           }
-        });
+        );
       }
       setPinjamByEmp(pinjamMap);
     } catch (error) {
@@ -178,7 +220,9 @@ const MidMonthPayrollPage: React.FC = () => {
       const rows = payrolls.map((payroll, idx) => {
         const staff = staffById.get(payroll.employee_id);
         const midMonthAmount = Number(payroll.amount) || 0;
-        const pinjamAmount = pinjamByEmp[payroll.employee_id] ?? 0;
+        const pinjam: MidMonthPinjamData | undefined =
+          pinjamByEmp[payroll.employee_id];
+        const pinjamAmount: number = pinjam?.totalAmount ?? 0;
         const netAmount = midMonthAmount - pinjamAmount;
         return {
           no: idx + 1,
@@ -189,6 +233,7 @@ const MidMonthPayrollPage: React.FC = () => {
           netAmount,
           total: netAmount,
           payment_preference: payroll.payment_method,
+          pinjamDetails: pinjam?.details ?? [],
         };
       });
 
@@ -303,7 +348,8 @@ const MidMonthPayrollPage: React.FC = () => {
       for (const payroll of bankPayrolls) {
         const staff = staffById.get(payroll.employee_id);
         const gross = Number(payroll.amount) || 0;
-        const pinjam = pinjamByEmp[payroll.employee_id] ?? 0;
+        const pinjam: number =
+          pinjamByEmp[payroll.employee_id]?.totalAmount ?? 0;
         const net = gross - pinjam;
 
         // Group by employee name so siblings collapse into one row; fall back to
@@ -449,6 +495,31 @@ const MidMonthPayrollPage: React.FC = () => {
       sum + (Number(payroll.amount) || 0),
     0
   );
+  const pinjamReportData: PinjamReportData[] = useMemo<PinjamReportData[]>(
+    () =>
+      filteredPayrolls.map(
+        (payroll: MidMonthPayroll, index: number): PinjamReportData => {
+          const midMonthAmount: number = Number(payroll.amount) || 0;
+          const pinjam: MidMonthPinjamData | undefined =
+            pinjamByEmp[payroll.employee_id];
+          const totalPinjam: number = pinjam?.totalAmount ?? 0;
+
+          return {
+            no: index + 1,
+            staff_id: payroll.employee_id,
+            staff_name: payroll.employee_name,
+            payment_preference: payroll.payment_method,
+            gaji_genap: midMonthAmount,
+            total_pinjam: totalPinjam,
+            pinjam_details: pinjam?.details ?? [],
+            final_total: midMonthAmount - totalPinjam,
+            net_pay: midMonthAmount,
+            mid_month_amount: midMonthAmount,
+          };
+        }
+      ),
+    [filteredPayrolls, pinjamByEmp]
+  );
 
   return (
     <div className="space-y-4">
@@ -577,13 +648,51 @@ const MidMonthPayrollPage: React.FC = () => {
 
       {/* Payrolls Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
-        <div className="px-6 py-4 border-b border-default-200 dark:border-gray-700">
+        <div className="flex flex-wrap items-center gap-2 px-6 py-4 border-b border-default-200 dark:border-gray-700">
           <h2 className="text-lg font-medium text-default-800 dark:text-gray-100">
             {getMonthName(currentMonth)} {currentYear}
           </h2>
+          <span className="text-default-300 dark:text-gray-600">|</span>
+          <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
+            {(["summary", "pinjam"] as MidMonthSubview[]).map(
+              (view: MidMonthSubview, index: number) => (
+                <button
+                  key={view}
+                  type="button"
+                  onClick={() => setActiveSubview(view)}
+                  className={`px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
+                    activeSubview === view
+                      ? "bg-sky-500 text-white"
+                      : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                  } ${
+                    index > 0
+                      ? "border-l border-default-200 dark:border-gray-600"
+                      : ""
+                  }`}
+                >
+                  {view}
+                </button>
+              )
+            )}
+          </div>
         </div>
 
-        {isLoading ? (
+        {activeSubview === "pinjam" ? (
+          isLoading ? (
+            <div className="flex justify-center py-12">
+              <LoadingSpinner />
+            </div>
+          ) : pinjamReportData.length === 0 ? (
+            <div className="text-center py-12 text-default-500 dark:text-gray-400">
+              No mid-month payrolls found.
+            </div>
+          ) : (
+            <div className="px-6 pt-2 pb-2">
+              <PinjamReportTable data={pinjamReportData} />
+              <PinjamBreakdownCard data={pinjamReportData} />
+            </div>
+          )
+        ) : isLoading ? (
           <div className="flex justify-center py-12">
             <LoadingSpinner />
           </div>

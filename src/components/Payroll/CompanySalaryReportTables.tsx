@@ -129,16 +129,19 @@ const PaymentBadge: React.FC<{ preference: string | null | undefined }> = ({
 
 // Pinjam tab: gaji/genap less this month's deductions, with each pinjam shown
 // as a chip on the staff row (matches the printed Pinjam Report).
-export const PinjamReportTable: React.FC<{ data: PinjamReportData[] }> = ({
-  data,
-}) => (
+export const PinjamReportTable: React.FC<{
+  data: PinjamReportData[];
+  gajiLabel?: string;
+}> = ({ data, gajiLabel = "Gaji/Genap" }) => (
   <div className="overflow-x-auto">
     <table className="w-full border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
       <thead className="bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700 sticky top-0 z-10">
         <tr>
           <th className={headClass}>NO.</th>
           <th className={headClass}>STAFF/ID</th>
-          <th className={`${headClass} text-right`}>GAJI/GENAP</th>
+          <th className={`${headClass} text-right`}>
+            {gajiLabel.toUpperCase()}
+          </th>
           <th className={`${headClass} text-right`}>TOTAL PINJAM</th>
           <th className={`${headClass} text-right`}>TOTAL</th>
           <th className={`${headClass} text-center`}>PAYMENT</th>

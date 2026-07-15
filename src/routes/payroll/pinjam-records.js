@@ -213,7 +213,11 @@ export default function (pool) {
           p.pinjam_type,
           SUM(p.amount) as total_amount,
           COUNT(*) as record_count,
-          STRING_AGG(p.description || ': ' || p.amount::text, ', ' ORDER BY p.description) as details
+          STRING_AGG(p.description || ': ' || p.amount::text, ', ' ORDER BY p.description) as details,
+          JSON_AGG(JSON_BUILD_OBJECT(
+            'description', COALESCE(NULLIF(BTRIM(p.description), ''), 'Pinjam'),
+            'amount', p.amount
+          ) ORDER BY p.amount DESC) as detail_rows
         FROM pinjam_records p
         LEFT JOIN staffs s ON p.employee_id = s.id
         WHERE p.year = $1 AND p.month = $2
@@ -248,8 +252,8 @@ export default function (pool) {
           summary[row.employee_id] = {
             employee_id: row.employee_id,
             employee_name: row.employee_name,
-            mid_month: { total_amount: 0, details: [], record_count: 0 },
-            monthly: { total_amount: 0, details: [], record_count: 0 }
+            mid_month: { total_amount: 0, details: [], detail_rows: [], record_count: 0 },
+            monthly: { total_amount: 0, details: [], detail_rows: [], record_count: 0 }
           };
         }
 
@@ -257,6 +261,7 @@ export default function (pool) {
         summary[row.employee_id][type] = {
           total_amount: parseFloat(row.total_amount),
           details: row.details.split(', '),
+          detail_rows: row.detail_rows,
           record_count: parseInt(row.record_count)
         };
       });

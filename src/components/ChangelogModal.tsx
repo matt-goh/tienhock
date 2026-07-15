@@ -19,6 +19,21 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-07-16",
+    ms: "Tab Pinjam dalam Laporan Gaji Jelly Polly dan Green Target kini juga mempunyai pilihan Month-End dan Mid-Month. Paparan Mid-Month menunjukkan amaun 1/2 Bulan, setiap pinjam pertengahan bulan dan baki pekerja selepas pinjam. Jumlah pada skrin serta PDF biasa dan Breakdown mengikut paparan yang dipilih.",
+    en: "The Pinjam tab in the Jelly Polly and Green Target Salary Reports now also has Month-End and Mid-Month views. The Mid-Month view shows the 1/2 Bulan amount, each mid-month pinjam and the staff's remaining balance. On-screen totals, the regular PDF and the Breakdown PDF all follow the selected view.",
+  },
+  {
+    date: "2026-07-16",
+    ms: "Tab Pinjam dalam Laporan Gaji Tien Hock kini mempunyai pilihan Month-End dan Mid-Month. Paparan Mid-Month menunjukkan amaun 1/2 Bulan, setiap pinjam pertengahan bulan, dan baki pekerja selepas pinjam. Butang cetak, muat turun PDF dan Breakdown mengikut paparan yang dipilih. Pinjam Mid-Month kekal sebagai maklumat sahaja dalam laporan hujung bulan dan tidak ditolak kali kedua.",
+    en: "The Pinjam tab in the Tien Hock Salary Report now has Month-End and Mid-Month views. The Mid-Month view shows the 1/2 Bulan amount, each mid-month pinjam and the staff's remaining balance. Print, PDF download and Breakdown actions follow the selected view. Mid-month pinjam remains informational in the month-end report and is not deducted a second time.",
+  },
+  {
+    date: "2026-07-16",
+    ms: "Halaman Gaji Pertengahan Bulan untuk Tien Hock, Jelly Polly dan Green Target kini mempunyai paparan Summary dan Pinjam. Paparan Pinjam menunjukkan amaun pendahuluan, jumlah pinjam, baki akhir dan pecahan setiap pinjam bagi setiap pekerja. PDF Gaji Pertengahan Bulan juga memaparkan pecahan pinjam di bawah baris pekerja, dan PDF Green Target kini menggunakan logo Green Target.",
+    en: "The Mid-Month Payroll pages for Tien Hock, Jelly Polly and Green Target now have Summary and Pinjam views. The Pinjam view shows each staff member's advance, total pinjam, final balance and individual pinjam breakdown. The Mid-Month Payroll PDF also lists the pinjam breakdown below each staff row, and the Green Target PDF now uses the Green Target logo.",
+  },
+  {
     date: "2026-07-15",
     ms: "Laporan Gaji Jelly Polly dan Green Target kini sama seperti Tien Hock. Empat tab baharu ditambah: Employee (senarai rata semua pekerja dengan jumlah keseluruhan), Bank (nama, No. K/P dan nombor akaun bank untuk pembayaran bulan itu), Pinjam (gaji/genap tolak pinjam bulan itu, dengan setiap pinjam dipaparkan pada baris pekerja dan ringkasan \"Pinjam by Type\"), dan Cuti (hari diambil/kelayakan serta amaun bagi setiap jenis cuti). Semua tab boleh dicetak dan dimuat turun sebagai PDF, dan tab Pinjam mempunyai butang \"Breakdown\" untuk mencetak senarai pekerja mengikut jenis pinjam. Susun atur halaman kini mengikut Tien Hock. Pinjam jenis mid-month tidak dimasukkan kerana ia sudah ditolak daripada pendahuluan pertengahan bulan.",
     en: "The Jelly Polly and Green Target Salary Reports now match Tien Hock. Four new tabs were added: Employee (a flat list of every staff with grand totals), Bank (name, IC No. and bank account number for that month's payments), Pinjam (gaji/genap less that month's pinjam, with each pinjam shown on the staff's row and a \"Pinjam by Type\" summary), and Cuti (days taken/entitlement and amount for each leave type). Every tab can be printed and downloaded as a PDF, and the Pinjam tab has a \"Breakdown\" button that prints the staff behind each pinjam type. The page layout now follows Tien Hock. Mid-month pinjam is not included, as it is already deducted from the mid-month advance.",

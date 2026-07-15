@@ -37,9 +37,35 @@ import {
   generateMidMonthPayrollReportPDF,
   MidMonthPayrollReportPDFData,
 } from "../../../utils/payroll/MidMonthPayrollReportPDF";
+import {
+  PinjamBreakdownCard,
+  PinjamReportTable,
+} from "../../../components/Payroll/CompanySalaryReportTables";
+import type {
+  PinjamDetail,
+  PinjamReportData,
+} from "../../../utils/payroll/PinjamReportPDF";
+import GreenTargetLogo from "../../../utils/GreenTargetLogo.png";
 import toast from "react-hot-toast";
 
 const GT_COMPANY_NAME = "GREEN TARGET SDN. BHD.";
+
+type MidMonthSubview = "summary" | "pinjam";
+
+interface MidMonthPinjamBucket {
+  total_amount?: number | string;
+  detail_rows?: PinjamDetail[];
+}
+
+interface MidMonthPinjamSummaryEntry {
+  employee_id?: string;
+  mid_month?: MidMonthPinjamBucket;
+}
+
+interface MidMonthPinjamData {
+  totalAmount: number;
+  details: PinjamDetail[];
+}
 
 interface GTMidMonthPayroll {
   id: number;
@@ -290,7 +316,11 @@ const GTMidMonthPayrollPage: React.FC = () => {
     useState<GTMidMonthPayroll | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [pinjamByEmp, setPinjamByEmp] = useState<Record<string, number>>({});
+  const [pinjamByEmp, setPinjamByEmp] = useState<
+    Record<string, MidMonthPinjamData>
+  >({});
+  const [activeSubview, setActiveSubview] =
+    useState<MidMonthSubview>("summary");
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isGeneratingExport, setIsGeneratingExport] = useState(false);
   const { staffs } = useStaffsCache();
@@ -338,14 +368,27 @@ const GTMidMonthPayrollPage: React.FC = () => {
       );
       setGtEmployees(employees || []);
 
-      const pinjamMap: Record<string, number> = {};
+      const pinjamMap: Record<string, MidMonthPinjamData> = {};
       if (Array.isArray(pinjamSummary)) {
-        pinjamSummary.forEach((entry: any) => {
-          const amount = Number(entry?.mid_month?.total_amount ?? 0);
-          if (entry?.employee_id) {
-            pinjamMap[entry.employee_id] = amount;
+        (pinjamSummary as MidMonthPinjamSummaryEntry[]).forEach(
+          (entry: MidMonthPinjamSummaryEntry): void => {
+            if (!entry.employee_id) return;
+            const detailRows: PinjamDetail[] = Array.isArray(
+              entry.mid_month?.detail_rows
+            )
+              ? entry.mid_month.detail_rows.map(
+                  (detail: PinjamDetail): PinjamDetail => ({
+                    description: detail.description,
+                    amount: Number(detail.amount) || 0,
+                  })
+                )
+              : [];
+            pinjamMap[entry.employee_id] = {
+              totalAmount: Number(entry.mid_month?.total_amount ?? 0),
+              details: detailRows,
+            };
           }
-        });
+        );
       }
       setPinjamByEmp(pinjamMap);
     } catch (error) {
@@ -388,6 +431,31 @@ const GTMidMonthPayrollPage: React.FC = () => {
     (sum, payroll) => sum + (Number(payroll.amount) || 0),
     0
   );
+  const pinjamReportData: PinjamReportData[] = useMemo<PinjamReportData[]>(
+    () =>
+      payrolls.map(
+        (payroll: GTMidMonthPayroll, index: number): PinjamReportData => {
+          const midMonthAmount: number = Number(payroll.amount) || 0;
+          const pinjam: MidMonthPinjamData | undefined =
+            pinjamByEmp[payroll.employee_id];
+          const totalPinjam: number = pinjam?.totalAmount ?? 0;
+
+          return {
+            no: index + 1,
+            staff_id: payroll.employee_id,
+            staff_name: payroll.employee_name,
+            payment_preference: payroll.payment_method,
+            gaji_genap: midMonthAmount,
+            total_pinjam: totalPinjam,
+            pinjam_details: pinjam?.details ?? [],
+            final_total: midMonthAmount - totalPinjam,
+            net_pay: midMonthAmount,
+            mid_month_amount: midMonthAmount,
+          };
+        }
+      ),
+    [payrolls, pinjamByEmp]
+  );
 
   // Mid-month report PDF (mirrors Tien Hock; net = advance - mid-month pinjam)
   const generatePDF = async (action: "download" | "print") => {
@@ -401,7 +469,9 @@ const GTMidMonthPayrollPage: React.FC = () => {
       const rows = payrolls.map((payroll, idx) => {
         const staff = staffById.get(payroll.employee_id);
         const midMonthAmount = Number(payroll.amount) || 0;
-        const pinjamAmount = pinjamByEmp[payroll.employee_id] ?? 0;
+        const pinjam: MidMonthPinjamData | undefined =
+          pinjamByEmp[payroll.employee_id];
+        const pinjamAmount: number = pinjam?.totalAmount ?? 0;
         const netAmount = midMonthAmount - pinjamAmount;
         return {
           no: idx + 1,
@@ -412,6 +482,7 @@ const GTMidMonthPayrollPage: React.FC = () => {
           netAmount,
           total: netAmount,
           payment_preference: payroll.payment_method,
+          pinjamDetails: pinjam?.details ?? [],
         };
       });
       const totalFinal = rows.reduce((sum, r) => sum + r.netAmount, 0);
@@ -422,6 +493,7 @@ const GTMidMonthPayrollPage: React.FC = () => {
         total_records: rows.length,
         summary: { total_final: totalFinal },
         companyName: GT_COMPANY_NAME,
+        logoSrc: GreenTargetLogo,
       };
       await generateMidMonthPayrollReportPDF(pdfData, action);
       toast.success(
@@ -511,7 +583,8 @@ const GTMidMonthPayrollPage: React.FC = () => {
         .map((payroll) => {
           const staff = staffById.get(payroll.employee_id);
           const gross = Number(payroll.amount) || 0;
-          const pinjam = pinjamByEmp[payroll.employee_id] ?? 0;
+          const pinjam: number =
+            pinjamByEmp[payroll.employee_id]?.totalAmount ?? 0;
           const net = gross - pinjam;
           return { staff, fallbackName: payroll.employee_name, net };
         })
@@ -670,13 +743,51 @@ const GTMidMonthPayrollPage: React.FC = () => {
 
       {/* Payrolls Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
-        <div className="px-6 py-4 border-b border-default-200 dark:border-gray-700">
+        <div className="flex flex-wrap items-center gap-2 px-6 py-4 border-b border-default-200 dark:border-gray-700">
           <h2 className="text-lg font-medium text-default-800 dark:text-gray-100">
             {getMonthName(currentMonth)} {currentYear}
           </h2>
+          <span className="text-default-300 dark:text-gray-600">|</span>
+          <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
+            {(["summary", "pinjam"] as MidMonthSubview[]).map(
+              (view: MidMonthSubview, index: number) => (
+                <button
+                  key={view}
+                  type="button"
+                  onClick={() => setActiveSubview(view)}
+                  className={`px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
+                    activeSubview === view
+                      ? "bg-sky-500 text-white"
+                      : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                  } ${
+                    index > 0
+                      ? "border-l border-default-200 dark:border-gray-600"
+                      : ""
+                  }`}
+                >
+                  {view}
+                </button>
+              )
+            )}
+          </div>
         </div>
 
-        {isLoading ? (
+        {activeSubview === "pinjam" ? (
+          isLoading ? (
+            <div className="flex justify-center py-12">
+              <LoadingSpinner />
+            </div>
+          ) : pinjamReportData.length === 0 ? (
+            <div className="text-center py-12 text-default-500 dark:text-gray-400">
+              No mid-month payrolls found.
+            </div>
+          ) : (
+            <div className="px-6 pt-2 pb-2">
+              <PinjamReportTable data={pinjamReportData} />
+              <PinjamBreakdownCard data={pinjamReportData} />
+            </div>
+          )
+        ) : isLoading ? (
           <div className="flex justify-center py-12">
             <LoadingSpinner />
           </div>
@@ -730,8 +841,10 @@ const GTMidMonthPayrollPage: React.FC = () => {
                       {formatCurrency(payroll.amount)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-default-600 dark:text-gray-300">
-                      {pinjamByEmp[payroll.employee_id]
-                        ? formatCurrency(pinjamByEmp[payroll.employee_id])
+                      {pinjamByEmp[payroll.employee_id]?.totalAmount
+                        ? formatCurrency(
+                            pinjamByEmp[payroll.employee_id]?.totalAmount ?? 0
+                          )
                         : "-"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 dark:text-gray-100">

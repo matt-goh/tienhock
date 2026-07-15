@@ -13,6 +13,7 @@ import {
   generatePinjamReportPDF,
   generatePinjamBreakdownPDF,
   PinjamReportData,
+  PinjamDetail,
 } from "../../../utils/payroll/PinjamReportPDF";
 import {
   generateBankReportPDF,
@@ -92,6 +93,16 @@ interface Comprehensive {
     total_pinjam: number;
     total_final: number;
   };
+}
+type PinjamViewMode = "month_end" | "mid_month";
+interface PinjamSummaryBucket {
+  total_amount?: number | string;
+  detail_rows?: PinjamDetail[];
+}
+interface PinjamSummaryEntry {
+  employee_id?: string;
+  employee_name?: string;
+  mid_month?: PinjamSummaryBucket;
 }
 interface AnnualSummary {
   year: number;
@@ -180,9 +191,16 @@ const fmtCurrency = (amount: number): string =>
 const isMonthlyTab = (tab: TabType): boolean =>
   (MONTHLY_TABS as readonly string[]).includes(tab);
 
+const getPinjamStaffKey = (
+  staffName: string | null | undefined,
+  staffId: string | null | undefined
+): string => (staffName || staffId || "").trim().toUpperCase();
+
 const GTSalaryReportPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>("monthly");
   const [annualView, setAnnualView] = useState<AnnualView>("summary");
+  const [pinjamViewMode, setPinjamViewMode] =
+    useState<PinjamViewMode>("month_end");
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -195,6 +213,7 @@ const GTSalaryReportPage: React.FC = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
 
   const [monthly, setMonthly] = useState<Comprehensive | null>(null);
+  const [pinjamSummary, setPinjamSummary] = useState<PinjamSummaryEntry[]>([]);
   const [annual, setAnnual] = useState<AnnualSummary | null>(null);
   const [breakdown, setBreakdown] = useState<AnnualBreakdown | null>(null);
 
@@ -240,10 +259,25 @@ const GTSalaryReportPage: React.FC = () => {
     setIsLoading(true);
     try {
       if (isMonthlyTab(activeTab)) {
-        const res = await api.get(
-          `/greentarget/api/salary-report?year=${currentYear}&month=${currentMonth}`
-        );
+        const [res, pinjamResponse] = await Promise.all([
+          api.get(
+            `/greentarget/api/salary-report?year=${currentYear}&month=${currentMonth}`
+          ),
+          api
+            .get(
+              `/greentarget/api/pinjam-records/summary?year=${currentYear}&month=${currentMonth}`
+            )
+            .catch((error: unknown): PinjamSummaryEntry[] => {
+              console.error("Error fetching GT pinjam summary:", error);
+              return [];
+            }),
+        ]);
         setMonthly(res);
+        setPinjamSummary(
+          Array.isArray(pinjamResponse)
+            ? (pinjamResponse as PinjamSummaryEntry[])
+            : []
+        );
       } else if (activeTab === "cuti") {
         if (cutiEmployeeIds.length === 0) return;
         const res = await api.post(
@@ -265,6 +299,7 @@ const GTSalaryReportPage: React.FC = () => {
       }
     } catch (error) {
       console.error("Error loading GT salary report:", error);
+      if (isMonthlyTab(activeTab)) setPinjamSummary([]);
       toast.error("Failed to load salary report");
     } finally {
       setIsLoading(false);
@@ -284,17 +319,109 @@ const GTSalaryReportPage: React.FC = () => {
     setCurrentYear(range.start.getFullYear());
   };
 
+  const midMonthPinjamData = useMemo<PinjamReportData[]>(() => {
+    if (!monthly) return [];
+
+    const pinjamByStaff = new Map<
+      string,
+      { totalAmount: number; details: PinjamDetail[] }
+    >();
+
+    pinjamSummary.forEach((entry: PinjamSummaryEntry): void => {
+      const key: string = getPinjamStaffKey(
+        entry.employee_name,
+        entry.employee_id
+      );
+      if (!key) return;
+
+      const bucket: PinjamSummaryBucket | undefined = entry.mid_month;
+      const details: PinjamDetail[] = Array.isArray(bucket?.detail_rows)
+        ? bucket.detail_rows.map(
+            (detail: PinjamDetail): PinjamDetail => ({
+              description:
+                String(detail.description || "Pinjam").trim() || "Pinjam",
+              amount: Number(detail.amount) || 0,
+            })
+          )
+        : [];
+      const existing = pinjamByStaff.get(key) ?? {
+        totalAmount: 0,
+        details: [],
+      };
+      existing.totalAmount += Number(bucket?.total_amount ?? 0);
+      existing.details.push(...details);
+      pinjamByStaff.set(key, existing);
+    });
+
+    return monthly.data
+      .map((row: PinjamReportData): PinjamReportData => {
+        const key: string = getPinjamStaffKey(row.staff_name, row.staff_id);
+        const pinjam = pinjamByStaff.get(key);
+        const midMonthAmount: number = Number(row.mid_month_amount) || 0;
+        const totalPinjam: number = pinjam?.totalAmount ?? 0;
+        const details: PinjamDetail[] = [...(pinjam?.details ?? [])].sort(
+          (a: PinjamDetail, b: PinjamDetail): number => b.amount - a.amount
+        );
+
+        return {
+          ...row,
+          gaji_genap: midMonthAmount,
+          total_pinjam: totalPinjam,
+          pinjam_details: details,
+          final_total: midMonthAmount - totalPinjam,
+          net_pay: midMonthAmount,
+          mid_month_amount: midMonthAmount,
+        };
+      })
+      .filter(
+        (row: PinjamReportData): boolean =>
+          row.gaji_genap !== 0 ||
+          row.total_pinjam !== 0 ||
+          (row.pinjam_details?.length ?? 0) > 0
+      )
+      .map(
+        (row: PinjamReportData, index: number): PinjamReportData => ({
+          ...row,
+          no: index + 1,
+        })
+      );
+  }, [monthly, pinjamSummary]);
+
+  const activePinjamData: PinjamReportData[] =
+    pinjamViewMode === "mid_month" ? midMonthPinjamData : monthly?.data ?? [];
+  const activePinjamSummary: Comprehensive["summary"] = useMemo(
+    () =>
+      activePinjamData.reduce(
+        (
+          totals: Comprehensive["summary"],
+          row: PinjamReportData
+        ): Comprehensive["summary"] => ({
+          total_gaji_genap: totals.total_gaji_genap + row.gaji_genap,
+          total_pinjam: totals.total_pinjam + row.total_pinjam,
+          total_final: totals.total_final + row.final_total,
+        }),
+        { total_gaji_genap: 0, total_pinjam: 0, total_final: 0 }
+      ),
+    [activePinjamData]
+  );
+  const activePinjamGajiLabel: string =
+    pinjamViewMode === "mid_month" ? "1/2 Bulan" : "Gaji/Genap";
+  const activePinjamReportLabel: string =
+    pinjamViewMode === "mid_month" ? "Mid-Month Pinjam" : "Pinjam";
+
   // Bank/Pinjam show take-home after advances; the other monthly tabs show the
   // full earned salary, so the header total follows the active tab.
   const headerTotal: number =
-    activeTab === "bank" || activeTab === "pinjam"
+    activeTab === "pinjam"
+      ? activePinjamSummary.total_final
+      : activeTab === "bank"
       ? monthly?.summary.total_final ?? 0
       : monthly?.employees_grand_totals?.setelah_digenapkan ?? 0;
 
   const handleGenerateBreakdown = async (
     action: "download" | "print"
   ): Promise<void> => {
-    if (!monthly || monthly.data.length === 0) {
+    if (!monthly || activePinjamData.length === 0) {
       toast.error("No data available to generate PDF");
       return;
     }
@@ -304,11 +431,13 @@ const GTSalaryReportPage: React.FC = () => {
         {
           year: currentYear,
           month: currentMonth,
-          data: monthly.data,
-          total_records: monthly.total_records,
-          summary: monthly.summary,
+          data: activePinjamData,
+          total_records: activePinjamData.length,
+          summary: activePinjamSummary,
           companyName: GT_COMPANY,
           logoSrc: GreenTargetLogo,
+          reportLabel: activePinjamReportLabel,
+          gajiLabel: activePinjamGajiLabel,
         },
         action
       );
@@ -365,7 +494,7 @@ const GTSalaryReportPage: React.FC = () => {
           action
         );
       } else if (activeTab === "pinjam") {
-        if (!monthly || monthly.data.length === 0) {
+        if (!monthly || activePinjamData.length === 0) {
           toast.error("No data to print for this month");
           return;
         }
@@ -373,11 +502,13 @@ const GTSalaryReportPage: React.FC = () => {
           {
             year: currentYear,
             month: currentMonth,
-            data: monthly.data,
-            total_records: monthly.total_records,
-            summary: monthly.summary,
+            data: activePinjamData,
+            total_records: activePinjamData.length,
+            summary: activePinjamSummary,
             companyName: GT_COMPANY,
             logoSrc: GreenTargetLogo,
+            reportLabel: activePinjamReportLabel,
+            gajiLabel: activePinjamGajiLabel,
           },
           action
         );
@@ -635,6 +766,35 @@ const GTSalaryReportPage: React.FC = () => {
                   </button>
                 ))}
               </div>
+              {activeTab === "pinjam" && (
+                <>
+                  <span className="text-default-300 dark:text-gray-600">|</span>
+                  <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setPinjamViewMode("month_end")}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                        pinjamViewMode === "month_end"
+                          ? "bg-sky-500 text-white"
+                          : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      Month-End
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPinjamViewMode("mid_month")}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-default-200 dark:border-gray-600 ${
+                        pinjamViewMode === "mid_month"
+                          ? "bg-sky-500 text-white"
+                          : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      Mid-Month
+                    </button>
+                  </div>
+                </>
+              )}
               {/* Sub-view toggle for the Annual tab - right after tabs */}
               {activeTab === "annual" && (
                 <>
@@ -673,7 +833,9 @@ const GTSalaryReportPage: React.FC = () => {
                   <span className="text-default-300 dark:text-gray-600">|</span>
                   <div className="text-sm text-default-600 dark:text-gray-300">
                     <span className="block font-medium">
-                      {monthly.total_records} employees
+                      {activeTab === "pinjam"
+                        ? activePinjamData.length
+                        : monthly.total_records} employees
                     </span>
                     <span className="block font-medium">
                       {fmtCurrency(headerTotal)}
@@ -686,7 +848,7 @@ const GTSalaryReportPage: React.FC = () => {
               {activeTab === "pinjam" && (
                 <PinjamBreakdownButton
                   disabled={
-                    !monthly || monthly.data.length === 0 || isGenerating
+                    !monthly || activePinjamData.length === 0 || isGenerating
                   }
                   onGenerate={handleGenerateBreakdown}
                 />
@@ -794,15 +956,19 @@ const GTSalaryReportPage: React.FC = () => {
 
           {/* PINJAM */}
           {activeTab === "pinjam" &&
-            (!monthly || monthly.data.length === 0 ? (
+            (!monthly || activePinjamData.length === 0 ? (
               <div className="text-center py-12 text-default-500 dark:text-gray-400">
-                No processed payroll for {getMonthName(currentMonth)}{" "}
-                {currentYear}.
+                {pinjamViewMode === "mid_month"
+                  ? `No mid-month data for ${getMonthName(currentMonth)} ${currentYear}.`
+                  : `No processed payroll for ${getMonthName(currentMonth)} ${currentYear}.`}
               </div>
             ) : (
               <div className="px-6 pt-2 pb-2">
-                <PinjamReportTable data={monthly.data} />
-                <PinjamBreakdownCard data={monthly.data} />
+                <PinjamReportTable
+                  data={activePinjamData}
+                  gajiLabel={activePinjamGajiLabel}
+                />
+                <PinjamBreakdownCard data={activePinjamData} />
               </div>
             ))}
 
