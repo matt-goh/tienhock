@@ -11,6 +11,7 @@ import {
 import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
+import type { PinjamDetail } from "./PinjamReportPDF";
 
 const colors = {
   textPrimary: "#0f172a",
@@ -97,12 +98,15 @@ const styles = StyleSheet.create({
     marginTop: 2,
     marginBottom: 2,
   },
+  employeeBlock: {
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.borderLight,
+    paddingBottom: 2,
+  },
   tableRow: {
     flexDirection: "row",
     paddingVertical: 3,
     paddingHorizontal: 3,
-    borderBottomWidth: 0.5,
-    borderBottomColor: colors.borderLight,
     minHeight: 18,
   },
 
@@ -131,6 +135,30 @@ const styles = StyleSheet.create({
   },
   colNet: {
     width: "15%",
+    textAlign: "right",
+    paddingRight: 4,
+  },
+
+  detailRow: {
+    flexDirection: "row",
+    paddingHorizontal: 3,
+    paddingBottom: 1.5,
+    marginTop: -2,
+  },
+  detailSpacer: {
+    width: "6%",
+  },
+  detailDesc: {
+    width: "64%",
+    fontSize: 7.5,
+    fontFamily: "Helvetica-Oblique",
+    color: colors.textMuted,
+    paddingLeft: 10,
+  },
+  detailAmount: {
+    width: "15%",
+    fontSize: 7.5,
+    color: colors.textMuted,
     textAlign: "right",
     paddingRight: 4,
   },
@@ -297,6 +325,7 @@ export interface MidMonthPayrollReportData {
   netAmount: number;
   total: number;
   payment_preference: string;
+  pinjamDetails?: PinjamDetail[];
 }
 
 export interface MidMonthPayrollReportPDFData {
@@ -308,31 +337,47 @@ export interface MidMonthPayrollReportPDFData {
     total_final: number;
   };
   companyName?: string;
+  logoSrc?: string;
 }
 
 const MidMonthRow: React.FC<{
   employee: MidMonthPayrollReportData;
-}> = ({ employee }) => (
-  <View style={styles.tableRow} wrap={false}>
-    <Text style={styles.colNo}>{employee.no}</Text>
-    <Text style={styles.colStaffName}>{employee.staff_name}</Text>
-    <Text style={styles.colIcNo}>{employee.icNo}</Text>
-    <Text style={styles.colMidMonth}>
-      {formatCurrency(employee.midMonthAmount)}
-    </Text>
-    <Text
-      style={[
-        styles.colPinjam,
-        employee.pinjamAmount > 0 ? { color: colors.danger } : {},
-      ]}
-    >
-      {formatCurrency(employee.pinjamAmount)}
-    </Text>
-    <Text style={[styles.colNet, styles.bold, { color: colors.primary }]}>
-      {formatCurrency(employee.netAmount)}
-    </Text>
-  </View>
-);
+}> = ({ employee }) => {
+  const details: PinjamDetail[] = employee.pinjamDetails ?? [];
+
+  return (
+    <View style={styles.employeeBlock} wrap={false}>
+      <View style={styles.tableRow}>
+        <Text style={styles.colNo}>{employee.no}</Text>
+        <Text style={styles.colStaffName}>{employee.staff_name}</Text>
+        <Text style={styles.colIcNo}>{employee.icNo}</Text>
+        <Text style={styles.colMidMonth}>
+          {formatCurrency(employee.midMonthAmount)}
+        </Text>
+        <Text
+          style={[
+            styles.colPinjam,
+            employee.pinjamAmount > 0 ? { color: colors.danger } : {},
+          ]}
+        >
+          {formatCurrency(employee.pinjamAmount)}
+        </Text>
+        <Text style={[styles.colNet, styles.bold, { color: colors.primary }]}>
+          {formatCurrency(employee.netAmount)}
+        </Text>
+      </View>
+      {details.map((detail: PinjamDetail, index: number) => (
+        <View style={styles.detailRow} key={index}>
+          <Text style={styles.detailSpacer} />
+          <Text style={styles.detailDesc}>{`•  ${detail.description}`}</Text>
+          <Text style={styles.detailAmount}>
+            {formatCurrency(detail.amount)}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+};
 
 const PaymentGroup: React.FC<{
   title: string;
@@ -384,7 +429,10 @@ const PaymentGroup: React.FC<{
 const MidMonthPayrollReportPDF: React.FC<{
   data: MidMonthPayrollReportPDFData;
   companyName?: string;
-}> = ({ data, companyName = TIENHOCK_INFO.name }) => {
+}> = ({ data, companyName }) => {
+  const resolvedCompanyName: string =
+    companyName ?? data.companyName ?? TIENHOCK_INFO.name;
+  const resolvedLogo: string = data.logoSrc ?? TienHockLogo;
   const reportTitle = `${getMonthName(data.month)} ${data.year} Mid-Month Payroll Report`;
 
   const groupedData = groupByPaymentPreference(data.data);
@@ -398,9 +446,9 @@ const MidMonthPayrollReportPDF: React.FC<{
     >
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
-          <Image src={TienHockLogo} style={styles.logo} />
+          <Image src={resolvedLogo} style={styles.logo} />
           <View style={styles.headerTextContainer}>
-            <Text style={styles.companyName}>{companyName}</Text>
+            <Text style={styles.companyName}>{resolvedCompanyName}</Text>
             <Text style={styles.reportTitle}>{reportTitle}</Text>
           </View>
         </View>
