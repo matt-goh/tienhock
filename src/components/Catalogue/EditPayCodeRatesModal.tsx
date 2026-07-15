@@ -22,6 +22,16 @@ interface EditRatesState {
   is_default: boolean;
 }
 
+// Only a blank field means "inherit the default rate". 0 is a real override —
+// e.g. a job that must not earn this pay code — so it has to survive as 0
+// rather than collapse into null.
+const parseRateOverride = (value: string): number | null => {
+  const trimmedValue = value.trim();
+  if (trimmedValue === "") return null;
+  const numericValue = Number(trimmedValue);
+  return Number.isFinite(numericValue) ? numericValue : NaN;
+};
+
 interface EditPayCodeRatesModalProps {
   // API base for pay-code endpoints (JP passes /jellypolly/api)
   apiBase?: string;
@@ -116,16 +126,20 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
     setError(null);
 
     // Convert edited strings to numbers or null
-    const newBiasa =
-      editRates.biasa.trim() === ""
-        ? null
-        : parseFloat(editRates.biasa) || null;
-    const newAhad =
-      editRates.ahad.trim() === "" ? null : parseFloat(editRates.ahad) || null;
-    const newUmum =
-      editRates.umum.trim() === "" ? null : parseFloat(editRates.umum) || null;
+    const newBiasa = parseRateOverride(editRates.biasa);
+    const newAhad = parseRateOverride(editRates.ahad);
+    const newUmum = parseRateOverride(editRates.umum);
 
     // Basic validation
+    const hasInvalidRate = [newBiasa, newAhad, newUmum].some(
+      (rate: number | null): boolean => rate !== null && !Number.isFinite(rate)
+    );
+    if (hasInvalidRate) {
+      setError("Invalid rate value. Rates must be valid numbers.");
+      setIsSaving(false);
+      return;
+    }
+
     if (
       (newBiasa !== null && newBiasa < 0) ||
       (newAhad !== null && newAhad < 0) ||
@@ -294,6 +308,7 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
                         </div>
                       </div>
                       <PayRateScheduleManager
+                        apiBase={apiBase}
                         scope="job"
                         payCodeId={payCodeDetail.id}
                         jobId={jobId}

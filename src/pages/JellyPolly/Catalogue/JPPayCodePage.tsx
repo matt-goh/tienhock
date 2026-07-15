@@ -767,6 +767,7 @@ const JPPayCodePage: React.FC = () => {
 
       {/* Modals & Dialogs */}
       <PayCodeModal
+        apiBase="/jellypolly/api"
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         onSave={handleSavePayCode}
