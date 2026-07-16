@@ -93,13 +93,18 @@ Legacy remains the imported accounting treatment:
 
 ### Debtor identity differences
 
-Of 885 reference-matched credit rows, 883 use the exact resolved ERP debtor.
-The two exceptions are:
+Of 885 reference-matched credit rows, 883 used the exact resolved ERP debtor at
+the time of this check. The two identified exceptions were:
 
 - `63263`: ERP customer `AA-T`, legacy debtor `AA`. Both records have the same
   address and phone but different branch names.
 - `63760`: ERP customer `FRESHMART`, legacy debtor `NEW FRESHMART`. Both refer
-  to the same business name through duplicate customer identities.
+  to the same business name through duplicate customer identities. **Resolved
+  2026-07-16:** the user supplied both customer ledgers and approved the
+  correction. Invoice `63760`, receipt allocation `TF090626-1` and its RM1,415
+  debtor credit now consistently use `NEW FRESHMART`; the migration also pins
+  the exact printed particulars and cheque references. See
+  `dev/migrations/2026-07-16_freshmart_ledger_reconciliation.sql`.
 
 All 1,186 reference-matched cash rows have the exact `CH_REV1` counterpart.
 
@@ -176,13 +181,15 @@ audit decision, not an import cleanup.
   become nonposting genuine payments through `BANK_PBB`: `MIB000627` (cheque),
   `TT280126-1`, `TT190226-1`, and `TT050526` (the TT rows are strongly inferred
   as online transfers from the 2026 convention).
-- Debtors: `63263` would move from `AA-T` to `AA`; `63760` would move from
-  `FRESHMART` to `NEW FRESHMART`. The latter also requires June receipt journal
-  3869 line 2 to credit `NEW FRESHMART` RM1,415.00 so the receipt/source/ledger
-  chain remains coherent.
+- Debtors: `63263` would move from `AA-T` to `AA`. The `63760` case was approved
+  and corrected on 2026-07-16: the invoice moved from `FRESHMART` to
+  `NEW FRESHMART`, together with its June receipt allocation and RM1,415 debtor
+  credit, so the receipt/source/ledger chain is coherent.
 
-These are deterministic from the available accounting evidence, but changing
-submitted or consolidated source documents still requires explicit approval.
+The remaining items are deterministic from the available accounting evidence,
+but changing submitted or consolidated source documents still requires
+explicit approval. The `63760` approval and correction is the recorded
+exception above.
 
 ### Evidence still missing
 
@@ -217,9 +224,11 @@ submitted or consolidated source documents still requires explicit approval.
 3. Retain the 90 zero-value operational documents, or supply legacy stock
    evidence proving how their 229 returns and 174 free units should be
    represented.
-4. Approve the two debtor changes (including the connected June receipt line)
-   and the inferred TT payment methods.
+4. Approve the remaining `63263` debtor change and the inferred TT payment
+   methods. The `63760` / Freshmart debtor correction was approved and applied
+   on 2026-07-16 from the supplied customer-ledger PDFs.
 
-Until these are decided, no invoice, order, customer, payment, MyInvois, or
-journal source row is authorized for mutation. This does not reduce the exact
-legacy accounting parity already achieved by `IMP`.
+Except for separately approved and documented repairs such as `63760`, no
+invoice, order, customer, payment, MyInvois, or journal source row is authorized
+for mutation until the remaining items are decided. This does not reduce the
+exact legacy accounting parity already achieved by `IMP`.

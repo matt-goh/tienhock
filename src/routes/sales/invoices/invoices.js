@@ -3804,8 +3804,9 @@ export default function (pool, config) {
       // 1. First, get the current invoice to check status
       const invoiceCheckQuery = `
       SELECT id, customerid, einvoice_status, invoice_status, uuid,
-             submission_uid, datetime_validated, createddate
-      FROM invoices 
+             submission_uid, datetime_validated, createddate,
+             paymenttype, balance_due
+      FROM invoices
       WHERE id = $1
     `;
       const invoiceResult = await client.query(invoiceCheckQuery, [id]);
@@ -3904,9 +3905,34 @@ export default function (pool, config) {
     `;
       const updateResult = await client.query(updateQuery, [customerid, id]);
 
+      // 6. Move the receivable to the new customer. The invoice-owned journal
+      // debits the customer's DEBTOR child account, so without this re-sync the
+      // journal keeps debiting the OLD customer: the invoice then disappears
+      // from the new customer's statement/ledger (both are built from the child
+      // ledger) and inflates the old one's. Skipped for a journal detached by
+      // manual_override, which the sync leaves alone by design.
+      if (invoice.customerid !== customerid) {
+        await syncSalesJournalEntry(
+          client,
+          updateResult.rows[0],
+          req.user?.id || null
+        );
+
+        // Carry the outstanding credit across too — credit_used tracks what the
+        // customer still owes, so the old customer must give back exactly what
+        // the new one takes on.
+        if (updateResult.rows[0].paymenttype === "INVOICE") {
+          const outstanding = parseFloat(invoice.balance_due || 0);
+          if (outstanding !== 0) {
+            await updateCustomerCredit(client, invoice.customerid, -outstanding);
+            await updateCustomerCredit(client, customerid, outstanding);
+          }
+        }
+      }
+
       await client.query("COMMIT");
 
-      // 6. Return success response
+      // 7. Return success response
       res.json({
         message: "Customer updated successfully",
         invoice: {
