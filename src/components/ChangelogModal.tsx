@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-16",
+    ms: "Penukaran pelanggan untuk invois Tien Hock kini hanya dibenarkan bagi invois bersih dalam tempoh perakaunan terbuka. Jika invois mempunyai resit atau bayaran, Nota Kredit/Debit/Bayaran Balik aktif, atau berada dalam e-Invois konsolidasi, mesej pada skrin akan menyenaraikan rekod yang mesti dibatalkan dahulu serta cara merekodkannya semula. Invois dalam tempoh berkunci atau yang mempunyai jurnal Manual tidak boleh diubah sendiri; berikan nombor invois, ID pelanggan lama dan baharu serta bukti sokongan kepada akauntan atau pentadbir sistem. Bagi invois yang selamat diubah, lejar dan baki kredit pelanggan dipindahkan bersama-sama.",
+    en: "Changing the customer on a Tien Hock invoice is now limited to clean invoices in the open accounting period. If a receipt or payment, active Credit/Debit/Refund Note, or consolidated e-Invoice blocks the change, an on-screen message lists the affected records, what must be cancelled first and what must be recorded again. Locked-period invoices and invoices with a Manual journal are not self-service changes; give the invoice number, old and new customer IDs, and supporting proof to the accountant or system administrator. For eligible invoices, the customer ledger and credit balance move together.",
+  },
+  {
+    date: "2026-07-16",
     ms: "Jadual yang dikembangkan pada halaman Penghutang Tien Hock kini memaparkan Nota Kredit, Nota Debit dan Nota Bayaran Balik yang menjejaskan baki di bawah invois belum selesai yang berkaitan. Setiap baris menunjukkan kesan tambah atau tolak pada baki serta sebab dokumen, dan nombor dokumen boleh dibuka terus untuk melihat butirannya.",
     en: "The expanded table on the Tien Hock Debtors page now shows Credit Notes, Debit Notes and balance-affecting Refund Notes beneath their related outstanding invoices. Each row shows whether the document adds to or reduces the balance, includes its reason, and opens the document details directly.",
   },
