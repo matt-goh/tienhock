@@ -5,6 +5,7 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import type {
   AdjustmentDocument,
   ExtendedInvoiceData,
+  InvoiceCustomerChangeBlockedData,
   Payment,
   PaymentCancellationErrorData,
   ProductItem,
@@ -202,6 +203,37 @@ interface InvoiceDetailsLocationState {
   fromCustomerTransactions?: boolean;
 }
 
+interface CustomerChangeApiErrorData {
+  code?: string;
+  requiresConfirmation?: boolean;
+  currentEInvoiceStatus?: string;
+}
+
+type EInvoiceCancelAction =
+  | {
+      type: "customer";
+      data: { customerid: string; eInvoiceStatus?: string };
+    }
+  | { type: "datetime"; data: { createddate: string } }
+  | { type: "orderdetails"; data: { products: ProductItem[] } };
+
+const getCustomerChangeApiErrorData = (
+  error: unknown
+): CustomerChangeApiErrorData | null => {
+  if (!(error instanceof Error) || !("data" in error)) return null;
+
+  const data: unknown = (error as Error & { data?: unknown }).data;
+  if (!data || typeof data !== "object") return null;
+
+  return data as CustomerChangeApiErrorData;
+};
+
+const isCustomerChangeBlockedData = (
+  data: CustomerChangeApiErrorData | null
+): data is InvoiceCustomerChangeBlockedData =>
+  data?.code === "INVOICE_CUSTOMER_CHANGE_BLOCKED" &&
+  Array.isArray((data as Partial<InvoiceCustomerChangeBlockedData>).blockers);
+
 // --- Main Component ---
 const InvoiceDetailsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -283,6 +315,8 @@ const InvoiceDetailsPage: React.FC = () => {
   } | null>(null);
   const [customerQuery, setCustomerQuery] = useState<string>("");
   const [isUpdatingCustomer, setIsUpdatingCustomer] = useState<boolean>(false);
+  const [customerChangeBlockedData, setCustomerChangeBlockedData] =
+    useState<InvoiceCustomerChangeBlockedData | null>(null);
 
   // Pagination state for customer loading
   const [displayedCustomers, setDisplayedCustomers] = useState<
@@ -319,10 +353,12 @@ const InvoiceDetailsPage: React.FC = () => {
   const [isPrinting, setIsPrinting] = useState(false);
   const [showEInvoiceCancelConfirm, setShowEInvoiceCancelConfirm] =
     useState<boolean>(false);
-  const [eInvoiceCancelAction, setEInvoiceCancelAction] = useState<{
-    type: "customer" | "datetime";
-    data: any;
-  } | null>(null);
+  const [eInvoiceCancelAction, setEInvoiceCancelAction] =
+    useState<EInvoiceCancelAction | null>(null);
+  const eInvoiceCancellationStatus: string | null | undefined =
+    eInvoiceCancelAction?.type === "customer"
+      ? eInvoiceCancelAction.data.eInvoiceStatus || invoiceData?.einvoice_status
+      : invoiceData?.einvoice_status;
   // UUID edit states
   const [isEditingUUID, setIsEditingUUID] = useState<boolean>(false);
   const [selectedUUID, setSelectedUUID] = useState<string>("");
@@ -634,22 +670,8 @@ const InvoiceDetailsPage: React.FC = () => {
       return;
     }
 
-    // Check if this requires e-invoice cancellation confirmation
-    const requiresConfirmation =
-      invoiceData?.einvoice_status !== null &&
-      invoiceData?.einvoice_status !== "cancelled";
-
-    if (requiresConfirmation) {
-      // Show confirmation dialog first
-      setEInvoiceCancelAction({
-        type: "customer",
-        data: { customerid: selectedCustomer.id },
-      });
-      setShowEInvoiceCancelConfirm(true);
-      return;
-    }
-
-    // Proceed directly if no confirmation needed
+    // Let the API validate accounting dependencies before asking the user to
+    // cancel an e-Invoice that may not be eligible for a customer change.
     await performCustomerUpdate(false);
   };
 
@@ -683,6 +705,29 @@ const InvoiceDetailsPage: React.FC = () => {
       await fetchDetails();
     } catch (error) {
       console.error("Error updating customer:", error);
+      const apiErrorData: CustomerChangeApiErrorData | null =
+        getCustomerChangeApiErrorData(error);
+
+      if (isCustomerChangeBlockedData(apiErrorData)) {
+        setIsEditingCustomer(false);
+        setSelectedCustomer(null);
+        setCustomerQuery("");
+        setCustomerChangeBlockedData(apiErrorData);
+        return;
+      }
+
+      if (apiErrorData?.requiresConfirmation) {
+        setEInvoiceCancelAction({
+          type: "customer",
+          data: {
+            customerid: selectedCustomer.id,
+            eInvoiceStatus: apiErrorData.currentEInvoiceStatus,
+          },
+        });
+        setShowEInvoiceCancelConfirm(true);
+        return;
+      }
+
       const errorMessage =
         error instanceof Error ? error.message : "Failed to update customer";
       toast.error(errorMessage);
@@ -725,7 +770,8 @@ const InvoiceDetailsPage: React.FC = () => {
   };
 
   // Function to handle opening the edit modal
-  const handleOpenCustomerEdit = () => {
+  const handleOpenCustomerEdit = (): void => {
+    setCustomerChangeBlockedData(null);
     setIsEditingCustomer(true);
     // Set the current customer as selected
     const currentCustomer = customers.find(
@@ -986,7 +1032,7 @@ const InvoiceDetailsPage: React.FC = () => {
     if (requiresConfirmation) {
       // Show confirmation dialog first
       setEInvoiceCancelAction({
-        type: "orderdetails" as any,
+        type: "orderdetails",
         data: { products: editedProducts },
       });
       setShowEInvoiceCancelConfirm(true);
@@ -2879,6 +2925,19 @@ const InvoiceDetailsPage: React.FC = () => {
               </button>
             </div>
 
+            <div className="mb-4 flex rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+              <IconAlertTriangle
+                size={18}
+                className="mr-2 mt-0.5 flex-shrink-0"
+              />
+              <p>
+                Only clean, open-period invoices can move to another customer.
+                If blocked, the system will list exactly what you must cancel
+                or who to contact. A submitted e-Invoice must be cancelled and
+                resubmitted.
+              </p>
+            </div>
+
             <div className="mb-4">
               <CustomerCombobox
                 name="customer"
@@ -2920,6 +2979,51 @@ const InvoiceDetailsPage: React.FC = () => {
           </div>
         </div>
       )}
+      <ConfirmationDialog
+        isOpen={customerChangeBlockedData !== null}
+        onClose={(): void => undefined}
+        onConfirm={() => setCustomerChangeBlockedData(null)}
+        title="Customer Was Not Changed"
+        message={
+          customerChangeBlockedData ? (
+            <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+              <p>
+                Resolve every item below, then return to this invoice and try
+                the customer change again.
+              </p>
+              <p className="rounded-lg bg-default-100 px-3 py-2 font-medium text-default-800 dark:bg-gray-700 dark:text-gray-100">
+                Invoice {customerChangeBlockedData.invoice_id}: {" "}
+                {customerChangeBlockedData.old_customer_id} → {" "}
+                {customerChangeBlockedData.requested_customer_id}
+              </p>
+              {customerChangeBlockedData.blockers.map((blocker, index) => (
+                <div
+                  key={`${blocker.type}-${index}`}
+                  className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-rose-900 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-100"
+                >
+                  <p className="font-semibold">{blocker.title}</p>
+                  <p className="mt-1">{blocker.detail}</p>
+                  <p className="mt-2">
+                    <span className="font-semibold">What to do:</span>{" "}
+                    {blocker.action}
+                  </p>
+                  {blocker.references && blocker.references.length > 0 && (
+                    <p className="mt-2 text-xs">
+                      <span className="font-semibold">References:</span>{" "}
+                      {blocker.references.join(", ")}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            ""
+          )
+        }
+        confirmButtonText="Close"
+        hideCancelButton
+        variant="danger"
+      />
       {/* Salesman Edit Modal */}
       {isEditingSalesman && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 -top-4">
@@ -3196,19 +3300,39 @@ const InvoiceDetailsPage: React.FC = () => {
         isOpen={showEInvoiceCancelConfirm}
         onClose={handleCancelEInvoiceCancellation}
         onConfirm={handleConfirmEInvoiceCancellation}
-        title="Cancel E-Invoice Required"
-        message={`This invoice has been submitted to MyInvois (Status: ${
-          invoiceData?.einvoice_status
-        }). Changing ${
-          eInvoiceCancelAction?.type === "customer"
-            ? "customer information"
-            : eInvoiceCancelAction?.type === "datetime"
-            ? "date/time"
-            : eInvoiceCancelAction?.type === "orderdetails"
-            ? "line items"
-            : "invoice data"
-        } will cancel the e-invoice at MyInvois. You will need to resubmit the e-invoice after making all necessary changes. Do you want to continue?`}
-        confirmButtonText="Cancel E-Invoice & Continue"
+        title={
+          eInvoiceCancellationStatus === "invalid"
+            ? "Clear Invalid E-Invoice"
+            : "Cancel E-Invoice Required"
+        }
+        message={
+          eInvoiceCancellationStatus === "invalid"
+            ? `This invoice's previous MyInvois submission is invalid. Changing ${
+                eInvoiceCancelAction?.type === "customer"
+                  ? "customer information"
+                  : eInvoiceCancelAction?.type === "datetime"
+                  ? "date/time"
+                  : eInvoiceCancelAction?.type === "orderdetails"
+                  ? "line items"
+                  : "invoice data"
+              } will clear the failed e-Invoice data so you can correct and resubmit it. Do you want to continue?`
+            : `This invoice has been submitted to MyInvois (Status: ${
+                eInvoiceCancellationStatus
+              }). Changing ${
+                eInvoiceCancelAction?.type === "customer"
+                  ? "customer information"
+                  : eInvoiceCancelAction?.type === "datetime"
+                  ? "date/time"
+                  : eInvoiceCancelAction?.type === "orderdetails"
+                  ? "line items"
+                  : "invoice data"
+              } will cancel the e-Invoice at MyInvois. You will need to resubmit it after making all necessary changes. Do you want to continue?`
+        }
+        confirmButtonText={
+          eInvoiceCancellationStatus === "invalid"
+            ? "Clear E-Invoice & Continue"
+            : "Cancel E-Invoice & Continue"
+        }
         variant="danger"
       />
       {/* Overpayment Confirmation Dialog */}

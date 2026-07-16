@@ -413,6 +413,33 @@ export interface PaymentCancellationErrorData {
   linked_invoice_ids?: string[];
 }
 
+export type InvoiceCustomerChangeBlockerType =
+  | "cancelled_invoice"
+  | "historical_lock"
+  | "receipt"
+  | "payment"
+  | "adjustment"
+  | "consolidated_invoice"
+  | "manual_journal"
+  | "accounting_integrity";
+
+export interface InvoiceCustomerChangeBlocker {
+  type: InvoiceCustomerChangeBlockerType;
+  title: string;
+  detail: string;
+  action: string;
+  references?: Array<string | number>;
+}
+
+export interface InvoiceCustomerChangeBlockedData {
+  code: "INVOICE_CUSTOMER_CHANGE_BLOCKED";
+  message: string;
+  invoice_id: string;
+  old_customer_id: string;
+  requested_customer_id: string;
+  blockers: InvoiceCustomerChangeBlocker[];
+}
+
 export type AdjustmentDocType = "credit_note" | "debit_note" | "refund_note";
 
 export interface AdjustmentDocLine {

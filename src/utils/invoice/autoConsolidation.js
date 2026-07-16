@@ -23,12 +23,10 @@ import {
  * Now includes immediate processing for eligible invoices in the 5-day window (days 3-7) after month-end
  */
 export const checkAndProcessDueConsolidations = async (pool) => {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
+  const now = new Date();
 
+  try {
     // Get current date in UTC (since server is UTC)
-    const now = new Date();
     const currentDate = now.toISOString().split("T")[0]; // YYYY-MM-DD
 
     console.log(
@@ -52,15 +50,37 @@ export const checkAndProcessDueConsolidations = async (pool) => {
 
       // Get companies with auto-consolidation enabled
       const settingsQuery = `SELECT * FROM consolidation_settings WHERE auto_consolidation_enabled = true`;
-      const settingsResult = await client.query(settingsQuery);
+      const settingsResult = await pool.query(settingsQuery);
 
       for (const settings of settingsResult.rows) {
         const company = settings.company_id;
+        const client = await pool.connect();
+        let transactionOpen = false;
+
         console.log(
           `[${now.toISOString()}] Checking ${company} for eligible invoices...`
         );
 
         try {
+          await client.query("BEGIN");
+          transactionOpen = true;
+
+          if (company === "tienhock") {
+            // Match the manual route's period lock. Waiting here ensures the
+            // eligibility query below sees the prior run's committed parent.
+            await client.query(
+              `SELECT pg_advisory_xact_lock(
+                 hashtext('tienhock:invoice-consolidation'),
+                 $1::integer
+               )`,
+              [
+                isInConsolidationWindow.targetYear * 100 +
+                  isInConsolidationWindow.targetMonth +
+                  1,
+              ]
+            );
+          }
+
           // Check if we already have a completed consolidation for this month that is not cancelled
           const existingConsolidationQuery = `
             SELECT ct.*, 
@@ -102,6 +122,8 @@ export const checkAndProcessDueConsolidations = async (pool) => {
                   existingConsolidation.consolidated_invoice_id
                 }) with status: ${consolidatedInvoiceStatus}`
               );
+              await client.query("COMMIT");
+              transactionOpen = false;
               continue;
             } else {
               // The consolidated invoice was cancelled or doesn't exist, reset the tracking to allow re-consolidation
@@ -167,6 +189,8 @@ export const checkAndProcessDueConsolidations = async (pool) => {
               "skipped",
               "No eligible invoices found"
             );
+            await client.query("COMMIT");
+            transactionOpen = false;
             continue;
           }
 
@@ -216,6 +240,8 @@ export const checkAndProcessDueConsolidations = async (pool) => {
               null,
               result.consolidated_invoice_id
             );
+            await client.query("COMMIT");
+            transactionOpen = false;
             console.log(
               `[${now.toISOString()}] Successfully consolidated ${company} invoices into ${
                 result.consolidated_invoice_id
@@ -225,19 +251,119 @@ export const checkAndProcessDueConsolidations = async (pool) => {
             throw new Error(result.message || "Consolidation failed");
           }
         } catch (error) {
+          if (transactionOpen) {
+            try {
+              await client.query("ROLLBACK");
+            } catch (rollbackError) {
+              console.error(
+                `[${now.toISOString()}] Error rolling back ${company} consolidation:`,
+                rollbackError
+              );
+            }
+            transactionOpen = false;
+          }
+
           console.error(
             `[${now.toISOString()}] Error consolidating ${company}:`,
             error
           );
 
-          await upsertConsolidationTracking(
-            client,
-            company,
-            isInConsolidationWindow.targetYear,
-            isInConsolidationWindow.targetMonth,
-            "failed",
-            error.message || "Consolidation error"
-          );
+          try {
+            // Record failure only after the company's work was rolled back.
+            if (company === "tienhock") {
+              await client.query("BEGIN");
+              transactionOpen = true;
+
+              // Re-enter the same period lock before recording failure. A
+              // newer run may have completed while the failed transaction was
+              // being rolled back, and its completed status must win.
+              await client.query(
+                `SELECT pg_advisory_xact_lock(
+                   hashtext('tienhock:invoice-consolidation'),
+                   $1::integer
+                 )`,
+                [
+                  isInConsolidationWindow.targetYear * 100 +
+                    isInConsolidationWindow.targetMonth +
+                    1,
+                ]
+              );
+
+              const newerCompletedResult = await client.query(
+                `SELECT th.id AS consolidated_invoice_id
+                   FROM invoices th
+                  WHERE th.is_consolidated = true
+                    AND th.consolidated_invoices IS NOT NULL
+                    AND th.id LIKE $1
+                    AND COALESCE(th.invoice_status, 'active') <> 'cancelled'
+                  ORDER BY th.id DESC
+                  LIMIT 1`,
+                [
+                  `CON-${isInConsolidationWindow.targetYear}${String(
+                    isInConsolidationWindow.targetMonth + 1
+                  ).padStart(2, "0")}%`,
+                ]
+              );
+
+              if (newerCompletedResult.rows.length === 0) {
+                await upsertConsolidationTracking(
+                  client,
+                  company,
+                  isInConsolidationWindow.targetYear,
+                  isInConsolidationWindow.targetMonth,
+                  "failed",
+                  error.message || "Consolidation error"
+                );
+              } else {
+                console.log(
+                  `[${now.toISOString()}] Skipped stale ${company} failure status because ${
+                    newerCompletedResult.rows[0].consolidated_invoice_id
+                  } completed successfully`
+                );
+              }
+
+              await client.query("COMMIT");
+              transactionOpen = false;
+            } else {
+              await upsertConsolidationTracking(
+                client,
+                company,
+                isInConsolidationWindow.targetYear,
+                isInConsolidationWindow.targetMonth,
+                "failed",
+                error.message || "Consolidation error"
+              );
+            }
+          } catch (trackingError) {
+            if (transactionOpen) {
+              try {
+                await client.query("ROLLBACK");
+              } catch (rollbackError) {
+                console.error(
+                  `[${now.toISOString()}] Error rolling back ${company} failure tracking:`,
+                  rollbackError
+                );
+              }
+              transactionOpen = false;
+            }
+
+            console.error(
+              `[${now.toISOString()}] Error recording ${company} consolidation failure:`,
+              trackingError
+            );
+          }
+        } finally {
+          if (transactionOpen) {
+            try {
+              await client.query("ROLLBACK");
+            } catch (rollbackError) {
+              console.error(
+                `[${now.toISOString()}] Error closing ${company} consolidation transaction:`,
+                rollbackError
+              );
+            }
+          }
+          client.release();
         }
       }
     } else {
@@ -246,16 +372,12 @@ export const checkAndProcessDueConsolidations = async (pool) => {
       );
     }
 
-    await client.query("COMMIT");
     console.log(`[${now.toISOString()}] Auto-consolidation check completed`);
   } catch (error) {
-    await client.query("ROLLBACK");
     console.error(
       `[${now.toISOString()}] Error in auto-consolidation check:`,
       error
     );
-  } finally {
-    client.release();
   }
 };
 
@@ -348,6 +470,9 @@ async function getEligibleTienhockInvoices(client, month, year) {
   const startTimestamp = startDate.getTime().toString();
   const endTimestamp = endDate.getTime().toString();
 
+  // This function runs inside the scheduler's consolidation transaction.
+  // Lock sources in the same order as manual consolidation so customer
+  // changes serialize before the parent row is inserted.
   const invoiceQuery = `
     SELECT 
       i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype, 
@@ -366,10 +491,10 @@ async function getEligibleTienhockInvoices(client, month, year) {
       WHERE consolidated.is_consolidated = true
       AND consolidated.consolidated_invoices IS NOT NULL
       AND consolidated.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
-      AND consolidated.invoice_status != 'cancelled' 
-      AND consolidated.einvoice_status != 'cancelled'
+      AND COALESCE(consolidated.invoice_status, 'active') <> 'cancelled'
     )
-    ORDER BY CAST(i.createddate AS bigint) ASC
+    ORDER BY i.id ASC
+    FOR UPDATE OF i
   `;
 
   const invoiceResult = await client.query(invoiceQuery, [
@@ -394,6 +519,11 @@ async function getEligibleTienhockInvoices(client, month, year) {
     // Map orderDetails to products for consistent calculation logic
     invoice.products = orderDetailsResult.rows;
   }
+
+  invoiceResult.rows.sort((left, right) => {
+    const dateDifference = Number(left.createddate) - Number(right.createddate);
+    return dateDifference || String(left.id).localeCompare(String(right.id));
+  });
 
   return invoiceResult.rows;
 }

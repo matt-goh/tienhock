@@ -703,8 +703,11 @@ export default function (pool) {
       await client.query("BEGIN");
 
       // Check if entry exists and is editable
-      const checkQuery =
-        "SELECT status, entry_type, source_type, description FROM journal_entries WHERE id = $1";
+      const checkQuery = `
+        SELECT status, entry_type, source_type, description
+        FROM journal_entries
+        WHERE id = $1
+        FOR UPDATE`;
       const checkResult = await client.query(checkQuery, [id]);
 
       if (checkResult.rows.length === 0) {
