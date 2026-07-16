@@ -189,6 +189,265 @@ export default function (pool) {
     }
   });
 
+  // GET /:code/overview - Legacy-style annual activity for one account branch.
+  // The selected code and every descendant are rolled up recursively. Direct
+  // children are returned separately, with each child's own full branch total.
+  router.get("/:code/overview", async (req, res) => {
+    const { code } = req.params;
+    const now = new Date();
+    const yearValue = req.query.year || String(now.getFullYear());
+    const monthValue = req.query.month || String(now.getMonth() + 1);
+    const year = /^\d{4}$/.test(yearValue) ? Number(yearValue) : Number.NaN;
+    const month = /^\d{1,2}$/.test(monthValue)
+      ? Number(monthValue)
+      : Number.NaN;
+
+    if (!Number.isInteger(year) || year < 1900 || year > 2100) {
+      return res.status(400).json({
+        message: "Invalid year. Must be between 1900 and 2100.",
+      });
+    }
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
+      return res.status(400).json({
+        message: "Invalid month. Must be between 1 and 12.",
+      });
+    }
+
+    const yearStart = `${year}-01-01`;
+    const nextYearStart = `${year + 1}-01-01`;
+
+    try {
+      const [accountResult, childrenResult, activityResult] = await Promise.all([
+        pool.query(
+          `SELECT
+             ac.id, ac.code, ac.description, ac.ledger_type, ac.parent_code,
+             ac.level, ac.sort_order, ac.is_active, ac.is_system, ac.notes,
+             ac.fs_note, ac.created_at, ac.updated_at,
+             lt.name AS ledger_type_name,
+             fsn.name AS fs_note_name
+           FROM account_codes ac
+           LEFT JOIN ledger_types lt ON lt.code = ac.ledger_type
+           LEFT JOIN financial_statement_notes fsn ON fsn.code = ac.fs_note
+           WHERE ac.code = $1`,
+          [code]
+        ),
+        pool.query(
+          `SELECT
+             id, code, description, ledger_type, parent_code, level,
+             sort_order, is_active, is_system, notes, fs_note,
+             created_at, updated_at
+           FROM account_codes
+           WHERE parent_code = $1
+           ORDER BY sort_order, code`,
+          [code]
+        ),
+        pool.query(
+          `WITH RECURSIVE account_tree AS (
+             SELECT
+               ac.code,
+               ac.parent_code,
+               0::integer AS depth,
+               NULL::varchar AS branch_code,
+               ARRAY[ac.code::text] AS path
+             FROM account_codes ac
+             WHERE ac.code = $1
+
+             UNION ALL
+
+             SELECT
+               child.code,
+               child.parent_code,
+               parent.depth + 1,
+               CASE
+                 WHEN parent.depth = 0 THEN child.code
+                 ELSE parent.branch_code
+               END AS branch_code,
+               parent.path || child.code::text
+             FROM account_codes child
+             JOIN account_tree parent ON child.parent_code = parent.code
+             WHERE NOT child.code::text = ANY(parent.path)
+           ),
+           latest_anchors AS (
+             SELECT DISTINCT ON (aob.account_code)
+               aob.account_code,
+               aob.as_of_date,
+               aob.amount
+             FROM account_opening_balances aob
+             JOIN account_tree tree ON tree.code = aob.account_code
+             WHERE aob.as_of_date <= $2::date
+             ORDER BY aob.account_code, aob.as_of_date DESC
+           ),
+           prior_movements AS (
+             SELECT
+               jel.account_code,
+               je.entry_date,
+               COALESCE(jel.debit_amount, 0) -
+                 COALESCE(jel.credit_amount, 0) AS net
+             FROM journal_entry_lines jel
+             JOIN journal_entries je ON je.id = jel.journal_entry_id
+             JOIN account_tree tree ON tree.code = jel.account_code
+             WHERE je.status = 'posted'
+               AND je.entry_date < $2::date
+           ),
+           opening_by_account AS (
+             SELECT
+               tree.code,
+               tree.branch_code,
+               COALESCE(anchor.amount, 0) +
+                 COALESCE(
+                   SUM(movement.net) FILTER (
+                     WHERE anchor.as_of_date IS NULL
+                        OR movement.entry_date >= anchor.as_of_date
+                   ),
+                   0
+                 ) AS amount
+             FROM account_tree tree
+             LEFT JOIN latest_anchors anchor
+               ON anchor.account_code = tree.code
+             LEFT JOIN prior_movements movement
+               ON movement.account_code = tree.code
+             GROUP BY
+               tree.code,
+               tree.branch_code,
+               anchor.as_of_date,
+               anchor.amount
+           ),
+           monthly_by_account AS (
+             SELECT
+               tree.code,
+               tree.branch_code,
+               EXTRACT(MONTH FROM je.entry_date)::integer AS month,
+               COALESCE(SUM(jel.debit_amount), 0) AS debit,
+               COALESCE(SUM(jel.credit_amount), 0) AS credit
+             FROM account_tree tree
+             JOIN journal_entry_lines jel ON jel.account_code = tree.code
+             JOIN journal_entries je ON je.id = jel.journal_entry_id
+             WHERE je.status = 'posted'
+               AND je.entry_date >= $2::date
+               AND je.entry_date < $3::date
+             GROUP BY
+               tree.code,
+               tree.branch_code,
+               EXTRACT(MONTH FROM je.entry_date)
+           )
+           SELECT
+             'opening' AS row_type,
+             code,
+             branch_code,
+             NULL::integer AS month,
+             0::numeric AS debit,
+             0::numeric AS credit,
+             amount AS net
+           FROM opening_by_account
+
+           UNION ALL
+
+           SELECT
+             'month' AS row_type,
+             code,
+             branch_code,
+             month,
+             debit,
+             credit,
+             debit - credit AS net
+           FROM monthly_by_account
+           ORDER BY row_type, code, month`,
+          [code, yearStart, nextYearStart]
+        ),
+      ]);
+
+      if (accountResult.rows.length === 0) {
+        return res.status(404).json({ message: "Account code not found" });
+      }
+
+      const createMonths = () =>
+        Array.from({ length: 12 }, (_unused, index) => ({
+          month: index + 1,
+          debit: 0,
+          credit: 0,
+          net: 0,
+        }));
+      const overall = { opening: 0, months: createMonths() };
+      const directAccount = { opening: 0, months: createMonths() };
+      const branches = new Map(
+        childrenResult.rows.map((child) => [
+          child.code,
+          { opening: 0, months: createMonths() },
+        ])
+      );
+
+      activityResult.rows.forEach((row) => {
+        const net = parseFloat(row.net) || 0;
+        const branch = row.branch_code ? branches.get(row.branch_code) : null;
+
+        if (row.row_type === "opening") {
+          overall.opening += net;
+          if (branch) branch.opening += net;
+          else directAccount.opening += net;
+          return;
+        }
+
+        const monthIndex = parseInt(row.month, 10) - 1;
+        if (monthIndex < 0 || monthIndex > 11) return;
+        const debit = parseFloat(row.debit) || 0;
+        const credit = parseFloat(row.credit) || 0;
+        overall.months[monthIndex].debit += debit;
+        overall.months[monthIndex].credit += credit;
+        overall.months[monthIndex].net += net;
+
+        const target = branch || directAccount;
+        target.months[monthIndex].debit += debit;
+        target.months[monthIndex].credit += credit;
+        target.months[monthIndex].net += net;
+      });
+
+      const summarize = (activity) => {
+        const balanceBroughtForward =
+          activity.opening +
+          activity.months
+            .slice(0, month - 1)
+            .reduce((sum, item) => sum + item.net, 0);
+        const currentMonthMovement = activity.months[month - 1].net;
+        return {
+          opening_balance: activity.opening,
+          balance_brought_forward: balanceBroughtForward,
+          current_month_movement: currentMonthMovement,
+          accumulative_balance:
+            balanceBroughtForward + currentMonthMovement,
+        };
+      };
+
+      const children = childrenResult.rows.map((child) => ({
+        ...child,
+        ...summarize(
+          branches.get(child.code) || { opening: 0, months: createMonths() }
+        ),
+      }));
+
+      res.json({
+        account: accountResult.rows[0],
+        period: {
+          year,
+          opening_month: 1,
+          current_month: month,
+        },
+        subtree_account_count: activityResult.rows.filter(
+          (row) => row.row_type === "opening"
+        ).length,
+        months: overall.months,
+        totals: summarize(overall),
+        direct_account: summarize(directAccount),
+        children,
+      });
+    } catch (error) {
+      console.error("Error fetching account code overview:", error);
+      res.status(500).json({
+        message: "Error fetching account code overview",
+        error: error.message,
+      });
+    }
+  });
+
   // GET /:code - Get single account code by code
   router.get("/:code", async (req, res) => {
     try {
@@ -240,6 +499,7 @@ export default function (pool) {
       level,
       sort_order,
       is_active,
+      fs_note,
       notes,
     } = req.body;
 
@@ -291,11 +551,23 @@ export default function (pool) {
         }
       }
 
+      if (fs_note) {
+        const fsNoteQuery =
+          "SELECT 1 FROM financial_statement_notes WHERE code = $1";
+        const fsNoteResult = await client.query(fsNoteQuery, [fs_note]);
+        if (fsNoteResult.rows.length === 0) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({
+            message: `Financial statement note '${fs_note}' does not exist`,
+          });
+        }
+      }
+
       const insertQuery = `
         INSERT INTO account_codes (
           code, description, ledger_type, parent_code,
-          level, sort_order, is_active, notes, created_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          level, sort_order, is_active, fs_note, notes, created_by
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *
       `;
 
@@ -307,6 +579,7 @@ export default function (pool) {
         calculatedLevel,
         sort_order || 0,
         is_active !== false,
+        fs_note || null,
         notes || null,
         req.staffId || null,
       ];
@@ -339,6 +612,7 @@ export default function (pool) {
       parent_code,
       sort_order,
       is_active,
+      fs_note,
       notes,
     } = req.body;
 
@@ -354,7 +628,7 @@ export default function (pool) {
 
       // Check if account exists
       const checkQuery =
-        "SELECT is_system, level FROM account_codes WHERE code = $1";
+        "SELECT is_system, level, fs_note FROM account_codes WHERE code = $1";
       const checkResult = await client.query(checkQuery, [code]);
       if (checkResult.rows.length === 0) {
         await client.query("ROLLBACK");
@@ -402,6 +676,21 @@ export default function (pool) {
         }
       }
 
+      if (fs_note) {
+        const fsNoteQuery =
+          "SELECT 1 FROM financial_statement_notes WHERE code = $1";
+        const fsNoteResult = await client.query(fsNoteQuery, [fs_note]);
+        if (fsNoteResult.rows.length === 0) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({
+            message: `Financial statement note '${fs_note}' does not exist`,
+          });
+        }
+      }
+
+      const nextFsNote =
+        fs_note === undefined ? checkResult.rows[0].fs_note : fs_note || null;
+
       const updateQuery = `
         UPDATE account_codes
         SET
@@ -411,10 +700,11 @@ export default function (pool) {
           level = $4,
           sort_order = $5,
           is_active = $6,
-          notes = $7,
-          updated_by = $8,
+          fs_note = $7,
+          notes = $8,
+          updated_by = $9,
           updated_at = CURRENT_TIMESTAMP
-        WHERE code = $9
+        WHERE code = $10
         RETURNING *
       `;
 
@@ -425,6 +715,7 @@ export default function (pool) {
         newLevel,
         sort_order || 0,
         is_active !== false,
+        nextFsNote,
         notes || null,
         req.staffId || null,
         code,

@@ -496,6 +496,12 @@ export interface PinjamReportPDFData {
     total_pinjam: number;
     total_final: number;
   };
+  // Optional company header (default Tien Hock); Green Target passes its own.
+  companyName?: string;
+  logoSrc?: string;
+  // Optional labels for the Mid-Month subview; month-end output keeps defaults.
+  reportLabel?: string;
+  gajiLabel?: string;
 }
 
 // PDF Components
@@ -545,18 +551,25 @@ const PinjamRow: React.FC<{
 const PinjamReportPDF: React.FC<{
   data: PinjamReportPDFData;
   companyName?: string;
-}> = ({ data, companyName = TIENHOCK_INFO.name }) => {
-  const reportTitle = `${getMonthName(data.month)} ${data.year} Pinjam Report`;
+}> = ({ data, companyName }) => {
+  const resolvedCompanyName =
+    companyName ?? data.companyName ?? TIENHOCK_INFO.name;
+  const resolvedLogo = data.logoSrc ?? TienHockLogo;
+  const reportLabel = data.reportLabel ?? "Pinjam";
+  const gajiLabel = data.gajiLabel ?? "Gaji/Genap";
+  const reportTitle = `${getMonthName(data.month)} ${data.year} ${reportLabel} Report`;
   const pinjamByType = aggregatePinjamByType(data.data);
 
   return (
-    <Document title={`Pinjam Report ${getMonthName(data.month)} ${data.year}`}>
+    <Document
+      title={`${reportLabel} Report ${getMonthName(data.month)} ${data.year}`}
+    >
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
-          <Image src={TienHockLogo} style={styles.logo} />
+          <Image src={resolvedLogo} style={styles.logo} />
           <View style={styles.headerTextContainer}>
-            <Text style={styles.companyName}>{companyName}</Text>
+            <Text style={styles.companyName}>{resolvedCompanyName}</Text>
             <Text style={styles.reportTitle}>{reportTitle}</Text>
           </View>
         </View>
@@ -566,7 +579,7 @@ const PinjamReportPDF: React.FC<{
           <View style={styles.tableHeader}>
             <Text style={styles.colNo}>NO.</Text>
             <Text style={styles.colStaffId}>STAFF/ID</Text>
-            <Text style={styles.colGajiGenap}>GAJI/GENAP</Text>
+            <Text style={styles.colGajiGenap}>{gajiLabel.toUpperCase()}</Text>
             <Text style={styles.colPinjam}>TOTAL PINJAM</Text>
             <Text style={styles.colTotal}>TOTAL</Text>
             <Text style={styles.colPayment}>PAYMENT</Text>
@@ -605,7 +618,7 @@ const PinjamReportPDF: React.FC<{
 
         {/* Enhanced Footer Summary */}
         <View style={styles.footerSection} wrap={false}>
-          <Text style={styles.footerTitle}>Pinjam Report Summary</Text>
+          <Text style={styles.footerTitle}>{reportLabel} Report Summary</Text>
 
           {/* Main Summary Row */}
           <View style={styles.footerMainRow}>
@@ -614,7 +627,7 @@ const PinjamReportPDF: React.FC<{
               <Text style={styles.footerMainValue}>{data.total_records}</Text>
             </View>
             <View style={styles.footerColumn}>
-              <Text style={styles.footerMainLabel}>Total Gaji/Genap</Text>
+              <Text style={styles.footerMainLabel}>Total {gajiLabel}</Text>
               <Text style={styles.footerMainValue}>
                 RM {formatCurrency(data.summary.total_gaji_genap)}
               </Text>
@@ -652,20 +665,24 @@ const PinjamReportPDF: React.FC<{
 const PinjamBreakdownPDF: React.FC<{
   data: PinjamReportPDFData;
   companyName?: string;
-}> = ({ data, companyName = TIENHOCK_INFO.name }) => {
-  const reportTitle = `${getMonthName(data.month)} ${data.year} Pinjam Breakdown`;
+}> = ({ data, companyName }) => {
+  const resolvedCompanyName =
+    companyName ?? data.companyName ?? TIENHOCK_INFO.name;
+  const resolvedLogo = data.logoSrc ?? TienHockLogo;
+  const reportLabel = data.reportLabel ?? "Pinjam";
+  const reportTitle = `${getMonthName(data.month)} ${data.year} ${reportLabel} Breakdown`;
   const pinjamByType = aggregatePinjamByType(data.data);
   const contributorsByType = aggregatePinjamContributorsByType(data.data);
 
   return (
     <Document
-      title={`Pinjam Breakdown ${getMonthName(data.month)} ${data.year}`}
+      title={`${reportLabel} Breakdown ${getMonthName(data.month)} ${data.year}`}
     >
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
-          <Image src={TienHockLogo} style={styles.logo} />
+          <Image src={resolvedLogo} style={styles.logo} />
           <View style={styles.headerTextContainer}>
-            <Text style={styles.companyName}>{companyName}</Text>
+            <Text style={styles.companyName}>{resolvedCompanyName}</Text>
             <Text style={styles.reportTitle}>{reportTitle}</Text>
           </View>
         </View>
@@ -777,9 +794,10 @@ export const generatePinjamReportPDF = async (
   action: "download" | "print"
 ) => {
   try {
+    const fileLabel = (data.reportLabel ?? "Pinjam").replace(/\s+/g, "_");
     await outputPdf(
       <PinjamReportPDF data={data} />,
-      `Pinjam_Report_${getMonthName(data.month)}_${data.year}.pdf`,
+      `${fileLabel}_Report_${getMonthName(data.month)}_${data.year}.pdf`,
       action,
       "pinjam report PDF"
     );
@@ -794,9 +812,10 @@ export const generatePinjamBreakdownPDF = async (
   action: "download" | "print"
 ) => {
   try {
+    const fileLabel = (data.reportLabel ?? "Pinjam").replace(/\s+/g, "_");
     await outputPdf(
       <PinjamBreakdownPDF data={data} />,
-      `Pinjam_Breakdown_${getMonthName(data.month)}_${data.year}.pdf`,
+      `${fileLabel}_Breakdown_${getMonthName(data.month)}_${data.year}.pdf`,
       action,
       "pinjam breakdown PDF"
     );

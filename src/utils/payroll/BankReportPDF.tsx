@@ -337,6 +337,9 @@ export interface BankReportPDFData {
   summary: {
     total_final: number;
   };
+  // Optional company header (default Tien Hock); Green Target passes its own.
+  companyName?: string;
+  logoSrc?: string;
 }
 
 // PDF Components
@@ -401,7 +404,10 @@ const PaymentGroup: React.FC<{
 const BankReportPDF: React.FC<{
   data: BankReportPDFData;
   companyName?: string;
-}> = ({ data, companyName = TIENHOCK_INFO.name }) => {
+}> = ({ data, companyName }) => {
+  const resolvedCompanyName =
+    companyName ?? data.companyName ?? TIENHOCK_INFO.name;
+  const resolvedLogo = data.logoSrc ?? TienHockLogo;
   const reportTitle = `${getMonthName(data.month)} ${data.year} Gaji Report`;
 
   const groupedData = groupByPaymentPreference(data.data);
@@ -414,9 +420,9 @@ const BankReportPDF: React.FC<{
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
-          <Image src={TienHockLogo} style={styles.logo} />
+          <Image src={resolvedLogo} style={styles.logo} />
           <View style={styles.headerTextContainer}>
-            <Text style={styles.companyName}>{companyName}</Text>
+            <Text style={styles.companyName}>{resolvedCompanyName}</Text>
             <Text style={styles.reportTitle}>{reportTitle}</Text>
           </View>
         </View>

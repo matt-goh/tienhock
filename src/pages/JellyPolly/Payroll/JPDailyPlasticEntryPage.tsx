@@ -16,6 +16,7 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import TimeNavigator, { TimeRange } from "../../../components/TimeNavigator";
 import { FormCombobox, SelectOption } from "../../../components/FormComponents";
+import JPLeaveSection from "./JPLeaveSection";
 import { api } from "../../../routes/utils/api";
 import {
   EmployeePayCodeDetails,
@@ -188,6 +189,15 @@ const JPDailyPlasticEntryPage: React.FC = () => {
   const dayRange = useMemo<TimeRange>(
     () => ({ start: selectedDateValue, end: selectedDateValue }),
     [selectedDateValue]
+  );
+
+  const leaveEmployees = useMemo<{ id: string; name: string }[]>(
+    () =>
+      entries.map((entry: PlasticEntry) => ({
+        id: entry.employee_id,
+        name: entry.employee_name,
+      })),
+    [entries]
   );
 
   const fetchEntries = useCallback(async (): Promise<void> => {
@@ -804,6 +814,18 @@ const JPDailyPlasticEntryPage: React.FC = () => {
             );
           })}
         </div>
+      )}
+
+      {/* Leave & Absence Recording for JP Plastic staff on the selected date */}
+      {!isLoading && entries.length > 0 && (
+        <JPLeaveSection
+          employees={leaveEmployees}
+          year={parseInt(selectedDate.slice(0, 4), 10)}
+          fixedDate={selectedDate}
+          dayType={dayType}
+          loadEndpoint={`${API_BASE}/leave?date=${selectedDate}`}
+          saveEndpoint={`${API_BASE}/leave`}
+        />
       )}
 
       <ConfirmationDialog

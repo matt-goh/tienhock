@@ -1079,6 +1079,7 @@ export interface AccountCodeInput {
   description: string;
   ledger_type?: string | null;
   parent_code?: string | null;
+  fs_note?: string | null;
   level?: number;
   sort_order?: number;
   is_active?: boolean;

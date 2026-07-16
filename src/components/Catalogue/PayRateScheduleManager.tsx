@@ -16,6 +16,10 @@ const MONTHS = [
 ];
 
 interface PayRateScheduleManagerProps {
+  // API base for the schedule endpoints (JP passes /jellypolly/api). The JP
+  // catalogue lives in its own schema, so a JP pay code/staff must not be
+  // written through the TH route.
+  apiBase?: string;
   scope: PayRateScheduleScope;
   payCodeId: string;
   employeeId?: string | null;
@@ -47,6 +51,7 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
   employeeId = null,
   jobId = null,
   baseRates,
+  apiBase = "/api",
 }) => {
   const now = new Date();
   const [schedules, setSchedules] = useState<PayRateSchedule[]>([]);
@@ -73,7 +78,7 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
       if (scope === "employee" && employeeId) params.set("employee_id", employeeId);
       if (scope === "job" && jobId) params.set("job_id", jobId);
       const data: PayRateSchedule[] = await api.get(
-        `/api/pay-rate-schedules?${params.toString()}`,
+        `${apiBase}/pay-rate-schedules?${params.toString()}`,
       );
       setSchedules(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -81,7 +86,7 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [scope, payCodeId, employeeId, jobId]);
+  }, [scope, payCodeId, employeeId, jobId, apiBase]);
 
   useEffect(() => {
     fetchSchedules();
@@ -117,7 +122,7 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
     }
     setSaving(true);
     try {
-      await api.post("/api/pay-rate-schedules", {
+      await api.post(`${apiBase}/pay-rate-schedules`, {
         scope,
         pay_code_id: payCodeId,
         employee_id: scope === "employee" ? employeeId : null,
@@ -140,7 +145,7 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
 
   const handleDelete = async (id: number): Promise<void> => {
     try {
-      await api.delete(`/api/pay-rate-schedules/${id}`);
+      await api.delete(`${apiBase}/pay-rate-schedules/${id}`);
       toast.success("Rate change removed");
       await fetchSchedules();
     } catch (err: any) {

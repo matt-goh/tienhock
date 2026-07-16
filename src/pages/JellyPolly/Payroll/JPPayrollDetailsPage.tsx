@@ -998,11 +998,11 @@ const JPPayrollDetailsPage: React.FC = () => {
 
       {normalizedLeaveRecords.length > 0 && (
         <div className="border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
-          <div className="px-4 py-2 bg-cyan-50 dark:bg-cyan-900/20 border-b border-cyan-100 dark:border-cyan-800/50">
-            <h3 className="text-md font-semibold text-cyan-800 dark:text-cyan-300 flex items-center gap-2">
+          <div className="px-4 py-2 bg-teal-50 dark:bg-teal-900/20 border-b border-teal-100 dark:border-teal-800/50">
+            <h3 className="text-md font-semibold text-teal-800 dark:text-teal-300 flex items-center gap-2">
               <IconCalendarEvent
                 size={18}
-                className="text-cyan-600 dark:text-cyan-400"
+                className="text-teal-600 dark:text-teal-400"
               />
               Leave Pay
             </h3>
@@ -1038,7 +1038,7 @@ const JPPayrollDetailsPage: React.FC = () => {
                       <td className="px-3 py-2 text-right text-sm text-default-600 dark:text-gray-400">
                         {record.days_taken}
                       </td>
-                      <td className="px-3 py-2 text-right text-sm font-medium text-cyan-700 dark:text-cyan-300">
+                      <td className="px-3 py-2 text-right text-sm font-medium text-teal-700 dark:text-teal-300">
                         {formatCurrency(record.amount_paid)}
                       </td>
                     </tr>
@@ -1053,7 +1053,7 @@ const JPPayrollDetailsPage: React.FC = () => {
                   >
                     Total Leave Pay
                   </td>
-                  <td className="px-3 py-2 text-right font-bold text-cyan-700 dark:text-cyan-300">
+                  <td className="px-3 py-2 text-right font-bold text-teal-700 dark:text-teal-300">
                     {formatCurrency(leaveTotal)}
                   </td>
                 </tr>

@@ -9,9 +9,33 @@ import TimeNavigator, { TimeRange } from "../../../components/TimeNavigator";
 import { api } from "../../../routes/utils/api";
 import { getMonthName } from "../../../utils/payroll/payrollUtils";
 import { generateSalaryReportPDF } from "../../../utils/payroll/SalaryReportPDF";
+import {
+  generatePinjamReportPDF,
+  generatePinjamBreakdownPDF,
+  PinjamReportData,
+  PinjamDetail,
+} from "../../../utils/payroll/PinjamReportPDF";
+import {
+  generateBankReportPDF,
+  BankReportData,
+} from "../../../utils/payroll/BankReportPDF";
+import { generateBatchCutiReportPDF } from "../../../utils/payroll/CutiReportPDF";
+import {
+  BankReportTable,
+  PinjamReportTable,
+  PinjamBreakdownCard,
+  PinjamBreakdownButton,
+  CutiReportTable,
+  CutiBatchEmployee,
+} from "../../../components/Payroll/CompanySalaryReportTables";
+import { useJPStaffsCache } from "../../../utils/JellyPolly/useJPStaffsCache";
+import { groupStaffsByName } from "../../../utils/payroll/groupStaffsByName";
 import toast from "react-hot-toast";
 
 const JP_COMPANY = "JELLY POLLY";
+
+// Tabs whose data all comes from the single monthly salary-report endpoint.
+const MONTHLY_TABS = ["employee", "monthly", "bank", "pinjam"] as const;
 
 // Build the PDF's locationOrder from a location_map (codes sorted ascending).
 const buildLocationOrder = (map: Record<string, string>) =>
@@ -56,6 +80,27 @@ interface Comprehensive {
   locations: LocationData[];
   grand_totals: Totals;
   location_map: Record<string, string>;
+  // Employee / Bank / Pinjam tabs are served by the same monthly endpoint.
+  employees: EmpRow[];
+  employees_grand_totals: Totals;
+  bank_data: BankReportData[];
+  data: PinjamReportData[];
+  total_records: number;
+  summary: {
+    total_gaji_genap: number;
+    total_pinjam: number;
+    total_final: number;
+  };
+}
+type PinjamViewMode = "month_end" | "mid_month";
+interface PinjamSummaryBucket {
+  total_amount?: number | string;
+  detail_rows?: PinjamDetail[];
+}
+interface PinjamSummaryEntry {
+  employee_id?: string;
+  employee_name?: string;
+  mid_month?: PinjamSummaryBucket;
 }
 interface AnnualSummary {
   year: number;
@@ -109,19 +154,65 @@ const fmt = (n: number): string =>
     maximumFractionDigits: 2,
   });
 
-type TabType = "monthly" | "annual";
+type TabType =
+  | "employee"
+  | "monthly"
+  | "bank"
+  | "pinjam"
+  | "cuti"
+  | "annual";
 type AnnualView = "summary" | "breakdown";
+
+const TABS: TabType[] = [
+  "employee",
+  "monthly",
+  "bank",
+  "pinjam",
+  "cuti",
+  "annual",
+];
+
+// "monthly" is JP's location-grouped view (TH calls the same view "Location").
+const TAB_LABELS: Record<TabType, string> = {
+  employee: "Employee",
+  monthly: "Location",
+  bank: "Bank",
+  pinjam: "Pinjam",
+  cuti: "Cuti",
+  annual: "Annual",
+};
+
+const fmtCurrency = (amount: number): string =>
+  new Intl.NumberFormat("en-MY", {
+    style: "currency",
+    currency: "MYR",
+  }).format(Number(amount) || 0);
+
+const isMonthlyTab = (tab: TabType): boolean =>
+  (MONTHLY_TABS as readonly string[]).includes(tab);
+
+const getPinjamStaffKey = (
+  staffName: string | null | undefined,
+  staffId: string | null | undefined
+): string => (staffName || staffId || "").trim().toUpperCase();
 
 const JPSalaryReportPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>("monthly");
   const [annualView, setAnnualView] = useState<AnnualView>("summary");
+  const [pinjamViewMode, setPinjamViewMode] =
+    useState<PinjamViewMode>("month_end");
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  const { staffs } = useJPStaffsCache();
+  const [cutiEmployees, setCutiEmployees] = useState<CutiBatchEmployee[]>([]);
+  const [cutiSummary, setCutiSummary] = useState<any>(null);
 
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
 
   const [monthly, setMonthly] = useState<Comprehensive | null>(null);
+  const [pinjamSummary, setPinjamSummary] = useState<PinjamSummaryEntry[]>([]);
   const [annual, setAnnual] = useState<AnnualSummary | null>(null);
   const [breakdown, setBreakdown] = useState<AnnualBreakdown | null>(null);
   const [locationMap, setLocationMap] = useState<Record<string, string>>({});
@@ -142,15 +233,44 @@ const JPSalaryReportPage: React.FC = () => {
     [currentYear]
   );
 
+  // Multi-ID employees share one leave bucket, so dedupe by name before the call.
+  const cutiEmployeeIds = useMemo(
+    () => groupStaffsByName(staffs).map((s) => s.id),
+    [staffs]
+  );
+
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      if (activeTab === "monthly") {
-        const res = await api.get(
-          `/jellypolly/api/salary-report?year=${currentYear}&month=${currentMonth}`
-        );
+      if (isMonthlyTab(activeTab)) {
+        const [res, pinjamResponse] = await Promise.all([
+          api.get(
+            `/jellypolly/api/salary-report?year=${currentYear}&month=${currentMonth}`
+          ),
+          api
+            .get(
+              `/jellypolly/api/pinjam-records/summary?year=${currentYear}&month=${currentMonth}`
+            )
+            .catch((error: unknown): PinjamSummaryEntry[] => {
+              console.error("Error fetching JP pinjam summary:", error);
+              return [];
+            }),
+        ]);
         setMonthly(res);
+        setPinjamSummary(
+          Array.isArray(pinjamResponse)
+            ? (pinjamResponse as PinjamSummaryEntry[])
+            : []
+        );
         if (res?.location_map) setLocationMap(res.location_map);
+      } else if (activeTab === "cuti") {
+        if (cutiEmployeeIds.length === 0) return;
+        const res = await api.post(
+          "/jellypolly/api/leave-management/batch-reports",
+          { employeeIds: cutiEmployeeIds, year: currentYear }
+        );
+        setCutiEmployees(res?.employees || []);
+        setCutiSummary(res?.summary ?? null);
       } else if (annualView === "summary") {
         const res = await api.get(
           `/jellypolly/api/salary-report/annual?year=${currentYear}`
@@ -166,11 +286,12 @@ const JPSalaryReportPage: React.FC = () => {
       }
     } catch (error) {
       console.error("Error loading JP salary report:", error);
+      if (isMonthlyTab(activeTab)) setPinjamSummary([]);
       toast.error("Failed to load salary report");
     } finally {
       setIsLoading(false);
     }
-  }, [activeTab, annualView, currentYear, currentMonth]);
+  }, [activeTab, annualView, currentYear, currentMonth, cutiEmployeeIds]);
 
   useEffect(() => {
     fetchData();
@@ -185,10 +306,211 @@ const JPSalaryReportPage: React.FC = () => {
     setCurrentYear(range.start.getFullYear());
   };
 
-  const handleGenerate = async (action: "download" | "print") => {
+  const midMonthPinjamData = useMemo<PinjamReportData[]>(() => {
+    if (!monthly) return [];
+
+    const pinjamByStaff = new Map<
+      string,
+      { totalAmount: number; details: PinjamDetail[] }
+    >();
+
+    pinjamSummary.forEach((entry: PinjamSummaryEntry): void => {
+      const key: string = getPinjamStaffKey(
+        entry.employee_name,
+        entry.employee_id
+      );
+      if (!key) return;
+
+      const bucket: PinjamSummaryBucket | undefined = entry.mid_month;
+      const details: PinjamDetail[] = Array.isArray(bucket?.detail_rows)
+        ? bucket.detail_rows.map(
+            (detail: PinjamDetail): PinjamDetail => ({
+              description:
+                String(detail.description || "Pinjam").trim() || "Pinjam",
+              amount: Number(detail.amount) || 0,
+            })
+          )
+        : [];
+      const existing = pinjamByStaff.get(key) ?? {
+        totalAmount: 0,
+        details: [],
+      };
+      existing.totalAmount += Number(bucket?.total_amount ?? 0);
+      existing.details.push(...details);
+      pinjamByStaff.set(key, existing);
+    });
+
+    return monthly.data
+      .map((row: PinjamReportData): PinjamReportData => {
+        const key: string = getPinjamStaffKey(row.staff_name, row.staff_id);
+        const pinjam = pinjamByStaff.get(key);
+        const midMonthAmount: number = Number(row.mid_month_amount) || 0;
+        const totalPinjam: number = pinjam?.totalAmount ?? 0;
+        const details: PinjamDetail[] = [...(pinjam?.details ?? [])].sort(
+          (a: PinjamDetail, b: PinjamDetail): number => b.amount - a.amount
+        );
+
+        return {
+          ...row,
+          gaji_genap: midMonthAmount,
+          total_pinjam: totalPinjam,
+          pinjam_details: details,
+          final_total: midMonthAmount - totalPinjam,
+          net_pay: midMonthAmount,
+          mid_month_amount: midMonthAmount,
+        };
+      })
+      .filter(
+        (row: PinjamReportData): boolean =>
+          row.gaji_genap !== 0 ||
+          row.total_pinjam !== 0 ||
+          (row.pinjam_details?.length ?? 0) > 0
+      )
+      .map(
+        (row: PinjamReportData, index: number): PinjamReportData => ({
+          ...row,
+          no: index + 1,
+        })
+      );
+  }, [monthly, pinjamSummary]);
+
+  const activePinjamData: PinjamReportData[] =
+    pinjamViewMode === "mid_month" ? midMonthPinjamData : monthly?.data ?? [];
+  const activePinjamSummary: Comprehensive["summary"] = useMemo(
+    () =>
+      activePinjamData.reduce(
+        (
+          totals: Comprehensive["summary"],
+          row: PinjamReportData
+        ): Comprehensive["summary"] => ({
+          total_gaji_genap: totals.total_gaji_genap + row.gaji_genap,
+          total_pinjam: totals.total_pinjam + row.total_pinjam,
+          total_final: totals.total_final + row.final_total,
+        }),
+        { total_gaji_genap: 0, total_pinjam: 0, total_final: 0 }
+      ),
+    [activePinjamData]
+  );
+  const activePinjamGajiLabel: string =
+    pinjamViewMode === "mid_month" ? "1/2 Bulan" : "Gaji/Genap";
+  const activePinjamReportLabel: string =
+    pinjamViewMode === "mid_month" ? "Mid-Month Pinjam" : "Pinjam";
+
+  // Bank/Pinjam show take-home after advances; the other monthly tabs show the
+  // full earned salary, so the header total follows the active tab.
+  const headerTotal: number =
+    activeTab === "pinjam"
+      ? activePinjamSummary.total_final
+      : activeTab === "bank"
+      ? monthly?.summary.total_final ?? 0
+      : monthly?.employees_grand_totals?.setelah_digenapkan ?? 0;
+
+  const handleGenerateBreakdown = async (
+    action: "download" | "print"
+  ): Promise<void> => {
+    if (!monthly || activePinjamData.length === 0) {
+      toast.error("No data available to generate PDF");
+      return;
+    }
     setIsGenerating(true);
     try {
-      if (activeTab === "monthly") {
+      await generatePinjamBreakdownPDF(
+        {
+          year: currentYear,
+          month: currentMonth,
+          data: activePinjamData,
+          total_records: activePinjamData.length,
+          summary: activePinjamSummary,
+          companyName: JP_COMPANY,
+          reportLabel: activePinjamReportLabel,
+          gajiLabel: activePinjamGajiLabel,
+        },
+        action
+      );
+      toast.success(
+        `Pinjam breakdown ${action === "download" ? "downloaded" : "generated for printing"}`
+      );
+    } catch (error) {
+      console.error("Error generating pinjam breakdown PDF:", error);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleGenerate = async (
+    action: "download" | "print"
+  ): Promise<void> => {
+    setIsGenerating(true);
+    try {
+      if (activeTab === "employee") {
+        if (!monthly || monthly.employees.length === 0) {
+          toast.error("No data to print for this month");
+          return;
+        }
+        await generateSalaryReportPDF(
+          {
+            reportType: "employee-individual",
+            periodType: "monthly",
+            year: currentYear,
+            month: currentMonth,
+            employees: monthly.employees as any,
+            grandTotals: monthly.employees_grand_totals as any,
+            locationMap: locationMap,
+            locationOrder: buildLocationOrder(locationMap),
+            companyName: JP_COMPANY,
+          },
+          action
+        );
+      } else if (activeTab === "bank") {
+        if (!monthly || monthly.bank_data.length === 0) {
+          toast.error("No data to print for this month");
+          return;
+        }
+        await generateBankReportPDF(
+          {
+            year: currentYear,
+            month: currentMonth,
+            data: monthly.bank_data,
+            total_records: monthly.bank_data.length,
+            summary: { total_final: monthly.summary.total_final },
+            companyName: JP_COMPANY,
+          },
+          action
+        );
+      } else if (activeTab === "pinjam") {
+        if (!monthly || activePinjamData.length === 0) {
+          toast.error("No data to print for this month");
+          return;
+        }
+        await generatePinjamReportPDF(
+          {
+            year: currentYear,
+            month: currentMonth,
+            data: activePinjamData,
+            total_records: activePinjamData.length,
+            summary: activePinjamSummary,
+            companyName: JP_COMPANY,
+            reportLabel: activePinjamReportLabel,
+            gajiLabel: activePinjamGajiLabel,
+          },
+          action
+        );
+      } else if (activeTab === "cuti") {
+        if (cutiEmployees.length === 0 || !cutiSummary) {
+          toast.error("No leave data to print for this year");
+          return;
+        }
+        await generateBatchCutiReportPDF(
+          {
+            year: currentYear,
+            employees: cutiEmployees as any,
+            companyName: JP_COMPANY,
+            summary: cutiSummary,
+          },
+          action
+        );
+      } else if (activeTab === "monthly") {
         if (!monthly || monthly.locations.length === 0) {
           toast.error("No data to print for this month");
           return;
@@ -404,100 +726,245 @@ const JPSalaryReportPage: React.FC = () => {
   );
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col md:flex-row justify-between items-center gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-            Salary Report (Jelly Polly)
-          </h1>
-          <div className="flex items-center rounded-full border border-default-200 bg-default-100 p-0.5 dark:border-gray-700 dark:bg-gray-900">
-            {(["monthly", "annual"] as TabType[]).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-3 py-1 rounded-full text-xs font-medium capitalize transition-colors ${
-                  activeTab === tab
-                    ? "bg-sky-500 text-white shadow-sm"
-                    : "text-default-600 hover:bg-white hover:text-default-800 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
-                }`}
+    <div className="space-y-3">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
+        <div className="px-6 py-3 border-b border-default-200 dark:border-gray-700">
+          <div className="flex flex-wrap justify-between items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Tab buttons */}
+              <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
+                {TABS.map((tab, index: number) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                      activeTab === tab
+                        ? "bg-sky-500 text-white"
+                        : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                    } ${index > 0 ? "border-l border-default-200 dark:border-gray-600" : ""}`}
+                  >
+                    {TAB_LABELS[tab]}
+                  </button>
+                ))}
+              </div>
+              {activeTab === "pinjam" && (
+                <>
+                  <span className="text-default-300 dark:text-gray-600">|</span>
+                  <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setPinjamViewMode("month_end")}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                        pinjamViewMode === "month_end"
+                          ? "bg-sky-500 text-white"
+                          : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      Month-End
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPinjamViewMode("mid_month")}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-default-200 dark:border-gray-600 ${
+                        pinjamViewMode === "mid_month"
+                          ? "bg-sky-500 text-white"
+                          : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      Mid-Month
+                    </button>
+                  </div>
+                </>
+              )}
+              {/* Sub-view toggle for the Annual tab - right after tabs */}
+              {activeTab === "annual" && (
+                <>
+                  <span className="text-default-300 dark:text-gray-600">|</span>
+                  <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
+                    {(["summary", "breakdown"] as AnnualView[]).map(
+                      (v, index: number) => (
+                        <button
+                          key={v}
+                          onClick={() => setAnnualView(v)}
+                          className={`px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
+                            annualView === v
+                              ? "bg-sky-500 text-white"
+                              : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                          } ${index > 0 ? "border-l border-default-200 dark:border-gray-600" : ""}`}
+                        >
+                          {v}
+                        </button>
+                      )
+                    )}
+                  </div>
+                </>
+              )}
+              <span className="text-default-300 dark:text-gray-600">|</span>
+              <TimeNavigator
+                range={isMonthlyTab(activeTab) ? monthRange : yearRange}
+                onChange={
+                  isMonthlyTab(activeTab) ? handleTimeChange : handleYearChange
+                }
+                modes={isMonthlyTab(activeTab) ? ["month"] : ["year"]}
+                presets={false}
+                allowFuture={!isMonthlyTab(activeTab)}
+              />
+              {monthly && isMonthlyTab(activeTab) && (
+                <>
+                  <span className="text-default-300 dark:text-gray-600">|</span>
+                  <div className="text-sm text-default-600 dark:text-gray-300">
+                    <span className="block font-medium">
+                      {activeTab === "pinjam"
+                        ? activePinjamData.length
+                        : monthly.total_records} employees
+                    </span>
+                    <span className="block font-medium">
+                      {fmtCurrency(headerTotal)}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {activeTab === "pinjam" && (
+                <PinjamBreakdownButton
+                  disabled={
+                    !monthly || activePinjamData.length === 0 || isGenerating
+                  }
+                  onGenerate={handleGenerateBreakdown}
+                />
+              )}
+              <Button
+                onClick={fetchData}
+                icon={IconRefresh}
+                variant="outline"
+                disabled={isLoading}
+                size="sm"
               >
-                {tab}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={() => handleGenerate("print")}
-            icon={IconPrinter}
-            variant="outline"
-            disabled={isGenerating || isLoading}
-          >
-            Print
-          </Button>
-          <Button
-            onClick={() => handleGenerate("download")}
-            icon={IconDownload}
-            variant="outline"
-            disabled={isGenerating || isLoading}
-          >
-            Download
-          </Button>
-          <Button
-            onClick={fetchData}
-            icon={IconRefresh}
-            variant="outline"
-            disabled={isLoading}
-          >
-            Refresh
-          </Button>
-        </div>
-      </div>
-
-      {/* Controls */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm p-4 flex flex-wrap items-end gap-4">
-        {activeTab === "monthly" ? (
-          <TimeNavigator
-            range={monthRange}
-            onChange={handleTimeChange}
-            modes={["month"]}
-            presets={false}
-          />
-        ) : (
-          <div className="flex items-center gap-3">
-            <TimeNavigator
-              range={yearRange}
-              onChange={handleYearChange}
-              modes={["year"]}
-              presets={false}
-              allowFuture
-            />
-            <div className="flex items-center rounded-full border border-default-200 bg-default-100 p-0.5 dark:border-gray-700 dark:bg-gray-900">
-              {(["summary", "breakdown"] as AnnualView[]).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => setAnnualView(v)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium capitalize transition-colors ${
-                    annualView === v
-                      ? "bg-sky-500 text-white shadow-sm"
-                      : "text-default-600 hover:bg-white hover:text-default-800 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
-                  }`}
-                >
-                  {v}
-                </button>
-              ))}
+                Refresh
+              </Button>
+              <Button
+                onClick={() => handleGenerate("print")}
+                icon={IconPrinter}
+                variant="outline"
+                disabled={isGenerating || isLoading}
+                size="sm"
+              >
+                Print
+              </Button>
+              <Button
+                onClick={() => handleGenerate("download")}
+                icon={IconDownload}
+                variant="outline"
+                disabled={isGenerating || isLoading}
+                size="sm"
+              >
+                Download
+              </Button>
             </div>
           </div>
-        )}
-      </div>
-
-      {/* Content */}
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <LoadingSpinner />
         </div>
-      ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm overflow-auto max-h-[75vh]">
+
+        {/* Content */}
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <LoadingSpinner />
+          </div>
+        ) : (
+          <div className="overflow-auto max-h-[75vh]">
+          {/* EMPLOYEE — same columns as the location view, but one flat list. */}
+          {activeTab === "employee" &&
+            (!monthly || monthly.employees.length === 0 ? (
+              <div className="text-center py-12 text-default-500 dark:text-gray-400">
+                No processed payroll for {getMonthName(currentMonth)}{" "}
+                {currentYear}.
+              </div>
+            ) : (
+              <table className="w-full table-fixed">
+                {renderTableColGroup()}
+                {renderSalaryHeader("NAMA PEKERJA")}
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
+                  {monthly.employees.map((emp, index: number) => (
+                    <tr
+                      key={emp.staff_id}
+                      className={
+                        index % 2 === 0
+                          ? "bg-white dark:bg-gray-800"
+                          : "bg-default-25 dark:bg-gray-750"
+                      }
+                    >
+                      <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 text-center">
+                        {index + 1}
+                      </td>
+                      <td className={bodyNameCellClass}>
+                        <span
+                          className="block truncate"
+                          title={`${emp.staff_id.toUpperCase()} - ${emp.staff_name.toUpperCase()}`}
+                        >
+                          {emp.staff_id.toUpperCase()} -{" "}
+                          {emp.staff_name.toUpperCase()}
+                        </span>
+                      </td>
+                      {renderAmountCells(emp)}
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="sticky bottom-0 z-20">
+                  <tr>
+                    <td
+                      colSpan={2}
+                      className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600"
+                    >
+                      GRAND TOTAL
+                    </td>
+                    {renderAmountCells(monthly.employees_grand_totals, true)}
+                  </tr>
+                </tfoot>
+              </table>
+            ))}
+
+          {/* BANK */}
+          {activeTab === "bank" &&
+            (!monthly || monthly.bank_data.length === 0 ? (
+              <div className="text-center py-12 text-default-500 dark:text-gray-400">
+                No payments for {getMonthName(currentMonth)} {currentYear}.
+              </div>
+            ) : (
+              <div className="px-6 pt-2 pb-2">
+                <BankReportTable data={monthly.bank_data} />
+              </div>
+            ))}
+
+          {/* PINJAM */}
+          {activeTab === "pinjam" &&
+            (!monthly || activePinjamData.length === 0 ? (
+              <div className="text-center py-12 text-default-500 dark:text-gray-400">
+                {pinjamViewMode === "mid_month"
+                  ? `No mid-month data for ${getMonthName(currentMonth)} ${currentYear}.`
+                  : `No processed payroll for ${getMonthName(currentMonth)} ${currentYear}.`}
+              </div>
+            ) : (
+              <div className="px-6 pt-2 pb-2">
+                <PinjamReportTable
+                  data={activePinjamData}
+                  gajiLabel={activePinjamGajiLabel}
+                />
+                <PinjamBreakdownCard data={activePinjamData} />
+              </div>
+            ))}
+
+          {/* CUTI */}
+          {activeTab === "cuti" &&
+            (cutiEmployees.length === 0 ? (
+              <div className="text-center py-12 text-default-500 dark:text-gray-400">
+                No leave records in {currentYear}.
+              </div>
+            ) : (
+              <div className="px-6 pt-2 pb-2">
+                <CutiReportTable employees={cutiEmployees} month={null} />
+              </div>
+            ))}
+
           {/* MONTHLY */}
           {activeTab === "monthly" &&
             (!monthly || monthly.locations.length === 0 ? (
@@ -718,8 +1185,9 @@ const JPSalaryReportPage: React.FC = () => {
                 </tfoot>
               </table>
             ))}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

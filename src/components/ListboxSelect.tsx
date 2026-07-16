@@ -26,6 +26,7 @@ interface ListboxSelectProps {
   placeholder?: string;
   className?: string; // wrapper width/spacing, e.g. "w-64"
   buttonClassName?: string; // extra classes on the button (e.g. text size)
+  ariaLabel?: string;
 }
 
 const ListboxSelect: React.FC<ListboxSelectProps> = ({
@@ -36,6 +37,7 @@ const ListboxSelect: React.FC<ListboxSelectProps> = ({
   placeholder = "Select...",
   className = "",
   buttonClassName = "",
+  ariaLabel,
 }) => {
   const selectedOption = options.find((o) => o.value === value);
 
@@ -43,6 +45,7 @@ const ListboxSelect: React.FC<ListboxSelectProps> = ({
     <Listbox value={value} onChange={onChange} disabled={disabled}>
       <div className={clsx("relative", className)}>
         <ListboxButton
+          aria-label={ariaLabel}
           className={clsx(
             "relative w-full cursor-pointer rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-10 text-left text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 disabled:cursor-not-allowed disabled:opacity-50",
             buttonClassName

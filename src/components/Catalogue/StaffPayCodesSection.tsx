@@ -44,6 +44,16 @@ import {
 
 type PayCodeViewMode = "grouped" | "flat";
 
+// A pay code is "customized" when any of its three rates overrides the default.
+// 0 is a real override (see EditEmployeePayCodeRatesModal), so this must test
+// against null rather than falsiness.
+const hasCustomizedRate = (
+  payCode: EmployeePayCodeDetails | JobPayCodeDetails
+): boolean =>
+  payCode.override_rate_biasa !== null ||
+  payCode.override_rate_ahad !== null ||
+  payCode.override_rate_umum !== null;
+
 interface StaffPayCodesSectionProps {
   employee: Employee;
   // Catalogue source — Jelly Polly pages pass "jellypolly" (own staff/pay-code
@@ -115,7 +125,7 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
   );
   const [batchConfirmDialog, setBatchConfirmDialog] = useState<{
     isOpen: boolean;
-    action: "set" | "clear";
+    action: "set" | "clear" | "clear-rates";
     payType: string;
     sectionKey: string;
     payCodes: (EmployeePayCodeDetails | JobPayCodeDetails)[];
@@ -319,6 +329,58 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
     [refreshPayCodeMappings]
   );
 
+  // Reset every customized rate in a group back to its default rate. Scoped to
+  // employee-specific pay codes only: job-linked overrides live on the job and
+  // are shared with every other staff member holding it.
+  const executeBatchClearEmployeeRates = useCallback(
+    async (payCodes: EmployeePayCodeDetails[]) => {
+      if (!id || payCodes.length === 0) return;
+
+      const payType = payCodes[0]?.pay_type;
+      setBatchDefaultLoading(`employee-${payType}-rates`);
+
+      try {
+        // Sequential: each PUT wraps its writes in a transaction on the shared
+        // pool, so firing them in parallel would interleave those transactions.
+        for (const payCode of payCodes) {
+          await api.put(`${apiBase}/employee-pay-codes/${id}/${payCode.id}`, {
+            override_rate_biasa: null,
+            override_rate_ahad: null,
+            override_rate_umum: null,
+          });
+        }
+
+        toast.success(
+          `Successfully cleared customized rates for ${payCodes.length} pay code(s)`
+        );
+        await refreshPayCodeMappings();
+      } catch (error) {
+        console.error("Error clearing customized rates:", error);
+        toast.error("An error occurred while clearing customized rates");
+        // Some rows may already be cleared — resync so the UI matches the DB.
+        await refreshPayCodeMappings();
+      } finally {
+        setBatchDefaultLoading(null);
+      }
+    },
+    [id, apiBase, refreshPayCodeMappings]
+  );
+
+  // Show the clear-customized-rates confirmation dialog
+  const showClearRatesConfirmDialog = useCallback(
+    (payType: string, payCodes: EmployeePayCodeDetails[]) => {
+      setBatchConfirmDialog({
+        isOpen: true,
+        action: "clear-rates",
+        payType,
+        sectionKey: "employee",
+        payCodes,
+        onConfirm: () => executeBatchClearEmployeeRates(payCodes),
+      });
+    },
+    [executeBatchClearEmployeeRates]
+  );
+
   // Show batch confirmation dialog
   const showBatchConfirmDialog = useCallback(
     (
@@ -509,7 +571,11 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
       payCodes: (EmployeePayCodeDetails | JobPayCodeDetails)[],
       value: boolean
     ) => void,
-    isBatchLoading?: boolean
+    isBatchLoading?: boolean,
+    onBatchClearRates?: (
+      payCodes: (EmployeePayCodeDetails | JobPayCodeDetails)[]
+    ) => void,
+    isClearRatesLoading?: boolean
   ) => {
     if (payCodes.length === 0) return null;
 
@@ -528,6 +594,10 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
     );
 
     if (filteredPayCodes.length === 0) return null;
+
+    // Only the codes that actually carry an override are worth clearing, and
+    // the button is pointless when there are none.
+    const customizedPayCodes = filteredPayCodes.filter(hasCustomizedRate);
 
     return (
       <div key={groupKey} className="space-y-2">
@@ -552,29 +622,46 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
           </button>
 
           {/* Right: Batch buttons */}
-          {onBatchSetDefault && (
+          {(onBatchSetDefault || onBatchClearRates) && (
             <div
               className="flex items-center gap-1.5 ml-2"
               onClick={(e) => e.stopPropagation()}
             >
-              <button
-                type="button"
-                onClick={() => onBatchSetDefault(filteredPayCodes, true)}
-                disabled={isBatchLoading}
-                className="px-2 py-0.5 text-xs font-medium rounded bg-emerald-200 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-300 dark:hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                title="Set all as default"
-              >
-                {isBatchLoading ? "..." : "All Default"}
-              </button>
-              <button
-                type="button"
-                onClick={() => onBatchSetDefault(filteredPayCodes, false)}
-                disabled={isBatchLoading}
-                className="px-2 py-0.5 text-xs font-medium rounded bg-default-200 dark:bg-gray-700 text-default-700 dark:text-gray-200 hover:bg-default-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                title="Clear all defaults"
-              >
-                {isBatchLoading ? "..." : "Clear All"}
-              </button>
+              {onBatchSetDefault && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onBatchSetDefault(filteredPayCodes, true)}
+                    disabled={isBatchLoading}
+                    className="px-2 py-0.5 text-xs font-medium rounded bg-emerald-200 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-300 dark:hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    title="Set all as default"
+                  >
+                    {isBatchLoading ? "..." : "All Default"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onBatchSetDefault(filteredPayCodes, false)}
+                    disabled={isBatchLoading}
+                    className="px-2 py-0.5 text-xs font-medium rounded bg-default-200 dark:bg-gray-700 text-default-700 dark:text-gray-200 hover:bg-default-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    title="Clear all defaults"
+                  >
+                    {isBatchLoading ? "..." : "Clear All Default"}
+                  </button>
+                </>
+              )}
+              {onBatchClearRates && customizedPayCodes.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onBatchClearRates(customizedPayCodes)}
+                  disabled={isClearRatesLoading}
+                  className="px-2 py-0.5 text-xs font-medium rounded bg-rose-200 dark:bg-rose-900/50 text-rose-800 dark:text-rose-200 hover:bg-rose-300 dark:hover:bg-rose-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  title={`Reset ${customizedPayCodes.length} customized rate(s) in this group back to the default rate`}
+                >
+                  {isClearRatesLoading
+                    ? "..."
+                    : `Clear All Customized Rates (${customizedPayCodes.length})`}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -730,7 +817,13 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
                               payCodes,
                               value
                             ),
-                          batchDefaultLoading === `employee-${payType}`
+                          batchDefaultLoading === `employee-${payType}`,
+                          (payCodes) =>
+                            showClearRatesConfirmDialog(
+                              payType,
+                              payCodes as EmployeePayCodeDetails[]
+                            ),
+                          batchDefaultLoading === `employee-${payType}-rates`
                         )
                     );
                   })()}
@@ -1060,17 +1153,33 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
           title={
             batchConfirmDialog.action === "set"
               ? "Set All as Default"
+              : batchConfirmDialog.action === "clear-rates"
+              ? "Clear All Customized Rates"
               : "Clear All Defaults"
           }
-          message={`Are you sure you want to ${
-            batchConfirmDialog.action === "set" ? "set" : "clear"
-          } default for all ${batchConfirmDialog.payCodes.length} ${
-            batchConfirmDialog.payType
-          } pay codes?`}
-          confirmButtonText={
-            batchConfirmDialog.action === "set" ? "Set Default" : "Clear Default"
+          message={
+            batchConfirmDialog.action === "clear-rates"
+              ? `Are you sure you want to clear the customized rates for ${batchConfirmDialog.payCodes.length} ${batchConfirmDialog.payType} pay code(s)? They will go back to their default rate. This cannot be undone.`
+              : `Are you sure you want to ${
+                  batchConfirmDialog.action === "set" ? "set" : "clear"
+                } default for all ${batchConfirmDialog.payCodes.length} ${
+                  batchConfirmDialog.payType
+                } pay codes?`
           }
-          variant={batchConfirmDialog.action === "set" ? "success" : "default"}
+          confirmButtonText={
+            batchConfirmDialog.action === "set"
+              ? "Set Default"
+              : batchConfirmDialog.action === "clear-rates"
+              ? "Clear Rates"
+              : "Clear Default"
+          }
+          variant={
+            batchConfirmDialog.action === "set"
+              ? "success"
+              : batchConfirmDialog.action === "clear-rates"
+              ? "danger"
+              : "default"
+          }
         />
       )}
     </div>

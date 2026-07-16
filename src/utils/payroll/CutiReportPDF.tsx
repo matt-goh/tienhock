@@ -431,11 +431,17 @@ export interface CutiReportData {
   leaveBalance: CutiLeaveBalance;
   leaveTaken: CutiLeaveTaken;
   monthlySummary: Record<number, CutiMonthlyData>;
+  // Optional company header (default Tien Hock); Green Target passes its own.
+  companyName?: string;
+  logoSrc?: string;
 }
 
 export interface CutiBatchReportData {
   year: number;
   employees: CutiReportData[];
+  // Optional company header (default Tien Hock); Green Target passes its own.
+  companyName?: string;
+  logoSrc?: string;
   summary: {
     totalEmployees: number;
     totalDaysUsed: {
@@ -954,7 +960,10 @@ const MonthlyLeaveTable: React.FC<{
 const SingleCutiReportPDF: React.FC<{
   data: CutiReportData;
   companyName?: string;
-}> = ({ data, companyName = TIENHOCK_INFO.name }) => {
+}> = ({ data, companyName }) => {
+  const resolvedCompanyName =
+    companyName ?? data.companyName ?? TIENHOCK_INFO.name;
+  const resolvedLogo = data.logoSrc ?? TienHockLogo;
   const reportTitle = `${data.employee.name} - Leave Report ${data.year}`;
 
   return (
@@ -962,9 +971,9 @@ const SingleCutiReportPDF: React.FC<{
       <Page size="A4" orientation="landscape" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
-          <Image src={TienHockLogo} style={styles.logo} />
+          <Image src={resolvedLogo} style={styles.logo} />
           <View style={styles.headerTextContainer}>
-            <Text style={styles.companyName}>{companyName}</Text>
+            <Text style={styles.companyName}>{resolvedCompanyName}</Text>
             <Text style={styles.reportTitle}>{reportTitle}</Text>
           </View>
         </View>
@@ -1003,7 +1012,10 @@ const SingleCutiReportPDF: React.FC<{
 const BatchCutiReportPDF: React.FC<{
   data: CutiBatchReportData;
   companyName?: string;
-}> = ({ data, companyName = TIENHOCK_INFO.name }) => {
+}> = ({ data, companyName }) => {
+  const resolvedCompanyName =
+    companyName ?? data.companyName ?? TIENHOCK_INFO.name;
+  const resolvedLogo = data.logoSrc ?? TienHockLogo;
   const reportTitle = `Batch Leave Report ${data.year} - ${data.summary.totalEmployees} Employees`;
 
   return (
@@ -1012,9 +1024,9 @@ const BatchCutiReportPDF: React.FC<{
         <Page key={employeeData.employee.id} size="A4" style={styles.page}>
           {/* Header */}
           <View style={styles.header}>
-            <Image src={TienHockLogo} style={styles.logo} />
+            <Image src={resolvedLogo} style={styles.logo} />
             <View style={styles.headerTextContainer}>
-              <Text style={styles.companyName}>{companyName}</Text>
+              <Text style={styles.companyName}>{resolvedCompanyName}</Text>
               <Text style={styles.reportTitle}>
                 {employeeData.employee.name} - Leave Report {data.year}
               </Text>
