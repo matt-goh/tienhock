@@ -12,6 +12,9 @@ import {
   IconFolder,
   IconFolderOpen,
   IconFile,
+  IconX,
+  IconStar,
+  IconStarFilled,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -22,7 +25,7 @@ import {
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../routes/utils/api";
-import { AccountCode } from "../../types/types";
+import { AccountCode, LedgerType } from "../../types/types";
 import {
   useAccountCodesCache,
   useLedgerTypesCache,
@@ -30,6 +33,11 @@ import {
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
+import Checkbox from "../../components/Checkbox";
+import ListboxSelect, {
+  ListboxSelectOption,
+} from "../../components/ListboxSelect";
+import useAccountCodeFavourites from "../../hooks/useAccountCodeFavourites";
 
 // Financial statement note interface
 interface FinancialStatementNote {
@@ -50,9 +58,74 @@ interface VisibleTreeRow {
   depth: number;
 }
 
+interface TreeDisplayRow extends VisibleTreeRow {
+  isFavouriteShortcut: boolean;
+}
+
 type PaginationPageItem = number | "ellipsis";
 
 const ACCOUNT_CODES_PAGE_SIZE = 100;
+
+interface FsNoteListboxProps {
+  value: string;
+  onChange: (value: string) => void;
+  options: ListboxSelectOption[];
+  ariaLabel: string;
+}
+
+const FsNoteListbox: React.FC<FsNoteListboxProps> = ({
+  value,
+  onChange,
+  options,
+  ariaLabel,
+}) => {
+  const selectedOption: ListboxSelectOption | undefined = options.find(
+    (option: ListboxSelectOption): boolean => option.value === value
+  );
+
+  return (
+    <Listbox value={value} onChange={onChange}>
+      <ListboxButton
+        aria-label={ariaLabel}
+        className="relative w-full cursor-pointer rounded-md border border-default-200 bg-white py-1 pl-2 pr-8 text-left text-xs text-default-700 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+      >
+        <span className="block truncate">{selectedOption?.label || "-"}</span>
+        <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+          <IconChevronDown
+            size={15}
+            className="text-default-400 dark:text-gray-500"
+          />
+        </span>
+      </ListboxButton>
+      <ListboxOptions
+        anchor={{ to: "bottom end", gap: 4 }}
+        transition
+        className="z-[100] max-h-60 w-80 max-w-[calc(100vw-2rem)] origin-top overflow-auto rounded-md bg-white py-1 text-xs shadow-lg ring-1 ring-black/5 transition duration-100 ease-in focus:outline-none data-[closed]:scale-95 data-[closed]:opacity-0 dark:bg-gray-800 dark:ring-gray-700"
+      >
+        {options.map((option: ListboxSelectOption) => (
+          <ListboxOption
+            key={option.value}
+            value={option.value}
+            className="relative cursor-pointer select-none py-2 pl-3 pr-9 text-default-900 data-[focus]:bg-sky-100 data-[focus]:text-sky-900 dark:text-gray-100 dark:data-[focus]:bg-sky-900/40 dark:data-[focus]:text-sky-200"
+          >
+            {({ selected }: { selected: boolean }): React.ReactElement => (
+              <>
+                <span className={selected ? "font-medium" : "font-normal"}>
+                  {option.label}
+                </span>
+                {selected && (
+                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600 dark:text-sky-400">
+                    <IconCheck size={15} />
+                  </span>
+                )}
+              </>
+            )}
+          </ListboxOption>
+        ))}
+      </ListboxOptions>
+    </Listbox>
+  );
+};
 
 const AccountCodeListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -64,6 +137,12 @@ const AccountCodeListPage: React.FC = () => {
     refreshAccountCodes,
   } = useAccountCodesCache();
   const { ledgerTypes, isLoading: ledgerTypesLoading } = useLedgerTypesCache();
+  const {
+    favouriteCodes,
+    pendingCodes: pendingFavouriteCodes,
+    isLoading: favouritesLoading,
+    toggleFavourite,
+  } = useAccountCodeFavourites();
 
   // Financial statement notes state
   const [fsNotes, setFsNotes] = useState<FinancialStatementNote[]>([]);
@@ -85,7 +164,11 @@ const AccountCodeListPage: React.FC = () => {
   }, []);
 
   // Derived loading state
-  const loading = accountCodesLoading || ledgerTypesLoading || fsNotesLoading;
+  const loading =
+    accountCodesLoading ||
+    ledgerTypesLoading ||
+    fsNotesLoading ||
+    favouritesLoading;
 
   // Local state
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
@@ -139,6 +222,34 @@ const AccountCodeListPage: React.FC = () => {
     return sortNodes(roots);
   }, [flatAccounts]);
 
+  const parentCodes = useMemo((): Set<string> => {
+    const codes: Set<string> = new Set<string>();
+    flatAccounts.forEach((account: AccountCode): void => {
+      if (account.parent_code) codes.add(account.parent_code);
+    });
+    return codes;
+  }, [flatAccounts]);
+
+  const ledgerTypeOptions = useMemo((): ListboxSelectOption[] => {
+    return [
+      { value: "All", label: "All Types" },
+      ...ledgerTypes.map((ledgerType: LedgerType): ListboxSelectOption => ({
+        value: ledgerType.code,
+        label: `${ledgerType.code} - ${ledgerType.name}`,
+      })),
+    ];
+  }, [ledgerTypes]);
+
+  const fsNoteOptions = useMemo((): ListboxSelectOption[] => {
+    return [
+      { value: "", label: "-" },
+      ...fsNotes.map((note: FinancialStatementNote): ListboxSelectOption => ({
+        value: note.code,
+        label: `${note.code} - ${note.name}`,
+      })),
+    ];
+  }, [fsNotes]);
+
   // Filter accounts
   const filteredAccounts = useMemo(() => {
     let filtered = flatAccounts;
@@ -163,15 +274,25 @@ const AccountCodeListPage: React.FC = () => {
       filtered = filtered.filter((a) => a.is_active);
     }
 
+    filtered = filtered.filter(
+      (account: AccountCode): boolean =>
+        parentCodes.has(account.code) ||
+        !account.parent_code ||
+        favouriteCodes.has(account.code)
+    );
+
     return filtered;
-  }, [flatAccounts, searchTerm, selectedLedgerType, showInactive]);
+  }, [
+    flatAccounts,
+    searchTerm,
+    selectedLedgerType,
+    showInactive,
+    parentCodes,
+    favouriteCodes,
+  ]);
 
   // Filter tree for display
   const filteredTree = useMemo(() => {
-    if (!searchTerm && selectedLedgerType === "All" && showInactive) {
-      return accountCodes;
-    }
-
     // When filtering, show flat list or filtered tree
     const filteredCodes = new Set(filteredAccounts.map((a) => a.code));
 
@@ -194,7 +315,46 @@ const AccountCodeListPage: React.FC = () => {
     };
 
     return filterTree(accountCodes);
-  }, [accountCodes, filteredAccounts, searchTerm, selectedLedgerType, showInactive]);
+  }, [accountCodes, filteredAccounts]);
+
+  const revealFilteredBranches: boolean = searchTerm.length > 0;
+
+  const orderedFilteredAccounts = useMemo((): AccountCode[] => {
+    const favourites: AccountCode[] = [];
+    const remainingAccounts: AccountCode[] = [];
+
+    filteredAccounts.forEach((account: AccountCode): void => {
+      if (favouriteCodes.has(account.code)) favourites.push(account);
+      else remainingAccounts.push(account);
+    });
+
+    return [...favourites, ...remainingAccounts];
+  }, [filteredAccounts, favouriteCodes]);
+
+  // Open the permanent parent-account view by default, while still allowing the
+  // user to collapse individual branches afterwards.
+  useEffect((): void => {
+    const codesToExpand: Set<string> = new Set<string>();
+    const collectFilteredParents = (nodes: AccountTreeNode[]): void => {
+      nodes.forEach((node: AccountTreeNode): void => {
+        if (node.children.length > 0) {
+          codesToExpand.add(node.code);
+          collectFilteredParents(node.children);
+        }
+      });
+    };
+
+    collectFilteredParents(filteredTree);
+
+    if (codesToExpand.size === 0) return;
+    setExpandedNodes((previousCodes: Set<string>): Set<string> => {
+      const nextCodes: Set<string> = new Set<string>(previousCodes);
+      codesToExpand.forEach((code: string): void => {
+        nextCodes.add(code);
+      });
+      return nextCodes.size === previousCodes.size ? previousCodes : nextCodes;
+    });
+  }, [filteredTree]);
 
   const visibleTreeRows = useMemo((): VisibleTreeRow[] => {
     const rows: VisibleTreeRow[] = [];
@@ -206,7 +366,10 @@ const AccountCodeListPage: React.FC = () => {
       nodes.forEach((node: AccountTreeNode) => {
         rows.push({ node, depth });
 
-        if (node.children.length > 0 && expandedNodes.has(node.code)) {
+        if (
+          node.children.length > 0 &&
+          (expandedNodes.has(node.code) || revealFilteredBranches)
+        ) {
           appendVisibleRows(node.children, depth + 1);
         }
       });
@@ -214,10 +377,33 @@ const AccountCodeListPage: React.FC = () => {
 
     appendVisibleRows(filteredTree, 0);
     return rows;
-  }, [filteredTree, expandedNodes]);
+  }, [filteredTree, expandedNodes, revealFilteredBranches]);
+
+  const treeDisplayRows = useMemo((): TreeDisplayRow[] => {
+    const favouriteRows: TreeDisplayRow[] = orderedFilteredAccounts
+      .filter((account: AccountCode): boolean =>
+        favouriteCodes.has(account.code)
+      )
+      .map(
+        (account: AccountCode): TreeDisplayRow => ({
+          node: { ...account, children: [] },
+          depth: 0,
+          isFavouriteShortcut: true,
+        })
+      );
+    const hierarchyRows: TreeDisplayRow[] = visibleTreeRows.map(
+      (row: VisibleTreeRow): TreeDisplayRow => ({
+        ...row,
+        isFavouriteShortcut: false,
+      })
+    );
+    return [...favouriteRows, ...hierarchyRows];
+  }, [orderedFilteredAccounts, visibleTreeRows, favouriteCodes]);
 
   const totalDisplayItems: number =
-    viewMode === "tree" ? visibleTreeRows.length : filteredAccounts.length;
+    viewMode === "tree"
+      ? treeDisplayRows.length
+      : orderedFilteredAccounts.length;
   const totalPages: number = Math.max(
     1,
     Math.ceil(totalDisplayItems / ACCOUNT_CODES_PAGE_SIZE)
@@ -232,13 +418,13 @@ const AccountCodeListPage: React.FC = () => {
   const pageStartDisplay: number =
     totalDisplayItems > 0 ? pageStartIndex + 1 : 0;
 
-  const paginatedTreeRows = useMemo((): VisibleTreeRow[] => {
-    return visibleTreeRows.slice(pageStartIndex, pageEndIndex);
-  }, [visibleTreeRows, pageStartIndex, pageEndIndex]);
+  const paginatedTreeRows = useMemo((): TreeDisplayRow[] => {
+    return treeDisplayRows.slice(pageStartIndex, pageEndIndex);
+  }, [treeDisplayRows, pageStartIndex, pageEndIndex]);
 
   const paginatedFlatAccounts = useMemo((): AccountCode[] => {
-    return filteredAccounts.slice(pageStartIndex, pageEndIndex);
-  }, [filteredAccounts, pageStartIndex, pageEndIndex]);
+    return orderedFilteredAccounts.slice(pageStartIndex, pageEndIndex);
+  }, [orderedFilteredAccounts, pageStartIndex, pageEndIndex]);
 
   const paginationPageItems = useMemo((): PaginationPageItem[] => {
     const maxVisiblePages: number = 5;
@@ -288,6 +474,16 @@ const AccountCodeListPage: React.FC = () => {
   const handlePageChange = (page: number): void => {
     const nextPage: number = Math.min(Math.max(page, 1), totalPages);
     setCurrentPage(nextPage);
+  };
+
+  const handleFavouriteToggle = (
+    accountCode: string,
+    event: React.MouseEvent<HTMLButtonElement>
+  ): void => {
+    event.stopPropagation();
+    if (pendingFavouriteCodes.has(accountCode)) return;
+    setCurrentPage(1);
+    void toggleFavourite(accountCode);
   };
 
   // Toggle node expansion
@@ -356,7 +552,10 @@ const AccountCodeListPage: React.FC = () => {
   };
 
   // Handle fs_note update
-  const handleFsNoteChange = async (accountCode: string, newFsNote: string | null) => {
+  const handleFsNoteChange = async (
+    accountCode: string,
+    newFsNote: string | null
+  ): Promise<void> => {
     try {
       await api.patch(`/api/account-codes/${accountCode}/fs-note`, {
         fs_note: newFsNote,
@@ -372,18 +571,29 @@ const AccountCodeListPage: React.FC = () => {
   // Render tree row
   const renderTreeRow = (
     node: AccountTreeNode,
-    depth: number
+    depth: number,
+    isFavouriteShortcut: boolean = false
   ): React.ReactNode => {
-    const hasChildren: boolean = node.children.length > 0;
+    const hasVisibleChildren: boolean =
+      !isFavouriteShortcut && node.children.length > 0;
+    const isParentAccount: boolean = parentCodes.has(node.code);
     const isExpanded: boolean = expandedNodes.has(node.code);
+    const isVisuallyExpanded: boolean =
+      hasVisibleChildren && (isExpanded || revealFilteredBranches);
     const paddingLeft: number = depth * 24 + 8;
 
     return (
       <tr
-        key={node.code}
-        className={`hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer ${
-          !node.is_active ? "opacity-50" : ""
-        }`}
+        key={
+          isFavouriteShortcut
+            ? `favourite-shortcut:${node.code}`
+            : `hierarchy:${node.code}`
+        }
+        className={`cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700 ${
+          isFavouriteShortcut
+            ? "bg-amber-50/70 dark:bg-amber-950/20"
+            : ""
+        } ${!node.is_active ? "opacity-50" : ""}`}
         onClick={() => handleEditClick(node)}
       >
         <td
@@ -391,15 +601,23 @@ const AccountCodeListPage: React.FC = () => {
           style={{ paddingLeft: `${paddingLeft}px` }}
         >
           <div className="flex items-center">
-            {hasChildren ? (
+            {hasVisibleChildren ? (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   toggleExpand(node.code);
                 }}
-                className="p-1 hover:bg-default-200 dark:hover:bg-gray-600 rounded mr-1"
+                disabled={revealFilteredBranches}
+                className="mr-1 rounded p-1 hover:bg-default-200 disabled:cursor-default disabled:hover:bg-transparent dark:hover:bg-gray-600 dark:disabled:hover:bg-transparent"
+                title={
+                  revealFilteredBranches
+                    ? "Search result branches are expanded automatically"
+                    : isExpanded
+                    ? "Collapse account"
+                    : "Expand account"
+                }
               >
-                {isExpanded ? (
+                {isVisuallyExpanded ? (
                   <IconChevronDown size={16} />
                 ) : (
                   <IconChevronRight size={16} />
@@ -408,8 +626,8 @@ const AccountCodeListPage: React.FC = () => {
             ) : (
               <span className="w-7" />
             )}
-            {hasChildren ? (
-              isExpanded ? (
+            {isParentAccount ? (
+              isVisuallyExpanded ? (
                 <IconFolderOpen
                   size={18}
                   className="text-amber-500 dark:text-amber-400 mr-2 flex-shrink-0"
@@ -429,6 +647,11 @@ const AccountCodeListPage: React.FC = () => {
             <span className="text-sky-700 dark:text-sky-400 font-medium">
               {node.code}
             </span>
+            {isFavouriteShortcut && (
+              <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                Favourite
+              </span>
+            )}
           </div>
         </td>
         <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-200">
@@ -444,19 +667,14 @@ const AccountCodeListPage: React.FC = () => {
           )}
         </td>
         <td className="px-4 py-2 text-sm" onClick={(e) => e.stopPropagation()}>
-          <select
+          <FsNoteListbox
             value={node.fs_note || ""}
-            onChange={(e) => handleFsNoteChange(node.code, e.target.value || null)}
-            className="w-full text-xs border border-default-200 dark:border-gray-600 rounded px-1.5 py-1 bg-white dark:bg-gray-700 text-default-700 dark:text-gray-200 focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
-            title={node.fs_note ? fsNotes.find(n => n.code === node.fs_note)?.name : "No note assigned"}
-          >
-            <option value="">-</option>
-            {fsNotes.map((note) => (
-              <option key={note.code} value={note.code}>
-                {note.code} - {note.name.substring(0, 20)}{note.name.length > 20 ? "..." : ""}
-              </option>
-            ))}
-          </select>
+            onChange={(value: string): void => {
+              void handleFsNoteChange(node.code, value || null);
+            }}
+            options={fsNoteOptions}
+            ariaLabel={`FS Note for ${node.code}`}
+          />
         </td>
         <td className="px-4 py-2 text-center text-sm">
           <span
@@ -471,6 +689,34 @@ const AccountCodeListPage: React.FC = () => {
         </td>
         <td className="px-4 py-2 text-center text-sm">
           <div className="flex items-center justify-center space-x-2">
+            <button
+              type="button"
+              onClick={(event: React.MouseEvent<HTMLButtonElement>): void =>
+                handleFavouriteToggle(node.code, event)
+              }
+              disabled={pendingFavouriteCodes.has(node.code)}
+              aria-pressed={favouriteCodes.has(node.code)}
+              aria-label={
+                favouriteCodes.has(node.code)
+                  ? `Remove ${node.code} from favourites`
+                  : `Add ${node.code} to favourites`
+              }
+              className="text-default-300 transition-colors hover:text-amber-500 disabled:cursor-wait disabled:opacity-50 dark:text-gray-500 dark:hover:text-amber-400"
+              title={
+                favouriteCodes.has(node.code)
+                  ? "Remove from favourites"
+                  : "Add to favourites"
+              }
+            >
+              {favouriteCodes.has(node.code) ? (
+                <IconStarFilled
+                  size={18}
+                  className="text-amber-500 dark:text-amber-400"
+                />
+              ) : (
+                <IconStar size={18} />
+              )}
+            </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -527,19 +773,14 @@ const AccountCodeListPage: React.FC = () => {
           {account.parent_code || "-"}
         </td>
         <td className="px-4 py-2 text-sm" onClick={(e) => e.stopPropagation()}>
-          <select
+          <FsNoteListbox
             value={account.fs_note || ""}
-            onChange={(e) => handleFsNoteChange(account.code, e.target.value || null)}
-            className="w-full text-xs border border-default-200 dark:border-gray-600 rounded px-1.5 py-1 bg-white dark:bg-gray-700 text-default-700 dark:text-gray-200 focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
-            title={account.fs_note ? fsNotes.find(n => n.code === account.fs_note)?.name : "No note assigned"}
-          >
-            <option value="">-</option>
-            {fsNotes.map((note) => (
-              <option key={note.code} value={note.code}>
-                {note.code} - {note.name.substring(0, 20)}{note.name.length > 20 ? "..." : ""}
-              </option>
-            ))}
-          </select>
+            onChange={(value: string): void => {
+              void handleFsNoteChange(account.code, value || null);
+            }}
+            options={fsNoteOptions}
+            ariaLabel={`FS Note for ${account.code}`}
+          />
         </td>
         <td className="px-4 py-2 text-center text-sm">
           <span
@@ -554,6 +795,34 @@ const AccountCodeListPage: React.FC = () => {
         </td>
         <td className="px-4 py-2 text-center text-sm">
           <div className="flex items-center justify-center space-x-2">
+            <button
+              type="button"
+              onClick={(event: React.MouseEvent<HTMLButtonElement>): void =>
+                handleFavouriteToggle(account.code, event)
+              }
+              disabled={pendingFavouriteCodes.has(account.code)}
+              aria-pressed={favouriteCodes.has(account.code)}
+              aria-label={
+                favouriteCodes.has(account.code)
+                  ? `Remove ${account.code} from favourites`
+                  : `Add ${account.code} to favourites`
+              }
+              className="text-default-300 transition-colors hover:text-amber-500 disabled:cursor-wait disabled:opacity-50 dark:text-gray-500 dark:hover:text-amber-400"
+              title={
+                favouriteCodes.has(account.code)
+                  ? "Remove from favourites"
+                  : "Add to favourites"
+              }
+            >
+              {favouriteCodes.has(account.code) ? (
+                <IconStarFilled
+                  size={18}
+                  className="text-amber-500 dark:text-amber-400"
+                />
+              ) : (
+                <IconStar size={18} />
+              )}
+            </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -580,209 +849,159 @@ const AccountCodeListPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="mb-4 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
-        <div>
-          <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-            Chart of Accounts
-          </h1>
-          <p className="text-sm text-default-500 dark:text-gray-400 mt-1">
-            Manage account codes and hierarchy
-          </p>
-        </div>
-        <Button
-          onClick={handleAddClick}
-          color="sky"
-          variant="filled"
-          icon={IconPlus}
-          iconPosition="left"
-          size="md"
-        >
-          Add Account
-        </Button>
-      </div>
-
-      {/* Filters */}
-      <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Ledger Type Filter */}
-          <div className="flex items-center space-x-2">
-            <span className="font-semibold text-sm text-default-700 dark:text-gray-200">Type:</span>
-            <Listbox
+    <div className="space-y-3">
+      {/* Compact toolbar: one row on wide screens, responsive below that. */}
+      <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 xl:flex-nowrap 2xl:gap-x-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-default-700 dark:text-gray-200">
+              Type:
+            </span>
+            <ListboxSelect
               value={selectedLedgerType}
               onChange={setSelectedLedgerType}
-            >
-              <div className="relative">
-                <ListboxButton className="relative w-40 cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm dark:text-gray-100">
-                  <span className="block truncate text-gray-900 dark:text-gray-100">
-                    {selectedLedgerType === "All"
-                      ? "All Types"
-                      : selectedLedgerType}
-                  </span>
-                  <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                    <IconChevronDown size={20} className="text-gray-400 dark:text-gray-400" />
-                  </span>
-                </ListboxButton>
-                <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
-                  <ListboxOption
-                    value="All"
-                    className={({ active }) =>
-                      `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                        active ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-300" : "text-gray-900 dark:text-gray-100"
-                      }`
-                    }
-                  >
-                    {({ selected }) => (
-                      <>
-                        <span
-                          className={`block truncate ${
-                            selected ? "font-medium" : "font-normal"
-                          }`}
-                        >
-                          All Types
-                        </span>
-                        {selected && (
-                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
-                            <IconCheck size={20} />
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </ListboxOption>
-                  {ledgerTypes.map((lt) => (
-                    <ListboxOption
-                      key={lt.code}
-                      value={lt.code}
-                      className={({ active }) =>
-                        `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                          active ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-300" : "text-gray-900 dark:text-gray-100"
-                        }`
-                      }
-                    >
-                      {({ selected }) => (
-                        <>
-                          <span
-                            className={`block truncate ${
-                              selected ? "font-medium" : "font-normal"
-                            }`}
-                          >
-                            {lt.code} - {lt.name}
-                          </span>
-                          {selected && (
-                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
-                              <IconCheck size={20} />
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </ListboxOption>
-                  ))}
-                </ListboxOptions>
-              </div>
-            </Listbox>
+              options={ledgerTypeOptions}
+              className="w-32 2xl:w-40"
+              buttonClassName="!rounded-md !py-1.5 !text-sm !shadow-none"
+              ariaLabel="Filter by ledger type"
+            />
           </div>
 
-          {/* Show Inactive Toggle */}
-          <label className="flex items-center space-x-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showInactive}
-              onChange={(e) => setShowInactive(e.target.checked)}
-              className="rounded border-default-300 text-sky-600 focus:ring-sky-500"
-            />
-            <span className="text-sm text-default-700 dark:text-gray-200">Show Inactive</span>
-          </label>
+          <Checkbox
+            checked={showInactive}
+            onChange={setShowInactive}
+            label={
+              <>
+                <span className="2xl:hidden">Inactive</span>
+                <span className="hidden 2xl:inline">Show Inactive</span>
+              </>
+            }
+            size={18}
+            checkedColor="text-sky-600 dark:text-sky-400"
+            className="whitespace-nowrap"
+            ariaLabel="Show inactive accounts"
+          />
 
           {/* View Mode Toggle */}
-          <div className="flex items-center space-x-1 bg-default-100 dark:bg-gray-800 rounded-lg p-1">
+          <div className="flex items-center space-x-1 rounded-lg bg-default-100 p-1 dark:bg-gray-800">
             <button
-              onClick={() => setViewMode("tree")}
-              className={`px-3 py-1 text-sm rounded-md transition-colors ${
+              type="button"
+              onClick={(): void => setViewMode("tree")}
+              className={`rounded-md px-2.5 py-1 text-sm transition-colors ${
                 viewMode === "tree"
-                  ? "bg-white dark:bg-gray-700 shadow text-default-900 dark:text-gray-100"
-                  : "text-default-600 dark:text-gray-300 hover:text-default-900 dark:hover:text-gray-100"
+                  ? "bg-white text-default-900 shadow dark:bg-gray-700 dark:text-gray-100"
+                  : "text-default-600 hover:text-default-900 dark:text-gray-300 dark:hover:text-gray-100"
               }`}
             >
               Tree
             </button>
             <button
-              onClick={() => setViewMode("flat")}
-              className={`px-3 py-1 text-sm rounded-md transition-colors ${
+              type="button"
+              onClick={(): void => setViewMode("flat")}
+              className={`rounded-md px-2.5 py-1 text-sm transition-colors ${
                 viewMode === "flat"
-                  ? "bg-white dark:bg-gray-700 shadow text-default-900 dark:text-gray-100"
-                  : "text-default-600 dark:text-gray-300 hover:text-default-900 dark:hover:text-gray-100"
+                  ? "bg-white text-default-900 shadow dark:bg-gray-700 dark:text-gray-100"
+                  : "text-default-600 hover:text-default-900 dark:text-gray-300 dark:hover:text-gray-100"
               }`}
             >
               Flat
             </button>
           </div>
+
+          {/* Expand/Collapse controls follow the tree view selector. */}
+          {viewMode === "tree" && (
+            <div className="flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={expandAll}
+                disabled={revealFilteredBranches}
+                className="rounded p-1.5 text-default-600 hover:bg-default-100 hover:text-default-900 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+                title={
+                  revealFilteredBranches
+                    ? "Search result branches are expanded automatically"
+                    : "Expand All"
+                }
+                aria-label="Expand all accounts"
+              >
+                <IconFolderOpen size={19} />
+              </button>
+              <button
+                type="button"
+                onClick={collapseAll}
+                disabled={revealFilteredBranches}
+                className="rounded p-1.5 text-default-600 hover:bg-default-100 hover:text-default-900 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+                title={
+                  revealFilteredBranches
+                    ? "Search result branches are expanded automatically"
+                    : "Collapse All"
+                }
+                aria-label="Collapse all accounts"
+              >
+                <IconFolder size={19} />
+              </button>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 whitespace-nowrap text-sm text-default-500 dark:text-gray-400">
+            <span>
+              Total:{" "}
+              <span className="font-medium text-default-900 dark:text-gray-100">
+                {flatAccounts.length}
+              </span>
+              <span className="hidden 2xl:inline"> accounts</span>
+            </span>
+            <span className="text-default-300 dark:text-gray-600">|</span>
+            <span>
+              <span className="2xl:hidden">Shown: </span>
+              <span className="hidden 2xl:inline">Showing: </span>
+              <span className="font-medium text-default-900 dark:text-gray-100">
+                {filteredAccounts.length}
+              </span>
+            </span>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Search */}
-          <div className="relative w-full md:w-64">
+        <div className="flex w-full flex-shrink-0 items-center gap-2 sm:w-auto">
+          <div className="relative min-w-0 flex-1 sm:w-56 sm:flex-none xl:w-36 2xl:w-56">
             <IconSearch
-              className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-default-400"
+              className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-default-400"
               stroke={1.5}
             />
             <input
               type="text"
               placeholder="Search code or description..."
-              className="w-full rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-gray-900 dark:text-gray-100 py-2 pl-10 pr-4 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              className="w-full rounded-full border border-default-300 bg-white py-1.5 pl-9 pr-8 text-sm text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
+                setSearchTerm(event.target.value)
+              }
             />
             {searchTerm && (
               <button
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-300"
-                onClick={() => setSearchTerm("")}
+                type="button"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[0px] text-default-400 hover:text-default-700 dark:text-gray-400 dark:hover:text-gray-200"
+                onClick={(): void => setSearchTerm("")}
                 title="Clear search"
+                aria-label="Clear search"
               >
-                ×
+                <IconX size={15} />
               </button>
             )}
           </div>
 
-          {/* Expand/Collapse buttons for tree view */}
-          {viewMode === "tree" && (
-            <div className="flex items-center gap-1">
-              <button
-                onClick={expandAll}
-                className="p-2 text-default-600 dark:text-gray-400 hover:text-default-900 dark:hover:text-gray-100 hover:bg-default-100 dark:hover:bg-gray-700 rounded"
-                title="Expand All"
-              >
-                <IconFolderOpen size={20} />
-              </button>
-              <button
-                onClick={collapseAll}
-                className="p-2 text-default-600 dark:text-gray-400 hover:text-default-900 dark:hover:text-gray-100 hover:bg-default-100 dark:hover:bg-gray-700 rounded"
-                title="Collapse All"
-              >
-                <IconFolder size={20} />
-              </button>
-            </div>
-          )}
+          <Button
+            onClick={handleAddClick}
+            color="sky"
+            variant="filled"
+            icon={IconPlus}
+            iconPosition="left"
+            size="sm"
+            className="whitespace-nowrap"
+          >
+            <span className="2xl:hidden">Add</span>
+            <span className="hidden 2xl:inline">Add Account</span>
+          </Button>
         </div>
-      </div>
-
-      {/* Stats */}
-      <div className="mb-4 flex items-center gap-4 text-sm text-default-600 dark:text-gray-400">
-        <span>
-          Total:{" "}
-          <span className="font-medium text-default-900 dark:text-gray-100">
-            {flatAccounts.length}
-          </span>{" "}
-          accounts
-        </span>
-        {searchTerm || selectedLedgerType !== "All" || !showInactive ? (
-          <span>
-            Showing:{" "}
-            <span className="font-medium text-default-900 dark:text-gray-100">
-              {filteredAccounts.length}
-            </span>
-          </span>
-        ) : null}
       </div>
 
       {/* Content */}
@@ -824,8 +1043,9 @@ const AccountCodeListPage: React.FC = () => {
               <tbody className="divide-y divide-default-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
                 {viewMode === "tree" ? (
                   paginatedTreeRows.length > 0 ? (
-                    paginatedTreeRows.map(({ node, depth }) =>
-                      renderTreeRow(node, depth)
+                    paginatedTreeRows.map(
+                      ({ node, depth, isFavouriteShortcut }: TreeDisplayRow) =>
+                        renderTreeRow(node, depth, isFavouriteShortcut)
                     )
                   ) : (
                     <tr>
@@ -834,7 +1054,9 @@ const AccountCodeListPage: React.FC = () => {
                         className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                       >
                         No account codes found.{" "}
-                        {searchTerm || selectedLedgerType !== "All"
+                        {searchTerm ||
+                        selectedLedgerType !== "All" ||
+                        !showInactive
                           ? "Try adjusting your filters."
                           : "Create one to get started."}
                       </td>
@@ -849,7 +1071,9 @@ const AccountCodeListPage: React.FC = () => {
                       className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                     >
                       No account codes found.{" "}
-                      {searchTerm || selectedLedgerType !== "All"
+                      {searchTerm ||
+                      selectedLedgerType !== "All" ||
+                      !showInactive
                         ? "Try adjusting your filters."
                         : "Create one to get started."}
                     </td>
