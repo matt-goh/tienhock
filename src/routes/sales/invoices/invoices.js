@@ -63,6 +63,7 @@ const schedulePendingInvoiceCheck = (invoiceId, pool, apiClient) => {
  */
 const checkAndUpdatePendingInvoice = async (invoiceId, pool, apiClient) => {
   const client = await pool.connect();
+  let checkedUuid = null;
   try {
     await client.query("BEGIN");
 
@@ -76,10 +77,12 @@ const checkAndUpdatePendingInvoice = async (invoiceId, pool, apiClient) => {
 
     if (invoiceResult.rows.length === 0) {
       console.log(`Invoice ${invoiceId} is no longer pending or doesn't exist`);
+      await client.query("ROLLBACK");
       return;
     }
 
     const invoice = invoiceResult.rows[0];
+    checkedUuid = invoice.uuid;
     console.log(
       `Checking pending invoice ${invoiceId} with UUID ${invoice.uuid}`
     );
@@ -117,19 +120,29 @@ const checkAndUpdatePendingInvoice = async (invoiceId, pool, apiClient) => {
             long_id = $2, 
             datetime_validated = $3
         WHERE id = $4
+          AND uuid = $5
+          AND einvoice_status = 'pending'
+        RETURNING id
       `;
 
-      await client.query(updateQuery, [
+      const updateResult = await client.query(updateQuery, [
         newStatus,
         longId,
         datetimeValidated,
         invoiceId,
+        checkedUuid,
       ]);
 
       await client.query("COMMIT");
-      console.log(
-        `Updated invoice ${invoiceId} status from pending to ${newStatus}`
-      );
+      if (updateResult.rows.length > 0) {
+        console.log(
+          `Updated invoice ${invoiceId} status from pending to ${newStatus}`
+        );
+      } else {
+        console.log(
+          `Ignored stale pending status result for invoice ${invoiceId}`
+        );
+      }
     } else {
       await client.query("ROLLBACK");
       console.log(`Invoice ${invoiceId} status remains pending`);
@@ -139,7 +152,10 @@ const checkAndUpdatePendingInvoice = async (invoiceId, pool, apiClient) => {
     console.error(`Error checking pending invoice ${invoiceId}:`, error);
 
     // If invoice is invalid due to API error, clear the e-invoice status
-    if (error.status === 404 || error.message?.includes("not found")) {
+    if (
+      checkedUuid &&
+      (error.status === 404 || error.message?.includes("not found"))
+    ) {
       try {
         await client.query("BEGIN");
         const clearQuery = `
@@ -150,8 +166,10 @@ const checkAndUpdatePendingInvoice = async (invoiceId, pool, apiClient) => {
               long_id = NULL, 
               datetime_validated = NULL
           WHERE id = $1
+            AND uuid = $2
+            AND einvoice_status = 'pending'
         `;
-        await client.query(clearQuery, [invoiceId]);
+        await client.query(clearQuery, [invoiceId, checkedUuid]);
         await client.query("COMMIT");
         console.log(
           `Cleared e-invoice status for invoice ${invoiceId} due to API error`
@@ -3407,7 +3425,7 @@ export default function (pool, config) {
 
       // Check if invoice exists and get current status
       const invoiceCheck = await client.query(
-        "SELECT invoice_status, einvoice_status FROM invoices WHERE id = $1",
+        "SELECT invoice_status, einvoice_status FROM invoices WHERE id = $1 FOR UPDATE",
         [id]
       );
 
@@ -3492,6 +3510,7 @@ export default function (pool, config) {
       SELECT id, einvoice_status, invoice_status, uuid, submission_uid, datetime_validated, customerid, paymenttype, totalamountpayable, createddate, is_consolidated, journal_entry_id
       FROM invoices
       WHERE id = $1
+      FOR UPDATE
     `;
       const invoiceResult = await client.query(invoiceCheckQuery, [id]);
 
@@ -3789,9 +3808,15 @@ export default function (pool, config) {
   router.put("/:id/customer", async (req, res) => {
     const { id } = req.params;
     const { customerid, confirmEInvoiceCancellation } = req.body;
+    const confirmedEInvoiceCancellation =
+      confirmEInvoiceCancellation === true;
+    const requestedCustomerId =
+      customerid === null || customerid === undefined
+        ? ""
+        : String(customerid).trim();
 
     // Validation
-    if (!customerid) {
+    if (!requestedCustomerId) {
       return res.status(400).json({
         message: "Customer ID is required",
       });
@@ -3801,13 +3826,16 @@ export default function (pool, config) {
     try {
       await client.query("BEGIN");
 
-      // 1. First, get the current invoice to check status
+      // Lock the invoice before checking dependencies so a receipt or
+      // adjustment cannot be attached between validation and the update.
       const invoiceCheckQuery = `
       SELECT id, customerid, einvoice_status, invoice_status, uuid,
-             submission_uid, datetime_validated, createddate,
-             paymenttype, balance_due
+             submission_uid, long_id, datetime_validated, createddate,
+             paymenttype, totalamountpayable, balance_due,
+             is_consolidated, journal_entry_id
       FROM invoices
       WHERE id = $1
+      FOR UPDATE
     `;
       const invoiceResult = await client.query(invoiceCheckQuery, [id]);
 
@@ -3820,98 +3848,618 @@ export default function (pool, config) {
 
       const invoice = invoiceResult.rows[0];
 
-      assertTienHockAccountingDateUnlocked(
-        invoice.createddate,
-        `Sales invoice ${id}`
+      // Lock both customer balances in a stable order. A successful transfer
+      // later subtracts and adds the exact same outstanding amount.
+      const customerIdsToLock = [invoice.customerid, requestedCustomerId]
+        .filter((value) => value !== null && value !== undefined && value !== "")
+        .map((value) => String(value))
+        .filter((value, index, values) => values.indexOf(value) === index)
+        .sort();
+      const customerResult = await client.query(
+        `SELECT id, name, credit_used
+           FROM customers
+          WHERE id = ANY($1::text[])
+          ORDER BY id
+          FOR UPDATE`,
+        [customerIdsToLock]
+      );
+      const customerById = new Map(
+        customerResult.rows.map((customer) => [String(customer.id), customer])
+      );
+      const targetCustomer = customerById.get(requestedCustomerId);
+
+      if (!targetCustomer) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: `Customer with ID '${requestedCustomerId}' not found`,
+        });
+      }
+
+      // A same-customer request is a no-op. It must not cancel an e-Invoice or
+      // fail because an otherwise immutable historical invoice was selected.
+      if (String(invoice.customerid) === requestedCustomerId) {
+        await client.query("COMMIT");
+        return res.json({
+          message: "Invoice already belongs to this customer",
+          invoice: {
+            id: invoice.id,
+            customerid: requestedCustomerId,
+            customerName: targetCustomer.name,
+            oldCustomerId: invoice.customerid,
+          },
+          unchanged: true,
+          einvoiceCleared: false,
+        });
+      }
+
+      const blockers = [];
+
+      try {
+        assertTienHockAccountingDateUnlocked(
+          invoice.createddate,
+          `Sales invoice ${id}`
+        );
+      } catch (error) {
+        if (!isAccountingPeriodLockedError(error)) {
+          throw error;
+        }
+        blockers.push({
+          type: "historical_lock",
+          title: "Historical accounting period is locked",
+          detail: `Invoice ${id} is dated ${error.accounting_date}, before the open accounting date ${error.open_date}.`,
+          action: `This cannot be changed from Invoice Details. Give invoice ${id}, the old customer ID (${invoice.customerid}), the requested customer ID (${requestedCustomerId}), and the supporting document or ledger proof to the accountant or system administrator for an approved historical correction.`,
+          references: [String(id)],
+        });
+      }
+
+      if (invoice.invoice_status === "cancelled") {
+        blockers.push({
+          type: "cancelled_invoice",
+          title: "The invoice is cancelled",
+          detail: `Cancelled invoice ${id} is an audit record and its customer cannot be reassigned.`,
+          action:
+            "Create a replacement invoice under the correct customer. Do not alter the cancelled record.",
+          references: [String(id)],
+        });
+      }
+
+      if (invoice.is_consolidated) {
+        blockers.push({
+          type: "consolidated_invoice",
+          title: "This is a consolidated invoice",
+          detail: `${id} is the consolidated wrapper, not an individual source invoice.`,
+          action:
+            "Open Sales > Invoice > Consolidate > History and cancel this consolidated record. Correct the individual source invoice, then consolidate it again.",
+          references: [String(id)],
+        });
+      }
+
+      const receiptResult = await client.query(
+        `SELECT r.id, r.display_reference, r.status,
+                je.status AS journal_status,
+                (SELECT COUNT(*)::int
+                   FROM receipt_allocations all_ra
+                  WHERE all_ra.receipt_id = r.id) AS allocation_count,
+                EXISTS (
+                  SELECT 1
+                    FROM bank_in_allocations bia
+                    JOIN bank_in_groups big ON big.id = bia.group_id
+                    JOIN bank_ins bi ON bi.id = big.bank_in_id
+                   WHERE bia.receipt_id = r.id
+                     AND bia.source_type = 'cash_receipt'
+                     AND bi.status = 'posted'
+                ) AS is_banked
+           FROM receipts r
+           JOIN receipt_allocations ra ON ra.receipt_id = r.id
+           LEFT JOIN payments p ON p.receipt_allocation_id = ra.id
+           LEFT JOIN journal_entries je ON je.id = r.journal_entry_id
+          WHERE (ra.invoice_id = $1 OR p.invoice_id = $1)
+            AND (
+              r.status IN ('pending', 'posted')
+              OR (r.status = 'cancelled' AND je.status = 'posted')
+            )
+          GROUP BY r.id, r.display_reference, r.status, je.status
+          ORDER BY r.id`,
+        [id]
+      );
+      const liveReceipts = receiptResult.rows.filter((receipt) =>
+        ["pending", "posted"].includes(receipt.status)
+      );
+      const inconsistentReceipts = receiptResult.rows.filter(
+        (receipt) =>
+          receipt.status === "cancelled" && receipt.journal_status === "posted"
       );
 
-      // 2. Check if this is critical e-Invoice data change
-      const requiresConfirmation =
-        invoice.einvoice_status !== null &&
-        invoice.einvoice_status !== "cancelled";
+      if (liveReceipts.length > 0) {
+        const receiptDetails = liveReceipts.map((receipt) => {
+          const reference = receipt.display_reference || `Receipt #${receipt.id}`;
+          const allocationText =
+            Number(receipt.allocation_count) > 1
+              ? `, ${receipt.allocation_count} allocations in the group`
+              : "";
+          return `${reference} (${receipt.status}${
+            receipt.is_banked ? ", banked" : ""
+          }${allocationText})`;
+        });
+        blockers.push({
+          type: "receipt",
+          title: "A payment receipt is linked to this invoice",
+          detail: receiptDetails.join("; "),
+          action:
+            "Open Sales > Payments and cancel the entire payment group first. If it has been included in a Bank-In, cancel it first from Accounting > Cash Bank-In (RV). Do not confirm a pending cheque. Then retry the customer change and recreate the whole payment group: preserve every unaffected invoice/customer allocation and use the corrected customer only for this invoice's allocation.",
+          references: liveReceipts.map((receipt) =>
+            String(receipt.display_reference || receipt.id)
+          ),
+        });
+      }
 
-      if (requiresConfirmation && !confirmEInvoiceCancellation) {
+      const paymentResult = await client.query(
+        `SELECT p.payment_id, p.status, p.payment_reference,
+                p.internal_reference, je.status AS journal_status
+           FROM payments p
+           LEFT JOIN receipt_allocations ra ON ra.id = p.receipt_allocation_id
+           LEFT JOIN receipts live_r
+             ON live_r.id = ra.receipt_id
+            AND live_r.status IN ('pending', 'posted')
+           LEFT JOIN journal_entries je ON je.id = p.journal_entry_id
+          WHERE p.invoice_id = $1
+            AND COALESCE(p.is_auto_collection, false) = false
+            AND (
+              ((p.status IS NULL OR p.status IN ('active', 'pending', 'overpaid'))
+                AND live_r.id IS NULL)
+              OR (p.status = 'cancelled' AND je.status = 'posted')
+            )
+          ORDER BY p.payment_id`,
+        [id]
+      );
+      const livePayments = paymentResult.rows.filter(
+        (payment) =>
+          payment.status === null ||
+          ["active", "pending", "overpaid"].includes(payment.status)
+      );
+      const inconsistentPayments = paymentResult.rows.filter(
+        (payment) =>
+          payment.status === "cancelled" && payment.journal_status === "posted"
+      );
+
+      if (livePayments.length > 0) {
+        const paymentReferences = livePayments.map((payment) =>
+          String(
+            payment.payment_reference ||
+              payment.internal_reference ||
+              `Payment #${payment.payment_id}`
+          )
+        );
+        blockers.push({
+          type: "payment",
+          title: "A payment record is linked to this invoice",
+          detail: paymentReferences.join(", "),
+          action:
+            "Open this invoice's Payment History and cancel every listed payment first. Then retry the customer change and record the payment again. If a legacy payment cannot be cancelled normally, ask the accountant or system administrator for an audited reconciliation.",
+          references: paymentReferences,
+        });
+      }
+
+      const adjustmentResult = await client.query(
+        `SELECT ad.id, ad.display_id, ad.type, ad.status,
+                ad.einvoice_status, ad.paired_with_id,
+                je.status AS journal_status
+           FROM adjustment_documents ad
+           LEFT JOIN journal_entries je ON je.id = ad.journal_entry_id
+          WHERE ad.original_invoice_id = $1
+            AND COALESCE(ad.is_consolidated, false) = false
+            AND (
+              ad.status = 'active'
+              OR (ad.status = 'cancelled' AND je.status = 'posted')
+            )
+          ORDER BY ad.created_at, ad.id`,
+        [id]
+      );
+      const activeAdjustments = adjustmentResult.rows.filter(
+        (adjustment) => adjustment.status === "active"
+      );
+      const inconsistentAdjustments = adjustmentResult.rows.filter(
+        (adjustment) =>
+          adjustment.status === "cancelled" &&
+          adjustment.journal_status === "posted"
+      );
+
+      if (activeAdjustments.length > 0) {
+        const adjustmentReferences = activeAdjustments.map((adjustment) =>
+          String(adjustment.display_id || adjustment.id)
+        );
+        blockers.push({
+          type: "adjustment",
+          title: "An active adjustment document is linked to this invoice",
+          detail: activeAdjustments
+            .map(
+              (adjustment) =>
+                `${adjustment.display_id || adjustment.id} (${adjustment.type}, e-Invoice: ${
+                  adjustment.einvoice_status || "not submitted"
+                })`
+            )
+            .join("; "),
+          action:
+            "Open Sales > Adjustment Docs. Cancel the adjustment e-Invoice first if prompted, cancel a paired Refund Note before its Credit Note, and then cancel every listed CN, DN, or RN. Retry the customer change and recreate any adjustment that is still needed.",
+          references: adjustmentReferences,
+        });
+      }
+
+      const consolidatedResult = await client.query(
+        `SELECT con.id, con.einvoice_status
+           FROM invoices con
+          WHERE con.is_consolidated = true
+            AND COALESCE(con.invoice_status, 'active') <> 'cancelled'
+            AND con.consolidated_invoices IS NOT NULL
+            AND con.consolidated_invoices::jsonb ? $1
+          ORDER BY con.id`,
+        [String(id)]
+      );
+      if (consolidatedResult.rows.length > 0) {
+        const consolidatedReferences = consolidatedResult.rows.map((row) =>
+          String(row.id)
+        );
+        blockers.push({
+          type: "consolidated_invoice",
+          title: "This invoice is in a consolidated e-Invoice",
+          detail: consolidatedResult.rows
+            .map(
+              (row) =>
+                `${row.id} (e-Invoice: ${row.einvoice_status || "not submitted"})`
+            )
+            .join("; "),
+          action:
+            "Open Sales > Invoice > Consolidate > History and cancel every listed consolidated record. If an adjustment note was submitted against it, cancel that note first. Then retry the customer change and consolidate the invoice again.",
+          references: consolidatedReferences,
+        });
+      }
+
+      // Lock the journal which syncSalesJournalEntry would rebuild. A manually
+      // detached journal must never be silently left on the old debtor account.
+      const journalResult = await client.query(
+        `SELECT id, reference_no, display_reference, entry_type, status,
+                manual_override, source_type, source_id
+           FROM journal_entries
+          WHERE ($2::bigint IS NOT NULL AND id = $2::bigint)
+             OR (source_type = 'invoice' AND source_id = $1)
+             OR reference_no = $1
+          ORDER BY id
+          FOR UPDATE`,
+        [String(id), invoice.journal_entry_id]
+      );
+      const linkedJournal = invoice.journal_entry_id
+        ? journalResult.rows.find(
+            (journal) =>
+              String(journal.id) === String(invoice.journal_entry_id)
+          )
+        : null;
+      const sourceJournal = journalResult.rows.find(
+        (journal) =>
+          journal.source_type === "invoice" &&
+          String(journal.source_id) === String(id)
+      );
+      const legacySalesJournal = journalResult.rows.find(
+        (journal) =>
+          journal.entry_type === "S" &&
+          String(journal.reference_no) === String(id)
+      );
+      const salesJournal =
+        linkedJournal || sourceJournal || legacySalesJournal || null;
+      const conflictingReferenceJournal = journalResult.rows.find(
+        (journal) =>
+          journal.entry_type !== "S" &&
+          String(journal.reference_no) === String(id) &&
+          (!salesJournal || String(journal.id) !== String(salesJournal.id))
+      );
+      const journalReference = salesJournal
+        ? String(
+            salesJournal.display_reference ||
+              salesJournal.reference_no ||
+              `Journal #${salesJournal.id}`
+          )
+        : null;
+
+      if (conflictingReferenceJournal) {
+        const conflictingReference = String(
+          conflictingReferenceJournal.display_reference ||
+            conflictingReferenceJournal.reference_no ||
+            `Journal #${conflictingReferenceJournal.id}`
+        );
+        blockers.push({
+          type: "accounting_integrity",
+          title: "The invoice number conflicts with another journal",
+          detail: `${conflictingReference} is a ${conflictingReferenceJournal.entry_type} journal using invoice reference ${id}.`,
+          action:
+            "Ask the accountant or system administrator to reconcile the duplicate journal reference before changing the customer.",
+          references: [conflictingReference],
+        });
+      }
+
+      const hasExpectedJournalOwnership =
+        salesJournal &&
+        ((salesJournal.source_type === "invoice" &&
+          String(salesJournal.source_id) === String(id)) ||
+          (salesJournal.source_type === null &&
+            String(salesJournal.reference_no) === String(id)));
+
+      if (salesJournal?.manual_override) {
+        blockers.push({
+          type: "manual_journal",
+          title: "The sales journal was edited manually",
+          detail: `${journalReference} is detached from automatic invoice updates, so its debtor line cannot be moved safely.`,
+          action:
+            "There is no normal self-service reset for this. Ask the accountant or system administrator to reconcile the journal and restore the invoice-owned journal to system-managed status, or make an approved audited correction, before retrying.",
+          references: [journalReference],
+        });
+      } else if (
+        (invoice.journal_entry_id &&
+          (!salesJournal ||
+            String(salesJournal.id) !== String(invoice.journal_entry_id))) ||
+        (!invoice.journal_entry_id &&
+          salesJournal?.source_type === "invoice" &&
+          String(salesJournal.reference_no) !== String(id)) ||
+        (salesJournal &&
+          (salesJournal.entry_type !== "S" ||
+            salesJournal.status !== "posted" ||
+            !hasExpectedJournalOwnership))
+      ) {
+        blockers.push({
+          type: "accounting_integrity",
+          title: "The invoice journal needs accounting review",
+          detail: journalReference
+            ? `${journalReference} is not a normal posted, invoice-owned sales journal.`
+            : `Invoice ${id} points to a sales journal that no longer exists.`,
+          action:
+            "Do not move only the debtor line. Ask the accountant or system administrator to reconcile and restore the invoice-owned sales journal, then retry the customer change.",
+          references: journalReference ? [journalReference] : [String(id)],
+        });
+      }
+
+      const integrityReferences = [];
+      integrityReferences.push(
+        ...inconsistentReceipts.map((receipt) =>
+          String(receipt.display_reference || `Receipt #${receipt.id}`)
+        ),
+        ...inconsistentPayments.map((payment) =>
+          String(
+            payment.payment_reference ||
+              payment.internal_reference ||
+              `Payment #${payment.payment_id}`
+          )
+        ),
+        ...inconsistentAdjustments.map((adjustment) =>
+          String(adjustment.display_id || adjustment.id)
+        )
+      );
+      if (integrityReferences.length > 0) {
+        blockers.push({
+          type: "accounting_integrity",
+          title: "A cancelled document still has a posted journal",
+          detail: integrityReferences.join(", "),
+          action:
+            "Ask the accountant or system administrator to reconcile these cancelled documents and journals. The invoice customer cannot be changed until their accounting status agrees.",
+          references: integrityReferences,
+        });
+      }
+
+      const oldCustomer = customerById.get(String(invoice.customerid));
+      if (!oldCustomer) {
+        blockers.push({
+          type: "accounting_integrity",
+          title: "The current customer record is missing",
+          detail: `Invoice ${id} refers to customer ${invoice.customerid}, but that customer record was not found.`,
+          action:
+            "Ask the system administrator to restore or reconcile the current customer record before changing this invoice.",
+          references: [String(invoice.customerid)],
+        });
+      }
+
+      const outstanding = Number(invoice.balance_due || 0);
+      const invoiceTotal = Number(invoice.totalamountpayable || 0);
+      const hasLiveBalanceDependency =
+        liveReceipts.length > 0 ||
+        livePayments.length > 0 ||
+        activeAdjustments.length > 0;
+      const expectedCleanBalance =
+        invoice.paymenttype === "INVOICE" ? invoiceTotal : 0;
+      if (
+        !hasLiveBalanceDependency &&
+        Math.abs(outstanding - expectedCleanBalance) > 0.005
+      ) {
+        blockers.push({
+          type: "accounting_integrity",
+          title: "The invoice balance does not match its clean state",
+          detail: `Invoice ${id} totals RM ${invoiceTotal.toFixed(
+            2
+          )}, but its balance due is RM ${outstanding.toFixed(2)} with no active payment or adjustment explaining the difference.`,
+          action:
+            "Ask the accountant or system administrator to reconcile the invoice balance, customer credit and debtor ledger before changing the customer.",
+          references: [String(id)],
+        });
+      }
+
+      if (
+        !hasLiveBalanceDependency &&
+        invoice.paymenttype === "INVOICE" &&
+        outstanding < -0.005
+      ) {
+        blockers.push({
+          type: "accounting_integrity",
+          title: "The invoice has a negative outstanding balance",
+          detail: `Invoice ${id} has balance due RM ${outstanding.toFixed(2)}.`,
+          action:
+            "Ask the accountant to reconcile the overpayment or adjustment records before changing the customer.",
+          references: [String(id)],
+        });
+      } else if (
+        !hasLiveBalanceDependency &&
+        invoice.paymenttype === "INVOICE" &&
+        outstanding > 0.005 &&
+        oldCustomer &&
+        Number(oldCustomer.credit_used || 0) + 0.005 < outstanding
+      ) {
+        blockers.push({
+          type: "accounting_integrity",
+          title: "Customer credit does not match the invoice balance",
+          detail: `Invoice ${id} has RM ${outstanding.toFixed(
+            2
+          )} outstanding, but customer ${invoice.customerid} has only RM ${Number(
+            oldCustomer.credit_used || 0
+          ).toFixed(2)} total credit used.`,
+          action:
+            "Ask the accountant or system administrator to reconcile customer credit and the debtor ledger before retrying. This prevents the transfer from increasing the combined customer balance.",
+          references: [String(id), String(invoice.customerid)],
+        });
+      }
+
+      const currentEInvoiceStatus = String(
+        invoice.einvoice_status || ""
+      ).toLowerCase();
+      if (
+        (["valid", "pending"].includes(currentEInvoiceStatus) &&
+          !invoice.uuid) ||
+        (!currentEInvoiceStatus && invoice.submission_uid && !invoice.uuid) ||
+        (invoice.long_id && !invoice.uuid)
+      ) {
+        blockers.push({
+          type: "accounting_integrity",
+          title: "The e-Invoice submission is not ready to change",
+          detail: `Invoice ${id} has e-Invoice status ${
+            invoice.einvoice_status || "processing"
+          } but no MyInvois document UUID.`,
+          action:
+            "Wait for MyInvois processing and refresh the e-Invoice status. If the UUID still does not appear, ask the system administrator to reconcile the submission before changing the customer.",
+          references: [String(id)],
+        });
+      }
+
+      if (blockers.length > 0) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({
+          code: "INVOICE_CUSTOMER_CHANGE_BLOCKED",
+          message: `Customer cannot be changed for invoice ${id} yet. Resolve every linked record below, then retry; the system moves only a clean invoice automatically.`,
+          invoice_id: String(id),
+          old_customer_id: String(invoice.customerid),
+          requested_customer_id: requestedCustomerId,
+          blockers,
+        });
+      }
+
+      let effectiveEInvoiceStatus = currentEInvoiceStatus;
+      if (
+        invoice.uuid &&
+        ["", "invalid", "cancelled"].includes(currentEInvoiceStatus)
+      ) {
+        let remoteDocumentDetails;
+        try {
+          remoteDocumentDetails = await apiClient.makeApiCall(
+            "GET",
+            `/api/v1.0/documents/${invoice.uuid}/details`
+          );
+        } catch (statusError) {
+          console.error(
+            `Error checking e-invoice ${invoice.uuid} before customer change:`,
+            statusError
+          );
+          await client.query("ROLLBACK");
+          return res.status(409).json({
+            code: "INVOICE_CUSTOMER_CHANGE_BLOCKED",
+            message: `Customer cannot be changed for invoice ${id} until its MyInvois status is confirmed.`,
+            invoice_id: String(id),
+            old_customer_id: String(invoice.customerid),
+            requested_customer_id: requestedCustomerId,
+            blockers: [
+              {
+                type: "accounting_integrity",
+                title: "MyInvois status could not be verified",
+                detail: `The system could not confirm the current status of e-Invoice UUID ${invoice.uuid}.`,
+                action:
+                  "Refresh or sync the e-Invoice status and try again. If MyInvois remains unavailable or the statuses disagree, ask the system administrator to reconcile the submission before changing the customer.",
+                references: [String(id), String(invoice.uuid)],
+              },
+            ],
+          });
+        }
+
+        const remoteStatus = String(
+          remoteDocumentDetails?.status || ""
+        ).toLowerCase();
+        if (remoteStatus === "cancelled") {
+          effectiveEInvoiceStatus = "cancelled";
+        } else if (["invalid", "rejected"].includes(remoteStatus)) {
+          effectiveEInvoiceStatus = "invalid";
+        } else if (remoteStatus === "valid" || remoteDocumentDetails?.longId) {
+          effectiveEInvoiceStatus = "valid";
+        } else {
+          await client.query("ROLLBACK");
+          return res.status(409).json({
+            code: "INVOICE_CUSTOMER_CHANGE_BLOCKED",
+            message: `Customer cannot be changed for invoice ${id} while its e-Invoice is processing.`,
+            invoice_id: String(id),
+            old_customer_id: String(invoice.customerid),
+            requested_customer_id: requestedCustomerId,
+            blockers: [
+              {
+                type: "accounting_integrity",
+                title: "The e-Invoice is still processing",
+                detail: `MyInvois reports status ${
+                  remoteDocumentDetails?.status || "unknown"
+                } for invoice ${id}.`,
+                action:
+                  "Wait for MyInvois processing to finish, refresh or sync the e-Invoice status, and then retry the customer change.",
+                references: [String(id), String(invoice.uuid)],
+              },
+            ],
+          });
+        }
+      }
+
+      // Check e-Invoice confirmation only after all local blockers have been
+      // collected. A rejected move must not cancel the external document.
+      const requiresConfirmation =
+        Boolean(
+          invoice.einvoice_status ||
+            invoice.uuid ||
+            invoice.submission_uid ||
+            invoice.long_id
+        ) &&
+        !(
+          effectiveEInvoiceStatus === "cancelled" &&
+          currentEInvoiceStatus === "cancelled"
+        );
+      const eInvoiceStatusForConfirmation =
+        effectiveEInvoiceStatus === "valid"
+          ? "valid"
+          : currentEInvoiceStatus || effectiveEInvoiceStatus;
+
+      if (requiresConfirmation && !confirmedEInvoiceCancellation) {
         await client.query("ROLLBACK");
         return res.status(400).json({
           message:
             "Customer change requires e-Invoice cancellation confirmation",
           requiresConfirmation: true,
-          currentEInvoiceStatus: invoice.einvoice_status,
+          currentEInvoiceStatus: eInvoiceStatusForConfirmation,
         });
       }
 
-      // 3. If confirmation provided, attempt to cancel e-invoice via API and clear fields
-      if (requiresConfirmation && confirmEInvoiceCancellation) {
-        let apiCancellationSuccess = false;
-
-        // Try to cancel via MyInvois API if UUID exists
-        if (invoice.uuid && invoice.einvoice_status !== "cancelled") {
-          try {
-            // Using the API client logic you provided
-            await apiClient.makeApiCall(
-              "PUT",
-              `/api/v1.0/documents/state/${invoice.uuid}/state`,
-              { status: "cancelled", reason: "Customer information updated" }
-            );
-            apiCancellationSuccess = true;
-          } catch (cancelError) {
-            console.error(
-              `Error cancelling e-invoice ${invoice.uuid} via API:`,
-              cancelError
-            );
-            if (cancelError.status === 400) {
-              console.warn(
-                `E-invoice ${invoice.uuid} might already be cancelled or in a non-cancellable state.`
-              );
-              apiCancellationSuccess = true;
-            }
-          }
-        }
-
-        // Clear e-invoice fields regardless of API result
-        const clearEInvoiceQuery = `
-        UPDATE invoices 
-        SET uuid = NULL, 
-            submission_uid = NULL, 
-            long_id = NULL,
-            datetime_validated = NULL, 
-            einvoice_status = NULL
-        WHERE id = $1
-      `;
-        await client.query(clearEInvoiceQuery, [id]);
-      }
-
-      // 4. Check if the new customer exists
-      const customerCheckQuery = `
-      SELECT id, name FROM customers WHERE id = $1
-    `;
-      const customerResult = await client.query(customerCheckQuery, [
-        customerid,
-      ]);
-
-      if (customerResult.rows.length === 0) {
-        await client.query("ROLLBACK");
-        return res.status(400).json({
-          message: `Customer with ID '${customerid}' not found`,
-        });
-      }
-
-      // 5. Update the invoice with the new customer
       const updateQuery = `
       UPDATE invoices 
       SET customerid = $1
       WHERE id = $2
       RETURNING *
     `;
-      const updateResult = await client.query(updateQuery, [customerid, id]);
+      const updateResult = await client.query(updateQuery, [
+        requestedCustomerId,
+        id,
+      ]);
 
       // 6. Move the receivable to the new customer. The invoice-owned journal
       // debits the customer's DEBTOR child account, so without this re-sync the
       // journal keeps debiting the OLD customer: the invoice then disappears
       // from the new customer's statement/ledger (both are built from the child
-      // ledger) and inflates the old one's. Skipped for a journal detached by
-      // manual_override, which the sync leaves alone by design.
-      if (invoice.customerid !== customerid) {
+      // ledger) and inflates the old one's. Detached manual journals were
+      // blocked above, so this sync cannot silently leave the old debtor line.
+      if (String(invoice.customerid) !== requestedCustomerId) {
         await syncSalesJournalEntry(
           client,
           updateResult.rows[0],
@@ -3923,11 +4471,86 @@ export default function (pool, config) {
         // the new one takes on.
         if (updateResult.rows[0].paymenttype === "INVOICE") {
           const outstanding = parseFloat(invoice.balance_due || 0);
-          if (outstanding !== 0) {
-            await updateCustomerCredit(client, invoice.customerid, -outstanding);
-            await updateCustomerCredit(client, customerid, outstanding);
+          if (outstanding > 0.005) {
+            await client.query(
+              `UPDATE customers
+                  SET credit_used = COALESCE(credit_used, 0) - $1
+                WHERE id = $2`,
+              [invoice.balance_due, invoice.customerid]
+            );
+            await client.query(
+              `UPDATE customers
+                  SET credit_used = COALESCE(credit_used, 0) + $1
+                WHERE id = $2`,
+              [invoice.balance_due, requestedCustomerId]
+            );
           }
         }
+      }
+
+      // Stage every local mutation before cancelling the external document.
+      // If journal or credit handling fails, MyInvois remains untouched and
+      // this transaction rolls back cleanly.
+      if (requiresConfirmation && confirmedEInvoiceCancellation) {
+        if (
+          invoice.uuid &&
+          effectiveEInvoiceStatus !== "cancelled" &&
+          effectiveEInvoiceStatus !== "invalid"
+        ) {
+          let cancellationVerified = false;
+          try {
+            await apiClient.makeApiCall(
+              "PUT",
+              `/api/v1.0/documents/state/${invoice.uuid}/state`,
+              { status: "cancelled", reason: "Customer information updated" }
+            );
+            cancellationVerified = true;
+          } catch (cancelError) {
+            console.error(
+              `Error cancelling e-invoice ${invoice.uuid} via API:`,
+              cancelError
+            );
+            try {
+              const documentDetails = await apiClient.makeApiCall(
+                "GET",
+                `/api/v1.0/documents/${invoice.uuid}/details`
+              );
+              const verifiedStatus = String(
+                documentDetails?.status || ""
+              ).toLowerCase();
+              cancellationVerified = [
+                "cancelled",
+                "invalid",
+                "rejected",
+              ].includes(verifiedStatus);
+            } catch (verificationError) {
+              console.error(
+                `Error verifying e-invoice ${invoice.uuid} cancellation:`,
+                verificationError
+              );
+            }
+
+            if (!cancellationVerified) {
+              const error = new Error(
+                "MyInvois did not confirm the e-Invoice cancellation. The customer was not changed. Retry the cancellation, or sync the e-Invoice status before trying again."
+              );
+              error.status = 409;
+              error.code = "EINVOICE_CANCELLATION_FAILED";
+              throw error;
+            }
+          }
+        }
+
+        await client.query(
+          `UPDATE invoices
+              SET uuid = NULL,
+                  submission_uid = NULL,
+                  long_id = NULL,
+                  datetime_validated = NULL,
+                  einvoice_status = NULL
+            WHERE id = $1`,
+          [id]
+        );
       }
 
       await client.query("COMMIT");
@@ -3938,10 +4561,11 @@ export default function (pool, config) {
         invoice: {
           id: updateResult.rows[0].id,
           customerid: updateResult.rows[0].customerid,
-          customerName: customerResult.rows[0].name,
+          customerName: targetCustomer.name,
           oldCustomerId: invoice.customerid,
         },
-        einvoiceCleared: requiresConfirmation && confirmEInvoiceCancellation,
+        einvoiceCleared:
+          requiresConfirmation && confirmedEInvoiceCancellation,
       });
     } catch (error) {
       await client.query("ROLLBACK");
@@ -4042,7 +4666,7 @@ export default function (pool, config) {
 
       // Check if invoice exists and get current status (including customerid for credit adjustments)
       const invoiceCheck = await client.query(
-        "SELECT invoice_status, paymenttype, balance_due, totalamountpayable, createddate, customerid, is_consolidated FROM invoices WHERE id = $1",
+        "SELECT invoice_status, paymenttype, balance_due, totalamountpayable, createddate, customerid, is_consolidated FROM invoices WHERE id = $1 FOR UPDATE",
         [id]
       );
 
@@ -4253,7 +4877,7 @@ export default function (pool, config) {
 
       // Check if invoice exists and get current status
       const invoiceCheck = await client.query(
-        "SELECT id, einvoice_status, invoice_status, uuid, submission_uid, datetime_validated, paymenttype, totalamountpayable, customerid, is_consolidated, journal_entry_id, createddate FROM invoices WHERE id = $1",
+        "SELECT id, einvoice_status, invoice_status, uuid, submission_uid, datetime_validated, paymenttype, totalamountpayable, customerid, is_consolidated, journal_entry_id, createddate FROM invoices WHERE id = $1 FOR UPDATE",
         [id]
       );
 
@@ -4357,7 +4981,6 @@ export default function (pool, config) {
         invoiceId: id,
         createddate: createddate,
         einvoiceCleared: requiresConfirmation && confirmEInvoiceCancellation,
-        paymentsUpdated: paymentsResult.rows.length,
       });
     } catch (error) {
       await client.query("ROLLBACK");

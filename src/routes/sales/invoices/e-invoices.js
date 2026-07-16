@@ -37,10 +37,13 @@ async function fetchCustomerData(pool, customerId) {
 }
 
 // Helper function to fetch invoice from database
-const getInvoices = async (pool, invoiceId) => {
-  const client = await pool.connect();
+const getInvoices = async (pool, invoiceId, transactionClient = null) => {
+  const client = transactionClient || (await pool.connect());
+  const managesTransaction = transactionClient === null;
   try {
-    await client.query("BEGIN");
+    if (managesTransaction) {
+      await client.query("BEGIN");
+    }
 
     const invoiceQuery = `
         SELECT 
@@ -89,7 +92,9 @@ const getInvoices = async (pool, invoiceId) => {
       invoiceId,
     ]);
 
-    await client.query("COMMIT");
+    if (managesTransaction) {
+      await client.query("COMMIT");
+    }
 
     return {
       ...invoiceResult.rows[0],
@@ -105,10 +110,14 @@ const getInvoices = async (pool, invoiceId) => {
       })),
     };
   } catch (error) {
-    await client.query("ROLLBACK");
+    if (managesTransaction) {
+      await client.query("ROLLBACK");
+    }
     throw error;
   } finally {
-    client.release();
+    if (managesTransaction) {
+      client.release();
+    }
   }
 };
 
@@ -150,14 +159,77 @@ export default function (pool, config) {
 
   // POST /api/einvoice/submit - Submit Invoice to MyInvois (Updated with pending check)
   router.post("/submit", async (req, res) => {
-    try {
-      const { invoiceIds } = req.body;
-      const isMinimal = req.query.fields === "minimal";
+    const requestedInvoiceIds = req.body.invoiceIds;
+    const invoiceIds = Array.isArray(requestedInvoiceIds)
+      ? [
+          ...new Set(
+            requestedInvoiceIds
+              .map((invoiceId) => String(invoiceId).trim())
+              .filter(Boolean)
+          ),
+        ]
+      : requestedInvoiceIds;
+    const isMinimal = req.query.fields === "minimal";
+    let client = null;
+    let transactionStarted = false;
 
-      if (!invoiceIds?.length) {
+    try {
+      if (!Array.isArray(invoiceIds) || invoiceIds.length === 0) {
         return res.status(400).json({
           success: false,
           message: "No invoice IDs provided for submission",
+        });
+      }
+
+      const lockInvoiceIds = [...invoiceIds].sort((left, right) =>
+        left.localeCompare(right)
+      );
+
+      client = await pool.connect();
+      await client.query("BEGIN");
+      transactionStarted = true;
+
+      // Customer reassignment and both consolidation paths lock these same
+      // rows. Take the final submission snapshot only after any earlier change
+      // has committed, then keep it stable through MyInvois persistence.
+      await client.query(
+        `SELECT id
+           FROM invoices
+          WHERE id = ANY($1::varchar[])
+          ORDER BY id
+          FOR UPDATE`,
+        [lockInvoiceIds]
+      );
+
+      // Consolidated source invoices keep their own blank e-Invoice fields, so
+      // status alone cannot distinguish them from individually eligible bills.
+      const consolidatedMembershipResult = await client.query(
+        `SELECT source.id, consolidated.id AS consolidated_id
+           FROM invoices source
+          JOIN invoices consolidated
+             ON consolidated.is_consolidated = true
+            AND consolidated.consolidated_invoices IS NOT NULL
+            AND consolidated.consolidated_invoices::jsonb ? CAST(source.id AS text)
+          WHERE source.id = ANY($1::varchar[])
+            AND COALESCE(source.is_consolidated, false) = false
+            AND COALESCE(consolidated.invoice_status, 'active') <> 'cancelled'
+          ORDER BY source.id, consolidated.id`,
+        [lockInvoiceIds]
+      );
+
+      if (consolidatedMembershipResult.rows.length > 0) {
+        await client.query("COMMIT");
+        transactionStarted = false;
+        return res.status(409).json({
+          success: false,
+          code: "INVOICES_ALREADY_CONSOLIDATED",
+          message:
+            "One or more invoices already belong to an active consolidated e-Invoice. Refresh the list and submit only unconsolidated invoices.",
+          invoices: consolidatedMembershipResult.rows.map((row) => ({
+            id: row.id,
+            consolidatedInvoiceId: row.consolidated_id,
+          })),
+          overallStatus: "Invalid",
         });
       }
 
@@ -167,7 +239,7 @@ export default function (pool, config) {
       FROM invoices 
       WHERE id = ANY($1) AND long_id IS NOT NULL AND long_id != ''
       `;
-      const validatedResult = await pool.query(validatedQuery, [invoiceIds]);
+      const validatedResult = await client.query(validatedQuery, [invoiceIds]);
       const alreadyValidatedInvoices = validatedResult.rows;
 
       // Track already processed invoices to skip
@@ -187,7 +259,7 @@ export default function (pool, config) {
       AND (long_id IS NULL OR long_id = '')
       AND (einvoice_status = 'pending' OR einvoice_status IS NULL)
       `;
-      const pendingResult = await pool.query(pendingQuery, [invoiceIds]);
+      const pendingResult = await client.query(pendingQuery, [invoiceIds]);
       const pendingInvoices = pendingResult.rows;
 
       // Normalize any invoices that have UUID but null einvoice_status to 'pending'
@@ -205,7 +277,7 @@ export default function (pool, config) {
           const invoiceIdsToNormalize = invoicesToNormalize.map(
             (inv) => inv.id
           );
-          await pool.query(normalizeQuery, [invoiceIdsToNormalize]);
+          await client.query(normalizeQuery, [invoiceIdsToNormalize]);
 
           console.log(
             `Normalized ${invoicesToNormalize.length} invoices from null to pending status`
@@ -245,19 +317,33 @@ export default function (pool, config) {
             newStatus !== "pending" ||
             (newStatus === "valid" && documentDetails.longId)
           ) {
-            await pool.query(
+            const statusUpdateResult = await client.query(
               `UPDATE invoices SET 
               einvoice_status = $1, 
               long_id = $2, 
               datetime_validated = $3 
-            WHERE id = $4`,
+            WHERE id = $4
+              AND uuid = $5
+              AND (einvoice_status = 'pending' OR einvoice_status IS NULL)`,
               [
                 newStatus,
                 documentDetails.longId || null,
                 documentDetails.dateTimeValidated || null,
                 invoice.id,
+                invoice.uuid,
               ]
             );
+
+            // Never restore a stale result after another workflow has cleared
+            // or replaced the UUID/status snapshot.
+            if (statusUpdateResult.rowCount === 0) {
+              statusUpdateResults.failed.push({
+                id: invoice.id,
+                error:
+                  "The invoice e-Invoice state changed while its pending status was being checked. Refresh and try again.",
+              });
+              continue;
+            }
           }
 
           statusUpdateResults.updated.push({
@@ -281,7 +367,9 @@ export default function (pool, config) {
       // STEP 3: Filter out already processed pending and validated invoices
       const processedIds = [
         ...alreadyValidatedInvoices.map((inv) => inv.id),
-        ...statusUpdateResults.updated.map((upd) => upd.id),
+        // A failed status lookup is still an already-submitted document. Never
+        // send a duplicate payload just because MyInvois polling failed.
+        ...pendingInvoices.map((invoice) => invoice.id),
       ];
 
       const invoiceIdsToProcess = invoiceIds.filter(
@@ -290,6 +378,9 @@ export default function (pool, config) {
 
       // If all invoices were already processed, return early with results
       if (invoiceIdsToProcess.length === 0) {
+        await client.query("COMMIT");
+        transactionStarted = false;
+
         if (isMinimal) {
           // Construct minimal format response
           const minimalInvoices = [
@@ -351,13 +442,13 @@ export default function (pool, config) {
       for (const invoiceId of invoiceIdsToProcess) {
         try {
           // If not a duplicate, process the invoice
-          const invoiceData = await getInvoices(pool, invoiceId);
+          const invoiceData = await getInvoices(pool, invoiceId, client);
           if (!invoiceData) {
             throw new Error(`Invoice with ID ${invoiceId} not found`);
           }
 
           const customerData = await fetchCustomerData(
-            pool,
+            client,
             invoiceData.customerid
           );
 
@@ -403,6 +494,9 @@ export default function (pool, config) {
 
       // If there are any validation errors, but we still have valid invoices, continue processing
       if (validationErrors.length > 0 && transformedInvoices.length === 0) {
+        await client.query("COMMIT");
+        transactionStarted = false;
+
         if (isMinimal) {
           // Construct minimal response for validation errors
           const minimalResponse = validationErrors.map((err) => {
@@ -467,6 +561,9 @@ export default function (pool, config) {
 
       // Handle no valid invoices
       if (transformedInvoices.length === 0) {
+        await client.query("COMMIT");
+        transactionStarted = false;
+
         if (isMinimal) {
           // Similar to above, but different status code
           const minimalResponse = validationErrors.map((err) => {
@@ -549,82 +646,90 @@ export default function (pool, config) {
         submissionResult.success &&
         submissionResult.acceptedDocuments?.length > 0
       ) {
-        const client = await pool.connect();
-        try {
-          await client.query("BEGIN");
+        // Update each accepted document using the same transaction that owns
+        // the source locks. A DB failure must roll the transaction back and
+        // must not be reported to the caller as a successful persistence.
+        for (const doc of submissionResult.acceptedDocuments) {
+          const status = doc.longId ? "valid" : "pending";
+          const acceptedInvoiceId = String(
+            doc.internalId || doc.invoiceCodeNumber || ""
+          );
 
-          // Update each accepted document in the invoices table
-          for (const doc of submissionResult.acceptedDocuments) {
-            const status = doc.longId ? "valid" : "pending";
-            try {
-              await client.query(
-                `UPDATE invoices SET 
+          if (!lockInvoiceIds.includes(acceptedInvoiceId)) {
+            throw new Error(
+              `MyInvois returned an unexpected invoice ID: ${acceptedInvoiceId}`
+            );
+          }
+
+          const acceptedUpdateResult = await client.query(
+            `UPDATE invoices SET
             uuid = $1,
             submission_uid = $2,
             long_id = $3, 
             datetime_validated = $4,
             einvoice_status = $5
           WHERE id = $6`,
-                [
-                  doc.uuid,
-                  doc.submissionUid,
-                  doc.longId || null,
-                  doc.dateTimeValidated || null,
-                  status,
-                  doc.internalId,
-                ]
+            [
+              doc.uuid,
+              doc.submissionUid || submissionResult.submissionUid || null,
+              doc.longId || null,
+              doc.dateTimeValidated || null,
+              status,
+              acceptedInvoiceId,
+            ]
+          );
+
+          if (acceptedUpdateResult.rowCount !== 1) {
+            throw new Error(
+              `Failed to persist MyInvois result for invoice ${acceptedInvoiceId}`
+            );
+          }
+        }
+
+        // Update each rejected document to mark as 'invalid'
+        // BUT skip validation errors (they should remain empty)
+        if (submissionResult.rejectedDocuments?.length > 0) {
+          for (const doc of submissionResult.rejectedDocuments) {
+            const invoiceId = doc.internalId || doc.invoiceCodeNumber;
+            if (!invoiceId) continue;
+
+            // Skip updating status for validation errors (especially missing TIN/ID)
+            const isValidationError =
+              doc.error?.code === "MISSING_TIN" ||
+              doc.error?.code === "CF001" ||
+              doc.error?.message?.toLowerCase().includes("tin") ||
+              doc.error?.message?.toLowerCase().includes("id number");
+
+            if (isValidationError) {
+              console.log(
+                `Skipping status update for validation error on invoice ${invoiceId}: ${doc.error?.message}`
               );
-            } catch (error) {
-              console.error(
-                `Failed to update invoice ${doc.internalId}:`,
-                error
+              continue;
+            }
+
+            const rejectedInvoiceId = String(invoiceId);
+            if (!lockInvoiceIds.includes(rejectedInvoiceId)) {
+              throw new Error(
+                `MyInvois returned an unexpected rejected invoice ID: ${rejectedInvoiceId}`
+              );
+            }
+
+            const rejectedUpdateResult = await client.query(
+              `UPDATE invoices SET einvoice_status = 'invalid' WHERE id = $1`,
+              [rejectedInvoiceId]
+            );
+
+            if (rejectedUpdateResult.rowCount !== 1) {
+              throw new Error(
+                `Failed to persist MyInvois rejection for invoice ${rejectedInvoiceId}`
               );
             }
           }
-
-          // Update each rejected document to mark as 'invalid'
-          // BUT skip validation errors (they should remain empty)
-          if (submissionResult.rejectedDocuments?.length > 0) {
-            for (const doc of submissionResult.rejectedDocuments) {
-              const invoiceId = doc.internalId || doc.invoiceCodeNumber;
-              if (!invoiceId) continue;
-
-              // Skip updating status for validation errors (especially missing TIN/ID)
-              const isValidationError =
-                doc.error?.code === "MISSING_TIN" ||
-                doc.error?.code === "CF001" ||
-                doc.error?.message?.toLowerCase().includes("tin") ||
-                doc.error?.message?.toLowerCase().includes("id number");
-
-              if (isValidationError) {
-                console.log(
-                  `Skipping status update for validation error on invoice ${invoiceId}: ${doc.error?.message}`
-                );
-                continue;
-              }
-
-              try {
-                await client.query(
-                  `UPDATE invoices SET einvoice_status = 'invalid' WHERE id = $1`,
-                  [invoiceId]
-                );
-              } catch (error) {
-                console.error(
-                  `Failed to update invoice ${invoiceId} to invalid:`,
-                  error
-                );
-              }
-            }
-          }
-
-          await client.query("COMMIT");
-        } catch (error) {
-          await client.query("ROLLBACK");
-          console.error("Error updating invoices with e-invoice data:", error);
-        } finally {
-          client.release();
         }
       }
+
+      await client.query("COMMIT");
+      transactionStarted = false;
 
       // Determine appropriate status code
       let statusCode = 201; // Default to Created for complete success
@@ -642,11 +747,7 @@ export default function (pool, config) {
       // Prepare response based on format requested
       if (isMinimal) {
         // Map submitted invoice results to minimal format
-        const allInvoices = [
-          ...invoiceIdsToProcess,
-          ...alreadyValidatedInvoices.map((inv) => inv.id),
-          ...statusUpdateResults.updated.map((upd) => upd.id),
-        ];
+        const allInvoices = [...new Set(invoiceIds)];
 
         const minimalInvoices = allInvoices.map((id) => {
           // First check if it was an already validated invoice
@@ -695,7 +796,7 @@ export default function (pool, config) {
 
           // Check if it was newly accepted
           const accepted = submissionResult.acceptedDocuments?.find(
-            (doc) => doc.internalId === id
+            (doc) => (doc.internalId || doc.invoiceCodeNumber) === id
           );
           if (accepted) {
             return {
@@ -766,6 +867,18 @@ export default function (pool, config) {
         });
       }
     } catch (error) {
+      if (client && transactionStarted) {
+        try {
+          await client.query("ROLLBACK");
+        } catch (rollbackError) {
+          console.error(
+            "Failed to roll back individual e-Invoice submission:",
+            rollbackError
+          );
+        }
+        transactionStarted = false;
+      }
+
       console.error("Submission error:", error);
 
       // Check for specific error codes like 422 (duplicate payload)
@@ -842,6 +955,18 @@ export default function (pool, config) {
           overallStatus: "Invalid",
         });
       }
+    } finally {
+      if (client && transactionStarted) {
+        try {
+          await client.query("ROLLBACK");
+        } catch (rollbackError) {
+          console.error(
+            "Failed to clean up individual e-Invoice submission transaction:",
+            rollbackError
+          );
+        }
+      }
+      client?.release();
     }
   });
 
@@ -1286,8 +1411,7 @@ export default function (pool, config) {
           WHERE consolidated.is_consolidated = true
           AND consolidated.consolidated_invoices IS NOT NULL
           AND consolidated.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
-          AND consolidated.invoice_status != 'cancelled' 
-          AND consolidated.einvoice_status != 'cancelled'
+          AND COALESCE(consolidated.invoice_status, 'active') <> 'cancelled'
         )
         GROUP BY i.id
         ORDER BY CAST(i.createddate AS bigint) ASC
@@ -1333,9 +1457,12 @@ export default function (pool, config) {
   // Submit consolidated invoice
   router.post("/submit-consolidated", async (req, res) => {
     try {
-      const { invoices: invoiceIds, month, year } = req.body;
+      const { invoices: requestedInvoiceIds, month, year } = req.body;
 
-      if (!invoiceIds?.length) {
+      if (
+        !Array.isArray(requestedInvoiceIds) ||
+        requestedInvoiceIds.length === 0
+      ) {
         return res.status(400).json({
           success: false,
           message: "No invoice IDs provided for consolidation",
@@ -1349,154 +1476,263 @@ export default function (pool, config) {
         });
       }
 
-      // Fetch all invoice data
-      const invoiceData = [];
-      let totalRounding = 0;
-      let totalTaxAmount = 0;
-      for (const invoiceId of invoiceIds) {
-        try {
-          const invoice = await getInvoices(pool, invoiceId);
-          if (invoice) {
-            invoiceData.push(invoice);
-            totalRounding += Number(invoice.rounding || 0);
-            totalTaxAmount += Number(invoice.tax_amount || 0);
-          }
-        } catch (error) {
-          console.warn(`Failed to fetch invoice ${invoiceId}:`, error);
-          // Continue with other invoices
-        }
-      }
-
-      if (invoiceData.length === 0) {
+      const consolidationMonth = Number.parseInt(String(month), 10);
+      const consolidationYear = Number.parseInt(String(year), 10);
+      if (
+        !Number.isInteger(consolidationMonth) ||
+        consolidationMonth < 0 ||
+        consolidationMonth > 11 ||
+        !Number.isInteger(consolidationYear)
+      ) {
         return res.status(400).json({
           success: false,
-          message: "No valid invoices found for consolidation",
+          message: "Invalid consolidation month or year",
         });
       }
 
-      // Generate consolidated invoice XML
-      const consolidatedXml = await EInvoiceConsolidatedTemplate(
-        invoiceData,
-        month,
-        year
-      );
+      const invoiceIds = [
+        ...new Set(
+          requestedInvoiceIds
+            .map((invoiceId) => String(invoiceId).trim())
+            .filter(Boolean)
+        ),
+      ];
 
-      // Generate base consolidated ID
-      const baseConsolidatedId = `CON-${year}${String(
-        parseInt(month) + 1
-      ).padStart(2, "0")}`;
-
-      // Check for existing consolidated invoices with the same base ID pattern
-      const existingIdsQuery = `
-      SELECT id FROM invoices 
-      WHERE id LIKE $1 
-      ORDER BY id DESC
-    `;
-      const existingIdsResult = await pool.query(existingIdsQuery, [
-        `${baseConsolidatedId}%`,
-      ]);
-
-      let consolidatedId;
-      if (existingIdsResult.rows.length === 0) {
-        // No existing IDs, use the base ID
-        consolidatedId = baseConsolidatedId;
-      } else {
-        // Find the highest suffix number and increment
-        let maxSuffix = 0;
-        for (const row of existingIdsResult.rows) {
-          const id = row.id;
-          // Extract suffix number if present (e.g., "CON-202504-1" -> 1)
-          const match = id.match(new RegExp(`^${baseConsolidatedId}-?(\\d+)$`));
-          if (match && match[1]) {
-            const suffix = parseInt(match[1]);
-            if (suffix > maxSuffix) {
-              maxSuffix = suffix;
-            }
-          }
-        }
-        // Increment the highest suffix or start with 1 if no suffixed versions exist
-        consolidatedId = `${baseConsolidatedId}-${
-          maxSuffix > 0 ? maxSuffix + 1 : 1
-        }`;
+      if (invoiceIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "No valid invoice IDs provided for consolidation",
+        });
       }
 
-      const requestBody = {
-        documents: [
-          {
-            format: "XML",
-            document: Buffer.from(consolidatedXml, "utf8").toString("base64"),
-            documentHash: createHash("sha256")
-              .update(consolidatedXml, "utf8")
-              .digest("hex"),
-            codeNumber: consolidatedId,
-          },
-        ],
-      };
-
-      // Submit to MyInvois API
-      const submissionResponse = await apiClient.makeApiCall(
-        "POST",
-        "/api/v1.0/documentsubmissions",
-        requestBody
+      const lockInvoiceIds = [...invoiceIds].sort((left, right) =>
+        left.localeCompare(right)
       );
 
-      if (submissionResponse.acceptedDocuments?.length > 0) {
-        // Poll for final status
-        const finalStatus = await submissionHandler.pollSubmissionStatus(
-          submissionResponse.submissionUid
-        );
-        const consolidatedData = finalStatus.documentSummary[0];
+      const endYear = consolidationMonth === 11
+        ? consolidationYear + 1
+        : consolidationYear;
+      const endMonth = consolidationMonth === 11 ? 0 : consolidationMonth + 1;
+      const startDate = new Date(
+        `${consolidationYear}-${String(consolidationMonth + 1).padStart(
+          2,
+          "0"
+        )}-01T00:00:00+08:00`
+      );
+      const endDate = new Date(
+        `${endYear}-${String(endMonth + 1).padStart(2, "0")}-01T00:00:00+08:00`
+      );
+      const startTimestamp = startDate.getTime().toString();
+      const endTimestamp = endDate.getTime().toString();
 
-        if (
-          finalStatus.overallStatus === "Invalid" ||
-          consolidatedData.status === "Invalid"
-        ) {
-          return res.status(400).json({
+      const client = await pool.connect();
+      let transactionCommitted = false;
+
+      try {
+        await client.query("BEGIN");
+
+        // Manual and automatic Tien Hock consolidation share this period lock.
+        // A waiter takes its eligibility snapshot only after the prior run has
+        // committed or rolled back.
+        await client.query(
+          `SELECT pg_advisory_xact_lock(
+             hashtext('tienhock:invoice-consolidation'),
+             $1::integer
+           )`,
+          [consolidationYear * 100 + consolidationMonth + 1]
+        );
+
+        // Serialize consolidation with invoice customer changes. Every source
+        // row is locked in a deterministic order and remains locked until the
+        // consolidated parent is inserted.
+        const lockedInvoiceResult = await client.query(
+          `SELECT
+             i.id,
+             i.customerid
+           FROM invoices i
+           WHERE i.id = ANY($1::varchar[])
+             AND CAST(i.createddate AS bigint) >= $2
+             AND CAST(i.createddate AS bigint) < $3
+             AND LOWER(i.id) NOT LIKE 'f%'
+             AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid')
+             AND i.invoice_status != 'cancelled'
+             AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
+             AND NOT EXISTS (
+               SELECT 1
+               FROM invoices consolidated
+               WHERE consolidated.is_consolidated = true
+                 AND consolidated.consolidated_invoices IS NOT NULL
+                 AND consolidated.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
+                 AND COALESCE(consolidated.invoice_status, 'active') <> 'cancelled'
+             )
+           ORDER BY i.id
+           FOR UPDATE OF i`,
+          [lockInvoiceIds, startTimestamp, endTimestamp]
+        );
+
+        const eligibleInvoiceIds = new Set(
+          lockedInvoiceResult.rows.map((invoice) => invoice.id)
+        );
+        const unavailableInvoiceIds = invoiceIds.filter(
+          (invoiceId) => !eligibleInvoiceIds.has(invoiceId)
+        );
+
+        if (unavailableInvoiceIds.length > 0) {
+          return res.status(409).json({
             success: false,
-            message: "Consolidated invoice submission was rejected",
-            submissionUid: submissionResponse.submissionUid,
-            consolidatedId,
-            uuid: consolidatedData.uuid,
-            status: consolidatedData.status,
-            errors: [
-              {
-                code: "INVALID_SUBMISSION",
-                message: "The submission was marked as invalid by MyInvois",
-              },
-            ],
+            code: "CONSOLIDATION_INVOICES_CHANGED",
+            message:
+              "Some selected invoices are no longer eligible. Refresh the list and try again.",
+            invoiceIds: unavailableInvoiceIds,
           });
         }
 
-        // Check if the submission is still pending
-        const isPending =
-          finalStatus.overallStatus === "InProgress" ||
-          consolidatedData.status === "Submitted" ||
-          !consolidatedData.longId;
+        const lockedCustomerByInvoiceId = new Map(
+          lockedInvoiceResult.rows.map((invoice) => [
+            invoice.id,
+            String(invoice.customerid),
+          ])
+        );
+        const invoiceData = [];
+        let totalRounding = 0;
+        let totalTaxAmount = 0;
 
-        // Calculate totals from all invoices
-        const totalExcludingTax = invoiceData.reduce(
-          (sum, inv) => sum + parseFloat(inv.total_excluding_tax || 0),
-          0
+        for (const invoiceId of invoiceIds) {
+          const invoice = await getInvoices(pool, invoiceId, client);
+          if (
+            String(invoice.customerid) !==
+            lockedCustomerByInvoiceId.get(invoiceId)
+          ) {
+            throw new Error(
+              `Invoice ${invoiceId} customer changed during consolidation`
+            );
+          }
+          invoiceData.push(invoice);
+          totalRounding += Number(invoice.rounding || 0);
+          totalTaxAmount += Number(invoice.tax_amount || 0);
+        }
+
+        // Generate consolidated invoice XML from the locked customer and
+        // invoice snapshot.
+        const consolidatedXml = await EInvoiceConsolidatedTemplate(
+          invoiceData,
+          consolidationMonth,
+          consolidationYear
         );
 
-        const totalPayable = invoiceData.reduce(
-          (sum, inv) => sum + parseFloat(inv.totalamountpayable || 0),
-          0
+        // Generate base consolidated ID
+        const baseConsolidatedId = `CON-${consolidationYear}${String(
+          consolidationMonth + 1
+        ).padStart(2, "0")}`;
+
+        // Check for existing consolidated invoices with the same base ID pattern
+        const existingIdsQuery = `
+        SELECT id FROM invoices
+        WHERE id LIKE $1
+        ORDER BY id DESC
+      `;
+        const existingIdsResult = await client.query(existingIdsQuery, [
+          `${baseConsolidatedId}%`,
+        ]);
+
+        let consolidatedId;
+        if (existingIdsResult.rows.length === 0) {
+          // No existing IDs, use the base ID
+          consolidatedId = baseConsolidatedId;
+        } else {
+          // Find the highest suffix number and increment
+          let maxSuffix = 0;
+          for (const row of existingIdsResult.rows) {
+            const id = row.id;
+            // Extract suffix number if present (e.g., "CON-202504-1" -> 1)
+            const match = id.match(new RegExp(`^${baseConsolidatedId}-?(\\d+)$`));
+            if (match && match[1]) {
+              const suffix = parseInt(match[1]);
+              if (suffix > maxSuffix) {
+                maxSuffix = suffix;
+              }
+            }
+          }
+          // Increment the highest suffix or start with 1 if no suffixed versions exist
+          consolidatedId = `${baseConsolidatedId}-${
+            maxSuffix > 0 ? maxSuffix + 1 : 1
+          }`;
+        }
+
+        const requestBody = {
+          documents: [
+            {
+              format: "XML",
+              document: Buffer.from(consolidatedXml, "utf8").toString("base64"),
+              documentHash: createHash("sha256")
+                .update(consolidatedXml, "utf8")
+                .digest("hex"),
+              codeNumber: consolidatedId,
+            },
+          ],
+        };
+
+        // Submit to MyInvois API
+        const submissionResponse = await apiClient.makeApiCall(
+          "POST",
+          "/api/v1.0/documentsubmissions",
+          requestBody
         );
 
-        // Mark the original invoices as consolidated
-        const client = await pool.connect();
-        try {
-          await client.query("BEGIN");
+        if (submissionResponse.acceptedDocuments?.length > 0) {
+          // Poll for final status
+          const finalStatus = await submissionHandler.pollSubmissionStatus(
+            submissionResponse.submissionUid
+          );
+          const consolidatedData = finalStatus.documentSummary[0];
 
-          // Insert consolidated record
+          if (
+            finalStatus.overallStatus === "Invalid" ||
+            consolidatedData.status === "Invalid"
+          ) {
+            return res.status(400).json({
+              success: false,
+              message: "Consolidated invoice submission was rejected",
+              submissionUid: submissionResponse.submissionUid,
+              consolidatedId,
+              uuid: consolidatedData.uuid,
+              status: consolidatedData.status,
+              errors: [
+                {
+                  code: "INVALID_SUBMISSION",
+                  message: "The submission was marked as invalid by MyInvois",
+                },
+              ],
+            });
+          }
+
+          // Check if the submission is still pending
+          const isPending =
+            finalStatus.overallStatus === "InProgress" ||
+            consolidatedData.status === "Submitted" ||
+            !consolidatedData.longId;
+
+          // Calculate totals from all invoices
+          const totalExcludingTax = invoiceData.reduce(
+            (sum, inv) => sum + parseFloat(inv.total_excluding_tax || 0),
+            0
+          );
+
+          const totalPayable = invoiceData.reduce(
+            (sum, inv) => sum + parseFloat(inv.totalamountpayable || 0),
+            0
+          );
+
+          // Insert the parent while the selected source invoices are still
+          // locked. A waiting customer change then sees this active membership
+          // after commit and is blocked by the customer-change guard.
           await client.query(
             `INSERT INTO invoices (
-            id, uuid, submission_uid, long_id, datetime_validated,
-            total_excluding_tax, tax_amount, rounding, totalamountpayable,
-            invoice_status, einvoice_status, is_consolidated, consolidated_invoices,
-            customerid, salespersonid, createddate, paymenttype, balance_due
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+              id, uuid, submission_uid, long_id, datetime_validated,
+              total_excluding_tax, tax_amount, rounding, totalamountpayable,
+              invoice_status, einvoice_status, is_consolidated, consolidated_invoices,
+              customerid, salespersonid, createddate, paymenttype, balance_due
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
             [
               consolidatedId,
               consolidatedData.uuid,
@@ -1520,44 +1756,51 @@ export default function (pool, config) {
           );
 
           await client.query("COMMIT");
-        } catch (error) {
-          await client.query("ROLLBACK");
-          console.error("Failed to record consolidated invoice:", error);
-          throw error; // Let the outer catch handle this
-        } finally {
-          client.release();
+          transactionCommitted = true;
+
+          // Format for SubmissionResultsModal compatibility
+          const formattedResponse = {
+            success: true,
+            message: isPending
+              ? "Consolidated invoice submitted, but is still pending validation"
+              : "Consolidated invoice submitted successfully",
+            acceptedDocuments: [
+              {
+                internalId: consolidatedId,
+                uuid: consolidatedData.uuid,
+                longId: consolidatedData.longId || null,
+                status: consolidatedData.status,
+                dateTimeReceived: finalStatus.dateTimeReceived,
+                dateTimeValidated: consolidatedData.dateTimeValidated,
+              },
+            ],
+            rejectedDocuments: [],
+            overallStatus: isPending ? "Pending" : "Valid",
+            submissionUid: submissionResponse.submissionUid,
+            documentCount: 1,
+          };
+
+          return res.json(formattedResponse);
+        } else {
+          return res.status(400).json({
+            success: false,
+            message: "Submission failed",
+            rejectedDocuments: submissionResponse.rejectedDocuments,
+            overallStatus: "Invalid",
+          });
         }
-
-        // Format for SubmissionResultsModal compatibility
-        const formattedResponse = {
-          success: true,
-          message: isPending
-            ? "Consolidated invoice submitted, but is still pending validation"
-            : "Consolidated invoice submitted successfully",
-          acceptedDocuments: [
-            {
-              internalId: consolidatedId,
-              uuid: consolidatedData.uuid,
-              longId: consolidatedData.longId || null,
-              status: consolidatedData.status,
-              dateTimeReceived: finalStatus.dateTimeReceived,
-              dateTimeValidated: consolidatedData.dateTimeValidated,
-            },
-          ],
-          rejectedDocuments: [],
-          overallStatus: isPending ? "Pending" : "Valid",
-          submissionUid: submissionResponse.submissionUid,
-          documentCount: 1,
-        };
-
-        return res.json(formattedResponse);
-      } else {
-        return res.status(400).json({
-          success: false,
-          message: "Submission failed",
-          rejectedDocuments: submissionResponse.rejectedDocuments,
-          overallStatus: "Invalid",
-        });
+      } finally {
+        if (!transactionCommitted) {
+          try {
+            await client.query("ROLLBACK");
+          } catch (rollbackError) {
+            console.error(
+              "Failed to roll back consolidated invoice transaction:",
+              rollbackError
+            );
+          }
+        }
+        client.release();
       }
     } catch (error) {
       console.error("Consolidated submission error:", error);

@@ -111,7 +111,8 @@ function normalizeAllocations(allocations) {
     }
     return {
       type,
-      invoice_id: a.invoice_id ? String(a.invoice_id) : null,
+      invoice_id:
+        type === "invoice" && a.invoice_id ? String(a.invoice_id) : null,
       customer_id: a.customer_id ? String(a.customer_id) : null,
       target_account: a.target_account || null,
       external_reference: a.external_reference || null,
@@ -333,18 +334,14 @@ export async function createReceipt(client, payload, userId) {
     assertTienHockAccountingDateUnlocked(postingDate, "Receipt (posting date)");
   }
 
-  // Fill customer ids for invoice allocations + description default.
-  const preMap = {};
-  const ids = [...new Set(allocs.filter((a) => a.type === "invoice").map((a) => a.invoice_id))];
-  if (ids.length > 0) {
-    const invRes = await client.query(
-      `SELECT id, customerid FROM invoices WHERE id = ANY($1::varchar[])`,
-      [ids]
-    );
-    for (const row of invRes.rows) preMap[row.id] = row.customerid;
-  }
+  // Lock invoice allocations before snapshotting their customer or inserting
+  // any receipt rows. This also validates pending receipts against the same
+  // invoice state used by immediately posted receipts.
+  const invoiceMap = await lockInvoices(client, allocs);
   for (const a of allocs) {
-    if (a.type === "invoice" && !a.customer_id) a.customer_id = preMap[a.invoice_id] || null;
+    if (a.type === "invoice") {
+      a.customer_id = invoiceMap[a.invoice_id]?.customerid || null;
+    }
   }
 
   const description = (payload.description || "").trim() || defaultDescription(allocs);
@@ -426,7 +423,6 @@ export async function createReceipt(client, payload, userId) {
   }
 
   if (!isPending) {
-    const invoiceMap = await lockInvoices(client, allocs);
     await postReceiptJournal(client, receipt, allocs, invoiceMap, userId);
   }
 
