@@ -426,7 +426,8 @@ const AccountLedgerPage: React.FC = () => {
             onChange={handleAccountChange}
             disabled={accountsLoading}
             placeholder="Search account code or name..."
-            className="w-72"
+            className="w-[28rem] max-w-full"
+            hierarchical
           />
 
           {selectedAccount && (
