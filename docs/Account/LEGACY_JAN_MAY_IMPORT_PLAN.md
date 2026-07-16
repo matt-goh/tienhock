@@ -395,6 +395,15 @@ as follows:
    nonposting and leave the imported journals untouched.
 2. Keep the private source CSV,
    generated staging CSV/report, and production dump untracked.
+3. **Independent verification (added 17 Jul 2026):** the user exported scanned
+   legacy reports (Jan–May monthly Trial Balances, May Balance Sheet / Detail
+   Income Statement / CoGM / Trade Debtor List). They provably contain the
+   decomposition of the RM1,456,480.37 opening residue (opening inventories
+   626,875.15 + CS_* 829,605.22). The verification and residue-closure work is
+   planned in
+   [LEGACY_REPORT_VERIFICATION_PLAN.md](LEGACY_REPORT_VERIFICATION_PLAN.md);
+   until its V2 completes, the residue in this document remains the accepted
+   named limitation.
 
 ---
 
