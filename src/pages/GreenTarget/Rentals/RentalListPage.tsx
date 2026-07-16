@@ -1,6 +1,6 @@
 // src/pages/GreenTarget/Rentals/RentalListPage.tsx
-import { useState, useEffect, useMemo, Fragment } from "react";
-import { format } from "date-fns";
+import { useState, useEffect, useCallback, Fragment } from "react";
+import { endOfDay, format, startOfDay, subDays } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import {
   IconSearch,
@@ -20,6 +20,7 @@ import {
 } from "@tabler/icons-react";
 import { Dialog, Transition, Listbox } from "@headlessui/react";
 import Button from "../../../components/Button";
+import TimeNavigator, { TimeRange } from "../../../components/TimeNavigator";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
@@ -298,13 +299,33 @@ const RentalCard = ({
   );
 };
 
+interface RentalDateRange {
+  start: Date | null;
+  end: Date | null;
+}
+
+// Matches TimeNavigator's own "Last 30 days" preset (29 days back through today),
+// so the trigger shows that label rather than a raw date range.
+const getDefaultDateRange = (): RentalDateRange => ({
+  start: startOfDay(subDays(new Date(), 29)),
+  end: endOfDay(new Date()),
+});
+
 const RentalListPage = () => {
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  // `searchInput` is what the user is typing; `appliedSearch` is what the
+  // backend is filtering on, committed on blur or Enter.
+  const [searchInput, setSearchInput] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [activeOnly, setActiveOnly] = useState(false);
+  const [dateRange, setDateRange] = useState<RentalDateRange>(
+    getDefaultDateRange()
+  );
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [rentalToDelete, setRentalToDelete] = useState<Rental | null>(null);
   const [isPickupDialogOpen, setIsPickupDialogOpen] = useState(false);
@@ -317,7 +338,6 @@ const RentalListPage = () => {
   const ITEMS_PER_PAGE = 12;
 
   useEffect(() => {
-    fetchRentals();
     fetchPickupDestinations();
   }, []);
 
@@ -335,11 +355,29 @@ const RentalListPage = () => {
     }
   };
 
-  const fetchRentals = async () => {
+  const fetchRentals = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await greenTargetApi.getRentals();
-      setRentals(data);
+      const response = await greenTargetApi.getRentals({
+        page: currentPage,
+        limit: ITEMS_PER_PAGE,
+        ...(appliedSearch ? { search: appliedSearch } : {}),
+        ...(activeOnly ? { active_only: true } : {}),
+        ...(dateRange.start
+          ? { start_date: format(dateRange.start, "yyyy-MM-dd") }
+          : {}),
+        ...(dateRange.end
+          ? { end_date: format(dateRange.end, "yyyy-MM-dd") }
+          : {}),
+      });
+      // Deleting the last row of the last page can leave us past the end.
+      if (currentPage > response.pagination.totalPages) {
+        setCurrentPage(response.pagination.totalPages);
+        return;
+      }
+      setRentals(response.data);
+      setTotalItems(response.pagination.total);
+      setTotalPages(response.pagination.totalPages);
       setError(null);
     } catch (err) {
       setError("Failed to fetch rentals. Please try again later.");
@@ -347,6 +385,32 @@ const RentalListPage = () => {
     } finally {
       setLoading(false);
     }
+  }, [currentPage, appliedSearch, activeOnly, dateRange]);
+
+  useEffect(() => {
+    fetchRentals();
+  }, [fetchRentals]);
+
+  // Commit the typed search to the backend. Called on blur and on Enter.
+  const commitSearch = () => {
+    if (searchInput.trim() === appliedSearch) return;
+    setAppliedSearch(searchInput.trim());
+    setCurrentPage(1);
+  };
+
+  const handleTimeNavigatorChange = (range: TimeRange): void => {
+    setDateRange({ start: range.start, end: range.end });
+    setCurrentPage(1);
+  };
+
+  const clearDateRange = (): void => {
+    setDateRange({ start: null, end: null });
+    setCurrentPage(1);
+  };
+
+  const handleActiveOnlyToggle = (): void => {
+    setActiveOnly((prev) => !prev);
+    setCurrentPage(1);
   };
 
   const handleGenerateDeliveryOrder = (rental: Rental) => {
@@ -398,10 +462,8 @@ const RentalListPage = () => {
         // Only show success and update state if there's no error
         toast.success("Rental deleted successfully");
 
-        // Remove deleted rental from state
-        setRentals(
-          rentals.filter((r) => r.rental_id !== rentalToDelete.rental_id)
-        );
+        // Refetch so the page, total and pagination stay in sync with the server
+        fetchRentals();
       }
     } catch (error: any) {
       // This will catch network errors or other exceptions
@@ -459,14 +521,8 @@ const RentalListPage = () => {
 
       toast.success("Rental marked as picked up");
 
-      // Update the rental in the local state to reflect changes
-      setRentals(
-        rentals.map((r) =>
-          r.rental_id === rentalToPickup.rental_id
-            ? { ...r, date_picked: today, pickup_destination: selectedDestination }
-            : r
-        )
-      );
+      // Refetch: with "Active Rentals Only" on, this rental now drops out
+      fetchRentals();
     } catch (error) {
       console.error("Error updating rental:", error);
       toast.error("Failed to mark rental as picked up");
@@ -476,41 +532,6 @@ const RentalListPage = () => {
       setRentalToPickup(null);
     }
   };
-
-  const filteredRentals = useMemo(() => {
-    const todayStr = format(new Date(), "yyyy-MM-dd");
-
-    return rentals.filter((rental) => {
-      // Filter by search term (customer name, location, driver or dumpster number)
-      const matchesSearch =
-        rental.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (rental.location_address &&
-          rental.location_address
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase())) ||
-        rental.driver.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        rental.tong_no.toLowerCase().includes(searchTerm.toLowerCase());
-
-      // Filter by active status - consider rentals with future pickup dates as active
-      const isRentalActive =
-        !rental.date_picked || toLocalDateString(rental.date_picked) > todayStr;
-
-      const matchesStatus = activeOnly ? isRentalActive : true;
-
-      return matchesSearch && matchesStatus;
-    });
-  }, [rentals, searchTerm, activeOnly]);
-
-  const totalPages = Math.ceil(filteredRentals.length / ITEMS_PER_PAGE);
-
-  const paginatedRentals = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredRentals.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredRentals, currentPage]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, activeOnly]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -612,29 +633,21 @@ const RentalListPage = () => {
     return buttons;
   };
 
-  if (loading) {
-    return (
-      <div className="mt-40 w-full flex items-center justify-center">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-
   if (error) {
     return <div>Error: {error}</div>;
   }
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <h1 className="text-2xl text-default-700 dark:text-gray-200 font-bold truncate overflow-hidden overflow-ellipsis max-w-[300px]">
-          Rentals ({filteredRentals.length})
+          Rentals ({totalItems})
         </h1>
         <div className="flex flex-col sm:flex-row gap-3 items-center justify-end ml-auto">
           <div className="flex items-center">
             <button
               type="button"
-              onClick={() => setActiveOnly(!activeOnly)}
+              onClick={handleActiveOnlyToggle}
               className="p-2 rounded-full transition-opacity duration-200 hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 active:bg-default-200 flex items-center"
             >
               {activeOnly ? (
@@ -650,8 +663,28 @@ const RentalListPage = () => {
                   height={20}
                 />
               )}
-              <span className="ml-2 font-medium">Active Rentals Only</span>
+              <span className="ml-2 font-medium whitespace-nowrap">
+                Active Rentals Only
+              </span>
             </button>
+          </div>
+          <div className="flex items-center gap-1">
+            <TimeNavigator
+              range={dateRange}
+              onChange={handleTimeNavigatorChange}
+              placeholder="All dates"
+            />
+            {dateRange.start && (
+              <button
+                type="button"
+                onClick={clearDateRange}
+                className="h-[40px] w-[40px] flex items-center justify-center rounded-lg border border-default-300 dark:border-gray-600 text-default-500 dark:text-gray-400 hover:bg-default-50 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+                title="Clear date filter"
+                aria-label="Clear date filter"
+              >
+                <IconX size={18} />
+              </button>
+            )}
           </div>
           <div className="relative w-full sm:w-64">
             <IconSearch
@@ -662,8 +695,14 @@ const RentalListPage = () => {
               type="text"
               placeholder="Search"
               className="w-full pl-11 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 focus:border-default-500 dark:focus:border-gray-500 rounded-full"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onBlur={commitSearch}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.currentTarget.blur();
+                }
+              }}
             />
           </div>
           <div className="flex">
@@ -679,13 +718,17 @@ const RentalListPage = () => {
         </div>
       </div>
 
-      {filteredRentals.length === 0 ? (
+      {loading ? (
+        <div className="mt-40 w-full flex items-center justify-center">
+          <LoadingSpinner />
+        </div>
+      ) : rentals.length === 0 ? (
         <div className="text-center py-8">
           <p className="text-default-500 dark:text-gray-400">No rentals found.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
-          {paginatedRentals.map((rental) => (
+          {rentals.map((rental) => (
             <RentalCard
               key={rental.rental_id}
               rental={rental}
@@ -698,7 +741,7 @@ const RentalListPage = () => {
         </div>
       )}
 
-      {filteredRentals.length > 0 && (
+      {!loading && rentals.length > 0 && (
         <div className="mt-6 flex justify-between items-center text-default-700 dark:text-gray-200">
           <button
             className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 active:bg-default-200"

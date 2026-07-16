@@ -1221,8 +1221,10 @@ const buildMainPayrollPage = (
           holiday_descriptions: [],
         };
       }
-      acc[leaveType].total_days += record.days_taken;
-      acc[leaveType].total_amount += record.amount_paid;
+      // days_taken/amount_paid arrive as numeric strings from the API, so they
+      // are coerced before summing — "+" would otherwise concatenate them.
+      acc[leaveType].total_days += Number(record.days_taken) || 0;
+      acc[leaveType].total_amount += Number(record.amount_paid) || 0;
       if (
         record.holiday_description &&
         !acc[leaveType].holiday_descriptions.includes(
@@ -2022,8 +2024,10 @@ const buildIndividualJobPage = (
           holiday_descriptions: [],
         };
       }
-      acc[leaveType].total_days += record.days_taken;
-      acc[leaveType].total_amount += record.amount_paid;
+      // days_taken/amount_paid arrive as numeric strings from the API, so they
+      // are coerced before summing — "+" would otherwise concatenate them.
+      acc[leaveType].total_days += Number(record.days_taken) || 0;
+      acc[leaveType].total_amount += Number(record.amount_paid) || 0;
       if (
         record.holiday_description &&
         !acc[leaveType].holiday_descriptions.includes(

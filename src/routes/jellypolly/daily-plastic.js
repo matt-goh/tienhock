@@ -7,6 +7,12 @@ import { reprocessJPEmployeesSafe } from "./jpPayrollProcessor.js";
 const SECTION = "PLASTIC";
 const JOB_ID = "JP_PLASTIC";
 const DEFAULT_SHIFT = 1;
+const VALID_LEAVE_TYPES = new Set([
+  "cuti_umum",
+  "cuti_sakit",
+  "cuti_tahunan",
+  "cuti_rawatan",
+]);
 
 const isValidYmd = (value) =>
   typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -21,6 +27,14 @@ const round2 = (value) => Math.round(value * 100) / 100;
 const parseNonNegativeNumber = (value) => {
   const parsed = parseFloat(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+};
+
+// Leave amounts may legitimately be 0, so this returns null (invalid) instead
+// of coercing, unlike parseNonNegativeNumber above.
+const parseLeaveAmount = (value) => {
+  const parsed = parseFloat(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return Math.round(parsed * 100) / 100;
 };
 
 const getDayType = async (client, dateString) => {
@@ -403,6 +417,197 @@ export default function (pool) {
       console.error("Error clearing JP daily plastic:", error);
       res.status(500).json({
         message: "Error clearing daily plastic",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  /**
+   * GET /jellypolly/api/daily-plastic/leave?date=YYYY-MM-DD
+   * The day's leave records for JP Plastic staff (JP leave ledger).
+   */
+  router.get("/leave", async (req, res) => {
+    const { date } = req.query;
+    if (!isValidYmd(date)) {
+      return res
+        .status(400)
+        .json({ message: "A valid ?date=YYYY-MM-DD is required" });
+    }
+
+    try {
+      const result = await pool.query(
+        `SELECT lr.id,
+                lr.employee_id,
+                to_char(lr.leave_date, 'YYYY-MM-DD') AS leave_date,
+                lr.leave_type,
+                CAST(lr.amount_paid AS NUMERIC(10, 2)) AS amount_paid,
+                COALESCE(s.name, lr.employee_id) AS employee_name
+         FROM jellypolly.leave_records lr
+         JOIN jellypolly.staffs s ON s.id = lr.employee_id
+         WHERE lr.leave_date = $1
+           AND lr.status = 'approved'
+           AND s.date_resigned IS NULL
+           AND s.job::jsonb ? $2
+         ORDER BY s.name, lr.id`,
+        [date, JOB_ID]
+      );
+
+      res.json(
+        result.rows.map((row) => ({
+          ...row,
+          amount_paid: parseFloat(row.amount_paid) || 0,
+        }))
+      );
+    } catch (error) {
+      console.error("Error fetching JP daily plastic leave:", error);
+      res.status(500).json({
+        message: "Error fetching leave records",
+        error: error.message,
+      });
+    }
+  });
+
+  /**
+   * POST /jellypolly/api/daily-plastic/leave
+   * Batch save the plastic leave section for one date. Rows are written with a
+   * NULL work_log_id so clearing a staff's plastic entry never cascades their
+   * leave away; the JP payroll processor pays amount_paid into gross and
+   * excludes that day's work items.
+   * Body: { date, leaveEntries: [{employeeId, leaveType, amount_paid}],
+   *         updatedLeaveEntries: [{id, amount_paid}], deletedLeaveIds: [id], created_by }
+   */
+  router.post("/leave", async (req, res) => {
+    const {
+      date,
+      leaveEntries = [],
+      updatedLeaveEntries = [],
+      deletedLeaveIds = [],
+      created_by,
+    } = req.body;
+
+    if (!isValidYmd(date)) {
+      return res
+        .status(400)
+        .json({ message: "A valid date (YYYY-MM-DD) is required" });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // Employees to re-run payroll for: everyone this request touches.
+      const affectedEmployeeIds = new Set();
+
+      const collectEmployeeIds = async (leaveIds) => {
+        if (leaveIds.length === 0) return;
+        const result = await client.query(
+          "SELECT employee_id FROM jellypolly.leave_records WHERE id = ANY($1::int[])",
+          [leaveIds]
+        );
+        for (const row of result.rows) affectedEmployeeIds.add(row.employee_id);
+      };
+
+      if (Array.isArray(deletedLeaveIds) && deletedLeaveIds.length > 0) {
+        const ids = deletedLeaveIds.map((id) => parseInt(id, 10));
+        if (ids.some((id) => !Number.isInteger(id))) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({ message: "Invalid leave id" });
+        }
+        await collectEmployeeIds(ids);
+        await client.query(
+          "DELETE FROM jellypolly.leave_records WHERE id = ANY($1::int[])",
+          [ids]
+        );
+      }
+
+      if (Array.isArray(leaveEntries) && leaveEntries.length > 0) {
+        for (const leave of leaveEntries) {
+          const employeeId = String(leave.employee_id || leave.employeeId || "");
+          const leaveType = leave.leave_type || leave.leaveType;
+          const leaveAmount = parseLeaveAmount(leave.amount_paid);
+
+          if (!employeeId || !VALID_LEAVE_TYPES.has(leaveType)) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+              message: `Invalid leave entry for ${employeeId || "unknown employee"}`,
+            });
+          }
+          if (leaveAmount === null) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+              message: `Leave amount for ${employeeId} must be a non-negative number`,
+            });
+          }
+
+          const isPlasticStaff = await assertPlasticStaff(client, employeeId);
+          if (!isPlasticStaff) {
+            await client.query("ROLLBACK");
+            return res
+              .status(400)
+              .json({ message: `${employeeId} is not assigned to JP Plastic` });
+          }
+
+          // One leave record per person per day: the ledger is shared with the
+          // other JP entry pages, so skip anyone already recorded that day.
+          const existingLeave = await client.query(
+            `SELECT id FROM jellypolly.leave_records
+             WHERE employee_id = $1 AND leave_date = $2`,
+            [employeeId, date]
+          );
+          if (existingLeave.rows.length > 0) continue;
+
+          await client.query(
+            `INSERT INTO jellypolly.leave_records (
+              employee_id, leave_date, leave_type, work_log_id, days_taken,
+              amount_paid, status, created_by
+            ) VALUES ($1, $2, $3, NULL, 1.0, $4, 'approved', $5)`,
+            [employeeId, date, leaveType, leaveAmount, created_by || null]
+          );
+          affectedEmployeeIds.add(employeeId);
+        }
+      }
+
+      if (Array.isArray(updatedLeaveEntries) && updatedLeaveEntries.length > 0) {
+        for (const leave of updatedLeaveEntries) {
+          const leaveId = parseInt(leave.id, 10);
+          const leaveAmount = parseLeaveAmount(leave.amount_paid);
+
+          if (!Number.isInteger(leaveId) || leaveAmount === null) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+              message: "Leave amount must be a non-negative number",
+            });
+          }
+
+          await collectEmployeeIds([leaveId]);
+          await client.query(
+            `UPDATE jellypolly.leave_records
+             SET amount_paid = $1, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $2`,
+            [leaveAmount, leaveId]
+          );
+        }
+      }
+
+      await client.query("COMMIT");
+
+      if (affectedEmployeeIds.size > 0) {
+        const { year, month } = yearMonthOf(date);
+        await reprocessJPEmployeesSafe(pool, {
+          year,
+          month,
+          employeeIds: Array.from(affectedEmployeeIds),
+        });
+      }
+
+      res.json({ message: "Plastic leave saved" });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error saving JP daily plastic leave:", error);
+      res.status(500).json({
+        message: "Error saving leave records",
         error: error.message,
       });
     } finally {

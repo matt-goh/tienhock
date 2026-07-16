@@ -884,8 +884,13 @@ const InvoiceListPage: React.FC = () => {
   const [invoices, setInvoices] = useState<InvoiceGT[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  // `searchInput` is what the user is typing; `appliedSearch` is what the
+  // backend is filtering on, committed on blur or Enter.
+  const [searchInput, setSearchInput] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const [invoiceToCancel, setInvoiceToCancel] = useState<InvoiceGT | null>(
     null
@@ -986,6 +991,10 @@ const InvoiceListPage: React.FC = () => {
     try {
       const params = new URLSearchParams();
 
+      // Pagination
+      params.append("page", currentPage.toString());
+      params.append("limit", ITEMS_PER_PAGE.toString());
+
       // Add date filters
       if (dateRange.start) {
         params.append("start_date", formatDateForAPI(dateRange.start));
@@ -1006,10 +1015,26 @@ const InvoiceListPage: React.FC = () => {
       } else if (filters.consolidation === "individual") {
         params.append("exclude_consolidated", "true");
       }
+      if (appliedSearch) {
+        params.append("search", appliedSearch);
+      }
 
-      const queryString = params.toString() ? `?${params.toString()}` : "";
-      const data = await api.get(`/greentarget/api/invoices${queryString}`);
-      setInvoices(data);
+      const response = await api.get(
+        `/greentarget/api/invoices?${params.toString()}`
+      );
+
+      // Deleting the last row of the last page can leave us past the end.
+      if (currentPage > response.pagination.totalPages) {
+        setCurrentPage(response.pagination.totalPages);
+        return;
+      }
+
+      setInvoices(response.data);
+      setTotalItems(response.pagination.total);
+      setTotalPages(response.pagination.totalPages);
+      // Selection can't span pages once each page is a separate fetch, so the
+      // running total below stays honest.
+      setSelectedInvoiceIds(new Set());
       setError(null);
     } catch (err) {
       setError("Failed to fetch invoices. Please try again later.");
@@ -1017,7 +1042,7 @@ const InvoiceListPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters, dateRange]);
+  }, [filters, dateRange, currentPage, appliedSearch]);
 
   const fetchCustomers = async () => {
     try {
@@ -1105,15 +1130,32 @@ const InvoiceListPage: React.FC = () => {
     }
   }, [searchParams, initialParamsApplied, customerOptions, filters]); // Add dependencies
 
-  // Effect 3: Fetch invoices when filters, dateRange change, OR after initial params are applied
+  // Effect 3: Fetch invoices when the page, filters, date range or search change,
+  // OR after initial params are applied. Each of those setters resets the page
+  // itself, so this never fires twice for one change.
   useEffect(() => {
     // Only run fetch if initial parameter processing is complete
     if (initialParamsApplied) {
       fetchInvoices();
-      // Reset to page 1 when filters or date range change
-      setCurrentPage(1);
     }
-  }, [filters, dateRange, initialParamsApplied, fetchInvoices]); // Add fetchInvoices
+  }, [initialParamsApplied, fetchInvoices]);
+
+  // Filter changes restart at page 1; batched with the filter update so the
+  // fetch effect only runs once.
+  const updateFilters = useCallback(
+    (updater: (prev: InvoiceFilters) => InvoiceFilters): void => {
+      setFilters(updater);
+      setCurrentPage(1);
+    },
+    []
+  );
+
+  // Commit the typed search to the backend. Called on blur and on Enter.
+  const commitSearch = (): void => {
+    if (searchInput.trim() === appliedSearch) return;
+    setAppliedSearch(searchInput.trim());
+    setCurrentPage(1);
+  };
 
   // Effect 4: Calculate active filter count (remains the same)
   useEffect(() => {
@@ -1199,17 +1241,8 @@ const InvoiceListPage: React.FC = () => {
         await api.delete(url);
         toast.success("Invoice deleted successfully");
 
-        // Remove the invoice from the list
-        setInvoices(
-          invoices.filter((i) => i.invoice_id !== invoiceToDelete.invoice_id)
-        );
-
-        // Remove from selected invoices if it was selected
-        setSelectedInvoiceIds((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(invoiceToDelete.invoice_id.toString());
-          return newSet;
-        });
+        // Refetch so the page, total and pagination stay in sync with the server
+        fetchInvoices();
       } catch (error: any) {
         const errorData = error?.response?.data;
 
@@ -1721,55 +1754,11 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
-  const filteredInvoices = useMemo(() => {
-    return invoices.filter((invoice) => {
-      const searchTermLower = searchTerm.toLowerCase();
-
-      return (
-        // Search invoice number
-        invoice.invoice_number.toLowerCase().includes(searchTermLower) ||
-        // Search customer name
-        invoice.customer_name.toLowerCase().includes(searchTermLower) ||
-        // Search driver name
-        invoice.driver?.toLowerCase().includes(searchTermLower) ||
-        false ||
-        // Search phone numbers
-        invoice.customer_phone_number
-          ?.toLowerCase()
-          .includes(searchTermLower) ||
-        false ||
-        invoice.location_phone_number
-          ?.toLowerCase()
-          .includes(searchTermLower) ||
-        false ||
-        // Search location address
-        invoice.location_address?.toLowerCase().includes(searchTermLower) ||
-        false ||
-        // Search rental ID
-        invoice.rental_id?.toString().includes(searchTermLower) ||
-        false ||
-        // Search dumpster ID
-        invoice.tong_no?.toLowerCase().includes(searchTermLower) ||
-        false
-      );
-    });
-  }, [invoices, searchTerm]);
-
   const clearFilters = () => {
     setFilters(DEFAULT_FILTERS);
     setCustomerQuery("");
-  };
-
-  const totalPages = Math.ceil(filteredInvoices.length / ITEMS_PER_PAGE);
-
-  const paginatedInvoices = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredInvoices.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredInvoices, currentPage]);
-
-  useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  };
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -1868,14 +1857,6 @@ const InvoiceListPage: React.FC = () => {
     return buttons;
   };
 
-  if (loading) {
-    return (
-      <div className="mt-40 w-full flex items-center justify-center">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-
   if (error) {
     return <div>Error: {error}</div>;
   }
@@ -1888,7 +1869,7 @@ const InvoiceListPage: React.FC = () => {
         <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4">
           {/* Title */}
           <h1 className="text-2xl text-default-700 dark:text-gray-200 font-bold whitespace-nowrap">
-            Invoices ({filteredInvoices.length})
+            Invoices ({totalItems})
           </h1>
 
           {/* Filters and Actions */}
@@ -2006,8 +1987,14 @@ const InvoiceListPage: React.FC = () => {
                 type="text"
                 placeholder="Search"
                 className="w-full pl-10 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 focus:border-default-500 dark:focus:border-gray-500 rounded-lg h-[40px]"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onBlur={commitSearch}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.currentTarget.blur();
+                  }
+                }}
               />
             </div>
           </div>
@@ -2154,7 +2141,11 @@ const InvoiceListPage: React.FC = () => {
         </div>
       </div>
 
-      {filteredInvoices.length === 0 ? (
+      {loading ? (
+          <div className="mt-40 w-full flex items-center justify-center">
+            <LoadingSpinner />
+          </div>
+        ) : invoices.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4 bg-slate-50 dark:bg-gray-800/50 rounded-xl border border-dashed border-default-200 dark:border-gray-700">
             <IconFileInvoice
               size={64}
@@ -2165,14 +2156,14 @@ const InvoiceListPage: React.FC = () => {
               No invoices found
             </h3>
             <p className="text-default-500 dark:text-gray-400 text-center max-w-md mb-6">
-              {searchTerm
+              {appliedSearch
                 ? "Your search didn't match any invoices. Try adjusting your search terms or filters."
                 : "You haven't created any invoices yet."}
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
-            {paginatedInvoices.map((invoice) => (
+            {invoices.map((invoice) => (
               <InvoiceCard
                 key={invoice.invoice_id}
                 invoice={invoice}
@@ -2192,7 +2183,7 @@ const InvoiceListPage: React.FC = () => {
           </div>
         )}
 
-      {filteredInvoices.length > 0 && (
+      {!loading && invoices.length > 0 && (
         <div className="mt-6 flex justify-between items-center text-default-700 dark:text-gray-200">
           <button
             className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 active:bg-default-200"
@@ -2258,7 +2249,7 @@ const InvoiceListPage: React.FC = () => {
                       const newCustomerId = Array.isArray(value)
                         ? value[0] || null
                         : value || null;
-                      setFilters((prev) => ({
+                      updateFilters((prev) => ({
                         ...prev,
                         customer_id: newCustomerId,
                       }));
@@ -2298,7 +2289,7 @@ const InvoiceListPage: React.FC = () => {
                                 filters.status?.includes(status) || false
                               }
                               onChange={(e) => {
-                                setFilters((prev) => ({
+                                updateFilters((prev) => ({
                                   ...prev,
                                   status: e.target.checked
                                     ? [...(prev.status || []), status]
@@ -2341,7 +2332,7 @@ const InvoiceListPage: React.FC = () => {
                           className="sr-only"
                           checked={filters.consolidation === "all"}
                           onChange={() =>
-                            setFilters((prev) => ({
+                            updateFilters((prev) => ({
                               ...prev,
                               consolidation: "all",
                             }))
@@ -2369,7 +2360,7 @@ const InvoiceListPage: React.FC = () => {
                           className="sr-only"
                           checked={filters.consolidation === "individual"}
                           onChange={() =>
-                            setFilters((prev) => ({
+                            updateFilters((prev) => ({
                               ...prev,
                               consolidation: "individual",
                             }))
@@ -2397,7 +2388,7 @@ const InvoiceListPage: React.FC = () => {
                           className="sr-only"
                           checked={filters.consolidation === "consolidated"}
                           onChange={() =>
-                            setFilters((prev) => ({
+                            updateFilters((prev) => ({
                               ...prev,
                               consolidation: "consolidated",
                             }))

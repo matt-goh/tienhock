@@ -13,6 +13,8 @@ import Checkbox from "../Checkbox";
 import PayRateScheduleManager from "./PayRateScheduleManager";
 
 interface PayCodeModalProps {
+  // API base for the rate-timeline endpoints (JP passes /jellypolly/api)
+  apiBase?: string;
   isOpen: boolean;
   onClose: () => void;
   onSave: (payCode: PayCode) => Promise<void>; // Parameter is the full PayCode (without code)
@@ -86,6 +88,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
   onSave,
   initialData = null,
   existingPayCodes,
+  apiBase = "/api",
 }) => {
   // State type should match the structure without 'code'
   const [formData, setFormData] = useState<PayCodeFormData>(defaultPayCode);
@@ -537,6 +540,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                   {/* Effective-dated rate changes (existing pay codes only) */}
                   {isEditMode && formData.id && (
                     <PayRateScheduleManager
+                      apiBase={apiBase}
                       scope="pay_code"
                       payCodeId={formData.id}
                       baseRates={{

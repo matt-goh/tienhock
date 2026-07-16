@@ -28,6 +28,7 @@ import {
   generatePinjamReportPDF,
   generatePinjamBreakdownPDF,
   PinjamReportPDFData,
+  PinjamDetail,
   aggregatePinjamContributorsByType,
 } from "../../utils/payroll/PinjamReportPDF";
 import {
@@ -92,6 +93,19 @@ interface SalaryReportData {
   final_total: number;
   net_pay: number;
   mid_month_amount: number;
+}
+
+type PinjamViewMode = "month_end" | "mid_month";
+
+interface PinjamSummaryBucket {
+  total_amount?: number | string;
+  detail_rows?: PinjamDetail[];
+}
+
+interface PinjamSummaryEntry {
+  employee_id?: string;
+  employee_name?: string;
+  mid_month?: PinjamSummaryBucket;
 }
 
 // Individual employee salary data for Employee tab
@@ -168,6 +182,11 @@ interface SalaryReportResponse {
 const isBankPaymentPreference = (
   paymentPreference: string | null | undefined
 ): boolean => (paymentPreference ?? "").trim().toLowerCase() === "bank";
+
+const getPinjamStaffKey = (
+  staffName: string | null | undefined,
+  staffId: string | null | undefined
+): string => (staffName || staffId || "").trim().toUpperCase();
 
 // Comprehensive salary data for location-based reporting
 interface LocationSalaryData {
@@ -301,6 +320,9 @@ const SalaryReportPage: React.FC = () => {
   const [expandedPinjamTypes, setExpandedPinjamTypes] = useState<Set<string>>(
     new Set()
   );
+  const [pinjamViewMode, setPinjamViewMode] =
+    useState<PinjamViewMode>("month_end");
+  const [pinjamSummary, setPinjamSummary] = useState<PinjamSummaryEntry[]>([]);
   const [columnGuideLanguage, setColumnGuideLanguage] =
     useState<ColumnGuideLanguage>("bm");
   const [isPrintDropdownOpen, setIsPrintDropdownOpen] = useState<boolean>(false);
@@ -520,6 +542,98 @@ const SalaryReportPage: React.FC = () => {
     });
   }, [reportData]);
 
+  const midMonthPinjamData = useMemo<SalaryReportData[]>(() => {
+    if (!reportData) return [];
+
+    const pinjamByStaff = new Map<
+      string,
+      { totalAmount: number; details: PinjamDetail[] }
+    >();
+
+    pinjamSummary.forEach((entry: PinjamSummaryEntry): void => {
+      const key: string = getPinjamStaffKey(
+        entry.employee_name,
+        entry.employee_id
+      );
+      if (!key) return;
+
+      const bucket: PinjamSummaryBucket | undefined = entry.mid_month;
+      const details: PinjamDetail[] = Array.isArray(bucket?.detail_rows)
+        ? bucket.detail_rows.map(
+            (detail: PinjamDetail): PinjamDetail => ({
+              description:
+                String(detail.description || "Pinjam").trim() || "Pinjam",
+              amount: Number(detail.amount) || 0,
+            })
+          )
+        : [];
+      const existing = pinjamByStaff.get(key) ?? {
+        totalAmount: 0,
+        details: [],
+      };
+      existing.totalAmount += Number(bucket?.total_amount ?? 0);
+      existing.details.push(...details);
+      pinjamByStaff.set(key, existing);
+    });
+
+    return reportData.data
+      .map((row: SalaryReportData): SalaryReportData => {
+        const key: string = getPinjamStaffKey(row.staff_name, row.staff_id);
+        const pinjam = pinjamByStaff.get(key);
+        const midMonthAmount: number = Number(row.mid_month_amount) || 0;
+        const totalPinjam: number = pinjam?.totalAmount ?? 0;
+        const details: PinjamDetail[] = [...(pinjam?.details ?? [])].sort(
+          (a: PinjamDetail, b: PinjamDetail): number => b.amount - a.amount
+        );
+
+        return {
+          ...row,
+          gaji_genap: midMonthAmount,
+          total_pinjam: totalPinjam,
+          pinjam_details: details,
+          final_total: midMonthAmount - totalPinjam,
+          net_pay: midMonthAmount,
+          mid_month_amount: midMonthAmount,
+        };
+      })
+      .filter(
+        (row: SalaryReportData): boolean =>
+          row.gaji_genap !== 0 ||
+          row.total_pinjam !== 0 ||
+          (row.pinjam_details?.length ?? 0) > 0
+      )
+      .map(
+        (row: SalaryReportData, index: number): SalaryReportData => ({
+          ...row,
+          no: index + 1,
+        })
+      );
+  }, [pinjamSummary, reportData]);
+
+  const activePinjamData: SalaryReportData[] =
+    pinjamViewMode === "mid_month"
+      ? midMonthPinjamData
+      : reportData?.data ?? [];
+  const activePinjamSummary: SalaryReportResponse["summary"] = useMemo(
+    () =>
+      activePinjamData.reduce(
+        (
+          totals: SalaryReportResponse["summary"],
+          row: SalaryReportData
+        ): SalaryReportResponse["summary"] => ({
+          total_gaji_genap: totals.total_gaji_genap + row.gaji_genap,
+          total_pinjam: totals.total_pinjam + row.total_pinjam,
+          total_final: totals.total_final + row.final_total,
+        }),
+        { total_gaji_genap: 0, total_pinjam: 0, total_final: 0 }
+      ),
+    [activePinjamData]
+  );
+  const activePinjamGajiLabel: string =
+    pinjamViewMode === "mid_month" ? "1/2 Bulan" : "Gaji/Genap";
+  const activePinjamReportLabel: string =
+    pinjamViewMode === "mid_month" ? "Mid-Month Pinjam" : "Pinjam";
+
   // Generate year and month options
   const yearOptions = useMemo(() => {
     const years = [];
@@ -619,15 +733,29 @@ const SalaryReportPage: React.FC = () => {
   const fetchSalaryReport = async () => {
     setIsLoading(true);
     try {
-      const response = await api.get(
-        `/api/salary-report?year=${currentYear}&month=${currentMonth}`
-      );
+      const [response, pinjamResponse] = await Promise.all([
+        api.get(
+          `/api/salary-report?year=${currentYear}&month=${currentMonth}`
+        ),
+        api.get(
+          `/api/pinjam-records/summary?year=${currentYear}&month=${currentMonth}`
+        ).catch((error: unknown): PinjamSummaryEntry[] => {
+          console.error("Error fetching pinjam summary:", error);
+          return [];
+        }),
+      ]);
       setReportData(response);
       setComprehensiveSalaryData(response.comprehensive);
+      setPinjamSummary(
+        Array.isArray(pinjamResponse)
+          ? (pinjamResponse as PinjamSummaryEntry[])
+          : []
+      );
     } catch (error) {
       console.error("Error fetching salary report:", error);
       setReportData(null);
       setComprehensiveSalaryData(null);
+      setPinjamSummary([]);
     } finally {
       setIsLoading(false);
     }
@@ -731,15 +859,36 @@ const SalaryReportPage: React.FC = () => {
     bankPinjamTabsUseMonthlyData ? reportData : activeReportData;
   const displayedLoading: boolean =
     bankPinjamTabsUseMonthlyData ? isLoading : activeLoading;
-  const displayedHeaderTotal: number = bankPinjamTabsUseMonthlyData
-    ? displayedReportData?.summary.total_final ?? 0
-    : displayedReportData?.employees_grand_totals?.setelah_digenapkan ?? 0;
-  const displayedGajiGenapTotal: number = bankPinjamTabsUseMonthlyData
-    ? displayedReportData?.summary.total_gaji_genap ?? 0
-    : displayedReportData?.employees_grand_totals?.setelah_digenapkan ?? 0;
-  const displayedFinalTotal: number = bankPinjamTabsUseMonthlyData
-    ? displayedReportData?.summary.total_final ?? 0
-    : displayedReportData?.employees_grand_totals?.setelah_digenapkan ?? 0;
+  const displayedRecordCount: number =
+    activeTab === 3
+      ? activePinjamData.length
+      : displayedReportData?.total_records ?? 0;
+  const displayedHeaderTotal: number =
+    activeTab === 3
+      ? activePinjamSummary.total_final
+      : bankPinjamTabsUseMonthlyData
+        ? displayedReportData?.summary.total_final ?? 0
+        : displayedReportData?.employees_grand_totals?.setelah_digenapkan ?? 0;
+  const displayedGajiGenapTotal: number =
+    activeTab === 3
+      ? activePinjamSummary.total_gaji_genap
+      : bankPinjamTabsUseMonthlyData
+        ? displayedReportData?.summary.total_gaji_genap ?? 0
+        : displayedReportData?.employees_grand_totals?.setelah_digenapkan ?? 0;
+  const displayedPinjamTotal: number =
+    activeTab === 3
+      ? activePinjamSummary.total_pinjam
+      : displayedReportData?.summary.total_pinjam ?? 0;
+  const displayedFinalTotal: number =
+    activeTab === 3
+      ? activePinjamSummary.total_final
+      : bankPinjamTabsUseMonthlyData
+        ? displayedReportData?.summary.total_final ?? 0
+        : displayedReportData?.employees_grand_totals?.setelah_digenapkan ?? 0;
+  const hasDisplayedRows: boolean =
+    activeTab === 3
+      ? activePinjamData.length > 0
+      : (displayedReportData?.data.length ?? 0) > 0;
   // Whether the Print/Download PDF buttons should be enabled. The Annual tab (5)
   // uses its own annualData; Cuti (4) has no PDF; the rest use displayedReportData.
   const pdfHasData: boolean =
@@ -747,7 +896,7 @@ const SalaryReportPage: React.FC = () => {
       ? annualViewMode === 'breakdown'
         ? !!annualBreakdownData && annualBreakdownData.locations.length > 0
         : !!annualData && annualData.monthly.length > 0
-      : !!displayedReportData && displayedReportData.data.length > 0;
+      : hasDisplayedRows;
   const pdfDisabled: boolean = activeTab === 4 || !pdfHasData || isGeneratingPDF;
   // The yearly views (Annual, and the Yearly period on Employee/Location) are briefly
   // saved on the server to load faster, so they can be a couple of minutes behind.
@@ -844,7 +993,7 @@ const SalaryReportPage: React.FC = () => {
 
   // Generate the separate Pinjam Breakdown PDF (Pinjam by Type + contributors)
   const generateBreakdownPDF = async (action: "download" | "print") => {
-    if (!reportData || reportData.data.length === 0) {
+    if (!reportData || activePinjamData.length === 0) {
       toast.error("No data available to generate PDF");
       return;
     }
@@ -853,14 +1002,18 @@ const SalaryReportPage: React.FC = () => {
       const pdfData: PinjamReportPDFData = {
         year: reportData.year,
         month: reportData.month,
-        data: reportData.data,
-        total_records: reportData.total_records,
-        summary: reportData.summary,
+        data: activePinjamData,
+        total_records: activePinjamData.length,
+        summary: activePinjamSummary,
+        reportLabel: activePinjamReportLabel,
+        gajiLabel: activePinjamGajiLabel,
       };
       await generatePinjamBreakdownPDF(pdfData, action);
       const actionText =
         action === "download" ? "downloaded" : "generated for printing";
-      toast.success(`Pinjam breakdown ${actionText} successfully`);
+      toast.success(
+        `${activePinjamReportLabel} breakdown ${actionText} successfully`
+      );
     } catch (error) {
       console.error("Error generating PDF:", error);
       toast.error("Failed to generate PDF");
@@ -873,7 +1026,7 @@ const SalaryReportPage: React.FC = () => {
   // Used in both the wide and narrow toolbars to avoid duplicating the markup.
   const renderBreakdownButton = () => {
     const disabled =
-      !reportData || reportData.data.length === 0 || isGeneratingPDF;
+      !reportData || activePinjamData.length === 0 || isGeneratingPDF;
     return (
       <div
         className="relative"
@@ -1046,18 +1199,26 @@ const SalaryReportPage: React.FC = () => {
       } else {
         // Generate Pinjam (Salary) Report PDF
         if (!reportData) return; // Guard for TypeScript
+        if (activePinjamData.length === 0) {
+          toast.error("No data available to generate PDF");
+          return;
+        }
         const pdfData: PinjamReportPDFData = {
           year: reportData.year,
           month: reportData.month,
-          data: reportData.data,
-          total_records: reportData.total_records,
-          summary: reportData.summary,
+          data: activePinjamData,
+          total_records: activePinjamData.length,
+          summary: activePinjamSummary,
+          reportLabel: activePinjamReportLabel,
+          gajiLabel: activePinjamGajiLabel,
         };
 
         await generatePinjamReportPDF(pdfData, action);
         const actionText =
           action === "download" ? "downloaded" : "generated for printing";
-        toast.success(`Pinjam report ${actionText} successfully`);
+        toast.success(
+          `${activePinjamReportLabel} report ${actionText} successfully`
+        );
       }
     } catch (error) {
       console.error("Error generating PDF:", error);
@@ -2954,8 +3115,11 @@ const SalaryReportPage: React.FC = () => {
             <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider max-w-[150px] truncate" title="Staff ID and Name">
               STAFF/ID
             </th>
-            <th className="px-2 py-2 text-right text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider max-w-[120px] truncate" title="Gaji Digenapkan">
-              GAJI/GENAP
+            <th
+              className="px-2 py-2 text-right text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider max-w-[120px] truncate"
+              title={activePinjamGajiLabel}
+            >
+              {activePinjamGajiLabel.toUpperCase()}
             </th>
             <th className="px-2 py-2 text-right text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider max-w-[120px] truncate" title="Total Pinjam">
               TOTAL PINJAM
@@ -2969,7 +3133,7 @@ const SalaryReportPage: React.FC = () => {
           </tr>
         </thead>
         <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-          {reportData?.data.map((item, index) => (
+          {activePinjamData.map((item: SalaryReportData, index: number) => (
             <tr key={item.staff_id} className={index % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-default-25 dark:bg-gray-750"}>
               <td className="px-2 py-1 text-sm text-default-900 dark:text-gray-100">
                 {item.no}
@@ -3026,7 +3190,7 @@ const SalaryReportPage: React.FC = () => {
   // Pinjam Breakdown - grand total per pinjam type, each expandable to reveal
   // the staff who contributed to that type and their amounts.
   const PinjamBreakdown = () => {
-    const byType = aggregatePinjamContributorsByType(reportData?.data ?? []);
+    const byType = aggregatePinjamContributorsByType(activePinjamData);
     if (byType.length === 0) return null;
 
     const togglePinjamType = (key: string) => {
@@ -3118,7 +3282,7 @@ const SalaryReportPage: React.FC = () => {
             Total Pinjam
           </span>
           <span className="whitespace-nowrap text-base font-bold tabular-nums text-default-900 dark:text-gray-50">
-            {formatCurrency(reportData?.summary.total_pinjam ?? 0)}
+            {formatCurrency(activePinjamSummary.total_pinjam)}
           </span>
         </div>
       </div>
@@ -3767,6 +3931,42 @@ const SalaryReportPage: React.FC = () => {
     return label;
   };
 
+  const renderPinjamViewToggle = (
+    compact: boolean = false
+  ): React.ReactNode => (
+    <>
+      <span
+        className={`${compact ? "hidden sm:inline " : ""}text-default-300 dark:text-gray-600`}
+      >
+        |
+      </span>
+      <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setPinjamViewMode("month_end")}
+          className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+            pinjamViewMode === "month_end"
+              ? "bg-sky-500 text-white"
+              : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+          }`}
+        >
+          Month-End
+        </button>
+        <button
+          type="button"
+          onClick={() => setPinjamViewMode("mid_month")}
+          className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-default-200 dark:border-gray-600 ${
+            pinjamViewMode === "mid_month"
+              ? "bg-sky-500 text-white"
+              : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+          }`}
+        >
+          Mid-Month
+        </button>
+      </div>
+    </>
+  );
+
   return (
     <div className="space-y-3">
       {/* Salary Report Table */}
@@ -3819,6 +4019,7 @@ const SalaryReportPage: React.FC = () => {
                   </div>
                 </>
               )}
+              {activeTab === 3 && renderPinjamViewToggle()}
               {/* Sub-view toggle for Annual tab */}
               {activeTab === 5 && (
                 <>
@@ -3889,7 +4090,7 @@ const SalaryReportPage: React.FC = () => {
                   <span className="text-default-300 dark:text-gray-600">|</span>
                   <div className="text-sm text-default-600 dark:text-gray-300">
                     <span className="block font-medium">
-                      {displayedReportData.total_records} employees
+                      {displayedRecordCount} employees
                     </span>
                     <span className="block font-medium">
                       {formatCurrency(displayedHeaderTotal)}
@@ -4071,6 +4272,7 @@ const SalaryReportPage: React.FC = () => {
                     </div>
                   </>
                 )}
+                {activeTab === 3 && renderPinjamViewToggle(true)}
                 {/* Sub-view toggle for Annual tab */}
                 {activeTab === 5 && (
                   <>
@@ -4232,7 +4434,7 @@ const SalaryReportPage: React.FC = () => {
                   <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
                   <div className="text-sm text-default-600 dark:text-gray-300">
                     <span className="block font-medium">
-                      {displayedReportData.total_records} employees
+                      {displayedRecordCount} employees
                     </span>
                     <span className="block font-medium">
                       {formatCurrency(displayedHeaderTotal)}
@@ -4279,12 +4481,16 @@ const SalaryReportPage: React.FC = () => {
           <div className="flex justify-center py-12">
             <LoadingSpinner />
           </div>
-        ) : !displayedReportData || displayedReportData.data.length === 0 ? (
+        ) : !displayedReportData || !hasDisplayedRows ? (
           <div className="text-center py-12 text-default-500 dark:text-gray-400">
             <IconFileText className="mx-auto h-12 w-12 text-default-300 mb-4" />
-            <p className="text-lg font-medium">No salary data found</p>
+            <p className="text-lg font-medium">
+              {activeTab === 3 && pinjamViewMode === "mid_month"
+                ? "No mid-month data found"
+                : "No salary data found"}
+            </p>
             <p>
-              No salary data available for {periodType === 'yearly' ? currentYear : `${getMonthName(currentMonth)} ${currentYear}`}
+              No {activeTab === 3 && pinjamViewMode === "mid_month" ? "mid-month" : "salary"} data available for {periodType === 'yearly' ? currentYear : `${getMonthName(currentMonth)} ${currentYear}`}
             </p>
           </div>
         ) : (
@@ -4311,7 +4517,7 @@ const SalaryReportPage: React.FC = () => {
                 <div className="flex items-center gap-2 text-sm text-default-600 dark:text-gray-300">
                   <span>
                     <span className="font-medium">Total Records:</span>{" "}
-                    {displayedReportData.total_records}
+                    {displayedRecordCount}
                   </span>
                   <span aria-hidden="true">|</span>
                   <button
@@ -4325,7 +4531,9 @@ const SalaryReportPage: React.FC = () => {
                 </div>
                 <div className="flex flex-col md:flex-row space-y-1 md:space-y-0 md:space-x-6 text-sm">
                   <div className="text-default-700 dark:text-gray-200">
-                    <span className="font-medium">Total Gaji/Genap:</span>{" "}
+                    <span className="font-medium">
+                      Total {activeTab === 3 ? activePinjamGajiLabel : "Gaji/Genap"}:
+                    </span>{" "}
                     <span className="text-default-900 dark:text-gray-100">
                       {formatCurrency(displayedGajiGenapTotal)}
                     </span>
@@ -4333,7 +4541,7 @@ const SalaryReportPage: React.FC = () => {
                   <div className="text-default-700 dark:text-gray-200">
                     <span className="font-medium">Total Pinjam:</span>{" "}
                     <span className="text-default-900 dark:text-gray-100">
-                      {formatCurrency(displayedReportData.summary.total_pinjam)}
+                      {formatCurrency(displayedPinjamTotal)}
                     </span>
                   </div>
                   <div className="text-sky-700 dark:text-sky-400">

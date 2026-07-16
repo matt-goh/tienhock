@@ -10,6 +10,7 @@ import backupRouter from "./admin/backup.js";
 
 // User routes
 import bookmarksRouter from "./user/bookmarks.js";
+import accountCodeFavouritesRouter from "./user/account-code-favourites.js";
 
 // Catalogue routes
 import customerValidationRouter from "./catalogue/customer-validation.js";
@@ -203,6 +204,10 @@ export default function setupRoutes(app, pool) {
 
   // User routes
   app.use("/api/bookmarks", bookmarksRouter(pool));
+  app.use(
+    "/api/account-code-favourites",
+    accountCodeFavouritesRouter(pool)
+  );
 
   // Accounting routes
   app.use("/api/debtors", debtorsRouter(pool));

@@ -70,7 +70,7 @@ This is a comprehensive ERP system supporting three companies:
 - Maintenance mode support for database operations
 - Environment variables for database configuration
 
-#### Database Schema (86 tables)
+#### Database Schema (87 tables)
 
 **Accounting & Finance:**
 
@@ -142,6 +142,7 @@ This is a comprehensive ERP system supporting three companies:
 - `staffs` - id (no whitespace allowed), name, telephone_no, email, gender, nationality, birthdate, address, job, location, date_joined, ic_no, bank_account_number, epf_no, income_tax_no, socso_no, document, payment_type, payment_preference, race, agama, date_resigned, password, updated_at, marital_status, spouse_employment_status, number_of_children, kwsp_number, department, head_staff_id (references staffs.id - for same-name staff, indicates who is the "Head" for location determination in salary reports), epf_age_override, epf_nationality_override, socso_age_override, sip_age_override (per-staff statutory contribution overrides; NULL = auto from birthdate/nationality. age overrides: 'under_60'|'over_60'|'none' where 'none' = not eligible; epf_nationality_override: 'local'|'foreign'. Honoured by payroll EPF/SOCSO/SIP calculation)
 - `active_sessions` - session_id, staff_id, last_active, created_at, status
 - `bookmarks` - id, staff_id, name
+- `account_code_favourites` - id, staff_id (FK staffs), account_code (FK account_codes), created_at (unique: staff_id, account_code). Per-user Chart of Accounts favourites; rows are removed automatically when the staff or account code is deleted
 
 **Jobs & Work:**
 
