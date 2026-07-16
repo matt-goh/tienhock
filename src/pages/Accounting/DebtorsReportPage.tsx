@@ -29,6 +29,9 @@ import {
   TIENHOCK_INFO,
 } from "../../utils/invoice/einvoice/companyInfo";
 import toast from "react-hot-toast";
+import { AdjustmentDocTypeBadge } from "../../components/AdjustmentDocs/AdjustmentDocBadge";
+import type { AdjustmentDocType } from "../../types/types";
+import { formatAdjustmentDocDisplayId } from "../../utils/adjustments/formatDocId";
 
 interface Payment {
   payment_id: number;
@@ -38,12 +41,23 @@ interface Payment {
   amount: number;
 }
 
+interface DebtorAdjustmentDocument {
+  id: string;
+  display_id: string | null;
+  type: AdjustmentDocType;
+  date: string;
+  debit_amount: number;
+  credit_amount: number;
+  reason: string | null;
+}
+
 interface Invoice {
   invoice_id: string;
   invoice_number: string;
   date: string;
   amount: number;
   payments: Payment[];
+  adjustmentDocs?: DebtorAdjustmentDocument[];
   balance: number;
 }
 
@@ -94,6 +108,7 @@ export interface DebtorsReportPageConfig {
   customerDetailsPath: (customerId: string) => string;
   customerInvoicesPath: (customerId: string) => string;
   invoiceDetailsPath: (invoiceId: string) => string;
+  adjustmentDocDetailsPath?: (adjustmentDocId: string) => string;
   companyName: string;
   statementCompanyInfo?: CompanyInfo;
   statementCompanyName?: string;
@@ -116,6 +131,8 @@ const DEFAULT_DEBTORS_REPORT_CONFIG: DebtorsReportPageConfig = {
     `/sales/invoice?customerId=${customerId}`,
   invoiceDetailsPath: (invoiceId: string): string =>
     `/sales/invoice/${invoiceId}`,
+  adjustmentDocDetailsPath: (adjustmentDocId: string): string =>
+    `/sales/adjustment-docs/${adjustmentDocId}`,
   companyName: TIENHOCK_INFO.name,
   statementCompanyInfo: TIENHOCK_INFO,
   statementCompanyName: "TIEN HOCK FOOD INDUSTRIES SDN BHD (953309-T)",
@@ -129,6 +146,45 @@ const appendMonthYearParams = (
 ): string => {
   const separator = endpoint.includes("?") ? "&" : "?";
   return `${endpoint}${separator}month=${month}&year=${year}`;
+};
+
+// Keyed by the endpoint so each company's report keeps its own last-viewed month.
+const selectedMonthStorageKey = (debtorsEndpoint: string): string =>
+  `debtorsReport.selectedMonth:${debtorsEndpoint}`;
+
+const readStoredSelectedMonth = (debtorsEndpoint: string): Date | null => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const stored: string | null = window.localStorage.getItem(
+      selectedMonthStorageKey(debtorsEndpoint)
+    );
+    const match: RegExpExecArray | null = stored
+      ? /^(\d{4})-(\d{2})$/.exec(stored)
+      : null;
+    if (!match) return null;
+
+    const yearValue: number = Number.parseInt(match[1], 10);
+    const monthIndex: number = Number.parseInt(match[2], 10) - 1;
+    if (monthIndex < 0 || monthIndex > 11) return null;
+
+    return new Date(yearValue, monthIndex, 1);
+  } catch (_error: unknown) {
+    return null;
+  }
+};
+
+const storeSelectedMonth = (debtorsEndpoint: string, date: Date): void => {
+  if (typeof window === "undefined") return;
+
+  try {
+    const value = `${date.getFullYear()}-${String(
+      date.getMonth() + 1
+    ).padStart(2, "0")}`;
+    window.localStorage.setItem(selectedMonthStorageKey(debtorsEndpoint), value);
+  } catch (_error: unknown) {
+    // Month preservation is best-effort when browser storage is unavailable.
+  }
 };
 
 const calculateCustomerTotals = (customers: Customer[]): DebtorsTotals => {
@@ -156,11 +212,21 @@ const calculateSalesmenTotals = (salesmen: Salesman[]): DebtorsTotals => {
   );
 };
 
+const getAdjustmentBalanceEffect = (
+  adjustment: DebtorAdjustmentDocument
+): number => {
+  return (
+    Number(adjustment.debit_amount || 0) -
+    Number(adjustment.credit_amount || 0)
+  );
+};
 
 const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
   config = DEFAULT_DEBTORS_REPORT_CONFIG,
 }) => {
   const navigate = useNavigate();
+  const adjustmentDocDetailsPath = config.adjustmentDocDetailsPath;
+  const showsAdjustmentDocs: boolean = Boolean(adjustmentDocDetailsPath);
   const [debtorsData, setDebtorsData] = useState<DebtorsData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -172,8 +238,13 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
     new Set()
   );
 
-  // Month selection state
+  // Month selection state, restored from the last month this report was viewed
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
+    const storedMonth: Date | null = readStoredSelectedMonth(
+      config.debtorsEndpoint
+    );
+    if (storedMonth) return storedMonth;
+
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
@@ -209,6 +280,14 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                   ...payment,
                   date: formatDateFromTimestamp(payment.date),
                 })),
+                adjustmentDocs: (invoice.adjustmentDocs ?? []).map(
+                  (
+                    adjustment: DebtorAdjustmentDocument
+                  ): DebtorAdjustmentDocument => ({
+                    ...adjustment,
+                    date: formatDate(adjustment.date),
+                  })
+                ),
               })),
             })),
           })),
@@ -228,7 +307,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
     [config.debtorsEndpoint]
   );
 
-  // Initial data fetch for the default (current) month
+  // Initial data fetch for the restored (or current) month
   useEffect(() => {
     if (allTimeMode) {
       fetchDebtors();
@@ -245,8 +324,9 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
     (newDate: Date) => {
       setAllTimeMode(false);
       setSelectedMonth(newDate);
+      storeSelectedMonth(config.debtorsEndpoint, newDate);
     },
-    []
+    [config.debtorsEndpoint]
   );
 
   // Toggle all time mode
@@ -308,6 +388,11 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(amount);
+  };
+
+  const formatBalanceEffect = (amount: number): string => {
+    if (Math.abs(amount) < 0.005) return "-";
+    return `${amount > 0 ? "+" : "-"} RM ${formatCurrency(Math.abs(amount))}`;
   };
 
   const toggleSalesman = (salesmanId: string): void => {
@@ -897,7 +982,9 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                                       #
                                     </th>
                                     <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                                      Invoice No.
+                                      {showsAdjustmentDocs
+                                        ? "Invoice / Document No."
+                                        : "Invoice No."}
                                     </th>
                                     <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
                                       Date
@@ -1071,6 +1158,99 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                                           )
                                         )
                                       )}
+                                      {showsAdjustmentDocs &&
+                                        (invoice.adjustmentDocs ?? []).map(
+                                          (
+                                            adjustment: DebtorAdjustmentDocument
+                                          ) => {
+                                            const balanceEffect: number =
+                                              getAdjustmentBalanceEffect(
+                                                adjustment
+                                              );
+                                            const isDebitEffect: boolean =
+                                              balanceEffect > 0;
+
+                                            return (
+                                              <tr
+                                                key={`${invoice.invoice_id}-${adjustment.id}`}
+                                                className="bg-sky-50/50 dark:bg-sky-950/20 text-default-800 dark:text-gray-100 hover:bg-sky-100/60 dark:hover:bg-sky-900/30"
+                                              >
+                                                <td className="px-3 py-2 text-default-400 dark:text-gray-500">
+                                                  -
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                  <div className="flex items-center gap-2 whitespace-nowrap">
+                                                    <AdjustmentDocTypeBadge
+                                                      type={adjustment.type}
+                                                    />
+                                                    {adjustmentDocDetailsPath ? (
+                                                      <button
+                                                        type="button"
+                                                        className="rounded-sm font-medium hover:text-sky-600 dark:hover:text-sky-400 hover:underline focus:outline-none focus:ring-2 focus:ring-sky-500"
+                                                        onClick={() =>
+                                                          navigate(
+                                                            adjustmentDocDetailsPath(
+                                                              adjustment.id
+                                                            )
+                                                          )
+                                                        }
+                                                      >
+                                                        {formatAdjustmentDocDisplayId(
+                                                          adjustment
+                                                        )}
+                                                      </button>
+                                                    ) : (
+                                                      <span className="font-medium">
+                                                        {formatAdjustmentDocDisplayId(
+                                                          adjustment
+                                                        )}
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                  {adjustment.date}
+                                                </td>
+                                                <td className="px-3 py-2 text-right text-default-400 dark:text-gray-500">
+                                                  -
+                                                </td>
+                                                <td className="px-3 py-2 text-sky-700 dark:text-sky-300">
+                                                  Adjustment
+                                                </td>
+                                                <td
+                                                  className="px-3 py-2 max-w-xs truncate"
+                                                  title={
+                                                    adjustment.reason ||
+                                                    undefined
+                                                  }
+                                                >
+                                                  <span
+                                                    className={`mr-2 font-medium ${
+                                                      isDebitEffect
+                                                        ? "text-rose-600 dark:text-rose-400"
+                                                        : "text-emerald-600 dark:text-emerald-400"
+                                                    }`}
+                                                    title="Effect on outstanding balance"
+                                                  >
+                                                    {formatBalanceEffect(
+                                                      balanceEffect
+                                                    )}
+                                                  </span>
+                                                  {adjustment.reason || "-"}
+                                                </td>
+                                                <td className="px-3 py-2 text-default-400 dark:text-gray-500">
+                                                  -
+                                                </td>
+                                                <td className="px-3 py-2 text-right text-default-400 dark:text-gray-500">
+                                                  -
+                                                </td>
+                                                <td className="px-3 py-2 text-right text-default-400 dark:text-gray-500">
+                                                  -
+                                                </td>
+                                              </tr>
+                                            );
+                                          }
+                                        )}
                                     </React.Fragment>
                                   ))}
                                 </tbody>
