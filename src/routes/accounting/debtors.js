@@ -47,6 +47,40 @@ export default function (pool, config) {
         WHERE p.status NOT IN ('cancelled', 'pending')
         GROUP BY p.invoice_id
       ),
+      invoice_adjustments AS (
+        -- Active adjustment documents that affect the invoice's debtor balance.
+        -- A paired Refund Note clears the debtor credit created by its Credit
+        -- Note; standalone Refund Notes use CUST_DEP and do not belong here.
+        SELECT
+          ad.original_invoice_id,
+          json_agg(
+            json_build_object(
+              'id', ad.id,
+              'display_id', ad.display_id,
+              'type', ad.type,
+              'date', ad.createddate::text,
+              'debit_amount', CASE
+                WHEN ad.type = 'debit_note'
+                  OR (ad.type = 'refund_note' AND ad.paired_with_id IS NOT NULL)
+                THEN ad.totalamountpayable
+                ELSE 0
+              END,
+              'credit_amount', CASE
+                WHEN ad.type = 'credit_note' THEN ad.totalamountpayable
+                ELSE 0
+              END,
+              'reason', ad.reason
+            ) ORDER BY ad.createddate, ad.id
+          ) AS adjustment_docs
+        FROM adjustment_documents ad
+        WHERE ad.status = 'active'
+          AND COALESCE(ad.is_consolidated, false) = false
+          AND (
+            ad.type IN ('credit_note', 'debit_note')
+            OR (ad.type = 'refund_note' AND ad.paired_with_id IS NOT NULL)
+          )
+        GROUP BY ad.original_invoice_id
+      ),
       unpaid_invoices AS (
         -- Get all unpaid/partially paid invoices, with optional date filter
         SELECT
@@ -57,9 +91,11 @@ export default function (pool, config) {
           i.totalamountpayable,
           i.balance_due,
           COALESCE(ip.total_paid, 0) as total_paid,
-          COALESCE(ip.payments, '[]'::json) as payments
+          COALESCE(ip.payments, '[]'::json) as payments,
+          COALESCE(ia.adjustment_docs, '[]'::json) as adjustment_docs
         FROM invoices i
         LEFT JOIN invoice_payments ip ON i.id = ip.invoice_id
+        LEFT JOIN invoice_adjustments ia ON i.id = ia.original_invoice_id
         WHERE i.invoice_status IN ('Unpaid', 'Overdue')
           AND i.balance_due > 0.01
           ${filterClause}
@@ -83,6 +119,7 @@ export default function (pool, config) {
               'date', ui.createddate,
               'amount', ui.totalamountpayable,
               'payments', ui.payments,
+              'adjustmentDocs', ui.adjustment_docs,
               'balance', ui.balance_due
             ) ORDER BY ui.createddate
           ) as invoices,

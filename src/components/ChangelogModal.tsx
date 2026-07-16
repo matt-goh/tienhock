@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-16",
+    ms: "Jadual yang dikembangkan pada halaman Penghutang Tien Hock kini memaparkan Nota Kredit, Nota Debit dan Nota Bayaran Balik yang menjejaskan baki di bawah invois belum selesai yang berkaitan. Setiap baris menunjukkan kesan tambah atau tolak pada baki serta sebab dokumen, dan nombor dokumen boleh dibuka terus untuk melihat butirannya.",
+    en: "The expanded table on the Tien Hock Debtors page now shows Credit Notes, Debit Notes and balance-affecting Refund Notes beneath their related outstanding invoices. Each row shows whether the document adds to or reduces the balance, includes its reason, and opens the document details directly.",
+  },
+  {
+    date: "2026-07-16",
     ms: "Menukar pelanggan sesuatu invois kini turut memindahkan invois itu ke lejar dan penyata pelanggan baharu, berserta had kredit yang digunakan. Sebelum ini invois itu kekal dalam lejar pelanggan lama, jadi ia tidak dipaparkan dalam Penyata Akaun pelanggan baharu dan baki pelanggan lama menjadi lebih tinggi daripada sepatutnya. Invois 64072 yang terjejas telah dibetulkan: ia kini dipaparkan dalam penyata PASAR MINI MY SHOP-KM5 sebagai RM1,646.00 pada 09/07/2026 dengan jumlah perlu dibayar RM1,596.60 selepas Nota Kredit TH/CN/26/22 (sebelum ini penyata hanya menunjukkan -RM49.40). Baki PASAR MINI MYSHOP KOTA MARUDU turun RM1,646.00 kepada jumlah sebenarnya.",
     en: "Changing an invoice's customer now also moves that invoice into the new customer's ledger and statement, together with the credit used. Previously the invoice stayed in the old customer's ledger, so it did not appear on the new customer's Statement of Account and the old customer's balance was higher than it should be. The affected invoice 64072 has been corrected: it now appears on the PASAR MINI MY SHOP-KM5 statement as RM1,646.00 on 09/07/2026 with RM1,596.60 due after Credit Note TH/CN/26/22 (previously the statement showed only -RM49.40). PASAR MINI MYSHOP KOTA MARUDU's balance drops by RM1,646.00 to its true amount.",
   },
