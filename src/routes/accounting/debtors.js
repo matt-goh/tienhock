@@ -205,6 +205,28 @@ export default function (pool, config) {
 
   const pad2 = (n) => String(n).padStart(2, "0");
   const isoDate = (y, m, d) => `${y}-${pad2(m)}-${pad2(d)}`;
+  const roundMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
+
+  /**
+   * Invoice aging cannot see legacy/unallocated credits held in the customer
+   * debtor ledger. Put that difference in the oldest bucket so aging always
+   * reconciles to the authoritative statement closing balance.
+   */
+  const reconcileAgingToLedger = (agingRow, ledgerBalance) => {
+    const current = roundMoney(agingRow.aging_current);
+    const oneMonth = roundMoney(agingRow.aging_1_month);
+    const twoMonths = roundMoney(agingRow.aging_2_months);
+    const threePlus = roundMoney(agingRow.aging_3_plus);
+    const agingTotal = roundMoney(current + oneMonth + twoMonths + threePlus);
+    const ledgerDifference = roundMoney(ledgerBalance - agingTotal);
+
+    return {
+      current_month: current,
+      one_month: oneMonth,
+      two_months: twoMonths,
+      three_months_plus: roundMoney(threePlus + ledgerDifference),
+    };
+  };
 
   /** Resolve a customer's debtor child account code (same rule as debtorSync). */
   const resolveChildCode = async (customerId) => {
@@ -379,12 +401,7 @@ export default function (pool, config) {
       // 4. Aging as at the period end (per-invoice as-of outstanding)
       const agingResult = await pool.query(agingSql, [customerId, startStr, endStr]);
       const agingRow = agingResult.rows[0] || {};
-      const aging = {
-        current_month: parseFloat(agingRow.aging_current || 0),
-        one_month: parseFloat(agingRow.aging_1_month || 0),
-        two_months: parseFloat(agingRow.aging_2_months || 0),
-        three_months_plus: parseFloat(agingRow.aging_3_plus || 0),
-      };
+      const aging = reconcileAgingToLedger(agingRow, runningBalance);
 
       res.json({
         customer: {
@@ -526,18 +543,22 @@ export default function (pool, config) {
       };
 
       const customers = result.rows.map((row) => {
-        const aging = agingByCustomer[row.customer_id] || {};
+        const totalDue = parseFloat(row.total_due) || 0;
+        const reconciledAging = reconcileAgingToLedger(
+          agingByCustomer[row.customer_id] || {},
+          totalDue
+        );
         const customer = {
           account_no: row.customer_id,
           particular: row.customer_name || "UNNAMED",
           bal_bf: parseFloat(row.bal_bf) || 0,
           current_invoices: parseFloat(row.current_invoices) || 0,
           payment: parseFloat(row.payment) || 0,
-          total_due: parseFloat(row.total_due) || 0,
-          aging_current: parseFloat(aging.aging_current) || 0,
-          aging_1_month: parseFloat(aging.aging_1_month) || 0,
-          aging_2_months: parseFloat(aging.aging_2_months) || 0,
-          aging_3_plus: parseFloat(aging.aging_3_plus) || 0,
+          total_due: totalDue,
+          aging_current: reconciledAging.current_month,
+          aging_1_month: reconciledAging.one_month,
+          aging_2_months: reconciledAging.two_months,
+          aging_3_plus: reconciledAging.three_months_plus,
         };
 
         // Accumulate totals

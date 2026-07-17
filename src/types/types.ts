@@ -380,7 +380,7 @@ export interface Payment {
   payment_date: string;
   posting_date?: string | null;
   amount_paid: number;
-  payment_method: "cash" | "cheque" | "bank_transfer" | "online";
+  payment_method: "cash" | "cheque" | "bank_transfer" | "online" | "contra";
   payment_reference?: string;
   internal_reference?: string;
   bank_account?: "CASH" | "BANK_PBB" | "BANK_ABB";
