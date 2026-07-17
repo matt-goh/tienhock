@@ -370,7 +370,9 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                   onViewPaymentGroup && manageableReceiptId !== null
                 );
                 const canAddToGroup: boolean = Boolean(
-                  onAddPaymentToGroup && groupTemplate.payment_reference
+                  onAddPaymentToGroup &&
+                    groupTemplate.payment_reference &&
+                    groupTemplate.payment_method !== "contra"
                 );
                 const totalAmount = paymentGroup.reduce(
                   (sum, p) => sum + (p.amount_paid || 0),
@@ -534,7 +536,8 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                                   <IconCircleCheck size={16} />
                                 </Button>
                               )}
-                              {payment.status !== "cancelled" && (
+                              {payment.status !== "cancelled" &&
+                                payment.payment_method !== "contra" && (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -649,7 +652,8 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                               <IconCircleCheck size={16} />
                             </Button>
                           )}
-                          {payment.status !== "cancelled" && (
+                          {payment.status !== "cancelled" &&
+                            payment.payment_method !== "contra" && (
                             <Button
                               size="sm"
                               variant="outline"
