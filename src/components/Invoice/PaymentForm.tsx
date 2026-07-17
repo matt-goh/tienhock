@@ -13,9 +13,14 @@ import TimeNavigator, {
   type TimeRange,
 } from "../../components/TimeNavigator";
 
+export type RecordablePaymentMethod = Exclude<
+  Payment["payment_method"],
+  "contra"
+>;
+
 export interface PaymentFormInitialValues {
   payment_date?: string;
-  payment_method?: Payment["payment_method"];
+  payment_method?: RecordablePaymentMethod;
   payment_reference?: string;
   bank_account?: Payment["bank_account"];
   notes?: string;
@@ -42,7 +47,7 @@ interface InvoicePaymentAllocation {
 
 interface PaymentFormData {
   payment_date: string;
-  payment_method: Payment["payment_method"];
+  payment_method: RecordablePaymentMethod;
   payment_reference: string;
   bank_account: string;
   notes: string;
@@ -154,7 +159,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     payment_date: getInitialPaymentDate(initialValues?.payment_date),
     payment_method:
       initialValues?.payment_method ??
-      ("cheque" as Payment["payment_method"]),
+      ("cheque" as RecordablePaymentMethod),
     payment_reference: initialValues?.payment_reference ?? "",
     bank_account: initialValues?.bank_account ?? "BANK_PBB",
     notes: initialValues?.notes ?? "",
@@ -555,7 +560,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                     onChange={(value: string | number) =>
                       setFormData({
                         ...formData,
-                        payment_method: value as Payment["payment_method"],
+                        payment_method: value as RecordablePaymentMethod,
                       })
                     }
                     options={paymentMethodOptions}
