@@ -635,6 +635,15 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
   }
 
   const filteredData = filterData(debtorsData);
+  const statementEndDateLabel: string = new Date(
+    selectedMonth.getFullYear(),
+    selectedMonth.getMonth() + 1,
+    0
+  ).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
   const allDebtorsExpanded =
     filteredData.salesmen.length > 0 &&
     filteredData.salesmen.every(
@@ -647,16 +656,21 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2 mb-3">
         {/* Left side: Month Navigator + Stats */}
         <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
-          <MonthNavigator
-            selectedMonth={selectedMonth}
-            onChange={handleMonthChange}
-            showGoToCurrentButton={false}
-            size="sm"
-            pickerPlacement={
-              config.monthPickerPlacement ??
-              DEFAULT_DEBTORS_REPORT_CONFIG.monthPickerPlacement
-            }
-          />
+          <div className="flex items-center gap-2">
+            <span className="whitespace-nowrap text-xs font-medium text-default-500 dark:text-gray-400">
+              Invoice month
+            </span>
+            <MonthNavigator
+              selectedMonth={selectedMonth}
+              onChange={handleMonthChange}
+              showGoToCurrentButton={false}
+              size="sm"
+              pickerPlacement={
+                config.monthPickerPlacement ??
+                DEFAULT_DEBTORS_REPORT_CONFIG.monthPickerPlacement
+              }
+            />
+          </div>
 
           {/* Compact Stats */}
           <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm">
@@ -914,7 +928,11 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                               variant="outline"
                               icon={IconFileText}
                               disabled={allTimeMode}
-                              title={allTimeMode ? "Select a specific month to print statement" : "Print Statement"}
+                              title={
+                                allTimeMode
+                                  ? "Select a specific month to print statement"
+                                  : `Print statement as at ${statementEndDateLabel}`
+                              }
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handlePrintStatement(customer);

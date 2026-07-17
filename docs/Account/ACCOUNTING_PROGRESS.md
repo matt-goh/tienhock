@@ -74,6 +74,8 @@ Small code enhancements worth doing alongside (not blockers):
 
 ## 4. Next priorities after the tie-out
 
+> **Update 17 Jul 2026:** the Jan–May legacy ledger import is complete and verified in production ([LEGACY_JAN_MAY_IMPORT_PLAN.md](LEGACY_JAN_MAY_IMPORT_PLAN.md)), and the user has supplied scanned legacy verification reports (five monthly Trial Balances, May Balance Sheet / Detail Income Statement / CoGM / Trade Debtor List). The active plan is now [LEGACY_REPORT_VERIFICATION_PLAN.md](LEGACY_REPORT_VERIFICATION_PLAN.md): transcribe the scans into validated fixtures, machine-verify the import against them, close the named RM1,456,480.37 opening residue (the scans provably contain its decomposition — opening inventories 626,875.15 + CS_* 829,605.22), then build the standing 1:1 report capability. It subsumes item 1 below for the 2026 books.
+
 Ranked; full rationale in [ACCOUNTING_GAP_ANALYSIS.md](ACCOUNTING_GAP_ANALYSIS.md) (statuses refreshed 2 Jul 2026):
 
 1. **Opening balances into the statements (1A-7) — the single most important unlock.** (a) Multi-account opening-balance setup screen (migration "Opening Balance as at …" sheet); (b) wire `account_opening_balances` into the TB/BS/IS/CoGM engines, which today sum YTD from Jan 1 ([financial-reports.js:373-391](../../src/routes/accounting/financial-reports.js)). The Balance Sheet cannot balance for an established company until this is done.

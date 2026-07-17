@@ -637,6 +637,17 @@ export default function (pool) {
         );
       }
 
+      // A contra row applies credit that was already present in the debtor
+      // ledger. Cancelling it as if it were cash would reopen the invoice
+      // without reversing any accounting entry.
+      if (payment.payment_method === "contra") {
+        const error = new Error(
+          `Contra credit on invoice ${invoice_id} is an accounting reconciliation and cannot be cancelled as a payment.`
+        );
+        error.status = 409;
+        throw error;
+      }
+
       const existingAdjustment = await fetchActiveAdjustmentForInvoice(
         client,
         invoice_id
