@@ -26,7 +26,9 @@ import {
   getEligibleEmployees,
   processMonthlyPayrolls,
   type PayrollProcessEmployeeSelection,
+  type PayrollProcessingError,
 } from "../../utils/payroll/payrollUtils";
+import PayrollProcessingErrorsDialog from "../../components/Payroll/PayrollProcessingErrorsDialog";
 import { formatDistanceToNow } from "date-fns";
 import MissingIncomeTaxRatesDialog, {
   MissingIncomeTaxEmployee,
@@ -321,6 +323,12 @@ const PayrollPage: React.FC = () => {
   const [missingIncomeTaxEmployees, setMissingIncomeTaxEmployees] = useState<
     MissingIncomeTaxEmployee[]
   >([]);
+  // Employees skipped by processing (e.g. July 2026+ OT-formula blocks)
+  const [processingErrors, setProcessingErrors] = useState<
+    PayrollProcessingError[]
+  >([]);
+  const [showProcessingErrorsDialog, setShowProcessingErrorsDialog] =
+    useState(false);
   // The employee payroll row currently being processed via its per-row button
   // (drives the inline spinner on that row).
   const [processingEmployeePayrollId, setProcessingEmployeePayrollId] =
@@ -893,7 +901,15 @@ const PayrollPage: React.FC = () => {
     }
 
     if (response.errors?.length > 0) {
-      toast.error(`Processed with ${response.errors.length} errors`);
+      // Show the skipped employees with reasons and quick fix links
+      // (e.g. July 2026+ OT-formula blocks).
+      setProcessingErrors(response.errors);
+      setShowProcessingErrorsDialog(true);
+      if (response.processed_count > 0) {
+        toast.success(
+          `Processed ${response.processed_count} employees (${response.errors.length} skipped)`
+        );
+      }
     } else {
       toast.success(
         `Successfully processed ${response.processed_count} employees`
@@ -1398,6 +1414,12 @@ const PayrollPage: React.FC = () => {
         isOpen={showMissingTaxDialog}
         onClose={() => setShowMissingTaxDialog(false)}
         employees={missingIncomeTaxEmployees}
+      />
+      {/* Skipped employees (July 2026+ OT-formula blocks etc.) */}
+      <PayrollProcessingErrorsDialog
+        isOpen={showProcessingErrorsDialog}
+        onClose={() => setShowProcessingErrorsDialog(false)}
+        errors={processingErrors}
       />
     </div>
   );
