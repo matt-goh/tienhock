@@ -4,6 +4,15 @@ import {
   resolveContributionContext,
   ageAtPayrollMonth,
 } from "./contributionOverrides.js";
+import {
+  isOTFormulaEffective,
+  isFormulaOTItem,
+  computeOTRates,
+  otRateCentsForDayType,
+  buildOTSnapshot,
+  dayTypeFromDate,
+  resolveOTPayBasis,
+} from "./otFormula.js";
 
 const SOCSO_SKBBK_EFFECTIVE_YEAR = 2026;
 const SOCSO_SKBBK_EFFECTIVE_MONTH = 6;
@@ -205,7 +214,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     // Get all current payroll items
     const itemsRes = await pool.query(
       `
-      SELECT pi.*, pc.pay_type
+      SELECT pi.*, pc.pay_type, pc.ot_rate_mode
       FROM payroll_items pi
       LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
       WHERE pi.employee_payroll_id = $1
@@ -285,7 +294,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     // Get commission records for this employee for the specific month/year
     const commissionRecordsRes = await pool.query(
       `
-      SELECT amount, description, is_advance
+      SELECT amount, description, is_advance, location_code
       FROM commission_records
       WHERE employee_id = ANY($1)
         AND DATE(commission_date) >= $2
@@ -334,6 +343,198 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
           : sum,
       0,
     );
+
+    // July 2026+ OT salary formula: after any earning change the month's OT
+    // rate must be re-derived from the stored non-OT earnings and the stored
+    // formula-scope OT items repriced BEFORE totals are recomputed (mirrors
+    // the process-all integration; see src/routes/payroll/otFormula.js).
+    let otCalculationSnapshot = null;
+    if (isOTFormulaEffective(year, month)) {
+      const monthStart = `${year}-${month.toString().padStart(2, "0")}-01`;
+      const monthEnd = `${year}-${month.toString().padStart(2, "0")}-${new Date(year, month, 0).getDate().toString().padStart(2, "0")}`;
+      const formulaOTItems = payrollItems.filter(
+        (item) =>
+          isFormulaOTItem(item, null) &&
+          item.ot_rate_mode !== "fixed" &&
+          (item.quantity || 0) > 0,
+      );
+      if (formulaOTItems.length > 0) {
+        const staffRow = await pool.query(
+          "SELECT ot_pay_basis FROM staffs WHERE id = $1",
+          [employee_id],
+        );
+
+        const commissionIncludedPay = commissionRecords.reduce(
+          (sum, record) =>
+            record.location_code != null ? sum + record.amount : sum,
+          0,
+        );
+        const othersNonOTPay = othersRecords.reduce(
+          (sum, record) =>
+            (record.pay_type || "").toLowerCase() === "overtime"
+              ? sum
+              : sum + record.amount,
+          0,
+        );
+        // Paid leave is EXCLUDED from the numerator — HR prices leave FROM the
+        // derived daily rate, so leave never feeds the rate (HR model "RAMBU").
+        const leavePayTotal = leaveRecords.reduce(
+          (sum, record) => sum + record.amount_paid,
+          0,
+        );
+        const numeratorBreakdownCents = {
+          work_items: calculateConsolidatedPayrollItemsCents(
+            workItems.filter(
+              (item) => (item.pay_type || "Tambahan") !== "Overtime",
+            ),
+          ),
+          commission: Math.round(commissionIncludedPay * 100),
+          others_non_ot: Math.round(othersNonOTPay * 100),
+        };
+        const numeratorCents = Object.values(numeratorBreakdownCents).reduce(
+          (a, b) => a + b,
+          0,
+        );
+
+        // Derive the divisor sources FIRST; the basis then resolves as:
+        // explicit staff override > actual days (attendance dates or a
+        // Worked Days input) > monthly-logged default (÷26).
+        let workedDays = null;
+        let workedDaysSource = null;
+        let isMonthlyLogged = false;
+        {
+          const [attendanceRes, workedDaysInputRes] = await Promise.all([
+            pool.query(
+              `SELECT COUNT(DISTINCT d) AS days FROM (
+                 SELECT to_char(dwl.log_date, 'YYYY-MM-DD') AS d
+                 FROM daily_work_logs dwl
+                 JOIN daily_work_log_entries dwle ON dwl.id = dwle.work_log_id
+                 WHERE dwle.employee_id = ANY($1)
+                   AND dwl.log_date BETWEEN $2 AND $3
+                   AND dwl.status = 'Submitted'
+                   AND COALESCE(dwle.is_on_leave, false) = false
+                   AND (
+                     COALESCE(dwle.total_hours, 0) > 0
+                     OR EXISTS (
+                       SELECT 1 FROM daily_work_log_activities dwla
+                       WHERE dwla.log_entry_id = dwle.id
+                         AND COALESCE(dwla.calculated_amount, 0) > 0
+                     )
+                   )
+                   -- A date covered by an approved leave record is a leave
+                   -- day, not a worked day (mirrors process-all).
+                   AND NOT EXISTS (
+                     SELECT 1 FROM leave_records lr
+                     WHERE lr.employee_id = dwle.employee_id
+                       AND lr.leave_date = dwl.log_date
+                       AND lr.status = 'approved'
+                       AND lr.company <> 'JP'
+                   )
+                 UNION
+                 SELECT to_char(pe.entry_date, 'YYYY-MM-DD')
+                 FROM production_entries pe
+                 WHERE pe.worker_id = ANY($1)
+                   AND pe.entry_date BETWEEN $2 AND $3
+                   AND pe.bags_packed > 0
+               ) t`,
+              [scopedGroupEmployeeIds, monthStart, monthEnd],
+            ),
+            pool.query(
+              `SELECT MAX(mwle.worked_days) AS worked_days,
+                      COUNT(*) AS entry_count
+               FROM monthly_work_logs mwl
+               JOIN monthly_work_log_entries mwle ON mwl.id = mwle.monthly_log_id
+               WHERE mwle.employee_id = ANY($1)
+                 AND mwl.log_month = $2 AND mwl.log_year = $3
+                 AND mwl.status = 'Submitted'`,
+              [scopedGroupEmployeeIds, month, year],
+            ),
+          ]);
+          const attendanceDays =
+            parseInt(attendanceRes.rows[0]?.days, 10) || 0;
+          const monthlyInput = workedDaysInputRes.rows[0]?.worked_days
+            ? parseFloat(workedDaysInputRes.rows[0].worked_days)
+            : null;
+          isMonthlyLogged =
+            (parseInt(workedDaysInputRes.rows[0]?.entry_count, 10) || 0) > 0;
+          if (attendanceDays > 0 && monthlyInput != null) {
+            workedDays = Math.max(attendanceDays, monthlyInput);
+            workedDaysSource = "attendance+monthly_input";
+          } else if (monthlyInput != null) {
+            workedDays = monthlyInput;
+            workedDaysSource = "monthly_input";
+          } else if (attendanceDays > 0) {
+            workedDays = attendanceDays;
+            workedDaysSource = "attendance";
+          }
+        }
+
+        const payBasis = resolveOTPayBasis(staffRow.rows[0]?.ot_pay_basis, {
+          hasWorkedDaySource: workedDays != null,
+          isMonthlyLogged,
+        });
+        const otRates = computeOTRates({ payBasis, numeratorCents, workedDays });
+        if (!otRates.ok) {
+          // Decision 15: never fall back silently — surface the block to the
+          // caller (the item/earning save endpoints return this message).
+          throw new Error(`Kiraan kadar OT disekat: ${otRates.errors.join(" ")}`);
+        }
+
+        // Day type per stored item: daily/production items by source_date via
+        // the holiday calendar; monthly items by the system-generated
+        // (Ahad)/(Umum) description suffix.
+        const holidaysRes = await pool.query(
+          `SELECT to_char(holiday_date, 'YYYY-MM-DD') AS d
+           FROM holiday_calendar WHERE holiday_date BETWEEN $1 AND $2`,
+          [monthStart, monthEnd],
+        );
+        const holidaySet = new Set(holidaysRes.rows.map((r) => r.d));
+
+        for (const item of formulaOTItems) {
+          const description = item.description || "";
+          const dayType =
+            item.work_log_type === "monthly" || !item.source_date
+              ? /\(Ahad\)$/.test(description)
+                ? "Ahad"
+                : /\(Umum\)$/.test(description)
+                  ? "Umum"
+                  : "Biasa"
+              : dayTypeFromDate(toLocalYMD(item.source_date), holidaySet);
+          const newRate =
+            otRateCentsForDayType(otRates.rateCents, dayType) / 100;
+          const newAmount =
+            Math.round(newRate * (item.quantity || 0) * 100) / 100;
+          if (newRate !== item.rate || newAmount !== item.amount) {
+            await pool.query(
+              `UPDATE payroll_items SET rate = $1, amount = $2 WHERE id = $3`,
+              [newRate, newAmount, item.id],
+            );
+            item.rate = newRate;
+            item.amount = newAmount;
+          }
+        }
+
+        otCalculationSnapshot = buildOTSnapshot({
+          payBasis,
+          numeratorCents,
+          numeratorBreakdownCents,
+          excludedLeaveCents: Math.round(leavePayTotal * 100),
+          excludedBonusCents: Math.round(
+            (commissionRecords.reduce((sum, r) => sum + r.amount, 0) -
+              commissionIncludedPay) *
+              100,
+          ),
+          excludedOtCents:
+            calculateConsolidatedPayrollItemsCents(
+              workItems.filter(
+                (item) => (item.pay_type || "Tambahan") === "Overtime",
+              ),
+            ) + Math.round(othersOvertimeGrossPay * 100),
+          rates: otRates,
+          workedDaysSource,
+        });
+      }
+    }
 
     // Get all active contribution rates
     const [epfRatesRes, socsoRatesRes, sipRatesRes, incomeTaxRatesRes] =
@@ -650,14 +851,17 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     const setelahDigenapkan = Math.ceil(jumlah);
     const digenapkan = setelahDigenapkan - jumlah;
 
-    // Update gross pay, net pay, and rounding columns
+    // Update gross pay, net pay, rounding columns and the OT audit snapshot
+    // (snapshot only replaced when the formula ran; NULL clears a stale one
+    // if the month's formula OT items are gone).
     await pool.query(
-      `UPDATE employee_payrolls SET gross_pay = $1, net_pay = $2, digenapkan = $3, setelah_digenapkan = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5`,
+      `UPDATE employee_payrolls SET gross_pay = $1, net_pay = $2, digenapkan = $3, setelah_digenapkan = $4, ot_calculation = $5, updated_at = CURRENT_TIMESTAMP WHERE id = $6`,
       [
         grossPay.toFixed(2),
         netPay.toFixed(2),
         digenapkan.toFixed(2),
         setelahDigenapkan.toFixed(2),
+        otCalculationSnapshot ? JSON.stringify(otCalculationSnapshot) : null,
         employeePayrollId,
       ],
     );

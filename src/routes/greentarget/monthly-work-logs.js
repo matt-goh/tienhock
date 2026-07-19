@@ -267,8 +267,9 @@ export default function (pool) {
         // Insert employee entry
         const entryQuery = `
           INSERT INTO greentarget.monthly_work_log_entries (
-            monthly_log_id, employee_id, job_id, total_hours, overtime_hours
-          ) VALUES ($1, $2, $3, $4, $5)
+            monthly_log_id, employee_id, job_id, total_hours, overtime_hours,
+            worked_days
+          ) VALUES ($1, $2, $3, $4, $5, $6)
           RETURNING id
         `;
 
@@ -278,6 +279,7 @@ export default function (pool) {
           jobType,
           totalHours,
           overtimeHours || 0,
+          entry.workedDays || null,
         ]);
 
         const entryId = entryResult.rows[0].id;
@@ -452,8 +454,9 @@ export default function (pool) {
 
         const entryQuery = `
           INSERT INTO greentarget.monthly_work_log_entries (
-            monthly_log_id, employee_id, job_id, total_hours, overtime_hours
-          ) VALUES ($1, $2, $3, $4, $5)
+            monthly_log_id, employee_id, job_id, total_hours, overtime_hours,
+            worked_days
+          ) VALUES ($1, $2, $3, $4, $5, $6)
           RETURNING id
         `;
 
@@ -463,6 +466,7 @@ export default function (pool) {
           jobType,
           totalHours,
           overtimeHours || 0,
+          entry.workedDays || null,
         ]);
 
         const entryId = entryResult.rows[0].id;

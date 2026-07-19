@@ -552,7 +552,7 @@ const JPPayrollDetailsPage: React.FC = () => {
             </h3>
           </div>
           <div className="p-4 flex flex-col flex-grow">
-            <div className="space-y-2 flex-grow">
+            <div className="space-y-2 flex-grow pb-2">
               <div className="flex justify-between text-sm">
                 <span className="text-default-600 dark:text-gray-300">
                   Work Pay
@@ -612,6 +612,61 @@ const JPPayrollDetailsPage: React.FC = () => {
                 </span>
               </div>
             </div>
+
+            {/* July 2026+ OT salary-formula breakdown (audit snapshot) */}
+            {(payroll as any).ot_calculation && (
+              <div className="mt-3 rounded-md border border-amber-200 dark:border-amber-800/50 bg-amber-50/60 dark:bg-amber-900/10 p-3 text-xs">
+                <div className="mb-1.5 font-semibold text-amber-800 dark:text-amber-300">
+                  OT Rate Calculation (July 2026 formula)
+                </div>
+                <div className="space-y-1 text-default-600 dark:text-gray-300">
+                  <div className="flex justify-between">
+                    <span>
+                      Wage basis (
+                      {(payroll as any).ot_calculation.pay_basis ===
+                      "monthly_26"
+                        ? "monthly salary"
+                        : "actual days"}
+                      )
+                    </span>
+                    <span className="font-medium">
+                      {formatCurrency(
+                        (payroll as any).ot_calculation.numerator
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>
+                      ÷ {(payroll as any).ot_calculation.divisor_days} days ÷{" "}
+                      {(payroll as any).ot_calculation.normal_hours_per_day}{" "}
+                      hours
+                    </span>
+                    <span className="font-medium">
+                      {formatCurrency(
+                        (payroll as any).ot_calculation.hourly_rate
+                      )}
+                      /hr
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>OT rates (×1.5 / ×2.0 / ×3.0)</span>
+                    <span className="font-medium">
+                      {formatCurrency(
+                        (payroll as any).ot_calculation.rates.biasa
+                      )}{" "}
+                      /{" "}
+                      {formatCurrency(
+                        (payroll as any).ot_calculation.rates.ahad
+                      )}{" "}
+                      /{" "}
+                      {formatCurrency(
+                        (payroll as any).ot_calculation.rates.umum
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

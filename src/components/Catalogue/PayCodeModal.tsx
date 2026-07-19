@@ -23,7 +23,11 @@ interface PayCodeModalProps {
 }
 
 type PayCodeRateField = "rate_biasa" | "rate_ahad" | "rate_umum";
-type PayCodeListboxField = "pay_type" | "rate_unit" | "report_column";
+type PayCodeListboxField =
+  | "pay_type"
+  | "rate_unit"
+  | "report_column"
+  | "ot_rate_mode";
 type PayCodeFormData = Omit<
   PayCode,
   "code" | "rate_biasa" | "rate_ahad" | "rate_umum"
@@ -80,6 +84,7 @@ const defaultPayCode: PayCodeFormData = {
   is_active: true,
   requires_units_input: false,
   report_column: null,
+  ot_rate_mode: "salary_formula",
 };
 
 const PayCodeModal: React.FC<PayCodeModalProps> = ({
@@ -118,6 +123,13 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
     { id: "Tray", name: "Tray" },
     { id: "Percent", name: "Percent" },
     { id: "Fixed", name: "Fixed" },
+  ];
+
+  // July 2026+ OT rate mode (Overtime Hour codes only): formula-derived
+  // monthly rate versus keeping the configured fixed rates.
+  const otRateModeOptions = [
+    { id: "salary_formula", name: "Salary formula (from July 2026)" },
+    { id: "fixed", name: "Fixed configured rate" },
   ];
 
   // Salary Report column override (priority below the per-entry Others override).
@@ -205,6 +217,13 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
         setFormData((prev) => ({
           ...prev,
           pay_type: value as PayType,
+        }));
+      } else if (name === "ot_rate_mode") {
+        setFormData((prev) => ({
+          ...prev,
+          ot_rate_mode: (value || "salary_formula") as
+            | "salary_formula"
+            | "fixed",
         }));
       } else {
         setFormData((prev) => ({
@@ -298,6 +317,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
       rate_umum: finalRateUmum,
       // Empty string from the listbox means "automatic" -> store as null
       report_column: formData.report_column || null,
+      ot_rate_mode: formData.ot_rate_mode || "salary_formula",
     } as PayCode; // Assert type if Omit was used for state
 
     try {
@@ -420,6 +440,19 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                     options={reportColumnOptions}
                     disabled={isSaving}
                   />
+
+                  {/* July 2026+ OT rate mode (Overtime Hour codes only) */}
+                  {formData.pay_type === "Overtime" &&
+                    formData.rate_unit === "Hour" && (
+                      <FormListbox
+                        label="OT Rate Mode (July 2026 onwards)"
+                        name="ot_rate_mode"
+                        value={formData.ot_rate_mode ?? "salary_formula"}
+                        onChange={handleListboxChange("ot_rate_mode")}
+                        options={otRateModeOptions}
+                        disabled={isSaving}
+                      />
+                    )}
 
                   {/* Rate Inputs */}
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

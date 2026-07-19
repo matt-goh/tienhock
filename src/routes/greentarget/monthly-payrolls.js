@@ -4,6 +4,14 @@ import {
   calculateGTStatutoryDeductions,
   fetchActiveContributionRates,
 } from "./gtStatutoryCalc.js";
+import {
+  isOTFormulaEffective,
+  isFormulaOTItem,
+  computeOTRates,
+  otRateCentsForDayType,
+  buildOTSnapshot,
+  resolveOTPayBasis,
+} from "../payroll/otFormula.js";
 
 // Helper function to format date to YYYY-MM-DD string
 const formatDateToYMD = (date) => {
@@ -344,12 +352,13 @@ export default function (pool) {
         // Monthly work logs for OFFICE workers (from GT schema)
         client.query(`
           SELECT mwl.id, mwl.log_month, mwl.log_year, mwle.employee_id, mwle.job_id,
-            mwle.total_hours, mwle.overtime_hours,
+            mwle.total_hours, mwle.overtime_hours, mwle.worked_days,
             json_agg(json_build_object(
               'pay_code_id', mwla.pay_code_id,
               'description', pc.description,
               'pay_type', pc.pay_type,
               'rate_unit', pc.rate_unit,
+              'ot_rate_mode', pc.ot_rate_mode,
               'rate_used', mwla.rate_used,
               'hours_applied', mwla.hours_applied,
               'calculated_amount', mwla.calculated_amount
@@ -360,7 +369,7 @@ export default function (pool) {
           LEFT JOIN public.pay_codes pc ON mwla.pay_code_id = pc.id
           WHERE mwl.log_month = $1 AND mwl.log_year = $2 AND mwl.status = 'Submitted'
           GROUP BY mwl.id, mwl.log_month, mwl.log_year, mwle.employee_id, mwle.job_id,
-            mwle.total_hours, mwle.overtime_hours
+            mwle.total_hours, mwle.overtime_hours, mwle.worked_days
         `, [month, year]),
 
         // Existing manual items must remain part of gross/net/statutory totals
@@ -380,7 +389,7 @@ export default function (pool) {
           SELECT id, name, birthdate, nationality, marital_status,
             spouse_employment_status, number_of_children,
             epf_age_override, epf_nationality_override,
-            socso_age_override, sip_age_override
+            socso_age_override, sip_age_override, ot_pay_basis
           FROM public.staffs
         `),
 
@@ -513,12 +522,26 @@ export default function (pool) {
         jobPayCodesMap[row.job_id].push(row);
       });
 
-      // Process work logs into items per employee
+      // July 2026+ OT salary formula state (see src/routes/payroll/otFormula.js)
+      const otFormulaActive = isOTFormulaEffective(year, month);
+
+      // Process work logs into items per employee. Also collect the per-entry
+      // Worked Days input (actual_days divisor for monthly-logged staff).
       const workLogsByEmployee = {};
+      const monthlyWorkedDaysByEmployee = new Map();
       monthlyLogsResult.rows.forEach((log) => {
         const key = log.employee_id;
         if (!workLogsByEmployee[key]) {
           workLogsByEmployee[key] = { items: [] };
+        }
+        if (log.worked_days != null) {
+          const days = parseFloat(log.worked_days);
+          if (Number.isFinite(days)) {
+            monthlyWorkedDaysByEmployee.set(
+              key,
+              Math.max(monthlyWorkedDaysByEmployee.get(key) || 0, days)
+            );
+          }
         }
         (log.activities || []).filter((a) => a.pay_code_id).forEach((activity) => {
           const qty =
@@ -535,6 +558,7 @@ export default function (pool) {
             amount: parseFloat(activity.calculated_amount) || 0,
             work_log_id: log.id,
             work_log_type: "monthly",
+            ot_rate_mode: activity.ot_rate_mode || null,
           });
         });
       });
@@ -677,6 +701,123 @@ export default function (pool) {
             leaveDateSet.has(`${item.source_employee_id}|${item.source_date}`);
           const payableItems = combinedItems.filter((item) => !isLeaveDayItem(item));
 
+          // July 2026+ OT salary formula: derive this month's OT rates from
+          // earned non-OT wages and reprice formula-scope OT items BEFORE
+          // gross/EPF/net (docs/PAYROLL_OT_CALCULATION_BREAKDOWN.md). GT OFFICE
+          // has a single OT bucket, so formula OT is priced at the 1.5 Biasa
+          // rate. Bonus rows are excluded from the numerator; Advance rows
+          // (earned pay taken early) are included. Manual and 'fixed'-mode OT
+          // items keep their keyed values.
+          let otCalculationSnapshot = null;
+          if (otFormulaActive) {
+            const formulaOTItems = combinedItems.filter(
+              (item) =>
+                isFormulaOTItem(item, null) &&
+                item.ot_rate_mode !== "fixed" &&
+                // Kerja Luar OT records are user-keyed: their keyed rate wins
+                // (decision 16); they stay classified as OT (excluded from the
+                // numerator/EPF) but are never repriced.
+                item.work_log_type !== "others" &&
+                (parseFloat(item.quantity) || 0) > 0
+            );
+            if (formulaOTItems.length > 0) {
+              // Paid leave is EXCLUDED from the numerator — HR prices leave
+              // FROM the derived daily rate (HR model "RAMBU").
+              const numeratorBreakdownCents = {
+                work_items: payableItems.reduce(
+                  (sum, item) =>
+                    (item.pay_type || "Tambahan") !== "Overtime" &&
+                    item.work_log_type !== "bonus"
+                      ? sum + Math.round(item.amount * 100)
+                      : sum,
+                  0
+                ),
+              };
+              const numeratorCents = Object.values(
+                numeratorBreakdownCents
+              ).reduce((a, b) => a + b, 0);
+
+              // Derive the divisor sources FIRST; the basis then resolves as:
+              // explicit staff override > actual days (habuk attendance dates
+              // or a Worked Days input) > monthly-logged default (÷26).
+              // Attendance dates: submitted Daily Lori Habuk logs (DRIVER),
+              // excluding leave days; monthly-logged staff use the Worked
+              // Days input on the monthly work log or default to ÷26.
+              const habukDates = new Set(
+                (habukLinesByDriver[employeeId] || [])
+                  .map((line) => line.log_date)
+                  .filter(
+                    (d) => d && !leaveDateSet.has(`${employeeId}|${d}`)
+                  )
+              );
+              const monthlyInput =
+                monthlyWorkedDaysByEmployee.get(employeeId) ?? null;
+              let workedDays = null;
+              let workedDaysSource = null;
+              if (habukDates.size > 0 && monthlyInput != null) {
+                workedDays = Math.max(habukDates.size, monthlyInput);
+                workedDaysSource = "attendance+monthly_input";
+              } else if (monthlyInput != null) {
+                workedDays = monthlyInput;
+                workedDaysSource = "monthly_input";
+              } else if (habukDates.size > 0) {
+                workedDays = habukDates.size;
+                workedDaysSource = "attendance";
+              }
+              const payBasis = resolveOTPayBasis(staff.ot_pay_basis, {
+                hasWorkedDaySource: workedDays != null,
+                isMonthlyLogged: Boolean(workLogsByEmployee[employeeId]),
+              });
+
+              const otRates = computeOTRates({
+                payBasis,
+                numeratorCents,
+                workedDays,
+              });
+              if (!otRates.ok) {
+                // Decision 15: block this employee with an actionable error.
+                errors.push({
+                  employeeId,
+                  employeeName: staff.name,
+                  error: `Kiraan kadar OT disekat: ${otRates.errors.join(" ")}`,
+                });
+                continue;
+              }
+
+              formulaOTItems.forEach((item) => {
+                const rate =
+                  otRateCentsForDayType(otRates.rateCents, "Biasa") / 100;
+                item.rate = rate;
+                item.amount =
+                  Math.round(rate * (parseFloat(item.quantity) || 0) * 100) /
+                  100;
+              });
+
+              otCalculationSnapshot = buildOTSnapshot({
+                payBasis,
+                numeratorCents,
+                numeratorBreakdownCents,
+                excludedLeaveCents: leaveGrossCents,
+                excludedBonusCents: payableItems.reduce(
+                  (sum, item) =>
+                    item.work_log_type === "bonus"
+                      ? sum + Math.round(item.amount * 100)
+                      : sum,
+                  0
+                ),
+                excludedOtCents: payableItems.reduce(
+                  (sum, item) =>
+                    (item.pay_type || "Tambahan") === "Overtime"
+                      ? sum + Math.round(item.amount * 100)
+                      : sum,
+                  0
+                ),
+                rates: otRates,
+                workedDaysSource,
+              });
+            }
+          }
+
           // Calculate gross pay in integer cents to avoid float drift
           const grossPayCents =
             leaveGrossCents +
@@ -745,8 +886,8 @@ export default function (pool) {
             await client.query(
               `UPDATE greentarget.employee_payrolls
                SET gross_pay = $1, net_pay = $2, digenapkan = $3, setelah_digenapkan = $4,
-                   job_type = $5, section = $6
-               WHERE id = $7`,
+                   job_type = $5, section = $6, ot_calculation = $7
+               WHERE id = $8`,
               [
                 grossPay.toFixed(2),
                 netPay.toFixed(2),
@@ -754,6 +895,9 @@ export default function (pool) {
                 setelahDigenapkan.toFixed(2),
                 jobType,
                 jobType,
+                otCalculationSnapshot
+                  ? JSON.stringify(otCalculationSnapshot)
+                  : null,
                 employeePayrollId,
               ]
             );
@@ -771,8 +915,8 @@ export default function (pool) {
             const insertResult = await client.query(
               `INSERT INTO greentarget.employee_payrolls
                (monthly_payroll_id, employee_id, job_type, section, gross_pay, net_pay,
-                digenapkan, setelah_digenapkan)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+                digenapkan, setelah_digenapkan, ot_calculation)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
               [
                 id,
                 employeeId,
@@ -782,6 +926,9 @@ export default function (pool) {
                 netPay.toFixed(2),
                 digenapkan.toFixed(2),
                 setelahDigenapkan.toFixed(2),
+                otCalculationSnapshot
+                  ? JSON.stringify(otCalculationSnapshot)
+                  : null,
               ]
             );
             employeePayrollId = insertResult.rows[0].id;

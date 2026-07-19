@@ -149,6 +149,14 @@ export interface PayrollProcessEmployeeSelection {
   jobType: string;
 }
 
+// Per-employee error returned by the payroll process endpoints (e.g. the
+// July 2026+ OT-formula blocks). Rendered by PayrollProcessingErrorsDialog.
+export interface PayrollProcessingError {
+  employeeId: string;
+  employeeName?: string;
+  error: string;
+}
+
 export interface ProcessMonthlyPayrollsOptions {
   selected_employees: PayrollProcessEmployeeSelection[];
   prune_unselected?: boolean;

@@ -166,6 +166,7 @@ export default function (pool) {
       epfNationalityOverride,
       socsoAgeOverride,
       sipAgeOverride,
+      otPayBasis,
     } = req.body;
 
     try {
@@ -207,9 +208,9 @@ export default function (pool) {
           job, location, date_joined, ic_no, bank_account_number, epf_no,
           income_tax_no, socso_no, document, payment_type, payment_preference,
           race, agama, date_resigned, marital_status, spouse_employment_status, number_of_children, department, kwsp_number, password, head_staff_id,
-          epf_age_override, epf_nationality_override, socso_age_override, sip_age_override
+          epf_age_override, epf_nationality_override, socso_age_override, sip_age_override, ot_pay_basis
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34)
         RETURNING *
       `;
 
@@ -247,6 +248,7 @@ export default function (pool) {
         epfNationalityOverride || null,
         socsoAgeOverride || null,
         sipAgeOverride || null,
+        otPayBasis || null,
       ];
 
       const result = await pool.query(query, values);
@@ -460,7 +462,8 @@ export default function (pool) {
           s.epf_age_override as "epfAgeOverride",
           s.epf_nationality_override as "epfNationalityOverride",
           s.socso_age_override as "socsoAgeOverride",
-          s.sip_age_override as "sipAgeOverride"
+          s.sip_age_override as "sipAgeOverride",
+          s.ot_pay_basis as "otPayBasis"
         FROM
           staffs s
         WHERE
@@ -690,6 +693,7 @@ export default function (pool) {
       epfNationalityOverride,
       socsoAgeOverride,
       sipAgeOverride,
+      otPayBasis,
     } = req.body;
 
     try {
@@ -732,8 +736,9 @@ export default function (pool) {
               socso_no = $16, document = $17, payment_type = $18, payment_preference = $19, 
               race = $20, agama = $21, date_resigned = $22, marital_status = $23, 
               spouse_employment_status = $24, number_of_children = $25, department = $26, kwsp_number = $27, password = $28,
-              epf_age_override = $29, epf_nationality_override = $30, socso_age_override = $31, sip_age_override = $32
-          WHERE id = $33
+              epf_age_override = $29, epf_nationality_override = $30, socso_age_override = $31, sip_age_override = $32,
+              ot_pay_basis = $33
+          WHERE id = $34
           RETURNING *
         `;
 
@@ -770,6 +775,7 @@ export default function (pool) {
           epfNationalityOverride || null,
           socsoAgeOverride || null,
           sipAgeOverride || null,
+          otPayBasis || null,
           id,
         ];
 

@@ -3630,7 +3630,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
   return (
     <div className="space-y-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm px-6 py-3">
-        <div className="flex justify-between items-center pb-3 mb-4 border-b border-default-200 dark:border-gray-700">
+        <div className="sticky top-0 z-20 -mx-6 -mt-3 px-6 pt-3 pb-3 mb-4 bg-white dark:bg-gray-800 flex justify-between items-center border-b border-default-200 dark:border-gray-700">
           <div className="flex items-center gap-4">
             <BackButton onClick={handleBack} />
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
