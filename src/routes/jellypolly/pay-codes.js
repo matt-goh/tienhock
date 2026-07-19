@@ -25,6 +25,23 @@ export default function (pool) {
     return value;
   };
 
+  // OT rate mode (July 2026+ OT salary formula): 'salary_formula' (default)
+  // or 'fixed' (keep configured/keyed rates for special payments).
+  const OT_RATE_MODES = ["salary_formula", "fixed"];
+  const normalizeOTRateMode = (value) => {
+    if (value === undefined || value === null || value === "") {
+      return "salary_formula";
+    }
+    if (!OT_RATE_MODES.includes(value)) {
+      const err = new Error(
+        `Invalid ot_rate_mode '${value}'. Must be one of ${OT_RATE_MODES.join(", ")}.`
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+    return value;
+  };
+
   // GET / - Remove 'code' from SELECT
   router.get("/", async (req, res) => {
     try {
@@ -43,7 +60,7 @@ export default function (pool) {
           CAST(rate_biasa AS NUMERIC(10, 2)) as rate_biasa,
           CAST(rate_ahad AS NUMERIC(10, 2)) as rate_ahad,
           CAST(rate_umum AS NUMERIC(10, 2)) as rate_umum,
-          is_active, requires_units_input, report_column, created_at, updated_at
+          is_active, requires_units_input, report_column, ot_rate_mode, created_at, updated_at
         FROM jellypolly.pay_codes ORDER BY updated_at DESC, created_at DESC`; // Order by latest modified/created
       const result = await pool.query(query);
       // Parse numeric values
@@ -79,7 +96,7 @@ export default function (pool) {
           CAST(rate_biasa AS NUMERIC(10, 2)) as rate_biasa,
           CAST(rate_ahad AS NUMERIC(10, 2)) as rate_ahad,
           CAST(rate_umum AS NUMERIC(10, 2)) as rate_umum,
-          is_active, requires_units_input, report_column, created_at, updated_at
+          is_active, requires_units_input, report_column, ot_rate_mode, created_at, updated_at
         FROM jellypolly.pay_codes WHERE id = $1`;
       const result = await pool.query(query, [id]);
       if (result.rows.length === 0)
@@ -124,6 +141,7 @@ export default function (pool) {
       is_active,
       requires_units_input,
       report_column,
+      ot_rate_mode,
     } = req.body;
 
     // ID is now the main identifier besides description
@@ -137,8 +155,10 @@ export default function (pool) {
     }
 
     let normalizedReportColumn;
+    let normalizedOTRateMode;
     try {
       normalizedReportColumn = normalizeReportColumn(report_column);
+      normalizedOTRateMode = normalizeOTRateMode(ot_rate_mode);
     } catch (err) {
       return res.status(err.statusCode || 400).json({ message: err.message });
     }
@@ -157,8 +177,8 @@ export default function (pool) {
         INSERT INTO jellypolly.pay_codes (
           id, description, pay_type, rate_unit,
           rate_biasa, rate_ahad, rate_umum,
-          is_active, requires_units_input, report_column
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) -- Adjusted parameter count
+          is_active, requires_units_input, report_column, ot_rate_mode
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) -- Adjusted parameter count
         RETURNING *
       `;
       const values = [
@@ -172,6 +192,7 @@ export default function (pool) {
         is_active === undefined ? true : !!is_active,
         requires_units_input === undefined ? false : !!requires_units_input,
         normalizedReportColumn,
+        normalizedOTRateMode,
       ];
 
       const result = await pool.query(query, values);
@@ -222,6 +243,7 @@ export default function (pool) {
       is_active,
       requires_units_input,
       report_column,
+      ot_rate_mode,
     } = req.body;
 
     if (!id) {
@@ -239,8 +261,10 @@ export default function (pool) {
     }
 
     let normalizedReportColumn;
+    let normalizedOTRateMode;
     try {
       normalizedReportColumn = normalizeReportColumn(report_column);
+      normalizedOTRateMode = normalizeOTRateMode(ot_rate_mode);
     } catch (err) {
       return res.status(err.statusCode || 400).json({ message: err.message });
     }
@@ -274,8 +298,9 @@ export default function (pool) {
           rate_umum = $6,
           is_active = $7,
           requires_units_input = $8,
-          report_column = $9
-        WHERE id = $10 -- Adjusted parameter count
+          report_column = $9,
+          ot_rate_mode = $10
+        WHERE id = $11 -- Adjusted parameter count
         RETURNING *
       `;
       const values = [
@@ -288,6 +313,7 @@ export default function (pool) {
         is_active === undefined ? true : !!is_active,
         requires_units_input === undefined ? false : !!requires_units_input,
         normalizedReportColumn,
+        normalizedOTRateMode,
         id,
       ];
 

@@ -249,6 +249,8 @@ export default function (pool) {
             ahad_overtime_hours: parseFloat(entry.ahad_overtime_hours || 0),
             umum_hours: parseFloat(entry.umum_hours || 0),
             umum_overtime_hours: parseFloat(entry.umum_overtime_hours || 0),
+            worked_days:
+              entry.worked_days != null ? parseFloat(entry.worked_days) : null,
             activities: activitiesResult.rows.map((activity) => ({
               ...activity,
               hours_applied: activity.hours_applied
@@ -387,8 +389,9 @@ export default function (pool) {
         const entryQuery = `
           INSERT INTO monthly_work_log_entries (
             monthly_log_id, employee_id, job_id, total_hours, overtime_hours,
-            ahad_hours, ahad_overtime_hours, umum_hours, umum_overtime_hours
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            ahad_hours, ahad_overtime_hours, umum_hours, umum_overtime_hours,
+            worked_days
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
           RETURNING id
         `;
 
@@ -402,6 +405,7 @@ export default function (pool) {
           ahadOvertimeHours || 0,
           umumHours || 0,
           umumOvertimeHours || 0,
+          entry.workedDays || null,
         ]);
 
         const entryId = entryResult.rows[0].id;
@@ -599,8 +603,9 @@ export default function (pool) {
         const entryQuery = `
           INSERT INTO monthly_work_log_entries (
             monthly_log_id, employee_id, job_id, total_hours, overtime_hours,
-            ahad_hours, ahad_overtime_hours, umum_hours, umum_overtime_hours
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            ahad_hours, ahad_overtime_hours, umum_hours, umum_overtime_hours,
+            worked_days
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
           RETURNING id
         `;
 
@@ -614,6 +619,7 @@ export default function (pool) {
           ahadOvertimeHours || 0,
           umumHours || 0,
           umumOvertimeHours || 0,
+          entry.workedDays || null,
         ]);
 
         const entryId = entryResult.rows[0].id;

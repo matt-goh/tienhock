@@ -35,6 +35,9 @@ interface EmployeeEntry {
   employeeName: string;
   totalHours: number;
   overtimeHours: number;
+  // Worked days this month (July 2026+ OT formula divisor for actual-days
+  // staff logged only in monthly hours). null = not entered.
+  workedDays: number | null;
   selected: boolean;
 }
 
@@ -50,6 +53,7 @@ interface ExistingWorkLog {
     employee_name: string;
     total_hours: number;
     overtime_hours: number;
+    worked_days?: number | string | null;
     activities: {
       pay_code_id: string;
       description: string;
@@ -246,6 +250,10 @@ const GTMonthlyLogEntryPage: React.FC = () => {
           employeeName: emp.employee_name,
           totalHours: saved ? Number(saved.total_hours) : DEFAULT_HOURS,
           overtimeHours: saved ? Number(saved.overtime_hours) || 0 : DEFAULT_OVERTIME,
+          workedDays:
+            saved && saved.worked_days != null
+              ? Number(saved.worked_days)
+              : null,
           selected: true,
         };
         entries[emp.employee_id] = entry;
@@ -398,6 +406,7 @@ const GTMonthlyLogEntryPage: React.FC = () => {
           jobType: GT_OFFICE_JOB,
           totalHours: entry.totalHours,
           overtimeHours: entry.overtimeHours,
+          workedDays: entry.workedDays || null,
           activities: (employeeActivities[entry.employeeId] || [])
             .filter((a) => a.isSelected)
             .map((a) => ({
@@ -495,6 +504,42 @@ const GTMonthlyLogEntryPage: React.FC = () => {
         </div>
       </div>
     </div>
+  );
+
+  // Worked Days (July 2026+ OT formula divisor for actual-days staff).
+  // Empty = not entered; payroll blocks an actual-days employee with OT if no
+  // worked-day count can be derived.
+  const handleWorkedDaysChange = (employeeId: string, value: string) => {
+    const numValue = value === "" ? null : parseFloat(value);
+    setEmployeeEntries((prev) => {
+      const entry = prev[employeeId];
+      if (!entry) return prev;
+      return {
+        ...prev,
+        [employeeId]: {
+          ...entry,
+          workedDays:
+            numValue == null || Number.isNaN(numValue) ? null : numValue,
+        },
+      };
+    });
+  };
+
+  const renderWorkedDaysInput = (entry: EmployeeEntry) => (
+    <input
+      type="number"
+      value={entry.selected && entry.workedDays != null ? entry.workedDays : ""}
+      onChange={(e) => handleWorkedDaysChange(entry.employeeId, e.target.value)}
+      onClick={(e) => e.stopPropagation()}
+      disabled={!entry.selected || isSaving}
+      title="Actual worked days this month (July 2026+ OT rate divisor for actual-days staff)"
+      aria-label={`Worked days for ${entry.employeeName}`}
+      placeholder="-"
+      className="w-20 pl-3 py-1 text-center text-sm border rounded focus:ring-1 disabled:bg-default-100 dark:disabled:bg-gray-700 bg-white dark:bg-gray-800 dark:text-gray-100 disabled:text-default-400 dark:disabled:text-gray-500 border-default-300 dark:border-gray-600 focus:ring-sky-500 focus:border-sky-500"
+      min="0"
+      max="31"
+      step="0.5"
+    />
   );
 
   if (isLoading || loadingPayCodes) {
@@ -605,6 +650,12 @@ const GTMonthlyLogEntryPage: React.FC = () => {
                     <th className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap w-44">
                       Biasa
                     </th>
+                    <th
+                      className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap w-24"
+                      title="Actual worked days this month. Used from July 2026 to derive the OT rate for staff paid by actual worked days; leave empty for monthly-salary (÷26) staff."
+                    >
+                      Worked Days
+                    </th>
                     <th className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap">
                       Activities
                     </th>
@@ -653,6 +704,9 @@ const GTMonthlyLogEntryPage: React.FC = () => {
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap">
                           {renderHourGroup(entry)}
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap text-center">
+                          {renderWorkedDaysInput(entry)}
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-center">
                           <button
