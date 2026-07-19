@@ -59,6 +59,16 @@ const JPStaffFormPage: React.FC = () => {
     { id: "Unemployed", name: "Unemployed" },
   ];
 
+  // OT pay basis for the July 2026+ OT salary formula. "" (Auto) resolves from
+  // where the work is recorded: actual worked days when attendance dates or a
+  // Worked Days input exist, otherwise ÷26 for monthly-logged staff. The
+  // explicit options are overrides for odd cases only.
+  const otPayBasisOptions = [
+    { id: "", name: "Auto (from work records)" },
+    { id: "monthly_26", name: "Monthly salary (÷ 26)" },
+    { id: "actual_days", name: "Actual worked days" },
+  ];
+
   // Per-staff statutory contribution overrides ("auto" sentinel maps to ""/NULL on save)
   const contributionAgeOptions = [
     { id: "auto", name: "Auto (from birthdate)" },
@@ -105,6 +115,7 @@ const JPStaffFormPage: React.FC = () => {
     epfNationalityOverride: "auto",
     socsoAgeOverride: "auto",
     sipAgeOverride: "auto",
+    otPayBasis: "",
   });
   const [initialFormData, setInitialFormData] = useState<Employee>({
     ...formData,
@@ -279,6 +290,7 @@ const JPStaffFormPage: React.FC = () => {
         epfNationalityOverride: data.epfNationalityOverride || "auto",
         socsoAgeOverride: data.socsoAgeOverride || "auto",
         sipAgeOverride: data.sipAgeOverride || "auto",
+        otPayBasis: data.otPayBasis || "",
       };
 
       // Preserve modified fields from current formData
@@ -616,6 +628,7 @@ const JPStaffFormPage: React.FC = () => {
         formData.socsoAgeOverride === "auto" ? "" : formData.socsoAgeOverride,
       sipAgeOverride:
         formData.sipAgeOverride === "auto" ? "" : formData.sipAgeOverride,
+      otPayBasis: formData.otPayBasis || "",
     };
 
     try {
@@ -669,41 +682,11 @@ const JPStaffFormPage: React.FC = () => {
     />
   );
 
-  const renderContributionSelect = (
-    name: keyof Employee,
-    label: string,
-    selectOptions: SelectOption[]
-  ) => (
-    <div className="space-y-2">
-      <label
-        htmlFor={name}
-        className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate"
-        title={label}
-      >
-        {label}
-      </label>
-      <select
-        id={name}
-        name={name}
-        value={(formData[name] as string) ?? ""}
-        onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
-          handleListboxChange(name, event.target.value)
-        }
-        className="block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm"
-      >
-        {selectOptions.map((option: SelectOption) => (
-          <option key={option.id} value={option.id}>
-            {option.name}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-
   const renderListbox = (
     name: keyof Employee,
     label: string,
-    options: SelectOption[]
+    options: SelectOption[],
+    optionsPosition?: "top" | "bottom"
   ) => {
     const currentValue = formData[name];
 
@@ -716,6 +699,7 @@ const JPStaffFormPage: React.FC = () => {
         onChange={(value) => handleListboxChange(name, value)}
         options={options}
         placeholder={`Select ${label}...`}
+        optionsPosition={optionsPosition}
       />
     );
   };
@@ -1058,25 +1042,35 @@ const JPStaffFormPage: React.FC = () => {
                     entirely.
                   </p>
                   <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-                    {renderContributionSelect(
+                    {renderListbox(
                       "epfAgeOverride",
                       "EPF Age",
-                      contributionAgeOptions
+                      contributionAgeOptions,
+                      "top"
                     )}
-                    {renderContributionSelect(
+                    {renderListbox(
                       "epfNationalityOverride",
                       "EPF Rate Type",
-                      epfNationalityOptions
+                      epfNationalityOptions,
+                      "top"
                     )}
-                    {renderContributionSelect(
+                    {renderListbox(
                       "socsoAgeOverride",
                       "SOCSO Age",
-                      contributionAgeOptions
+                      contributionAgeOptions,
+                      "top"
                     )}
-                    {renderContributionSelect(
+                    {renderListbox(
                       "sipAgeOverride",
                       "SIP Age",
-                      contributionAgeOptions
+                      contributionAgeOptions,
+                      "top"
+                    )}
+                    {renderListbox(
+                      "otPayBasis",
+                      "OT Pay Basis (from July 2026)",
+                      otPayBasisOptions,
+                      "top"
                     )}
                   </div>
                 </div>

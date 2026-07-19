@@ -551,6 +551,10 @@ export interface Employee {
   epfNationalityOverride: string;
   socsoAgeOverride: string;
   sipAgeOverride: string;
+  // OT pay basis for the July 2026+ OT salary formula:
+  // "monthly_26" | "actual_days" | "" (unset = defaults to actual worked days,
+  // auto-counted from attendance; only monthly-salaried staff need monthly_26).
+  otPayBasis?: string;
   updatedAt?: string;
   headStaffId?: string | null;
 }
@@ -769,6 +773,9 @@ export interface PayCode {
   // Optional Salary Report column override: "GAJI" | "OT" | "BONUS" | "CIO" | "CUTI".
   // null = use automatic bucketing. Sits below the per-entry others_records.report_column override.
   report_column?: string | null;
+  // July 2026+ OT rate mode: "salary_formula" (default; Overtime Hour items are
+  // priced from the derived monthly rate) or "fixed" (keep configured rates).
+  ot_rate_mode?: "salary_formula" | "fixed";
   created_at?: string;
   updated_at?: string;
   section_id?: string; // Optional field to indicate the section when used in section_pay_codes
@@ -818,6 +825,26 @@ export interface JobLocationMapping {
   updated_at?: string;
 }
 
+// July 2026+ OT salary-formula audit snapshot (employee_payrolls.ot_calculation).
+// Money values in RM; written by the payroll processors via buildOTSnapshot.
+export interface OTCalculationSnapshot {
+  version: string;
+  pay_basis: "monthly_26" | "actual_days";
+  numerator: number;
+  numerator_breakdown: Record<string, number>;
+  excluded_bonus: number;
+  excluded_overtime: number;
+  // Paid leave kept out of the basis (v2+; may be absent on v1 snapshots)
+  excluded_leave?: number;
+  divisor_days: number;
+  worked_days_source: string | null;
+  normal_hours_per_day: number;
+  daily_rate: number;
+  hourly_rate: number;
+  multipliers: { biasa: number; ahad: number; umum: number };
+  rates: { biasa: number; ahad: number; umum: number };
+}
+
 export interface EmployeePayroll {
   id?: number;
   monthly_payroll_id?: number;
@@ -843,6 +870,9 @@ export interface EmployeePayroll {
   mid_month_payrolls_by_employee?: Record<string, number>;
   commission_records?: CommissionRecord[];
   others_records?: OthersRecord[];
+  // July 2026+ OT salary-formula audit snapshot written at processing time
+  // (employee_payrolls.ot_calculation). null/undefined = formula not applied.
+  ot_calculation?: OTCalculationSnapshot | null;
   // Mapping of employee_id to job_type for combined payrolls (e.g., {"MASRUN_S": "MEE_ROLL", "MASRUN": "MEE_SANGKUT"})
   employee_job_mapping?: Record<string, string>;
   // Designated Head sibling id (staffs.head_staff_id) for the same-name group, or
