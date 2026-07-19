@@ -1406,7 +1406,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   return (
     <div className="space-y-4">
       {/* Header & Month/Year Selection */}
-      <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-default-200 dark:border-gray-700">
+      <div className="sticky top-0 z-20 bg-white dark:bg-gray-800 p-4 rounded-lg border border-default-200 dark:border-gray-700">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-4">
             <BackButton onClick={handleCancel} />
