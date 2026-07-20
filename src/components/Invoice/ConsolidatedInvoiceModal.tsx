@@ -1,5 +1,6 @@
 // src/components/Invoice/ConsolidatedInvoiceModal.tsx
 import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../../routes/utils/api";
 import Button from "../Button";
 import LoadingSpinner from "../LoadingSpinner";
@@ -95,6 +96,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
   year,
   onMonthYearChange,
 }) => {
+  const navigate = useNavigate();
   // State hooks remain the same
   const [eligibleInvoices, setEligibleInvoices] = useState<EligibleInvoice[]>(
     []
@@ -1453,17 +1455,50 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                                   {statusText}
                                 </span>
                               </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-default-600 dark:text-gray-400 text-right">
-                                {item.consolidated_invoices?.length || 0}
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
+                                {item.consolidated_invoices?.length ? (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      navigate(
+                                        `/sales/invoice/consolidated/${item.id}`
+                                      )
+                                    }
+                                    className="text-sky-600 dark:text-sky-400 hover:underline font-medium"
+                                    title="View and print the invoices in this consolidation"
+                                  >
+                                    {item.consolidated_invoices.length}
+                                  </button>
+                                ) : (
+                                  <span className="text-default-600 dark:text-gray-400">
+                                    0
+                                  </span>
+                                )}
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap text-sm text-default-700 dark:text-gray-200 text-right font-medium">
                                 {formatCurrency(item.totalamountpayable)}
                               </td>
-                              <td
-                                className="px-4 py-3 whitespace-nowrap text-sm text-default-500 dark:text-gray-400 font-mono max-w-[150px] truncate"
-                                title={item.uuid || "MyInvois Document UUID"}
-                              >
-                                {item.uuid || "-"}
+                              <td className="px-4 py-3 whitespace-nowrap text-sm font-mono max-w-[150px] truncate">
+                                {currentStatus === "valid" &&
+                                item.uuid &&
+                                item.long_id ? (
+                                  <a
+                                    href={`https://myinvois.hasil.gov.my/${item.uuid}/share/${item.long_id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-sky-600 dark:text-sky-400 hover:underline"
+                                    title="Open on the MyInvois portal"
+                                  >
+                                    {item.uuid}
+                                  </a>
+                                ) : (
+                                  <span
+                                    className="text-default-500 dark:text-gray-400"
+                                    title={item.uuid || "MyInvois Document UUID"}
+                                  >
+                                    {item.uuid || "-"}
+                                  </span>
+                                )}
                               </td>
 
                               {/* --- UPDATED Actions Cell --- */}
