@@ -1,6 +1,6 @@
 # Legacy Report Scans — Verification & 1:1 Parity Plan (Handover)
 
-**Created 17 Jul 2026. Updated 20 Jul 2026. Phase V0 COMPLETE; V1 steps 1–4 (code mapping + TB + Trade Debtor List + BS/IS/CoGM statement comparisons) COMPLETE; V1 step 5 (consolidation & V2 sign-off package) and V2–V4 pending.**
+**Created 17 Jul 2026. Updated 20 Jul 2026. Phases V0, V1 and the approved V2 development package are COMPLETE. The development books are balanced at the RM5,389,607.26 pre-closing-stock boundary; production V2 remains a separate approval, and V3–V4 are pending.**
 Follow-on to the completed Jan–May legacy ledger import
 ([LEGACY_JAN_MAY_IMPORT_PLAN.md](LEGACY_JAN_MAY_IMPORT_PLAN.md)). That project ended with an
 exact, hash-pinned `IMP` journal projection but **no independent way to verify it**, and with the
@@ -16,11 +16,13 @@ from the legacy system as **scanned PDFs** (received 15 Jul 2026, now stored pri
 2. **Phase V1** — machine-compare fixtures against the dev DB per account / per customer / per
    statement line, categorising every difference. Expected headline result: the RM1,456,480.37
    residue decomposes into a *named per-account opening-correction set* (evidence in §2).
-3. **Phase V2** — user-approved guarded migration closing the opening gap (dev → prod). After
-   this the Balance Sheet balances (May target: **6,097,691.11**) and the TB residue is gone.
-4. **Phase V3** — close remaining report-capability gaps so users can *themselves* produce these
-   five reports 1:1 (content parity, never visual) from the ERP going forward — chiefly the
-   monthly closing-stock mechanism and Debtor-list column/aging parity.
+3. **Phase V2** — ✅ completed and verified on development 20 Jul 2026; production remains a
+   separately approved rollout. The guarded migration removes the TB residue and makes the Balance
+   Sheet balance at the pre-closing-stock May total **5,389,607.26**.
+4. **Phase V3** — close the remaining report-capability gaps so users can *themselves* produce
+   these five reports 1:1 (content parity, never visual) from the ERP going forward — chiefly the
+   monthly closing-stock mechanism, which takes May to **6,097,691.11**, and Debtor-list
+   column/aging parity.
 
 June 2026 is already row-by-row reconciled; this project is about Jan–May plus standing
 capability. **House rules inherited from the import project apply throughout: every difference is
@@ -446,28 +448,56 @@ package.
 `tdl` and `statements` together (36 ok gates, `ALL STAGES GREEN`). No build, lint or
 type-check command was run.
 
-### V1 remaining step (run standalone; pick up here in a fresh session)
+### V1 step 5 execution record — consolidation and V2 sign-off, completed 20 Jul 2026
 
-- **Step 5 — consolidation & gate to V2**: write `LEGACY_REPORT_RECONCILIATION.md` (findings
-  doc + the named opening-correction table account → amount → evidence page for user sign-off,
-  now including the 31 + 94 fs_note corrections from step 4 with the printed APPX as target),
-  document the standing harness run command, then present the V2 sign-off package (§6). The
-  step-4 projection figures (TB residue → 0; BS −626,875.15 without / 0.00 with the §8-2
-  engine change; May BS 5,389,607.26 pre-V3 vs target 6,097,691.11) belong in that package.
+**Files changed:** tracked
+[LEGACY_REPORT_RECONCILIATION.md](LEGACY_REPORT_RECONCILIATION.md) (the durable findings and
+sign-off document) and this plan. No database, report-engine, production, or user-facing state
+was changed.
 
-## 6. Phase V2 — close the opening gap (guarded mutation, dev → prod)
+- The reconciliation copies every sign-off-critical row out of the private generated JSON: all
+  **125 anchor corrections** with amount and May scan page/row, all **94 overlapping stock
+  `fs_note` moves**, and all **31 non-stock `fs_note` moves** with evidence. Their union is 156
+  accounts. The mapping set remains fingerprint-pinned at
+  `c83f4ef40c85ea3716fdecdace37dbfffbc53f51d23d8b2da02fc006fd8d2088`.
+- The exact package is now pinned: set 63 existing CS anchors (CR 829,605.22) to zero, insert 62
+  OS anchors (DR 626,875.15), apply the 31 + 94 printed APPX targets, route note 3-1 to the Income
+  Statement rather than CoGM, and teach only the opening-stock report semantics to read anchors.
+  The projected January population is 642 anchors, DR = CR 13,180,681.18.
+- A read-only dev check confirms zero overlap between the 125 stock accounts and the 1,571
+  2026-06-01 checkpoint anchors. The January corrections therefore remain effective through June
+  without mutating or invalidating any existing June checkpoint.
+- A generic "include every 3-* anchor in CoGM" design was rejected: finished-goods opening note
+  3-1 prints on the IS, while the legacy CoGM contains only raw-material and packing openings
+  3-3/3-7. The sign-off package uses the note metadata to keep that boundary explicit.
+- The phase boundary is now stated honestly: V2 removes the TB residue and makes the BS API
+  difference 0.00 at a legacy-format May total of **5,389,607.26**. The final printed
+  **6,097,691.11** additionally needs 708,083.85 of monthly closing stock, whose architecture
+  remains V3 unless the user explicitly expands V2.
+- The standing commands are documented in the reconciliation. On this final V1 run,
+  `validate-fixtures.mjs` passed all hashes/arithmetic gates and
+  `verify-legacy-reports.mjs` passed all four stages / 36 gates (`ALL STAGES GREEN`). The current
+  harness intentionally pins the pre-V2 state and must move to final-state expectations during
+  an approved V2 without weakening the old evidence.
 
-Blocked on V1's evidence and the user decisions in §8. Expected shape (verify, don't assume):
+**V1 is complete.** The exact V2 development package is presented for approval in the
+reconciliation; production remains a later, separate approval after development proof.
 
-- Insert the missing 01-01 openings for the stock family (and anything else V1 surfaces), and/or
-  supersede the existing `CS_*` CR anchors, replacing the named RM1,456,480.37 residue with real
-  balances.
-- **Anchor vs journal is a real decision, not a detail:** the IS/CoGM engines read *journal
-  movement only* — an anchor on a P&L-type account (opening inventories, notes 3-*) will fix the
-  TB/BS but will **never** render on the Income Statement/CoGM. If the legacy year-start roll was
-  itself a journal (posted in legacy after the export), the faithful reproduction is a
-  user-approved 01-01 journal; it must balance, which the transcribed per-account amounts will
-  prove one way or the other.
+## 6. Phase V2 — close the opening gap (✅ development complete 20 Jul 2026)
+
+The package in [LEGACY_REPORT_RECONCILIATION.md](LEGACY_REPORT_RECONCILIATION.md) was explicitly
+approved for development and implemented at the exact boundary below. Production was not changed.
+The evidence and settled §8 choices pin the delivered shape:
+
+- Update the 63 existing 01-01 CS anchors to explicit zero fences and insert the 62 printed 01-01
+  OS anchors. Apply the 31 non-stock + 94 stock effective-`fs_note` targets, plus the guarded
+  note-3-1 report-section correction. No account code or journal is created; `IMP` stays
+  immutable. Abort if any correction account has acquired a 2026-06-01 anchor.
+- **The anchor decision is settled:** opening inventories use `account_opening_balances`, not a
+  synthetic 01-01 journal. For report year `YYYY`, add only the exact `YYYY-01-01` opening-stock
+  anchor once to the existing posted YTD movement through the selected period end; later anchors
+  do not replace a fiscal-year opening. The IS and BS Current Year Profit include 3-1/3-3/3-7;
+  CoGM includes 3-3/3-7 only. Do not generically include every P&L anchor.
 - Delivery discipline exactly as the import: `dev/migrations/2026-MM-DD_*.sql`, precondition
   checks on the current anchor/journal population, exact expected counts/amounts, idempotent
   no-op rerun, rehearsal on a fresh restore, validated rollback backup for prod, PM2 window.
@@ -476,14 +506,62 @@ Blocked on V1's evidence and the user decisions in §8. Expected shape (verify, 
   will (correctly) no longer pass as written. Follow the presentation-migration precedent: the V2
   migration itself becomes the new final verifier, and the old scripts are documented as
   pre-V2-state only. Never weaken the old scripts in place.
-- Re-run after mutation: V1 harness (all offsets → 0; May BS balances at 6,097,691.11; TB residue
-  gone for every month Jan–Jun), the frozen June five-ledger recon (must be unchanged — the
-  correction touches openings, not June movement… but `CS_*`/stock anchors DO affect June-period
-  TB/BS levels, so June statement figures will legitimately change; name them), and the
-  1,571 June checkpoint equality.
+- Transition and re-run the harness after mutation: 880/880 TB accounts exact, all offsets zero,
+  the residue gone Jan–Jun, DEBTOR/TDL proofs unchanged, all 125 actionable APPX mismatches gone,
+  BS API difference 0.00, and 30/40 statement lines exact. The remaining ten are only the six
+  V3 closing-stock lines and their profit/CoGM cross-totals. Re-run the frozen June five-ledger
+  recon (movement must be unchanged), name the legitimate June TB/BS level changes, and re-prove
+  all 1,571 June checkpoint equalities.
 - Update docs ([ACCOUNTING_PROGRESS.md](ACCOUNTING_PROGRESS.md),
   [LEGACY_JAN_MAY_IMPORT_PLAN.md](LEGACY_JAN_MAY_IMPORT_PLAN.md) §3/§8-1) and add a changelog
   entry (user-visible: Balance Sheet now balances / opening stock loaded).
+
+### V2 development execution record — completed 20 Jul 2026
+
+- Added guarded migration
+  [`2026-07-20_legacy_report_v2_opening_stock.sql`](../../dev/migrations/2026-07-20_legacy_report_v2_opening_stock.sql).
+  Its literal target tables fingerprint the exact 125 anchors and 125 direct mapping changes; the
+  union is 156 accounts. It accepts only the wholly audited fresh state or the wholly audited final
+  state, snapshots every staging/IMP row, locks the affected tables, and aborts on any mixed state,
+  June overlap, account/note drift, journal drift, or checkpoint mismatch.
+- Rehearsed on isolated development clone `tienhock_v2_rehearsal_20260720`. The fresh pass reported
+  exactly 63 CS updates, 62 OS inserts, 125 `fs_note` updates and one note-3-1 update. The immediate
+  final-state rerun reported **0 / 0 / 0 / 0** writes. The identical two-pass sequence then succeeded
+  on database `tienhock`; production was not accessed or modified.
+- Final January state is 642 anchors: 290 nonzero, 352 zero, 230 debit and 60 credit rows, with
+  DR = CR **RM13,180,681.18**. All 63 target `CS_*` anchors are explicit zero, all 62 `OS_*`
+  anchors equal the scan values totalling **RM626,875.15**, and none of the 125 codes has a
+  2026-06-01 checkpoint.
+- [financial-reports.js](../../src/routes/accounting/financial-reports.js) now adds exact fiscal-year
+  opening stock once: IS and BS Current Year Profit use 3-1/3-3/3-7; CoGM uses 3-3/3-7. A direct
+  invocation of the actual May route handlers returned revenue RM3,334,649.33, COGS
+  RM3,082,527.72, expenses RM675,380.45, profit **-RM423,258.84**, CoGM
+  **RM2,998,134.52**, and a BS difference below one billionth of a ringgit (floating-point display;
+  accounting-cents difference RM0.00).
+- `validate-fixtures.mjs` ended `ALL CHECKS PASSED`. The transitioned
+  `verify-legacy-reports.mjs` ended `ALL STAGES GREEN`: TB **880/880 exact** with all five monthly
+  offsets zero; TDL 150/150 exact; all 156 approved effective mappings exact; statements **30/40
+  exact**, with precisely the six V3 closing-stock lines and four related cross-totals remaining;
+  May legacy-format net assets and financed by both **RM5,389,607.26**.
+- Immutable/regression proof remains exact: staging 12,635 rows; `IMP` 3,863 headers / 10,068 lines
+  / DR = CR RM13,503,516.15; all 1,571 June checkpoint equalities; June derived TB balanced; the
+  frozen five-ledger movement remains 1,030 lines. The standing portable fingerprints are IMP
+  `9c0d5c6b141af5d102f5a31c590f6f82`, June anchors
+  `147c022cef7b4a4c90735718860a60eb`, and June five-ledger movement
+  `c27dbd5a5db93bf08823ae4e0f22cad4`.
+- The legitimate June level change is now explicit: the unchanged journals plus corrected opening
+  stock move the derived TB from the pre-V2 DR RM16,752,953.37 / CR RM18,209,433.74 to **DR = CR
+  RM17,379,828.52**. After the approved note reclassifications, June BS assets and
+  liabilities-plus-equity are both **RM8,368,289.50**; legacy-format net assets/financed by are
+  **RM5,353,125.52**, with Current Year Profit **-RM459,740.58**. This is a level/classification
+  change only: June journal movement and all five reconciled ledgers are unchanged.
+- The old `verify-import.sql` and `insert-opening-anchors.sql` remain untouched and intentionally
+  describe the pre-V2 580-anchor/residue state. No build, lint or type-check command was run.
+
+**V2 is complete on development.** The remaining RM708,083.85 May closing stock, the exact ten
+statement differences, and the debtor presentation/aging items remain V3. A production rollout must
+start with a fresh read-only inventory and separate approval; do not weaken the development guards
+to force a drifted production state through.
 
 ## 7. Phase V3 — standing 1:1 report capability for users
 
@@ -497,16 +575,14 @@ findings; expected items):
    `material_stock_kilang_entries` figures) or report-level injection from those tables. This is
    gap item #4 in [ACCOUNTING_PROGRESS.md](ACCOUNTING_PROGRESS.md) §4 — design it against the
    scanned figures as acceptance targets (May: 188,979.60 / 336,909.82 / 182,194.43).
-2. **IS/CoGM opening-inventory lines** — however V2 lands (journal vs anchor), the engines must
-   actually render notes 3-1/3-3/3-7 with 626,875.15 total for every 2026 month.
-3. **Debtor list parity** — Step 3 proved the balances and exact legacy rules. Make the
+2. **Debtor list parity** — Step 3 proved the balances and exact legacy rules. Make the
    user-facing print path (a) classify CNs and the GUI contra like the legacy CURRENT/PAYMENT
    columns, (b) omit zero-close body rows while keeping the intended aggregate population clear,
    and (c) offer/reproduce the signed-ledger monthly FIFO aging model rather than the current
    explicit-invoice-allocation + forced-oldest-bridge model. Acceptance target: all 150 May rows
    and all four buckets equal `tdl-comparison.json`; the five/11-row fingerprints disappear.
-4. Keep the V1 harness as a regression gate (documented run command, like the import's
-   verification suite).
+3. Keep the transitioned V1/V2 harness as a regression gate (documented run command, like the
+   import's verification suite).
 
 **Phase V4 — closeout:** prod parity re-run, docs refresh, retain scans + fixtures permanently as
 audit evidence (they are the only independent proof of the Jan–May books).
@@ -517,11 +593,10 @@ audit evidence (they are the only independent proof of the Jan–May books).
    printed reports, then the question is moot.* → The printed TBs are the target state; V1 derives
    the correction empirically instead of from legacy-operator testimony.
 2. **Anchor vs 01-01 journal** — *User: definitely use anchors; users should be able to set an
-   anchor to correct amounts.* → Corrections go through `account_opening_balances` (and the V3
-   capability exposes anchor setting to users). Consequence to solve in V2/V3: the IS/CoGM engines
-   read journal movement only, so the opening-inventory statement lines (notes 3-1/3-3/3-7) need
-   the engines to learn to read those anchors (or an equivalent report-level source) — present the
-   concrete design with numbers at V2 sign-off.
+   anchor to correct amounts.* → Corrections use the existing Opening Balances UI/API and
+   `account_opening_balances`, never a synthetic journal. The V2 package adds each exact
+   `YYYY-01-01` stock-opening anchor once to posted YTD movement: IS/BS profit include
+   3-1/3-3/3-7, while CoGM includes only 3-3/3-7.
 3. **Scan-only account codes** — *User: do the logical, accounting-standard thing as long as it
    brings the data closer to 1:1.* → Create genuinely missing codes with correct fs_note; alias
    only provable identity matches; name every case in the reconciliation doc.
@@ -539,11 +614,10 @@ audit evidence (they are the only independent proof of the Jan–May books).
 - **OCR risk is structurally bounded**: TB-a totals, TDL row arithmetic, ST-a recomputation, and
   the V1 constant-offset invariant mean an undetected mis-read requires multiple compensating
   errors. Treat every non-constant offset as "re-read the page" before "data problem".
-- ~108 pages ≈ 5,400 TB rows (mostly `.00`) + ~200 debtor rows + ~60 statement lines. Transcribe
-  full pages (zero rows included — `CS_* = .00` is itself a finding); batch by page; validate
-  incrementally per month so errors surface early, not after 100 pages.
-- The dev DB Docker container wasn't running this session (`dev.bat` / `cd dev && docker compose
-  up` first); all V1 queries go through `docker exec -i tienhock_dev_db psql …` per CLAUDE.md.
+- V0 transcription is complete and hash-pinned. Do not edit a private scan/fixture unless a hash
+  or arithmetic gate first proves it is wrong; every zero row remains deliberate evidence.
+- The final V1 DB-backed run passed all 36 gates. Future runs still require the
+  `tienhock_dev_db` container and use read-only `docker exec … psql` queries per CLAUDE.md.
 - The renderer (`dev/import/legacy-report-fixtures/render-pdf.mjs`) was smoke-tested 17 Jul
   against all nine PDFs from the repo root; page counts in §1 come from it.
 - When V2 changes June-period statement *levels* via stock accounts (§6), the frozen June recon
@@ -552,8 +626,8 @@ audit evidence (they are the only independent proof of the Jan–May books).
   update docs rather than leaving stale figures.
 - The scans may also settle old classification questions (`BTRA` = APPX 5, `NT_7484`, `THJ_CK`/
   `THJ_SM`, `CL_GT`/`CL_GF` debit balances) — harvest those answers into
-  [LEGACY_TRIAL_BALANCE_CODE_ANALYSIS.md](LEGACY_TRIAL_BALANCE_CODE_ANALYSIS.md) while
-  transcribing, they cost nothing extra.
+  [LEGACY_TRIAL_BALANCE_CODE_ANALYSIS.md](LEGACY_TRIAL_BALANCE_CODE_ANALYSIS.md) during the V2
+  documentation refresh.
 
 ---
 

@@ -102,6 +102,32 @@ export default function (pool) {
           WHERE ap.anchor_date IS NOT NULL OR am.code IS NOT NULL
         )`;
 
+  /** @type {string[]} */
+  const INCOME_STATEMENT_OPENING_STOCK_NOTES = ["3-1", "3-3", "3-7"];
+
+  /** @type {string[]} */
+  const COGM_OPENING_STOCK_NOTES = ["3-3", "3-7"];
+
+  // Profit-and-loss reports consume only the exact fiscal-year opening-stock
+  // anchors. This is deliberately separate from the latest-anchor semantics
+  // used by the Trial Balance and Balance Sheet account balances: a later
+  // checkpoint must never replace opening stock in the Income Statement or
+  // CoGM.
+  /** @type {string} */
+  const EXACT_FISCAL_OPENING_STOCK_CTE = `
+        fiscal_opening_stock AS (
+          SELECT
+            efn.fs_note,
+            SUM(CASE WHEN aob.amount > 0 THEN aob.amount ELSE 0 END) AS total_debit,
+            SUM(CASE WHEN aob.amount < 0 THEN -aob.amount ELSE 0 END) AS total_credit,
+            SUM(aob.amount) AS net
+          FROM account_opening_balances aob
+          JOIN effective_fs_notes efn ON efn.code = aob.account_code
+          WHERE aob.as_of_date = $1::date
+            AND efn.fs_note = ANY($3::varchar[])
+          GROUP BY efn.fs_note
+        )`;
+
   // ==================== FINANCIAL STATEMENT NOTES ====================
 
   // GET /notes - Get all financial statement notes
@@ -116,6 +142,7 @@ export default function (pool) {
         FROM financial_statement_notes
         WHERE 1=1
       `;
+
       const params = [];
       let paramIndex = 1;
 
@@ -594,7 +621,8 @@ export default function (pool) {
       // Get balances grouped by effective fs_note for the YTD period
       const query = `
         WITH RECURSIVE ${EFFECTIVE_FS_NOTES_CTES},
-        period_balances AS (
+        ${EXACT_FISCAL_OPENING_STOCK_CTE},
+        period_activity AS (
           SELECT
             efn.fs_note,
             SUM(COALESCE(jel.debit_amount, 0)) as total_debit,
@@ -605,6 +633,17 @@ export default function (pool) {
           WHERE je.status = 'posted'
             AND je.entry_date BETWEEN $1 AND $2
           GROUP BY efn.fs_note
+          UNION ALL
+          SELECT fs_note, total_debit, total_credit
+          FROM fiscal_opening_stock
+        ),
+        period_balances AS (
+          SELECT
+            fs_note,
+            SUM(total_debit) AS total_debit,
+            SUM(total_credit) AS total_credit
+          FROM period_activity
+          GROUP BY fs_note
         )
         SELECT
           fsn.code,
@@ -628,7 +667,11 @@ export default function (pool) {
         ORDER BY fsn.sort_order, fsn.code
       `;
 
-      const result = await pool.query(query, [periodStartStr, periodEndStr]);
+      const result = await pool.query(query, [
+        periodStartStr,
+        periodEndStr,
+        INCOME_STATEMENT_OPENING_STOCK_NOTES,
+      ]);
 
       // Organize into sections
       const revenue = [];
@@ -710,12 +753,13 @@ export default function (pool) {
       );
 
       // Balance Sheet notes use each account's latest applicable opening
-      // anchor plus subsequent posted movement. Current Year Profit is kept
-      // movement-only and follows the same journal/note rules as the Income
-      // Statement and CoGM reports.
+      // anchor plus subsequent posted movement. Current Year Profit follows
+      // the Income Statement: exact fiscal-year opening stock plus posted YTD
+      // movement. Later checkpoint anchors do not replace fiscal opening stock.
       const query = `
         WITH RECURSIVE ${EFFECTIVE_FS_NOTES_CTES},
         ${ANCHORED_ACCOUNT_BALANCES_CTES},
+        ${EXACT_FISCAL_OPENING_STOCK_CTE},
         statement_balances AS (
           SELECT
             efn.fs_note,
@@ -726,7 +770,7 @@ export default function (pool) {
           JOIN effective_fs_notes efn ON efn.code = ab.code
           GROUP BY efn.fs_note
         ),
-        pnl_movements AS (
+        pnl_activity AS (
           SELECT
             efn.fs_note,
             SUM(
@@ -740,6 +784,14 @@ export default function (pool) {
             AND je.entry_date >= $1
             AND je.entry_date <= $2
           GROUP BY efn.fs_note
+          UNION ALL
+          SELECT fs_note, net
+          FROM fiscal_opening_stock
+        ),
+        pnl_movements AS (
+          SELECT fs_note, SUM(net) AS net
+          FROM pnl_activity
+          GROUP BY fs_note
         ),
         current_year_profit AS (
           SELECT COALESCE(
@@ -797,7 +849,11 @@ export default function (pool) {
         ORDER BY sort_order, code
       `;
 
-      const result = await pool.query(query, [periodStartStr, periodEndStr]);
+      const result = await pool.query(query, [
+        periodStartStr,
+        periodEndStr,
+        INCOME_STATEMENT_OPENING_STOCK_NOTES,
+      ]);
 
       // Organize into sections
       const assets = { current: [], non_current: [] };
@@ -908,7 +964,8 @@ export default function (pool) {
       // Get COGM-related balances grouped by effective fs_note
       const query = `
         WITH RECURSIVE ${EFFECTIVE_FS_NOTES_CTES},
-        period_balances AS (
+        ${EXACT_FISCAL_OPENING_STOCK_CTE},
+        period_activity AS (
           SELECT
             efn.fs_note,
             SUM(COALESCE(jel.debit_amount, 0)) as total_debit,
@@ -919,6 +976,17 @@ export default function (pool) {
           WHERE je.status = 'posted'
             AND je.entry_date BETWEEN $1 AND $2
           GROUP BY efn.fs_note
+          UNION ALL
+          SELECT fs_note, total_debit, total_credit
+          FROM fiscal_opening_stock
+        ),
+        period_balances AS (
+          SELECT
+            fs_note,
+            SUM(total_debit) AS total_debit,
+            SUM(total_credit) AS total_credit
+          FROM period_activity
+          GROUP BY fs_note
         )
         SELECT
           fsn.code,
@@ -941,7 +1009,11 @@ export default function (pool) {
         ORDER BY fsn.sort_order, fsn.code
       `;
 
-      const result = await pool.query(query, [periodStartStr, periodEndStr]);
+      const result = await pool.query(query, [
+        periodStartStr,
+        periodEndStr,
+        COGM_OPENING_STOCK_NOTES,
+      ]);
 
       // Categorize COGM items
       const rawMaterials = [];

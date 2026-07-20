@@ -1,4 +1,4 @@
-// Phase V1 harness — machine-compares the transcribed legacy report fixtures
+// Phase V1 + V2 harness — machine-compares the transcribed legacy report fixtures
 // against the dev DB (docs/Account/LEGACY_REPORT_VERIFICATION_PLAN.md §5).
 // Read-only: every DB access is a SELECT through docker exec psql.
 //
@@ -8,11 +8,12 @@
 //   map   V1 step 1 — printed TB code -> ERP account code mapping
 //         (normalization -> account_codes exact -> import alias table ->
 //         named exception list). Writes generated/account-map.json.
-//   tb    V1 step 2 — scanned TB balance vs ERP derived balance per account
+//   tb    V1 step 2 / V2 final state — scanned TB balance vs ERP derived balance per account
 //         per month-end (report semantics: latest anchor <= period end +
 //         posted movement from the anchor date, TD children collapsed into
 //         DEBTOR). Classifies exact / constant offset / non-constant offset,
-//         hard-gates the DEBTOR controls and the RM1,456,480.37 residue.
+//         hard-gates 880/880 exact accounts, the DEBTOR controls, and the
+//         balanced V2 January opening-anchor state.
 //         Writes generated/tb-comparison.json.
 //   tdl   V1 step 3 — scanned Trade Debtor List vs each ERP debtor-child
 //         ledger at 31 May. Proves BAL B/F, May debits/credits, TOTAL DUE and
@@ -20,12 +21,17 @@
 //         with the current Debtors-report calendar-month rules.
 //         Writes generated/tdl-comparison.json.
 //   statements
-//         V1 step 4 — scanned May BS / IS / CoGM note lines vs the three
+//         V1 step 4 / V2 final state — scanned May BS / IS / CoGM note lines
+//         vs the three
 //         financial-report engines, reproduced query-for-query. Attributes
-//         every difference to (a) the CS_*/OS_* opening set from stage tb,
-//         (b) legacy report-level stock injection (ST-b), or (c) a named
-//         fs_note mapping issue; anything else fails.
+//         with the exact 1 January opening-stock semantics. Requires 30/40
+//         exact lines; the remaining ten must be only the V3 closing-stock
+//         lines and their profit/CoGM cross-totals.
 //         Writes generated/statements-comparison.json.
+//   regressions
+//         V2 immutable-surface gates — the audited IMP accounting projection,
+//         all 1,571 June checkpoints, and the frozen June five-ledger movement.
+//         Writes generated/v2-regression.json.
 //
 // One green run keeps proving scan parity forever, like verify-import.sql
 // did for the import.
@@ -300,8 +306,144 @@ function stageMap() {
 const MONTH_ENDS = { "01": "2026-01-31", "02": "2026-02-28", "03": "2026-03-31", "04": "2026-04-30", "05": "2026-05-31" };
 // Printed DEBTOR controls (V0 finding: the control moves monthly).
 const DEBTOR_CONTROLS_CENTS = { "01": 53453147, "02": 56171082, "03": 46679100, "04": 57866195, "05": 50769772 };
-// The named import residue: missing DR RM1,456,480.37 in the opening anchors.
-const RESIDUE_CENTS = 145648037;
+// Historical V1 evidence. V2 resolves this residue exactly; it is retained in
+// generated output to keep the approved correction arithmetic auditable.
+const PRE_V2_RESIDUE_CENTS = 145648037;
+const V2_EXPECTED_TB_ACCOUNTS = 880;
+const V2_EXPECTED_JANUARY_ANCHORS = {
+  total: 642,
+  nonzero: 290,
+  debitRows: 230,
+  creditRows: 60,
+  zero: 352,
+  debitCents: 1318068118,
+  creditCents: 1318068118,
+  netCents: 0,
+};
+const V2_EXPECTED_CS_CODES = new Set([
+  "CS_B21", "CS_B23", "CS_B24", "CS_B31", "CS_B32", "CS_B33",
+  "CS_B34", "CS_B36", "CS_B37", "CS_B3UD", "CS_B5KG1", "CS_B600G",
+  "CS_BBER1", "CS_BBER2", "CS_BBER4", "CS_BBER5", "CS_BJAG1",
+  "CS_BLS1", "CS_BNL3", "CS_BNL5", "CS_BP1", "CS_BP2", "CS_BP600",
+  "CS_BPB1", "CS_BPB2", "CS_BPT1", "CS_BSDM1", "CS_BTAP1",
+  "CS_BTM1", "CS_BUP1", "CS_M2", "CS_M21", "CS_M25", "CS_M2UD",
+  "CS_M31", "CS_M32", "CS_M33", "CS_M39", "CS_M3UD", "CS_M41",
+  "CS_M42", "CS_M43", "CS_M45", "CS_M46", "CS_M47", "CS_M48",
+  "CS_M49", "CS_M50", "CS_M51", "CS_M52", "CS_MGRM1", "CS_MK5",
+  "CS_ML1", "CS_MM1", "CS_MM2", "CS_MNL1", "CS_MP1", "CS_MP2",
+  "CS_MSOD1", "CS_MT1", "CS_MTAP1", "CS_MTEP1", "CS_MTEP3",
+]);
+
+let v2OpeningAnchorStateCache = null;
+
+function verifyV2OpeningAnchorState() {
+  if (v2OpeningAnchorStateCache !== null) return v2OpeningAnchorStateCache;
+
+  const { tb, mappings } = computeMapping();
+  const januaryRows = query(`
+    SELECT account_code,
+           ROUND(amount * 100)::bigint AS amount_cents
+    FROM account_opening_balances
+    WHERE as_of_date = DATE '2026-01-01'`);
+  const januaryByCode = new Map(
+    januaryRows.map((r) => [r.account_code, parseInt(r.amount_cents, 10)])
+  );
+  const summary = query(`
+    SELECT COUNT(*)::bigint AS total,
+           COUNT(*) FILTER (WHERE ROUND(amount * 100)::bigint <> 0)::bigint AS nonzero,
+           COUNT(*) FILTER (WHERE ROUND(amount * 100)::bigint > 0)::bigint AS debit_rows,
+           COUNT(*) FILTER (WHERE ROUND(amount * 100)::bigint < 0)::bigint AS credit_rows,
+           COUNT(*) FILTER (WHERE ROUND(amount * 100)::bigint = 0)::bigint AS zero,
+           COALESCE(SUM(ROUND(amount * 100)) FILTER (WHERE amount > 0), 0)::bigint AS debit_cents,
+           COALESCE(-SUM(ROUND(amount * 100)) FILTER (WHERE amount < 0), 0)::bigint AS credit_cents,
+           COALESCE(SUM(ROUND(amount * 100)), 0)::bigint AS net_cents
+    FROM account_opening_balances
+    WHERE as_of_date = DATE '2026-01-01'`)[0];
+  const actualSummary = {
+    total: parseInt(summary.total, 10),
+    nonzero: parseInt(summary.nonzero, 10),
+    debitRows: parseInt(summary.debit_rows, 10),
+    creditRows: parseInt(summary.credit_rows, 10),
+    zero: parseInt(summary.zero, 10),
+    debitCents: parseInt(summary.debit_cents, 10),
+    creditCents: parseInt(summary.credit_cents, 10),
+    netCents: parseInt(summary.net_cents, 10),
+  };
+  for (const [field, expected] of Object.entries(V2_EXPECTED_JANUARY_ANCHORS))
+    if (actualSummary[field] !== expected)
+      fail(`V2 January anchors ${field} ${actualSummary[field]} != ${expected}`);
+
+  const mappingByCode = new Map(mappings.map((m) => [m.erpCode, m]));
+  const csTargets = [];
+  for (const code of [...V2_EXPECTED_CS_CODES].sort()) {
+    const mapping = mappingByCode.get(code);
+    const appx = mapping ? (tb["05"].get(mapping.printed)?.appx ?? "").trim() : "";
+    if (!mapping || !STMT_CLOSING_NOTES.has(appx)) {
+      fail(`${code}: expected V2 CS target is absent from the printed closing-stock family`);
+      continue;
+    }
+    const actualCents = januaryByCode.get(code);
+    if (actualCents === undefined) fail(`${code}: missing explicit V2 zero anchor at 2026-01-01`);
+    else if (actualCents !== 0) fail(`${code}: V2 CS anchor ${fmt(actualCents)} != explicit zero`);
+    csTargets.push({ code, appx, actualCents: actualCents ?? null });
+  }
+  if (csTargets.length !== 63)
+    fail(`V2 CS target count ${csTargets.length} != 63`);
+
+  const osTargets = mappings
+    .map((m) => {
+      const may = tb["05"].get(m.printed);
+      return { code: m.erpCode, printed: m.printed, appx: (may?.appx ?? "").trim(), expectedCents: may?.net ?? 0 };
+    })
+    .filter((r) => STMT_OPENING_NOTES.has(r.appx) && r.expectedCents !== 0)
+    .sort((a, b) => a.code.localeCompare(b.code));
+  if (osTargets.length !== 62)
+    fail(`V2 nonzero OS target count ${osTargets.length} != 62`);
+  for (const target of osTargets) {
+    for (const mm of TB_MONTHS)
+      if ((tb[mm].get(target.printed)?.net ?? 0) !== target.expectedCents)
+        fail(`${target.printed}: printed OS balance varies in ${mm}`);
+    const actualCents = januaryByCode.get(target.code);
+    if (actualCents === undefined)
+      fail(`${target.code}: missing V2 OS anchor at 2026-01-01`);
+    else if (actualCents !== target.expectedCents)
+      fail(`${target.code}: V2 OS anchor ${fmt(actualCents)} != scan ${fmt(target.expectedCents)}`);
+    target.actualCents = actualCents ?? null;
+  }
+  const osTotalCents = osTargets.reduce((sum, r) => sum + r.expectedCents, 0);
+  if (osTotalCents !== 62687515)
+    fail(`V2 OS target total ${fmt(osTotalCents)} != 626,875.15`);
+
+  const correctionCodes = new Set([...V2_EXPECTED_CS_CODES, ...osTargets.map((r) => r.code)]);
+  if (correctionCodes.size !== 125)
+    fail(`V2 anchor-correction union ${correctionCodes.size} != 125 accounts`);
+  const juneTargets = query(`
+    SELECT account_code, as_of_date::text AS as_of_date,
+           ROUND(amount * 100)::bigint AS amount_cents
+    FROM account_opening_balances
+    WHERE as_of_date = DATE '2026-06-01'`)
+    .filter((r) => correctionCodes.has(r.account_code));
+  if (juneTargets.length !== 0)
+    fail(`${juneTargets.length} V2 stock target(s) unexpectedly have a 1 June checkpoint anchor`);
+
+  if (Object.entries(V2_EXPECTED_JANUARY_ANCHORS)
+    .every(([field, expected]) => actualSummary[field] === expected)
+    && csTargets.length === 63 && osTargets.length === 62
+    && osTotalCents === 62687515 && juneTargets.length === 0) {
+    ok("V2 January anchors are exact: 642 rows (290 nonzero / 352 zero), DR = CR 13,180,681.18");
+    ok("63 CS targets are explicit zero, 62 OS targets equal the scans, and none has a 1 June checkpoint anchor");
+  }
+
+  v2OpeningAnchorStateCache = {
+    summary: actualSummary,
+    csTargets,
+    osTargets,
+    osTotalCents,
+    correctionCodes: [...correctionCodes].sort(),
+    juneTargets,
+  };
+  return v2OpeningAnchorStateCache;
+}
 
 function erpBalancesAt(periodEnd) {
   const sql = `
@@ -418,18 +560,30 @@ function stageTb() {
   if (TB_MONTHS.every((mm) => debtor.diffCents[mm] === 0))
     ok(`DEBTOR control matches ERP collapsed TD row at all five month-ends`);
 
-  // Global: Σ(scan − ERP) must equal the named residue at every month-end.
+  // V2 final state: every compared account and every global month-end total is
+  // exact. The pre-V2 residue remains historical evidence only.
   for (const mm of TB_MONTHS) {
     const total = rows.reduce((s, r) => s + r.diffCents[mm], 0);
-    if (total === RESIDUE_CENTS)
-      ok(`${MONTH_ENDS[mm]}: Σ offsets = ${fmt(total)} = the named DR residue`);
+    if (total === 0)
+      ok(`${MONTH_ENDS[mm]}: Σ(scan − ERP) = 0.00`);
     else
-      fail(`${MONTH_ENDS[mm]}: Σ offsets ${fmt(total)} != residue ${fmt(RESIDUE_CENTS)} (unexplained ${fmt(total - RESIDUE_CENTS)})`);
+      fail(`${MONTH_ENDS[mm]}: Σ(scan − ERP) ${fmt(total)} != 0.00`);
   }
 
-  // Constant offsets = the opening-correction candidate set.
+  if (rows.length === V2_EXPECTED_TB_ACCOUNTS
+    && byClass.exact.length === V2_EXPECTED_TB_ACCOUNTS
+    && byClass.constant_offset.length === 0
+    && byClass.non_constant_offset.length === 0) {
+    ok("V2 TB final state is exact: 880 compared / 880 exact / 0 constant / 0 non-constant");
+  } else {
+    fail(`V2 TB final counts ${rows.length}/${byClass.exact.length}/${byClass.constant_offset.length}/${byClass.non_constant_offset.length} != 880/880/0/0`);
+  }
+
+  const v2OpeningAnchors = verifyV2OpeningAnchorState();
+
+  // Any reappearance here is a post-V2 regression.
   if (byClass.constant_offset.length) {
-    console.log(`\nconstant offsets (scan − ERP identical Jan–May) — opening-correction candidates:`);
+    console.log(`\nCONSTANT OFFSETS (unexpected after V2):`);
     let sum = 0;
     for (const r of byClass.constant_offset) {
       sum += r.diffCents["05"];
@@ -453,7 +607,11 @@ function stageTb() {
   fs.writeFileSync(outFile, JSON.stringify({
     generatedAt: new Date().toISOString(),
     monthEnds: MONTH_ENDS,
-    residueCents: RESIDUE_CENTS,
+    finalExpectedResidueCents: 0,
+    preV2Evidence: {
+      residueCents: PRE_V2_RESIDUE_CENTS,
+      correctionIdentity: "82960522 CS credits zeroed + 62687515 OS debits inserted = 145648037 cents",
+    },
     debtorControlsCents: DEBTOR_CONTROLS_CENTS,
     counts: {
       compared: rows.length,
@@ -461,9 +619,378 @@ function stageTb() {
       constantOffset: byClass.constant_offset.length,
       nonConstantOffset: byClass.non_constant_offset.length,
     },
-    // Full detail for every non-exact account; exact accounts summarized.
+    v2OpeningAnchors,
+    // Full detail for every non-exact account; V2 requires this to be empty.
     nonExact: rows.filter((r) => r.classification !== "exact"),
     exactCodes: byClass.exact.map((r) => r.erpCode),
+  }, null, 2));
+  ok(`wrote ${path.relative(process.cwd(), outFile)}`);
+}
+
+// ---- Stage: regressions ----------------------------------------------------
+// Standing V2 guards for surfaces the correction package is not authorized to
+// change. These are portable semantic checks (no database IDs in fingerprints).
+const V2_EXPECTED_JUNE_CHECKPOINT_FINGERPRINT = "147c022cef7b4a4c90735718860a60eb";
+const V2_EXPECTED_IMP_ACCOUNTING_FINGERPRINT = "9c0d5c6b141af5d102f5a31c590f6f82";
+const V2_EXPECTED_JUNE_FIVE_LEDGER_FINGERPRINT = "c27dbd5a5db93bf08823ae4e0f22cad4";
+const V2_EXPECTED_LEGACY_TYPES = {
+  S: 2121, PUR: 83, B: 383, C: 45, RV: 410,
+  REC: 758, J: 53, JVDR: 5, JVSL: 5,
+};
+const V2_EXPECTED_JUNE_FIVE_LEDGER = {
+  BANK_PBB: { lines: 278, zeroLines: 0, debitCents: 68538869, creditCents: 64493848 },
+  CASH_SALES: { lines: 236, zeroLines: 29, debitCents: 0, creditCents: 21333110 },
+  CH_REV1: { lines: 306, zeroLines: 29, debitCents: 21333110, creditCents: 21478490 },
+  CH_REV2: { lines: 20, zeroLines: 0, debitCents: 720270, creditCents: 814520 },
+  CR_SALES: { lines: 190, zeroLines: 5, debitCents: 15835, creditCents: 51309680 },
+};
+
+function stageRegressions() {
+  console.log("\n=== stage regressions: V2 immutable IMP / June checkpoint / five-ledger state ===");
+  const openingAnchors = verifyV2OpeningAnchorState();
+
+  const staging = query(`
+    SELECT COUNT(*)::bigint AS rows,
+           COUNT(*) FILTER (WHERE record_kind = 'opening')::bigint AS opening_rows,
+           COUNT(*) FILTER (WHERE record_kind = 'transaction')::bigint AS transaction_rows,
+           COUNT(DISTINCT journal_group_key)
+             FILTER (WHERE record_kind = 'transaction')::bigint AS groups,
+           COALESCE(SUM(debit_cents) FILTER (WHERE record_kind = 'transaction'), 0)::bigint AS debit_cents,
+           COALESCE(SUM(credit_cents) FILTER (WHERE record_kind = 'transaction'), 0)::bigint AS credit_cents,
+           COUNT(*) FILTER (WHERE repaired)::bigint AS repaired_rows,
+           COUNT(*) FILTER (WHERE source_kind = 'DERIVED')::bigint AS derived_rows,
+           MIN(stage_sequence)::bigint AS min_sequence,
+           MAX(stage_sequence)::bigint AS max_sequence,
+           COUNT(DISTINCT source_sha256)::bigint AS source_hashes,
+           COUNT(*) FILTER (WHERE source_sha256 NOT IN (
+             '6230d4613768f3f1b51c6195852560446103e39b57b2deb8ac575d8c8ecaa918',
+             '6ef5ee949cca9b7903cff5ede201bea5d6e6bc8d341c45e91ea060aeac905a81'
+           ))::bigint AS unapproved_source_rows,
+           MD5(COALESCE(STRING_AGG(
+             JSONB_BUILD_ARRAY(
+               stage_sequence, record_kind, source_kind, source_sha256,
+               source_physical_line, account_code, entry_date::text,
+               journal_ref, journal_group_key, line_display_reference,
+               particulars, cheque_reference, debit_cents, credit_cents,
+               running_balance_cents, repaired, special_case
+             )::text,
+             E'\n' ORDER BY stage_sequence
+           ), '')) AS fingerprint
+    FROM import_legacy_rows`)[0];
+  const stagingState = {
+    rows: parseInt(staging.rows, 10),
+    openingRows: parseInt(staging.opening_rows, 10),
+    transactionRows: parseInt(staging.transaction_rows, 10),
+    groups: parseInt(staging.groups, 10),
+    debitCents: parseInt(staging.debit_cents, 10),
+    creditCents: parseInt(staging.credit_cents, 10),
+    repairedRows: parseInt(staging.repaired_rows, 10),
+    derivedRows: parseInt(staging.derived_rows, 10),
+    minSequence: parseInt(staging.min_sequence, 10),
+    maxSequence: parseInt(staging.max_sequence, 10),
+    sourceHashes: parseInt(staging.source_hashes, 10),
+    unapprovedSourceRows: parseInt(staging.unapproved_source_rows, 10),
+    fingerprint: staging.fingerprint,
+  };
+  const expectedStaging = {
+    rows: 12635, openingRows: 2567, transactionRows: 10068, groups: 3863,
+    debitCents: 1350351615, creditCents: 1350351615,
+    repairedRows: 8, derivedRows: 2, minSequence: 1, maxSequence: 12635,
+    sourceHashes: 2, unapprovedSourceRows: 0,
+    fingerprint: "70865390988ff2205b08ce4a972a0f96",
+  };
+  const stagingStartFailures = failures;
+  for (const [field, expected] of Object.entries(expectedStaging))
+    if (stagingState[field] !== expected)
+      fail(`legacy staging ${field} ${stagingState[field]} != ${expected}`);
+  if (failures === stagingStartFailures)
+    ok("legacy staging remains exact: 12,635 fingerprinted rows from the two approved source hashes");
+
+  const imp = query(`
+    WITH imported_headers AS (
+      SELECT * FROM journal_entries WHERE source_type = 'legacy_import'
+    ), imported_lines AS (
+      SELECT headers.*, lines.id AS line_id, lines.line_number,
+             lines.display_order, lines.account_code, lines.debit_amount,
+             lines.credit_amount, lines.particulars, lines.cheque_reference,
+             lines.display_reference AS line_display_reference,
+             lines.reference AS line_reference
+      FROM imported_headers headers
+      LEFT JOIN journal_entry_lines lines ON lines.journal_entry_id = headers.id
+    ), staged_movement AS (
+      SELECT account_code,
+             SUM(debit_cents - credit_cents)::bigint AS movement_cents
+      FROM import_legacy_rows
+      WHERE record_kind = 'transaction'
+      GROUP BY account_code
+    ), posted_movement AS (
+      SELECT account_code,
+             SUM(ROUND(debit_amount * 100) - ROUND(credit_amount * 100))::bigint AS movement_cents
+      FROM imported_lines
+      GROUP BY account_code
+    ), movement_differences AS (
+      SELECT 1
+      FROM staged_movement
+      FULL JOIN posted_movement USING (account_code)
+      WHERE staged_movement.movement_cents IS DISTINCT FROM posted_movement.movement_cents
+    ), type_counts AS (
+      SELECT legacy_entry_type, COUNT(*)::integer AS count
+      FROM imported_headers
+      GROUP BY legacy_entry_type
+    )
+    SELECT (SELECT COUNT(*) FROM imported_headers)::bigint AS headers,
+           COUNT(line_id)::bigint AS lines,
+           COALESCE(SUM(ROUND(debit_amount * 100)), 0)::bigint AS debit_cents,
+           COALESCE(SUM(ROUND(credit_amount * 100)), 0)::bigint AS credit_cents,
+           MD5(COALESCE(STRING_AGG(
+             JSONB_BUILD_ARRAY(
+               reference_no, entry_date::text, display_reference,
+               ROUND(total_debit * 100)::bigint,
+               ROUND(total_credit * 100)::bigint,
+               line_number, display_order, account_code,
+               ROUND(debit_amount * 100)::bigint,
+               ROUND(credit_amount * 100)::bigint,
+               particulars, cheque_reference, line_display_reference
+             )::text,
+             E'\n' ORDER BY reference_no, line_number, line_id
+           ), '')) AS accounting_fingerprint,
+           (SELECT COUNT(*) FROM imported_headers
+             WHERE entry_type IS DISTINCT FROM 'IMP'
+                OR status IS DISTINCT FROM 'posted'
+                OR source_id IS NULL
+                OR manual_override IS DISTINCT FROM false)::bigint AS bad_headers,
+           (SELECT COUNT(source_id) - COUNT(DISTINCT source_id) FROM imported_headers)::bigint AS duplicate_source_ids,
+           (SELECT COUNT(*) FROM journal_entries
+             WHERE entry_type = 'IMP'
+               AND source_type IS DISTINCT FROM 'legacy_import')::bigint AS imp_without_legacy_source,
+           (SELECT COUNT(*) FROM imported_headers
+             WHERE description IS NULL OR BTRIM(description) = ''
+                OR description LIKE 'Legacy import %')::bigint AS bad_descriptions,
+           COUNT(line_id) FILTER (
+             WHERE line_reference IS DISTINCT FROM line_display_reference
+           )::bigint AS line_reference_mismatches,
+           (SELECT COUNT(*) FROM imported_headers headers
+             WHERE EXISTS (
+               SELECT 1 FROM journal_entry_lines lines
+               WHERE lines.journal_entry_id = headers.id
+               GROUP BY lines.journal_entry_id
+               HAVING SUM(lines.debit_amount) IS DISTINCT FROM headers.total_debit
+                   OR SUM(lines.credit_amount) IS DISTINCT FROM headers.total_credit
+                   OR SUM(lines.debit_amount) IS DISTINCT FROM SUM(lines.credit_amount)
+             ))::bigint AS unbalanced_headers,
+           (SELECT COUNT(*) FROM movement_differences)::bigint AS staged_movement_mismatches,
+           (SELECT COALESCE(JSONB_OBJECT_AGG(legacy_entry_type, count), '{}'::jsonb)::text FROM type_counts) AS legacy_type_counts
+    FROM imported_lines`)[0];
+  const impState = {
+    headers: parseInt(imp.headers, 10),
+    lines: parseInt(imp.lines, 10),
+    debitCents: parseInt(imp.debit_cents, 10),
+    creditCents: parseInt(imp.credit_cents, 10),
+    accountingFingerprint: imp.accounting_fingerprint,
+    badHeaders: parseInt(imp.bad_headers, 10),
+    duplicateSourceIds: parseInt(imp.duplicate_source_ids, 10),
+    impWithoutLegacySource: parseInt(imp.imp_without_legacy_source, 10),
+    badDescriptions: parseInt(imp.bad_descriptions, 10),
+    lineReferenceMismatches: parseInt(imp.line_reference_mismatches, 10),
+    unbalancedHeaders: parseInt(imp.unbalanced_headers, 10),
+    stagedMovementMismatches: parseInt(imp.staged_movement_mismatches, 10),
+    legacyTypeCounts: JSON.parse(imp.legacy_type_counts),
+  };
+  const impStartFailures = failures;
+  const expectedImpScalars = {
+    headers: 3863,
+    lines: 10068,
+    debitCents: 1350351615,
+    creditCents: 1350351615,
+    accountingFingerprint: V2_EXPECTED_IMP_ACCOUNTING_FINGERPRINT,
+    badHeaders: 0,
+    duplicateSourceIds: 0,
+    impWithoutLegacySource: 0,
+    badDescriptions: 0,
+    lineReferenceMismatches: 0,
+    unbalancedHeaders: 0,
+    stagedMovementMismatches: 0,
+  };
+  for (const [field, expected] of Object.entries(expectedImpScalars))
+    if (impState[field] !== expected)
+      fail(`immutable IMP ${field} ${impState[field]} != ${expected}`);
+  if (Object.keys(impState.legacyTypeCounts).length !== Object.keys(V2_EXPECTED_LEGACY_TYPES).length
+    || Object.entries(V2_EXPECTED_LEGACY_TYPES)
+      .some(([type, expected]) => impState.legacyTypeCounts[type] !== expected))
+    fail(`immutable IMP legacy type counts ${JSON.stringify(impState.legacyTypeCounts)} != ${JSON.stringify(V2_EXPECTED_LEGACY_TYPES)}`);
+  if (failures === impStartFailures)
+    ok(`immutable IMP projection remains exact: 3,863 headers / 10,068 lines / ${V2_EXPECTED_IMP_ACCOUNTING_FINGERPRINT}`);
+
+  const juneRows = query(`
+    SELECT account_code, ROUND(amount * 100)::bigint AS amount_cents
+    FROM account_opening_balances
+    WHERE as_of_date = DATE '2026-06-01'
+    ORDER BY account_code`)
+    .map((r) => [r.account_code, parseInt(r.amount_cents, 10)]);
+  const juneCheckpointFingerprint = createHash("md5")
+    .update(JSON.stringify(juneRows))
+    .digest("hex");
+  const juneSummary = {
+    total: juneRows.length,
+    nonzero: juneRows.filter(([, amountCents]) => amountCents !== 0).length,
+    zero: juneRows.filter(([, amountCents]) => amountCents === 0).length,
+    netCents: juneRows.reduce((sum, [, amountCents]) => sum + amountCents, 0),
+    fingerprint: juneCheckpointFingerprint,
+  };
+  const juneSourceProof = query(`
+    WITH expected_cn(entry_date, debtor_account, amount_cents) AS (
+      VALUES
+        (DATE '2026-01-09', 'MYSHOP(KM)'::varchar, 2290::bigint),
+        (DATE '2026-01-17', 'MYSHOP-QL', 2565),
+        (DATE '2026-02-05', 'YTF', 105660),
+        (DATE '2026-02-06', 'MYSHOP-KD1', 2565),
+        (DATE '2026-02-14', 'MYSHOP-QL', 1540),
+        (DATE '2026-02-26', 'MYSHOP-LK', 6755),
+        (DATE '2026-03-10', 'MYSHOP-KM2', 3350),
+        (DATE '2026-03-10', 'MYSHOP(KM)', 1180),
+        (DATE '2026-03-18', 'C-CARE(6)', 19572),
+        (DATE '2026-04-08', 'MYSHOP-QL', 3340),
+        (DATE '2026-04-08', 'MYSHOP-QL', 3300),
+        (DATE '2026-04-08', 'MYSHOP(KM)', 1200),
+        (DATE '2026-05-20', 'MEEWOO-K', 21875),
+        (DATE '2026-05-28', 'MYSHOP-SKT', 5130),
+        (DATE '2026-05-28', 'MYSHOP(KM)', 685),
+        (DATE '2026-05-28', 'MYSHOP-KM2', 2485)
+    ), staged_opening AS (
+      SELECT account_code, SUM(running_balance_cents)::bigint AS opening_cents
+      FROM import_legacy_rows
+      WHERE record_kind = 'opening'
+      GROUP BY account_code
+    ), staged_movement AS (
+      SELECT account_code, SUM(debit_cents - credit_cents)::bigint AS movement_cents
+      FROM import_legacy_rows
+      WHERE record_kind = 'transaction' AND entry_date <= DATE '2026-05-31'
+      GROUP BY account_code
+    ), cn_projection AS (
+      SELECT 'CR_SALES'::varchar AS account_code, amount_cents AS movement_cents
+      FROM expected_cn
+      UNION ALL
+      SELECT debtor_account, -amount_cents FROM expected_cn
+    ), cn_movement AS (
+      SELECT account_code, SUM(movement_cents)::bigint AS movement_cents
+      FROM cn_projection GROUP BY account_code
+    ), source_accounts AS (
+      SELECT account_code FROM staged_opening
+      UNION SELECT account_code FROM staged_movement
+      UNION SELECT account_code FROM cn_movement
+    ), expected_source_close AS (
+      SELECT accounts.account_code,
+             COALESCE(opening.opening_cents, 0)
+               + COALESCE(movement.movement_cents, 0)
+               + COALESCE(cn.movement_cents, 0) AS close_cents
+      FROM source_accounts accounts
+      LEFT JOIN staged_opening opening USING (account_code)
+      LEFT JOIN staged_movement movement USING (account_code)
+      LEFT JOIN cn_movement cn USING (account_code)
+    ), june AS (
+      SELECT account_code, ROUND(amount * 100)::bigint AS amount_cents
+      FROM account_opening_balances
+      WHERE as_of_date = DATE '2026-06-01'
+    )
+    SELECT (SELECT COUNT(*) FROM expected_source_close)::bigint AS source_accounts,
+           (SELECT SUM(close_cents) FROM expected_source_close)::bigint AS source_net_cents,
+           COUNT(*) FILTER (
+             WHERE COALESCE(source.close_cents, 0) IS DISTINCT FROM june.amount_cents
+           )::bigint AS checkpoint_mismatches
+    FROM june
+    LEFT JOIN expected_source_close source USING (account_code)`)[0];
+  const juneSourceState = {
+    sourceAccounts: parseInt(juneSourceProof.source_accounts, 10),
+    sourceNetCents: parseInt(juneSourceProof.source_net_cents, 10),
+    checkpointMismatches: parseInt(juneSourceProof.checkpoint_mismatches, 10),
+  };
+  const juneStartFailures = failures;
+  const expectedJune = {
+    total: 1571, nonzero: 155, zero: 1416, netCents: -261795905,
+    fingerprint: V2_EXPECTED_JUNE_CHECKPOINT_FINGERPRINT,
+  };
+  for (const [field, expected] of Object.entries(expectedJune))
+    if (juneSummary[field] !== expected)
+      fail(`1 June checkpoint ${field} ${juneSummary[field]} != ${expected}`);
+  if (juneSourceState.sourceAccounts !== 2568)
+    fail(`source-derived close population ${juneSourceState.sourceAccounts} != 2568`);
+  if (juneSourceState.sourceNetCents !== -PRE_V2_RESIDUE_CENTS)
+    fail(`source-derived close net ${juneSourceState.sourceNetCents} != ${-PRE_V2_RESIDUE_CENTS}`);
+  if (juneSourceState.checkpointMismatches !== 0)
+    fail(`${juneSourceState.checkpointMismatches} of the 1,571 June checkpoints differ from their source-derived close`);
+  if (failures === juneStartFailures)
+    ok(`all 1,571 June checkpoints retain their exact source-derived values (${juneCheckpointFingerprint})`);
+
+  const juneTb = erpBalancesAt("2026-06-30");
+  const juneTbNetCents = [...juneTb.values()].reduce((sum, amountCents) => sum + amountCents, 0);
+  if (juneTbNetCents === 0) ok("30 June derived Trial Balance remains globally balanced");
+  else fail(`30 June derived Trial Balance net ${fmt(juneTbNetCents)} != 0.00`);
+
+  const fiveLedger = query(`
+    WITH canonical AS (
+      SELECT lines.account_code,
+             ROUND(lines.debit_amount * 100)::bigint AS debit_cents,
+             ROUND(lines.credit_amount * 100)::bigint AS credit_cents,
+             JSONB_BUILD_ARRAY(
+               lines.account_code, journals.entry_date::text,
+               journals.entry_type, COALESCE(journals.legacy_entry_type, ''),
+               journals.reference_no, COALESCE(journals.display_reference, ''),
+               COALESCE(journals.cheque_no, ''), COALESCE(journals.source_type, ''),
+               COALESCE(journals.source_id, ''), journals.manual_override,
+               lines.line_number, COALESCE(lines.display_order, lines.line_number),
+               ROUND(lines.debit_amount * 100)::bigint,
+               ROUND(lines.credit_amount * 100)::bigint,
+               COALESCE(lines.reference, ''), COALESCE(lines.display_reference, ''),
+               COALESCE(lines.particulars, ''), COALESCE(lines.cheque_reference, '')
+             )::text AS row_text
+      FROM journal_entries journals
+      JOIN journal_entry_lines lines ON lines.journal_entry_id = journals.id
+      WHERE journals.status = 'posted'
+        AND journals.entry_date BETWEEN DATE '2026-06-01' AND DATE '2026-06-30'
+        AND lines.account_code IN ('BANK_PBB', 'CASH_SALES', 'CH_REV1', 'CH_REV2', 'CR_SALES')
+    ), summary AS (
+      SELECT account_code, COUNT(*)::bigint AS lines,
+             COUNT(*) FILTER (WHERE debit_cents = 0 AND credit_cents = 0)::bigint AS zero_lines,
+             SUM(debit_cents)::bigint AS debit_cents,
+             SUM(credit_cents)::bigint AS credit_cents
+      FROM canonical GROUP BY account_code
+    )
+    SELECT (SELECT COUNT(*) FROM canonical)::bigint AS total_lines,
+           (SELECT MD5(COALESCE(STRING_AGG(row_text, E'\n' ORDER BY row_text), '')) FROM canonical) AS fingerprint,
+           JSONB_AGG(JSONB_BUILD_OBJECT(
+             'accountCode', account_code, 'lines', lines, 'zeroLines', zero_lines,
+             'debitCents', debit_cents, 'creditCents', credit_cents
+           ) ORDER BY account_code)::text AS accounts
+    FROM summary`)[0];
+  const fiveLedgerRows = JSON.parse(fiveLedger.accounts);
+  const fiveLedgerState = Object.fromEntries(fiveLedgerRows.map((r) => [r.accountCode, {
+    lines: r.lines,
+    zeroLines: r.zeroLines,
+    debitCents: r.debitCents,
+    creditCents: r.creditCents,
+  }]));
+  const fiveLedgerStartFailures = failures;
+  if (parseInt(fiveLedger.total_lines, 10) !== 1030)
+    fail(`June five-ledger lines ${fiveLedger.total_lines} != 1030`);
+  if (fiveLedger.fingerprint !== V2_EXPECTED_JUNE_FIVE_LEDGER_FINGERPRINT)
+    fail(`June five-ledger fingerprint ${fiveLedger.fingerprint} != ${V2_EXPECTED_JUNE_FIVE_LEDGER_FINGERPRINT}`);
+  if (JSON.stringify(fiveLedgerState) !== JSON.stringify(V2_EXPECTED_JUNE_FIVE_LEDGER))
+    fail(`June five-ledger aggregates ${JSON.stringify(fiveLedgerState)} != frozen ${JSON.stringify(V2_EXPECTED_JUNE_FIVE_LEDGER)}`);
+  if (failures === fiveLedgerStartFailures)
+    ok(`frozen June five-ledger movement remains exact: 1,030 lines / ${fiveLedger.fingerprint}`);
+
+  const outFile = path.join(genDir, "v2-regression.json");
+  fs.writeFileSync(outFile, JSON.stringify({
+    generatedAt: new Date().toISOString(),
+    openingAnchors,
+    staging: stagingState,
+    immutableImp: impState,
+    juneCheckpoints: { ...juneSummary, ...juneSourceState, juneTbNetCents },
+    juneFiveLedger: {
+      totalLines: parseInt(fiveLedger.total_lines, 10),
+      fingerprint: fiveLedger.fingerprint,
+      accounts: fiveLedgerState,
+    },
   }, null, 2));
   ok(`wrote ${path.relative(process.cwd(), outFile)}`);
 }
@@ -1181,29 +1708,38 @@ function stageTdl() {
 // (GET /api/financial-reports/{balance-sheet,income-statement,cogm}/2026/5 in
 // src/routes/accounting/financial-reports.js), reproduced query-for-query:
 // the Balance Sheet reads anchored balances grouped by effective fs_note plus
-// a synthetic movement-only Current Year Profit row; the Income Statement and
-// CoGM read posted journal movement only, grouped by effective fs_note.
+// a synthetic Current Year Profit row; the Income Statement and CoGM add only
+// exact fiscal-start 3-1/3-3/3-7 anchors to posted YTD movement.
 const STMT_PERIOD_START = "2026-01-01";
 const STMT_PERIOD_END = "2026-05-31";
 const STMT_OPENING_NOTES = new Set(["3-1", "3-3", "3-7"]);
 const STMT_CLOSING_NOTES = new Set(["14-1", "14-2", "14-3"]);
 const STMT_SECTIONS = new Set(["balance_sheet", "income_statement", "cogm"]);
-// The stock decomposition of the named DR residue (plan §2): printed OS_*
-// openings the ERP lacks minus the superseded THLD CS_* credit anchors the
-// ERP still carries.
+// Historical V1 stock decomposition and the V2 final-state targets.
 const STMT_OS_OPENING_TOTAL_CENTS = 62687515;
-const STMT_CS_ANCHOR_TOTAL_CENTS = -82960522;
+const PRE_V2_STMT_CS_ANCHOR_TOTAL_CENTS = -82960522;
+const STMT_EXPECTED_NET_PROFIT_CENTS = -42325884;
+const STMT_EXPECTED_COGM_CENTS = 299813452;
+const STMT_EXPECTED_NET_ASSETS_CENTS = 538960726;
+const STMT_EXPECTED_REVENUE_CENTS = 333464933;
+const STMT_EXPECTED_COGS_CENTS = 308252772;
+const STMT_EXPECTED_EXPENSE_CENTS = 67538045;
+const STMT_EXPECTED_CLOSINGS_CENTS = 70808385;
+const STMT_EXPECTED_RAW_PACKING_CLOSINGS_CENTS = 51910425;
+const STMT_EXPECTED_RESIDUAL_KEYS = new Set([
+  "bs:2", "bs:3", "bs:4", "bs:23",
+  "is:3", "is:5", "is:20",
+  "cogm:6", "cogm:11", "cogm:14",
+]);
 const STMT_ATTRIBUTIONS = {
-  csAnchor:
-    "ERP value is the THLD CS_* credit opening-anchor set, superseded per user decision §8-4 (printed TB = truth); V2 zeroes these anchors.",
-  osAnchorEngineGap:
-    "Scan opening-inventory line is backed by printed TB OS_* rows; the ERP has no OS anchors yet (V2 inserts them) and the IS/CoGM engines read journal movement only, so per plan §8-2 the engines must additionally learn to render anchor-backed opening notes.",
+  openingStock:
+    "V2 renders only the exact fiscal-year-start anchor for this approved opening-stock note, once, alongside posted YTD movement.",
   stockInjection:
     "Scan closing-inventory value has no printed-TB backing (the CS_* rows print .00): the legacy system injects month-end stock at report level from its stock module. The ERP equivalent is the V3 monthly closing-stock mechanism (plan §7-1).",
   profitIdentity:
-    "Profit differs by exactly closing minus opening inventories (the net stock injection); it resolves when the V2 opening set and the V3 closing-stock mechanism land.",
+    "After V2, profit differs by exactly the three deferred V3 closing inventories.",
   cogmIdentity:
-    "CoGM differs by exactly its opening-inventory lines minus its closing-inventory lines; same resolution path as the profit difference.",
+    "After V2, CoGM differs by exactly the deferred raw-material and packing-material closing inventories.",
 };
 // Category (c): accounts whose ERP fs_note differs from the printed TB APPX.
 // Every nonzero non-stock difference must be named here; the complete set is
@@ -1225,9 +1761,9 @@ const STMT_PAYROLL_SPLIT_CODES = new Set([
   "MBS_SMO", "MBS_TS", "MBSC_IL", "MBSC_M", "MBSC_SM", "MBSC_TS",
   "MBSIP_IL", "MBSIP_M", "MBSIP_SM", "MBSIP_TS", "MBSM_K", "MS_IL", "MS_SM",
 ]);
-// Pinned after inspection of the first run, like the tdl fingerprints: the
-// complete nonzero APPX-vs-fs_note difference set must stay byte-identical.
-const EXPECTED_STMT_MAPPING_DIFF_FINGERPRINT =
+// Historical V1 evidence: the complete 125-row actionable mapping set before
+// the approved V2 correction. It is no longer the live mismatch expectation.
+const PRE_V2_STMT_MAPPING_DIFF_FINGERPRINT =
   "c83f4ef40c85ea3716fdecdace37dbfffbc53f51d23d8b2da02fc006fd8d2088";
 
 function loadStatementFixture(basename) {
@@ -1335,29 +1871,37 @@ function stmtErpBalanceSheetNotes() {
   }]));
 }
 
-// The income-statement/CoGM engines' per-note output (posted journal movement
-// in the YTD period only), for every active income_statement/cogm note.
+// The income-statement/CoGM engines' per-note output: posted YTD movement plus
+// only exact fiscal-start anchors for the approved 3-1/3-3/3-7 opening notes.
 function stmtErpPnlNotes() {
   const sql = `
     WITH RECURSIVE ${STMT_EFFECTIVE_NOTES_CTES},
-    period_balances AS (
+    period_movements AS (
       SELECT efn.fs_note,
-             SUM(COALESCE(jel.debit_amount, 0)) AS total_debit,
-             SUM(COALESCE(jel.credit_amount, 0)) AS total_credit
+             SUM(COALESCE(jel.debit_amount, 0)
+               - COALESCE(jel.credit_amount, 0)) AS net
       FROM journal_entry_lines jel
       JOIN journal_entries je ON jel.journal_entry_id = je.id
       JOIN effective_fs_notes efn ON jel.account_code = efn.code
       WHERE je.status = 'posted'
         AND je.entry_date BETWEEN DATE '${STMT_PERIOD_START}' AND DATE '${STMT_PERIOD_END}'
       GROUP BY efn.fs_note
+    ), fiscal_start_opening_stock AS (
+      SELECT efn.fs_note, SUM(aob.amount) AS net
+      FROM account_opening_balances aob
+      JOIN effective_fs_notes efn ON efn.code = aob.account_code
+      WHERE aob.as_of_date = DATE '${STMT_PERIOD_START}'
+        AND efn.fs_note IN ('3-1', '3-3', '3-7')
+      GROUP BY efn.fs_note
     )
     SELECT fsn.code, fsn.category, fsn.report_section,
            ROUND((CASE WHEN fsn.normal_balance = 'debit'
-                       THEN COALESCE(pb.total_debit, 0) - COALESCE(pb.total_credit, 0)
-                       ELSE COALESCE(pb.total_credit, 0) - COALESCE(pb.total_debit, 0)
-                  END) * 100)::bigint AS balance_cents
+                        THEN COALESCE(pm.net, 0) + COALESCE(os.net, 0)
+                        ELSE -(COALESCE(pm.net, 0) + COALESCE(os.net, 0))
+                   END) * 100)::bigint AS balance_cents
     FROM financial_statement_notes fsn
-    LEFT JOIN period_balances pb ON fsn.code = pb.fs_note
+    LEFT JOIN period_movements pm ON fsn.code = pm.fs_note
+    LEFT JOIN fiscal_start_opening_stock os ON fsn.code = os.fs_note
     WHERE fsn.report_section IN ('income_statement', 'cogm') AND fsn.is_active = true`;
   return new Map(query(sql).map((r) => [r.code, {
     category: r.category,
@@ -1415,8 +1959,8 @@ function stmtErpEffectiveNoteByCode() {
 
 function stageStatements() {
   console.log("\n=== stage statements: scanned May BS / IS / CoGM vs the ERP report engines ===");
-  if (STMT_OS_OPENING_TOTAL_CENTS - STMT_CS_ANCHOR_TOTAL_CENTS !== RESIDUE_CENTS)
-    fail("static: OS openings minus CS anchors do not equal the named residue");
+  if (STMT_OS_OPENING_TOTAL_CENTS - PRE_V2_STMT_CS_ANCHOR_TOTAL_CENTS !== PRE_V2_RESIDUE_CENTS)
+    fail("static: the approved V2 stock correction no longer equals the historical V1 residue");
 
   const bs = loadStatementFixture("bs");
   const isf = loadStatementFixture("is");
@@ -1427,6 +1971,7 @@ function stageStatements() {
     fail(`fixture line counts ${bs.length}/${isf.length}/${cogmf.length} != pinned 24/20/14`);
 
   const { tb, mappings } = computeMapping();
+  const v2OpeningAnchors = verifyV2OpeningAnchorState();
 
   // Scan-side TB rollup by printed APPX (May), raw debit-minus-credit cents.
   const scanAppxNetCents = new Map();
@@ -1447,8 +1992,8 @@ function stageStatements() {
   const statementSign = (noteCode, netCents) =>
     notesMeta.get(noteCode)?.normalBalance === "credit" ? -netCents : netCents;
 
-  // --- Note metadata gates (plan §5-3: the six stock notes must exist; every
-  // printed note code must be a live ERP note) ---
+  // --- Note metadata gates: every printed note is live, and the six stock
+  // notes retain the exact V2 section/category/normal-balance contract. ---
   const fixtureNoteCodes = new Set();
   for (const line of [...bs, ...isf, ...cogmf])
     if (line.note && line.note !== "DN" && line.note !== "CH")
@@ -1461,8 +2006,23 @@ function stageStatements() {
   for (const noteCode of [...STMT_OPENING_NOTES, ...STMT_CLOSING_NOTES])
     if (!fixtureNoteCodes.has(noteCode))
       fail(`stock note ${noteCode} unexpectedly absent from the statement fixtures`);
-  if (failures === 0)
-    ok("all printed note codes exist and are active, including 3-1/3-3/3-7 and 14-1/14-2/14-3");
+  const expectedStockMetadata = {
+    "3-1": { category: "cogs", section: "income_statement", normalBalance: "debit", active: true },
+    "3-3": { category: "cogs", section: "cogm", normalBalance: "debit", active: true },
+    "3-7": { category: "cogs", section: "cogm", normalBalance: "debit", active: true },
+    "14-1": { category: "asset", section: "balance_sheet", normalBalance: "debit", active: true },
+    "14-2": { category: "asset", section: "balance_sheet", normalBalance: "debit", active: true },
+    "14-3": { category: "asset", section: "balance_sheet", normalBalance: "debit", active: true },
+  };
+  const metadataStartFailures = failures;
+  for (const [noteCode, expected] of Object.entries(expectedStockMetadata)) {
+    const actual = notesMeta.get(noteCode);
+    for (const [field, value] of Object.entries(expected))
+      if (actual?.[field] !== value)
+        fail(`stock note ${noteCode} ${field} ${actual?.[field] ?? "missing"} != ${value}`);
+  }
+  if (failures === metadataStartFailures)
+    ok("stock-note metadata is exact: 3-1 IS; 3-3/3-7 CoGM; 14-* Balance Sheet");
   // Every nonzero printed-TB APPX group must be a real note code, else the
   // scan-side backing sums below would silently drop value.
   for (const [appx, net] of scanAppxNetCents)
@@ -1498,41 +2058,76 @@ function stageStatements() {
   else
     fail(`printed OS openings total ${fmt(osScanTotal)} != pinned ${fmt(STMT_OS_OPENING_TOTAL_CENTS)}`);
 
-  // ERP side of the closing-stock notes: every contributor must be a printed
-  // CS-family account carrying its THLD anchor and nothing else.
+  // ERP stock state after V2: the 63 retained CS anchors are explicit zero;
+  // the 62 inserted OS anchors equal the scans; neither family has movement.
   const csByErpCode = new Map(csFamily.map((f) => [f.erpCode, f]));
-  const osErpCodes = new Set(osFamily.map((f) => f.erpCode));
+  const osTargetByCode = new Map(v2OpeningAnchors.osTargets.map((f) => [f.code, f]));
+  const erpRowByCode = new Map(erpAccountRows.map((r) => [r.code, r]));
   const csAnchorByNote = new Map();
   let csAnchorTotal = 0;
   const stockAppxVsNoteMismatches = [];
-  for (const r of erpAccountRows) {
-    if (r.effectiveNote && STMT_CLOSING_NOTES.has(r.effectiveNote)) {
-      if (!csByErpCode.has(r.code)) {
-        fail(`${r.code}: non-CS account contributes ${fmt(r.balanceCents)} to closing-stock note ${r.effectiveNote}`);
-        continue;
-      }
-      if (r.movementCents !== 0)
-        fail(`${r.code}: closing-stock account has posted movement ${fmt(r.movementCents)} (expected anchor-only)`);
-      csAnchorTotal += r.balanceCents;
-      csAnchorByNote.set(r.effectiveNote, (csAnchorByNote.get(r.effectiveNote) ?? 0) + r.balanceCents);
-      const scanAppx = csByErpCode.get(r.code).appx;
-      if (scanAppx !== r.effectiveNote)
-        stockAppxVsNoteMismatches.push({
-          code: r.code, scanAppx, erpNote: r.effectiveNote, anchorCents: r.anchorCents,
-        });
+  for (const code of [...V2_EXPECTED_CS_CODES].sort()) {
+    const row = erpRowByCode.get(code);
+    const scanAppx = csByErpCode.get(code)?.appx ?? null;
+    if (!row) {
+      fail(`${code}: explicit V2 CS zero anchor is absent from the ERP balance population`);
+      continue;
     }
-    if (osErpCodes.has(r.code))
-      fail(`${r.code}: printed opening-inventory account unexpectedly carries ERP anchor/movement (${fmt(r.balanceCents)})`);
+    if (row.anchorCents !== 0 || row.movementCents !== 0 || row.balanceCents !== 0)
+      fail(`${code}: expected zero anchor/movement/balance, got ${fmt(row.anchorCents)} / ${fmt(row.movementCents)} / ${fmt(row.balanceCents)}`);
+    if (scanAppx !== row.effectiveNote)
+      stockAppxVsNoteMismatches.push({
+        code, scanAppx, erpNote: row.effectiveNote, anchorCents: row.anchorCents,
+      });
+    csAnchorTotal += row.anchorCents;
+    if (row.effectiveNote)
+      csAnchorByNote.set(row.effectiveNote, (csAnchorByNote.get(row.effectiveNote) ?? 0) + row.anchorCents);
   }
-  if (csAnchorTotal === STMT_CS_ANCHOR_TOTAL_CENTS)
-    ok(`ERP closing-stock notes carry exactly the superseded CS anchors: ${fmt(csAnchorTotal)}`);
-  else
-    fail(`ERP closing-stock note total ${fmt(csAnchorTotal)} != pinned CS anchor set ${fmt(STMT_CS_ANCHOR_TOTAL_CENTS)}`);
+  for (const [code, target] of osTargetByCode) {
+    const row = erpRowByCode.get(code);
+    if (!row) {
+      fail(`${code}: inserted V2 OS anchor is absent from the ERP balance population`);
+      continue;
+    }
+    if (row.anchorCents !== target.expectedCents
+      || row.movementCents !== 0
+      || row.balanceCents !== target.expectedCents) {
+      fail(`${code}: OS anchor/movement/balance ${fmt(row.anchorCents)} / ${fmt(row.movementCents)} / ${fmt(row.balanceCents)} != ${fmt(target.expectedCents)} / 0.00 / ${fmt(target.expectedCents)}`);
+    }
+  }
+  const nonzeroClosingContributors = erpAccountRows.filter((r) =>
+    STMT_CLOSING_NOTES.has(r.effectiveNote)
+      && (r.anchorCents !== 0 || r.movementCents !== 0 || r.balanceCents !== 0));
+  if (nonzeroClosingContributors.length !== 0)
+    fail(`${nonzeroClosingContributors.length} account(s) still contribute a nonzero value to a 14-* closing-stock note`);
+  if (csAnchorTotal === 0 && nonzeroClosingContributors.length === 0)
+    ok("all 63 CS anchors are explicit zero and the ERP closing-stock notes remain zero for V3");
 
   // --- Scan-APPX vs ERP effective-note audit across the whole mapped chart.
-  // Computed before the line comparisons because the named non-stock moves
-  // define the expected note values for the affected statement lines ---
-  const erpRowByCode = new Map(erpAccountRows.map((r) => [r.code, r]));
+  // Gate the complete approved target set explicitly: after CS anchors become
+  // zero, a nonzero-only audit could otherwise hide a missing stock mapping. ---
+  const nonStockTargetCodes = new Set([
+    ...Object.keys(STMT_NOTE_MAPPING_REASONS),
+    ...STMT_PAYROLL_SPLIT_CODES,
+  ]);
+  const stockTargetCodes = new Set(v2OpeningAnchors.correctionCodes);
+  const allV2TargetCodes = new Set([...stockTargetCodes, ...nonStockTargetCodes]);
+  if (stockTargetCodes.size !== 125 || nonStockTargetCodes.size !== 31 || allV2TargetCodes.size !== 156)
+    fail(`V2 mapping target shape ${stockTargetCodes.size} stock / ${nonStockTargetCodes.size} non-stock / ${allV2TargetCodes.size} union != 125/31/156`);
+  const mappingByErpCode = new Map(mappings.map((m) => [m.erpCode, m]));
+  const targetMappingMismatches = [];
+  for (const code of [...allV2TargetCodes].sort()) {
+    const mapping = mappingByErpCode.get(code);
+    const scanAppx = mapping ? (tb["05"].get(mapping.printed)?.appx ?? "").trim() || null : null;
+    const erpNote = effectiveNoteByCode.get(code) ?? null;
+    if (!mapping || scanAppx === null || erpNote !== scanAppx)
+      targetMappingMismatches.push({ code, scanAppx, erpNote });
+  }
+  if (targetMappingMismatches.length === 0)
+    ok("all 156 approved V2 accounts resolve to their exact printed APPX notes");
+  else
+    fail(`${targetMappingMismatches.length} approved V2 account(s) do not resolve to their printed APPX note`);
+
   const appxAudit = [];
   for (const m of mappings) {
     const mayRow = tb["05"].get(m.printed);
@@ -1550,37 +2145,11 @@ function stageStatements() {
   }
   const isStockNote = (n) => n !== null && (STMT_OPENING_NOTES.has(n) || STMT_CLOSING_NOTES.has(n));
   const nonzeroMismatches = appxAudit.filter((r) => r.scanMayCents !== 0 || r.erpNetCents !== 0);
-  const stockSplitMismatches = nonzeroMismatches.filter((r) =>
-    isStockNote(r.scanAppx) && isStockNote(r.erpEffectiveNote));
-  const namedMoves = [];
-  for (const r of nonzeroMismatches) {
-    if (stockSplitMismatches.includes(r)) continue;
-    const reason = STMT_NOTE_MAPPING_REASONS[r.erpCode]
-      ?? (STMT_PAYROLL_SPLIT_CODES.has(r.erpCode) ? STMT_PAYROLL_SPLIT_REASON : null);
-    if (reason === null) {
-      fail(`${r.erpCode}: nonzero balance printed under APPX ${r.scanAppx} but ERP note ${r.erpEffectiveNote} — no named reason`);
-      continue;
-    }
-    // The account balance itself is TB-proven (stage tb): only its note differs.
-    if (r.scanMayCents !== r.erpNetCents)
-      fail(`${r.erpCode}: named note move has scan ${fmt(r.scanMayCents)} != ERP ${fmt(r.erpNetCents)} — that is a balance difference, not a classification difference`);
-    const bucket = (n) => notesMeta.get(n)?.section === "balance_sheet" ? "bs" : "pnl";
-    if (!notesMeta.has(r.scanAppx) || !notesMeta.has(r.erpEffectiveNote)
-      || bucket(r.scanAppx) !== bucket(r.erpEffectiveNote))
-      fail(`${r.erpCode}: named note move ${r.erpEffectiveNote} -> ${r.scanAppx} crosses the BS/P&L boundary — it would break the profit identity`);
-    namedMoves.push({ ...r, reason });
-  }
-  const moveAdjustNetByNote = new Map();
-  let moveIntoCogmNetCents = 0;
-  for (const mv of namedMoves) {
-    moveAdjustNetByNote.set(mv.erpEffectiveNote,
-      (moveAdjustNetByNote.get(mv.erpEffectiveNote) ?? 0) - mv.erpNetCents);
-    moveAdjustNetByNote.set(mv.scanAppx,
-      (moveAdjustNetByNote.get(mv.scanAppx) ?? 0) + mv.erpNetCents);
-    const sec = (n) => notesMeta.get(n)?.section;
-    moveIntoCogmNetCents += mv.erpNetCents
-      * ((sec(mv.scanAppx) === "cogm" ? 1 : 0) - (sec(mv.erpEffectiveNote) === "cogm" ? 1 : 0));
-  }
+  const stockSplitMismatches = appxAudit.filter((r) =>
+    stockTargetCodes.has(r.erpCode)
+      || (isStockNote(r.scanAppx) && isStockNote(r.erpEffectiveNote)
+        && (r.scanMayCents !== 0 || r.erpNetCents !== 0)));
+  const namedMoves = appxAudit.filter((r) => nonStockTargetCodes.has(r.erpCode));
   const canonicalMismatches = nonzeroMismatches
     .map((r) => ({ erpCode: r.erpCode, scanAppx: r.scanAppx, erpNote: r.erpEffectiveNote, netCents: r.erpNetCents, scanCents: r.scanMayCents }))
     .sort((a, b) => (a.erpCode < b.erpCode ? -1 : a.erpCode > b.erpCode ? 1 : 0));
@@ -1598,6 +2167,26 @@ function stageStatements() {
     if (n.section === "cogm") erpCogmTotal += n.balanceCents;
   }
   const erpNetProfitCents = erpRevenueTotal - erpCogsTotal - erpExpenseTotal;
+  const engineTotalStartFailures = failures;
+  const expectedEngineTotals = {
+    revenue: STMT_EXPECTED_REVENUE_CENTS,
+    cogs: STMT_EXPECTED_COGS_CENTS,
+    expenses: STMT_EXPECTED_EXPENSE_CENTS,
+    netProfit: STMT_EXPECTED_NET_PROFIT_CENTS,
+    cogm: STMT_EXPECTED_COGM_CENTS,
+  };
+  const actualEngineTotals = {
+    revenue: erpRevenueTotal,
+    cogs: erpCogsTotal,
+    expenses: erpExpenseTotal,
+    netProfit: erpNetProfitCents,
+    cogm: erpCogmTotal,
+  };
+  for (const [field, expected] of Object.entries(expectedEngineTotals))
+    if (actualEngineTotals[field] !== expected)
+      fail(`V2 ${field} ${fmt(actualEngineTotals[field])} != ${fmt(expected)}`);
+  if (failures === engineTotalStartFailures)
+    ok("V2 report totals are exact: profit -423,258.84 and CoGM 2,998,134.52");
 
   // --- Per-line comparisons ---
   const lineComparisons = [];
@@ -1628,29 +2217,18 @@ function stageStatements() {
     lineComparisons.push(row);
     return row;
   };
-  // Exact-required note lines: exact, or exactly explained by the named
-  // fs_note classification moves, or a failing unexplained difference.
+  // Every ordinary note line must be exact after V2. Only the explicitly
+  // enumerated V3 closing-stock lines and cross-totals may remain different.
   const compareNoteLine = (report, line, erpCents) => {
     if (line.amountCents === erpCents)
       return pushLine(report, line, erpCents, "exact");
-    const moveNet = moveAdjustNetByNote.get(line.note) ?? 0;
-    const adjustedCents = erpCents + statementSign(line.note, moveNet);
-    if (moveNet !== 0 && adjustedCents === line.amountCents) {
-      const row = pushLine(report, line, erpCents, "named_note_mapping_difference",
-        "The printed TB APPX and the ERP fs_note classify the movedAccounts under different notes; the printed statements are the 1:1 target (user decision §8-1). See namedNoteMappingMoves.");
-      row.adjustedErpCents = adjustedCents;
-      row.movedAccounts = namedMoves
-        .filter((mv) => mv.erpEffectiveNote === line.note || mv.scanAppx === line.note)
-        .map((mv) => ({ code: mv.erpCode, netCents: mv.erpNetCents, from: mv.erpEffectiveNote, to: mv.scanAppx }));
-      return row;
-    }
     return pushLine(report, line, erpCents, "unexplained");
   };
 
   // Balance Sheet
   for (const line of bs) {
     if (line.note === "DN") {
-      pushLine("bs", line, erpNetProfitCents, "profit_cross_reference", STMT_ATTRIBUTIONS.profitIdentity);
+      pushLine("bs", line, erpNetProfitCents, "v3_closing_stock_cross_total", STMT_ATTRIBUTIONS.profitIdentity);
       continue;
     }
     if (line.isSubtotal || !line.note) continue;
@@ -1660,11 +2238,11 @@ function stageStatements() {
       continue;
     }
     if (STMT_CLOSING_NOTES.has(line.note)) {
-      const row = pushLine("bs", line, erp.balanceCents, "stock_closing_note",
-        `${STMT_ATTRIBUTIONS.csAnchor} Scan side: ${STMT_ATTRIBUTIONS.stockInjection}`);
+      const row = pushLine("bs", line, erp.balanceCents, "v3_closing_stock_line",
+        STMT_ATTRIBUTIONS.stockInjection);
       const anchored = csAnchorByNote.get(line.note) ?? 0;
-      if (erp.balanceCents !== anchored)
-        fail(`BS note ${line.note}: ERP ${fmt(erp.balanceCents)} != its CS anchor set ${fmt(anchored)} — something else pollutes the note`);
+      if (erp.balanceCents !== 0 || anchored !== 0)
+        fail(`BS note ${line.note}: V2 closing-stock value ${fmt(erp.balanceCents)} / anchor ${fmt(anchored)} != 0.00`);
       row.csAnchorCents = anchored;
       continue;
     }
@@ -1675,27 +2253,27 @@ function stageStatements() {
   let isProfitLine = null;
   for (const line of isf) {
     if (line.note === "CH") {
-      pushLine("is", line, erpCogmTotal, "cogm_cross_reference", STMT_ATTRIBUTIONS.cogmIdentity);
+      pushLine("is", line, erpCogmTotal, "v3_closing_stock_cross_total", STMT_ATTRIBUTIONS.cogmIdentity);
       continue;
     }
     if (line.isSubtotal) {
       if (line.particular === "PROFIT FOR THE FINANCIAL YEAR") {
-        isProfitLine = pushLine("is", line, erpNetProfitCents, "profit_cross_reference", STMT_ATTRIBUTIONS.profitIdentity);
+        isProfitLine = pushLine("is", line, erpNetProfitCents, "v3_closing_stock_cross_total", STMT_ATTRIBUTIONS.profitIdentity);
       }
       continue;
     }
     if (!line.note) continue;
     if (STMT_OPENING_NOTES.has(line.note)) {
       const erpCents = erpPnl.get(line.note)?.balanceCents ?? 0;
-      if (erpCents !== 0)
-        fail(`IS opening-inventory note ${line.note} has ERP movement ${fmt(erpCents)} (expected 0)`);
-      pushLine("is", line, erpCents, "stock_opening_note", STMT_ATTRIBUTIONS.osAnchorEngineGap);
+      if (line.note !== "3-1")
+        fail(`IS unexpectedly renders opening-stock note ${line.note}; only 3-1 belongs here`);
+      compareNoteLine("is", line, erpCents);
       continue;
     }
     if (STMT_CLOSING_NOTES.has(line.note)) {
       if (erpPnl.has(line.note))
         fail(`closing-stock note ${line.note} is unexpectedly served by the P&L engines`);
-      pushLine("is", line, null, "stock_closing_scan_only", STMT_ATTRIBUTIONS.stockInjection);
+      pushLine("is", line, 0, "v3_closing_stock_line", STMT_ATTRIBUTIONS.stockInjection);
       continue;
     }
     const erp = erpPnl.get(line.note);
@@ -1711,22 +2289,22 @@ function stageStatements() {
   for (const line of cogmf) {
     if (line.isSubtotal) {
       if (line.particular === "TOTAL COST OF GOODS MANUFACTURED") {
-        cogmTotalLine = pushLine("cogm", line, erpCogmTotal, "cogm_cross_reference", STMT_ATTRIBUTIONS.cogmIdentity);
+        cogmTotalLine = pushLine("cogm", line, erpCogmTotal, "v3_closing_stock_cross_total", STMT_ATTRIBUTIONS.cogmIdentity);
       }
       continue;
     }
     if (!line.note) continue;
     if (STMT_OPENING_NOTES.has(line.note)) {
       const erpCents = erpPnl.get(line.note)?.balanceCents ?? 0;
-      if (erpCents !== 0)
-        fail(`CoGM opening-inventory note ${line.note} has ERP movement ${fmt(erpCents)} (expected 0)`);
-      pushLine("cogm", line, erpCents, "stock_opening_note", STMT_ATTRIBUTIONS.osAnchorEngineGap);
+      if (line.note !== "3-3" && line.note !== "3-7")
+        fail(`CoGM unexpectedly renders opening-stock note ${line.note}; only 3-3/3-7 belong here`);
+      compareNoteLine("cogm", line, erpCents);
       continue;
     }
     if (STMT_CLOSING_NOTES.has(line.note)) {
       if (erpPnl.has(line.note))
         fail(`closing-stock note ${line.note} is unexpectedly served by the P&L engines`);
-      pushLine("cogm", line, null, "stock_closing_scan_only", STMT_ATTRIBUTIONS.stockInjection);
+      pushLine("cogm", line, 0, "v3_closing_stock_line", STMT_ATTRIBUTIONS.stockInjection);
       continue;
     }
     const erp = erpPnl.get(line.note);
@@ -1755,21 +2333,20 @@ function stageStatements() {
   if (isProfitLine === null || scanProfit !== isProfitLine.scanCents)
     fail("BS profit line and IS profit line disagree (V0 tie broken)");
   const profitDiff = scanProfit - erpNetProfitCents;
-  if (profitDiff === closingsTotal - openingsTotal)
-    ok(`profit: scan ${fmt(scanProfit)} − ERP ${fmt(erpNetProfitCents)} = ${fmt(profitDiff)} = closings − openings exactly`);
+  if (profitDiff === closingsTotal && closingsTotal === STMT_EXPECTED_CLOSINGS_CENTS)
+    ok(`profit: scan ${fmt(scanProfit)} − ERP ${fmt(erpNetProfitCents)} = ${fmt(profitDiff)} = deferred closings exactly`);
   else
-    fail(`profit difference ${fmt(profitDiff)} != closings − openings ${fmt(closingsTotal - openingsTotal)}`);
+    fail(`profit difference ${fmt(profitDiff)} != deferred closings ${fmt(closingsTotal)}`);
 
-  // The CoGM total identity: openings − closings (the stock injection) plus
-  // the named salary-split moves that cross between the IS and CoGM sections.
-  const cogmOpenClose = fx(cogmf, "3-3") + fx(cogmf, "3-7") - fx(cogmf, "14-2") - fx(cogmf, "14-3");
-  const cogmExpectedDiff = cogmOpenClose + moveIntoCogmNetCents;
+  // After V2, opening stock and the salary split are exact. Only the V3 raw
+  // and packing closing-stock deductions remain outside the CoGM engine.
+  const cogmExpectedDiff = -STMT_EXPECTED_RAW_PACKING_CLOSINGS_CENTS;
   if (cogmTotalLine === null) fail("CoGM total line not found");
   else if (cogmTotalLine.diffCents === cogmExpectedDiff)
-    ok(`CoGM: scan ${fmt(cogmTotalLine.scanCents)} − ERP ${fmt(erpCogmTotal)} = ${fmt(cogmTotalLine.diffCents)} = openings − closings ${fmt(cogmOpenClose)} + named salary moves ${fmt(moveIntoCogmNetCents)} exactly`);
+    ok(`CoGM: scan ${fmt(cogmTotalLine.scanCents)} − ERP ${fmt(erpCogmTotal)} = ${fmt(cogmTotalLine.diffCents)} = deferred raw/packing closings exactly`);
   else
-    fail(`CoGM total difference ${fmt(cogmTotalLine?.diffCents ?? 0)} != openings − closings + named moves ${fmt(cogmExpectedDiff)}`);
-  const chLine = lineComparisons.find((l) => l.report === "is" && l.classification === "cogm_cross_reference");
+    fail(`CoGM total difference ${fmt(cogmTotalLine?.diffCents ?? 0)} != ${fmt(cogmExpectedDiff)}`);
+  const chLine = lineComparisons.find((l) => l.report === "is" && l.note === "CH");
   if (!chLine || !cogmTotalLine || chLine.scanCents !== cogmTotalLine.scanCents)
     fail("IS CoGM cross-reference line != CoGM statement total (V0 tie broken)");
 
@@ -1801,8 +2378,8 @@ function stageStatements() {
     ok("every nonzero 31-May balance reaches the statements through an active BS/IS/CoGM note");
   }
 
-  // --- The residue identity at statement level: the ERP May BS must be out
-  // of balance by exactly the named opening residue and nothing else ---
+  // --- V2 Balance Sheet boundary: balanced at the approved no-closing-stock
+  // level, with legacy-format net assets equal to financed-by. ---
   let erpAssets = 0, erpLiabilities = 0, erpEquity = 0;
   for (const n of erpBs.values()) {
     if (n.category === "asset") erpAssets += n.balanceCents;
@@ -1810,13 +2387,22 @@ function stageStatements() {
     else if (n.category === "equity") erpEquity += n.balanceCents;
   }
   const erpImbalance = erpAssets - erpLiabilities - (erpEquity + erpNetProfitCents);
-  if (erpImbalance === -RESIDUE_CENTS)
-    ok(`ERP May BS is out of balance by exactly the named residue: assets short ${fmt(RESIDUE_CENTS)}`);
-  else
-    fail(`ERP May BS imbalance ${fmt(erpImbalance)} != -residue ${fmt(-RESIDUE_CENTS)}`);
+  const erpNetAssets = erpAssets - erpLiabilities;
+  const erpFinancedBy = erpEquity + erpNetProfitCents;
+  if (erpImbalance !== 0)
+    fail(`V2 May BS imbalance ${fmt(erpImbalance)} != 0.00`);
+  if (erpNetAssets !== STMT_EXPECTED_NET_ASSETS_CENTS)
+    fail(`V2 May net assets ${fmt(erpNetAssets)} != ${fmt(STMT_EXPECTED_NET_ASSETS_CENTS)}`);
+  if (erpFinancedBy !== STMT_EXPECTED_NET_ASSETS_CENTS)
+    fail(`V2 May financed-by ${fmt(erpFinancedBy)} != ${fmt(STMT_EXPECTED_NET_ASSETS_CENTS)}`);
+  if (erpImbalance === 0
+    && erpNetAssets === STMT_EXPECTED_NET_ASSETS_CENTS
+    && erpFinancedBy === STMT_EXPECTED_NET_ASSETS_CENTS)
+    ok("V2 May BS balances: net assets = financed-by = 5,389,607.26");
 
   // --- ST-b closure: which printed statement lines are backed by printed TB
   // rows. Expected: every compared line except the closing-inventory lines ---
+  const stBackingStartFailures = failures;
   const unbackedLines = [];
   for (const c of lineComparisons) {
     if (!c.note || c.note === "DN" || c.note === "CH") continue;
@@ -1831,41 +2417,68 @@ function stageStatements() {
       fail(`${c.report} note ${c.note}: printed statement ${fmt(c.scanCents)} is not backed by printed TB rows (${fmt(backedCents)})`);
     }
   }
-  if (failures === 0)
-    ok(`ST-b: every printed statement line is TB-backed except the closing-inventory lines (${unbackedLines.join(", ")})`);
+  const expectedUnbackedLines = [
+    "bs 14-1", "bs 14-2", "bs 14-3",
+    "is 14-1", "cogm 14-2", "cogm 14-3",
+  ];
+  if (JSON.stringify([...unbackedLines].sort()) !== JSON.stringify([...expectedUnbackedLines].sort()))
+    fail(`ST-b unbacked lines ${unbackedLines.join(", ")} != exact six V3 closing-stock lines`);
+  if (failures === stBackingStartFailures)
+    ok(`ST-b: every printed statement note is TB-backed except the exact six V3 closing-stock lines`);
 
-  // --- The APPX-vs-fs_note difference set must be complete, named, and
-  // byte-identical to the pinned fingerprint (tdl precedent) ---
-  if (namedMoves.length) {
-    console.log(`\nnamed fs_note classification differences (nonzero, non-stock — V2 correction candidates):`);
-    for (const r of namedMoves)
-      console.log(`  ${r.erpCode.padEnd(14)} printed APPX ${String(r.scanAppx).padEnd(5)} ERP note ${String(r.erpEffectiveNote).padEnd(5)} ${fmt(r.erpNetCents).padStart(14)}`);
-  }
-  note(`${appxAudit.length} of ${mappings.length} mapped accounts print an APPX differing from the ERP effective fs_note: ${namedMoves.length} named non-stock moves, ${stockSplitMismatches.length} within the stock family, ${appxAudit.length - nonzeroMismatches.length} with zero balances (cosmetic)`);
-  if (stockAppxVsNoteMismatches.length)
-    note(`${stockAppxVsNoteMismatches.length} anchored CS account(s) sit under a different 14-* note than their printed APPX (affects only the per-note split of the superseded anchors)`);
-  if (nonzeroMismatches.length === 0) {
-    ok("no nonzero APPX-vs-fs_note differences");
-  } else if (EXPECTED_STMT_MAPPING_DIFF_FINGERPRINT === null) {
-    fail(`${nonzeroMismatches.length} nonzero APPX-vs-fs_note difference(s); inspect and pin fingerprint ${mappingDiffFingerprint}`);
-  } else if (mappingDiffFingerprint === EXPECTED_STMT_MAPPING_DIFF_FINGERPRINT) {
-    note(`${nonzeroMismatches.length} nonzero APPX-vs-fs_note differences retain the pinned classification set (${mappingDiffFingerprint})`);
-  } else {
-    fail(`APPX-vs-fs_note diff fingerprint ${mappingDiffFingerprint} != pinned ${EXPECTED_STMT_MAPPING_DIFF_FINGERPRINT}`);
-  }
+  // --- Final APPX state. The historical 125-row fingerprint is evidence of
+  // what V2 corrected, not a live mismatch target. ---
+  const cosmeticAppxMismatches = appxAudit.filter((r) => r.scanMayCents === 0 && r.erpNetCents === 0);
+  if (appxAudit.length !== 91 || cosmeticAppxMismatches.length !== 91)
+    fail(`post-V2 APPX audit has ${appxAudit.length} differences / ${cosmeticAppxMismatches.length} zero cosmetics; expected 91/91`);
+  if (nonzeroMismatches.length !== 0)
+    fail(`${nonzeroMismatches.length} nonzero APPX-vs-fs_note difference(s) remain after V2`);
+  if (namedMoves.length !== 0)
+    fail(`${namedMoves.length} approved non-stock mapping move(s) remain unapplied`);
+  if (stockSplitMismatches.length !== 0)
+    fail(`${stockSplitMismatches.length} approved stock mapping move(s) remain unapplied`);
+  if (stockAppxVsNoteMismatches.length !== 0)
+    fail(`${stockAppxVsNoteMismatches.length} zero CS anchor(s) still resolve to the wrong 14-* note`);
+  if (appxAudit.length === 91 && cosmeticAppxMismatches.length === 91
+    && nonzeroMismatches.length === 0 && namedMoves.length === 0
+    && stockSplitMismatches.length === 0 && stockAppxVsNoteMismatches.length === 0)
+    ok("APPX mapping is final: 0 actionable differences; 91 all-zero cosmetic rows remain");
 
   // --- Report ---
   const byClass = {};
   for (const c of lineComparisons) byClass[c.classification] = (byClass[c.classification] ?? 0) + 1;
   console.log(`\n${lineComparisons.length} compared statement lines: ${Object.entries(byClass).map(([k, v]) => `${v} ${k}`).join(", ")}`);
+  const residualLines = lineComparisons.filter((c) => c.classification.startsWith("v3_closing_stock_"));
+  const residualKeys = residualLines.map((c) => `${c.report}:${c.lineNo}`).sort();
+  const expectedResidualKeys = [...STMT_EXPECTED_RESIDUAL_KEYS].sort();
+  const expectedResidualDiffs = {
+    "bs:2": 18897960, "bs:3": 33690982, "bs:4": 18219443, "bs:23": 70808385,
+    "is:3": -51910425, "is:5": 18897960, "is:20": 70808385,
+    "cogm:6": 33690982, "cogm:11": 18219443, "cogm:14": -51910425,
+  };
+  if (lineComparisons.length !== 40 || (byClass.exact ?? 0) !== 30
+    || (byClass.v3_closing_stock_line ?? 0) !== 6
+    || (byClass.v3_closing_stock_cross_total ?? 0) !== 4)
+    fail(`statement final counts ${lineComparisons.length}/${byClass.exact ?? 0}/${byClass.v3_closing_stock_line ?? 0}/${byClass.v3_closing_stock_cross_total ?? 0} != 40/30/6/4`);
+  if (JSON.stringify(residualKeys) !== JSON.stringify(expectedResidualKeys))
+    fail(`V3 residual keys ${residualKeys.join(", ")} != ${expectedResidualKeys.join(", ")}`);
+  for (const line of residualLines) {
+    const key = `${line.report}:${line.lineNo}`;
+    if (line.diffCents !== expectedResidualDiffs[key])
+      fail(`${key} residual ${fmt(line.diffCents)} != ${fmt(expectedResidualDiffs[key])}`);
+  }
+  if (lineComparisons.length === 40 && (byClass.exact ?? 0) === 30
+    && JSON.stringify(residualKeys) === JSON.stringify(expectedResidualKeys)
+    && residualLines.every((line) => line.diffCents === expectedResidualDiffs[`${line.report}:${line.lineNo}`]))
+    ok("statement boundary is exact: 30/40 lines match; the exact ten V3-only lines remain");
 
   const outFile = path.join(genDir, "statements-comparison.json");
   fs.writeFileSync(outFile, JSON.stringify({
     generatedAt: new Date().toISOString(),
     period: { start: STMT_PERIOD_START, end: STMT_PERIOD_END },
     engineSemantics: {
-      balanceSheet: "latest anchor <= period end + posted movement from anchor date, grouped by effective fs_note (active balance_sheet notes), plus a synthetic movement-only Current Year Profit row",
-      incomeStatementAndCogm: "posted journal movement in the YTD period only, grouped by effective fs_note (active income_statement/cogm notes); anchors are never read",
+      balanceSheet: "latest anchor <= period end + posted movement from anchor date, grouped by effective fs_note (active balance_sheet notes), plus Current Year Profit from the V2 P&L calculation",
+      incomeStatementAndCogm: "posted YTD movement plus exact fiscal-start anchors for only 3-1/3-3/3-7; 3-1 is IS, while 3-3/3-7 are CoGM",
     },
     counts: { comparedLines: lineComparisons.length, byClassification: byClass },
     noteMetadata: Object.fromEntries([...fixtureNoteCodes].sort().map((c) => [c, notesMeta.get(c) ?? null])),
@@ -1889,31 +2502,37 @@ function stageStatements() {
       bsLiabilities: erpLiabilities,
       bsEquityExProfit: erpEquity,
       bsImbalance: erpImbalance,
+      bsNetAssets: erpNetAssets,
+      bsFinancedBy: erpFinancedBy,
     },
     identitiesCents: {
       scanProfit,
       profitDiff,
       openingsTotal,
       closingsTotal,
-      moveIntoCogmNet: moveIntoCogmNetCents,
-      residue: RESIDUE_CENTS,
+      cogmDiff: cogmTotalLine?.diffCents ?? null,
     },
     namedNoteMappingMoves: namedMoves,
     mappingDiffFingerprint,
-    v2DesignProjection: {
-      note: "Derived arithmetic for the V2 sign-off package (plan §6/§8-2), not live gates.",
-      postV2TbResidueCents: RESIDUE_CENTS + STMT_CS_ANCHOR_TOTAL_CENTS - STMT_OS_OPENING_TOTAL_CENTS,
-      postV2BsImbalanceWithoutEngineChangeCents: erpImbalance - STMT_CS_ANCHOR_TOTAL_CENTS,
-      postV2BsImbalanceWithAnchorRenderingCents: erpImbalance - STMT_CS_ANCHOR_TOTAL_CENTS + openingsTotal,
-      postV2MayBsTotalWithoutClosingInjectionCents: (bs.find((l) => l.particular === "TOTAL")?.amountCents ?? 0) - closingsTotal,
+    targetMappingMismatches,
+    preV2Evidence: {
+      residueCents: PRE_V2_RESIDUE_CENTS,
+      csAnchorTotalCents: PRE_V2_STMT_CS_ANCHOR_TOTAL_CENTS,
+      actionableMappingFingerprint: PRE_V2_STMT_MAPPING_DIFF_FINGERPRINT,
+    },
+    v2FinalState: {
+      netProfitCents: erpNetProfitCents,
+      cogmCents: erpCogmTotal,
+      bsImbalanceCents: erpImbalance,
+      netAssetsCents: erpNetAssets,
+      financedByCents: erpFinancedBy,
+      exactStatementLines: byClass.exact ?? 0,
+    },
+    v3Remaining: {
+      note: "Monthly closing stock remains outside V2.",
       scanMayBsTotalCents: bs.find((l) => l.particular === "TOTAL")?.amountCents ?? 0,
-      fullParityRequires: [
-        "V2: zero the 63 CS_* credit anchors and insert the printed OS_* openings as 2026-01-01 anchors (per-account amounts in tb-comparison.json)",
-        "V2: user-approved fs_note corrections for the namedNoteMappingMoves accounts (printed APPX = target) — closes the note 22/8/1/10/11 and 5/5-1 statement differences",
-        "V2: align the stock-family fs_notes with the printed APPX (appxVsNoteWithinStockFamily) so the V2 OS anchors render under the correct 3-1/3-3/3-7 note",
-        "§8-2: the IS/CoGM engines (and the BS Current Year Profit row) must render anchor-backed opening-inventory notes 3-1/3-3/3-7",
-        "V3-1: monthly closing-stock injection for BS 14-1/14-2/14-3 and the IS/CoGM LESS: CLOSING INVENTORIES lines (May targets 188,979.60 / 336,909.82 / 182,194.43)",
-      ],
+      closingStockCents: closingsTotal,
+      residualKeys,
     },
     lineComparisons,
     leaks,
@@ -1923,7 +2542,7 @@ function stageStatements() {
 }
 
 // ---- Run --------------------------------------------------------------------
-const STAGES = { map: stageMap, tb: stageTb, tdl: stageTdl, statements: stageStatements };
+const STAGES = { map: stageMap, tb: stageTb, tdl: stageTdl, statements: stageStatements, regressions: stageRegressions };
 const requested = process.argv.slice(2);
 const toRun = requested.length ? requested : Object.keys(STAGES);
 for (const s of toRun) {

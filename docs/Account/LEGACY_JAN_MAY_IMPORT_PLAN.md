@@ -117,6 +117,8 @@ Family sums (THLD): NCA fixed assets +11,284,675.98 · AD accum-depr −3,836,90
 
 ⚠ **The selected opening set does NOT balance.** RM1,448,916.97 is THLD's control-level missing debit, but replacing the excluded RM507,697.72 DEBTOR control with RM500,134.32 of THDB customer detail adds the named RM7,563.40 subledger drift. The actual anchor population therefore has a missing **DR RM1,456,480.37**. The likely omitted source is the balance-sheet **STOCK asset** (CS_* credits alone are 829,605.22) plus other balances absent from this export. No supporting opening TB was supplied, so the approved treatment is to preserve RM1,456,480.37 as the named Trial Balance/Balance Sheet residue and never invent a balancing figure. Journal movements, ledgers, IS, and CoGM remain independently verifiable.
 
+**V2 development supersession (20 Jul 2026):** this paragraph remains the exact import-era baseline and explains why the old acceptance scripts expect the residue. The later hash-validated Trial Balance scans independently supplied its full account-level decomposition: 63 `CS_*` credits totalling RM829,605.22 are explicit zero targets and 62 `OS_*` debits total RM626,875.15. The guarded V2 migration applies only those evidenced corrections on development, producing 642 January anchors balanced at RM13,180,681.18 per side. Production still retains the import-era state until separately approved.
+
 **DEBTOR control account:** opening 507,697.72 DR, **zero transaction rows** (static in legacy). Exclude it entirely — THDB per-customer openings are the approved authoritative detail. Its 507,697.72 equals *exactly* the "legacy 1 June debtor list" total imported as the June General-Statement B/F, while THDB per-customer openings net to 500,134.32 (**7,563.40 below the control**). Preserve that legacy control-vs-subledger drift as a named verification difference (§8-3).
 
 ---
@@ -175,6 +177,8 @@ The giant synthetic opening-journal fallback was not selected and must not be in
 
 **Balance Sheet completeness implemented:** the BS adds **Current Year Profit** from the same journal-only income-statement formula. The Note 22 / Note 7 invoice overrides and their response metadata were removed; journal data and anchors are authoritative.
 
+**V2 development update (20 Jul 2026):** the final sentence of item 3 and the journal-only Current Year Profit description above are now historical. IS and BS Current Year Profit add only exact `YYYY-01-01` opening-stock anchors for Notes 3-1/3-3/3-7 once to inclusive posted YTD movement; CoGM adds only 3-3/3-7. TB/BS account balances keep their separate latest-anchor rule. Later checkpoints do not replace fiscal opening stock, and monthly closing stock remains V3.
+
 **Bank ledger cutover implemented:** [bank-statement.js](../../src/routes/accounting/bank-statement.js) now limits the synthetic CH_REV1/CH_REV2→BANK_PBB projection to dates before **2026-01-01**, preventing double-counting once real January bank rows are imported.
 
 **Posting lock implemented:** Tien Hock sales, receipt/payment, and adjustment accounting mutations dated before **2026-06-01** fail with HTTP 409 / `ACCOUNTING_PERIOD_LOCKED`. JP is explicitly excluded. Direct SQL, manual journals, and bank-in mutations remain outside this narrow application guard (§9).
@@ -194,6 +198,7 @@ The giant synthetic opening-journal fallback was not selected and must not be in
 | **L5** ✅ dev + prod | TB/BS anchor engine, Current Year Profit, journal-only Note 7/22, bank cutoff, fs-note remap, HPB Note 16, guide, posting lock, and changelog | Jan–Jun BS residue exactly RM1,456,480.37; manual `PV008/06` RM483 retained as unproven contra |
 | **L6** ✅ production cutover | Audit live state, rehearse on a fresh proof database, stop writes, validate rollback, reproduce L2→L5, and verify the live app | completed 13 Jul 2026; proof and pristine rollback retained; production database/report/PM2/HTTP gates passed |
 | **L7** ✅ dev + proof + prod | After the last successful old `verify-import.sql`, run and rerun `2026-07-14_legacy_journal_presentation.sql`, then deploy the auditor-facing API/UI | completed 14 Jul 2026; semantic types/provenance/descriptions/line refs exact, second run updated 0/0, v2 accounting fingerprint unchanged |
+| **Report V2** ✅ development only | Apply the scan-evidenced 63 CS zero fences, 62 OS anchors, 125 APPX corrections and narrow fiscal-opening report semantics | development verified 20 Jul 2026 at 880/880 TB exact and balanced RM5,389,607.26 pre-closing-stock BS boundary; production requires separate approval |
 
 ---
 
@@ -287,7 +292,7 @@ application deployment completed on production commit `b4a6493d`.
 
 ## 8. Approved decisions (Phase L1 complete)
 
-1. **Opening gap:** no legacy TB/Balance Sheet was supplied. Preserve the exact selected-anchor missing debit of RM1,456,480.37 as a named limitation; do not invent a balancing account or amount. RM1,448,916.97 is only the THLD control-level gap before the RM7,563.40 DEBTOR/detail replacement drift.
+1. **Opening gap (import-era decision; V2-closed on development 20 Jul 2026):** no legacy TB/Balance Sheet was supplied during the import, so the exact selected-anchor missing debit of RM1,456,480.37 was preserved as a named limitation and never plugged. Later hash-validated Trial Balance scans proved the complete per-account correction set. The guarded report-V2 migration now closes it on development with 63 CS zero fences and 62 OS anchors; the old import scripts and production state remain pinned to this pre-V2 decision until a separately approved rollout. RM1,448,916.97 is only the THLD control-level gap before the RM7,563.40 DEBTOR/detail replacement drift.
 2. **REC conflicts:** cancel the 2,074 posted Jan–May payment-owned REC journals while preserving payment history. Applied on development and production.
 3. **DEBTOR control:** exclude the static THLD control and treat THDB per-customer detail as authoritative. Keep the existing 1 June anchors as checkpoints; any 7,563.40 control/detail drift remains named.
 4. **Invoice 015347:** route through `CHARLES-C` as four logical lines: DR customer / CR sales, then DR bank / CR customer.
@@ -395,15 +400,17 @@ as follows:
    nonposting and leave the imported journals untouched.
 2. Keep the private source CSV,
    generated staging CSV/report, and production dump untracked.
-3. **Independent verification (added 17 Jul 2026):** the user exported scanned
+3. **Independent verification (completed through V2 on development 20 Jul 2026):** the user exported scanned
    legacy reports (Jan–May monthly Trial Balances, May Balance Sheet / Detail
    Income Statement / CoGM / Trade Debtor List). They provably contain the
    decomposition of the RM1,456,480.37 opening residue (opening inventories
-   626,875.15 + CS_* 829,605.22). The verification and residue-closure work is
-   planned in
-   [LEGACY_REPORT_VERIFICATION_PLAN.md](LEGACY_REPORT_VERIFICATION_PLAN.md);
-   until its V2 completes, the residue in this document remains the accepted
-   named limitation.
+   626,875.15 + CS_* 829,605.22). The guarded residue-closure work and final
+   development evidence are recorded in
+   [LEGACY_REPORT_VERIFICATION_PLAN.md](LEGACY_REPORT_VERIFICATION_PLAN.md) and
+   [LEGACY_REPORT_RECONCILIATION.md](LEGACY_REPORT_RECONCILIATION.md). This
+   document's 580-anchor figures remain immutable pre-V2 import evidence; the
+   final development verifier expects 642 balanced January anchors. Production
+   remains unchanged pending separate approval.
 
 ---
 
