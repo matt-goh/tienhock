@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**MAPPING COMPLETE (re-applied 8 Jul 2026):** All 2,750 account codes have `fs_note` assigned.
+**MAPPING COMPLETE (legacy-report V2 verified on development 20 Jul 2026):** every active account has an effective `fs_note`. The 8 Jul base remap is followed by the exact 125-change V2 override proved against the printed APPX column (94 stock-family and 31 non-stock changes across 156 audited accounts).
 
-The original January 2026 bulk mapping was **lost in a dev-DB refresh** (only 2 codes still had `fs_note`), which left the Income Statement / Balance Sheet / CoGM completely empty. The mapping was re-applied on 8 Jul 2026 with a **corrected script**: [`dev/migrations/fs_note_remap_2026-07.sql`](../../dev/migrations/fs_note_remap_2026-07.sql) — that file is now the single source of truth for the mapping rules. The production version is idempotent only for the exact audited pre-remap/final populations and aborts on any account or mapping drift; review and re-pin new accounts instead of silently catch-all mapping them. Corrections vs the old script embedded in earlier versions of this doc:
+The original January 2026 bulk mapping was **lost in a dev-DB refresh** (only 2 codes still had `fs_note`), which left the Income Statement / Balance Sheet / CoGM completely empty. The mapping was re-applied on 8 Jul 2026 with the corrected base script [`dev/migrations/fs_note_remap_2026-07.sql`](../../dev/migrations/fs_note_remap_2026-07.sql). The scan-evidenced exceptions are now owned by [`dev/migrations/2026-07-20_legacy_report_v2_opening_stock.sql`](../../dev/migrations/2026-07-20_legacy_report_v2_opening_stock.sql); do not re-run the base remap over that final state. Both migrations fail closed on unreviewed drift. Corrections vs the old script embedded in earlier versions of this doc:
 
 - `MB*` admin-by-nature codes and vehicle codes → Note **5**, not 5-1 (per the legacy prefix table in [LEGACY_SYSTEM_REFERENCE.md](LEGACY_SYSTEM_REFERENCE.md)); only factory-section salary codes (suffix `_MM/_PM/_MB/_PB/_JB/_K`) + `THJ_*` → **5-1**.
 - `CASH% → 6` no longer clobbers `CASH_SALES` (revenue); `CR_SALES` added to Note 7.
@@ -24,14 +24,14 @@ The original January 2026 bulk mapping was **lost in a dev-DB refresh** (only 2 
 3. **Financial Statement Notes** → `financial_statement_notes` table defines report line items
 4. **Effective Note Inheritance** → a child account without its own `fs_note` inherits the nearest ancestor's note
 5. **As-of Reports** → Trial Balance and Balance Sheet use the latest account opening anchor on or before period end, plus posted movement from the anchor date
-6. **Movement Reports** → Income Statement and CoGM use posted journal movement from 1 January to period end
+6. **Profit-and-loss Reports** → Income Statement and Current Year Profit add exact 1 January opening-stock anchors for Notes 3-1/3-3/3-7 once to posted YTD movement; CoGM adds only Notes 3-3/3-7. Later anchors never replace fiscal opening stock
 
 ### Key Tables
 - `account_codes` - Contains `fs_note` column linking to financial statement notes
 - `financial_statement_notes` - Defines 33 report line items with category/section
 - `journal_entry_lines` - Transaction data with debit/credit amounts
 - `journal_entries` - Supplies posting status and accounting date
-- `account_opening_balances` - Signed DR-positive opening anchors used by Trial Balance and Balance Sheet
+- `account_opening_balances` - Signed DR-positive anchors used by Trial Balance/Balance Sheet and, only for exact fiscal-year opening-stock notes, the Income Statement/Current Year Profit/CoGM
 
 ---
 
@@ -44,9 +44,9 @@ The original January 2026 bulk mapping was **lost in a dev-DB refresh** (only 2 
 | **4** | Property, Plant & Equipment | Fixed assets, vehicles, machinery, accumulated depreciation | 25 |
 | **6** | Cash in Hand | Petty cash, cash on hand | 2 |
 | **8** | Prepayments & Deposits | Prepaid expenses, deposits paid | 31 |
-| **14-1** | Closing Stock (Finished Goods) | Finished product inventory | 108 |
-| **14-2** | Closing Stock (Raw Materials) | Raw material inventory | 22 |
-| **14-3** | Closing Stock (Packing Materials) | Packing material inventory | 10 |
+| **14-1** | Closing Stock (Finished Goods) | Finished product inventory | 61 |
+| **14-2** | Closing Stock (Raw Materials) | Raw material inventory | 27 |
+| **14-3** | Closing Stock (Packing Materials) | Packing material inventory | 52 |
 | **17** | Input Tax | GST/SST input tax claimable | 0 |
 | **19** | Cash at Bank | Bank balances | 4 |
 | **22** | Trade Receivables | Customer receivables (all TD accounts) | 1,511 |
@@ -87,17 +87,22 @@ The original January 2026 bulk mapping was **lost in a dev-DB refresh** (only 2 
 | **15** | Depreciation | Depreciation expense | 2 |
 | **23** | Hire Purchase Interest | HP interest expense | 30 |
 
-### COGM - Cost of Goods Manufactured (8 notes)
+### Income Statement - Opening Finished Goods (1 note)
 
 | Note | Name | Description | Mapped Count |
 |------|------|-------------|--------------|
-| **3-1** | Opening Stock (Finished Products) | Finished goods opening stock | 109 |
+| **3-1** | Opening Stock (Finished Products) | Finished goods opening stock included in cost of sales | 62 |
+
+### COGM - Cost of Goods Manufactured (7 notes)
+
+| Note | Name | Description | Mapped Count |
+|------|------|-------------|--------------|
 | **3-2** | Purchases (Packing Material) | Packing purchases | 8 |
-| **3-3** | Opening Stock (Raw Materials) | Raw material opening stock | 24 |
+| **3-3** | Opening Stock (Raw Materials) | Raw material opening stock | 29 |
 | **3-4** | Purchase of Chemical | Chemical purchases | 0 |
 | **3-5** | Purchase of Raw Material | Raw material purchases | 20 |
 | **3-6** | Freight & Transportation | Freight in on materials | 1 |
-| **3-7** | Opening Stock (Packing Material) | Packing opening stock | 10 |
+| **3-7** | Opening Stock (Packing Material) | Packing opening stock | 52 |
 | **5-1** | Factory Worker Salaries | Factory labor costs | 140 |
 
 ---
@@ -269,7 +274,7 @@ This section documents where each financial statement note gets its data from.
 
 ### STILL NOT AUTOMATED (report gaps)
 
-**Notes 14-1/14-2/14-3 (Closing Stock) & 3-1/3-3/3-7 (Opening Stock)** — no stock-valuation journal at period end yet; CoGM shows purchase totals, not material *used*.
+**Notes 14-1/14-2/14-3 (Closing Stock)** — the evidenced 2026 opening values in Notes 3-1/3-3/3-7 are now included from exact 1 January anchors, but there is still no user-managed monthly closing-stock source. Closing stock remains Phase V3.
 
 **Note 4 (PPE) / Note 15 (Depreciation)** — needs the fixed-asset register (gap 1A-4).
 
@@ -278,7 +283,7 @@ finance cost in Note 23. `HPA_*` principal and the paired `HPB_*` interest in
 suspense remain together in Balance Sheet Note 16. The full HP schedule is
 still needed (gap 1A-6); currently only manual journals exist.
 
-**Notes 20/21 (Retained Profit, Share Capital)** — pure opening-balance items; blocked on gap 1A-7.
+**Notes 20/21 (Retained Profit, Share Capital)** — pure opening-balance items read through the Balance Sheet anchor engine.
 
 **Note 3 (Tax Expenses), 3-6 (Freight In), 18-1/18-2 (Other income)** — manual journals only.
 
@@ -318,17 +323,18 @@ still needed (gap 1A-6); currently only manual journals exist.
 **Completed** ✅:
 1. Notes 22 and 7 are derived from posted journals, with no invoice-table override
 2. Trial Balance and Balance Sheet use the latest applicable opening anchor per account
-3. Balance Sheet includes journal-based Current Year Profit in Equity
+3. Income Statement and Balance Sheet Current Year Profit include exact 1 January opening stock for Notes 3-1/3-3/3-7; CoGM includes 3-3/3-7 only
+4. The May 2026 V2 Balance Sheet is balanced at the pre-closing-stock boundary; monthly closing stock remains V3
 
 **Medium Priority** (needs stock system first):
-4. Stock entries → Closing/Opening Stock
-5. Production → COGM entries
+5. Stock entries → monthly Closing Stock
+6. Production → COGM entries
 
 **Lower Priority** (likely manual):
-6. Fixed asset purchases
-7. Purchases/AP
-8. Petty cash
-9. Depreciation
+7. Fixed asset purchases
+8. Purchases/AP
+9. Petty cash
+10. Depreciation
 
 ---
 
@@ -355,12 +361,12 @@ Income Statement and CoGM use **Year-to-Date (YTD)** movement:
 | December 2025 | January 1, 2025 → December 31, 2025 |
 
 - **Trial Balance**: for each account, latest anchor with `as_of_date <= period_end` + posted movement in `[anchor_date, period_end]`; an unanchored account uses `[January 1, period_end]`. Anchor-only and explicit zero-fence accounts remain in the unfiltered result.
-- **Income Statement**: posted YTD revenue, CoGM and expense movement grouped by effective `fs_note`.
-- **Balance Sheet**: the same per-account anchor rule as Trial Balance, rolled up by effective `fs_note`. Equity also includes a no-note **Current Year Profit** line calculated from the same journal-only YTD Income Statement/CoGM movements.
-- **COGM**: posted YTD cost-of-goods-manufactured movement.
+- **Income Statement**: posted YTD revenue, CoGM and expense movement grouped by effective `fs_note`, plus exact `YYYY-01-01` opening-stock anchors for Notes 3-1/3-3/3-7 once.
+- **Balance Sheet**: the same per-account anchor rule as Trial Balance, rolled up by effective `fs_note`. Equity also includes a no-note **Current Year Profit** line calculated from the same YTD Income Statement/CoGM movement plus exact Notes 3-1/3-3/3-7 fiscal opening stock.
+- **COGM**: posted YTD cost-of-goods-manufactured movement plus exact `YYYY-01-01` opening-stock anchors for Notes 3-3/3-7 once. Finished-goods opening Note 3-1 is excluded.
 
-Anchors represent the balance at the **start** of `as_of_date`, so movement on the anchor date is included. A later anchor fences off all earlier anchors and journal activity for that account.
+Anchors represent the balance at the **start** of `as_of_date`, so movement on the anchor date is included. For TB/BS account balances, a later anchor fences off all earlier anchors and journal activity for that account. For the profit-and-loss opening-stock calculation, only the exact fiscal-year start is read; a later checkpoint is deliberately ignored.
 
 ---
 
-*Last Updated: 13 Jul 2026 — report engines use journal-authoritative Note 22/7 figures, account opening anchors, effective-note inheritance and Current Year Profit. Per-note "Mapped Count" figures above remain approximate.*
+*Last Updated: 20 Jul 2026 — development includes the guarded legacy-report V2 opening-stock anchors, exact APPX overrides and narrow fiscal-opening report semantics. Production rollout remains separately approved. Per-note "Mapped Count" figures above remain approximate.*
