@@ -8,6 +8,7 @@ import {
   isOTFormulaEffective,
   isFormulaOTItem,
   computeOTRates,
+  resolveWorkedDayDates,
   otRateCentsForDayType,
   buildOTSnapshot,
   dayTypeFromDate,
@@ -405,8 +406,8 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
         {
           const [attendanceRes, workedDaysInputRes] = await Promise.all([
             pool.query(
-              `SELECT COUNT(DISTINCT d) AS days FROM (
-                 SELECT to_char(dwl.log_date, 'YYYY-MM-DD') AS d
+              `SELECT d, src FROM (
+                 SELECT to_char(dwl.log_date, 'YYYY-MM-DD') AS d, 'daily' AS src
                  FROM daily_work_logs dwl
                  JOIN daily_work_log_entries dwle ON dwl.id = dwle.work_log_id
                  WHERE dwle.employee_id = ANY($1)
@@ -431,7 +432,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
                        AND lr.company <> 'JP'
                    )
                  UNION
-                 SELECT to_char(pe.entry_date, 'YYYY-MM-DD')
+                 SELECT to_char(pe.entry_date, 'YYYY-MM-DD'), 'production'
                  FROM production_entries pe
                  WHERE pe.worker_id = ANY($1)
                    AND pe.entry_date BETWEEN $2 AND $3
@@ -450,8 +451,11 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
               [scopedGroupEmployeeIds, month, year],
             ),
           ]);
-          const attendanceDays =
-            parseInt(attendanceRes.rows[0]?.days, 10) || 0;
+          // "Daily log wins": production dates only supply worked days when the
+          // group has no daily-log attendance (see resolveWorkedDayDates).
+          const { dates: attendanceDates, source: attendanceSource } =
+            resolveWorkedDayDates(attendanceRes.rows);
+          const attendanceDays = attendanceDates.size;
           const monthlyInput = workedDaysInputRes.rows[0]?.worked_days
             ? parseFloat(workedDaysInputRes.rows[0].worked_days)
             : null;
@@ -459,13 +463,13 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
             (parseInt(workedDaysInputRes.rows[0]?.entry_count, 10) || 0) > 0;
           if (attendanceDays > 0 && monthlyInput != null) {
             workedDays = Math.max(attendanceDays, monthlyInput);
-            workedDaysSource = "attendance+monthly_input";
+            workedDaysSource = `${attendanceSource}+monthly_input`;
           } else if (monthlyInput != null) {
             workedDays = monthlyInput;
             workedDaysSource = "monthly_input";
           } else if (attendanceDays > 0) {
             workedDays = attendanceDays;
-            workedDaysSource = "attendance";
+            workedDaysSource = attendanceSource;
           }
         }
 

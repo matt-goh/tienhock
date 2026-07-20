@@ -18,7 +18,10 @@
 // Sakit) are EXCLUDED from the numerator — HR prices leave FROM the derived
 // daily rate, so leave can never feed the rate ("holidays are not included in
 // the calculation of the overtime rate").
-export const OT_FORMULA_VERSION = "2026-07.v2";
+// v3 (2026-07-20, HR model "RAMBU"): "daily log wins" — production dates no
+// longer add worked days for a worker whose attendance is on a daily work log.
+// See resolveWorkedDayDates below.
+export const OT_FORMULA_VERSION = "2026-07.v3";
 export const OT_NORMAL_HOURS_PER_DAY = 8;
 export const OT_MONTHLY_DIVISOR = 26;
 export const OT_MULTIPLIERS = { biasa: 1.5, ahad: 2.0, umum: 3.0 };
@@ -47,6 +50,38 @@ export const resolveOTPayBasis = (
   if (hasWorkedDaySource) return "actual_days";
   if (isMonthlyLogged) return "monthly_26";
   return "actual_days";
+};
+
+/**
+ * Worked-day dates for one employee / sibling group, applying "daily log wins".
+ *
+ * When a daily work log records the worker's attendance for the month, that log
+ * IS the attendance record: production rows booked against the worker (or
+ * against a packing sibling ID) are piece-work OUTPUT for the month, not extra
+ * worked days. Production dates are the attendance FALLBACK only for workers
+ * with no daily work log at all that month, so production-only packers keep
+ * their divisor unchanged.
+ *
+ * HR model "RAMBU" (July 2026): 9 dryer daily-log days, plus packing production
+ * booked on 4 further dates against her RAMBU_PB sibling ID, is 9 worked days —
+ * not 13. Counting the packing-only dates diluted the daily rate (RM97.06
+ * instead of RM145.76) because those dates carried piece work worth as little
+ * as RM0.35 while adding a full day to the divisor.
+ *
+ * @param {Array<{d: string, src?: string}>} entries attendance rows for the group
+ * @returns {{dates: Set<string>, source: 'attendance'|'production'|null}}
+ */
+export const resolveWorkedDayDates = (entries) => {
+  const daily = new Set();
+  const production = new Set();
+  (entries || []).forEach((entry) => {
+    if (!entry || !entry.d) return;
+    if (entry.src === "production") production.add(entry.d);
+    else daily.add(entry.d);
+  });
+  if (daily.size > 0) return { dates: daily, source: "attendance" };
+  if (production.size > 0) return { dates: production, source: "production" };
+  return { dates: new Set(), source: null };
 };
 
 /**

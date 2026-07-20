@@ -47,4 +47,16 @@ I think we have to implement a dedicated system for recording them too.
 
 So I analyzed them by order from @core_tienhock_acc_docs.pdf, I ignore all the ones without any amount, so spend time reading all these and also @docs/Account/FRESH_ACCOUNTING_SYSTEM_PLAN.md, then let me know how you want to approach this. One important question i wanna ask is, should we keep the journal voucher system? In the old system, all these debits and credits are recorded in the journal voucher system, we have implemented in this new app, but I have strong preference for doing things from first principles and minimalism, since the old system is also from 20 years ago, I just wanna know, can we abandon the journal system, then implement entry system for each of the categories we found in the trial balance? Or are journal vouchers all needed for each items in the trial balance, thats why it was implemented this way.
 
+## Verified classification addendum — 20 Jul 2026
+
+The hash-validated January–May Trial Balance scans have now settled the report classifications used by legacy-report Phase V2. The complete account-by-account evidence remains in [LEGACY_REPORT_RECONCILIATION.md](LEGACY_REPORT_RECONCILIATION.md); this section records the reusable prefix conclusions:
+
+- `CS_*` is closing-stock presentation under Balance Sheet Notes 14-1 (finished goods), 14-2 (raw materials), or 14-3 (packing materials). The 63 scan-backed January CS rows are explicit RM0.00 fences after V2; they are not opening-stock credits.
+- `OS_*` is opening-stock presentation under Note 3-1 (finished goods), 3-3 (raw materials), or 3-7 (packing materials). The 62 scan-backed 1 January values total RM626,875.15. Note 3-1 belongs to Income Statement cost of sales; only 3-3 and 3-7 appear in the legacy CoGM.
+- Factory salary classifications proven by APPX are `BS_IL`, `BS_SM`, `MBE_{IL,M,SM,TS}`, `MBL_{IL,M,SM,TS}`, `MBS_{ILO,M,SMO,TS}`, `MBSC_{IL,M,SM,TS}`, `MBSIP_{IL,M,SM,TS}`, `MS_IL`, and `MS_SM` → Note 5-1. `MBSM_K` is the evidenced exception → administrative-expense Note 5.
+- The other settled non-stock exceptions are `CL_ABB` → Note 11; `CL_AFI`, `CL_GF`, and `CL_GT` → Note 8; and `OC_CMK`/`OC_MIL` → Note 1.
+- These are direct `account_codes.fs_note` decisions, not report-only aliases. Together with 94 stock-family changes, the 31 named non-stock changes are guarded by the V2 migration. The journal engine remains the accounting source; these classifications only decide where each balance renders.
+
+Items still described above as unknown (for example the business meaning of `BTRA` and `NT_7484`) remain open unless they are explicitly settled in a later evidence document. Monthly closing-stock entry/valuation also remains Phase V3; V2 establishes only the evidenced fiscal opening values and classifications.
+
 Think from first principles and standard accounting/Malaysia auditing practice, let me know how should we implement the accounting system in this new ERP app

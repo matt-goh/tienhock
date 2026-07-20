@@ -87,7 +87,7 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
       missingHeading: "Belum termasuk",
       missing: [
         "Akaun tanpa baki pembukaan akan menunjukkan pergerakan dari 1 Januari sahaja.",
-        "Nilai stok (stok awal / stok akhir) dan susut nilai — belum direkodkan secara automatik.",
+        "Stok awal 1 Januari telah dimasukkan. Nilai stok akhir bulanan dan susut nilai belum direkodkan secara automatik.",
       ],
       footer:
         "Setiap akaun ditanda dengan nombor Nota. Laporan penyata (Untung Rugi, Kunci Kira-kira, CoGM) menjumlahkan akaun mengikut Nota ini.",
@@ -145,7 +145,7 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
       missingHeading: "Not included yet",
       missing: [
         "Accounts without an opening balance show movement from 1 January only.",
-        "Stock values (opening/closing stock) and depreciation — not recorded automatically yet.",
+        "Opening stock at 1 January is included. Monthly closing stock and depreciation are not recorded automatically yet.",
       ],
       footer:
         "Every account is tagged with a Note number. The statement reports (Income Statement, Balance Sheet, CoGM) add up accounts by these Notes.",
@@ -169,6 +169,11 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
             "Daripada invois pembekal yang direkod di halaman Purchases (beras, tepung, sago dll.).",
         },
         {
+          label: "Stok awal 1 Januari",
+          detail:
+            "Nilai stok awal produk siap, bahan mentah dan bahan bungkusan yang telah disahkan dimasukkan sekali daripada baki pembukaan 1 Januari.",
+        },
+        {
           label: "Gaji pekerja kilang",
           detail:
             "Daripada baucar gaji bulanan (Voucher Generator) — bahagian mesin, bungkusan dan boiler.",
@@ -181,7 +186,7 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
       ],
       missingHeading: "Belum termasuk",
       missing: [
-        "Nilai stok awal dan stok akhir — untung kasar sebenar perlu campur/tolak nilai stok.",
+        "Nilai stok akhir bulanan — untung kasar sebenar masih perlu menolak stok akhir.",
         "Susut nilai (Nota 15) dan faedah sewa beli (Nota 23) — belum ada sistem automatik.",
         "Angka tahun lepas untuk perbandingan.",
       ],
@@ -205,6 +210,11 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
             "From supplier invoices recorded on the Purchases page (rice, flour, sago etc.).",
         },
         {
+          label: "Opening stock at 1 January",
+          detail:
+            "The confirmed opening values for finished goods, raw materials and packing materials are included once from the exact 1 January opening balances.",
+        },
+        {
           label: "Factory worker salaries",
           detail:
             "From the monthly payroll vouchers (Voucher Generator) — machine, packing and boiler sections.",
@@ -217,7 +227,7 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
       ],
       missingHeading: "Not included yet",
       missing: [
-        "Opening and closing stock values — true gross profit needs the stock movement added/subtracted.",
+        "Monthly closing stock — true gross profit still needs the closing value deducted.",
         "Depreciation (Note 15) and hire purchase interest (Note 23) — no automatic system yet.",
         "Last year's figures for comparison.",
       ],
@@ -260,7 +270,7 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
         {
           label: "Untung tahun semasa",
           detail:
-            "Untung atau rugi dari 1 Januari hingga akhir bulan dikira daripada catatan jurnal Jualan, CoGM dan Perbelanjaan, kemudian dimasukkan ke Modal.",
+            "Untung atau rugi dari 1 Januari hingga akhir bulan menggabungkan stok awal 1 Januari yang disahkan dengan catatan jurnal Jualan, CoGM dan Perbelanjaan, kemudian dimasukkan ke Modal.",
         },
       ],
       missingHeading: "Masih perlu direkod atau disahkan",
@@ -268,7 +278,6 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
         "Akaun tanpa baki pembukaan akan bermula dari 1 Januari sahaja.",
         "Perubahan nilai stok selepas baki pembukaan (Nota 14) belum direkod secara automatik.",
         "Susut nilai selepas baki pembukaan (Nota 4/15) masih perlu direkod melalui jurnal.",
-        "Perbezaan baki pembukaan lama yang telah dikenal pasti kekal sehingga Trial Balance atau Balance Sheet 1 Januari disahkan.",
       ],
       footer:
         "Angka laporan datang daripada baki pembukaan dan jurnal yang telah dipos, bukan terus daripada status invois semasa.",
@@ -305,7 +314,7 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
         {
           label: "Current Year Profit",
           detail:
-            "Profit or loss from 1 January to the selected month end is calculated from posted Sales, CoGM and Expense journals, then included in Equity.",
+            "Profit or loss from 1 January to the selected month end combines the confirmed 1 January opening stock with posted Sales, CoGM and Expense journals, then includes it in Equity.",
         },
       ],
       missingHeading: "Still to be recorded or confirmed",
@@ -313,7 +322,6 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
         "Accounts without an opening balance start from 1 January only.",
         "Stock-value changes after the opening balance (Note 14) are not posted automatically yet.",
         "Depreciation after the opening balance (Notes 4/15) still needs a journal entry.",
-        "The named legacy opening-balance difference remains until a 1 January Trial Balance or Balance Sheet is confirmed.",
       ],
       footer:
         "Report amounts come from opening balances and posted journals, not directly from current invoice statuses.",
@@ -337,6 +345,11 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
             "Invois pembekal untuk plastik/kotak (kategori packing material).",
         },
         {
+          label: "Stok awal bahan pada 1 Januari",
+          detail:
+            "Nilai bahan mentah dan bahan bungkusan yang telah disahkan dimasukkan sekali daripada baki pembukaan 1 Januari.",
+        },
+        {
           label: "Gaji pekerja kilang",
           detail:
             "Baucar gaji bulanan — bahagian mesin mee/bihun, bungkusan dan jaga boiler.",
@@ -344,12 +357,12 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
       ],
       missingHeading: "Belum termasuk",
       missing: [
-        "Stok awal dan stok akhir bahan — kos sebenar bahan terpakai perlu ambil kira stok.",
+        "Stok akhir bulanan bahan mentah dan bahan bungkusan belum dimasukkan.",
         "Tambang pengangkutan bahan masuk (Nota 3-6) — perlu direkod manual buat masa ini.",
         "Belian bahan kimia (Nota 3-4) jika belum direkod di Purchases.",
       ],
       footer:
-        "Angka di sini ialah jumlah belian, bukan jumlah bahan terpakai. Ia akan lebih tepat selepas sistem nilai stok disambungkan.",
+        "Angka di sini merangkumi stok awal dan pergerakan kos yang direkod. Stok akhir bulanan masih perlu ditolak untuk kos bahan terpakai yang lengkap.",
     },
     en: {
       title: "Where do these numbers come from?",
@@ -368,6 +381,11 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
             "Supplier invoices for plastic/boxes (packing material category).",
         },
         {
+          label: "Material opening stock at 1 January",
+          detail:
+            "The confirmed raw-material and packing-material values are included once from the exact 1 January opening balances.",
+        },
+        {
           label: "Factory worker salaries",
           detail:
             "Monthly payroll vouchers — mee/bihun machine, packing and boiler sections.",
@@ -375,12 +393,12 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
       ],
       missingHeading: "Not included yet",
       missing: [
-        "Opening and closing material stock — the true cost of materials used must account for stock.",
+        "Monthly closing raw-material and packing-material stock is not included yet.",
         "Freight in on materials (Note 3-6) — has to be keyed manually for now.",
         "Chemical purchases (Note 3-4) if not recorded in Purchases.",
       ],
       footer:
-        "The figures here are purchase totals, not materials actually used. They will become more accurate once stock values are connected.",
+        "These figures include opening stock and recorded cost movement. Monthly closing stock still needs to be deducted for the complete cost of materials used.",
     },
   },
 };

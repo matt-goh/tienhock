@@ -13,6 +13,7 @@ import {
   isOTFormulaEffective,
   isFormulaOTItem,
   computeOTRates,
+  resolveWorkedDayDates,
   otRateCentsForDayType,
   buildOTSnapshot,
   resolveOTPayBasis,
@@ -703,10 +704,12 @@ export default function (pool) {
             // production attendance). Same date counts once across shifts/jobs.
             // A zero entry (no hours, no paid activity) is NOT attendance —
             // HR model "RAMBU": a day keyed with all zeros stays outside the
-            // 9 worked days.
+            // 9 worked days. Rows are tagged daily/production so
+            // resolveWorkedDayDates can apply "daily log wins".
             client.query(
-              `SELECT employee_id, d FROM (
-                 SELECT dwle.employee_id, to_char(dwl.log_date, 'YYYY-MM-DD') AS d
+              `SELECT employee_id, d, src FROM (
+                 SELECT dwle.employee_id, to_char(dwl.log_date, 'YYYY-MM-DD') AS d,
+                        'daily' AS src
                  FROM daily_work_logs dwl
                  JOIN daily_work_log_entries dwle ON dwl.id = dwle.work_log_id
                  WHERE dwl.log_date BETWEEN $1 AND $2 AND dwl.status = 'Submitted'
@@ -732,7 +735,8 @@ export default function (pool) {
                        AND lr.company <> 'JP'
                    )
                  UNION
-                 SELECT pe.worker_id, to_char(pe.entry_date, 'YYYY-MM-DD')
+                 SELECT pe.worker_id, to_char(pe.entry_date, 'YYYY-MM-DD'),
+                        'production'
                  FROM production_entries pe
                  WHERE pe.entry_date BETWEEN $1 AND $2 AND pe.bags_packed > 0
                    AND pe.worker_id IS NOT NULL
@@ -757,7 +761,9 @@ export default function (pool) {
           if (!attendanceDatesByEmployee.has(r.employee_id)) {
             attendanceDatesByEmployee.set(r.employee_id, []);
           }
-          attendanceDatesByEmployee.get(r.employee_id).push(r.d);
+          attendanceDatesByEmployee
+            .get(r.employee_id)
+            .push({ d: r.d, src: r.src });
         });
         workedDaysResult.rows.forEach((r) => {
           monthlyWorkedDaysByEmployee.set(
@@ -1679,12 +1685,17 @@ export default function (pool) {
               // explicit staff override > actual days (attendance dates or a
               // Worked Days input) > monthly-logged default (÷26). Nothing to
               // set for typical staff.
-              const dates = new Set();
+              // "Daily log wins": production dates only supply worked days for
+              // a group with no daily-log attendance at all (see
+              // resolveWorkedDayDates).
+              const attendanceEntries = [];
               groupEmployeeIds.forEach((sibId) => {
-                (attendanceDatesByEmployee.get(sibId) || []).forEach((d) =>
-                  dates.add(d),
+                (attendanceDatesByEmployee.get(sibId) || []).forEach((entry) =>
+                  attendanceEntries.push(entry),
                 );
               });
+              const { dates, source: attendanceSource } =
+                resolveWorkedDayDates(attendanceEntries);
               let monthlyInput = null;
               groupEmployeeIds.forEach((sibId) => {
                 const val = monthlyWorkedDaysByEmployee.get(sibId);
@@ -1696,13 +1707,13 @@ export default function (pool) {
               let workedDaysSource = null;
               if (dates.size > 0 && monthlyInput != null) {
                 workedDays = Math.max(dates.size, monthlyInput);
-                workedDaysSource = "attendance+monthly_input";
+                workedDaysSource = `${attendanceSource}+monthly_input`;
               } else if (monthlyInput != null) {
                 workedDays = monthlyInput;
                 workedDaysSource = "monthly_input";
               } else if (dates.size > 0) {
                 workedDays = dates.size;
-                workedDaysSource = "attendance";
+                workedDaysSource = attendanceSource;
               }
               const payBasis = resolveOTPayBasis(staff.ot_pay_basis, {
                 hasWorkedDaySource: workedDays != null,
