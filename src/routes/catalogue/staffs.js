@@ -82,7 +82,8 @@ export default function (pool) {
            s.epf_age_override as "epfAgeOverride",
            s.epf_nationality_override as "epfNationalityOverride",
            s.socso_age_override as "socsoAgeOverride",
-           s.sip_age_override as "sipAgeOverride"`;
+           s.sip_age_override as "sipAgeOverride",
+           s.ot_pay_basis as "otPayBasis"`;
 
       let query = `
       SELECT ${columns}
