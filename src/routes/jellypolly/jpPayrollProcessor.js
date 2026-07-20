@@ -22,6 +22,7 @@ import {
   isOTFormulaEffective,
   isFormulaOTItem,
   computeOTRates,
+  resolveWorkedDayDates,
   otRateCentsForDayType,
   buildOTSnapshot,
   resolveOTPayBasis,
@@ -330,8 +331,9 @@ export const reprocessJPEmployees = async (
             // production attendance); one date counts once across jobs/siblings.
             // A zero entry (no hours, no paid activity) is NOT attendance.
             client.query(
-              `SELECT employee_id, d FROM (
-                 SELECT dwle.employee_id, to_char(dwl.log_date, 'YYYY-MM-DD') AS d
+              `SELECT employee_id, d, src FROM (
+                 SELECT dwle.employee_id, to_char(dwl.log_date, 'YYYY-MM-DD') AS d,
+                        'daily' AS src
                  FROM jellypolly.daily_work_logs dwl
                  JOIN jellypolly.daily_work_log_entries dwle
                    ON dwl.id = dwle.work_log_id
@@ -356,7 +358,8 @@ export const reprocessJPEmployees = async (
                        AND lr.status = 'approved'
                    )
                  UNION
-                 SELECT pe.worker_id, to_char(pe.entry_date, 'YYYY-MM-DD')
+                 SELECT pe.worker_id, to_char(pe.entry_date, 'YYYY-MM-DD'),
+                        'production'
                  FROM jellypolly.production_entries pe
                  JOIN public.products p ON pe.product_id = p.id
                  WHERE pe.entry_date BETWEEN $1 AND $2 AND pe.bags_packed > 0
@@ -384,7 +387,9 @@ export const reprocessJPEmployees = async (
           if (!attendanceDatesByEmployee.has(row.employee_id)) {
             attendanceDatesByEmployee.set(row.employee_id, []);
           }
-          attendanceDatesByEmployee.get(row.employee_id).push(row.d);
+          attendanceDatesByEmployee
+            .get(row.employee_id)
+            .push({ d: row.d, src: row.src });
         }
         for (const row of workedDaysResult.rows) {
           monthlyWorkedDaysByEmployee.set(
@@ -721,14 +726,18 @@ export const reprocessJPEmployees = async (
             // Derive the divisor sources FIRST; the basis then resolves as:
             // explicit staff override > actual days (attendance dates or a
             // Worked Days input) > monthly-logged default (÷26).
-            const dates = new Set();
+            // "Daily log wins": production dates only supply worked days for a
+            // group with no daily-log attendance (see resolveWorkedDayDates).
+            const attendanceEntries = [];
             for (const sibId of canonicalToSiblings.get(canonicalId) || [
               canonicalId,
             ]) {
-              for (const d of attendanceDatesByEmployee.get(sibId) || []) {
-                dates.add(d);
+              for (const entry of attendanceDatesByEmployee.get(sibId) || []) {
+                attendanceEntries.push(entry);
               }
             }
+            const { dates, source: attendanceSource } =
+              resolveWorkedDayDates(attendanceEntries);
             let monthlyInput = null;
             for (const sibId of canonicalToSiblings.get(canonicalId) || [
               canonicalId,
@@ -742,13 +751,13 @@ export const reprocessJPEmployees = async (
             let workedDaysSource = null;
             if (dates.size > 0 && monthlyInput != null) {
               workedDays = Math.max(dates.size, monthlyInput);
-              workedDaysSource = "attendance+monthly_input";
+              workedDaysSource = `${attendanceSource}+monthly_input`;
             } else if (monthlyInput != null) {
               workedDays = monthlyInput;
               workedDaysSource = "monthly_input";
             } else if (dates.size > 0) {
               workedDays = dates.size;
-              workedDaysSource = "attendance";
+              workedDaysSource = attendanceSource;
             }
             const payBasis = resolveOTPayBasis(staff.ot_pay_basis, {
               hasWorkedDaySource: workedDays != null,

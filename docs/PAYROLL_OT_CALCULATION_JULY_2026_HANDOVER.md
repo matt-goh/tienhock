@@ -367,6 +367,8 @@ Every blocking policy question below was answered by the user on 2026-07-18, wit
    Default rule to implement:
 
    - a worked day is one distinct calendar date with any recorded ordinary-work attendance (daily work log entry not fully on leave, or production attendance);
+
+   **Amended 2026-07-20 (formula v3) — "daily log wins".** The original rule counted daily-log dates and production dates as one union. In production this over-counted workers who hold both a daily-logged job and a production-logged job under sibling staff IDs: RAMBU's dryer log gave 9 days, but packing booked against her `RAMBU_PB` ID on 4 further dates pushed the divisor to 13, cutting her OT rate from RM27.33 to RM18.20 (one of those dates carried RM0.35 of piece work yet added a whole day). The rule is now: when the employee or any grouped sibling ID has any daily work-log attendance for the month, only daily-log dates supply worked days; production dates are the attendance fallback solely for workers with no daily work log at all that month, so production-only packers are unaffected. Confirmed by the user on 2026-07-20; implemented in `resolveWorkedDayDates` in `src/routes/payroll/otFormula.js`. Only RAMBU (13 → 9) and JAINJAM (14 → 8) changed in July 2026; no Jelly Polly or Green Target employee changed.
    - the same date counts once across multiple shifts, jobs, and grouped sibling staff IDs;
    - partial days and the short Saturday count as one full worked day (HR's example counts Saturday as a day; the correction happens through the fixed 8-hour divisor, not the day count);
    - attended Sundays and public holidays count as worked days;

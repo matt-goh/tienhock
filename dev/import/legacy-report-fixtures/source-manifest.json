@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "description": "Hash-pinned scanned legacy verification reports (received 15 Jul 2026) and their transcription fixtures. Plan: docs/Account/LEGACY_REPORT_VERIFICATION_PLAN.md. PDFs and fixture CSVs live in data/ (gitignored, contain customer data); rendered pages and validation output in generated/.",
+  "sources": {
+    "TB_2026_01": {
+      "filename": "Trial_Balance_Jan_2026.pdf",
+      "sha256": "15a9ce11dc7b18102d8d8751dd794b2289c092febc209020a6457360043d203a",
+      "pages": 20,
+      "report": "TRIAL BALANCE FOR THE MONTH OF 01/2026",
+      "printedGrandTotalCents": {
+        "debit": 1398235019,
+        "credit": 1398235019
+      }
+    },
+    "TB_2026_02": {
+      "filename": "Trial_Balance_Feb_2026.pdf",
+      "sha256": "6ac3e731b59dabfb7f94fbe87fa46b328f9a55ed80173d78c148a61f010497da",
+      "pages": 20,
+      "report": "TRIAL BALANCE FOR THE MONTH OF 02/2026",
+      "printedGrandTotalCents": {
+        "debit": 1452902666,
+        "credit": 1452902666
+      }
+    },
+    "TB_2026_03": {
+      "filename": "Trial_Balance_Mar_2026.pdf",
+      "sha256": "22926af36bdc3147c8832b604b84972da19bf0c929a2769421f1b26e9b418d74",
+      "pages": 20,
+      "report": "TRIAL BALANCE FOR THE MONTH OF 03/2026",
+      "printedGrandTotalCents": {
+        "debit": 1517118606,
+        "credit": 1517118606
+      }
+    },
+    "TB_2026_04": {
+      "filename": "Trial_Balance_Apr_2026.pdf",
+      "sha256": "2724357c2e53499c5e9f1eeeaeb9cce86b1654d17539a8586f4b90e0cffac897",
+      "pages": 20,
+      "report": "TRIAL BALANCE FOR THE MONTH OF 04/2026",
+      "printedGrandTotalCents": {
+        "debit": 1587644588,
+        "credit": 1587644588
+      }
+    },
+    "TB_2026_05": {
+      "filename": "Trial_Balance_May_2026.pdf",
+      "sha256": "66d3eaad9651fbc5cc3e4f09ac395afb78d391a068a3e4f09db07ff3b7193c6c",
+      "pages": 20,
+      "report": "TRIAL BALANCE FOR THE MONTH OF 05/2026",
+      "printedGrandTotalCents": {
+        "debit": 1640843778,
+        "credit": 1640843778
+      }
+    },
+    "BS_2026_05": {
+      "filename": "Balance_Sheet_for_May_2026.pdf",
+      "sha256": "f9d6fd2c830cb0b27edfe96fb64ed06e6aaf8028c81ba68348c073e917ad4807",
+      "pages": 1,
+      "report": "BALANCE SHEET FOR THE MONTH OF 05/2026",
+      "printedBalanceCents": 609769111
+    },
+    "IS_2026_05": {
+      "filename": "Income_Statement_for_May_2026.pdf",
+      "sha256": "57f6f31bd7763e35a03cf4f1e74282d6e89e794aad2e1374ea1eb560682e327f",
+      "pages": 1,
+      "report": "DETAIL INCOME STATEMENT FOR THE MONTH OF 05/2026",
+      "printedProfitCents": 28482501
+    },
+    "COGM_2026_05": {
+      "filename": "CoGM_for_May_2026.pdf",
+      "sha256": "73d60bd19381d9ba7b0e238cdb1d050dce947bcfce55171f3b7ea22c11aeabc2",
+      "pages": 1,
+      "report": "COST OF GOODS MANUFACTURED FOR THE MONTH OF 05/2026",
+      "printedTotalCents": 247903027
+    },
+    "TDL_2026_05_31": {
+      "filename": "Trade_Debtor_List_as_at_310526.pdf",
+      "sha256": "13b80235740209c4fecf237f368c2ccb63931381e5f1026e0d6b268d206fcd31",
+      "pages": 5,
+      "report": "TRADE DEBTOR LIST AS AT 31/05/2026",
+      "printedTotalsCents": {
+        "bal_bf": 57866195,
+        "current": 31637689,
+        "payment": -51808673,
+        "total_due": 50769772,
+        "age_current": 24541266,
+        "age_1m": 12474050,
+        "age_2m": 2405571,
+        "age_3m_plus": 4252462
+      },
+      "printedCreditorTotalsCents": {
+        "bal_bf": 6992030,
+        "current": -5968840,
+        "payment": 16846450,
+        "total_due": 8202420,
+        "age_current": 9600010,
+        "age_1m": 0,
+        "age_2m": 0,
+        "age_3m_plus": -187200
+      },
+      "note": "Legacy system clock is broken; printed REPORT DATE '01 MAR 2010' is meaningless."
+    }
+  },
+  "fixtures": {
+    "tb_2026-01.csv": "54932311b4f9e193d029112a79c7c28196b5f397a641ba3573a91ad0b344cb9a",
+    "tb_2026-02.csv": "724782b1c087b440ea2befde1c24234f7372ceed3419b6ea00017cbcfd6a41df",
+    "tb_2026-03.csv": "3bddcd625440d3d1bdd34bf22a7438d88912a26ea62a94084e9242a74dcb8bf0",
+    "tb_2026-04.csv": "bad8a03a3f324fb0c3cbb92b8f1f852f15026197c9df8b68a46f0522cad51974",
+    "tb_2026-05.csv": "38e866134f9848363abea65ebfdb3e13014e3e69f2fa6aa74c95086488cc0f89",
+    "trade_debtor_list_2026-05-31.csv": "2497050a756bbf2608434b02d1194ce15bd3a53adfc06b007a472e44fd4a5972",
+    "trade_creditor_list_2026-05-31.csv": "4c04fa666206d3169dc87456ad1cddbe471f0d0ebc08e97bcabcfe03a5df7bb8",
+    "bs_2026-05.csv": "e2c1cc033aa118947e95d71c17586d62983bd18c375781468bff61961c6828e4",
+    "is_2026-05.csv": "7cbd4128ab8ba733f8c249cc4536f4f91fe469cc77dbec9d5f1735fb5588fa87",
+    "cogm_2026-05.csv": "f298946105ea39fdc4c6ce215fa478665b43699f9a6c96c799a936f77fc07961"
+  }
+}
