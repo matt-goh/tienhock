@@ -10,18 +10,27 @@
 --   * route finished-goods opening stock (3-1) to the Income Statement;
 --   * preserve every staged/imported journal and every June checkpoint.
 --
--- Only the whole-chart guard constants differ, re-pinned to the fresh
--- read-only production inventory of 20 Jul 2026. Named, approved drift
--- versus the development-audited chart:
+-- Only the whole-chart guard constants differ, re-pinned to the production
+-- chart of accounts. Named, approved drift versus the development-audited
+-- chart:
 --   * SUJAYU, NG-SC           - new DEBTOR child accounts from live production
 --                               use (17/18 Jul 2026); no Jan-Jun activity.
 --   * LGP                     - "Local General Purchases" root account created
---                               manually in production 20 Jul 2026.
+--                               manually in production 20 Jul 2026; its
+--                               fs_note = '5' comes from the OP-to-LGP
+--                               migration (2026-07-20_gp_op_to_lgp.sql).
 --   * OP (Overseas Purchases) - fs_note stays NULL: the account is deprecated
 --                               (user-confirmed 20 Jul 2026). Reclassing its
 --                               balance to another purchase account is a
 --                               later, separate step; the resulting report
 --                               deviation is intentionally accepted for now.
+-- Rollout order (21 Jul 2026 re-pin): run 2026-07-20_gp_op_to_lgp.sql FIRST,
+-- then this script. The fresh-state fingerprint therefore pins the
+-- post-OP-to-LGP chart (LGP fs_note = '5'); the final-state fingerprint pins
+-- the chart after the 125 V2 fs_note changes on top of that. Re-pinned 21 Jul
+-- 2026 against a fresh production copy (fresh full mapping
+-- 6bafd6262089d7b217ab4ab2b5b1e4b4, final bd034913a5df1c2b9f54e7937cc9b87b;
+-- structure 47b88863017669feb7dd3356eba3e051 / 2824 accounts unchanged).
 -- Every other guard domain was verified fingerprint-identical to the audited
 -- development state on 20 Jul 2026 (staging, IMP journals, January anchors,
 -- notes metadata, June checkpoint anchors/equalities, June five-ledger
@@ -889,7 +898,7 @@ BEGIN
     AND v_selected_mapping_fingerprint =
       '436f3b19d2afeef3d0574efe21cb9130'
     AND v_full_mapping_fingerprint =
-      '4b0fcae87ac56abeb20146e484a8add0'
+      '6bafd6262089d7b217ab4ab2b5b1e4b4'
     AND v_notes_fingerprint =
       '207672fcc7fa80508a233cc2261be74c'
     AND (
@@ -934,7 +943,7 @@ BEGIN
     AND v_selected_direct_fingerprint =
       'feeb81bf0e1310e1d7d0617b10c34c2d'
     AND v_full_mapping_fingerprint =
-      '4d05a7a82a5080872a8dd6493734d98a'
+      'bd034913a5df1c2b9f54e7937cc9b87b'
     AND v_notes_fingerprint =
       'bff4355c4a1206a2770ad9dac3385d4c'
     AND (
@@ -1311,7 +1320,7 @@ BEGIN
      ) IS DISTINCT FROM (
        2824::bigint,
        '47b88863017669feb7dd3356eba3e051'::text,
-       '4d05a7a82a5080872a8dd6493734d98a'::text
+       'bd034913a5df1c2b9f54e7937cc9b87b'::text
      ) THEN
     RAISE EXCEPTION 'V2 final chart/mapping fingerprint mismatch';
   END IF;
