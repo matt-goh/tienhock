@@ -12,8 +12,10 @@
 //         per month-end (report semantics: latest anchor <= period end +
 //         posted movement from the anchor date, TD children collapsed into
 //         DEBTOR). Classifies exact / constant offset / non-constant offset,
-//         hard-gates 880/880 exact accounts, the DEBTOR controls, and the
-//         balanced V2 January opening-anchor state.
+//         hard-gates 880/880 exact accounts plus the 2 named GP-202604-0001
+//         drift rows (LGP, TP — the genuine April invoice keyed 20 Jul 2026,
+//         after the scans), the DEBTOR controls, and the balanced V2 January
+//         opening-anchor state.
 //         Writes generated/tb-comparison.json.
 //   tdl   V1 step 3 — scanned Trade Debtor List vs each ERP debtor-child
 //         ledger at 31 May. Proves BAL B/F, May debits/credits, TOTAL DUE and
@@ -24,8 +26,9 @@
 //         V1 step 4 / V2 final state — scanned May BS / IS / CoGM note lines
 //         vs the three
 //         financial-report engines, reproduced query-for-query. Attributes
-//         with the exact 1 January opening-stock semantics. Requires 30/40
-//         exact lines; the remaining ten must be only the V3 closing-stock
+//         with the exact 1 January opening-stock semantics. Requires 28/40
+//         exact lines plus 2 named GP-202604-0001 drift lines (BS note 13,
+//         IS note 5); the remaining ten must be only the V3 closing-stock
 //         lines and their profit/CoGM cross-totals.
 //         Writes generated/statements-comparison.json.
 //   regressions
@@ -310,6 +313,24 @@ const DEBTOR_CONTROLS_CENTS = { "01": 53453147, "02": 56171082, "03": 46679100, 
 // generated output to keep the approved correction arithmetic auditable.
 const PRE_V2_RESIDUE_CENTS = 145648037;
 const V2_EXPECTED_TB_ACCOUNTS = 880;
+// Approved post-scan business drift (user-confirmed genuine 20 Jul 2026):
+// GP-202604-0001 (journal 11829), self-billed April purchase SB2026070025
+// from SHANDONG STANDARD METAL PRODUCTS CO.,LTD, keyed in production on
+// 20 Jul 2026 with entry_date 2026-04-30 — DR LGP / CR TP RM7,261.51 (the
+// debit was OP until dev/migrations/2026-07-20_gp_op_to_lgp.sql). The May
+// scans were exported before this invoice was keyed, so they can never
+// contain it; every ±7,261.51 expectation shift below is this one document.
+const GP_DRIFT_REFERENCE = "GP-202604-0001";
+const GP_DRIFT_CENTS = 726151;
+const GP_DRIFT_ATTRIBUTION =
+  "Genuine April supplier invoice GP-202604-0001 (SB2026070025, Shandong " +
+  "Standard Metal Products) keyed 20 Jul 2026, after the May scans were " +
+  "exported: DR LGP / CR TP 7,261.51. User-confirmed genuine 20 Jul 2026.";
+// Expected scan−ERP diffs per TB month (Jan..May) for the two touched accounts.
+const GP_DRIFT_TB_PROFILE = {
+  LGP: [0, 0, 0, -726151, -726151],
+  TP: [0, 0, 0, 726151, 726151],
+};
 const V2_EXPECTED_JANUARY_ANCHORS = {
   total: 642,
   nonzero: 290,
@@ -544,10 +565,21 @@ function stageTb() {
     });
   }
 
+  // Reclassify the two approved GP-202604-0001 drift rows before bucketing:
+  // their exact Jan..May diff profile is pinned in GP_DRIFT_TB_PROFILE.
+  for (const r of rows) {
+    if (r.classification !== "non_constant_offset") continue;
+    const profile = GP_DRIFT_TB_PROFILE[r.erpCode];
+    if (profile && TB_MONTHS.every((mm, i) => r.diffCents[mm] === profile[i])) {
+      r.classification = "post_scan_gp_drift";
+      r.attribution = GP_DRIFT_ATTRIBUTION;
+    }
+  }
+
   // ---- Gates and report ----
-  const byClass = { exact: [], constant_offset: [], non_constant_offset: [] };
+  const byClass = { exact: [], constant_offset: [], non_constant_offset: [], post_scan_gp_drift: [] };
   for (const r of rows) byClass[r.classification].push(r);
-  console.log(`\n${rows.length} compared accounts: ${byClass.exact.length} exact, ${byClass.constant_offset.length} constant offset, ${byClass.non_constant_offset.length} non-constant offset`);
+  console.log(`\n${rows.length} compared accounts: ${byClass.exact.length} exact, ${byClass.constant_offset.length} constant offset, ${byClass.non_constant_offset.length} non-constant offset, ${byClass.post_scan_gp_drift.length} named GP drift`);
 
   // DEBTOR control must match at every month-end (V0 finding).
   const debtor = rows.find((r) => r.erpCode === "DEBTOR");
@@ -570,13 +602,14 @@ function stageTb() {
       fail(`${MONTH_ENDS[mm]}: Σ(scan − ERP) ${fmt(total)} != 0.00`);
   }
 
-  if (rows.length === V2_EXPECTED_TB_ACCOUNTS
+  if (rows.length === V2_EXPECTED_TB_ACCOUNTS + 2
     && byClass.exact.length === V2_EXPECTED_TB_ACCOUNTS
     && byClass.constant_offset.length === 0
-    && byClass.non_constant_offset.length === 0) {
-    ok("V2 TB final state is exact: 880 compared / 880 exact / 0 constant / 0 non-constant");
+    && byClass.non_constant_offset.length === 0
+    && byClass.post_scan_gp_drift.length === 2) {
+    ok("V2 TB final state is exact: 880 compared / 880 exact / 0 constant / 0 non-constant, plus the 2 named GP-202604-0001 drift rows (LGP, TP)");
   } else {
-    fail(`V2 TB final counts ${rows.length}/${byClass.exact.length}/${byClass.constant_offset.length}/${byClass.non_constant_offset.length} != 880/880/0/0`);
+    fail(`V2 TB final counts ${rows.length}/${byClass.exact.length}/${byClass.constant_offset.length}/${byClass.non_constant_offset.length}+${byClass.post_scan_gp_drift.length}d != 882/880/0/0+2d`);
   }
 
   const v2OpeningAnchors = verifyV2OpeningAnchorState();
@@ -1718,14 +1751,20 @@ const STMT_SECTIONS = new Set(["balance_sheet", "income_statement", "cogm"]);
 // Historical V1 stock decomposition and the V2 final-state targets.
 const STMT_OS_OPENING_TOTAL_CENTS = 62687515;
 const PRE_V2_STMT_CS_ANCHOR_TOTAL_CENTS = -82960522;
-const STMT_EXPECTED_NET_PROFIT_CENTS = -42325884;
+// The engine totals/net-assets pins below are the audited V2 final state
+// shifted by exactly the approved GP-202604-0001 drift (RM7,261.51 of April
+// expense and trade payable keyed 20 Jul 2026, after the scans).
+const STMT_EXPECTED_NET_PROFIT_CENTS = -42325884 - GP_DRIFT_CENTS;
 const STMT_EXPECTED_COGM_CENTS = 299813452;
-const STMT_EXPECTED_NET_ASSETS_CENTS = 538960726;
+const STMT_EXPECTED_NET_ASSETS_CENTS = 538960726 - GP_DRIFT_CENTS;
 const STMT_EXPECTED_REVENUE_CENTS = 333464933;
 const STMT_EXPECTED_COGS_CENTS = 308252772;
-const STMT_EXPECTED_EXPENSE_CENTS = 67538045;
+const STMT_EXPECTED_EXPENSE_CENTS = 67538045 + GP_DRIFT_CENTS;
 const STMT_EXPECTED_CLOSINGS_CENTS = 70808385;
 const STMT_EXPECTED_RAW_PACKING_CLOSINGS_CENTS = 51910425;
+// Statement note lines whose scan−ERP diff is exactly the GP-202604-0001
+// drift: BS note 13 (CR TP) and IS note 5 (DR LGP).
+const GP_DRIFT_NOTES = new Set(["bs:13", "is:5"]);
 const STMT_EXPECTED_RESIDUAL_KEYS = new Set([
   "bs:2", "bs:3", "bs:4", "bs:23",
   "is:3", "is:5", "is:20",
@@ -1737,7 +1776,7 @@ const STMT_ATTRIBUTIONS = {
   stockInjection:
     "Scan closing-inventory value has no printed-TB backing (the CS_* rows print .00): the legacy system injects month-end stock at report level from its stock module. The ERP equivalent is the V3 monthly closing-stock mechanism (plan §7-1).",
   profitIdentity:
-    "After V2, profit differs by exactly the three deferred V3 closing inventories.",
+    "After V2, profit differs by exactly the three deferred V3 closing inventories plus the approved GP-202604-0001 April invoice (RM7,261.51) keyed after the scans.",
   cogmIdentity:
     "After V2, CoGM differs by exactly the deferred raw-material and packing-material closing inventories.",
 };
@@ -2186,7 +2225,7 @@ function stageStatements() {
     if (actualEngineTotals[field] !== expected)
       fail(`V2 ${field} ${fmt(actualEngineTotals[field])} != ${fmt(expected)}`);
   if (failures === engineTotalStartFailures)
-    ok("V2 report totals are exact: profit -423,258.84 and CoGM 2,998,134.52");
+    ok("V2 report totals are exact: profit -430,520.35 and CoGM 2,998,134.52 (profit includes the named GP-202604-0001 drift)");
 
   // --- Per-line comparisons ---
   const lineComparisons = [];
@@ -2218,10 +2257,14 @@ function stageStatements() {
     return row;
   };
   // Every ordinary note line must be exact after V2. Only the explicitly
-  // enumerated V3 closing-stock lines and cross-totals may remain different.
+  // enumerated V3 closing-stock lines and cross-totals may remain different,
+  // plus the two named GP-202604-0001 drift lines.
   const compareNoteLine = (report, line, erpCents) => {
     if (line.amountCents === erpCents)
       return pushLine(report, line, erpCents, "exact");
+    if (GP_DRIFT_NOTES.has(`${report}:${line.note}`)
+      && line.amountCents - erpCents === -GP_DRIFT_CENTS)
+      return pushLine(report, line, erpCents, "post_scan_gp_drift", GP_DRIFT_ATTRIBUTION);
     return pushLine(report, line, erpCents, "unexplained");
   };
 
@@ -2333,10 +2376,10 @@ function stageStatements() {
   if (isProfitLine === null || scanProfit !== isProfitLine.scanCents)
     fail("BS profit line and IS profit line disagree (V0 tie broken)");
   const profitDiff = scanProfit - erpNetProfitCents;
-  if (profitDiff === closingsTotal && closingsTotal === STMT_EXPECTED_CLOSINGS_CENTS)
-    ok(`profit: scan ${fmt(scanProfit)} − ERP ${fmt(erpNetProfitCents)} = ${fmt(profitDiff)} = deferred closings exactly`);
+  if (profitDiff === closingsTotal + GP_DRIFT_CENTS && closingsTotal === STMT_EXPECTED_CLOSINGS_CENTS)
+    ok(`profit: scan ${fmt(scanProfit)} − ERP ${fmt(erpNetProfitCents)} = ${fmt(profitDiff)} = deferred closings + named GP-202604-0001 drift exactly`);
   else
-    fail(`profit difference ${fmt(profitDiff)} != deferred closings ${fmt(closingsTotal)}`);
+    fail(`profit difference ${fmt(profitDiff)} != deferred closings ${fmt(closingsTotal)} + GP drift ${fmt(GP_DRIFT_CENTS)}`);
 
   // After V2, opening stock and the salary split are exact. Only the V3 raw
   // and packing closing-stock deductions remain outside the CoGM engine.
@@ -2398,7 +2441,7 @@ function stageStatements() {
   if (erpImbalance === 0
     && erpNetAssets === STMT_EXPECTED_NET_ASSETS_CENTS
     && erpFinancedBy === STMT_EXPECTED_NET_ASSETS_CENTS)
-    ok("V2 May BS balances: net assets = financed-by = 5,389,607.26");
+    ok("V2 May BS balances: net assets = financed-by = 5,382,345.75 (5,389,607.26 less the named GP-202604-0001 drift)");
 
   // --- ST-b closure: which printed statement lines are backed by printed TB
   // rows. Expected: every compared line except the closing-inventory lines ---
@@ -2452,14 +2495,15 @@ function stageStatements() {
   const residualKeys = residualLines.map((c) => `${c.report}:${c.lineNo}`).sort();
   const expectedResidualKeys = [...STMT_EXPECTED_RESIDUAL_KEYS].sort();
   const expectedResidualDiffs = {
-    "bs:2": 18897960, "bs:3": 33690982, "bs:4": 18219443, "bs:23": 70808385,
-    "is:3": -51910425, "is:5": 18897960, "is:20": 70808385,
+    "bs:2": 18897960, "bs:3": 33690982, "bs:4": 18219443, "bs:23": 70808385 + GP_DRIFT_CENTS,
+    "is:3": -51910425, "is:5": 18897960, "is:20": 70808385 + GP_DRIFT_CENTS,
     "cogm:6": 33690982, "cogm:11": 18219443, "cogm:14": -51910425,
   };
-  if (lineComparisons.length !== 40 || (byClass.exact ?? 0) !== 30
+  if (lineComparisons.length !== 40 || (byClass.exact ?? 0) !== 28
     || (byClass.v3_closing_stock_line ?? 0) !== 6
-    || (byClass.v3_closing_stock_cross_total ?? 0) !== 4)
-    fail(`statement final counts ${lineComparisons.length}/${byClass.exact ?? 0}/${byClass.v3_closing_stock_line ?? 0}/${byClass.v3_closing_stock_cross_total ?? 0} != 40/30/6/4`);
+    || (byClass.v3_closing_stock_cross_total ?? 0) !== 4
+    || (byClass.post_scan_gp_drift ?? 0) !== 2)
+    fail(`statement final counts ${lineComparisons.length}/${byClass.exact ?? 0}/${byClass.v3_closing_stock_line ?? 0}/${byClass.v3_closing_stock_cross_total ?? 0}+${byClass.post_scan_gp_drift ?? 0}d != 40/28/6/4+2d`);
   if (JSON.stringify(residualKeys) !== JSON.stringify(expectedResidualKeys))
     fail(`V3 residual keys ${residualKeys.join(", ")} != ${expectedResidualKeys.join(", ")}`);
   for (const line of residualLines) {
@@ -2467,10 +2511,11 @@ function stageStatements() {
     if (line.diffCents !== expectedResidualDiffs[key])
       fail(`${key} residual ${fmt(line.diffCents)} != ${fmt(expectedResidualDiffs[key])}`);
   }
-  if (lineComparisons.length === 40 && (byClass.exact ?? 0) === 30
+  if (lineComparisons.length === 40 && (byClass.exact ?? 0) === 28
+    && (byClass.post_scan_gp_drift ?? 0) === 2
     && JSON.stringify(residualKeys) === JSON.stringify(expectedResidualKeys)
     && residualLines.every((line) => line.diffCents === expectedResidualDiffs[`${line.report}:${line.lineNo}`]))
-    ok("statement boundary is exact: 30/40 lines match; the exact ten V3-only lines remain");
+    ok("statement boundary is exact: 28/40 lines match, 2 named GP-202604-0001 drift lines (BS note 13, IS note 5); the exact ten V3-only lines remain");
 
   const outFile = path.join(genDir, "statements-comparison.json");
   fs.writeFileSync(outFile, JSON.stringify({

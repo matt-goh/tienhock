@@ -1,6 +1,6 @@
 # Legacy Report Scans — Verification & 1:1 Parity Plan (Handover)
 
-**Created 17 Jul 2026. Updated 20 Jul 2026. Phases V0, V1 and the approved V2 development package are COMPLETE. The development books are balanced at the RM5,389,607.26 pre-closing-stock boundary; production V2 remains a separate approval, and V3–V4 are pending.**
+**Created 17 Jul 2026. Updated 20 Jul 2026. Phases V0, V1 and the approved V2 development package are COMPLETE. The development books are balanced at the RM5,389,607.26 pre-closing-stock boundary; production V2 remains a separate approval (rollout variant rehearsed 20 Jul on a fresh production copy — see §6), and V3–V4 are pending.**
 Follow-on to the completed Jan–May legacy ledger import
 ([LEGACY_JAN_MAY_IMPORT_PLAN.md](LEGACY_JAN_MAY_IMPORT_PLAN.md)). That project ended with an
 exact, hash-pinned `IMP` journal projection but **no independent way to verify it**, and with the
@@ -563,7 +563,106 @@ statement differences, and the debtor presentation/aging items remain V3. A prod
 start with a fresh read-only inventory and separate approval; do not weaken the development guards
 to force a drifted production state through.
 
+### V2 production-rollout rehearsal execution record — 20 Jul 2026 (on a fresh production copy)
+
+**Files changed:** tracked
+[`2026-07-20_legacy_report_v2_opening_stock_prod.sql`](../../dev/migrations/2026-07-20_legacy_report_v2_opening_stock_prod.sql)
+(production-rollout variant) and this plan. The development-pinned migration is untouched.
+
+- The development database was replaced with a fresh production restore; the development-pinned
+  migration correctly refused it (`Chart of accounts differs from the exact V2 structure`). A full
+  read-only inventory (every guard domain, rolled back) proved the production state identical to
+  the audited development state **except four named chart facts**:
+  - `SUJAYU` / `NG-SC` — new DEBTOR child accounts from live production use (17/18 Jul 2026);
+    no Jan–Jun activity;
+  - `LGP` — "Local General Purchases" root account created manually in production 20 Jul 2026;
+  - `OP` (Overseas Purchases) — fs_note NULL: the account is deprecated (user-confirmed 20 Jul
+    2026); the audited development state had `OP` → note `5`.
+  - Everything else verified fingerprint-identical: the 2,821-account structure fingerprint after
+    excluding the three additions; the full mapping fingerprint after restoring `OP` → `5`; all 156
+    targets; the 580-row January anchor population and provenance; notes metadata; staging; IMP
+    journals; June anchors, all 1,571 checkpoint equalities and the June five-ledger movement.
+- The prod variant carries the byte-identical approved package (63 CS zero fences / 62 OS anchors /
+  125 fs_note changes / note 3-1 reroute); only the four whole-chart guard constants are re-pinned
+  (2,824 accounts, structure `47b88863017669feb7dd3356eba3e051`, fresh mapping
+  `4b0fcae87ac56abeb20146e484a8add0`, final mapping `4d05a7a82a5080872a8dd6493734d98a`).
+- Rehearsed on clone `tienhock_v2_prod_rehearsal_20260720` (fresh pass 63/62/125/1, rerun
+  0/0/0/0), then applied to `tienhock` with the identical two-pass result.
+- `validate-fixtures.mjs` passed all hashes/arithmetic gates. `verify-legacy-reports.mjs`: `map`,
+  `tdl` and `regressions` stages fully green; `tb` and `statements` stages show six failures that
+  decompose into exactly **two named post-audit production facts**:
+  1. **`GP-202604-0001`** (journal 11829) — self-billed foreign purchase from SHANDONG STANDARD
+     METAL PRODUCTS CO.,LTD, e-invoice `SB2026070025`, DR `OP` / CR `TP` **RM7,261.51**, entry_date
+     2026-04-30, **created in production 20 Jul 2026** — a genuine April supplier invoice keyed
+     after the scans and after the development audit. It alone makes TB `OP`/`TP` non-exact at
+     Apr–May (±7,261.51) and BS note 13 print 89,972.54 vs the scanned 82,711.03.
+  2. **OP deprecation** (fs_note NULL) — with a nonzero OP balance (at May, entirely from
+     `GP-202604-0001`), OP is invisible to the statement engines: May BS imbalance −7,261.51 and
+     net assets 5,382,345.75 vs the pinned 5,389,607.26. OP is still the live posting account for
+     foreign GP journals (24 journals in June, 31 in July), so the imbalance grows monthly until
+     the balance is reclassed and the posting account changes.
+- **Open decisions (user):** confirm `GP-202604-0001` is a genuine late April invoice rather than a
+  keying error (if corrected to a current date, all six failures disappear and the harness is green
+  as-is, since a zero-balance unmapped OP breaks nothing); decide the OP end-state (reclass the
+  balance to `LGP`/another purchase account with a current-dated journal, give `LGP` an fs_note,
+  stop posting to OP); then re-pin the harness expectations with these named deviations for the
+  production track.
+- A future real production rollout must re-run this read-only inventory: production keeps drifting
+  (today's activity proved it within hours), and the variant's chart pins reflect 20 Jul 2026 only.
+
+### GP purchase-account handover execution record — 20 Jul 2026 (OP → LGP)
+
+**Files changed:** tracked
+[`2026-07-20_gp_op_to_lgp.sql`](../../dev/migrations/2026-07-20_gp_op_to_lgp.sql),
+`dev/import/legacy-report-fixtures/verify-legacy-reports.mjs` (named-deviation re-pin) and this
+plan.
+
+- **Decision inputs:** `GP-202604-0001` / `SB2026070025` was user-confirmed as a genuine April
+  invoice keyed late — it stays April-dated. The OP end-state: OP is deprecated (user-confirmed);
+  its 63 self-billed foreign-purchase invoices (all machine spare-parts / general-stock purchases:
+  bearings, pulleys, motors, seals, conveyor belting, GI mesh, packaging stickers) were repointed
+  to `LGP` as the interim successor account. **The account naming (`LGP` = "Local General
+  Purchases" for what are entirely *foreign* purchases) and the final purchase-account structure
+  remain subject to end-user confirmation** — the developer flagged this explicitly; a later rename
+  is description-only and fingerprint-safe.
+- The guarded migration (advisory-locked, fresh/final two-state, exact expected counts): mapped
+  `LGP` → fs_note `5` (mirrors the audited OP classification; the only general Income Statement
+  expense note — a CoGM purchase note would distort the pinned CoGM), repointed all 63 invoice
+  headers, 23 invoice lines and all 63 GP journal lines (56 posted RM28,632.92 + 7 cancelled
+  RM1,322.92) from OP to LGP, and marked OP deprecated in its description. Amounts, dates,
+  references and particulars are unchanged. Rehearsed on `tienhock_v2_prod_rehearsal_20260720`,
+  then applied to `tienhock`; the immediate rerun verified the final state with **0 writes**.
+  OP is left with zero movement, no anchors and no fs_note — an empty shell outside every report
+  population.
+- **Harness re-pin (named deviation, evidence-backed):** every remaining scan-vs-ERP difference is
+  exactly ±RM7,261.51 from `GP-202604-0001`, user-confirmed genuine, keyed after the May scans were
+  exported — the scans can never contain it. `verify-legacy-reports.mjs` now pins it by name:
+  TB `LGP`/`TP` Apr–May diff profiles, IS note 5 and BS note 13 drift lines, and the shifted engine
+  totals (expenses 682,641.96 · profit **-430,520.35** · net assets/financed-by **5,382,345.75** =
+  5,389,607.26 − 7,261.51 · profit identity 715,345.36 = closings 708,083.85 + 7,261.51).
+- Final verification 20 Jul 2026: `validate-fixtures.mjs` ALL CHECKS PASSED;
+  `verify-legacy-reports.mjs` **ALL STAGES GREEN** — TB 880/880 exact + 2 named drift rows; TDL
+  150/150 exact; statements 28/40 exact + 2 named drift lines + the exact ten V3-only lines; the
+  May BS balances; every nonzero 31-May balance reaches an active note; all immutable/regression
+  gates unchanged (staging, IMP, 1,571 June checkpoints, five-ledger movement). No build, lint or
+  type-check command was run.
+- **Production note:** the same OP→LGP correction must run on real production (or be redone there
+  per the end-users' final account decision) — this dev database is a 20 Jul production copy and
+  the live system has continued keying foreign purchases against OP since.
+
 ## 7. Phase V3 — standing 1:1 report capability for users
+
+**V3 entry criteria — met 20 Jul 2026.** V2 is applied and verified on the (production-copy)
+development database, and the standing gate is green: `node
+dev/import/legacy-report-fixtures/validate-fixtures.mjs` and `node
+dev/import/legacy-report-fixtures/verify-legacy-reports.mjs` both pass fully (see the §6 GP
+handover record). The open overseas-purchase account question (`LGP` naming / final fs_note /
+one-account-vs-several) is **explicitly non-blocking for V3**: it lives entirely inside the named
+`GP-202604-0001` deviation (notes 5/13, accounts LGP/TP) and is orthogonal to the closing-stock
+notes (14-*/3-*) and debtor-parity work below. A later rename is description-only; a later
+account/note move is a mechanical re-pin of the same ±7,261.51 named drift. (Exception to note:
+if the final decision routes any of these purchases to a *CoGM* note, the CoGM identity gates move
+too — same arithmetic, one more named shift.)
 
 What "the user can create those 1:1 data" still needs after V2 (enumerate precisely from V1's
 findings; expected items):
@@ -628,6 +727,20 @@ audit evidence (they are the only independent proof of the Jan–May books).
   `THJ_SM`, `CL_GT`/`CL_GF` debit balances) — harvest those answers into
   [LEGACY_TRIAL_BALANCE_CODE_ANALYSIS.md](LEGACY_TRIAL_BALANCE_CODE_ANALYSIS.md) during the V2
   documentation refresh.
+- **The development database is now a 20 Jul 2026 production copy** with the V2 prod-variant and
+  the OP→LGP handover applied; the original audited development database no longer exists. The two
+  V2 migrations (`..._v2_opening_stock.sql` dev, `..._v2_opening_stock_prod.sql` prod variant) are
+  historical one-time gates: their whole-chart fingerprints reflect their respective 20 Jul states
+  and will legitimately fail a final-state rerun once the chart drifts further (the `LGP` fs_note
+  assignment already moved the prod-variant's final pin). **The standing regression gate is the
+  harness** (`validate-fixtures.mjs` + `verify-legacy-reports.mjs`), not a migration rerun.
+- `GP-202604-0001` is pinned in the harness **by name**. Any further backdated Jan–May entry keyed
+  in production will fail the gate loudly — that is the gate working: confirm genuineness, then
+  re-pin as another named deviation; never silence it.
+- Open but non-blocking: the final overseas-purchase account decision (rename `LGP`, split
+  accounts, or change fs_note) and the equivalent OP→LGP correction on real production, which is
+  still posting foreign purchases to the unmapped OP. Production V2 rollout itself still requires
+  the fresh read-only inventory + re-pinned variant + separate approval (§6).
 
 ---
 
