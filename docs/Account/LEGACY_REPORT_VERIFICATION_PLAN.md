@@ -650,10 +650,39 @@ plan.
   per the end-users' final account decision) — this dev database is a 20 Jul production copy and
   the live system has continued keying foreign purchases against OP since.
 
+### Variant re-pin execution record — 21 Jul 2026 (rollout order OP→LGP, then V2)
+
+**Files changed:** tracked
+[`2026-07-20_legacy_report_v2_opening_stock_prod.sql`](../../dev/migrations/2026-07-20_legacy_report_v2_opening_stock_prod.sql)
+(guard constants + header only) and this plan. The development-pinned migration remains untouched.
+
+- The development database was again replaced with a fresh 21 Jul production copy and
+  `2026-07-20_gp_op_to_lgp.sql` was run **first** (succeeded with its exact expected counts: 63
+  invoices / 56 posted / 7 cancelled / RM28,632.92 / RM1,322.92 / 23 lines). The V2 prod variant
+  then refused the database (`V2 preflight requires one exact wholly fresh or wholly final state`):
+  OP→LGP sets `LGP.fs_note = '5'`, but the variant's 20 Jul pins had LGP at NULL.
+- Read-only re-inventory proved the **only** drift versus the 20 Jul pins is that one
+  `LGP.fs_note` value: the 2,824-account structure fingerprint `47b88863017669feb7dd3356eba3e051`
+  passed unchanged, and only `LGP`/`OP` carried post-20-Jul `updated_at` stamps. The variant's
+  two full-mapping guard constants were re-pinned to the post-OP→LGP states (fresh
+  `6bafd6262089d7b217ab4ab2b5b1e4b4`, final `bd034913a5df1c2b9f54e7937cc9b87b` — the final value
+  re-computed by rolled-back simulation of the 125 fs_note changes). **Rollout order is now fixed:
+  OP→LGP first, then V2.**
+- Rehearsed on clone `tienhock_v2_prod_rehearsal_20260720` (fresh pass 63/62/125/1, rerun
+  0/0/0/0), then applied to `tienhock` with the identical two-pass result. All guard domains —
+  including the June preflight that had not yet run on the 21 Jul copy — passed.
+- Final verification 21 Jul 2026 on the V2-applied 21 Jul production copy:
+  `validate-fixtures.mjs` ALL CHECKS PASSED; `verify-legacy-reports.mjs` **ALL STAGES GREEN**
+  with the pinned named deviations unchanged (GP-202604-0001 ±RM7,261.51; the exact ten V3-only
+  statement lines). No new drift since 20 Jul surfaced anywhere.
+- A future real production rollout must still re-run the read-only inventory and re-pin if
+  production has drifted again: these pins reflect the 21 Jul 2026 production copy only.
+
 ## 7. Phase V3 — standing 1:1 report capability for users
 
-**V3 entry criteria — met 20 Jul 2026.** V2 is applied and verified on the (production-copy)
-development database, and the standing gate is green: `node
+**V3 entry criteria — met 20 Jul 2026, re-confirmed 21 Jul 2026** on a fresh 21 Jul production
+copy (rollout order OP→LGP then V2, per the §6 re-pin record). V2 is applied and verified on the
+(production-copy) development database, and the standing gate is green: `node
 dev/import/legacy-report-fixtures/validate-fixtures.mjs` and `node
 dev/import/legacy-report-fixtures/verify-legacy-reports.mjs` both pass fully (see the §6 GP
 handover record). The open overseas-purchase account question (`LGP` naming / final fs_note /
