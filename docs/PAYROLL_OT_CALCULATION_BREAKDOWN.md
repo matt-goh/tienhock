@@ -110,6 +110,19 @@ attendance**:
 
 Rules:
 
+- **Daily log wins** (v3, 2026-07-20). When the employee (or any of their
+  grouped sibling IDs) has *any* daily work-log attendance in the month, that
+  log is the attendance record for the month and **production entries do not
+  add worked days** — piece work booked against the worker is output, not extra
+  attendance. Production dates are the attendance fallback **only** for workers
+  with no daily work log at all that month, so production-only packers keep
+  their divisor exactly as before.
+  Why: HR's RAMBU model is 9 worked days. She has 9 dryer daily-log dates, but
+  packing was booked against her `RAMBU_PB` sibling ID on 4 further dates —
+  one of them worth RM0.35. Counting those as full worked days diluted the
+  daily rate from RM145.76 to RM97.06 and the OT rate from RM27.33 to RM18.20.
+  The stored snapshot records which source was used (`attendance` for daily
+  logs, `production` for the fallback).
 - The same date counts **once**, across multiple shifts, multiple jobs, and
   grouped sibling staff IDs.
 - Partial days and the short Saturday count as one full worked day.
@@ -129,7 +142,8 @@ week is 45 ordinary hours but 6 worked days).
 
 When both attendance dates and a Worked Days input exist, the larger of the two
 is used; the source is recorded in the stored snapshot
-(`attendance`, `monthly_input`, or `attendance+monthly_input`).
+(`attendance`, `production`, `monthly_input`, or either attendance source
+suffixed with `+monthly_input`).
 
 ## 5. Which OT items the formula reprices
 
@@ -247,24 +261,36 @@ If this worker's 40 OT hours were 30 Biasa + 6 Ahad + 4 Umum, OT pay would be
 
 ### Example B2 — HR's July 2026 model (RAMBU, daily-logged worker)
 
+She works two jobs under two staff IDs that share one payroll row: `RAMBU`
+(BH_DRYER, daily work log — this is where her OT arises) and `RAMBU_PB`
+(BH_PACKING, production entries only).
+
 Dryer hours 66 × RM8.72 = RM575.52, Jaga Gate RM300.00, packing/hancur/timbang
-piece work RM319.25, **9 actual worked days**, 37.5 OT hours, 1 day Cuti
+piece work RM386.29, **9 actual worked days**, 37.5 OT hours, 1 day Cuti
 Tahunan:
 
 ```
-Wage basis    575.52 + 300.00 + 319.25      = RM1,194.77   (Cuti NOT included)
-Daily rate    1,194.77 ÷ 9 = 132.752…       → RM132.75
-Hourly rate   132.75 ÷ 8  = 16.593…         → RM16.59
-OT rate       16.59 × 1.5                   = RM24.89 (Biasa)
-OT pay        24.89 × 37.5 hours            = RM933.38
-Cuti Tahunan  keyed at the daily rate       = RM132.75 (paid, outside the basis)
+Wage basis    575.52 + 300.00 + 386.29      = RM1,261.81   (Cuti NOT included)
+Daily rate    1,261.81 ÷ 9 = 140.201…       → RM140.20
+Hourly rate   140.20 ÷ 8  = 17.525          → RM17.53
+OT rate       17.53 × 1.5                   = RM26.30 (Biasa)
+OT pay        26.30 × 37.5 hours            = RM986.25
+Cuti Tahunan  RM81.30                        (paid, outside the basis)
 ```
 
-Every displayed step matches HR's worksheet (132.75 / 16.59 / 24.89). Note on
-the final line: HR's Excel shows RM933.41 because Excel carries unrounded
-decimals internally; the system pays at the sen-rounded RM24.89 rate that the
-worksheet itself displays, giving 24.89 × 37.5 = RM933.38. The stored rate and
-the amount always agree.
+**Why the divisor is 9 and not 13.** Her dryer daily work log covers 9 dates
+(1, 2, 4, 6, 7, 8, 9, 10, 11 July — the 13 July entry is excluded because it is
+a Cuti Tahunan date). Packing was booked against `RAMBU_PB` on those same days
+plus 14, 16, 17 and 18 July. Before v3 the divisor unioned both sources and
+used 13, which cut the daily rate to RM97.06 and the OT rate to RM18.20 — one
+of those extra dates carried RM0.35 of piece work yet added a whole day to the
+divisor. Under "daily log wins" the dryer log supplies the 9 worked days and
+the packing dates add income without adding days.
+
+A note on rounding: HR's Excel carries unrounded decimals internally and so
+shows a slightly different OT total; the system pays at the sen-rounded rate
+the worksheet itself displays, so the stored rate and the stored amount always
+agree with each other.
 
 ### Example C — monthly salary without additions
 
