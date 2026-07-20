@@ -50,6 +50,7 @@ import MaterialStockPage from "./Stock/Materials/MaterialStockPage";
 import InvoiceListPage from "./Invoice/InvoiceListPage";
 import InvoiceFormPage from "./Invoice/InvoiceFormPage";
 import InvoiceDetailsPage from "./Invoice/InvoiceDetailsPage";
+import ConsolidatedInvoiceDetailsPage from "./Invoice/ConsolidatedInvoiceDetailsPage";
 import PaymentPage from "./Payments/PaymentPage";
 
 // Adjustment Documents (Credit / Debit / Refund Notes)
@@ -501,6 +502,12 @@ export const TienHockNavData: SidebarItem[] = [
             path: "/sales/invoice/new",
             component: InvoiceFormPage,
             showInPopover: true,
+          },
+          // Route for viewing the invoices inside a consolidated e-Invoice
+          {
+            name: "Consolidated Invoice Details",
+            path: "/sales/invoice/consolidated/:id",
+            component: ConsolidatedInvoiceDetailsPage,
           },
           // Route for viewing an existing invoice
           {
