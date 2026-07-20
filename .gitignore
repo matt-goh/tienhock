@@ -17,15 +17,5 @@ dev/import/legacy-jan-may/data/*.csv
 dev/import/legacy-jan-may/generated/
 
 # private legacy report scans (contain customer data) + transcription fixtures
-# root entries cover the scans until they are moved into data/ (plan V0)
 dev/import/legacy-report-fixtures/data/
 dev/import/legacy-report-fixtures/generated/
-/Balance_Sheet_for_May_2026.pdf
-/CoGM_for_May_2026.pdf
-/Income_Statement_for_May_2026.pdf
-/Trade_Debtor_List_as_at_310526.pdf
-/Trial_Balance_Jan_2026.pdf
-/Trial_Balance_Feb_2026.pdf
-/Trial_Balance_Mar_2026.pdf
-/Trial_Balance_Apr_2026.pdf
-/Trial_Balance_May_2026.pdf

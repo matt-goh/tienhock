@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "description": "Named exception list for mapping printed legacy report account codes to ERP codes (plan V1, docs/Account/LEGACY_REPORT_VERIFICATION_PLAN.md §1 normalization rule). Every entry must name its evidence; no fuzzy matching. TB bank redirects intentionally override inactive/extraneous exact-code stubs; TDL customer mapping tries exact, then the import alias table, then these exceptions.",
+  "exceptions": [
+    {
+      "printedCode": "DEBTOR",
+      "kind": "td_control",
+      "erpCode": "DEBTOR",
+      "reason": "Printed one-row Trade Debtors control. The ERP trial-balance endpoint collapses all TD debtor children into a synthetic DEBTOR row; compare control-to-control (plan §2/§4 V0 finding: the control moves monthly)."
+    },
+    {
+      "printedCode": "HPA SWJ988",
+      "kind": "print_truncation",
+      "erpCode": "HPA_SWJ9882",
+      "reason": "The legacy TB prints account codes in a 10-character field (max printed length across all 885 codes is exactly 10), truncating HPA_SWJ9882. Printed particular 'TOYOTA HILUX DOUBLE CAB' matches the ERP description 'TOYOTA HILUX DOUBLE CAB (SWJ9882)'; SWJ9882 is the approved hire-purchase code per account-aliases.json requiredExactCodes."
+    },
+    {
+      "printedCode": "HPB SWJ988",
+      "kind": "print_truncation",
+      "erpCode": "HPB_SWJ9882",
+      "reason": "Same 10-character print truncation and Toyota Hilux SWJ9882 evidence as HPA SWJ988."
+    },
+    {
+      "printedCode": "PBB 1",
+      "kind": "bank_redirect",
+      "erpCode": "BANK_PBB",
+      "reason": "The Jan-May import redirected all THLD PBB_1 activity onto BANK_PBB (account-aliases.json alias). ERP PBB_1 is inactive with no anchors/movement; the printed May balance 172,288.16 DR equals the BANK_PBB figure inside BS CASH AT BANK note 19 (plan §2). Exact-matching the inactive PBB_1 stub would create a false constant offset."
+    },
+    {
+      "printedCode": "ABB",
+      "kind": "bank_redirect",
+      "erpCode": "BANK_ABB",
+      "reason": "The Jan-May import redirected all THLD ABB activity onto BANK_ABB (account-aliases.json alias). The printed May balance 204.26 DR equals the BANK_ABB figure inside BS CASH AT BANK note 19 (plan §2). The ERP ABB account (same description) holds no imported balance."
+    },
+    {
+      "printedCode": "MYSHOP-KNG",
+      "kind": "tdl_customer_alias",
+      "erpCode": "MYSHOP-KMB",
+      "reason": "Trade Debtor List p3 r7 prints MYSHOP-KNG with a -0.10 close. The audited ERP customer/debtor child MYSHOP-KMB carries the same -0.10 April and May close; V0 transcription-review.md records the identity."
+    }
+  ]
+}

@@ -1,12 +1,13 @@
 # Legacy Report Scans — Verification & 1:1 Parity Plan (Handover)
 
-**Created 17 Jul 2026. Status: PLAN ONLY — no fixture, comparison, or database work has started.**
+**Created 17 Jul 2026. Updated 20 Jul 2026. Phase V0 COMPLETE; V1 steps 1–4 (code mapping + TB + Trade Debtor List + BS/IS/CoGM statement comparisons) COMPLETE; V1 step 5 (consolidation & V2 sign-off package) and V2–V4 pending.**
 Follow-on to the completed Jan–May legacy ledger import
 ([LEGACY_JAN_MAY_IMPORT_PLAN.md](LEGACY_JAN_MAY_IMPORT_PLAN.md)). That project ended with an
 exact, hash-pinned `IMP` journal projection but **no independent way to verify it**, and with the
 approved named limitation of a missing **DR RM1,456,480.37** in the opening anchors (the Trial
 Balance / Balance Sheet residue). The user has now exported the requested verification documents
-from the legacy system as **scanned PDFs** (received 15 Jul 2026, currently in the repo root).
+from the legacy system as **scanned PDFs** (received 15 Jul 2026, now stored privately under
+`dev/import/legacy-report-fixtures/data/`).
 
 **Goal, in order:**
 
@@ -31,8 +32,8 @@ of Git; hash-pin everything; guarded idempotent SQL with no-op reruns; content p
 ## 1. Source scans (received 15 Jul 2026)
 
 Nine image-only scans (no text layer — `pdftotext` returns nothing; OCR/vision required).
-Dot-matrix print, high quality, ~50 rows/page on the TBs. SHA-256 pinned here; V0 re-pins them in
-a `source-manifest.json` alongside the fixtures.
+Dot-matrix print, high quality, ~50 rows/page on the TBs. SHA-256s are pinned both here and in
+`source-manifest.json` alongside the completed fixture hashes.
 
 | File | Pages | Content | SHA-256 |
 |---|---:|---|---|
@@ -48,10 +49,9 @@ a `source-manifest.json` alongside the fixtures.
 
 Notes on the scans themselves:
 
-- ⚠ **Privacy**: the Trade Debtor List (and TB creditor/director codes) carry real names. On
-  17 Jul the nine root filenames plus `dev/import/legacy-report-fixtures/{data,generated}/` were
-  added to `.gitignore`; V0 step 1 moves the PDFs into `data/` and the root entries can then be
-  dropped.
+- ⚠ **Privacy**: the Trade Debtor List (and TB creditor/director codes) carry real names. The PDFs
+  now live under the ignored `dev/import/legacy-report-fixtures/data/`; the temporary root-file
+  ignore entries were removed after the move. Both `data/` and `generated/` remain ignored.
 - The legacy system clock is broken — the Debtor List prints `REPORT DATE : 01 MAR 2010`.
   Ignore printed report dates; trust report titles/content only.
 - The TB `PARTICULAR` column is misaligned against `ACC/CODE` on at least the May TB final page
@@ -121,8 +121,8 @@ see [ACCOUNTING_GAP_ANALYSIS.md](ACCOUNTING_GAP_ANALYSIS.md) open questions 1–
    content, accounting meaning, calculations, reconciliation logic only.
 3. **Fixture home:** `dev/import/legacy-report-fixtures/` with `data/` (PDFs + transcribed CSVs)
    and `generated/` (rendered pages, validation reports) both gitignored; a tracked
-   `source-manifest.json` pins the PDF SHA-256s (§1) and, once approved, each fixture CSV's
-   SHA-256 — same discipline as `dev/import/legacy-jan-may/`.
+   `source-manifest.json` pins the PDF and final fixture CSV SHA-256s — same discipline as
+   `dev/import/legacy-jan-may/`.
 4. **Amounts are integer cents** in fixtures; dates/periods as literal strings; no locale parsing.
 5. **The imported `IMP` journals are immutable.** Whatever V1 finds, the correction path is new
    anchors and/or new user-approved journals/migrations — never edits to imported rows
@@ -135,12 +135,14 @@ see [ACCOUNTING_GAP_ANALYSIS.md](ACCOUNTING_GAP_ANALYSIS.md) open questions 1–
 1. Move the nine PDFs from the repo root into `dev/import/legacy-report-fixtures/data/`
    (then simplify the root `.gitignore` entries added 17 Jul). Write `source-manifest.json`.
 2. Render all pages (~108) to `generated/pages/` via `render-pdf.mjs <pdf> <prefix> all 2`.
-3. Transcribe, in value order: **May TB → Debtor List → BS/IS/CoGM → Apr/Mar/Feb/Jan TBs.**
+3. Transcribe, in value order: **May TB → Debtor/Creditor Lists → BS/IS/CoGM →
+   Apr/Mar/Feb/Jan TBs.**
    Fixture schemas:
-   - `tb_2026-MM.csv`: `page, row_on_page, acc_code_printed, acc_code_erp, particular, appx,
-     debit_cents, credit_cents` (one row per printed row incl. zeros; `acc_code_erp` filled by the
-     normalization rule in §1, blank = named unmapped exception). Grand-total row captured
-     separately in the manifest, not as a data row.
+   - `tb_2026-MM.csv`: `page, row_on_page, acc_code_printed, particular, appx, debit_cents,
+     credit_cents` (one row per printed row incl. zeros). The fixture remains a raw scan
+     transcription; V1 derives `acc_code_erp` using the normalization rule in §1 and records every
+     alias/exception in its comparison output. Grand-total rows are captured in the manifest, not
+     as data rows.
    - `trade_debtor_list_2026-05-31.csv`: `page, row_on_page, account_no, particular, bal_bf_cents,
      current_cents, payment_cents, total_due_cents, age_current_cents, age_1m_cents, age_2m_cents,
      age_3m_plus_cents` (+ the printed totals row in the manifest).
@@ -149,13 +151,15 @@ see [ACCOUNTING_GAP_ANALYSIS.md](ACCOUNTING_GAP_ANALYSIS.md) open questions 1–
 4. **File-only validator** (Node, mirrors `prepare-staging.mjs` philosophy — fail loudly, write a
    JSON validation report). Invariants:
    - **TB-a** per month: Σdebit = Σcredit = printed grand total (May: 16,408,437.78).
-   - **TB-b** every printed code maps to exactly one ERP code or a named exception; no duplicate
-     codes within a month.
+   - **TB-b** every printed code is nonblank and unique within a month; V1 owns the exact ERP-code
+     mapping and named exception list.
    - **TB-c** account set is consistent across the five months (additions/removals listed, not
      assumed away).
    - **TDL-a** per row: bal_bf + current + payment = total_due; aging buckets sum to total_due.
-   - **TDL-b** column sums equal the printed totals row (578,661.95 · 316,376.89 · −518,086.73 ·
-     507,697.72 · 245,412.66 · 124,740.50 · 24,055.71 · 42,524.62).
+   - **TDL-b** hard-gate the internally valid printed controls: total due 507,697.72 and the 1m /
+     2m / 3m+ aging totals 124,740.50 / 24,055.71 / 42,524.62. The scan's B/F, current, payment and
+     current-aging totals include unlisted zero-due accounts and are reported informationally;
+     they do not reconcile with the printed rows or even with the scan's own total-due figure.
    - **ST-a** BS/IS/CoGM printed subtotals recompute exactly; BS balances (6,097,691.11 both
      sides); IS profit = BS "profit for the financial year" (284,825.01); CoGM total = IS CoGM
      line (2,479,030.27); closing inventories agree across BS/IS/CoGM (188,979.60 / 336,909.82 /
@@ -167,6 +171,47 @@ see [ACCOUNTING_GAP_ANALYSIS.md](ACCOUNTING_GAP_ANALYSIS.md) open questions 1–
    - Cross: TB May `DEBTOR` = TDL total = 507,697.72.
 
    **Gate to V1:** validator green; fixture SHA-256s pinned in the manifest.
+
+### V0 execution record — completed 20 Jul 2026
+
+**Files changed:** tracked `.gitignore`, `dev/import/legacy-report-fixtures/{render-pdf.mjs,
+crop-page.mjs,validate-fixtures.mjs,source-manifest.json}` and this plan. The private PDFs, CSV
+fixtures, rendered pages and validation report live in the gitignored `data/` / `generated/`
+directories.
+
+- All **nine source PDFs / 108 source pages** were moved and hash-verified. The renderer produced
+  **213 PNGs**: standard and high-resolution copies for the 100 TB and five list pages, plus one
+  copy of each three statement pages.
+- The five TB fixtures each contain **885 account rows**, with identical account sets and no
+  duplicates. Their printed controls recompute exactly:
+
+  | Month | Debit | Credit | `DEBTOR` control |
+  |---|---:|---:|---:|
+  | Jan 2026 | 13,982,350.19 | 13,982,350.19 | 534,531.47 |
+  | Feb 2026 | 14,529,026.66 | 14,529,026.66 | 561,710.82 |
+  | Mar 2026 | 15,171,186.06 | 15,171,186.06 | 466,791.00 |
+  | Apr 2026 | 15,876,445.88 | 15,876,445.88 | 578,661.95 |
+  | May 2026 | 16,408,437.78 | 16,408,437.78 | 507,697.72 |
+
+- March–May had zero unexpected non-stock differences in the earlier dev-DB cross-checks;
+  January–February have zero unexpected non-stock differences against the independently
+  hash-pinned import staging. The only stock-family differences are the expected `OS_*` / `CS_*`
+  evidence already described in §2.
+- The list fixtures contain **150 debtor rows** plus the scan's bonus **three-creditor** first
+  page. Every listed row recomputes. Total due and the older aging buckets tie to the printed
+  controls; the scan's inconsistent aggregate-column quirk is preserved and named rather than
+  silently adjusted.
+- The BS / IS / CoGM fixtures contain **24 / 20 / 14 lines**. Every subtotal chain recomputes;
+  the BS balances at 6,097,691.11, IS profit is 284,825.01, CoGM is 2,479,030.27, and closing
+  inventories cross-tie across all three reports.
+- `node dev/import/legacy-report-fixtures/validate-fixtures.mjs` passes all hard gates and writes
+  `generated/validation-report.json`. It also verifies all **nine source hashes** and all **ten
+  final fixture hashes** pinned in `source-manifest.json`.
+
+**V0 finding correcting a pre-transcription assumption:** `DEBTOR` is not a static May control.
+It moves every month as shown above and matches the corresponding debtor-detail checkpoint. V1
+must expect the collapsed ERP TD row to match each month's printed control, not treat Jan–Apr as a
+designed difference.
 
 ## 5. Phase V1 — automated comparison against the DB (read-only)
 
@@ -189,10 +234,9 @@ plus a human-readable diff report doc. Comparisons:
      findings).
    - **Global check: Σ(all offsets) must equal net DR 1,456,480.37 at every month-end** — proving
      the residue is entirely opening-level and nothing is wrong in-window.
-   - Named expected difference: `DEBTOR` control is static 507,697.72 in legacy while the ERP's
-     collapsed TD row moves monthly with the true subledger; Jan–Apr TB `DEBTOR` rows will
-     disagree by design (the known control-vs-detail drift family, import-plan §8-3). Verify the
-     legacy row really is static and record per-month ERP TD totals beside it.
+   - Confirm the V0 finding that the collapsed ERP TD row equals the moving printed `DEBTOR`
+     control at every month-end (534,531.47 / 561,710.82 / 466,791.00 / 578,661.95 / 507,697.72).
+     Any difference is now a finding, not a designed control-vs-detail exception.
 2. **Trade Debtor List** — per-customer `total_due` vs derived debtor-child 31-May close (expect
    exact: June anchors already equal those closes; this now proves them against legacy print
    rather than against the legacy list total alone). Reconcile `bal_bf`/`current`/`payment`
@@ -214,6 +258,202 @@ plus a human-readable diff report doc. Comparisons:
 changes cannot silently break scan parity — plus a findings doc
 (`LEGACY_REPORT_RECONCILIATION.md`, mirroring
 [LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md](LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md)).
+
+### V1 step 1 execution record — account-code mapping, completed 20 Jul 2026
+
+**Files changed:** tracked `dev/import/legacy-report-fixtures/verify-legacy-reports.mjs`
+(the V1 harness; stage `map` implemented, later stages extend it) and
+`dev/import/legacy-report-fixtures/scan-code-exceptions.json` (the named exception list).
+Output `generated/account-map.json` is gitignored with the rest of `generated/`.
+
+- The V0 validator re-ran fully green first (all 9 source + 10 fixture hashes verified).
+- ERP TB report semantics pinned from `financial-reports.js`: per account, latest
+  `account_opening_balances` anchor with `as_of_date <= period end`, plus posted journal
+  movement from the anchor date (else Jan 1) through period end; population = active accounts
+  with an anchor or movement; TD children collapse into the synthetic `DEBTOR` row. Step 2's
+  derived balances must reproduce exactly this.
+- All **885 printed codes** (identical set across the five months, re-asserted) resolve:
+  **875 exact** after space→underscore normalization, **0 via the import alias table**,
+  **5 named exceptions**, **5 unmatched**. A collision guard proves no two printed codes land
+  on the same ERP code.
+- The 5 exceptions (each with evidence in `scan-code-exceptions.json`): `DEBTOR` → synthetic
+  TD control row; `HPA SWJ988`/`HPB SWJ988` → `HPA_SWJ9882`/`HPB_SWJ9882` (the TB prints codes
+  in a 10-char field — max printed length is exactly 10 — and the Toyota Hilux particulars
+  match); `PBB 1` → `BANK_PBB` and `ABB` → `BANK_ABB` (the import redirected these THLD bank
+  codes; printed May balances 172,288.16 / 204.26 equal the BS note-19 components, while
+  exact-matching the ERP stubs would fabricate a constant offset).
+- The 5 unmatched codes (`ARI`, `CR QF`, `DEP SAA453`, `OUTPUT.TAX`, `TAX EXP`) print **.00 in
+  all five months** — cosmetic chart differences, no ERP counterpart needed.
+- Notable: printed `PBB 2` exact-matches the **inactive** ERP `PBB_2` (zero everywhere on both
+  sides — harmless, flagged); printed `HR` is genuinely HIRING OF PLANT (zero), not the HR MART
+  debtor.
+
+### V1 step 2 execution record — TB comparison, completed 20 Jul 2026
+
+**Files changed:** `verify-legacy-reports.mjs` (stage `tb` added; run
+`node dev/import/legacy-report-fixtures/verify-legacy-reports.mjs` for all stages). Output
+`generated/tb-comparison.json` (gitignored) holds full per-account monthly scan/ERP/diff cents
+for every non-exact account, with scan evidence pages.
+
+Scanned balance vs ERP derived balance (exact endpoint semantics, TD collapsed into `DEBTOR`),
+five month-ends, integer cents. **Result: the residue decomposes perfectly and nothing else
+differs.**
+
+- **880 compared accounts: 755 exact, 125 constant offsets, 0 non-constant offsets,
+  0 nonzero scan-only or ERP-only findings.** Every offset is identical Jan–May.
+- **Σ offsets = DR 1,456,480.37 at every one of the five month-ends** (hard-gated in the
+  harness) — the entire difference between scans and ERP is opening-level; the imported
+  movement is fully proven at TB level.
+- The 125 offsets are exactly the stock family, matching §2's prediction to the cent:
+  **63 `CS_*` = +829,605.22** (ERP carries THLD CR anchors; printed TB says `.00` — presence
+  "both") and **62 `OS_*` = +626,875.15** (printed TB carries DR openings; ERP has nothing —
+  presence "scan_only", though all `OS_*` codes already exist in `account_codes`). The `OS_*`
+  set splits by APPX exactly into the statement notes: **3-1 = 84,393.20 · 3-3 = 348,501.50 ·
+  3-7 = 193,980.45.**
+- **`DEBTOR` control matches the ERP collapsed TD row at all five month-ends** (534,531.47 /
+  561,710.82 / 466,791.00 / 578,661.95 / 507,697.72 — hard-gated).
+- TB-level answer to the §2 stock question: the printed TBs carry **constant** `OS_*` openings
+  and **zero** `CS_*` all five months — the legacy TB records no monthly stock movement at all,
+  so the nonzero BS inventories (APPX 14-*) must be injected at report level (step 4/ST-b
+  delivers the final proof from the statement side).
+- This yields the complete V2 opening-correction candidate set: zero out the 63 `CS_*` CR
+  anchors (user decision §8-4: printed TB = truth) and anchor the 62 `OS_*` printed openings —
+  per-account amounts and evidence pages in `tb-comparison.json`.
+
+### V1 step 3 execution record — Trade Debtor List, completed 20 Jul 2026
+
+**Files changed:** `verify-legacy-reports.mjs` (stage `tdl` added),
+`scan-code-exceptions.json` (one audited TDL customer-code exception added), and this plan.
+Output `generated/tdl-comparison.json` (gitignored) holds every named endpoint difference,
+the exact scan evidence row, the two deterministic regression fingerprints, and the 150-row
+exact-code list.
+
+- **All 150 printed debtors resolve one-to-one:** 148 exact customer ids, existing import alias
+  `RS THOYIBAN-PTN` → `RS THOYYIBAN-PTN`, and named scan exception `MYSHOP-KNG` →
+  `MYSHOP-KMB` (same -0.10 April/May close; evidence p3 r7). No fuzzy matching.
+- **All 150 rows match exactly** for 30-Apr `BAL B/F`, legacy-semantic May `CURRENT` and
+  `PAYMENT`, May net movement, 31-May `TOTAL DUE`, and the independent 1-Jun debtor anchor.
+  The three control paths all total **507,697.72**. This independently proves every imported
+  debtor close, not merely the `DEBTOR` control total.
+- The printed column rules are now empirical and exact: `CURRENT` = S/DN/RN debtor debits net
+  of CN credits; `PAYMENT` = signed REC movement plus S cash-auto-collection credits; other
+  types are excluded. The current ERP General Statement's raw debit/credit split matches
+  145/150 rows. Its five named presentation differences total **841.75** in each column with
+  zero net effect: four May CNs totaling 301.75 belong in legacy `CURRENT`, and GUI's equal
+  540.00 wrong-bank-in/contra pair belongs in neither legacy column. The complete five-row
+  difference is hard-pinned by fingerprint
+  `3a9168d26b25a45e8e0048e7758ccf16f95409253fc58c5cddd461eb1d68c61b`.
+- The ERP ledger has **191** May activity/opening rows: the printed 150 nonzero closes plus
+  **41 zero-close rows omitted from the body**. Those 41 contribute 78,085.00 B/F + 68,855.40
+  CURRENT - 146,940.40 PAYMENT = zero. They explain why the printed B/F and PAYMENT controls
+  exceed the listed-row sums. The printed CURRENT control remains a proven legacy defect:
+  316,376.89 vs the complete legacy-semantic 447,122.50. No ERP-only nonzero close exists.
+- **Aging boundaries are pinned:** May = current, Apr = 1 month, Mar = 2 months, and opening +
+  Jan/Feb = 3 months+. A signed 1-Jan debtor anchor plus monthly debtor-ledger FIFO simulation
+  reproduces **all four aging buckets for all 150 customers exactly**: S/CN enter their document
+  month; payments normalize carried credits, consume positive balances oldest-first, and leave
+  any excess in the payment month.
+- The current ERP invoice-linked aging matches 139/150 rows. Its 11 named differences are an
+  **allocation-model gap**, not a boundary or balance error: ERP honors explicit payment/invoice
+  and CN/original-invoice links, then forces the ledger bridge into 3 months+; legacy uses the
+  signed-ledger FIFO rule above. Scan minus ERP totals are current -1,088.85 · 1m +158.75 ·
+  2m +1,032.41 · 3m+ -102.31 = zero, hard-pinned by fingerprint
+  `4514569fc2c30814ef505e0737e26fc1c02cbf22a057110f5b8013ea6f0d9817`.
+- Connected-path audit for V3: current aging uses today's active/cancelled state for historical
+  reports, ignores paired Refund Notes, includes unjournaled invoices, drops non-positive invoice
+  outstanding before bridging, and puts the entire bridge in 3m+. That last behavior contradicts
+  the old "no buckets fabricated from scalar anchors" note in
+  [INVOICE_PAYMENT_ACCOUNTING_PROGRESS.md](INVOICE_PAYMENT_ACCOUNTING_PROGRESS.md); reconcile the
+  documentation and intended policy when the user-facing parity work is designed, not in this
+  read-only verification step.
+- The PDF's bonus three-creditor page remains informational/file-arithmetic evidence only;
+  supplier/AP comparison is outside debtor Step 3. **Every Step 3 difference is named; the
+  `tdl` stage is green.** V3 must close the five column-presentation differences, 41-row body
+  filtering difference, and 11-row current-aging allocation gap if the user-facing printout is
+  to reproduce the legacy report 1:1.
+
+**Verification rerun:** `node dev/import/legacy-report-fixtures/validate-fixtures.mjs` passed all
+nine source hashes, ten fixture hashes and arithmetic/cross-report controls; the default
+`node dev/import/legacy-report-fixtures/verify-legacy-reports.mjs` run passed `map`, `tb` and
+`tdl` together (`ALL STAGES GREEN`). No build, lint or type-check command was run.
+
+### V1 step 4 execution record — BS / IS / CoGM statements, completed 20 Jul 2026
+
+**Files changed:** `verify-legacy-reports.mjs` (stage `statements` added; the default
+no-argument run now executes `map`, `tb`, `tdl` and `statements` together) and this plan.
+Output `generated/statements-comparison.json` (gitignored) holds all 40 line comparisons with
+attributions, the named fs_note move set, the whole-chart APPX audit and the V2 design
+projection figures.
+
+The stage reproduces the three engines query-for-query (BS: anchored balances grouped by
+effective fs_note + the synthetic movement-only Current Year Profit row; IS/CoGM: posted
+journal movement only) and compares each printed note line. **Result: 40 compared lines —
+20 exact, 20 attributed, zero unexplained.** Every difference lands in exactly the three
+allowed categories:
+
+- **(a) The CS/OS opening set (stage-2 residue).** The ERP BS inventory notes carry exactly
+  the superseded CS anchors (14-1 −408,919.39 · 14-2 −420,006.23 · 14-3 −679.60 =
+  −829,605.22, anchor-only, no posted movement, no other contributor), and the ERP renders
+  0.00 for opening-inventory notes 3-1/3-3/3-7 because the IS/CoGM engines read journal
+  movement only — the §8-2 engine consequence is now empirically confirmed, not inferred.
+- **(b) Report-level stock injection — ST-b settled.** Every printed statement line is backed
+  by printed TB rows (per-APPX sums recompute to the cent, incl. the misprint-prone CA DPO
+  row) **except the six closing-inventory lines** (BS 14-1/14-2/14-3, IS 14-1, CoGM
+  14-2/14-3). Legacy injects month-end closing stock at report level from its stock module;
+  the printed TB itself records no stock movement at all.
+- **(c) Named fs_note mapping differences — NEW finding, fingerprint-pinned**
+  (`c83f4ef40c85ea3716fdecdace37dbfffbc53f51d23d8b2da02fc006fd8d2088`). 31 nonzero accounts
+  are classified under a different note by the printed TB APPX than by the ERP fs_note:
+  `CL_ABB` 182,600.38 DR (printed 11 TERM LOANS, ERP 10), `CL_AFI` −25,696.82 (printed 8 —
+  the legacy BS shows note 22 as GROSS trade debtors, 507,697.72, and buries the impairment
+  allowance in note 8; ERP nets it in 22), `CL_GF` 31,696.82 / `CL_GT` 12,415.60 debit
+  balances (printed 8 — settles the §9 open classification question), `OC_CMK` 10,200.00 /
+  `OC_MIL` −33,638.54 (printed 1 ACCRUALS), and a 25-account payroll family whose 5 ↔ 5-1
+  moves net to exactly **310,329.96** (scan IS note 5 = 675,380.45 vs ERP 985,710.41; scan
+  CoGM 5-1 = 763,126.23 vs ERP 452,796.27). With these named moves applied, notes 22, 8, 1,
+  10, 11, 5 and 5-1 all close to the cent. The account balances themselves are identical —
+  only the note classification differs.
+
+Hard-gated identities, all green: scan profit 284,825.01 − ERP 203,616.31 = **+81,208.70 =
+closings 708,083.85 − openings 626,875.15** exactly; CoGM difference 333,707.66 = 23,377.70
+(its openings − closings) + 310,329.96 (the salary moves) exactly; the ERP May BS is out of
+balance by **exactly the named residue** (assets short 1,456,480.37); every nonzero 31-May
+balance reaches the statements through an active BS/IS/CoGM note (no leaks); revenue
+3,334,649.33, PPE, debtors, cash, director, taxation, share capital, retained profit B/F etc.
+are exact. Notes 3-1/3-3/3-7 (report_section `cogm`) and 14-1/14-2/14-3 (`balance_sheet`)
+all exist and are active; legacy prints the 3-1 opening on the IS while ERP's note 3-1 is
+cogm-section — presentation only, since the ERP IS folds cogm notes into its COGS bucket.
+
+Also recorded: 216 of the 880 mapped accounts print an APPX differing from the ERP effective
+fs_note — the 31 named moves above, 94 splits **within** the stock family (47 anchored CS
+accounts, e.g. ERP 14-1 vs printed 14-3, and their 47 OS mirror accounts, e.g. ERP 3-1 vs
+printed 3-7), and 91 zero-balance cosmetic cases. The stock-family splits are invisible in
+today's statements but matter for V2: per-account OS anchors would render under the wrong
+3-1/3-3/3-7 note unless the fs_notes are aligned to the printed APPX first.
+
+**V2 design consequences (projection figures in `statements-comparison.json`):** inserting
+the OS anchors and zeroing the CS anchors alone makes the TB residue 0 for every month, but
+the BS stays unbalanced by −626,875.15 because anchors on P&L-type notes never reach the
+engines; with the §8-2 engine change (render anchor-backed opening notes into IS/CoGM and the
+BS Current Year Profit) the BS balances at 5,389,607.26; reaching the legacy May target
+6,097,691.11 additionally requires the V3-1 closing-stock injection (708,083.85 on both
+sides). The fs_note corrections (31 named + 94 stock-family) are part of the V2 sign-off
+package.
+
+**Verification rerun:** `node dev/import/legacy-report-fixtures/validate-fixtures.mjs` passed
+(all nine source + ten fixture hashes and every arithmetic gate), and the default
+`node dev/import/legacy-report-fixtures/verify-legacy-reports.mjs` run passed `map`, `tb`,
+`tdl` and `statements` together (36 ok gates, `ALL STAGES GREEN`). No build, lint or
+type-check command was run.
+
+### V1 remaining step (run standalone; pick up here in a fresh session)
+
+- **Step 5 — consolidation & gate to V2**: write `LEGACY_REPORT_RECONCILIATION.md` (findings
+  doc + the named opening-correction table account → amount → evidence page for user sign-off,
+  now including the 31 + 94 fs_note corrections from step 4 with the printed APPX as target),
+  document the standing harness run command, then present the V2 sign-off package (§6). The
+  step-4 projection figures (TB residue → 0; BS −626,875.15 without / 0.00 with the §8-2
+  engine change; May BS 5,389,607.26 pre-V3 vs target 6,097,691.11) belong in that package.
 
 ## 6. Phase V2 — close the opening gap (guarded mutation, dev → prod)
 
@@ -259,31 +499,38 @@ findings; expected items):
    scanned figures as acceptance targets (May: 188,979.60 / 336,909.82 / 182,194.43).
 2. **IS/CoGM opening-inventory lines** — however V2 lands (journal vs anchor), the engines must
    actually render notes 3-1/3-3/3-7 with 626,875.15 total for every 2026 month.
-3. **Debtor list parity** — the ERP Debtors report already has aging; verify/extend the
-   month-statement columns (BAL B/F · CURRENT · PAYMENT · TOTAL DUE) and bucket rules so a user
-   can print the 31-May list and match the scan per customer.
+3. **Debtor list parity** — Step 3 proved the balances and exact legacy rules. Make the
+   user-facing print path (a) classify CNs and the GUI contra like the legacy CURRENT/PAYMENT
+   columns, (b) omit zero-close body rows while keeping the intended aggregate population clear,
+   and (c) offer/reproduce the signed-ledger monthly FIFO aging model rather than the current
+   explicit-invoice-allocation + forced-oldest-bridge model. Acceptance target: all 150 May rows
+   and all four buckets equal `tdl-comparison.json`; the five/11-row fingerprints disappear.
 4. Keep the V1 harness as a regression gate (documented run command, like the import's
    verification suite).
 
 **Phase V4 — closeout:** prod parity re-run, docs refresh, retain scans + fixtures permanently as
 audit evidence (they are the only independent proof of the Jan–May books).
 
-## 8. User decisions / questions to resolve (record answers here before V2)
+## 8. User decisions / questions — ANSWERED 17 Jul 2026
 
-1. **Ask the co-worker:** was the year-start stock roll (and/or year-end 2025 close) run in the
-   legacy system *after* the Jan–May Excel export was taken? What exactly did it post (accounts,
-   amounts, date)? Were monthly stock values also updated in legacy? This explains the `CS_* = .00`
-   TB rows and decides the V2 correction's shape and dating.
-2. **Anchor vs 01-01 journal** for the opening-stock correction (IS/CoGM visibility — §6).
-3. If the TB scans reveal account codes missing from the ERP chart: create them (with fs_note) or
-   alias them to existing codes?
-4. Approve superseding the existing `CS_*` CR anchors (they came from the hash-pinned THLD export;
-   changing them departs from "export = truth" in favour of "printed TB = truth" — needs explicit
-   sign-off since the two now provably differ).
-5. Debtor-aging bucket definitions for TDL parity (before treating bucket diffs as bugs).
-6. Only May BS/IS/CoGM/TDL were scanned. Jan–Apr statement prints (and Jan–Apr debtor lists) would
-   add four more checkpoints each — worth exporting if cheap, but the monthly TBs already give
-   per-account coverage, so this is optional.
+1. **Stock roll in legacy after the export?** — *User: no idea; just make the ERP 1:1 with the
+   printed reports, then the question is moot.* → The printed TBs are the target state; V1 derives
+   the correction empirically instead of from legacy-operator testimony.
+2. **Anchor vs 01-01 journal** — *User: definitely use anchors; users should be able to set an
+   anchor to correct amounts.* → Corrections go through `account_opening_balances` (and the V3
+   capability exposes anchor setting to users). Consequence to solve in V2/V3: the IS/CoGM engines
+   read journal movement only, so the opening-inventory statement lines (notes 3-1/3-3/3-7) need
+   the engines to learn to read those anchors (or an equivalent report-level source) — present the
+   concrete design with numbers at V2 sign-off.
+3. **Scan-only account codes** — *User: do the logical, accounting-standard thing as long as it
+   brings the data closer to 1:1.* → Create genuinely missing codes with correct fs_note; alias
+   only provable identity matches; name every case in the reconciliation doc.
+4. **Supersede `CS_*` CR anchors** — *User: yes, printed TB = truth.*
+5. **Aging bucket definitions** — answered by V1 Step 3: calendar-month boundaries are May =
+   current, Apr = 1m, Mar = 2m, and opening + Jan/Feb = 3m+. The legacy scan allocates signed
+   debtor-ledger documents FIFO; the current ERP report instead follows explicit invoice links
+   and puts its reconciliation bridge in 3m+. Both rules are now reproduced and regression-pinned.
+6. **Jan–Apr statement prints** — unanswered; optional (monthly TBs give per-account coverage).
 
 ## 9. Risks & notes for the next session
 
