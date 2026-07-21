@@ -173,10 +173,9 @@ const OthersAdvancePage: React.FC = () => {
           return "";
         }
       })();
-      const dateIso =
-        typeof commission.commission_date === "string"
-          ? commission.commission_date.slice(0, 10)
-          : "";
+      const dateIso = commission.commission_date
+        ? format(new Date(commission.commission_date), "yyyy-MM-dd")
+        : "";
       const haystack = [
         commission.employee_id || "",
         commission.employee_name || "",
