@@ -777,7 +777,7 @@ export default function (pool, config) {
       const invoice = result.rows[0];
 
       // Format response (Match ExtendedInvoiceData)
-      res.json({
+      const response = {
         id: invoice.id,
         salespersonid: invoice.salespersonid,
         customerid: invoice.customerid,
@@ -812,7 +812,65 @@ export default function (pool, config) {
           total: String(product.total || "0.00"),
           issubtotal: product.issubtotal || false,
         })),
-      });
+      };
+
+      // Optionally bundle related records so the details page can load
+      // everything in one request (?include=payments,adjustments). The shapes
+      // below MUST mirror GET /jellypolly/api/payments and
+      // GET /jellypolly/api/adjustment-docs so the frontend treats them the same.
+      const include = String(req.query.include || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      if (include.includes("payments")) {
+        const paymentsResult = await pool.query(
+          `
+          SELECT
+            p.payment_id, p.invoice_id, p.payment_date, p.amount_paid,
+            p.posting_date,
+            p.payment_method, p.payment_reference, p.internal_reference,
+            p.notes, p.created_at, p.status, p.cancellation_date
+          FROM jellypolly.payments p
+          WHERE p.invoice_id = $1
+          ORDER BY p.payment_date DESC, p.created_at DESC
+          `,
+          [id]
+        );
+        response.payments = paymentsResult.rows.map((p) => ({
+          ...p,
+          amount_paid: parseFloat(p.amount_paid || 0),
+        }));
+      }
+
+      if (include.includes("adjustments")) {
+        const adjResult = await pool.query(
+          `
+          SELECT a.*, i.customerid AS inv_customerid,
+                 i.einvoice_status AS original_invoice_einvoice_status,
+                 c.name AS customer_name,
+                 p.id AS paired_doc_id, COALESCE(p.display_id, p.id) AS paired_display_id,
+                 p.type AS paired_type, p.status AS paired_status,
+                 p.einvoice_status AS paired_einvoice_status
+            FROM jellypolly.adjustment_documents a
+            JOIN jellypolly.invoices i ON a.original_invoice_id = i.id
+       LEFT JOIN customers c ON a.customerid = c.id
+       LEFT JOIN jellypolly.adjustment_documents p ON a.paired_with_id = p.id
+           WHERE a.original_invoice_id = $1
+           ORDER BY a.created_at DESC
+          `,
+          [id]
+        );
+        response.adjustmentDocs = adjResult.rows.map((r) => ({
+          ...r,
+          total_excluding_tax: parseFloat(r.total_excluding_tax || 0),
+          tax_amount: parseFloat(r.tax_amount || 0),
+          rounding: parseFloat(r.rounding || 0),
+          totalamountpayable: parseFloat(r.totalamountpayable || 0),
+        }));
+      }
+
+      res.json(response);
     } catch (error) {
       console.error("Error fetching invoice:", error);
       res

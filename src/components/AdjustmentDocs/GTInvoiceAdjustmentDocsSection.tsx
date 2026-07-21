@@ -25,7 +25,7 @@ interface GTAdjDocRow {
   type: AdjustmentDocType;
   total_amount: number;
   status: AdjustmentDocument["status"];
-  einvoice_status: EInvoiceStatus;
+  einvoice_status?: EInvoiceStatus;
   paired_doc_id?: string | null;
 }
 
@@ -33,6 +33,11 @@ interface Props {
   invoiceId: number | string;
   refreshKey?: number;
   onDocsLoaded?: (docs: GTAdjDocRow[]) => void;
+  /**
+   * Preloaded docs (bundled into the invoice fetch). When provided the section
+   * renders these directly and skips its own network request.
+   */
+  docs?: GTAdjDocRow[];
 }
 
 const formatCurrency = (amount: number): string =>
@@ -45,14 +50,19 @@ const GTInvoiceAdjustmentDocsSection: React.FC<Props> = ({
   invoiceId,
   refreshKey,
   onDocsLoaded,
+  docs: preloadedDocs,
 }) => {
   const navigate = useNavigate();
-  const [docs, setDocs] = useState<GTAdjDocRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const isControlled = preloadedDocs !== undefined;
+  const [fetchedDocs, setFetchedDocs] = useState<GTAdjDocRow[]>([]);
+  const [loading, setLoading] = useState(!isControlled);
+  const docs: GTAdjDocRow[] = isControlled
+    ? (preloadedDocs as GTAdjDocRow[])
+    : fetchedDocs;
 
   const fetchDocs = useCallback(async () => {
     if (!invoiceId && invoiceId !== 0) {
-      setDocs([]);
+      setFetchedDocs([]);
       onDocsLoaded?.([]);
       setLoading(false);
       return;
@@ -66,10 +76,10 @@ const GTInvoiceAdjustmentDocsSection: React.FC<Props> = ({
         )}&include_cancelled=true`
       );
       const fetched: GTAdjDocRow[] = Array.isArray(result) ? result : [];
-      setDocs(fetched);
+      setFetchedDocs(fetched);
       onDocsLoaded?.(fetched);
     } catch {
-      setDocs([]);
+      setFetchedDocs([]);
       onDocsLoaded?.([]);
     } finally {
       setLoading(false);
@@ -77,8 +87,11 @@ const GTInvoiceAdjustmentDocsSection: React.FC<Props> = ({
   }, [invoiceId, onDocsLoaded]);
 
   useEffect(() => {
+    // When the parent supplies docs (bundled with the invoice fetch), skip the
+    // dedicated request entirely.
+    if (isControlled) return;
     fetchDocs();
-  }, [fetchDocs, refreshKey]);
+  }, [fetchDocs, refreshKey, isControlled]);
 
   if (loading) {
     return (

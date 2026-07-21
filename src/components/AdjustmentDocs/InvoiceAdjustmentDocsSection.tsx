@@ -45,6 +45,12 @@ interface Props {
    */
   refreshKey?: number;
   onDocsLoaded?: (docs: AdjustmentDocument[]) => void;
+  /**
+   * Preloaded docs (e.g. bundled into the invoice fetch via
+   * `?include=adjustments`). When provided the section renders these directly
+   * and skips its own network request — the parent owns the data lifecycle.
+   */
+  docs?: AdjustmentDocument[];
 }
 
 const formatCurrency = (amount: number): string =>
@@ -58,11 +64,16 @@ const InvoiceAdjustmentDocsSection: React.FC<Props> = ({
   company = "tienhock",
   refreshKey,
   onDocsLoaded,
+  docs: preloadedDocs,
 }) => {
   const navigate = useNavigate();
   const paths: AdjustmentDocsPaths = getAdjustmentDocsPaths(company);
-  const [docs, setDocs] = useState<AdjustmentDocument[]>([]);
-  const [loading, setLoading] = useState(true);
+  const isControlled = preloadedDocs !== undefined;
+  const [fetchedDocs, setFetchedDocs] = useState<AdjustmentDocument[]>([]);
+  const [loading, setLoading] = useState(!isControlled);
+  const docs: AdjustmentDocument[] = isControlled
+    ? (preloadedDocs as AdjustmentDocument[])
+    : fetchedDocs;
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [printingDoc, setPrintingDoc] = useState<AdjustmentDocument | null>(
     null
@@ -129,7 +140,7 @@ const InvoiceAdjustmentDocsSection: React.FC<Props> = ({
 
   const fetchDocs = useCallback(async () => {
     if (!invoiceId) {
-      setDocs([]);
+      setFetchedDocs([]);
       onDocsLoaded?.([]);
       setLoading(false);
       return;
@@ -142,13 +153,13 @@ const InvoiceAdjustmentDocsSection: React.FC<Props> = ({
           invoiceId
         )}&include_cancelled=true`
       );
-      const fetchedDocs: AdjustmentDocument[] = Array.isArray(result)
+      const nextDocs: AdjustmentDocument[] = Array.isArray(result)
         ? result
         : [];
-      setDocs(fetchedDocs);
-      onDocsLoaded?.(fetchedDocs);
+      setFetchedDocs(nextDocs);
+      onDocsLoaded?.(nextDocs);
     } catch {
-      setDocs([]);
+      setFetchedDocs([]);
       onDocsLoaded?.([]);
     } finally {
       setLoading(false);
@@ -156,8 +167,11 @@ const InvoiceAdjustmentDocsSection: React.FC<Props> = ({
   }, [invoiceId, onDocsLoaded, paths.apiBase]);
 
   useEffect(() => {
+    // When the parent supplies docs (bundled with the invoice fetch), skip the
+    // dedicated request entirely.
+    if (isControlled) return;
     fetchDocs();
-  }, [fetchDocs, refreshKey]);
+  }, [fetchDocs, refreshKey, isControlled]);
 
   if (loading) {
     return (
