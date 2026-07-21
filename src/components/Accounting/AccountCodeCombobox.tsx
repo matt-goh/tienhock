@@ -6,6 +6,7 @@ import {
   IconFile,
   IconFolder,
   IconFolderOpen,
+  IconPlus,
 } from "@tabler/icons-react";
 import { useAccountCodesCache } from "../../utils/accounting/useAccountingCache";
 import { AccountCode } from "../../types/types";
@@ -22,6 +23,7 @@ interface AccountCodeComboboxProps {
   hierarchical?: boolean;
   allowEmpty?: boolean;
   emptyLabel?: string;
+  onAddAccount?: (query: string) => void;
 }
 
 interface AccountHierarchyRow {
@@ -54,6 +56,7 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
   hierarchical = false,
   allowEmpty = false,
   emptyLabel = "No account",
+  onAddAccount,
 }: AccountCodeComboboxProps) => {
   const { accountCodes: allAccountCodes } = useAccountCodesCache();
   const [query, setQuery] = useState<string>("");
@@ -532,6 +535,18 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
     }
   };
 
+  const handleAddAccount = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ): void => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (disabled) return;
+    const trimmedQuery: string = query.trim();
+    setIsOpen(false);
+    setQuery("");
+    onAddAccount?.(trimmedQuery);
+  };
+
   const handleToggleExpand = (
     event: React.MouseEvent<HTMLElement>,
     code: string
@@ -578,38 +593,52 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
       )}
       <div className="relative">
         <div className="flex">
-          <input
-            id={inputId}
-            ref={inputRef}
-            type="text"
-            role="combobox"
-            aria-expanded={isOpen}
-            aria-controls={listboxId}
-            aria-haspopup={hierarchical ? "tree" : "listbox"}
-            aria-activedescendant={isOpen ? activeOptionId : undefined}
-            aria-autocomplete="list"
-            value={isOpen ? query : displayValue}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>): void => {
-              setQuery(event.target.value);
-              if (!isOpen) setIsOpen(true);
-            }}
-            onFocus={(): void => {
-              if (!disabled) setIsOpen(true);
-            }}
-            onKeyDown={handleKeyDown}
-            disabled={disabled}
-            placeholder={placeholder}
-            className={`${inputClassName} pr-8`}
-          />
-          <button
-            type="button"
-            onClick={handleToggleOpen}
-            disabled={disabled}
-            aria-label={isOpen ? "Close account options" : "Open account options"}
-            className="absolute inset-y-0 right-0 flex items-center pr-2 text-default-400 hover:text-default-600 disabled:cursor-not-allowed dark:text-gray-500 dark:hover:text-gray-300"
-          >
-            <IconChevronDown size={16} />
-          </button>
+          <div className="relative flex-1">
+            <input
+              id={inputId}
+              ref={inputRef}
+              type="text"
+              role="combobox"
+              aria-expanded={isOpen}
+              aria-controls={listboxId}
+              aria-haspopup={hierarchical ? "tree" : "listbox"}
+              aria-activedescendant={isOpen ? activeOptionId : undefined}
+              aria-autocomplete="list"
+              value={isOpen ? query : displayValue}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>): void => {
+                setQuery(event.target.value);
+                if (!isOpen) setIsOpen(true);
+              }}
+              onFocus={(): void => {
+                if (!disabled) setIsOpen(true);
+              }}
+              onKeyDown={handleKeyDown}
+              disabled={disabled}
+              placeholder={placeholder}
+              className={`${inputClassName} pr-8`}
+            />
+            <button
+              type="button"
+              onClick={handleToggleOpen}
+              disabled={disabled}
+              aria-label={isOpen ? "Close account options" : "Open account options"}
+              className="absolute inset-y-0 right-0 flex items-center pr-2 text-default-400 hover:text-default-600 disabled:cursor-not-allowed dark:text-gray-500 dark:hover:text-gray-300"
+            >
+              <IconChevronDown size={16} />
+            </button>
+          </div>
+          {onAddAccount && (
+            <button
+              type="button"
+              onClick={handleAddAccount}
+              disabled={disabled}
+              title="Add account code"
+              aria-label="Add account code"
+              className="flex items-center pl-1 pr-2 text-default-400 hover:text-sky-600 disabled:cursor-not-allowed dark:text-gray-500 dark:hover:text-sky-400"
+            >
+              <IconPlus size={16} />
+            </button>
+          )}
         </div>
         {isOpen && !disabled && (
           <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-lg border border-default-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">

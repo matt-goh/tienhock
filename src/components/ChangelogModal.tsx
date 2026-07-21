@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-21",
+    ms: "Dua pembaharuan pada pemilih kod akaun. Pertama, carian di halaman Account Codes kini turut menemui akaun anak yang tiada anak sendiri (contohnya BRM dan MRM di bawah RM) — sebelum ini akaun anak sedemikian hanya muncul jika ditandakan sebagai kegemaran. Kedua, ruangan Account dalam borang Journal kini menggunakan pemilih hierarki yang sama seperti halaman Account Ledger, memaparkan akaun induk dan anak dalam bentuk pokok yang boleh dikembangkan, dengan butang + untuk menambah kod akaun baharu seperti sebelum ini.",
+    en: "Two updates to the account code picker. First, searching on the Account Codes page now finds child accounts that have no children of their own (e.g. BRM and MRM under RM) — previously such child accounts only appeared if favourited. Second, the Account field in the Journal form now uses the same hierarchical picker as the Account Ledger page, showing parent and child accounts as an expandable tree, with the + button to add a new account code as before.",
+  },
+  {
+    date: "2026-07-21",
     ms: "Halaman Cash Bank-In (RV) kini boleh merekodkan jurnal drawing — wang pendahuluan yang dibayar balik oleh pekerja dan dibankkan. Klik \"New Drawing (CA_WA)\", isi tarikh, bank, nombor RV, jumlah dan keterangan (boleh diubah, lalai \"FROM DRAWING WORKERS\"), kemudian Post. Jurnal yang dihasilkan mendebitkan akaun bank dan mengkreditkan CA_WA (Worker's Advance), dan disenaraikan bersama bank-in biasa dengan lencana \"Drawing\".",
     en: "The Cash Bank-In (RV) page can now record drawing journals — worker advance repayments that are banked in. Click \"New Drawing (CA_WA)\", fill in the date, bank, RV number, amount and description (editable, default \"FROM DRAWING WORKERS\"), then Post. The journal debits the bank account and credits CA_WA (Worker's Advance), and is listed alongside regular bank-ins with a \"Drawing\" badge.",
   },
