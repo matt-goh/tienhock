@@ -90,10 +90,11 @@ function toIsoDate(d: Date): string {
 
 function parseIsoDate(s: string | null | undefined): Date | null {
   if (!s) return null;
-  const iso = s.slice(0, 10);
-  const [y, m, d] = iso.split("-").map(Number);
-  if (!y || !m || !d) return null;
-  return new Date(y, m - 1, d);
+  // `s` may be a bare yyyy-MM-dd or a full UTC ISO string from a `date` column;
+  // let Date parse it and read it in local time (CLAUDE.md rule 17). Slicing the
+  // first 10 chars off the ISO form would keep the UTC (previous) day.
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 function formatDisplay(d: Date | null): string {

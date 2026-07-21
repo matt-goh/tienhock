@@ -44,7 +44,9 @@ const isLegacyImportEntry = (entry: JournalEntry): boolean =>
   entry.entry_type === LEGACY_IMPORT_ENTRY_TYPE;
 
 const getVisibleReference = (entry: JournalEntry): string =>
-  isLegacyImportEntry(entry)
+  // Legacy imports and bank-in RV journals keep a hidden unique reference_no
+  // (IMP-… / BI-…) and carry the visible Journal No. in display_reference.
+  isLegacyImportEntry(entry) || entry.entry_type === "RV"
     ? entry.display_reference?.trim() || entry.reference_no
     : entry.reference_no;
 

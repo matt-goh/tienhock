@@ -625,7 +625,15 @@ plan.
   to `LGP` as the interim successor account. **The account naming (`LGP` = "Local General
   Purchases" for what are entirely *foreign* purchases) and the final purchase-account structure
   remain subject to end-user confirmation** — the developer flagged this explicitly; a later rename
-  is description-only and fingerprint-safe.
+  is description-only and fingerprint-safe. **⚠ UPDATE (21 Jul 2026, user decision — §8-7):** the
+  end-user has since confirmed that foreign purchases are **not** to be linked to any
+  financial-statement note (neither `OP` nor `LGP` gets an `fs_note`); their real accounting is done
+  via the user's separate manual purchase journals. The interim `LGP → 5` mapping recorded above is
+  therefore **superseded** — `LGP.fs_note` is reset to NULL. Implemented on dev 21 Jul 2026 (migration
+  `2026-07-21_foreign_gp_unlink.sql` unmapped `LGP`/`OP` and cancelled the 56 unpaid foreign `GP`
+  journals; code stops auto-posting foreign `GP`). The `verify-legacy-reports.mjs` re-pin and the
+  production rollout (incl. dropping/revising this OP→LGP prod migration) remain follow-ups; see
+  §8-7.
 - The guarded migration (advisory-locked, fresh/final two-state, exact expected counts): mapped
   `LGP` → fs_note `5` (mirrors the audited OP classification; the only general Income Statement
   expense note — a CoGM purchase note would distort the pinned CoGM), repointed all 63 invoice
@@ -686,8 +694,11 @@ copy (rollout order OP→LGP then V2, per the §6 re-pin record). V2 is applied 
 (production-copy) development database, and the standing gate is green: `node
 dev/import/legacy-report-fixtures/validate-fixtures.mjs` and `node
 dev/import/legacy-report-fixtures/verify-legacy-reports.mjs` both pass fully (see the §6 GP
-handover record). The open overseas-purchase account question (`LGP` naming / final fs_note /
-one-account-vs-several) is **explicitly non-blocking for V3**: it lives entirely inside the named
+handover record). The overseas-purchase account question (`LGP` naming / final fs_note /
+one-account-vs-several) — **now decided 21 Jul 2026 (§8-7): foreign purchases are NOT linked to any
+note (`OP`/`LGP` get no `fs_note`); the real accounting is the user's separate manual purchase
+journals; implemented on dev 21 Jul (migration `2026-07-21_foreign_gp_unlink.sql` + code, §8-7),
+harness re-pin + production pending** — is **explicitly non-blocking for V3**: it lives entirely inside the named
 `GP-202604-0001` deviation (notes 5/13, accounts LGP/TP) and is orthogonal to the closing-stock
 notes (14-*/3-*) and debtor-parity work below. A later rename is description-only; a later
 account/note move is a mechanical re-pin of the same ±7,261.51 named drift. (Exception to note:
@@ -827,7 +838,43 @@ with a fresh 21 Jul 2026 production import for this rehearsal and was left byte-
   production drifts before the window (new accounts/anchors or backdated Jan–May journals would
   trip the guards loudly anyway).
 
-## 8. User decisions / questions — ANSWERED 17 Jul 2026
+### Foreign-purchase unlink execution record — 21 Jul 2026 (development)
+
+**Decision:** §8-7 (user, 21 Jul 2026) — foreign/overseas purchases are NOT linked to any
+financial-statement note; the real accounting is the user's separate manual purchase journals.
+This supersedes the OP→LGP handover's interim `LGP → 5` mapping (§6).
+
+**Files changed:** tracked
+[`self-billed-invoices.js`](../../src/routes/accounting/self-billed-invoices.js) (create/update
+paths gate the `GP` journal to LOCAL purchases only; a local→foreign switch cancels + detaches the
+old journal), new migration
+[`2026-07-21_foreign_gp_unlink.sql`](../../dev/migrations/2026-07-21_foreign_gp_unlink.sql), and
+the docs ([this plan](LEGACY_REPORT_VERIFICATION_PLAN.md) §6/§7/§8-7/§9,
+[ACCOUNTING_PROGRESS.md](ACCOUNTING_PROGRESS.md),
+[ACCOUNTING_GAP_ANALYSIS.md](ACCOUNTING_GAP_ANALYSIS.md),
+[FINANCIAL_STATEMENTS_MAPPING.md](FINANCIAL_STATEMENTS_MAPPING.md)).
+
+- Migration (guarded, idempotent, atomic) applied to dev `tienhock`: unmapped `LGP` and `OP` to
+  `fs_note = NULL` (1 row) and cancelled **56** posted foreign `GP` journals (all unpaid, zero
+  linked supplier payments; a safety gate aborts if any foreign invoice still holds a posted `GP`
+  journal, e.g. a paid one). Immediate rerun wrote 0 rows.
+- Post-state verified by direct query: `OP`/`LGP` both `fs_note = NULL`; all 63 LGP `GP` lines now
+  sit on cancelled journals (56 newly + 7 previously); **zero posted `OP`/`LGP` lines** and **zero
+  posted foreign `TP`** remain (so no Balance Sheet imbalance); the foreign self-billed invoice
+  records and their unpaid payables are intact (invoices keep the now-cancelled `journal_entry_id`
+  for audit).
+- **Not done here (needs the private `data/` fixtures, absent from this checkout):** re-pin
+  `verify-legacy-reports.mjs`. Its current pins *expect* the `GP-202604-0001` ±RM7,261.51 named
+  deviation, which this change removes, so on a re-run the May statements become **scan-exact**
+  (net assets → 6,097,691.11; TB `LGP`/`TP` Apr–May exact; statements 40/40) and the June
+  derived-TB pin drops by the June foreign-GP total **RM8,016.49** (July foreign-GP RM13,354.92 is
+  outside the June window). Re-pin to scan-exact, don't weaken the gate.
+- **Production:** unchanged. Real production still posts foreign purchases to the unmapped `OP`;
+  the rollout there is the same code deploy plus an equivalent cancellation migration, and the
+  planned OP→LGP production migration (assigns `LGP → 5`) is dropped/revised under this decision
+  (§6/§8-7). No build, lint or type-check command was run.
+
+## 8. User decisions / questions — ANSWERED 17 Jul 2026 (item 7 added 21 Jul 2026)
 
 1. **Stock roll in legacy after the export?** — *User: no idea; just make the ERP 1:1 with the
    printed reports, then the question is moot.* → The printed TBs are the target state; V1 derives
@@ -846,6 +893,32 @@ with a fresh 21 Jul 2026 production import for this rehearsal and was left byte-
    debtor-ledger documents FIFO; the current ERP report instead follows explicit invoice links
    and puts its reconciliation bridge in 3m+. Both rules are now reproduced and regression-pinned.
 6. **Jan–Apr statement prints** — unanswered; optional (monthly TBs give per-account coverage).
+7. **Overseas/foreign purchase account classification** (the OP→LGP handover's open question;
+   §6/§7/§9) — *User (21 Jul 2026): foreign purchases are NOT to be linked to any financial-statement
+   note — neither `OP` nor `LGP` carries an `fs_note`.* The actual purchase/expense for these items
+   is recorded separately through **manual purchase journals the user keys**, so classifying the
+   auto-posted foreign `GP` journals under a note (the interim `LGP → 5`) would double-count them.
+   This supersedes the OP→LGP handover's interim `LGP → 5` mapping (§6), which was applied only to
+   rebalance the May BS. **Target state:** `LGP.fs_note = NULL` (matching `OP`); the foreign `GP`
+   journals stay in the GL/subledger for the e-invoice + payable record but drop out of the
+   IS/CoGM/BS roll-up. **IMPLEMENTED on development 21 Jul 2026** (production separate — see below).
+   The resolution kept the *whole* foreign `GP` journal off the statements: (i) **code** — foreign
+   self-billed invoices no longer auto-post a `GP` journal
+   ([self-billed-invoices.js](../../src/routes/accounting/self-billed-invoices.js) create/update
+   paths; local general purchases are unchanged); (ii) **data** — guarded idempotent migration
+   [`2026-07-21_foreign_gp_unlink.sql`](../../dev/migrations/2026-07-21_foreign_gp_unlink.sql)
+   unmapped `LGP` and `OP` to `fs_note = NULL` and cancelled the 56 posted foreign `GP` journals
+   (all unpaid, zero linked supplier payments → both the DR `LGP` and CR `TP` legs removed, so no BS
+   imbalance; invoices keep their now-cancelled `journal_entry_id` for audit). Verified on dev: zero
+   posted `OP`/`LGP` lines remain, zero posted foreign `TP`, the foreign invoice records and payables
+   are intact (unpaid), and the migration rerun is a no-op. **Still to do:** (a) **re-pin the standing
+   `verify-legacy-reports.mjs` gate** — it currently *expects* the `GP-202604-0001` ±RM7,261.51 named
+   deviation, which is now gone, so the May statements become scan-exact (net assets → 6,097,691.11)
+   and the June derived-TB pin drops by the June foreign-GP total RM8,016.49; the re-pin needs the
+   private fixtures under `data/` (absent from this checkout) and is therefore a follow-up; (b) the
+   **production rollout** — real production still posts foreign purchases to the unmapped `OP`, so it
+   needs the same code deploy plus an equivalent cancellation migration, and the planned OP→LGP
+   production migration (which assigns `LGP → 5`) is now dropped/revised under this decision.
 
 ## 9. Risks & notes for the next session
 
@@ -878,10 +951,18 @@ with a fresh 21 Jul 2026 production import for this rehearsal and was left byte-
 - `GP-202604-0001` is pinned in the harness **by name**. Any further backdated Jan–May entry keyed
   in production will fail the gate loudly — that is the gate working: confirm genuineness, then
   re-pin as another named deviation; never silence it.
-- Open but non-blocking: the final overseas-purchase account decision (rename `LGP`, split
-  accounts, or change fs_note) and the equivalent OP→LGP correction on real production, which is
-  still posting foreign purchases to the unmapped OP. Production V2 rollout itself still requires
-  the fresh read-only inventory + re-pinned variant + separate approval (§6).
+- **Overseas-purchase classification — IMPLEMENTED on dev 21 Jul 2026 (§8-7); harness re-pin +
+  production pending:** foreign purchases are not linked to any financial-statement note (`OP` and
+  `LGP` are now `fs_note = NULL`); the real accounting is the user's separate manual purchase
+  journals. On dev, migration `2026-07-21_foreign_gp_unlink.sql` unmapped `LGP`/`OP` and cancelled
+  the 56 posted (unpaid) foreign `GP` journals — both legs off the statements, no BS imbalance — and
+  the code no longer auto-posts foreign `GP` journals. This supersedes the interim `LGP → 5` mapping
+  and removes the `GP-202604-0001` drift, so the `verify-legacy-reports.mjs` pins tied to it must be
+  re-pinned to scan-exact (needs the private fixtures under `data/`). On real production `OP` is
+  still the live, unmapped posting account, so it needs the same code deploy plus an equivalent
+  cancellation migration; the planned OP→LGP production migration (it assigns `LGP → 5`) is
+  dropped/revised under this decision. Production V2 rollout itself still requires the fresh
+  read-only inventory + re-pinned variant + separate approval (§6).
 
 ---
 

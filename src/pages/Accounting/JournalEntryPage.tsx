@@ -26,6 +26,8 @@ import {
 } from "../../utils/accounting/useAccountingCache";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
+import AccountCodeCombobox from "../../components/Accounting/AccountCodeCombobox";
+import useAccountCodeFavourites from "../../hooks/useAccountCodeFavourites";
 import {
   FormInput,
   FormListbox,
@@ -46,7 +48,6 @@ import {
   IconTrash,
   IconDeviceFloppy,
   IconFileText,
-  IconChevronDown,
   IconCheck,
 } from "@tabler/icons-react";
 
@@ -120,205 +121,6 @@ const parseLocalDateString = (dateString: string): Date | null => {
   return new Date(year, month - 1, day);
 };
 
-// Inline searchable combobox for account code selection
-interface AccountCodeCellProps {
-  value: string;
-  options: SelectOption[];
-  onChange: (value: string) => void;
-  onAddAccount?: (query: string) => void;
-  disabled?: boolean;
-  placeholder?: string;
-}
-
-const ACCOUNT_LOAD_INCREMENT = 50;
-
-const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
-  value,
-  options,
-  onChange,
-  onAddAccount,
-  disabled = false,
-  placeholder = "Search account...",
-}: AccountCodeCellProps) => {
-  const [query, setQuery] = useState("");
-  const [isOpen, setIsOpen] = useState(false);
-  const [loadedCount, setLoadedCount] = useState(50);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  const filteredOptions = useMemo(() => {
-    if (!query) return options;
-    const lowerQuery = query.toLowerCase();
-    return options.filter(
-      (opt: SelectOption) =>
-        opt.id.toString().toLowerCase().includes(lowerQuery) ||
-        opt.name.toLowerCase().includes(lowerQuery)
-    );
-  }, [query, options]);
-
-  // Paginated options for display
-  const displayedOptions = useMemo(() => {
-    return filteredOptions.slice(0, loadedCount);
-  }, [filteredOptions, loadedCount]);
-
-  const hasMoreOptions = displayedOptions.length < filteredOptions.length;
-  const remainingCount = filteredOptions.length - displayedOptions.length;
-  const trimmedQuery: string = query.trim();
-
-  const selectedOption = options.find(
-    (opt: SelectOption) => opt.id.toString() === value
-  );
-  const displayValue = selectedOption?.name || "";
-
-  // Reset loaded count when query changes
-  useEffect(() => {
-    setLoadedCount(50);
-  }, [query]);
-
-  // Handle click outside to close dropdown
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        setIsOpen(false);
-        setQuery("");
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isOpen]);
-
-  const handleSelect = (optionId: string) => {
-    onChange(optionId);
-    setIsOpen(false);
-    setQuery("");
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setQuery(e.target.value);
-    if (!isOpen) setIsOpen(true);
-  };
-
-  const handleFocus = () => {
-    setIsOpen(true);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
-      setIsOpen(false);
-      setQuery("");
-    }
-  };
-
-  const handleLoadMore = () => {
-    setLoadedCount((prev) => prev + ACCOUNT_LOAD_INCREMENT);
-  };
-
-  const handleAddAccount = (
-    e: React.MouseEvent<HTMLButtonElement>
-  ): void => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsOpen(false);
-    onAddAccount?.(trimmedQuery);
-    setQuery("");
-  };
-
-  return (
-    <div className="relative" ref={containerRef}>
-      <div className="flex">
-        <input
-          ref={inputRef}
-          type="text"
-          value={isOpen ? query : displayValue}
-          onChange={handleInputChange}
-          onFocus={handleFocus}
-          onKeyDown={handleKeyDown}
-          disabled={disabled}
-          placeholder={placeholder}
-          className="w-full px-2 py-1.5 text-sm bg-transparent border-0 focus:ring-1 focus:ring-sky-500 focus:bg-white dark:focus:bg-gray-700 rounded placeholder:text-gray-400 dark:placeholder:text-gray-500 text-default-900 dark:text-gray-100 disabled:cursor-not-allowed"
-        />
-        <button
-          type="button"
-          onClick={() => {
-            if (disabled) return;
-            setIsOpen(!isOpen);
-            inputRef.current?.focus();
-          }}
-          disabled={disabled}
-          className="px-1 text-default-400 dark:text-gray-500 hover:text-default-600 dark:hover:text-gray-300 disabled:cursor-not-allowed"
-        >
-          <IconChevronDown size={16} />
-        </button>
-        {onAddAccount && (
-          <button
-            type="button"
-            onClick={handleAddAccount}
-            disabled={disabled}
-            title="Add account code"
-            aria-label="Add account code"
-            className="px-1 text-default-400 dark:text-gray-500 hover:text-sky-600 dark:hover:text-sky-400 disabled:cursor-not-allowed"
-          >
-            <IconPlus size={16} />
-          </button>
-        )}
-      </div>
-      {isOpen && !disabled && (
-        <div
-          ref={dropdownRef}
-          className="absolute z-50 mt-1 w-full max-h-60 overflow-auto bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 rounded-lg shadow-lg"
-        >
-          {displayedOptions.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-default-500 dark:text-gray-400">
-              No accounts found
-            </div>
-          ) : (
-            displayedOptions.map((opt: SelectOption) => (
-              <div
-                key={opt.id}
-                onClick={() => handleSelect(opt.id.toString())}
-                className={`px-3 py-2 text-sm cursor-pointer hover:bg-sky-50 dark:hover:bg-sky-900/50 flex items-center justify-between gap-2 ${
-                  opt.id.toString() === value ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-200" : "text-default-900 dark:text-gray-100"
-                }`}
-              >
-                <span>{opt.name}</span>
-                {opt.id.toString() === value && (
-                  <IconCheck size={16} className="text-sky-600 dark:text-sky-400 flex-shrink-0" />
-                )}
-              </div>
-            ))
-          )}
-
-          {/* Load More Button */}
-          {hasMoreOptions && (
-            <div className="border-t border-gray-200 dark:border-gray-700 p-2">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleLoadMore();
-                }}
-                className="w-full text-center py-1.5 px-4 text-sm font-medium text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/30 rounded-md hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors duration-200 flex items-center justify-center"
-              >
-                <IconChevronDown size={16} className="mr-1.5" />
-                <span>
-                  Load More ({remainingCount} remaining)
-                </span>
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
 interface QuickAddAccountCodeFormData {
   code: string;
   description: string;
@@ -337,7 +139,6 @@ interface QuickAddAccountCodeModalProps {
   isOpen: boolean;
   initialQuery: string;
   existingAccountCodes: AccountCode[];
-  activeAccountCodes: AccountCode[];
   ledgerTypes: LedgerType[];
   ledgerTypesLoading: boolean;
   onClose: () => void;
@@ -369,7 +170,6 @@ const QuickAddAccountCodeModal: React.FC<QuickAddAccountCodeModalProps> = ({
   isOpen,
   initialQuery,
   existingAccountCodes,
-  activeAccountCodes,
   ledgerTypes,
   ledgerTypesLoading,
   onClose,
@@ -400,25 +200,6 @@ const QuickAddAccountCodeModal: React.FC<QuickAddAccountCodeModalProps> = ({
     ],
     [ledgerTypes]
   );
-
-  const parentAccountOptions: SelectOption[] = useMemo((): SelectOption[] => {
-    const normalizedCode: string = formData.code.trim().toUpperCase();
-
-    return [
-      { id: "", name: "None (Top Level)" },
-      ...activeAccountCodes
-        .filter(
-          (accountCode: AccountCode): boolean =>
-            accountCode.code.toUpperCase() !== normalizedCode
-        )
-        .map(
-          (accountCode: AccountCode): SelectOption => ({
-            id: accountCode.code,
-            name: `${accountCode.code} - ${accountCode.description}`,
-          })
-        ),
-    ];
-  }, [activeAccountCodes, formData.code]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement>
@@ -643,15 +424,19 @@ const QuickAddAccountCodeModal: React.FC<QuickAddAccountCodeModalProps> = ({
                       <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
                         Parent Account
                       </label>
-                      <div className="rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50">
-                        <AccountCodeCell
-                          value={formData.parent_code}
-                          options={parentAccountOptions}
-                          onChange={handleParentAccountChange}
-                          disabled={isSaving}
-                          placeholder="Search parent account..."
-                        />
-                      </div>
+                      <AccountCodeCombobox
+                        value={formData.parent_code}
+                        onChange={handleParentAccountChange}
+                        disabled={isSaving}
+                        placeholder="Search parent account..."
+                        hierarchical
+                        allowEmpty
+                        emptyLabel="None (Top Level)"
+                        filter={(account: AccountCode): boolean =>
+                          account.code.toUpperCase() !==
+                          formData.code.trim().toUpperCase()
+                        }
+                      />
                     </div>
                   </div>
 
@@ -733,6 +518,11 @@ const JournalEntryPage: React.FC = () => {
   // Cached reference data
   const { entryTypes, isLoading: entryTypesLoading } = useJournalEntryTypesCache();
   const { accountCodes: cachedAccountCodes, isLoading: accountCodesLoading } = useAccountCodesCache();
+  const {
+    favouriteCodes,
+    pendingCodes: pendingFavouriteCodes,
+    toggleFavourite,
+  } = useAccountCodeFavourites();
   const { ledgerTypes: allLedgerTypes, isLoading: ledgerTypesLoading } = useLedgerTypesCache();
   const [optimisticAccountCodes, setOptimisticAccountCodes] = useState<AccountCode[]>([]);
 
@@ -753,12 +543,6 @@ const JournalEntryPage: React.FC = () => {
       ...cachedAccountCodes,
     ];
   }, [cachedAccountCodes, optimisticAccountCodes]);
-
-  // Filter to only active account codes
-  const accountCodes = useMemo(
-    () => allAccountCodes.filter((a) => a.is_active),
-    [allAccountCodes]
-  );
 
   const ledgerTypes = useMemo(
     () => allLedgerTypes.filter((lt: LedgerType) => lt.is_active),
@@ -1226,11 +1010,6 @@ const JournalEntryPage: React.FC = () => {
       name: `${entryType.code} - ${entryType.name}`,
     }));
 
-  const accountCodeOptions: SelectOption[] = accountCodes.map((a) => ({
-    id: a.code,
-    name: `${a.code} - ${a.description}`,
-  }));
-
   // Format amount for display
   const formatAmount = (value: string): string => {
     const num = parseFloat(value);
@@ -1431,7 +1210,7 @@ const JournalEntryPage: React.FC = () => {
                       <th className="px-3 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-12">
                         #
                       </th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-80">
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-[30rem]">
                         Account
                       </th>
                       <th className="px-3 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-24">
@@ -1462,9 +1241,8 @@ const JournalEntryPage: React.FC = () => {
 
                         {/* Account Code */}
                         <td className="px-1 py-1">
-                          <AccountCodeCell
+                          <AccountCodeCombobox
                             value={line.account_code}
-                            options={accountCodeOptions}
                             onChange={(value: string) =>
                               handleLineChange(index, "account_code", value)
                             }
@@ -1472,6 +1250,10 @@ const JournalEntryPage: React.FC = () => {
                               handleOpenQuickAddAccount(index, query)
                             }
                             disabled={isSaving}
+                            hierarchical
+                            favouriteCodes={favouriteCodes}
+                            pendingFavouriteCodes={pendingFavouriteCodes}
+                            onToggleFavourite={toggleFavourite}
                           />
                         </td>
 
@@ -1676,7 +1458,6 @@ const JournalEntryPage: React.FC = () => {
         isOpen={quickAddTargetLineIndex !== null}
         initialQuery={quickAddInitialQuery}
         existingAccountCodes={allAccountCodes}
-        activeAccountCodes={accountCodes}
         ledgerTypes={ledgerTypes}
         ledgerTypesLoading={ledgerTypesLoading}
         onClose={handleCloseQuickAddAccount}

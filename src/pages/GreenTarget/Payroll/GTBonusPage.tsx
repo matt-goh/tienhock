@@ -168,10 +168,9 @@ const GTBonusPage: React.FC = () => {
           return "";
         }
       })();
-      const dateIso =
-        typeof bonus.commission_date === "string"
-          ? bonus.commission_date.slice(0, 10)
-          : "";
+      const dateIso = bonus.commission_date
+        ? format(new Date(bonus.commission_date), "yyyy-MM-dd")
+        : "";
       const haystack = [
         bonus.employee_id || "",
         bonus.employee_name || "",

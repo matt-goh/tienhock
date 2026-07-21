@@ -12,23 +12,103 @@ import {
   getReceiptGroup,
   updateReceiptReference,
 } from "../accounting/receipt-service.js";
+import { applyOverpayment } from "../accounting/overpayment-apply.js";
 
 export default function (pool) {
   const router = Router();
 
   // --- POST /api/receipts — create one atomic receipt ---
+  // Accepts an optional flat `overpayment_allocations` array
+  // ([{ invoice_id, amount }]) alongside the money `allocations`: each
+  // customer's held overpayment (CUST_DEP excess) is applied to their
+  // invoices FIRST (its own payments rows + REC journals), then the money
+  // receipt covers the remainder — all in ONE transaction. When only
+  // overpayment_allocations are sent, no receipt is created at all.
   router.post("/", async (req, res) => {
+    const { overpayment_allocations, ...receiptPayload } = req.body;
+    const userId = req.user?.id || null;
+
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      const result = await createReceipt(client, req.body, req.user?.id || null);
+
+      // 1. Apply held overpayment per customer (grouped server-side).
+      const overpaymentApplied = [];
+      if (
+        Array.isArray(overpayment_allocations) &&
+        overpayment_allocations.length > 0
+      ) {
+        const applyInvoiceIds = [
+          ...new Set(overpayment_allocations.map((a) => String(a.invoice_id))),
+        ];
+        const customerResult = await client.query(
+          `SELECT id, customerid FROM invoices WHERE id = ANY($1::varchar[])`,
+          [applyInvoiceIds]
+        );
+        const customerByInvoice = {};
+        for (const row of customerResult.rows) {
+          customerByInvoice[row.id] = row.customerid;
+        }
+        const groupsByCustomer = new Map();
+        for (const a of overpayment_allocations) {
+          const customerId = customerByInvoice[String(a.invoice_id)];
+          if (!customerId) {
+            throw Object.assign(
+              new Error(`Invoice ${a.invoice_id} not found`),
+              { status: 404 }
+            );
+          }
+          if (!groupsByCustomer.has(customerId)) {
+            groupsByCustomer.set(customerId, []);
+          }
+          groupsByCustomer.get(customerId).push(a);
+        }
+        for (const allocs of groupsByCustomer.values()) {
+          overpaymentApplied.push(
+            await applyOverpayment(
+              client,
+              {
+                allocations: allocs,
+                payment_date: receiptPayload.received_date,
+                notes: receiptPayload.notes,
+              },
+              userId
+            )
+          );
+        }
+      }
+
+      // 2. Money receipt for the remainder (skipped for a pure apply).
+      let receiptResult = null;
+      if (
+        Array.isArray(receiptPayload.allocations) &&
+        receiptPayload.allocations.length > 0
+      ) {
+        receiptResult = await createReceipt(client, receiptPayload, userId);
+      }
+
+      if (!receiptResult && overpaymentApplied.length === 0) {
+        throw Object.assign(
+          new Error("At least one allocation is required"),
+          { status: 400 }
+        );
+      }
+
       await client.query("COMMIT");
+
+      const totalApplied = overpaymentApplied.reduce(
+        (sum, group) => sum + group.total_applied,
+        0
+      );
       res.status(201).json({
-        message:
-          result.receipt.status === "pending"
+        message: receiptResult
+          ? receiptResult.receipt.status === "pending"
             ? "Cheque receipt recorded (pending clearance)"
-            : "Receipt recorded",
-        ...result,
+            : "Receipt recorded"
+          : "Overpayment applied successfully",
+        ...(receiptResult || { receipt: null, allocations: [], payments: [] }),
+        overpayment_applied: overpaymentApplied,
+        total_overpayment_applied: Math.round(totalApplied * 100) / 100,
       });
     } catch (error) {
       await client.query("ROLLBACK");

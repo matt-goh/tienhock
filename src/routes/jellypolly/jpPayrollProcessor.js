@@ -18,15 +18,6 @@ import {
   calculateGTStatutoryDeductions,
   fetchActiveContributionRates,
 } from "../greentarget/gtStatutoryCalc.js";
-import {
-  isOTFormulaEffective,
-  isFormulaOTItem,
-  computeOTRates,
-  resolveWorkedDayDates,
-  otRateCentsForDayType,
-  buildOTSnapshot,
-  resolveOTPayBasis,
-} from "../payroll/otFormula.js";
 
 // jellypolly.jobs id -> JP payroll job type. Membership is derived from
 // jellypolly.staffs.job (TH-style): holding one of these job ids makes the
@@ -85,7 +76,7 @@ export const ensureMonthlyPayroll = async (client, year, month, createdBy) => {
  *   payroll should be rebuilt. null/omitted = all actively assigned JP staff
  *   (a full "process month", which also prunes payrolls of unassigned staff).
  * @param {string|null} [options.createdBy]
- * @returns {Promise<{monthlyPayrollId:number, processed:Array, removed:string[], blocked:Array<{employeeId:string, employeeName:string, error:string}>}>}
+ * @returns {Promise<{monthlyPayrollId:number, processed:Array, removed:string[]}>}
  */
 export const reprocessJPEmployees = async (
   pool,
@@ -156,10 +147,6 @@ export const reprocessJPEmployees = async (
 
     const processed = [];
     const removed = [];
-    // Employees whose July-2026+ OT rate could not be derived (decision 15:
-    // block with a clear error instead of falling back). Their existing
-    // payroll row is left untouched.
-    const blocked = [];
 
     if (targetCanonicalIds.length > 0) {
       // All sibling ids whose work rolls up into the targets
@@ -186,7 +173,7 @@ export const reprocessJPEmployees = async (
           `SELECT id, name, birthdate, nationality, marital_status,
                   spouse_employment_status, number_of_children,
                   epf_age_override, epf_nationality_override,
-                  socso_age_override, sip_age_override, ot_pay_basis
+                  socso_age_override, sip_age_override
            FROM jellypolly.staffs
            WHERE id = ANY($1)`,
           [targetCanonicalIds]
@@ -210,7 +197,7 @@ export const reprocessJPEmployees = async (
         ),
         // Daily work log activities (Salesman / Ice-Polly / Jelly Cup / Plastic)
         client.query(
-          `SELECT dwl.id AS work_log_id, dwl.section, dwl.log_date, dwl.day_type,
+          `SELECT dwl.id AS work_log_id, dwl.section, dwl.log_date,
                   dwle.employee_id, dwle.job_id,
                   dwla.pay_code_id, pc.description, pc.pay_type, pc.rate_unit,
                   dwla.hours_applied, dwla.units_produced, dwla.foc_units,
@@ -314,91 +301,6 @@ export const reprocessJPEmployees = async (
       const { epfRates, socsoRates, sipRates, incomeTaxRates } =
         contributionRates;
 
-      // July 2026+ OT salary-formula inputs (see src/routes/payroll/otFormula.js)
-      const otFormulaActive = isOTFormulaEffective(year, month);
-      let otRateModeByPayCode = new Map();
-      const attendanceDatesByEmployee = new Map();
-      const monthlyWorkedDaysByEmployee = new Map();
-      if (otFormulaActive) {
-        const [otModesResult, attendanceResult, workedDaysResult] =
-          await Promise.all([
-            client.query(
-              `SELECT id, ot_rate_mode FROM jellypolly.pay_codes
-               WHERE pay_type = 'Overtime'`
-            ),
-            // Worked-day rule (decision 5): distinct calendar dates with any
-            // ordinary-work attendance (daily entry not on leave, or JP
-            // production attendance); one date counts once across jobs/siblings.
-            // A zero entry (no hours, no paid activity) is NOT attendance.
-            client.query(
-              `SELECT employee_id, d, src FROM (
-                 SELECT dwle.employee_id, to_char(dwl.log_date, 'YYYY-MM-DD') AS d,
-                        'daily' AS src
-                 FROM jellypolly.daily_work_logs dwl
-                 JOIN jellypolly.daily_work_log_entries dwle
-                   ON dwl.id = dwle.work_log_id
-                 WHERE dwl.log_date >= $1 AND dwl.log_date <= $2
-                   AND dwl.status <> 'Draft'
-                   AND COALESCE(dwle.is_on_leave, false) = false
-                   AND dwle.employee_id = ANY($3)
-                   AND (
-                     COALESCE(dwle.total_hours, 0) > 0
-                     OR EXISTS (
-                       SELECT 1 FROM jellypolly.daily_work_log_activities dwla
-                       WHERE dwla.log_entry_id = dwle.id
-                         AND COALESCE(dwla.calculated_amount, 0) > 0
-                     )
-                   )
-                   -- A date covered by an approved leave record is a leave
-                   -- day, not a worked day (mirrors TH).
-                   AND NOT EXISTS (
-                     SELECT 1 FROM jellypolly.leave_records lr
-                     WHERE lr.employee_id = dwle.employee_id
-                       AND lr.leave_date = dwl.log_date
-                       AND lr.status = 'approved'
-                   )
-                 UNION
-                 SELECT pe.worker_id, to_char(pe.entry_date, 'YYYY-MM-DD'),
-                        'production'
-                 FROM jellypolly.production_entries pe
-                 JOIN public.products p ON pe.product_id = p.id
-                 WHERE pe.entry_date BETWEEN $1 AND $2 AND pe.bags_packed > 0
-                   AND p.type = 'JP' AND pe.worker_id = ANY($3)
-               ) t`,
-              [startDate, endDate, targetSiblingIds]
-            ),
-            client.query(
-              `SELECT mwle.employee_id, MAX(mwle.worked_days) AS worked_days
-               FROM jellypolly.monthly_work_logs mwl
-               JOIN jellypolly.monthly_work_log_entries mwle
-                 ON mwl.id = mwle.monthly_log_id
-               WHERE mwl.log_month = $1 AND mwl.log_year = $2
-                 AND mwl.status = 'Submitted'
-                 AND mwle.worked_days IS NOT NULL
-                 AND mwle.employee_id = ANY($3)
-               GROUP BY mwle.employee_id`,
-              [month, year, targetSiblingIds]
-            ),
-          ]);
-        otRateModeByPayCode = new Map(
-          otModesResult.rows.map((r) => [r.id, r.ot_rate_mode])
-        );
-        for (const row of attendanceResult.rows) {
-          if (!attendanceDatesByEmployee.has(row.employee_id)) {
-            attendanceDatesByEmployee.set(row.employee_id, []);
-          }
-          attendanceDatesByEmployee
-            .get(row.employee_id)
-            .push({ d: row.d, src: row.src });
-        }
-        for (const row of workedDaysResult.rows) {
-          monthlyWorkedDaysByEmployee.set(
-            row.employee_id,
-            parseFloat(row.worked_days)
-          );
-        }
-      }
-
       const canonicalOf = (id) => idToCanonical.get(id) || id;
       const groupByCanonical = (rows) => {
         const grouped = new Map();
@@ -493,10 +395,9 @@ export const reprocessJPEmployees = async (
               : activity.units_produced != null
               ? parseFloat(activity.units_produced) || 1
               : 1;
-          const monthlyDescription = activity.description || "";
           combinedItems.push({
             pay_code_id: activity.pay_code_id,
-            description: monthlyDescription,
+            description: activity.description || "",
             pay_type: activity.pay_type || "Tambahan",
             rate: parseFloat(activity.rate_used) || 0,
             rate_unit: activity.rate_unit || "Fixed",
@@ -508,13 +409,6 @@ export const reprocessJPEmployees = async (
             source_date: null,
             work_log_id: activity.work_log_id,
             work_log_type: "monthly",
-            // Day-type category for the July 2026+ OT formula; monthly variant
-            // labels carry the system-generated (Ahad)/(Umum) suffix.
-            ot_day_type: /\(Ahad\)$/.test(monthlyDescription)
-              ? "Ahad"
-              : /\(Umum\)$/.test(monthlyDescription)
-              ? "Umum"
-              : "Biasa",
           });
         }
 
@@ -539,7 +433,6 @@ export const reprocessJPEmployees = async (
             source_date: activity.log_date,
             work_log_id: activity.work_log_id,
             work_log_type: "daily",
-            ot_day_type: activity.day_type || "Biasa",
           });
         }
 
@@ -684,144 +577,6 @@ export const reprocessJPEmployees = async (
           continue;
         }
 
-        // July 2026+ OT salary formula: derive the month's OT rates from
-        // earned non-OT wages and reprice formula-scope OT items BEFORE
-        // gross/EPF/net (docs/PAYROLL_OT_CALCULATION_BREAKDOWN.md). Manual
-        // items, 'fixed'-mode codes and user-keyed Kerja Luar OT keep their
-        // keyed values; Bonus rows are excluded from the numerator, Advance
-        // rows (earned pay taken early) are included.
-        let otCalculationSnapshot = null;
-        if (otFormulaActive) {
-          const formulaOTItems = combinedItems.filter(
-            (item) =>
-              isFormulaOTItem(item, otRateModeByPayCode) &&
-              item.work_log_type !== "others" &&
-              (parseFloat(item.quantity) || 0) > 0
-          );
-          if (formulaOTItems.length > 0) {
-            // Paid leave is EXCLUDED from the numerator — HR prices leave FROM
-            // the derived daily rate (HR model "RAMBU").
-            const numeratorBreakdownCents = {
-              work_items: combinedItems.reduce(
-                (sum, item) =>
-                  !isLeaveDayWorkItem(item) &&
-                  (item.pay_type || "Tambahan") !== "Overtime" &&
-                  item.work_log_type !== "bonus"
-                    ? sum + toCents(item.amount)
-                    : sum,
-                0
-              ),
-              manual_items: manualItems.reduce(
-                (sum, manual) =>
-                  (manual.pay_type || "Tambahan") !== "Overtime"
-                    ? sum + toCents(manual.amount)
-                    : sum,
-                0
-              ),
-            };
-            const numeratorCents = Object.values(
-              numeratorBreakdownCents
-            ).reduce((a, b) => a + b, 0);
-
-            // Derive the divisor sources FIRST; the basis then resolves as:
-            // explicit staff override > actual days (attendance dates or a
-            // Worked Days input) > monthly-logged default (÷26).
-            // "Daily log wins": production dates only supply worked days for a
-            // group with no daily-log attendance (see resolveWorkedDayDates).
-            const attendanceEntries = [];
-            for (const sibId of canonicalToSiblings.get(canonicalId) || [
-              canonicalId,
-            ]) {
-              for (const entry of attendanceDatesByEmployee.get(sibId) || []) {
-                attendanceEntries.push(entry);
-              }
-            }
-            const { dates, source: attendanceSource } =
-              resolveWorkedDayDates(attendanceEntries);
-            let monthlyInput = null;
-            for (const sibId of canonicalToSiblings.get(canonicalId) || [
-              canonicalId,
-            ]) {
-              const val = monthlyWorkedDaysByEmployee.get(sibId);
-              if (val != null && Number.isFinite(val)) {
-                monthlyInput = Math.max(monthlyInput ?? 0, val);
-              }
-            }
-            let workedDays = null;
-            let workedDaysSource = null;
-            if (dates.size > 0 && monthlyInput != null) {
-              workedDays = Math.max(dates.size, monthlyInput);
-              workedDaysSource = `${attendanceSource}+monthly_input`;
-            } else if (monthlyInput != null) {
-              workedDays = monthlyInput;
-              workedDaysSource = "monthly_input";
-            } else if (dates.size > 0) {
-              workedDays = dates.size;
-              workedDaysSource = attendanceSource;
-            }
-            const payBasis = resolveOTPayBasis(staff.ot_pay_basis, {
-              hasWorkedDaySource: workedDays != null,
-              isMonthlyLogged: monthlyByCanonical.has(canonicalId),
-            });
-
-            const otRates = computeOTRates({
-              payBasis,
-              numeratorCents,
-              workedDays,
-            });
-            if (!otRates.ok) {
-              blocked.push({
-                employeeId: canonicalId,
-                employeeName: staff.name,
-                error: `Kiraan kadar OT disekat: ${otRates.errors.join(" ")}`,
-              });
-              continue;
-            }
-
-            formulaOTItems.forEach((item) => {
-              const rate =
-                otRateCentsForDayType(otRates.rateCents, item.ot_day_type) /
-                100;
-              item.rate = rate;
-              item.amount =
-                Math.round(rate * (parseFloat(item.quantity) || 0) * 100) /
-                100;
-            });
-
-            otCalculationSnapshot = buildOTSnapshot({
-              payBasis,
-              numeratorCents,
-              numeratorBreakdownCents,
-              excludedLeaveCents: leaveGrossCents,
-              excludedBonusCents: combinedItems.reduce(
-                (sum, item) =>
-                  !isLeaveDayWorkItem(item) && item.work_log_type === "bonus"
-                    ? sum + toCents(item.amount)
-                    : sum,
-                0
-              ),
-              excludedOtCents:
-                combinedItems.reduce(
-                  (sum, item) =>
-                    !isLeaveDayWorkItem(item) &&
-                    (item.pay_type || "Tambahan") === "Overtime"
-                      ? sum + toCents(item.amount)
-                      : sum,
-                  0
-                ) +
-                manualItems.reduce(
-                  (sum, manual) =>
-                    (manual.pay_type || "Tambahan") === "Overtime"
-                      ? sum + toCents(manual.amount)
-                      : sum,
-                  0
-                ),
-              rates: otRates,
-              workedDaysSource,
-            });
-          }
-        }
-
         // Gross in integer cents (auto items + kept manual items + leave pay).
         // Daily work items on the owner's leave day are stored below but
         // excluded here (TH convention: the day is paid via leave).
@@ -886,9 +641,8 @@ export const reprocessJPEmployees = async (
         const upsertResult = await client.query(
           `INSERT INTO jellypolly.employee_payrolls
              (monthly_payroll_id, employee_id, job_type, section, gross_pay,
-              net_pay, digenapkan, setelah_digenapkan, employee_job_mapping,
-              ot_calculation)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+              net_pay, digenapkan, setelah_digenapkan, employee_job_mapping)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
            ON CONFLICT (monthly_payroll_id, employee_id) DO UPDATE SET
              job_type = EXCLUDED.job_type,
              section = EXCLUDED.section,
@@ -897,7 +651,6 @@ export const reprocessJPEmployees = async (
              digenapkan = EXCLUDED.digenapkan,
              setelah_digenapkan = EXCLUDED.setelah_digenapkan,
              employee_job_mapping = EXCLUDED.employee_job_mapping,
-             ot_calculation = EXCLUDED.ot_calculation,
              updated_at = CURRENT_TIMESTAMP
            RETURNING id`,
           [
@@ -910,9 +663,6 @@ export const reprocessJPEmployees = async (
             digenapkan.toFixed(2),
             setelahDigenapkan.toFixed(2),
             JSON.stringify(assignedJobTypes),
-            otCalculationSnapshot
-              ? JSON.stringify(otCalculationSnapshot)
-              : null,
           ]
         );
         const employeePayrollId = upsertResult.rows[0].id;
@@ -1013,13 +763,7 @@ export const reprocessJPEmployees = async (
     );
 
     await client.query("COMMIT");
-    if (blocked.length > 0) {
-      console.warn(
-        `JP payroll ${year}-${month}: ${blocked.length} employee(s) blocked by the OT formula:`,
-        blocked.map((b) => `${b.employeeId}: ${b.error}`).join("; ")
-      );
-    }
-    return { monthlyPayrollId, processed, removed, blocked };
+    return { monthlyPayrollId, processed, removed };
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

@@ -3,6 +3,7 @@
 // (partial amounts allowed) and CH_REV2 credit-invoice cash receipts, under a
 // shared editable RV###/MM number. Posts DR bank / CR holding via /api/bank-ins.
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
 import { IconBuildingBank, IconPlus } from "@tabler/icons-react";
@@ -57,11 +58,14 @@ interface BankInGroupDraft {
 
 interface BankInRow {
   id: number;
+  kind: "bank_in" | "drawing" | "manual_journal";
   rv_number: string;
   posting_date: string;
   bank_account: string;
   total_amount: string;
   status: string;
+  description: string | null;
+  journal_entry_id: number | null;
   groups:
     | { group_number: number; holding_account: string; amount: string; description: string }[]
     | null;
@@ -85,7 +89,7 @@ const BankInPage: React.FC = () => {
   const [receipts, setReceipts] = useState<UnbankedReceipt[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [showForm, setShowForm] = useState<boolean>(false);
+  const [formMode, setFormMode] = useState<"bank_in" | "drawing" | null>(null);
   const [step, setStep] = useState<"select" | "preview">("select");
   const [cancelTarget, setCancelTarget] = useState<BankInRow | null>(null);
 
@@ -100,6 +104,10 @@ const BankInPage: React.FC = () => {
   const [receiptChecked, setReceiptChecked] = useState<Record<number, boolean>>({});
   const [receiptAmounts, setReceiptAmounts] = useState<Record<number, string>>({});
   const [draftGroups, setDraftGroups] = useState<BankInGroupDraft[]>([]);
+
+  // Drawing journal form (DR bank / CR CA_WA worker's advance repayment).
+  const [drawingAmount, setDrawingAmount] = useState<string>("");
+  const [drawingDescription, setDrawingDescription] = useState<string>("FROM DRAWING WORKERS");
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -137,8 +145,8 @@ const BankInPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (showForm) fetchNextRv(postingDate);
-  }, [showForm, postingDate, fetchNextRv]);
+    if (formMode) fetchNextRv(postingDate);
+  }, [formMode, postingDate, fetchNextRv]);
 
   const selectedPoolTotal = useMemo(
     () =>
@@ -248,6 +256,41 @@ const BankInPage: React.FC = () => {
     }
   };
 
+  const handlePostDrawing = async () => {
+    const amount = round2(parseFloat(drawingAmount) || 0);
+    if (!(amount > 0)) {
+      toast.error("Enter a positive amount");
+      return;
+    }
+    if (!drawingDescription.trim()) {
+      toast.error("Description is required");
+      return;
+    }
+    setIsSubmitting(true);
+    const toastId = toast.loading("Posting drawing journal...");
+    try {
+      const result = await api.post("/api/bank-ins/drawing", {
+        posting_date: postingDate,
+        bank_account: bankAccount,
+        rv_number: rvNumber.trim() || undefined,
+        amount,
+        description: drawingDescription.trim(),
+      });
+      toast.success(
+        result?.message || "Drawing journal posted",
+        { id: toastId }
+      );
+      resetForm();
+      await fetchAll();
+    } catch (error: any) {
+      const message =
+        error.response?.data?.message || error.data?.message || error.message || "Failed to post drawing journal";
+      toast.error(message, { id: toastId });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleCancel = async () => {
     if (!cancelTarget) return;
     const toastId = toast.loading(`Cancelling ${cancelTarget.rv_number}...`);
@@ -269,12 +312,14 @@ const BankInPage: React.FC = () => {
   };
 
   const resetForm = () => {
-    setShowForm(false);
+    setFormMode(null);
     setStep("select");
     setPoolAmounts({});
     setReceiptChecked({});
     setReceiptAmounts({});
     setDraftGroups([]);
+    setDrawingAmount("");
+    setDrawingDescription("FROM DRAWING WORKERS");
   };
 
   const inputCls =
@@ -301,7 +346,7 @@ const BankInPage: React.FC = () => {
             credit-invoice cash receipts (CH_REV2)
           </p>
         </div>
-        {!showForm && (
+        {!formMode && (
           <div className="flex flex-wrap items-center gap-2">
             <TimeNavigator
               range={{ start: parseYmd(filterStart), end: parseYmd(filterEnd) }}
@@ -312,14 +357,95 @@ const BankInPage: React.FC = () => {
               placeholder="All dates"
               size="sm"
             />
-            <Button color="sky" icon={IconPlus} onClick={() => setShowForm(true)}>
+            <Button color="sky" icon={IconPlus} onClick={() => setFormMode("bank_in")}>
               New Bank-In
+            </Button>
+            <Button variant="outline" color="sky" icon={IconPlus} onClick={() => setFormMode("drawing")}>
+              New Drawing (CA_WA)
             </Button>
           </div>
         )}
       </div>
 
-      {showForm && (
+      {formMode === "drawing" && (
+        <div className="w-full bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                Date <span className="text-red-500">*</span>
+              </label>
+              <TimeNavigator
+                range={{ start: parseYmd(postingDate), end: parseYmd(postingDate) }}
+                onChange={(r) => setPostingDate(format(r.start, "yyyy-MM-dd"))}
+                modes={["day"]}
+                presets={false}
+                showArrows={false}
+                allowFuture
+                disabled={isSubmitting}
+                placeholder="Pick date"
+                className="w-full"
+                triggerClassName="w-full justify-between"
+              />
+            </div>
+            <FormListbox
+              name="bank_account"
+              label="Bank Account"
+              value={bankAccount}
+              onChange={(value) => setBankAccount(value as string)}
+              options={bankAccountOptions}
+              disabled={isSubmitting}
+            />
+            <FormInput
+              name="rv_number"
+              label="RV Number"
+              value={rvNumber}
+              onChange={(e) => setRvNumber(e.target.value.toUpperCase())}
+              disabled={isSubmitting}
+              placeholder="RV001/06"
+              required
+            />
+            <FormInput
+              name="drawing_amount"
+              label="Amount (RM)"
+              type="number"
+              step="0.01"
+              value={drawingAmount}
+              onChange={(e) => setDrawingAmount(e.target.value)}
+              disabled={isSubmitting}
+              placeholder="0.00"
+              required
+            />
+          </div>
+          <FormInput
+            name="drawing_description"
+            label="Description"
+            value={drawingDescription}
+            onChange={(e) => setDrawingDescription(e.target.value.toUpperCase())}
+            disabled={isSubmitting}
+            placeholder="FROM DRAWING WORKERS"
+            required
+          />
+          <p className="text-xs text-default-500 dark:text-gray-400 pl-1">
+            Posts {rvNumber || "RV—"}: DR {bankAccount} / CR CA_WA (WORKER'S ADVANCE) for RM{" "}
+            {fmtAmt(parseFloat(drawingAmount) || 0)}. It is listed with a "Drawing" badge — edit
+            or cancel it later from the Journal page.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={resetForm} disabled={isSubmitting}>
+              Close
+            </Button>
+            <Button
+              color="sky"
+              onClick={handlePostDrawing}
+              disabled={isSubmitting || !(parseFloat(drawingAmount) > 0)}
+            >
+              {isSubmitting ? "Posting..." : `Post ${rvNumber || "Drawing"}`}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {formMode === "bank_in" && (
         <div className="w-full bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div className="space-y-2">
@@ -571,14 +697,32 @@ const BankInPage: React.FC = () => {
           <tbody>
             {bankIns.map((b) => (
               <tr
-                key={b.id}
+                key={`${b.kind}-${b.id}`}
                 className="border-t border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/40"
               >
-                <td className="px-4 py-2.5 whitespace-nowrap">{fmtDMY(String(b.posting_date).slice(0, 10))}</td>
-                <td className="px-4 py-2.5 font-mono">{b.rv_number}</td>
+                <td className="px-4 py-2.5 whitespace-nowrap">{fmtDMY(format(new Date(b.posting_date), "yyyy-MM-dd"))}</td>
+                <td className="px-4 py-2.5 font-mono">
+                  {b.journal_entry_id ? (
+                    <Link
+                      to={`/accounting/journal-entries/${b.journal_entry_id}`}
+                      className="text-sky-600 dark:text-sky-400 hover:underline"
+                    >
+                      {b.rv_number}
+                    </Link>
+                  ) : (
+                    b.rv_number
+                  )}
+                  {b.kind !== "bank_in" && (
+                    <span className="ml-2 inline-flex px-1.5 py-0.5 text-xs font-medium rounded bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-400 font-sans">
+                      {b.kind === "drawing" ? "Drawing" : "Manual"}
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-2.5">{b.bank_account}</td>
                 <td className="px-4 py-2.5 text-default-600 dark:text-gray-400">
-                  {(b.groups || []).map((g) => g.description).join(" & ") || "-"}
+                  {b.kind === "bank_in"
+                    ? (b.groups || []).map((g) => g.description).join(" & ") || "-"
+                    : b.description || "-"}
                 </td>
                 <td className="px-4 py-2.5 text-right font-medium">{fmtAmt(b.total_amount)}</td>
                 <td className="px-4 py-2.5">
@@ -593,7 +737,7 @@ const BankInPage: React.FC = () => {
                   </span>
                 </td>
                 <td className="px-4 py-2.5 text-right">
-                  {b.status === "posted" && (
+                  {b.kind === "bank_in" && b.status === "posted" && (
                     <Button size="sm" variant="outline" color="rose" onClick={() => setCancelTarget(b)}>
                       Cancel
                     </Button>

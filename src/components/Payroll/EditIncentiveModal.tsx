@@ -12,6 +12,7 @@ import Checkbox from "../Checkbox";
 import { IconDeviceFloppy } from "@tabler/icons-react";
 import { FormInput, FormListbox } from "../FormComponents";
 import toast from "react-hot-toast";
+import { format } from "date-fns";
 import { api } from "../../routes/utils/api";
 import { useLocationMappingsCache } from "../../utils/catalogue/useLocationMappingsCache";
 
@@ -87,7 +88,10 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
     if (incentive) {
       setAmount(incentive.amount.toString());
       setDescription(incentive.description);
-      setIncentiveDate(incentive.commission_date.split("T")[0]);
+      // commission_date is a `date` column returned as a UTC ISO string; parse
+      // and format in local time so the pre-fill (and save-back) keep the right
+      // day (CLAUDE.md rule 17) instead of slicing the UTC previous day.
+      setIncentiveDate(format(new Date(incentive.commission_date), "yyyy-MM-dd"));
       setLocationCode(incentive.location_code || null);
       setIsAdvance(incentive.is_advance !== false);
     }

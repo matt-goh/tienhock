@@ -11,7 +11,7 @@ The original January 2026 bulk mapping was **lost in a dev-DB refresh** (only 2 
 - `CH_REV1`/`CH_REV2` (cash-method receipt holding accounts = cash received, not yet banked) → Note **6**, not 18-2.
 - Taxation codes (`TAX_CP`, `TAX_IT`, `CL_TAX`) tagged Note 12 *before* the vehicle road-tax `TAX_%` → 5 rule; `DF_TAX` → Note 1 (legacy BS convention).
 - `CL_*` family handled: `CL_WSF`/`CL_GTH` → 9, `CL_PB%`/`CL_SCB`/`CL_LOAN` → 11, other `CL_%`/`OC_%`/`CUST_DEP` → 10.
-- Lean-GL codes added: `TP`/`CL_TP` → 13, `PUR%` → 3-5, `NCA_%` → 4, `DEBTOR` → 22, `OP` (Overseas Purchases, used by GP journals) → 5 ⚠️ *provisional — confirm with the user whether GP overseas purchases belong in admin expenses (5) or raw-material purchases (3-5)*.
+- Lean-GL codes added: `TP`/`CL_TP` → 13, `PUR%` → 3-5, `NCA_%` → 4, `DEBTOR` → 22. `OP`/`LGP` (Overseas/foreign purchases): **no `fs_note` — RESOLVED & implemented on dev 21 Jul 2026: foreign purchases are NOT linked to any note; they are recorded via the user's separate manual purchase journals. Foreign self-billed invoices no longer auto-post a `GP` journal, and migration `2026-07-21_foreign_gp_unlink.sql` unmapped `OP`/`LGP` and cancelled the existing 56 unpaid foreign `GP` journals. Supersedes the interim → 5 mapping; harness re-pin + production pending — see [LEGACY_REPORT_VERIFICATION_PLAN.md](LEGACY_REPORT_VERIFICATION_PLAN.md) §8-7**.
 - `BE_%`/`BL_%` are payroll codes (EPF/Levy per section), removed from the old PPE (Note 4) rule.
 
 ---

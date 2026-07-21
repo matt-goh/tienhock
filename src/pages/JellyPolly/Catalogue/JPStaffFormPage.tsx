@@ -59,16 +59,6 @@ const JPStaffFormPage: React.FC = () => {
     { id: "Unemployed", name: "Unemployed" },
   ];
 
-  // OT pay basis for the July 2026+ OT salary formula. "" (Auto) resolves from
-  // where the work is recorded: actual worked days when attendance dates or a
-  // Worked Days input exist, otherwise ÷26 for monthly-logged staff. The
-  // explicit options are overrides for odd cases only.
-  const otPayBasisOptions = [
-    { id: "", name: "Auto (from work records)" },
-    { id: "monthly_26", name: "Monthly salary (÷ 26)" },
-    { id: "actual_days", name: "Actual worked days" },
-  ];
-
   // Per-staff statutory contribution overrides ("auto" sentinel maps to ""/NULL on save)
   const contributionAgeOptions = [
     { id: "auto", name: "Auto (from birthdate)" },
@@ -115,7 +105,6 @@ const JPStaffFormPage: React.FC = () => {
     epfNationalityOverride: "auto",
     socsoAgeOverride: "auto",
     sipAgeOverride: "auto",
-    otPayBasis: "",
   });
   const [initialFormData, setInitialFormData] = useState<Employee>({
     ...formData,
@@ -290,7 +279,6 @@ const JPStaffFormPage: React.FC = () => {
         epfNationalityOverride: data.epfNationalityOverride || "auto",
         socsoAgeOverride: data.socsoAgeOverride || "auto",
         sipAgeOverride: data.sipAgeOverride || "auto",
-        otPayBasis: data.otPayBasis || "",
       };
 
       // Preserve modified fields from current formData
@@ -628,7 +616,6 @@ const JPStaffFormPage: React.FC = () => {
         formData.socsoAgeOverride === "auto" ? "" : formData.socsoAgeOverride,
       sipAgeOverride:
         formData.sipAgeOverride === "auto" ? "" : formData.sipAgeOverride,
-      otPayBasis: formData.otPayBasis || "",
     };
 
     try {
@@ -682,11 +669,41 @@ const JPStaffFormPage: React.FC = () => {
     />
   );
 
+  const renderContributionSelect = (
+    name: keyof Employee,
+    label: string,
+    selectOptions: SelectOption[]
+  ) => (
+    <div className="space-y-2">
+      <label
+        htmlFor={name}
+        className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate"
+        title={label}
+      >
+        {label}
+      </label>
+      <select
+        id={name}
+        name={name}
+        value={(formData[name] as string) ?? ""}
+        onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
+          handleListboxChange(name, event.target.value)
+        }
+        className="block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm"
+      >
+        {selectOptions.map((option: SelectOption) => (
+          <option key={option.id} value={option.id}>
+            {option.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+
   const renderListbox = (
     name: keyof Employee,
     label: string,
-    options: SelectOption[],
-    optionsPosition?: "top" | "bottom"
+    options: SelectOption[]
   ) => {
     const currentValue = formData[name];
 
@@ -699,7 +716,6 @@ const JPStaffFormPage: React.FC = () => {
         onChange={(value) => handleListboxChange(name, value)}
         options={options}
         placeholder={`Select ${label}...`}
-        optionsPosition={optionsPosition}
       />
     );
   };
@@ -995,23 +1011,6 @@ const JPStaffFormPage: React.FC = () => {
                   )}
                   {renderInput("dateJoined", "Date Joined", "date")}
                 </div>
-                <div className="border-t border-default-200 dark:border-gray-700 pt-6">
-                  <h3 className="text-base font-medium text-default-800 dark:text-gray-100 mb-1">
-                    Overtime Settings
-                  </h3>
-                  <p className="text-sm text-default-500 dark:text-gray-400 mb-4">
-                    Controls the divisor used by the OT salary formula from July
-                    2026. Leave as Auto to follow how this staff's work is
-                    recorded.
-                  </p>
-                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-                    {renderListbox(
-                      "otPayBasis",
-                      "OT Pay Basis (from July 2026)",
-                      otPayBasisOptions
-                    )}
-                  </div>
-                </div>
                 <StaffPayCodesSection employee={formData} company="jellypolly" />
               </div>
               <div className="space-y-6 mt-5">
@@ -1059,29 +1058,25 @@ const JPStaffFormPage: React.FC = () => {
                     entirely.
                   </p>
                   <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-                    {renderListbox(
+                    {renderContributionSelect(
                       "epfAgeOverride",
                       "EPF Age",
-                      contributionAgeOptions,
-                      "top"
+                      contributionAgeOptions
                     )}
-                    {renderListbox(
+                    {renderContributionSelect(
                       "epfNationalityOverride",
                       "EPF Rate Type",
-                      epfNationalityOptions,
-                      "top"
+                      epfNationalityOptions
                     )}
-                    {renderListbox(
+                    {renderContributionSelect(
                       "socsoAgeOverride",
                       "SOCSO Age",
-                      contributionAgeOptions,
-                      "top"
+                      contributionAgeOptions
                     )}
-                    {renderListbox(
+                    {renderContributionSelect(
                       "sipAgeOverride",
                       "SIP Age",
-                      contributionAgeOptions,
-                      "top"
+                      contributionAgeOptions
                     )}
                   </div>
                 </div>

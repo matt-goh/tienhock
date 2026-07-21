@@ -7,6 +7,7 @@ import {
   getCashSalesPools,
   getUnbankedCashReceipts,
   createBankIn,
+  createDrawingJournal,
   cancelBankIn,
 } from "./bank-in-service.js";
 
@@ -51,39 +52,73 @@ export default function (pool) {
     }
   });
 
-  // --- GET /api/bank-ins — list ---
+  // --- GET /api/bank-ins — list (structured bank-ins + manually keyed RV journals) ---
   router.get("/", async (req, res) => {
     const { startDate, endDate, status, limit = "100" } = req.query;
     try {
       const params = [];
-      let where = "WHERE 1=1";
+      let biWhere = "WHERE 1=1";
+      // Manually keyed RV journals: entry_type 'RV' with no owning bank_ins row.
+      // Interface-created drawing journals own an rv_registry row via
+      // journal_entry_id and are listed as kind 'drawing' (not "Manual");
+      // legacy/imported and hand-keyed RVs stay 'manual_journal'.
+      let jeWhere =
+        "WHERE je.entry_type = 'RV'" +
+        " AND NOT EXISTS (SELECT 1 FROM bank_ins x WHERE x.journal_entry_id = je.id)";
       if (startDate) {
         params.push(String(startDate).slice(0, 10));
-        where += ` AND bi.posting_date >= $${params.length}`;
+        biWhere += ` AND bi.posting_date >= $${params.length}`;
+        jeWhere += ` AND je.entry_date >= $${params.length}`;
       }
       if (endDate) {
         params.push(String(endDate).slice(0, 10));
-        where += ` AND bi.posting_date <= $${params.length}`;
+        biWhere += ` AND bi.posting_date <= $${params.length}`;
+        jeWhere += ` AND je.entry_date <= $${params.length}`;
       }
       if (status) {
         params.push(status);
-        where += ` AND bi.status = $${params.length}`;
+        biWhere += ` AND bi.status = $${params.length}`;
+        jeWhere += ` AND je.status = $${params.length}`;
       }
       params.push(Math.min(parseInt(limit, 10) || 100, 500));
       const result = await pool.query(
-        `SELECT bi.*, rv.rv_number, rv.rv_year, je.reference_no AS journal_reference_no,
-                (SELECT json_agg(json_build_object(
-                    'id', big.id, 'group_number', big.group_number,
-                    'holding_account', big.holding_account, 'amount', big.amount,
-                    'description', big.description
-                  ) ORDER BY big.group_number)
-                   FROM bank_in_groups big WHERE big.bank_in_id = bi.id) AS groups
-           FROM bank_ins bi
-           JOIN rv_registry rv ON rv.id = bi.rv_registry_id
-           LEFT JOIN journal_entries je ON je.id = bi.journal_entry_id
-          ${where}
-          ORDER BY bi.posting_date DESC, rv.rv_seq DESC
-          LIMIT $${params.length}`,
+        `SELECT * FROM (
+           SELECT bi.id, 'bank_in'::text AS kind, rv.rv_number, rv.rv_year, rv.rv_seq,
+                  bi.posting_date, bi.bank_account, bi.total_amount, bi.status,
+                  bi.notes AS description, bi.journal_entry_id,
+                  je.reference_no AS journal_reference_no,
+                  (SELECT json_agg(json_build_object(
+                      'id', big.id, 'group_number', big.group_number,
+                      'holding_account', big.holding_account, 'amount', big.amount,
+                      'description', big.description
+                    ) ORDER BY big.group_number)
+                     FROM bank_in_groups big WHERE big.bank_in_id = bi.id) AS groups
+             FROM bank_ins bi
+             JOIN rv_registry rv ON rv.id = bi.rv_registry_id
+             LEFT JOIN journal_entries je ON je.id = bi.journal_entry_id
+            ${biWhere}
+           UNION ALL
+           SELECT je.id,
+                  CASE WHEN rvr.id IS NOT NULL THEN 'drawing' ELSE 'manual_journal' END::text AS kind,
+                  je.reference_no AS rv_number,
+                  NULL::int AS rv_year,
+                  (substring(je.reference_no from 'RV(\d+)/[0-9]{2}'))::int AS rv_seq,
+                  je.entry_date AS posting_date,
+                  (SELECT jel.account_code
+                     FROM journal_entry_lines jel
+                    WHERE jel.journal_entry_id = je.id AND jel.debit_amount > 0
+                    ORDER BY jel.line_number
+                    LIMIT 1) AS bank_account,
+                  je.total_debit AS total_amount, je.status, je.description,
+                  je.id AS journal_entry_id,
+                  je.reference_no AS journal_reference_no,
+                  NULL::json AS groups
+             FROM journal_entries je
+             LEFT JOIN rv_registry rvr ON rvr.journal_entry_id = je.id
+            ${jeWhere}
+         ) combined
+         ORDER BY posting_date DESC, rv_seq DESC NULLS LAST, id DESC
+         LIMIT $${params.length}`,
         params
       );
       res.json(result.rows);
@@ -141,6 +176,23 @@ export default function (pool) {
       await client.query("ROLLBACK");
       console.error("Error creating bank-in:", error);
       res.status(400).json({ message: error.message || "Error creating bank-in" });
+    } finally {
+      client.release();
+    }
+  });
+
+  // --- POST /api/bank-ins/drawing — manual drawing RV journal (DR bank / CR CA_WA) ---
+  router.post("/drawing", async (req, res) => {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await createDrawingJournal(client, req.body || {}, req.user?.id || null);
+      await client.query("COMMIT");
+      res.status(201).json({ message: `Drawing journal ${result.rv_number} posted`, ...result });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error creating drawing journal:", error);
+      res.status(400).json({ message: error.message || "Error creating drawing journal" });
     } finally {
       client.release();
     }
