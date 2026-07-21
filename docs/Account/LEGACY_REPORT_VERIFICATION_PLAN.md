@@ -1,6 +1,6 @@
 # Legacy Report Scans — Verification & 1:1 Parity Plan (Handover)
 
-**Created 17 Jul 2026. Updated 20 Jul 2026. Phases V0, V1 and the approved V2 development package are COMPLETE. The development books are balanced at the RM5,389,607.26 pre-closing-stock boundary; production V2 remains a separate approval (rollout variant rehearsed 20 Jul on a fresh production copy — see §6), and V3–V4 are pending.**
+**Created 17 Jul 2026. Updated 21 Jul 2026. Phases V0–V3 are COMPLETE on development: the May books balance at RM8,980,756.68 with keyed monthly closing stock injected (net assets RM6,090,429.60 = scan RM6,097,691.11 less the named GP-202604-0001 drift), the Trade Debtor list/statement matches the legacy scans 150/150 including FIFO aging, and those ±RM7,261.51 GP-drift lines are the only remaining scan differences anywhere. Production V2/V3 remains a separate approval (rollout order OP→LGP then V2, rehearsed on fresh production copies — see §6); V4 (production closeout) is pending.**
 Follow-on to the completed Jan–May legacy ledger import
 ([LEGACY_JAN_MAY_IMPORT_PLAN.md](LEGACY_JAN_MAY_IMPORT_PLAN.md)). That project ended with an
 exact, hash-pinned `IMP` journal projection but **no independent way to verify it**, and with the
@@ -19,10 +19,11 @@ from the legacy system as **scanned PDFs** (received 15 Jul 2026, now stored pri
 3. **Phase V2** — ✅ completed and verified on development 20 Jul 2026; production remains a
    separately approved rollout. The guarded migration removes the TB residue and makes the Balance
    Sheet balance at the pre-closing-stock May total **5,389,607.26**.
-4. **Phase V3** — close the remaining report-capability gaps so users can *themselves* produce
-   these five reports 1:1 (content parity, never visual) from the ERP going forward — chiefly the
-   monthly closing-stock mechanism, which takes May to **6,097,691.11**, and Debtor-list
-   column/aging parity.
+4. **Phase V3** — ✅ completed and verified on development 21 Jul 2026 (see the §7 execution
+   record): users can now *themselves* produce these five reports 1:1 (content parity, never
+   visual) from the ERP going forward. Monthly closing stock is keyed on the Material Stock page
+   and injected at report level (May reaches **6,090,429.60** = 6,097,691.11 less the named GP
+   drift), and the Debtor list/statement has full column/aging parity.
 
 June 2026 is already row-by-row reconciled; this project is about Jan–May plus standing
 capability. **House rules inherited from the import project apply throughout: every difference is
@@ -711,6 +712,52 @@ findings; expected items):
    and all four buckets equal `tdl-comparison.json`; the five/11-row fingerprints disappear.
 3. Keep the transitioned V1/V2 harness as a regression gate (documented run command, like the
    import's verification suite).
+
+### V3 execution record — completed 21 Jul 2026 (development)
+
+**Files changed:** migration
+[`2026-07-21_closing_stock_values.sql`](../../dev/migrations/2026-07-21_closing_stock_values.sql)
+(new `closing_stock_values` table + guarded May seed);
+[`financial-reports.js`](../../src/routes/accounting/financial-reports.js) (exact-month
+`getClosingStockValues`, GET/PUT `/api/financial-reports/closing-stock/:year/:month`, and the
+three engine injections); [`materials.js`](../../src/routes/accounting/materials.js)
+(`/api/materials/closing-stock-reference`); [`debtors.js`](../../src/routes/accounting/debtors.js)
+(legacy CURRENT/PAYMENT semantics, zero-close body filter, `computeLegacyFifoAging` replacing the
+invoice-allocation + forced-oldest-bridge model);
+[`StockAdjustmentEntryPage.tsx`](../../src/pages/Stock/Materials/StockAdjustmentEntryPage.tsx)
+("Closing Stock (Financial Statements)" card) and
+[`ReportSourceGuide.tsx`](../../src/components/Accounting/ReportSourceGuide.tsx) (caveat texts);
+the verification harness `verify-legacy-reports.mjs` (tdl + statements stage transitions).
+
+- **Item 1 — monthly closing stock:** exact-month values are keyed in `closing_stock_values`
+  (UNIQUE year/month/fs_note; fs_note CHECK 14-1/14-2/14-3) via the Material Stock page card;
+  each field's "Page total" chip references the page's own stock accumulation as a suggestion.
+  The engines inject the keyed values at report level only — the GL 14-* notes stay zero (the 63
+  explicit-zero CS anchors are untouched and still gated): BS 14-* assets plus Current Year
+  Profit, IS all three as negative cogs, CoGM 14-2/14-3 as negative raw/packing materials. May
+  2026 is seeded from the scans (188,979.60 / 336,909.82 / 182,194.43); months with no keyed row
+  show no injection (April verified zero).
+- **Item 2 — debtor parity:** the general statement now computes the legacy columns directly
+  (CURRENT = S/DN/RN debits − CN credits; PAYMENT = S+REC credits − REC debits, via
+  `COALESCE(legacy_entry_type, entry_type)`), totals over the full 191-child population, and
+  prints only non-zero-close body rows (the 41 zero-close rows drop out, exactly like the scan).
+  `computeLegacyFifoAging` (signed 1-Jan anchor + monthly document buckets consumed FIFO, a
+  negative-payment month folded into current) drives both the list and the per-customer statement
+  aging box. The five column-presentation rows and the 11 aging rows named in §5 step 3 all
+  disappear, as designed.
+- **Verified figures (May 2026, 21 Jul production copy):** BS balances at RM8,980,756.68 both
+  sides; net assets = financed-by = RM6,090,429.60 = scan RM6,097,691.11 − the named drift. IS
+  net profit RM277,563.50 = scan RM284,825.01 − drift; cogs RM2,374,443.87; CoGM RM2,479,030.27
+  (exact). Trade Debtor list: 150 body rows; bal b/f 578,661.95 / current 447,122.50 / payment
+  518,086.73 / total due 507,697.72; full-population FIFO aging 316,376.89 / 124,740.50 /
+  24,055.71 / 42,524.62, reconciling to total due exactly (the printed scan current-aging total
+  omits zero-close rows' buckets and stays informational).
+- **Item 3 — harness:** the tdl stage now hard-fails on any column/aging difference and pins the
+  full-population FIFO totals; the statements stage reproduces the injection, gates
+  `closing_stock_values` 2026-05 = the scanned figures, and expects 36/40 compared lines exact +
+  4 named post-scan GP-drift lines (BS note 13, IS note 5, and both profit cross-totals) — the
+  only scan differences left anywhere. Final run 21 Jul 2026: `validate-fixtures.mjs` ALL CHECKS
+  PASSED; `verify-legacy-reports.mjs` ALL STAGES GREEN.
 
 **Phase V4 — closeout:** prod parity re-run, docs refresh, retain scans + fixtures permanently as
 audit evidence (they are the only independent proof of the Jan–May books).

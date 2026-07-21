@@ -324,7 +324,7 @@ still needed (gap 1A-6); currently only manual journals exist.
 1. Notes 22 and 7 are derived from posted journals, with no invoice-table override
 2. Trial Balance and Balance Sheet use the latest applicable opening anchor per account
 3. Income Statement and Balance Sheet Current Year Profit include exact 1 January opening stock for Notes 3-1/3-3/3-7; CoGM includes 3-3/3-7 only
-4. The May 2026 V2 Balance Sheet is balanced at the pre-closing-stock boundary; monthly closing stock remains V3
+4. The May 2026 Balance Sheet is balanced with keyed monthly closing stock (V3, 21 Jul 2026: exact-month `closing_stock_values` injected at report level, never a GL posting)
 
 **Medium Priority** (needs stock system first):
 5. Stock entries → monthly Closing Stock

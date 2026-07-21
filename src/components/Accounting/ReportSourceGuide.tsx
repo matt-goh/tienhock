@@ -87,7 +87,7 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
       missingHeading: "Belum termasuk",
       missing: [
         "Akaun tanpa baki pembukaan akan menunjukkan pergerakan dari 1 Januari sahaja.",
-        "Stok awal 1 Januari telah dimasukkan. Nilai stok akhir bulanan dan susut nilai belum direkodkan secara automatik.",
+        "Stok awal 1 Januari telah dimasukkan. Nilai stok akhir bulan direkod di halaman Material Stock (kad Closing Stock (Financial Statements)) dan dimasukkan ke dalam Kunci Kira-kira, Untung Rugi dan CoGM untuk bulan tersebut pada tahap laporan — Imbangan Duga sengaja tidak menunjukkan pergerakan stok akhir, sama seperti laporan lama. Susut nilai masih belum direkodkan secara automatik.",
       ],
       footer:
         "Setiap akaun ditanda dengan nombor Nota. Laporan penyata (Untung Rugi, Kunci Kira-kira, CoGM) menjumlahkan akaun mengikut Nota ini.",
@@ -145,7 +145,7 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
       missingHeading: "Not included yet",
       missing: [
         "Accounts without an opening balance show movement from 1 January only.",
-        "Opening stock at 1 January is included. Monthly closing stock and depreciation are not recorded automatically yet.",
+        "Opening stock at 1 January is included. Month-end closing stock is keyed on the Material Stock page (Closing Stock (Financial Statements) card) and injected into the Balance Sheet, Income Statement and CoGM for that month at report level — the Trial Balance intentionally shows no closing-stock movement, matching the legacy reports. Depreciation is still not recorded automatically.",
       ],
       footer:
         "Every account is tagged with a Note number. The statement reports (Income Statement, Balance Sheet, CoGM) add up accounts by these Notes.",
@@ -186,7 +186,7 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
       ],
       missingHeading: "Belum termasuk",
       missing: [
-        "Nilai stok akhir bulanan — untung kasar sebenar masih perlu menolak stok akhir.",
+        "Stok akhir untuk bulan yang belum direkod di halaman Material Stock (kad Closing Stock (Financial Statements)) — bulan yang telah direkod ditolak pada tahap laporan.",
         "Susut nilai (Nota 15) dan faedah sewa beli (Nota 23) — belum ada sistem automatik.",
         "Angka tahun lepas untuk perbandingan.",
       ],
@@ -227,7 +227,7 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
       ],
       missingHeading: "Not included yet",
       missing: [
-        "Monthly closing stock — true gross profit still needs the closing value deducted.",
+        "Closing stock for months not yet keyed on the Material Stock page (Closing Stock (Financial Statements) card) — keyed months are deducted automatically at report level.",
         "Depreciation (Note 15) and hire purchase interest (Note 23) — no automatic system yet.",
         "Last year's figures for comparison.",
       ],
@@ -357,12 +357,12 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
       ],
       missingHeading: "Belum termasuk",
       missing: [
-        "Stok akhir bulanan bahan mentah dan bahan bungkusan belum dimasukkan.",
+        "Stok akhir bahan mentah dan bahan bungkusan untuk bulan yang belum direkod di halaman Material Stock — bulan yang telah direkod ditolak pada tahap laporan.",
         "Tambang pengangkutan bahan masuk (Nota 3-6) — perlu direkod manual buat masa ini.",
         "Belian bahan kimia (Nota 3-4) jika belum direkod di Purchases.",
       ],
       footer:
-        "Angka di sini merangkumi stok awal dan pergerakan kos yang direkod. Stok akhir bulanan masih perlu ditolak untuk kos bahan terpakai yang lengkap.",
+        "Angka di sini merangkumi stok awal dan pergerakan kos yang direkod. Nilai stok akhir bulan direkod di halaman Material Stock (kad Closing Stock (Financial Statements)) dan ditolak untuk bulan tersebut pada tahap laporan, menjadikan kos bahan terpakai yang lengkap.",
     },
     en: {
       title: "Where do these numbers come from?",
@@ -393,12 +393,12 @@ const GUIDE_CONTENT: Record<ReportKind, Record<Lang, GuideText>> = {
       ],
       missingHeading: "Not included yet",
       missing: [
-        "Monthly closing raw-material and packing-material stock is not included yet.",
+        "Closing raw-material and packing-material stock for months not yet keyed on the Material Stock page — keyed months are deducted at report level.",
         "Freight in on materials (Note 3-6) — has to be keyed manually for now.",
         "Chemical purchases (Note 3-4) if not recorded in Purchases.",
       ],
       footer:
-        "These figures include opening stock and recorded cost movement. Monthly closing stock still needs to be deducted for the complete cost of materials used.",
+        "These figures include opening stock and recorded cost movement. Month-end closing stock is keyed on the Material Stock page (Closing Stock (Financial Statements) card) and deducted for that month at report level, giving the complete cost of materials used.",
     },
   },
 };

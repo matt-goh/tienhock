@@ -128,6 +128,36 @@ export default function (pool) {
           GROUP BY efn.fs_note
         )`;
 
+  /** @type {string[]} */
+  const CLOSING_STOCK_NOTES = ["14-1", "14-2", "14-3"];
+
+  // V3 monthly closing stock. The legacy system injected month-end stock into
+  // the BS/IS/CoGM at report level from its stock module; its printed Trial
+  // Balances carry the CS_* accounts at .00 every month. The ERP mirrors that:
+  // the confirmed month-end values keyed on the Material Stock page live in
+  // closing_stock_values and are injected into the statement responses only —
+  // never into the GL — so the Trial Balance keeps the CS accounts at zero.
+  // Exact-month semantics: an unkeyed month injects nothing, and the Balance
+  // Sheet stays balanced because the inventory lines and Current Year Profit
+  // skip the injection together.
+  const getClosingStockValues = async (year, month) => {
+    const result = await pool.query(
+      `SELECT csv.fs_note, csv.amount, fsn.name
+         FROM closing_stock_values csv
+         JOIN financial_statement_notes fsn ON fsn.code = csv.fs_note
+        WHERE csv.year = $1 AND csv.month = $2`,
+      [year, month]
+    );
+    const map = {};
+    let total = 0;
+    for (const row of result.rows) {
+      const amount = parseFloat(row.amount) || 0;
+      map[row.fs_note] = { name: row.name, amount };
+      total += amount;
+    }
+    return { map, total };
+  };
+
   // ==================== FINANCIAL STATEMENT NOTES ====================
 
   // GET /notes - Get all financial statement notes
@@ -428,6 +458,92 @@ export default function (pool) {
     }
   });
 
+  // ==================== CLOSING STOCK (V3) ====================
+
+  // GET /closing-stock/:year/:month - the confirmed month-end closing-stock
+  // values keyed on the Material Stock page (null = not keyed). Injected into
+  // the BS/IS/CoGM at report level; never part of the GL.
+  router.get("/closing-stock/:year/:month", async (req, res) => {
+    try {
+      const { year, month } = req.params;
+      const validation = validateYearMonth(year, month);
+      if (!validation.valid) {
+        return res.status(400).json({ message: validation.error });
+      }
+
+      const { map } = await getClosingStockValues(validation.year, validation.month);
+      const values = {};
+      for (const note of CLOSING_STOCK_NOTES) {
+        values[note] = map[note] ? map[note].amount : null;
+      }
+
+      res.json({ year: validation.year, month: validation.month, values });
+    } catch (error) {
+      console.error("Error fetching closing stock values:", error);
+      res.status(500).json({
+        message: "Error fetching closing stock values",
+        error: error.message,
+      });
+    }
+  });
+
+  // PUT /closing-stock/:year/:month - confirm all three month-end values at
+  // once. Body: { values: { "14-1": number, "14-2": number, "14-3": number } }.
+  router.put("/closing-stock/:year/:month", async (req, res) => {
+    const client = await pool.connect();
+    try {
+      const { year, month } = req.params;
+      const validation = validateYearMonth(year, month);
+      if (!validation.valid) {
+        return res.status(400).json({ message: validation.error });
+      }
+
+      const values = req.body?.values || {};
+      const amounts = {};
+      for (const note of CLOSING_STOCK_NOTES) {
+        const amount = Number(values[note]);
+        if (!Number.isFinite(amount)) {
+          return res.status(400).json({
+            message: `A finite numeric value is required for closing-stock note ${note}`,
+          });
+        }
+        amounts[note] = Math.round(amount * 100) / 100;
+      }
+
+      await client.query("BEGIN");
+      for (const note of CLOSING_STOCK_NOTES) {
+        await client.query(
+          `INSERT INTO closing_stock_values (
+             year, month, fs_note, amount, created_by, updated_by
+           ) VALUES ($1, $2, $3, $4, $5, $5)
+           ON CONFLICT (year, month, fs_note)
+           DO UPDATE SET
+             amount = EXCLUDED.amount,
+             updated_at = CURRENT_TIMESTAMP,
+             updated_by = EXCLUDED.updated_by`,
+          [validation.year, validation.month, note, amounts[note], req.staffId || null]
+        );
+      }
+      await client.query("COMMIT");
+
+      res.json({
+        message: "Closing stock values saved",
+        year: validation.year,
+        month: validation.month,
+        values: amounts,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error saving closing stock values:", error);
+      res.status(500).json({
+        message: "Error saving closing stock values",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
   // ==================== TRIAL BALANCE ====================
 
   // GET /trial-balance/:year/:month - Generate trial balance for a period
@@ -673,6 +789,11 @@ export default function (pool) {
         INCOME_STATEMENT_OPENING_STOCK_NOTES,
       ]);
 
+      const closingStock = await getClosingStockValues(
+        validation.year,
+        validation.month
+      );
+
       // Organize into sections
       const revenue = [];
       const expenses = [];
@@ -697,6 +818,19 @@ export default function (pool) {
         } else if (row.category === "cogs") {
           cogs.push(item);
           totalCogs += item.amount;
+        }
+      }
+
+      // V3: inject the keyed month-end closing stock as the "LESS: CLOSING
+      // INVENTORIES" deductions. Finished goods (14-1) prints as its own IS
+      // line; raw/packing (14-2/14-3) reach the IS through the CoGM total,
+      // whose notes are bucketed into this COGS section — so all three are
+      // deducted here. Report-level only; the GL never carries closing stock.
+      for (const note of CLOSING_STOCK_NOTES) {
+        if (closingStock.map[note]) {
+          const amount = closingStock.map[note].amount;
+          cogs.push({ note, name: closingStock.map[note].name, amount: -amount });
+          totalCogs -= amount;
         }
       }
 
@@ -855,6 +989,11 @@ export default function (pool) {
         INCOME_STATEMENT_OPENING_STOCK_NOTES,
       ]);
 
+      const closingStock = await getClosingStockValues(
+        validation.year,
+        validation.month
+      );
+
       // Organize into sections
       const assets = { current: [], non_current: [] };
       const liabilities = { current: [], non_current: [] };
@@ -874,6 +1013,18 @@ export default function (pool) {
           name: row.name,
           amount: parseFloat(row.balance),
         };
+
+        // V3 report-level closing-stock injection. The GL is pinned at zero
+        // for the 14-* notes (63 explicit zero CS anchors, no movement — the
+        // legacy-parity harness gates this), so adding the keyed value is an
+        // exact override, never a double count. Current Year Profit (the
+        // code-less synthetic row) absorbs the same total, which keeps the
+        // Balance Sheet balanced against the inventory lines.
+        if (row.code === null) {
+          item.amount += closingStock.total;
+        } else if (closingStock.map[row.code]) {
+          item.amount += closingStock.map[row.code].amount;
+        }
 
         if (row.category === "asset") {
           if (nonCurrentAssetNotes.includes(row.code)) {
@@ -1015,6 +1166,11 @@ export default function (pool) {
         COGM_OPENING_STOCK_NOTES,
       ]);
 
+      const closingStock = await getClosingStockValues(
+        validation.year,
+        validation.month
+      );
+
       // Categorize COGM items
       const rawMaterials = [];
       const packingMaterials = [];
@@ -1051,6 +1207,20 @@ export default function (pool) {
           otherCosts.push(item);
           totalOtherCosts += item.amount;
         }
+      }
+
+      // V3: inject the keyed month-end closing stock for raw and packing
+      // materials as the "LESS: CLOSING INVENTORIES" deductions. Report-level
+      // only; the GL never carries closing stock.
+      if (closingStock.map["14-2"]) {
+        const amount = closingStock.map["14-2"].amount;
+        rawMaterials.push({ note: "14-2", name: closingStock.map["14-2"].name, amount: -amount });
+        totalRawMaterials -= amount;
+      }
+      if (closingStock.map["14-3"]) {
+        const amount = closingStock.map["14-3"].amount;
+        packingMaterials.push({ note: "14-3", name: closingStock.map["14-3"].name, amount: -amount });
+        totalPackingMaterials -= amount;
       }
 
       const totalCogm = totalRawMaterials + totalPackingMaterials + totalLaborCosts + totalOtherCosts;

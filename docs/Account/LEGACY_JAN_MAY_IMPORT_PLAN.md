@@ -177,7 +177,7 @@ The giant synthetic opening-journal fallback was not selected and must not be in
 
 **Balance Sheet completeness implemented:** the BS adds **Current Year Profit** from the same journal-only income-statement formula. The Note 22 / Note 7 invoice overrides and their response metadata were removed; journal data and anchors are authoritative.
 
-**V2 development update (20 Jul 2026):** the final sentence of item 3 and the journal-only Current Year Profit description above are now historical. IS and BS Current Year Profit add only exact `YYYY-01-01` opening-stock anchors for Notes 3-1/3-3/3-7 once to inclusive posted YTD movement; CoGM adds only 3-3/3-7. TB/BS account balances keep their separate latest-anchor rule. Later checkpoints do not replace fiscal opening stock, and monthly closing stock remains V3.
+**V2 development update (20 Jul 2026):** the final sentence of item 3 and the journal-only Current Year Profit description above are now historical. IS and BS Current Year Profit add only exact `YYYY-01-01` opening-stock anchors for Notes 3-1/3-3/3-7 once to inclusive posted YTD movement; CoGM adds only 3-3/3-7. TB/BS account balances keep their separate latest-anchor rule. Later checkpoints do not replace fiscal opening stock; monthly closing stock was added by V3 (21 Jul 2026) via `closing_stock_values`, injected at report level.
 
 **Bank ledger cutover implemented:** [bank-statement.js](../../src/routes/accounting/bank-statement.js) now limits the synthetic CH_REV1/CH_REV2→BANK_PBB projection to dates before **2026-01-01**, preventing double-counting once real January bank rows are imported.
 
