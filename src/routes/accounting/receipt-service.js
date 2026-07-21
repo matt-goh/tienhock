@@ -343,12 +343,15 @@ export async function createReceipt(client, payload, userId) {
       a.customer_id = invoiceMap[a.invoice_id]?.customerid || null;
     }
   }
+  const invoiceIds = [
+    ...new Set(allocs.filter((a) => a.type === "invoice").map((a) => a.invoice_id)),
+  ].sort();
 
   const description = (payload.description || "").trim() || defaultDescription(allocs);
   const descriptionOverridden = Boolean((payload.description || "").trim());
   const displayReference =
     (payload.display_reference || payload.payment_reference || "").trim() ||
-    (method === "cash" && ids.length === 1 ? `C${ids[0]}` : null);
+    (method === "cash" && invoiceIds.length === 1 ? `C${invoiceIds[0]}` : null);
 
   // Insert as 'pending' first — the posted-needs-journal CHECK requires the
   // journal to exist before the status can become 'posted'
@@ -396,7 +399,7 @@ export async function createReceipt(client, payload, userId) {
   const paymentRows = [];
   for (const a of allocs) {
     if (a.type === "account") continue;
-    const compatInvoiceId = a.invoice_id || ids[0] || null;
+    const compatInvoiceId = a.invoice_id || invoiceIds[0] || null;
     if (!compatInvoiceId) continue; // excess with no invoice context: allocation row only
     const rowStatus = isPending ? "pending" : a.type === "excess" ? "overpaid" : "active";
     const rowRef =
