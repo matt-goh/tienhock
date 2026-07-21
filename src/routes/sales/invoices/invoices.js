@@ -2295,7 +2295,7 @@ export default function (pool, config) {
       const invoice = result.rows[0];
 
       // Format response (Match ExtendedInvoiceData)
-      res.json({
+      const response = {
         id: invoice.id,
         salespersonid: invoice.salespersonid,
         customerid: invoice.customerid,
@@ -2331,7 +2331,82 @@ export default function (pool, config) {
           total: String(product.total || "0.00"),
           issubtotal: product.issubtotal || false,
         })),
-      });
+      };
+
+      // Optionally bundle related records so the details page can load
+      // everything in one request (?include=payments,adjustments). The shapes
+      // below MUST mirror GET /api/payments and GET /api/adjustment-docs so the
+      // frontend can treat them identically.
+      const include = String(req.query.include || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      if (include.includes("payments")) {
+        const paymentsResult = await pool.query(
+          `
+          SELECT
+            p.payment_id, p.invoice_id, p.payment_date, p.amount_paid,
+            p.payment_method, p.payment_reference, p.internal_reference,
+            p.bank_account, p.journal_entry_id, p.is_auto_collection,
+            p.receipt_allocation_id, ra.receipt_id,
+            COALESCE(r.journal_entry_id, p.journal_entry_id) as voucher_journal_id,
+            r.status as receipt_status, r.display_reference as receipt_reference,
+            (SELECT COUNT(*)::integer
+               FROM receipts group_r
+               JOIN receipt_allocations group_ra ON group_ra.receipt_id = group_r.id
+              WHERE group_r.display_reference IS NOT DISTINCT FROM r.display_reference
+                AND group_r.received_date = r.received_date
+                AND group_r.payment_method = r.payment_method
+                AND group_r.debit_account = r.debit_account
+                AND group_r.origin = r.origin
+                AND group_r.status IN ('pending', 'posted')) as allocation_count,
+            p.notes, p.created_at, p.status, p.cancellation_date,
+            je.reference_no as journal_reference_no
+          FROM payments p
+          LEFT JOIN receipt_allocations ra ON ra.id = p.receipt_allocation_id
+          LEFT JOIN receipts r ON r.id = ra.receipt_id
+          LEFT JOIN journal_entries je
+            ON je.id = COALESCE(r.journal_entry_id, p.journal_entry_id)
+          WHERE p.invoice_id = $1
+          ORDER BY p.payment_date DESC, p.created_at DESC
+          `,
+          [id]
+        );
+        response.payments = paymentsResult.rows.map((p) => ({
+          ...p,
+          amount_paid: parseFloat(p.amount_paid || 0),
+        }));
+      }
+
+      if (include.includes("adjustments")) {
+        const adjResult = await pool.query(
+          `
+          SELECT a.*, i.customerid AS inv_customerid,
+                 i.einvoice_status AS original_invoice_einvoice_status,
+                 c.name AS customer_name,
+                 p.id AS paired_doc_id, COALESCE(p.display_id, p.id) AS paired_display_id,
+                 p.type AS paired_type, p.status AS paired_status,
+                 p.einvoice_status AS paired_einvoice_status
+            FROM adjustment_documents a
+            JOIN invoices i ON a.original_invoice_id = i.id
+       LEFT JOIN customers c ON a.customerid = c.id
+       LEFT JOIN adjustment_documents p ON a.paired_with_id = p.id
+           WHERE a.original_invoice_id = $1
+           ORDER BY a.created_at DESC
+          `,
+          [id]
+        );
+        response.adjustmentDocs = adjResult.rows.map((r) => ({
+          ...r,
+          total_excluding_tax: parseFloat(r.total_excluding_tax || 0),
+          tax_amount: parseFloat(r.tax_amount || 0),
+          rounding: parseFloat(r.rounding || 0),
+          totalamountpayable: parseFloat(r.totalamountpayable || 0),
+        }));
+      }
+
+      res.json(response);
     } catch (error) {
       console.error("Error fetching invoice:", error);
       res

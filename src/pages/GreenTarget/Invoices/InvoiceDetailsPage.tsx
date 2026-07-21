@@ -3141,7 +3141,10 @@ const InvoiceDetailsPage: React.FC = () => {
       </div>
 
       {/* Adjustment Documents (CN / DN / RN) inline list */}
-      <GTInvoiceAdjustmentDocsSection invoiceId={invoice.invoice_id} />
+      <GTInvoiceAdjustmentDocsSection
+        invoiceId={invoice.invoice_id}
+        docs={invoice.adjustmentDocs || []}
+      />
 
       {/* e-Invoice Details Section */}
       {invoice.einvoice_status && (

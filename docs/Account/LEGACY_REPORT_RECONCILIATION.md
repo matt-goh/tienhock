@@ -1,8 +1,8 @@
 # Jan–May 2026 legacy report reconciliation
 
-Date checked: 2026-07-20  
-Database: development; its immutable Jan–May journal population matches the guarded production import, while V2 anchors/mappings/report code are development-only  
-Status: Phase V1 evidence gate passed with zero unexplained rows; the exact approved Phase V2 package was implemented and verified on development 20 Jul 2026; production remains unchanged pending separate approval
+Date checked: 2026-07-21  
+Database: development; its immutable Jan–May journal population matches the guarded production import, while V2+V3 anchors/mappings/report code are development-only  
+Status: Phase V1 evidence gate passed with zero unexplained rows; the approved Phase V2 package (20 Jul 2026) and Phase V3 package (21 Jul 2026: keyed monthly closing stock + full debtor list/aging parity) were implemented and verified on development; production remains unchanged pending separate approval
 
 This is the sign-off companion to the
 [Legacy Report Verification Plan](LEGACY_REPORT_VERIFICATION_PLAN.md). It independently checks the
@@ -85,18 +85,21 @@ and the opening balance plus January/February is three months or older. Signed d
 are carried by month and payments consume positive balances oldest-first. That reconstruction
 matches all 150 scan rows exactly.
 
-The current ERP presentation still has three V3 gaps:
+The ERP presentation gaps below were **closed by V3 on 21 Jul 2026**: the general statement now
+computes the legacy CURRENT/PAYMENT columns directly, omits the 41 zero-close body rows, and ages
+by the signed-ledger FIFO model, so every row and bucket difference is exactly zero. The three
+historical gaps were:
 
 - The scan omits 41 customers whose May activity closes at zero. Those rows explain the printed
-  body/control differences without changing total due.
-- The current General Statement debit/credit split has five named column differences. They total
-  RM841.75 in each column and net to zero. The pinned fingerprint is
-  `3a9168d26b25a45e8e0048e7758ccf16f95409253fc58c5cddd461eb1d68c61b`.
-- Current invoice-linked aging has 11 named allocation-model differences. Their four bucket
-  differences net to zero, and the pinned fingerprint is
-  `4514569fc2c30814ef505e0737e26fc1c02cbf22a057110f5b8013ea6f0d9817`.
+  body/control differences without changing total due. (V3 now omits them from the body too.)
+- The pre-V3 General Statement debit/credit split had five named column differences, totaling
+  RM841.75 in each column and netting to zero. (V3 computes the legacy columns, so the
+  differences are exactly zero.)
+- Pre-V3 invoice-linked aging had 11 named allocation-model differences whose four bucket
+  differences net to zero. (V3 ages by the proven signed-ledger FIFO model, so the differences
+  are exactly zero.)
 
-### Five current-column presentation differences
+### Five current-column presentation differences (historical — closed by V3, 21 Jul 2026)
 
 The amounts below are scan minus the current ERP report. The exact debtor close is unchanged.
 
@@ -108,7 +111,7 @@ The amounts below are scan minus the current ERP report. The exact debtor close 
 | `MYSHOP-KM2` | -RM24.85 | +RM24.85 | TDL p3 r6 | Legacy nets May credit note THCN/26/16 out of CURRENT; the GL report puts its credit in PAYMENT. |
 | `MYSHOP-SKT` | -RM51.30 | +RM51.30 | TDL p3 r12 | Legacy nets May credit note THCN/26/14 out of CURRENT; the GL report puts its credit in PAYMENT. |
 
-### Eleven current-aging allocation differences
+### Eleven current-aging allocation differences (historical — closed by V3, 21 Jul 2026)
 
 | Account | Current | 1 month | 2 months | 3 months+ | Evidence | Named cause |
 |---|---:|---:|---:|---:|---|---|
@@ -488,6 +491,32 @@ Final evidence:
   mapping, progress, import-handoff, code-analysis and changelog documentation were advanced to the
   same boundary.
 
+### V3 execution result — 21 Jul 2026
+
+V3 closed the two remaining parity gaps exactly as scoped, through
+[`2026-07-21_closing_stock_values.sql`](../../dev/migrations/2026-07-21_closing_stock_values.sql)
+and the report/debtor route changes recorded in the plan's §7 execution record.
+
+- Monthly closing stock is keyed per month in `closing_stock_values` (Material Stock page
+  "Closing Stock (Financial Statements)" card) and injected at report level only; the GL 14-*
+  notes stay zero. May 2026 is seeded from the scans: RM188,979.60 / RM336,909.82 /
+  RM182,194.43 (total RM708,083.85).
+- The Trade Debtor general statement computes the legacy CURRENT/PAYMENT columns, totals over
+  the full 191-child population, omits the 41 zero-close body rows, and ages by the
+  signed-ledger FIFO model (`computeLegacyFifoAging`). The five column and eleven aging
+  differences above are all exactly zero.
+- Final May figures: BS balanced at RM8,980,756.68; net assets = financed-by RM6,090,429.60;
+  profit RM277,563.50; cogs RM2,374,443.87; CoGM RM2,479,030.27. The statement comparison is
+  36/40 exact; the four remaining lines (BS note 13, IS note 5, and both profit cross-totals)
+  differ by exactly ±RM7,261.51 — the genuine GP-202604-0001 April invoice keyed 20 Jul 2026,
+  after the scans. Net assets/profit therefore land RM7,261.51 below the printed
+  RM6,097,691.11 / RM284,825.01 shown in the boundary table above.
+- Full-population FIFO aging totals RM316,376.89 / RM124,740.50 / RM24,055.71 / RM42,524.62
+  reconcile to total due RM507,697.72 exactly; the printed scan current-aging total omits
+  zero-close rows' buckets and stays informational.
+- Standing harness re-pinned and green 21 Jul 2026: `validate-fixtures.mjs` ALL CHECKS PASSED;
+  `verify-legacy-reports.mjs` ALL STAGES GREEN.
+
 ## Standing verification and audit artifacts
 
 With the development database running as `tienhock_dev_db`, run from the repository root:
@@ -497,7 +526,7 @@ node dev/import/legacy-report-fixtures/validate-fixtures.mjs
 node dev/import/legacy-report-fixtures/verify-legacy-reports.mjs
 ```
 
-The first command must end with `ALL CHECKS PASSED`. The transitioned V1/V2 harness must end with
+The first command must end with `ALL CHECKS PASSED`. The transitioned V1/V2/V3 harness must end with
 `ALL STAGES GREEN`. It writes the ignored local outputs
 `generated/account-map.json`, `tb-comparison.json`, `tdl-comparison.json`, and
 `statements-comparison.json`, plus `v2-regression.json`.
@@ -509,21 +538,25 @@ Tracked audit machinery:
 - [source-manifest.json](../../dev/import/legacy-report-fixtures/source-manifest.json)
 - [scan-code-exceptions.json](../../dev/import/legacy-report-fixtures/scan-code-exceptions.json)
 
-The current harness now pins the final V2 state: 880 exact TB accounts, 642 balanced January
-anchors, all 156 approved mappings, the exact ten V3-only statement residuals, immutable IMP and
-the June regressions. The old `verify-import.sql` and `insert-opening-anchors.sql` remain immutable
+The current harness now pins the final V3 state: 880 exact TB accounts, 642 balanced January
+anchors, all 156 approved mappings, keyed May closing stock equal to the scanned figures, 36/40
+exact statement lines plus the four named GP-drift lines, 150/150 debtor rows with zero
+column/aging differences plus the full-population FIFO totals, immutable IMP and the June
+regressions. The old `verify-import.sql` and `insert-opening-anchors.sql` remain immutable
 pre-V2 evidence and will correctly fail against the 642-anchor final state; the guarded V2
 migration and transitioned harness are the final verifier.
 
 ## Boundaries and remaining work
 
-- Only May BS/IS/CoGM scans exist. Jan–April statement parity and monthly closing-stock values are
-  not independently evidenced; the five TBs still prove every account movement and opening level.
-- V3 must design the monthly closing-stock mechanism, then reproduce May values
-  RM188,979.60 / RM336,909.82 / RM182,194.43.
-- V3 must close the five debtor column-presentation differences, omit the 41 zero-close body rows
-  under the intended control policy, and offer the proven signed-ledger FIFO aging model for the
-  11 allocation differences.
+- Only May BS/IS/CoGM scans exist. Jan–April statement parity and their monthly closing-stock
+  values are not independently evidenced; the five TBs still prove every account movement and
+  opening level.
+- ~~V3 must design the monthly closing-stock mechanism~~ — done 21 Jul 2026: exact-month values
+  are keyed in `closing_stock_values` on the Material Stock page and injected at report level;
+  May reproduces RM188,979.60 / RM336,909.82 / RM182,194.43 exactly.
+- ~~V3 must close the five debtor column-presentation differences, omit the 41 zero-close body
+  rows, and offer the proven signed-ledger FIFO aging model~~ — done 21 Jul 2026: all column and
+  aging differences are exactly zero and the body prints only non-zero-close rows.
 - The bonus creditor page and supplier/AP comparison remain outside scope.
 - Content and accounting parity are the goal; visual layout parity is not.
 - V2 `fs_note` changes affect historical and future report levels. The standing harness therefore
@@ -533,8 +566,10 @@ migration and transitioned harness are the final verifier.
 
 ## Next decision: production remains separate
 
-The recommended option was selected and is complete on development: balanced RM5,389,607.26 V2,
-with the RM708,083.85 closing-stock mechanism left to V3. Expanding V2 to closing stock was not
-selected. No production database, process or deployment was changed; any production rollout needs
-a fresh read-only inventory, validated rollback and separate approval before this guarded migration
-or report engine is deployed there.
+The recommended option was selected and both packages are complete on development: the V2 opening
+package (balanced RM5,389,607.26, 20 Jul) and V3 (21 Jul) — keyed monthly closing stock taking the
+May BS to RM8,980,756.68 (net assets RM6,090,429.60) and full Trade Debtor column/aging parity.
+The only remaining scan differences anywhere are the named ±RM7,261.51 GP-202604-0001 lines. No
+production database, process or deployment was changed; any production rollout needs a fresh
+read-only inventory, validated rollback and separate approval before this guarded migration or
+report engine is deployed there.

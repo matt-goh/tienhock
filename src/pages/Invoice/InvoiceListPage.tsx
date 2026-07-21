@@ -316,9 +316,27 @@ const InvoiceListPage: React.FC = () => {
   const [showSubmissionResults, setShowSubmissionResults] = useState(false);
   const [submissionResults, setSubmissionResults] = useState(null);
   const [isSubmittingInvoices, setIsSubmittingInvoices] = useState(false);
-  const [showConsolidatedModal, setShowConsolidatedModal] = useState(false);
+  const [showConsolidatedModal, setShowConsolidatedModal] = useState(
+    () => !!(location.state as { openConsolidatedModal?: boolean } | null)
+      ?.openConsolidatedModal
+  );
   const [showPrintOverlay, setShowPrintOverlay] = useState(false);
   const [showSoloPrintOverlay, setShowSoloPrintOverlay] = useState(false);
+
+  // Consume the "reopen the consolidation modal" flag set when returning from
+  // the consolidated invoice page, so a later refresh does not reopen it.
+  useEffect(() => {
+    if (
+      (location.state as { openConsolidatedModal?: boolean } | null)
+        ?.openConsolidatedModal
+    ) {
+      navigate(location.pathname + location.search, {
+        replace: true,
+        state: null,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isGeneratingSoloPDF, setIsGeneratingSoloPDF] = useState(false);
   const [selectedInvoicesForPDF, setSelectedInvoicesForPDF] = useState<

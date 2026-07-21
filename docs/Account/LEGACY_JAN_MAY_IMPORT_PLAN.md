@@ -1,6 +1,6 @@
 # Legacy Jan–May 2026 Ledger Import — Plan & Handover
 
-**Created 13 Jul 2026. Updated 14 Jul 2026 — GUARDED ACCOUNTING IMPORT AND AUDITOR-FACING PRESENTATION COMPLETE AND VERIFIED IN PRODUCTION.**
+**Created 13 Jul 2026. Updated 14 Jul 2026 — GUARDED ACCOUNTING IMPORT AND AUDITOR-FACING PRESENTATION COMPLETE AND VERIFIED IN PRODUCTION.** Follow-on scan-verification Phases V2 (residue closure) and V3 (closing stock + debtor parity) completed on development 20–21 Jul 2026; production retains the import-era state pending the separately approved rollout — see [LEGACY_REPORT_VERIFICATION_PLAN.md](LEGACY_REPORT_VERIFICATION_PLAN.md).
 Goal: extend the 1:1 legacy parity already achieved for June 2026 (see [INVOICE_PAYMENT_ACCOUNTING_PROGRESS.md](INVOICE_PAYMENT_ACCOUNTING_PROGRESS.md)) backwards to 1 January 2026, by importing the legacy system's Jan–May ledger exports as posted journals, so that **every 2026 report (Trial Balance, Income Statement, Balance Sheet, CoGM, Account Ledger, Customer/General Statements) reads real journal data for the whole year**. June onwards is organic ERP entry (already row-by-row reconciled); Jan–May becomes imported legacy truth; the two meet at the existing 1 June anchors, which become verification checkpoints.
 
 The deterministic preflight, staging load, five monthly `IMP` batches,
@@ -10,7 +10,7 @@ rollback backup. Production has exactly 3,863 imported journals / 10,068 lines
 and DR = CR RM13,503,516.15; the proof and pristine rollback databases remain
 retained, and the database, report, PM2, and HTTP checks passed. The approved
 HPB interest-in-suspense classification is applied and the Balance Sheet
-residue remains the exact RM1,456,480.37 opening limitation. The RM483 debit in
+residue remains the exact RM1,456,480.37 opening limitation (closed on development by report Phase V2, 20 Jul 2026 — §8-1). The RM483 debit in
 manual June journal `PV008/06` remains unchanged because available legacy
 evidence proves only its bank credit, not the expense contra. See §10 for the
 executed state and remaining source-invoice boundary.
@@ -161,7 +161,7 @@ collides; imported rows are the Jan–May sales ledger.
 ## 5. Openings & statement wiring — implemented on development
 
 **Applied mechanism:** anchors at 2026-01-01 + `account_opening_balances` in the
-TB/BS engines. Development now has 580 January anchors: 291 nonzero balances
+TB/BS engines. Development now has 580 January anchors (the pre-V2 population — report Phase V2 took it to 642, DR = CR RM13,180,681.18 per side): 291 nonzero balances
 and 289 explicit zero fences. The guarded insert preserved the pre-existing
 `C-CARE(1)` RM7,635.00 row, inserted 579 rows, and inserted zero rows on rerun:
 
@@ -177,7 +177,7 @@ The giant synthetic opening-journal fallback was not selected and must not be in
 
 **Balance Sheet completeness implemented:** the BS adds **Current Year Profit** from the same journal-only income-statement formula. The Note 22 / Note 7 invoice overrides and their response metadata were removed; journal data and anchors are authoritative.
 
-**V2 development update (20 Jul 2026):** the final sentence of item 3 and the journal-only Current Year Profit description above are now historical. IS and BS Current Year Profit add only exact `YYYY-01-01` opening-stock anchors for Notes 3-1/3-3/3-7 once to inclusive posted YTD movement; CoGM adds only 3-3/3-7. TB/BS account balances keep their separate latest-anchor rule. Later checkpoints do not replace fiscal opening stock, and monthly closing stock remains V3.
+**V2 development update (20 Jul 2026):** the final sentence of item 3 and the journal-only Current Year Profit description above are now historical. IS and BS Current Year Profit add only exact `YYYY-01-01` opening-stock anchors for Notes 3-1/3-3/3-7 once to inclusive posted YTD movement; CoGM adds only 3-3/3-7. TB/BS account balances keep their separate latest-anchor rule. Later checkpoints do not replace fiscal opening stock; monthly closing stock was added by V3 (21 Jul 2026) via `closing_stock_values`, injected at report level.
 
 **Bank ledger cutover implemented:** [bank-statement.js](../../src/routes/accounting/bank-statement.js) now limits the synthetic CH_REV1/CH_REV2→BANK_PBB projection to dates before **2026-01-01**, preventing double-counting once real January bank rows are imported.
 
@@ -199,6 +199,7 @@ The giant synthetic opening-journal fallback was not selected and must not be in
 | **L6** ✅ production cutover | Audit live state, rehearse on a fresh proof database, stop writes, validate rollback, reproduce L2→L5, and verify the live app | completed 13 Jul 2026; proof and pristine rollback retained; production database/report/PM2/HTTP gates passed |
 | **L7** ✅ dev + proof + prod | After the last successful old `verify-import.sql`, run and rerun `2026-07-14_legacy_journal_presentation.sql`, then deploy the auditor-facing API/UI | completed 14 Jul 2026; semantic types/provenance/descriptions/line refs exact, second run updated 0/0, v2 accounting fingerprint unchanged |
 | **Report V2** ✅ development only | Apply the scan-evidenced 63 CS zero fences, 62 OS anchors, 125 APPX corrections and narrow fiscal-opening report semantics | development verified 20 Jul 2026 at 880/880 TB exact and balanced RM5,389,607.26 pre-closing-stock BS boundary; production requires separate approval |
+| **Report V3** ✅ development only | Key exact-month closing stock in `closing_stock_values` (Material Stock page card) injected at report level into BS/IS/CoGM; debtor list/statement legacy CURRENT/PAYMENT columns, zero-close body filter and signed-ledger FIFO aging | development verified 21 Jul 2026 — May BS balances RM8,980,756.68 (net assets RM6,090,429.60 = scan RM6,097,691.11 less the named RM7,261.51 GP-202604-0001 drift), 150/150 debtor rows exact; production requires separate approval |
 
 ---
 
@@ -287,6 +288,8 @@ maintenance window. The post-migration inventory matched accounting fingerprint
 `70cc1b6d97fc2fdaeff191c14092f531`, all nine semantic type counts, 3,863 unique
 source links, 3,862 visible references, and 10,068 exact line references. The
 application deployment completed on production commit `b4a6493d`.
+
+**Post-V2 verifier status (21 Jul 2026):** `verify-import.sql` and `insert-opening-anchors.sql` intentionally still pin the pre-V2 580-anchor/residue state and remain pre-V2 evidence only — never weaken them in place. The standing regression gate for the Jan–May books is the legacy-report harness: `node dev/import/legacy-report-fixtures/validate-fixtures.mjs` and `node dev/import/legacy-report-fixtures/verify-legacy-reports.mjs` (ALL STAGES GREEN on the 21 Jul 2026 production-copy development database).
 
 ---
 
@@ -400,7 +403,7 @@ as follows:
    nonposting and leave the imported journals untouched.
 2. Keep the private source CSV,
    generated staging CSV/report, and production dump untracked.
-3. **Independent verification (completed through V2 on development 20 Jul 2026):** the user exported scanned
+3. **Independent verification (completed through V3 on development 21 Jul 2026):** the user exported scanned
    legacy reports (Jan–May monthly Trial Balances, May Balance Sheet / Detail
    Income Statement / CoGM / Trade Debtor List). They provably contain the
    decomposition of the RM1,456,480.37 opening residue (opening inventories
@@ -410,7 +413,7 @@ as follows:
    [LEGACY_REPORT_RECONCILIATION.md](LEGACY_REPORT_RECONCILIATION.md). This
    document's 580-anchor figures remain immutable pre-V2 import evidence; the
    final development verifier expects 642 balanced January anchors. Production
-   remains unchanged pending separate approval.
+   remains unchanged pending separate approval. Phase V3 (21 Jul 2026, development) then added keyed monthly closing stock (`closing_stock_values`, report-level injection into BS/IS/CoGM) and full Trade Debtor list/statement parity (legacy CURRENT/PAYMENT columns, zero-close body filter, signed-ledger FIFO aging): the May Balance Sheet balances at RM8,980,756.68 and 150/150 debtor rows match the scans exactly.
 
 ---
 

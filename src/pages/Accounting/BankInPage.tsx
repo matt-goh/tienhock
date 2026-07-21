@@ -11,7 +11,17 @@ import Checkbox from "../../components/Checkbox";
 import { FormInput, FormListbox } from "../../components/FormComponents";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
+import TimeNavigator from "../../components/TimeNavigator";
 import { api } from "../../routes/utils/api";
+
+// Parse a yyyy-MM-dd string into a local Date (null when empty/invalid).
+const parseYmd = (s: string): Date | null => {
+  if (!s) return null;
+  const [y, m, d] = s.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const date = new Date(y, m - 1, d);
+  return isNaN(date.getTime()) ? null : date;
+};
 
 interface CashSalesPool {
   source_date: string;
@@ -79,6 +89,10 @@ const BankInPage: React.FC = () => {
   const [step, setStep] = useState<"select" | "preview">("select");
   const [cancelTarget, setCancelTarget] = useState<BankInRow | null>(null);
 
+  // History-table date filter (scopes only the bank-in list, not the pools/receipts).
+  const [filterStart, setFilterStart] = useState<string>("");
+  const [filterEnd, setFilterEnd] = useState<string>("");
+
   const [postingDate, setPostingDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
   const [bankAccount, setBankAccount] = useState<string>("BANK_PBB");
   const [rvNumber, setRvNumber] = useState<string>("");
@@ -90,8 +104,11 @@ const BankInPage: React.FC = () => {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
+      const listParams = new URLSearchParams({ limit: "100" });
+      if (filterStart) listParams.append("startDate", filterStart);
+      if (filterEnd) listParams.append("endDate", filterEnd);
       const [list, poolData] = await Promise.all([
-        api.get("/api/bank-ins?limit=100"),
+        api.get(`/api/bank-ins?${listParams.toString()}`),
         api.get("/api/bank-ins/pools"),
       ]);
       setBankIns(Array.isArray(list) ? list : []);
@@ -104,7 +121,7 @@ const BankInPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filterStart, filterEnd]);
 
   useEffect(() => {
     fetchAll();
@@ -285,24 +302,43 @@ const BankInPage: React.FC = () => {
           </p>
         </div>
         {!showForm && (
-          <Button color="sky" icon={IconPlus} onClick={() => setShowForm(true)}>
-            New Bank-In
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <TimeNavigator
+              range={{ start: parseYmd(filterStart), end: parseYmd(filterEnd) }}
+              onChange={(r) => {
+                setFilterStart(format(r.start, "yyyy-MM-dd"));
+                setFilterEnd(format(r.end, "yyyy-MM-dd"));
+              }}
+              placeholder="All dates"
+              size="sm"
+            />
+            <Button color="sky" icon={IconPlus} onClick={() => setShowForm(true)}>
+              New Bank-In
+            </Button>
+          </div>
         )}
       </div>
 
       {showForm && (
         <div className="w-full bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-            <FormInput
-              name="posting_date"
-              label="Bank-In Date"
-              type="date"
-              value={postingDate}
-              onChange={(e) => setPostingDate(e.target.value)}
-              disabled={isSubmitting || step === "preview"}
-              required
-            />
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                Bank-In Date <span className="text-red-500">*</span>
+              </label>
+              <TimeNavigator
+                range={{ start: parseYmd(postingDate), end: parseYmd(postingDate) }}
+                onChange={(r) => setPostingDate(format(r.start, "yyyy-MM-dd"))}
+                modes={["day"]}
+                presets={false}
+                showArrows={false}
+                allowFuture
+                disabled={isSubmitting || step === "preview"}
+                placeholder="Pick date"
+                className="w-full"
+                triggerClassName="w-full justify-between"
+              />
+            </div>
             <FormListbox
               name="bank_account"
               label="Bank Account"
@@ -568,7 +604,9 @@ const BankInPage: React.FC = () => {
             {bankIns.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-8 text-center text-default-400">
-                  No bank-ins yet
+                  {filterStart || filterEnd
+                    ? "No bank-ins in this date range"
+                    : "No bank-ins yet"}
                 </td>
               </tr>
             )}
