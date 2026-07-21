@@ -274,12 +274,16 @@ const AccountCodeListPage: React.FC = () => {
       filtered = filtered.filter((a) => a.is_active);
     }
 
-    filtered = filtered.filter(
-      (account: AccountCode): boolean =>
-        parentCodes.has(account.code) ||
-        !account.parent_code ||
-        favouriteCodes.has(account.code)
-    );
+    // Default browsing view shows parents/top-level/favourites only; while
+    // searching, keep every match so leaf children (e.g. RM's children) surface.
+    if (!searchTerm) {
+      filtered = filtered.filter(
+        (account: AccountCode): boolean =>
+          parentCodes.has(account.code) ||
+          !account.parent_code ||
+          favouriteCodes.has(account.code)
+      );
+    }
 
     return filtered;
   }, [
