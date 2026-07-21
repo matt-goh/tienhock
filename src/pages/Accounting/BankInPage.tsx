@@ -574,7 +574,7 @@ const BankInPage: React.FC = () => {
                 key={b.id}
                 className="border-t border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/40"
               >
-                <td className="px-4 py-2.5 whitespace-nowrap">{fmtDMY(String(b.posting_date).slice(0, 10))}</td>
+                <td className="px-4 py-2.5 whitespace-nowrap">{fmtDMY(format(new Date(b.posting_date), "yyyy-MM-dd"))}</td>
                 <td className="px-4 py-2.5 font-mono">{b.rv_number}</td>
                 <td className="px-4 py-2.5">{b.bank_account}</td>
                 <td className="px-4 py-2.5 text-default-600 dark:text-gray-400">
