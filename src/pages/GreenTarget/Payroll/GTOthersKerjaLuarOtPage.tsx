@@ -235,10 +235,9 @@ const GTOthersKerjaLuarOtPage: React.FC = () => {
             return "";
           }
         })();
-        const dateIso =
-          typeof r.record_date === "string"
-            ? r.record_date.slice(0, 10)
-            : "";
+        const dateIso = r.record_date
+          ? format(new Date(r.record_date), "yyyy-MM-dd")
+          : "";
         const amount = Number(r.amount) || 0;
         const haystack = [
           r.employee_name || "",
