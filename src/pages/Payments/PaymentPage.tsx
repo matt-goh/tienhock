@@ -154,8 +154,13 @@ const PaymentPage: React.FC = () => {
   };
 
   const handleAddPaymentToGroup = (payment: Payment): void => {
-    if (payment.payment_method === "contra") {
-      toast.error("Contra credits cannot be reused as payment groups.");
+    if (
+      payment.payment_method === "contra" ||
+      payment.payment_method === "overpayment"
+    ) {
+      toast.error(
+        "Contra and overpayment credits cannot be reused as payment groups."
+      );
       return;
     }
     if (!payment.payment_reference) {
