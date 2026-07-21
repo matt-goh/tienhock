@@ -16,6 +16,7 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import SubmissionResultsModal from "../../components/Invoice/SubmissionResultsModal";
 import { FormInput, FormListbox } from "../../components/FormComponents";
+import TimeNavigator, { type TimeRange } from "../../components/TimeNavigator";
 import {
   getInvoiceDetailsBundle,
   cancelInvoice,
@@ -234,6 +235,11 @@ const isCustomerChangeBlockedData = (
   Array.isArray((data as Partial<InvoiceCustomerChangeBlockedData>).blockers);
 
 // --- Main Component ---
+const createTodayClearanceRange = (): TimeRange => {
+  const today: Date = new Date();
+  return { start: today, end: today };
+};
+
 const InvoiceDetailsPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -298,8 +304,8 @@ const InvoiceDetailsPage: React.FC = () => {
     useState(false);
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
   const [selectedBankAccountForConfirm, setSelectedBankAccountForConfirm] = useState<string>("BANK_PBB"); // Default to Public Bank for payment confirmation
-  const [clearanceDateForConfirm, setClearanceDateForConfirm] =
-    useState<string>("");
+  const [clearanceDateRangeForConfirm, setClearanceDateRangeForConfirm] =
+    useState<TimeRange>(createTodayClearanceRange);
   const paymentConfirmationGroupSize: number = Math.max(
     1,
     Number(paymentToConfirm?.allocation_count) || 1
@@ -1304,16 +1310,16 @@ const InvoiceDetailsPage: React.FC = () => {
     setPaymentToConfirm(payment);
     // Pre-populate with existing bank account or default to BANK_PBB
     setSelectedBankAccountForConfirm(payment.bank_account || "BANK_PBB");
-    setClearanceDateForConfirm("");
+    setClearanceDateRangeForConfirm(createTodayClearanceRange());
     setShowConfirmPaymentDialog(true);
   };
 
   const handleConfirmPaymentConfirm = async (): Promise<void> => {
     if (!paymentToConfirm || isConfirmingPayment) return;
-    if (!clearanceDateForConfirm) {
-      toast.error("Select the date the cheque actually cleared the bank.");
-      return;
-    }
+    const clearanceDateForConfirm: string = format(
+      clearanceDateRangeForConfirm.start,
+      "yyyy-MM-dd"
+    );
 
     setIsConfirmingPayment(true);
     setShowConfirmPaymentDialog(false);
@@ -1340,7 +1346,7 @@ const InvoiceDetailsPage: React.FC = () => {
       setIsConfirmingPayment(false);
       setPaymentToConfirm(null);
       setSelectedBankAccountForConfirm("BANK_PBB"); // Reset to default
-      setClearanceDateForConfirm("");
+      setClearanceDateRangeForConfirm(createTodayClearanceRange());
     }
   };
 
@@ -2635,7 +2641,7 @@ const InvoiceDetailsPage: React.FC = () => {
             setShowConfirmPaymentDialog(false);
             setPaymentToConfirm(null);
             setSelectedBankAccountForConfirm("BANK_PBB");
-            setClearanceDateForConfirm("");
+            setClearanceDateRangeForConfirm(createTodayClearanceRange());
           }}
           onConfirm={() => void handleConfirmPaymentConfirm()}
           title={
@@ -2701,16 +2707,21 @@ const InvoiceDetailsPage: React.FC = () => {
               )}
 
               <div>
-                <FormInput
-                  name="cheque_clearance_date"
-                  label="Cheque Clearance Date"
-                  type="date"
-                  value={clearanceDateForConfirm}
-                  onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
-                    setClearanceDateForConfirm(event.target.value)
+                <label className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300">
+                  Cheque Clearance Date
+                </label>
+                <TimeNavigator
+                  range={clearanceDateRangeForConfirm}
+                  onChange={(range: TimeRange): void =>
+                    setClearanceDateRangeForConfirm(range)
                   }
+                  modes={["day"]}
+                  presets={false}
+                  showArrows={false}
+                  size="sm"
                   disabled={isConfirmingPayment}
-                  required
+                  className="w-full"
+                  triggerClassName="w-full justify-between"
                 />
                 <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
                   Use the date the bank statement shows the cheque as cleared.
@@ -2730,6 +2741,7 @@ const InvoiceDetailsPage: React.FC = () => {
               : "Confirm Payment"
           }
           variant="success"
+          allowContentOverflow
         />
       )}
       <ConfirmationDialog
