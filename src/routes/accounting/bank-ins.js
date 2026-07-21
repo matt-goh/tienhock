@@ -81,7 +81,7 @@ export default function (pool) {
         `SELECT * FROM (
            SELECT bi.id, 'bank_in'::text AS kind, rv.rv_number, rv.rv_year, rv.rv_seq,
                   bi.posting_date, bi.bank_account, bi.total_amount, bi.status,
-                  bi.notes AS description,
+                  bi.notes AS description, bi.journal_entry_id,
                   je.reference_no AS journal_reference_no,
                   (SELECT json_agg(json_build_object(
                       'id', big.id, 'group_number', big.group_number,
@@ -104,6 +104,7 @@ export default function (pool) {
                     ORDER BY jel.line_number
                     LIMIT 1) AS bank_account,
                   je.total_debit AS total_amount, je.status, je.description,
+                  je.id AS journal_entry_id,
                   je.reference_no AS journal_reference_no,
                   NULL::json AS groups
              FROM journal_entries je

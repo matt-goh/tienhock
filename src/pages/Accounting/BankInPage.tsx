@@ -3,6 +3,7 @@
 // (partial amounts allowed) and CH_REV2 credit-invoice cash receipts, under a
 // shared editable RV###/MM number. Posts DR bank / CR holding via /api/bank-ins.
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
 import { IconBuildingBank, IconPlus } from "@tabler/icons-react";
@@ -64,6 +65,7 @@ interface BankInRow {
   total_amount: string;
   status: string;
   description: string | null;
+  journal_entry_id: number | null;
   groups:
     | { group_number: number; holding_account: string; amount: string; description: string }[]
     | null;
@@ -578,7 +580,16 @@ const BankInPage: React.FC = () => {
               >
                 <td className="px-4 py-2.5 whitespace-nowrap">{fmtDMY(format(new Date(b.posting_date), "yyyy-MM-dd"))}</td>
                 <td className="px-4 py-2.5 font-mono">
-                  {b.rv_number}
+                  {b.journal_entry_id ? (
+                    <Link
+                      to={`/accounting/journal-entries/${b.journal_entry_id}`}
+                      className="text-sky-600 dark:text-sky-400 hover:underline"
+                    >
+                      {b.rv_number}
+                    </Link>
+                  ) : (
+                    b.rv_number
+                  )}
                   {b.kind === "manual_journal" && (
                     <span className="ml-2 inline-flex px-1.5 py-0.5 text-xs font-medium rounded bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-400 font-sans">
                       Manual
