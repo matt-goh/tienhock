@@ -2,6 +2,18 @@
 import { Router } from "express";
 import cache, { CACHE_TTL, CACHE_KEYS } from "../utils/memory-cache.js";
 
+// pg returns `date` columns as JS Date objects at local midnight; using
+// .toISOString() to derive yyyy-MM-dd shifts the day back one in UTC+8 (see
+// CLAUDE.md rule 17). Extract from the Date's local fields instead.
+const dateToYmd = (value) => {
+  if (!value) return "";
+  if (typeof value === "string") return value.slice(0, 10);
+  const y = value.getFullYear();
+  const m = String(value.getMonth() + 1).padStart(2, "0");
+  const d = String(value.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
 export default function (pool) {
   const router = Router();
 
@@ -109,15 +121,9 @@ export default function (pool) {
               job: Array.isArray(staff.job) ? staff.job : [],
               location: Array.isArray(staff.location) ? staff.location : [],
               // Format dates
-              birthdate: staff.birthdate
-                ? staff.birthdate.toISOString().split("T")[0]
-                : "",
-              dateJoined: staff.dateJoined
-                ? staff.dateJoined.toISOString().split("T")[0]
-                : "",
-              dateResigned: staff.dateResigned
-                ? staff.dateResigned.toISOString().split("T")[0]
-                : "",
+              birthdate: dateToYmd(staff.birthdate),
+              dateJoined: dateToYmd(staff.dateJoined),
+              dateResigned: dateToYmd(staff.dateResigned),
             }));
 
       // Cache the result
@@ -480,8 +486,7 @@ export default function (pool) {
       const staff = result.rows[0];
 
       // Format dates
-      const formatDate = (date) =>
-        date ? new Date(date).toISOString().split("T")[0] : "";
+      const formatDate = dateToYmd;
 
       // Convert null values to empty strings and format dates
       const formattedStaff = Object.entries(staff).reduce(

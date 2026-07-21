@@ -84,10 +84,10 @@ const formatCurrency = (amount: number): string =>
 
 const formatIsoDate = (s: string | null | undefined): string => {
   if (!s) return "—";
-  const iso = s.slice(0, 10);
-  const [y, m, d] = iso.split("-").map(Number);
-  if (!y || !m || !d) return "—";
-  return new Date(y, m - 1, d).toLocaleDateString("en-GB");
+  // `s` may be a full UTC ISO string from a `date` column; parse and read in
+  // local time (CLAUDE.md rule 17) — slicing would keep the UTC (previous) day.
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-GB");
 };
 
 const GTAdjustmentDocsDetailsPage: React.FC = () => {
