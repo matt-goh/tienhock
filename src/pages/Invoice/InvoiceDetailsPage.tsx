@@ -17,8 +17,7 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import SubmissionResultsModal from "../../components/Invoice/SubmissionResultsModal";
 import { FormInput, FormListbox } from "../../components/FormComponents";
 import {
-  getInvoiceById,
-  getPaymentsForInvoice,
+  getInvoiceDetailsBundle,
   cancelInvoice,
   cancelPayment,
   getGroupedReceiptCancellationError,
@@ -389,41 +388,23 @@ const InvoiceDetailsPage: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      // Fetch concurrently
-      const [invoiceRes, paymentsRes] = await Promise.allSettled([
-        getInvoiceById(invoiceId),
-        getPaymentsForInvoice(invoiceId, true),
-      ]);
+      // Single request bundles the invoice, its payments, and adjustment docs.
+      const { invoice, payments, adjustmentDocs } =
+        await getInvoiceDetailsBundle(invoiceId);
 
-      // Process Invoice Response
-      if (invoiceRes.status === "fulfilled") {
-        setInvoiceData(invoiceRes.value);
-        // Pre-fill payment amount based on fetched balance
-        setPaymentFormData((prev) => ({
-          ...prev,
-          amount_paid:
-            invoiceRes.value.balance_due > 0 ? invoiceRes.value.balance_due : 0, // Ensure non-negative
-        }));
-      } else {
-        console.error("Failed to fetch invoice:", invoiceRes.reason);
-        throw new Error(
-          invoiceRes.reason?.message || "Failed to load invoice details."
-        );
-      }
-
-      // Process Payments Response
-      if (paymentsRes.status === "fulfilled") {
-        setPayments(paymentsRes.value);
-      } else {
-        // Don't fail the whole page if only payments fail, just log and show message maybe
-        console.error("Failed to fetch payments:", paymentsRes.reason);
-        toast.error("Could not load payment history.");
-        setPayments([]); // Clear previous payments if fetch fails
-      }
+      setInvoiceData(invoice);
+      // Pre-fill payment amount based on fetched balance
+      setPaymentFormData((prev) => ({
+        ...prev,
+        amount_paid: invoice.balance_due > 0 ? invoice.balance_due : 0, // Ensure non-negative
+      }));
+      setPayments(payments);
+      setAdjustmentDocs(adjustmentDocs);
     } catch (err: any) {
       setError(err.message || "Failed to load invoice details.");
       setInvoiceData(null); // Clear data on critical error
       setPayments([]);
+      setAdjustmentDocs([]);
     } finally {
       setIsLoading(false);
     }
@@ -2606,7 +2587,7 @@ const InvoiceDetailsPage: React.FC = () => {
         <div className="mt-4">
           <InvoiceAdjustmentDocsSection
             invoiceId={invoiceData.id}
-            onDocsLoaded={setAdjustmentDocs}
+            docs={adjustmentDocs}
           />
         </div>
       )}

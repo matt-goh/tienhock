@@ -271,6 +271,60 @@ export const getInvoiceById = async (
   }
 };
 
+// GET Invoice details bundle (invoice + payments + adjustment docs) in a single
+// request. Used by the invoice details page so it doesn't fire three separate
+// GET calls on load.
+export interface InvoiceDetailsBundle {
+  invoice: ExtendedInvoiceData;
+  payments: Payment[];
+  adjustmentDocs: any[];
+}
+
+export const getInvoiceDetailsBundle = async (
+  id: string
+): Promise<InvoiceDetailsBundle> => {
+  try {
+    const inv = await api.get(
+      `/api/invoices/${id}?include=payments,adjustments`
+    );
+
+    if (!inv || !inv.id) {
+      throw new Error("Invoice not found or invalid response.");
+    }
+
+    const { payments, adjustmentDocs, ...invoiceFields } = inv;
+
+    const invoice: ExtendedInvoiceData = {
+      ...invoiceFields,
+      total_excluding_tax: parseFloat(inv.total_excluding_tax || 0),
+      tax_amount: parseFloat(inv.tax_amount || 0),
+      rounding: parseFloat(inv.rounding || 0),
+      totalamountpayable: parseFloat(inv.totalamountpayable || 0),
+      products: ensureProductsHaveUid(inv.products),
+      customerName: inv.customerName || inv.customerid,
+      is_consolidated: Boolean(inv.is_consolidated || false),
+      consolidated_invoices: inv.consolidated_invoices,
+    };
+
+    return {
+      invoice,
+      payments: Array.isArray(payments)
+        ? payments.map((p: any) => ({
+            ...p,
+            amount_paid: parseFloat(p.amount_paid || 0),
+          }))
+        : [],
+      adjustmentDocs: Array.isArray(adjustmentDocs) ? adjustmentDocs : [],
+    };
+  } catch (error) {
+    console.error(`Error fetching invoice details for ${id}:`, error);
+    const errorMessage =
+      error instanceof Error ? error.message : `Failed to fetch invoice ${id}`;
+    toast.error(errorMessage);
+    throw new Error(errorMessage);
+  }
+};
+
 // GET Multiple Invoices By IDs (batch fetch)
 export const getInvoicesByIds = async (
   ids: string[]
