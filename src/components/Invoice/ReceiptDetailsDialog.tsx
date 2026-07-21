@@ -23,10 +23,15 @@ import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import Button from "../Button";
 import ConfirmationDialog from "../ConfirmationDialog";
-import { FormInput } from "../FormComponents";
+import TimeNavigator, { type TimeRange } from "../TimeNavigator";
 
 type PaymentGroupStatus = "pending" | "posted" | "mixed" | "cancelled";
 type ReceiptAllocationType = "invoice" | "excess" | "account";
+
+const createTodayClearanceRange = (): TimeRange => {
+  const today: Date = new Date();
+  return { start: today, end: today };
+};
 
 interface ReceiptAllocation {
   id: number;
@@ -193,7 +198,9 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
     useState<boolean>(false);
   const [isConfirmConfirmationOpen, setIsConfirmConfirmationOpen] =
     useState<boolean>(false);
-  const [clearanceDate, setClearanceDate] = useState<string>("");
+  const [clearanceDateRange, setClearanceDateRange] = useState<TimeRange>(
+    createTodayClearanceRange
+  );
   const [isEditingReference, setIsEditingReference] =
     useState<boolean>(false);
   const [referenceValue, setReferenceValue] = useState<string>("");
@@ -295,7 +302,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
     if (!isOpen) {
       setIsCancelConfirmationOpen(false);
       setIsConfirmConfirmationOpen(false);
-      setClearanceDate("");
+      setClearanceDateRange(createTodayClearanceRange());
       setIsCancelling(false);
       setIsConfirming(false);
       setIsEditingReference(false);
@@ -309,14 +316,14 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
     setIsEditingReference(false);
     setReferenceValue("");
     setReferenceError(null);
-    setClearanceDate("");
+    setClearanceDateRange(createTodayClearanceRange());
   }, [receiptId]);
 
   const handleClose = (): void => {
     if (!isCancelling && !isConfirming && !isSavingReference) {
       setIsCancelConfirmationOpen(false);
       setIsConfirmConfirmationOpen(false);
-      setClearanceDate("");
+      setClearanceDateRange(createTodayClearanceRange());
       onClose();
     }
   };
@@ -410,10 +417,10 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
     ) {
       return;
     }
-    if (!clearanceDate) {
-      toast.error("Select the date the cheque actually cleared the bank.");
-      return;
-    }
+    const clearanceDate: string = format(
+      clearanceDateRange.start,
+      "yyyy-MM-dd"
+    );
 
     setIsConfirmConfirmationOpen(false);
     setIsConfirming(true);
@@ -448,7 +455,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
       console.error("Error refreshing payments after group confirmation:", error);
     } finally {
       setIsConfirming(false);
-      setClearanceDate("");
+      setClearanceDateRange(createTodayClearanceRange());
     }
   };
 
@@ -570,16 +577,19 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
         will be created using the payment details already recorded.
       </p>
       <div>
-        <FormInput
-          name="group_cheque_clearance_date"
-          label="Cheque Clearance Date"
-          type="date"
-          value={clearanceDate}
-          onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
-            setClearanceDate(event.target.value)
-          }
+        <label className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300">
+          Cheque Clearance Date
+        </label>
+        <TimeNavigator
+          range={clearanceDateRange}
+          onChange={(range: TimeRange): void => setClearanceDateRange(range)}
+          modes={["day"]}
+          presets={false}
+          showArrows={false}
+          size="sm"
           disabled={isConfirming}
-          required
+          className="w-full"
+          triggerClassName="w-full justify-between"
         />
         <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
           Use the date the bank statement shows the cheque as cleared. This
@@ -974,7 +984,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                           size="sm"
                           icon={IconCircleCheck}
                           onClick={() => {
-                            setClearanceDate("");
+                            setClearanceDateRange(createTodayClearanceRange());
                             setIsConfirmConfirmationOpen(true);
                           }}
                           className="flex-1 sm:flex-none"
@@ -1022,7 +1032,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
         isOpen={isConfirmConfirmationOpen}
         onClose={() => {
           setIsConfirmConfirmationOpen(false);
-          setClearanceDate("");
+          setClearanceDateRange(createTodayClearanceRange());
         }}
         onConfirm={() => void handleConfirmPaymentGroup()}
         title={`Confirm payment group ${
@@ -1031,6 +1041,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
         message={groupConfirmationMessage}
         confirmButtonText="Confirm All Pending Payments"
         variant="success"
+        allowContentOverflow
       />
 
       <ConfirmationDialog
