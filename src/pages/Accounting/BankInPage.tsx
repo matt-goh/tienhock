@@ -57,11 +57,13 @@ interface BankInGroupDraft {
 
 interface BankInRow {
   id: number;
+  kind: "bank_in" | "manual_journal";
   rv_number: string;
   posting_date: string;
   bank_account: string;
   total_amount: string;
   status: string;
+  description: string | null;
   groups:
     | { group_number: number; holding_account: string; amount: string; description: string }[]
     | null;
@@ -571,14 +573,23 @@ const BankInPage: React.FC = () => {
           <tbody>
             {bankIns.map((b) => (
               <tr
-                key={b.id}
+                key={`${b.kind}-${b.id}`}
                 className="border-t border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/40"
               >
                 <td className="px-4 py-2.5 whitespace-nowrap">{fmtDMY(format(new Date(b.posting_date), "yyyy-MM-dd"))}</td>
-                <td className="px-4 py-2.5 font-mono">{b.rv_number}</td>
+                <td className="px-4 py-2.5 font-mono">
+                  {b.rv_number}
+                  {b.kind === "manual_journal" && (
+                    <span className="ml-2 inline-flex px-1.5 py-0.5 text-xs font-medium rounded bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-400 font-sans">
+                      Manual
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-2.5">{b.bank_account}</td>
                 <td className="px-4 py-2.5 text-default-600 dark:text-gray-400">
-                  {(b.groups || []).map((g) => g.description).join(" & ") || "-"}
+                  {b.kind === "manual_journal"
+                    ? b.description || "-"
+                    : (b.groups || []).map((g) => g.description).join(" & ") || "-"}
                 </td>
                 <td className="px-4 py-2.5 text-right font-medium">{fmtAmt(b.total_amount)}</td>
                 <td className="px-4 py-2.5">
@@ -593,7 +604,7 @@ const BankInPage: React.FC = () => {
                   </span>
                 </td>
                 <td className="px-4 py-2.5 text-right">
-                  {b.status === "posted" && (
+                  {b.kind === "bank_in" && b.status === "posted" && (
                     <Button size="sm" variant="outline" color="rose" onClick={() => setCancelTarget(b)}>
                       Cancel
                     </Button>

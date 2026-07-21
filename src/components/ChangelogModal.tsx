@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-21",
+    ms: "Halaman Cash Bank-In (RV) kini turut menyenaraikan jurnal RV yang dikunci masuk secara manual (contohnya bayaran balik pembekal atau bayaran balik pekerja) bersama bank-in biasa, mengikut tarikh dan nombor RV. Baris sedemikian ditandakan lencana \"Manual\" dan tidak boleh dibatalkan dari halaman ini — uruskannya melalui halaman Journal seperti biasa.",
+    en: "The Cash Bank-In (RV) page now also lists manually keyed RV journals (such as supplier refunds or worker repayments) alongside regular bank-ins, interleaved by date and RV number. These rows carry a \"Manual\" badge and cannot be cancelled from this page — manage them through the Journal page as usual.",
+  },
+  {
+    date: "2026-07-21",
     ms: "Dalam pengurusan e-Invois Disatukan, klik bilangan invois untuk membuka halaman baharu yang menunjukkan semua invois di dalam penyatuan itu. Paparan utama menyusun invois mengikut julat nombor resit yang sama seperti yang dicetak pada e-Invois Disatukan, jadi setiap baris boleh dipadankan terus dengan salinan yang dihantar; kembangkan mana-mana baris untuk melihat invois di dalamnya. Paparan kedua menyenaraikan semua invois mengikut tarikh. Anda boleh klik mana-mana invois untuk membukanya, mencari mengikut nombor invois atau nama pelanggan, menyemak sama ada jumlahnya sepadan dengan jumlah e-Invois Disatukan, dan mencetak salinan semua invois sekali gus.",
     en: "In Consolidated e-Invoice management, click the invoice count to open a new page showing every invoice inside that consolidation. The main view groups invoices by the same receipt number ranges printed on the consolidated e-Invoice, so each row matches a line on the submitted copy; expand any row to see the invoices behind it. A second view lists every invoice by date. You can click any invoice to open it, search by invoice number or customer name, check that the amounts add up to the consolidated total, and print copies of all the invoices at once.",
   },
