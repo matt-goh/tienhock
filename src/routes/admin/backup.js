@@ -1302,9 +1302,15 @@ export default function backupRouter(pool) {
       const { stdout, stderr } = await executeCommand(command);
       if (stderr) console.error('Backup stderr:', stderr);
 
-      // Upload to S3 and delete local file after success
-      uploadBackupToS3(backupPath, backupFilename, env)
-        .then(async (uploaded) => {
+      // Upload to S3 and delete local file after success.
+      // When S3 is the backup store, /list reads from S3 — so await the upload
+      // before responding, otherwise the frontend's immediate refresh runs
+      // before the upload finishes and the new backup is missing until a manual
+      // refresh. When S3 is disabled (dev), the local pg_dump file already
+      // exists, so keep the upload fire-and-forget.
+      if (isS3BackupEnabled()) {
+        try {
+          const uploaded = await uploadBackupToS3(backupPath, backupFilename, env);
           if (uploaded) {
             console.log(`[S3 Backup] Synced: ${backupFilename}`);
             // Delete local file after successful S3 upload
@@ -1315,8 +1321,10 @@ export default function backupRouter(pool) {
               console.warn(`[Backup] Failed to delete local file: ${err.message}`);
             }
           }
-        })
-        .catch(err => console.warn(`[S3 Backup] Skipped or failed: ${err.message}`));
+        } catch (err) {
+          console.warn(`[S3 Backup] Skipped or failed: ${err.message}`);
+        }
+      }
 
       res.json({ message: 'Backup created successfully' });
     } catch (error) {
