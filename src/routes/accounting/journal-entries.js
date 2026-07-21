@@ -136,6 +136,7 @@ export default function (pool) {
       if (search) {
         query += ` AND (
           ${VISIBLE_REFERENCE_SQL} ILIKE $${paramIndex}
+          OR (je.entry_type = 'RV' AND COALESCE(je.display_reference, '') ILIKE $${paramIndex})
           OR je.description ILIKE $${paramIndex}
           OR (${LEGACY_IMPORT_SQL} AND ${DISPLAY_ENTRY_TYPE_SQL} ILIKE $${paramIndex})
           OR (${LEGACY_IMPORT_SQL} AND jet.name ILIKE $${paramIndex})

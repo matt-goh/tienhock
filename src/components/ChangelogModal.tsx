@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-21",
+    ms: "Senarai dan butiran Journal kini memaparkan nombor RV sebenar (contohnya RV076/06) untuk jurnal bank-in yang dihasilkan dari halaman Cash Bank-In, menggantikan rujukan dalaman \"BI-…\" yang tidak bermakna. Carian mengikut nombor RV turut menemui jurnal tersebut. Jurnal RV yang dikunci masuk secara manual tidak berubah.",
+    en: "The Journal list and details pages now show the actual RV number (e.g. RV076/06) for bank-in journals created from the Cash Bank-In page, replacing the meaningless internal \"BI-…\" reference. Searching by RV number also finds these journals. Manually keyed RV journals are unchanged.",
+  },
+  {
+    date: "2026-07-21",
     ms: "Halaman Cash Bank-In (RV) kini turut menyenaraikan jurnal RV yang dikunci masuk secara manual (contohnya bayaran balik pembekal atau bayaran balik pekerja) bersama bank-in biasa, mengikut tarikh dan nombor RV. Baris sedemikian ditandakan lencana \"Manual\" dan tidak boleh dibatalkan dari halaman ini — uruskannya melalui halaman Journal seperti biasa.",
     en: "The Cash Bank-In (RV) page now also lists manually keyed RV journals (such as supplier refunds or worker repayments) alongside regular bank-ins, interleaved by date and RV number. These rows carry a \"Manual\" badge and cannot be cancelled from this page — manage them through the Journal page as usual.",
   },
