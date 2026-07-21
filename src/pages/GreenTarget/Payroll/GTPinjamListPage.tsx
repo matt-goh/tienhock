@@ -278,7 +278,6 @@ const GTPinjamListPage: React.FC = () => {
         month: currentMonth,
         totalMidMonthPinjam,
         totalMonthlyPinjam,
-        companyName: "GREEN TARGET SDN. BHD.",
       };
       await generatePinjamPDF(pdfData, action);
       toast.success(
