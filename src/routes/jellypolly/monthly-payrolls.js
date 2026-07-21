@@ -221,13 +221,6 @@ export default function (pool) {
         processed_count: result.processed.length,
         removed: result.removed,
         processed: result.processed,
-        // July 2026+ employees whose OT rate could not be derived (missing
-        // pay basis / worked days); their payroll was left untouched.
-        errors: (result.blocked || []).map((b) => ({
-          employeeId: b.employeeId,
-          employeeName: b.employeeName,
-          error: b.error,
-        })),
       });
     } catch (error) {
       console.error("Error in JP payroll processing:", error);

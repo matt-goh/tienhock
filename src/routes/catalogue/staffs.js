@@ -2,18 +2,6 @@
 import { Router } from "express";
 import cache, { CACHE_TTL, CACHE_KEYS } from "../utils/memory-cache.js";
 
-// pg returns `date` columns as JS Date objects at local midnight; using
-// .toISOString() to derive yyyy-MM-dd shifts the day back one in UTC+8 (see
-// CLAUDE.md rule 17). Extract from the Date's local fields instead.
-const dateToYmd = (value) => {
-  if (!value) return "";
-  if (typeof value === "string") return value.slice(0, 10);
-  const y = value.getFullYear();
-  const m = String(value.getMonth() + 1).padStart(2, "0");
-  const d = String(value.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-};
-
 export default function (pool) {
   const router = Router();
 
@@ -94,8 +82,7 @@ export default function (pool) {
            s.epf_age_override as "epfAgeOverride",
            s.epf_nationality_override as "epfNationalityOverride",
            s.socso_age_override as "socsoAgeOverride",
-           s.sip_age_override as "sipAgeOverride",
-           s.ot_pay_basis as "otPayBasis"`;
+           s.sip_age_override as "sipAgeOverride"`;
 
       let query = `
       SELECT ${columns}
@@ -121,9 +108,15 @@ export default function (pool) {
               job: Array.isArray(staff.job) ? staff.job : [],
               location: Array.isArray(staff.location) ? staff.location : [],
               // Format dates
-              birthdate: dateToYmd(staff.birthdate),
-              dateJoined: dateToYmd(staff.dateJoined),
-              dateResigned: dateToYmd(staff.dateResigned),
+              birthdate: staff.birthdate
+                ? staff.birthdate.toISOString().split("T")[0]
+                : "",
+              dateJoined: staff.dateJoined
+                ? staff.dateJoined.toISOString().split("T")[0]
+                : "",
+              dateResigned: staff.dateResigned
+                ? staff.dateResigned.toISOString().split("T")[0]
+                : "",
             }));
 
       // Cache the result
@@ -173,7 +166,6 @@ export default function (pool) {
       epfNationalityOverride,
       socsoAgeOverride,
       sipAgeOverride,
-      otPayBasis,
     } = req.body;
 
     try {
@@ -215,9 +207,9 @@ export default function (pool) {
           job, location, date_joined, ic_no, bank_account_number, epf_no,
           income_tax_no, socso_no, document, payment_type, payment_preference,
           race, agama, date_resigned, marital_status, spouse_employment_status, number_of_children, department, kwsp_number, password, head_staff_id,
-          epf_age_override, epf_nationality_override, socso_age_override, sip_age_override, ot_pay_basis
+          epf_age_override, epf_nationality_override, socso_age_override, sip_age_override
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33)
         RETURNING *
       `;
 
@@ -255,7 +247,6 @@ export default function (pool) {
         epfNationalityOverride || null,
         socsoAgeOverride || null,
         sipAgeOverride || null,
-        otPayBasis || null,
       ];
 
       const result = await pool.query(query, values);
@@ -469,8 +460,7 @@ export default function (pool) {
           s.epf_age_override as "epfAgeOverride",
           s.epf_nationality_override as "epfNationalityOverride",
           s.socso_age_override as "socsoAgeOverride",
-          s.sip_age_override as "sipAgeOverride",
-          s.ot_pay_basis as "otPayBasis"
+          s.sip_age_override as "sipAgeOverride"
         FROM
           staffs s
         WHERE
@@ -486,7 +476,8 @@ export default function (pool) {
       const staff = result.rows[0];
 
       // Format dates
-      const formatDate = dateToYmd;
+      const formatDate = (date) =>
+        date ? new Date(date).toISOString().split("T")[0] : "";
 
       // Convert null values to empty strings and format dates
       const formattedStaff = Object.entries(staff).reduce(
@@ -699,7 +690,6 @@ export default function (pool) {
       epfNationalityOverride,
       socsoAgeOverride,
       sipAgeOverride,
-      otPayBasis,
     } = req.body;
 
     try {
@@ -742,9 +732,8 @@ export default function (pool) {
               socso_no = $16, document = $17, payment_type = $18, payment_preference = $19, 
               race = $20, agama = $21, date_resigned = $22, marital_status = $23, 
               spouse_employment_status = $24, number_of_children = $25, department = $26, kwsp_number = $27, password = $28,
-              epf_age_override = $29, epf_nationality_override = $30, socso_age_override = $31, sip_age_override = $32,
-              ot_pay_basis = $33
-          WHERE id = $34
+              epf_age_override = $29, epf_nationality_override = $30, socso_age_override = $31, sip_age_override = $32
+          WHERE id = $33
           RETURNING *
         `;
 
@@ -781,7 +770,6 @@ export default function (pool) {
           epfNationalityOverride || null,
           socsoAgeOverride || null,
           sipAgeOverride || null,
-          otPayBasis || null,
           id,
         ];
 

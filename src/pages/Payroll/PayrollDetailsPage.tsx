@@ -41,9 +41,7 @@ import {
   ConsolidatedPayrollItem,
   processMonthlyPayrolls,
   type PayrollProcessEmployeeSelection,
-  type PayrollProcessingError,
 } from "../../utils/payroll/payrollUtils";
-import PayrollProcessingErrorsDialog from "../../components/Payroll/PayrollProcessingErrorsDialog";
 import toast from "react-hot-toast";
 import AddManualItemModal from "../../components/Payroll/AddManualItemModal";
 import CrossCompanyTakeHomeCard from "../../components/Payroll/CrossCompanyTakeHomeCard";
@@ -143,12 +141,6 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isReprocessingPayroll, setIsReprocessingPayroll] = useState(false);
-  // Employees skipped by reprocessing (e.g. July 2026+ OT-formula blocks)
-  const [processingErrors, setProcessingErrors] = useState<
-    PayrollProcessingError[]
-  >([]);
-  const [showProcessingErrorsDialog, setShowProcessingErrorsDialog] =
-    useState(false);
   const [midMonthPayroll, setMidMonthPayroll] =
     useState<MidMonthPayroll | null>(null);
   const [monthlyLeaveRecords, setMonthlyLeaveRecords] = useState<
@@ -363,10 +355,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       );
 
       if (response.errors?.length > 0) {
-        // Show the skipped employee with the reason and a quick fix link
-        // (e.g. July 2026+ OT-formula blocks).
-        setProcessingErrors(response.errors);
-        setShowProcessingErrorsDialog(true);
+        toast.error(`Processed with ${response.errors.length} errors`);
       } else {
         toast.success("Payroll reprocessed successfully");
       }
@@ -1878,7 +1867,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             </h3>
           </div>
           <div className="p-4 flex flex-col flex-grow">
-            <div className="space-y-2 flex-grow pb-2">
+            <div className="space-y-2 flex-grow">
               <div className="flex justify-between text-sm">
                 <span className="text-default-600 dark:text-gray-300">
                   Base Pay
@@ -1963,64 +1952,6 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 </span>
               </div>
             </div>
-
-            {/* July 2026+ OT salary-formula breakdown (audit snapshot) */}
-            {payroll.ot_calculation && (
-              <div className="mt-3 rounded-md border border-amber-200 dark:border-amber-800/50 bg-amber-50/60 dark:bg-amber-900/10 p-3 text-xs">
-                <div className="font-semibold text-amber-800 dark:text-amber-300 mb-1.5">
-                  OT Rate Calculation (July 2026 formula)
-                </div>
-                <div className="space-y-1 text-default-600 dark:text-gray-300">
-                  <div className="flex justify-between">
-                    <span>
-                      Wage basis (
-                      {payroll.ot_calculation.pay_basis === "monthly_26"
-                        ? "monthly salary"
-                        : "actual days"}
-                      )
-                    </span>
-                    <span className="font-medium">
-                      {formatCurrency(payroll.ot_calculation.numerator)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>
-                      ÷ {payroll.ot_calculation.divisor_days} days ÷{" "}
-                      {payroll.ot_calculation.normal_hours_per_day} hours
-                    </span>
-                    <span className="font-medium">
-                      {formatCurrency(payroll.ot_calculation.hourly_rate)}/hr
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>OT rates (×1.5 / ×2.0 / ×3.0)</span>
-                    <span className="font-medium">
-                      {formatCurrency(payroll.ot_calculation.rates.biasa)} /{" "}
-                      {formatCurrency(payroll.ot_calculation.rates.ahad)} /{" "}
-                      {formatCurrency(payroll.ot_calculation.rates.umum)}
-                    </span>
-                  </div>
-                  {payroll.ot_calculation.excluded_bonus > 0 && (
-                    <div className="flex justify-between text-default-400 dark:text-gray-500">
-                      <span>Bonus excluded from basis</span>
-                      <span>
-                        {formatCurrency(payroll.ot_calculation.excluded_bonus)}
-                      </span>
-                    </div>
-                  )}
-                  {(payroll.ot_calculation.excluded_leave ?? 0) > 0 && (
-                    <div className="flex justify-between text-default-400 dark:text-gray-500">
-                      <span>Cuti excluded from basis</span>
-                      <span>
-                        {formatCurrency(
-                          payroll.ot_calculation.excluded_leave ?? 0,
-                        )}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
@@ -3489,13 +3420,6 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         onClose={() => setShowAddItemModal(false)}
         employeePayrollId={Number(id)}
         onItemAdded={fetchEmployeePayrollComprehensive}
-      />
-
-      {/* Skipped employees (July 2026+ OT-formula blocks etc.) */}
-      <PayrollProcessingErrorsDialog
-        isOpen={showProcessingErrorsDialog}
-        onClose={() => setShowProcessingErrorsDialog(false)}
-        errors={processingErrors}
       />
 
       {/* Delete Item Confirmation Dialog */}
