@@ -1,6 +1,6 @@
 # Legacy Report Scans — Verification & 1:1 Parity Plan (Handover)
 
-**Created 17 Jul 2026. Updated 21 Jul 2026. Phases V0–V3 are COMPLETE on development: the May books balance at RM8,980,756.68 with keyed monthly closing stock injected (net assets RM6,090,429.60 = scan RM6,097,691.11 less the named GP-202604-0001 drift), the Trade Debtor list/statement matches the legacy scans 150/150 including FIFO aging, and those ±RM7,261.51 GP-drift lines are the only remaining scan differences anywhere. Production V2/V3 remains a separate approval (rollout order OP→LGP then V2, rehearsed on fresh production copies — see §6); V4 (production closeout) is pending.**
+**Created 17 Jul 2026. Updated 21 Jul 2026. Phases V0–V3 are COMPLETE on development: the May books balance at RM8,980,756.68 with keyed monthly closing stock injected (net assets RM6,090,429.60 = scan RM6,097,691.11 less the named GP-202604-0001 drift), the Trade Debtor list/statement matches the legacy scans 150/150 including FIFO aging, and those ±RM7,261.51 GP-drift lines are the only remaining scan differences anywhere. Production V2/V3 remains a separate approval (rollout order OP→LGP then V2, rehearsed on fresh production copies — see §6); V4 (closeout — parity re-run, docs refresh, permanent scan/fixture retention) is complete (§7).**
 Follow-on to the completed Jan–May legacy ledger import
 ([LEGACY_JAN_MAY_IMPORT_PLAN.md](LEGACY_JAN_MAY_IMPORT_PLAN.md)). That project ended with an
 exact, hash-pinned `IMP` journal projection but **no independent way to verify it**, and with the
@@ -759,8 +759,45 @@ the verification harness `verify-legacy-reports.mjs` (tdl + statements stage tra
   only scan differences left anywhere. Final run 21 Jul 2026: `validate-fixtures.mjs` ALL CHECKS
   PASSED; `verify-legacy-reports.mjs` ALL STAGES GREEN.
 
-**Phase V4 — closeout:** prod parity re-run, docs refresh, retain scans + fixtures permanently as
-audit evidence (they are the only independent proof of the Jan–May books).
+### V4 execution record — completed 21 Jul 2026 (development closeout)
+
+**Files changed:** tracked `dev/import/legacy-report-fixtures/README.md` (permanent-retention
+rule + gate runbook); docs refresh across
+[ACCOUNTING_PROGRESS.md](ACCOUNTING_PROGRESS.md),
+[LEGACY_JAN_MAY_IMPORT_PLAN.md](LEGACY_JAN_MAY_IMPORT_PLAN.md),
+[LEGACY_TRIAL_BALANCE_CODE_ANALYSIS.md](LEGACY_TRIAL_BALANCE_CODE_ANALYSIS.md),
+[INVOICE_PAYMENT_ACCOUNTING_PROGRESS.md](INVOICE_PAYMENT_ACCOUNTING_PROGRESS.md),
+[ACCOUNTING_GAP_ANALYSIS.md](ACCOUNTING_GAP_ANALYSIS.md),
+[LEGACY_SYSTEM_REFERENCE.md](LEGACY_SYSTEM_REFERENCE.md) and
+[FINANCIAL_STATEMENTS_MAPPING.md](FINANCIAL_STATEMENTS_MAPPING.md); and this plan. No database,
+report-engine, production, or user-facing state was changed.
+
+- **Prod parity re-run:** on the 21 Jul 2026 production-copy development database (OP→LGP + V2 +
+  V3 applied), `validate-fixtures.mjs` passed all nine source hashes, ten fixture hashes and
+  every arithmetic/cross-report gate; `verify-legacy-reports.mjs` passed all stages — TB
+  880/880 exact + 2 named GP-drift rows; TDL 150/150 exact including FIFO aging; statements
+  36/40 exact + 4 named `GP-202604-0001` drift lines; May BS RM8,980,756.68 / net assets
+  RM6,090,429.60; all immutable/regression gates unchanged (staging, IMP
+  `9c0d5c6b141af5d102f5a31c590f6f82`, 1,571 June checkpoints
+  `147c022cef7b4a4c90735718860a60eb`, five-ledger movement
+  `c27dbd5a5db93bf08823ae4e0f22cad4`).
+- **Docs refresh:** the scan-settled classifications (`BTRA`/`MBTRA` → APPX 5; `NT_7484` →
+  APPX 5, zero balance; `THJ_CK`/`THJ_SM`/`THJ_E`/`THJ_L`/`THJ_SC` → APPX 5-1; `CL_GT` DR
+  12,415.60 / `CL_GF` DR 31,696.82 → APPX 8) are harvested into the TB code analysis (new 21 Jul
+  addendum), the legacy system reference (Q1–4 resolved) and the gap analysis (Q1–4 settled plus
+  the V2/V3 engine closings). The import plan records the Report V3 phase row and the post-V2
+  verifier status; the invoice/payment progress doc gains §5l (V2/V3 postscripts, the post-V2
+  June levels, the aging-model supersession); the mapping guide's closing-stock gap row now
+  records the V3 mechanism. Changelog entries for V2 (20 Jul) and V3 (21 Jul) were already
+  present in `CHANGELOG_ENTRIES`; no new entry was needed for this docs-only phase.
+- **Permanent retention:** the nine scans, ten fixtures, rendered pages and generated reports
+  under `dev/import/legacy-report-fixtures/` (`data/` + `generated/`, both gitignored — private
+  customer data) are permanent audit evidence and the only independent proof of the Jan–May
+  books; they must never be deleted or committed. The tracked manifest, harness and README pin
+  and document them.
+- **Remaining boundary:** the production rollout itself (fresh read-only inventory → OP→LGP →
+  V2 prod variant → V3 migration, re-pinning if production has drifted) still requires separate
+  approval and a PM2 window (§6). Nothing in V4 touches production.
 
 ## 8. User decisions / questions — ANSWERED 17 Jul 2026
 

@@ -274,7 +274,7 @@ This section documents where each financial statement note gets its data from.
 
 ### STILL NOT AUTOMATED (report gaps)
 
-**Notes 14-1/14-2/14-3 (Closing Stock)** — the evidenced 2026 opening values in Notes 3-1/3-3/3-7 are now included from exact 1 January anchors, but there is still no user-managed monthly closing-stock source. Closing stock remains Phase V3.
+**Notes 14-1/14-2/14-3 (Closing Stock)** ✅ — exact-month values are keyed in `closing_stock_values` via the Material Stock page "Closing Stock (Financial Statements)" card and injected at report level (BS 14-* assets plus Current Year Profit; IS all three as negative cogs; CoGM 14-2/14-3), never a GL posting. May 2026 is seeded from the legacy scans (188,979.60 / 336,909.82 / 182,194.43). The evidenced 2026 opening values in Notes 3-1/3-3/3-7 are included from exact 1 January anchors. (Phase V3, 21 Jul 2026 — development; production pending.)
 
 **Note 4 (PPE) / Note 15 (Depreciation)** — needs the fixed-asset register (gap 1A-4).
 
