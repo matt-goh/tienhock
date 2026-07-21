@@ -302,9 +302,20 @@ const BankInPage: React.FC = () => {
           </p>
         </div>
         {!showForm && (
-          <Button color="sky" icon={IconPlus} onClick={() => setShowForm(true)}>
-            New Bank-In
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <TimeNavigator
+              range={{ start: parseYmd(filterStart), end: parseYmd(filterEnd) }}
+              onChange={(r) => {
+                setFilterStart(format(r.start, "yyyy-MM-dd"));
+                setFilterEnd(format(r.end, "yyyy-MM-dd"));
+              }}
+              placeholder="All dates"
+              size="sm"
+            />
+            <Button color="sky" icon={IconPlus} onClick={() => setShowForm(true)}>
+              New Bank-In
+            </Button>
+          </div>
         )}
       </div>
 
@@ -541,23 +552,6 @@ const BankInPage: React.FC = () => {
               </div>
             </>
           )}
-        </div>
-      )}
-
-      {!showForm && (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-default-700 dark:text-gray-300 pl-1">
-            Bank-In History
-          </h2>
-          <TimeNavigator
-            range={{ start: parseYmd(filterStart), end: parseYmd(filterEnd) }}
-            onChange={(r) => {
-              setFilterStart(format(r.start, "yyyy-MM-dd"));
-              setFilterEnd(format(r.end, "yyyy-MM-dd"));
-            }}
-            placeholder="All dates"
-            size="sm"
-          />
         </div>
       )}
 
