@@ -132,6 +132,40 @@ type DeleteTarget =
   | { type: "material"; material: MaterialWithStock }
   | { type: "variant"; material: MaterialWithStock; variant: StockEntryRow };
 
+type ClosingStockNote = "14-1" | "14-2" | "14-3";
+
+type ClosingStockReferenceKey = "finished_goods" | "raw_materials" | "packing_materials";
+
+interface ClosingStockValuesResponse {
+  year: number;
+  month: number;
+  values: Record<ClosingStockNote, number | null>;
+}
+
+interface ClosingStockReferenceResponse {
+  year: number;
+  month: number;
+  finished_goods: number;
+  raw_materials: number;
+  packing_materials: number;
+}
+
+const closingStockFields: {
+  note: ClosingStockNote;
+  label: string;
+  referenceKey: ClosingStockReferenceKey;
+}[] = [
+  { note: "14-1", label: "Finished Goods (14-1)", referenceKey: "finished_goods" },
+  { note: "14-2", label: "Raw Materials (14-2)", referenceKey: "raw_materials" },
+  { note: "14-3", label: "Packing Materials (14-3)", referenceKey: "packing_materials" },
+];
+
+const emptyClosingStockInputs = (): Record<ClosingStockNote, string> => ({
+  "14-1": "",
+  "14-2": "",
+  "14-3": "",
+});
+
 const categoryLabels: Record<MaterialCategory, string> = {
   ingredient: "Ingredients",
   raw_material: "Raw Materials",
@@ -663,6 +697,12 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
   const [pageHeaderHeight, setPageHeaderHeight] = useState<number>(0);
   const [draggedRowKey, setDraggedRowKey] = useState<string | null>(null);
   const [dragOverlay, setDragOverlay] = useState<DragOverlayState | null>(null);
+  const [closingStockInputs, setClosingStockInputs] = useState<Record<ClosingStockNote, string>>(
+    emptyClosingStockInputs
+  );
+  const [closingStockReference, setClosingStockReference] =
+    useState<ClosingStockReferenceResponse | null>(null);
+  const [isSavingClosingStock, setIsSavingClosingStock] = useState<boolean>(false);
   const pageHeaderRef = useRef<HTMLDivElement | null>(null);
   const scrollRestoredRef = useRef<boolean>(false);
   const wasLoadingRef = useRef<boolean>(false);
@@ -888,6 +928,78 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
   useEffect(() => {
     fetchStockKilang();
   }, [fetchStockKilang]);
+
+  // Confirmed month-end closing-stock values for the financial statements are
+  // company-wide, so they load once per month regardless of the active tab.
+  useEffect(() => {
+    if (mode !== "material") return;
+
+    let cancelled = false;
+
+    const fetchClosingStockValues = async (): Promise<void> => {
+      try {
+        const response = await api.get<ClosingStockValuesResponse>(
+          `/api/financial-reports/closing-stock/${year}/${month}`
+        );
+        if (cancelled) return;
+
+        const nextInputs: Record<ClosingStockNote, string> = emptyClosingStockInputs();
+        closingStockFields.forEach((field) => {
+          const value: number | null = response.values?.[field.note] ?? null;
+          nextInputs[field.note] = value === null ? "" : String(value);
+        });
+        setClosingStockInputs(nextInputs);
+      } catch (error: unknown) {
+        if (cancelled) return;
+        console.error("Error fetching closing stock values:", error);
+        toast.error("Failed to load closing stock values");
+        setClosingStockInputs(emptyClosingStockInputs());
+      }
+    };
+
+    const fetchClosingStockReference = async (): Promise<void> => {
+      try {
+        const response = await api.get<ClosingStockReferenceResponse>(
+          `/api/materials/closing-stock-reference?year=${year}&month=${month}`
+        );
+        if (cancelled) return;
+        setClosingStockReference(response);
+      } catch (error: unknown) {
+        if (cancelled) return;
+        // The reference chips are informational only — hide them on failure.
+        console.error("Error fetching closing stock reference:", error);
+        setClosingStockReference(null);
+      }
+    };
+
+    fetchClosingStockValues();
+    fetchClosingStockReference();
+
+    return (): void => {
+      cancelled = true;
+    };
+  }, [mode, year, month]);
+
+  const handleSaveClosingStock = async (): Promise<void> => {
+    setIsSavingClosingStock(true);
+    try {
+      const values: Record<ClosingStockNote, number> = {
+        "14-1": makeNumber(closingStockInputs["14-1"]),
+        "14-2": makeNumber(closingStockInputs["14-2"]),
+        "14-3": makeNumber(closingStockInputs["14-3"]),
+      };
+
+      await api.put(`/api/financial-reports/closing-stock/${year}/${month}`, { values });
+      toast.success("Closing stock values saved");
+    } catch (error: unknown) {
+      console.error("Error saving closing stock values:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to save closing stock values"
+      );
+    } finally {
+      setIsSavingClosingStock(false);
+    }
+  };
 
   const groupedMaterials = useMemo(() => {
     const groups: Record<MaterialCategory, MaterialWithStock[]> = {
@@ -2489,6 +2601,74 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
           </div>
         </div>
       </div>
+
+      {mode === "material" && (
+        <div className="rounded-lg border border-default-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+            <div className="min-w-0 max-w-xl">
+              <h2 className="text-sm font-semibold text-default-700 dark:text-gray-200">
+                Closing Stock (Financial Statements)
+              </h2>
+              <p className="mt-0.5 text-xs text-default-500 dark:text-gray-400">
+                Confirmed month-end values injected into the Balance Sheet, Income
+                Statement and CoGM for this month. Reference totals come from this
+                page's stock data.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+              {closingStockFields.map((field) => (
+                <div key={field.note} className="w-44">
+                  <label className="mb-1 block text-xs font-medium text-default-600 dark:text-gray-300">
+                    {field.label}
+                  </label>
+                  <input
+                    type="number"
+                    value={closingStockInputs[field.note]}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                      setClosingStockInputs(
+                        (prev: Record<ClosingStockNote, string>): Record<ClosingStockNote, string> => ({
+                          ...prev,
+                          [field.note]: event.target.value,
+                        })
+                      )
+                    }
+                    className="w-full px-2 py-1 text-right font-mono text-sm border border-default-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                  />
+                  {closingStockReference && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setClosingStockInputs(
+                          (prev: Record<ClosingStockNote, string>): Record<ClosingStockNote, string> => ({
+                            ...prev,
+                            [field.note]: closingStockReference[field.referenceKey].toFixed(2),
+                          })
+                        )
+                      }
+                      title="Click to use this value"
+                      className="mt-1 inline-flex items-center rounded-full bg-default-100 px-2 py-0.5 text-xs text-default-500 transition-colors hover:bg-sky-100 hover:text-sky-700 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-sky-900/40 dark:hover:text-sky-300"
+                    >
+                      Page total: RM {formatNumber(closingStockReference[field.referenceKey])}
+                    </button>
+                  )}
+                </div>
+              ))}
+              <Button
+                color="sky"
+                size="sm"
+                onClick={handleSaveClosingStock}
+                disabled={isSavingClosingStock}
+                icon={IconDeviceFloppy}
+              >
+                {isSavingClosingStock ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center h-64">
