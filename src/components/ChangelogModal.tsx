@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-21",
+    ms: "Bayaran lebih daripada pelanggan kini dipaparkan dengan jelas. Penyata Akaun pelanggan menunjukkan nota \"Unapplied overpayment held\" di bawah jumlah perlu dibayar, laporan Debtors menambah ruangan \"Overpayment Held\" pada ringkasan pelanggan, dan halaman Account Ledger memaparkan lencana \"Overpayment held\" apabila akaun pelanggan dibuka. Jumlah ini adalah bayaran lebih yang disimpan sebagai deposit pelanggan dan tidak mengubah sebarang baki atau laporan kewangan.",
+    en: "Customer overpayments are now clearly visible. The customer Statement of Account shows an \"Unapplied overpayment held\" note below the total amount due, the Debtors report adds an \"Overpayment Held\" figure to the customer summary, and the Account Ledger page shows an \"Overpayment held\" badge when a customer's ledger is opened. This amount is the excess payment kept as a customer deposit and does not change any balances or financial reports.",
+  },
+  {
+    date: "2026-07-21",
     ms: "Senarai dan butiran Journal kini memaparkan nombor RV sebenar (contohnya RV076/06) untuk jurnal bank-in yang dihasilkan dari halaman Cash Bank-In, menggantikan rujukan dalaman \"BI-…\" yang tidak bermakna. Carian mengikut nombor RV turut menemui jurnal tersebut. Jurnal RV yang dikunci masuk secara manual tidak berubah.",
     en: "The Journal list and details pages now show the actual RV number (e.g. RV076/06) for bank-in journals created from the Cash Bank-In page, replacing the meaningless internal \"BI-…\" reference. Searching by RV number also finds these journals. Manually keyed RV journals are unchanged.",
   },

@@ -51,6 +51,10 @@ export interface AccountLedgerData {
     credit: number;
     count: number;
   };
+  // Non-posting display extra (DEBTOR child ledgers only): the customer's
+  // unapplied receipt overpayment held in CUST_DEP. Never part of the ledger
+  // lines/balances — omitted/0 for non-customer accounts.
+  unapplied_overpayment?: number;
 }
 
 // Shared report palette (matches DebtorsReportPDF / InvoicePDF slate scheme)
