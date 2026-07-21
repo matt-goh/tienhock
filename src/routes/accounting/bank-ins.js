@@ -7,6 +7,7 @@ import {
   getCashSalesPools,
   getUnbankedCashReceipts,
   createBankIn,
+  createDrawingJournal,
   cancelBankIn,
 } from "./bank-in-service.js";
 
@@ -58,6 +59,9 @@ export default function (pool) {
       const params = [];
       let biWhere = "WHERE 1=1";
       // Manually keyed RV journals: entry_type 'RV' with no owning bank_ins row.
+      // Interface-created drawing journals own an rv_registry row via
+      // journal_entry_id and are listed as kind 'drawing' (not "Manual");
+      // legacy/imported and hand-keyed RVs stay 'manual_journal'.
       let jeWhere =
         "WHERE je.entry_type = 'RV'" +
         " AND NOT EXISTS (SELECT 1 FROM bank_ins x WHERE x.journal_entry_id = je.id)";
@@ -94,7 +98,9 @@ export default function (pool) {
              LEFT JOIN journal_entries je ON je.id = bi.journal_entry_id
             ${biWhere}
            UNION ALL
-           SELECT je.id, 'manual_journal'::text AS kind, je.reference_no AS rv_number,
+           SELECT je.id,
+                  CASE WHEN rvr.id IS NOT NULL THEN 'drawing' ELSE 'manual_journal' END::text AS kind,
+                  je.reference_no AS rv_number,
                   NULL::int AS rv_year,
                   (substring(je.reference_no from 'RV(\d+)/[0-9]{2}'))::int AS rv_seq,
                   je.entry_date AS posting_date,
@@ -108,6 +114,7 @@ export default function (pool) {
                   je.reference_no AS journal_reference_no,
                   NULL::json AS groups
              FROM journal_entries je
+             LEFT JOIN rv_registry rvr ON rvr.journal_entry_id = je.id
             ${jeWhere}
          ) combined
          ORDER BY posting_date DESC, rv_seq DESC NULLS LAST, id DESC
@@ -169,6 +176,23 @@ export default function (pool) {
       await client.query("ROLLBACK");
       console.error("Error creating bank-in:", error);
       res.status(400).json({ message: error.message || "Error creating bank-in" });
+    } finally {
+      client.release();
+    }
+  });
+
+  // --- POST /api/bank-ins/drawing — manual drawing RV journal (DR bank / CR CA_WA) ---
+  router.post("/drawing", async (req, res) => {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await createDrawingJournal(client, req.body || {}, req.user?.id || null);
+      await client.query("COMMIT");
+      res.status(201).json({ message: `Drawing journal ${result.rv_number} posted`, ...result });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error creating drawing journal:", error);
+      res.status(400).json({ message: error.message || "Error creating drawing journal" });
     } finally {
       client.release();
     }
