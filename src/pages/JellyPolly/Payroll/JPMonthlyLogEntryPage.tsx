@@ -73,9 +73,6 @@ interface EmployeeEntry {
   ahadOvertimeHours: number;
   umumHours: number;
   umumOvertimeHours: number;
-  // Worked days this month (July 2026+ OT formula divisor for actual-days
-  // staff logged only in monthly hours). null = not entered.
-  workedDays: number | null;
   selected: boolean;
 }
 
@@ -333,10 +330,6 @@ const JPMonthlyLogEntryPage: React.FC<JPMonthlyLogEntryPageProps> = ({
           ahadOvertimeHours: savedEntry.ahad_overtime_hours || 0,
           umumHours: savedEntry.umum_hours || 0,
           umumOvertimeHours: savedEntry.umum_overtime_hours || 0,
-          workedDays:
-            savedEntry.worked_days != null
-              ? Number(savedEntry.worked_days)
-              : null,
           selected: true,
         };
       } else {
@@ -354,7 +347,6 @@ const JPMonthlyLogEntryPage: React.FC<JPMonthlyLogEntryPageProps> = ({
           ahadOvertimeHours: 0,
           umumHours: 0,
           umumOvertimeHours: 0,
-          workedDays: null,
           selected: mode === "create",
         };
       }
@@ -863,20 +855,6 @@ const JPMonthlyLogEntryPage: React.FC<JPMonthlyLogEntryPageProps> = ({
     }));
   };
 
-  // Worked Days (July 2026+ OT formula divisor). Empty input = null (payroll
-  // derives from attendance where possible or blocks with a clear error).
-  const handleWorkedDaysChange = (employeeId: string, value: string) => {
-    const numValue = value === "" ? null : parseFloat(value);
-    setEmployeeEntries((prev) => ({
-      ...prev,
-      [employeeId]: {
-        ...prev[employeeId],
-        workedDays:
-          numValue == null || Number.isNaN(numValue) ? null : numValue,
-      },
-    }));
-  };
-
   // Employees that already have a leave entry on the selected date (existing or new),
   // keyed by employee_id -> leave type label. Used to disable them in the picker.
   // Multi-ID employees: the flag is propagated across all sibling IDs so the
@@ -1159,7 +1137,6 @@ const JPMonthlyLogEntryPage: React.FC<JPMonthlyLogEntryPageProps> = ({
           umumOvertimeHours: supportsDayTypeHours
             ? emp.umumOvertimeHours || 0
             : 0,
-          workedDays: emp.workedDays || null,
           activities: (employeeActivities[emp.employeeId] || []).filter(
             (a) => a.isSelected,
           ),
@@ -1477,12 +1454,6 @@ const JPMonthlyLogEntryPage: React.FC<JPMonthlyLogEntryPageProps> = ({
                     </th>
                   </>
                 )}
-                <th
-                  className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap w-24"
-                  title="Actual worked days this month. Used from July 2026 to derive the OT rate for staff paid by actual worked days; leave empty for monthly-salary (÷26) staff."
-                >
-                  Worked Days
-                </th>
                 <th className="px-6 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap">
                   Activities
                 </th>
@@ -1566,28 +1537,6 @@ const JPMonthlyLogEntryPage: React.FC<JPMonthlyLogEntryPageProps> = ({
                       </td>
                     </>
                   )}
-                  <td className="px-4 py-2 whitespace-nowrap">
-                    <input
-                      type="number"
-                      value={
-                        entry.selected && entry.workedDays != null
-                          ? entry.workedDays
-                          : ""
-                      }
-                      onChange={(e) =>
-                        handleWorkedDaysChange(entry.employeeId, e.target.value)
-                      }
-                      onClick={(e) => e.stopPropagation()}
-                      disabled={!entry.selected || isSaving}
-                      title="Actual worked days this month (July 2026+ OT rate divisor for actual-days staff)"
-                      aria-label={`Worked days for ${entry.employeeName}`}
-                      placeholder="-"
-                      className="w-20 pl-3 py-1 text-center text-sm border rounded focus:ring-1 disabled:bg-default-100 dark:disabled:bg-gray-700 bg-white dark:bg-gray-800 dark:text-gray-100 disabled:text-default-400 dark:disabled:text-gray-500 border-default-300 dark:border-gray-600 focus:ring-sky-500 focus:border-sky-500"
-                      min="0"
-                      max="31"
-                      step="0.5"
-                    />
-                  </td>
                   <td className="px-6 py-2 whitespace-nowrap text-right text-sm font-medium">
                     <ActivitiesTooltip
                       activities={(

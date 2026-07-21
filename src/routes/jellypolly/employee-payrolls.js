@@ -21,19 +21,11 @@ export default function (pool) {
       throw new Error("Employee payroll not found");
     }
     const { employee_id, year, month } = payrollResult.rows[0];
-    const result = await reprocessJPEmployees(pool, {
+    await reprocessJPEmployees(pool, {
       year,
       month,
       employeeIds: [employee_id],
     });
-    // July 2026+ OT formula block (decision 15): surface it instead of leaving
-    // the payroll silently stale after a manual item change.
-    const blockedEmployee = (result.blocked || []).find(
-      (b) => b.employeeId === employee_id
-    );
-    if (blockedEmployee) {
-      throw new Error(blockedEmployee.error);
-    }
   };
 
   const roundMoney = (value) =>
