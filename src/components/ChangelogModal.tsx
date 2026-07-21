@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-21",
+    ms: "Sistem kegemaran kod akaun kini turut hadir dalam pemilih akaun di halaman Account Ledger dan borang Journal. Tandakan bintang pada mana-mana akaun dalam senarai juntai bawah untuk menambahkannya sebagai kegemaran — akaun kegemaran dipaparkan di bahagian atas senarai dengan latar kuning, sama seperti di halaman Account Codes. Klik bintang sekali lagi untuk membuangnya.",
+    en: "The account code favourites system is now available in the account pickers on the Account Ledger page and the Journal form. Click the star on any account in the dropdown to favourite it — favourited accounts are pinned to the top of the list with an amber background, just like on the Account Codes page. Click the star again to remove it.",
+  },
+  {
+    date: "2026-07-21",
     ms: "Pembelian luar negara (import) yang dimasukkan sebagai e-invois bil sendiri tidak lagi dicatat secara automatik ke dalam akaun dan tidak lagi dipaparkan dalam penyata kewangan. Sila rekodkan pembelian ini menggunakan jurnal pembelian manual anda sendiri seperti biasa. (Pembelian am tempatan tidak terjejas.)",
     en: "Overseas (foreign) purchases entered as self-billed e-invoices are no longer posted automatically to the accounts and no longer appear in the financial statements. Please record these purchases using your own manual purchase journals as usual. (Local general purchases are unaffected.)",
   },

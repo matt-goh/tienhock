@@ -7,6 +7,8 @@ import {
   IconFolder,
   IconFolderOpen,
   IconPlus,
+  IconStar,
+  IconStarFilled,
 } from "@tabler/icons-react";
 import { useAccountCodesCache } from "../../utils/accounting/useAccountingCache";
 import { AccountCode } from "../../types/types";
@@ -24,6 +26,9 @@ interface AccountCodeComboboxProps {
   allowEmpty?: boolean;
   emptyLabel?: string;
   onAddAccount?: (query: string) => void;
+  favouriteCodes?: ReadonlySet<string>;
+  pendingFavouriteCodes?: ReadonlySet<string>;
+  onToggleFavourite?: (accountCode: string) => void;
 }
 
 interface AccountHierarchyRow {
@@ -57,6 +62,9 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
   allowEmpty = false,
   emptyLabel = "No account",
   onAddAccount,
+  favouriteCodes,
+  pendingFavouriteCodes,
+  onToggleFavourite,
 }: AccountCodeComboboxProps) => {
   const { accountCodes: allAccountCodes } = useAccountCodesCache();
   const [query, setQuery] = useState<string>("");
@@ -66,6 +74,8 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
   const [activeOptionCode, setActiveOptionCode] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const keyboardNavScrollRef = useRef<boolean>(false);
   const inputId: string = useId();
   const listboxId: string = `${inputId}-listbox`;
 
@@ -308,11 +318,68 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
     selectableCodes,
   ]);
 
+  const favouritesEnabled: boolean = Boolean(favouriteCodes && onToggleFavourite);
+
+  // Favourited accounts pinned to the top of the dropdown (matches the query
+  // too, so searching keeps relevant favourites visible first).
+  const favouriteRows: AccountHierarchyRow[] = useMemo(() => {
+    if (!favouritesEnabled || !favouriteCodes || favouriteCodes.size === 0) {
+      return [];
+    }
+
+    const sourceAccounts: AccountCode[] = hierarchical
+      ? hierarchyAccounts
+      : selectableAccounts;
+
+    return sourceAccounts
+      .filter(
+        (account: AccountCode): boolean =>
+          favouriteCodes.has(account.code) &&
+          (!normalizedQuery ||
+            account.code.toLowerCase().includes(normalizedQuery) ||
+            account.description.toLowerCase().includes(normalizedQuery))
+      )
+      .sort(sortAccounts)
+      .map(
+        (account: AccountCode): AccountHierarchyRow => ({
+          account,
+          depth: 0,
+          hasChildren: false,
+          childCount: 0,
+          selectable: selectableCodes.has(account.code),
+        })
+      );
+  }, [
+    favouritesEnabled,
+    favouriteCodes,
+    hierarchical,
+    hierarchyAccounts,
+    selectableAccounts,
+    normalizedQuery,
+    selectableCodes,
+  ]);
+
+  const mainRows: AccountHierarchyRow[] = useMemo(() => {
+    // Hierarchical mode keeps favourites inside the tree as well (same as the
+    // Account Codes page); flat mode drops them to avoid duplicates.
+    if (hierarchical || favouriteRows.length === 0 || !favouriteCodes) {
+      return visibleRows;
+    }
+    return visibleRows.filter(
+      (row: AccountHierarchyRow): boolean => !favouriteCodes.has(row.account.code)
+    );
+  }, [favouriteCodes, favouriteRows, hierarchical, visibleRows]);
+
+  const combinedRows: AccountHierarchyRow[] = useMemo(
+    () => [...favouriteRows, ...mainRows],
+    [favouriteRows, mainRows]
+  );
+
   const displayedRows: AccountHierarchyRow[] = useMemo(() => {
-    return visibleRows.slice(0, loadedCount);
-  }, [loadedCount, visibleRows]);
-  const hasMore: boolean = displayedRows.length < visibleRows.length;
-  const remaining: number = visibleRows.length - displayedRows.length;
+    return combinedRows.slice(0, loadedCount);
+  }, [loadedCount, combinedRows]);
+  const hasMore: boolean = displayedRows.length < combinedRows.length;
+  const remaining: number = combinedRows.length - displayedRows.length;
   const keyboardOptionCodes: string[] = useMemo(() => {
     const accountCodes: string[] = displayedRows
       .filter((row: AccountHierarchyRow): boolean => row.selectable)
@@ -389,8 +456,20 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
 
   useEffect((): void => {
     if (!isOpen || !activeOptionId) return;
+    // Only scroll for keyboard navigation — hover-driven active changes point
+    // at a row that is already visible (and for favourites would scroll away
+    // from the pinned row to the tree row).
+    if (!keyboardNavScrollRef.current) return;
+    keyboardNavScrollRef.current = false;
     document.getElementById(activeOptionId)?.scrollIntoView({ block: "nearest" });
   }, [activeOptionId, isOpen]);
+
+  useEffect((): void => {
+    if (!isOpen) return;
+    // Always open scrolled to the top, where favourites are pinned.
+    keyboardNavScrollRef.current = false;
+    scrollContainerRef.current?.scrollTo({ top: 0 });
+  }, [isOpen]);
 
   useEffect((): void | (() => void) => {
     if (!isOpen) return;
@@ -452,6 +531,7 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
 
   const moveActiveOption = (direction: 1 | -1): void => {
     if (keyboardOptionCodes.length === 0) return;
+    keyboardNavScrollRef.current = true;
 
     setActiveOptionCode((previousCode: string | null): string => {
       const currentIndex: number =
@@ -481,6 +561,7 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
 
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
+      keyboardNavScrollRef.current = true;
       if (!isOpen) {
         setIsOpen(true);
         const initialIndex: number = event.key === "ArrowDown"
@@ -706,14 +787,24 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
                 </div>
               )}
 
-              <div role="presentation" className="max-h-72 overflow-auto py-1">
+              <div
+                ref={scrollContainerRef}
+                role="presentation"
+                className="max-h-72 overflow-auto py-1"
+              >
                 {displayedRows.length === 0 ? (
                   <div className="px-3 py-2 text-sm text-default-500 dark:text-gray-400">
                     No accounts found
                   </div>
                 ) : (
-                  displayedRows.map((row: AccountHierarchyRow) => {
+                  displayedRows.map((row: AccountHierarchyRow, rowIndex: number) => {
                   const { account, depth, hasChildren, childCount, selectable } = row;
+                  const isFavouriteShortcut: boolean =
+                    favouritesEnabled && rowIndex < favouriteRows.length;
+                  const isFavourite: boolean =
+                    favouriteCodes?.has(account.code) ?? false;
+                  const isFavouritePending: boolean =
+                    pendingFavouriteCodes?.has(account.code) ?? false;
                   const isExpanded: boolean =
                     hasChildren &&
                     (searchVisibleCodes !== null || expandedCodes.has(account.code));
@@ -725,8 +816,16 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
 
                   return (
                     <div
-                      key={account.code}
-                      id={getOptionId(account.code)}
+                      key={
+                        isFavouriteShortcut
+                          ? `favourite:${account.code}`
+                          : account.code
+                      }
+                      id={
+                        isFavouriteShortcut
+                          ? `${getOptionId(account.code)}-favourite`
+                          : getOptionId(account.code)
+                      }
                       role={hierarchical ? "treeitem" : "option"}
                       aria-level={hierarchical ? depth + 1 : undefined}
                       aria-expanded={
@@ -745,6 +844,10 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
                         selectable
                           ? "cursor-pointer hover:bg-sky-50 dark:hover:bg-sky-900/50"
                           : "cursor-default bg-default-50/60 text-default-400 dark:bg-gray-900/30 dark:text-gray-500"
+                      } ${
+                        isFavouriteShortcut
+                          ? "bg-amber-50/70 dark:bg-amber-950/20"
+                          : ""
                       } ${
                         isSelected
                           ? "bg-sky-100 text-sky-900 dark:bg-sky-900/50 dark:text-sky-200"
@@ -832,6 +935,41 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
                         <span className="flex-shrink-0 rounded bg-default-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-default-500 dark:bg-gray-700 dark:text-gray-400">
                           Inactive
                         </span>
+                      )}
+                      {favouritesEnabled && (
+                        <button
+                          type="button"
+                          onClick={(
+                            event: React.MouseEvent<HTMLButtonElement>
+                          ): void => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            if (isFavouritePending) return;
+                            onToggleFavourite?.(account.code);
+                          }}
+                          disabled={isFavouritePending}
+                          aria-pressed={isFavourite}
+                          aria-label={
+                            isFavourite
+                              ? `Remove ${account.code} from favourites`
+                              : `Add ${account.code} to favourites`
+                          }
+                          title={
+                            isFavourite
+                              ? "Remove from favourites"
+                              : "Add to favourites"
+                          }
+                          className="flex-shrink-0 text-default-300 transition-colors hover:text-amber-500 disabled:cursor-wait disabled:opacity-50 dark:text-gray-500 dark:hover:text-amber-400"
+                        >
+                          {isFavourite ? (
+                            <IconStarFilled
+                              size={15}
+                              className="text-amber-500 dark:text-amber-400"
+                            />
+                          ) : (
+                            <IconStar size={15} />
+                          )}
+                        </button>
                       )}
                       {isSelected && (
                         <IconCheck

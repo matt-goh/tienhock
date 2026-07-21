@@ -28,6 +28,7 @@ import OpeningBalanceModal from "../../../components/Accounting/OpeningBalanceMo
 import { api } from "../../../routes/utils/api";
 import { sessionService } from "../../../services/SessionService";
 import { useAccountCodesCache } from "../../../utils/accounting/useAccountingCache";
+import useAccountCodeFavourites from "../../../hooks/useAccountCodeFavourites";
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import {
   generateAccountLedgerPDF,
@@ -161,6 +162,11 @@ const saveLastRange = (start: string, end: string): void => {
 const AccountLedgerPage: React.FC = () => {
   const navigate = useNavigate();
   const { accountCodes, isLoading: accountsLoading } = useAccountCodesCache();
+  const {
+    favouriteCodes,
+    pendingCodes: pendingFavouriteCodes,
+    toggleFavourite,
+  } = useAccountCodeFavourites();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Deep-linkable: /accounting/reports/account-ledger?account=MGT&start=2026-06-01&end=2026-06-30
@@ -428,6 +434,9 @@ const AccountLedgerPage: React.FC = () => {
             placeholder="Search account code or name..."
             className="w-[28rem] max-w-full"
             hierarchical
+            favouriteCodes={favouriteCodes}
+            pendingFavouriteCodes={pendingFavouriteCodes}
+            onToggleFavourite={toggleFavourite}
           />
 
           {selectedAccount && (
