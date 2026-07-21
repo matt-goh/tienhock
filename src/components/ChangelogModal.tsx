@@ -30,6 +30,11 @@ const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   },
   {
     date: "2026-07-21",
+    ms: "Bayaran lebih pelanggan kini boleh digunakan untuk melangsaikan invois belum bayar. Dalam borang bayaran, ruangan \"Apply held overpayment\" muncul apabila pelanggan yang dipilih mempunyai bayaran lebih — jumlahnya boleh diubah atau dimatikan, dan selebihnya dibayar seperti biasa dengan tunai, cek atau pemindahan dalam satu transaksi yang sama. Bayaran lebih digunakan mengikut invois tertua dahulu. Permohonan boleh dibatalkan seperti bayaran biasa; pembatalan memulangkan jumlah tersebut kepada baki bayaran lebih pelanggan.",
+    en: "Customer overpayments can now be used to settle unpaid invoices. In the payment form, an \"Apply held overpayment\" option appears when a selected customer has an overpayment — the amount can be adjusted or turned off, and the rest is paid as usual by cash, cheque or transfer in the same single transaction. The overpayment is used against the oldest invoice first. An application can be cancelled like a normal payment; cancelling returns the amount to the customer's overpayment balance.",
+  },
+  {
+    date: "2026-07-21",
     ms: "Bayaran lebih daripada pelanggan kini dipaparkan dengan jelas. Penyata Akaun pelanggan menunjukkan nota \"Unapplied overpayment held\" di bawah jumlah perlu dibayar, laporan Debtors menambah ruangan \"Overpayment Held\" pada ringkasan pelanggan, dan halaman Account Ledger memaparkan lencana \"Overpayment held\" apabila akaun pelanggan dibuka. Jumlah ini adalah bayaran lebih yang disimpan sebagai deposit pelanggan dan tidak mengubah sebarang baki atau laporan kewangan.",
     en: "Customer overpayments are now clearly visible. The customer Statement of Account shows an \"Unapplied overpayment held\" note below the total amount due, the Debtors report adds an \"Overpayment Held\" figure to the customer summary, and the Account Ledger page shows an \"Overpayment held\" badge when a customer's ledger is opened. This amount is the excess payment kept as a customer deposit and does not change any balances or financial reports.",
   },

@@ -36,20 +36,30 @@ export async function fetchUnappliedOverpayments(pool, customerIds) {
 /**
  * Unapplied overpayment of one customer as at a date (yyyy-MM-dd), for as-at
  * documents like the customer statement: excess from receipts posted on/before
- * the date, minus refunds (standalone refund notes against the overpaid
- * payment) created on/before the date, minus anything already applied.
+ * the date, minus overpayment applications dated on/before the date (from the
+ * dated overpayment_applications records, excluding cancelled applications),
+ * minus refunds (standalone refund notes against the overpaid payment) created
+ * on/before the date.
  */
 export async function fetchUnappliedOverpaymentAsOf(pool, customerId, asOfDate) {
   const endOfDayMs = new Date(`${asOfDate}T23:59:59.999`).getTime();
   const queryResult = await pool.query(
     `SELECT
-       (SELECT COALESCE(SUM(ra.amount - ra.applied_amount), 0)
+       (SELECT COALESCE(SUM(ra.amount), 0)
           FROM receipt_allocations ra
           JOIN receipts r ON r.id = ra.receipt_id
          WHERE ra.allocation_type = 'excess'
            AND r.status = 'posted'
            AND ra.customer_id = $1
            AND r.posting_date <= $2)
+       -
+       (SELECT COALESCE(SUM(oa.amount), 0)
+          FROM overpayment_applications oa
+          JOIN payments p ON p.payment_id = oa.payment_id
+          JOIN receipt_allocations ra ON ra.id = oa.receipt_allocation_id
+         WHERE ra.customer_id = $1
+           AND p.status = 'active'
+           AND p.payment_date <= $2)
        -
        (SELECT COALESCE(SUM(ad.totalamountpayable), 0)
           FROM adjustment_documents ad
