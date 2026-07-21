@@ -36,6 +36,10 @@ node dev/import/legacy-report-fixtures/validate-fixtures.mjs
 node dev/import/legacy-report-fixtures/verify-legacy-reports.mjs
 ```
 
+`VERIFY_DB=<name> node dev/import/legacy-report-fixtures/verify-legacy-reports.mjs` runs the
+harness against a different database in the same container (used for clone rehearsals; default
+`tienhock`).
+
 The harness pins the post-V3 state: TB 880/880 exact, Trade Debtor List 150/150 exact
 (including signed-ledger FIFO aging), statements 36/40 exact plus the four named
 `GP-202604-0001` drift lines (±RM7,261.51 — a genuine April invoice keyed after the scans were

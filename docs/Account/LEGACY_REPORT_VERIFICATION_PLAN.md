@@ -799,6 +799,34 @@ report-engine, production, or user-facing state was changed.
   V2 prod variant → V3 migration, re-pinning if production has drifted) still requires separate
   approval and a PM2 window (§6). Nothing in V4 touches production.
 
+### V4 production-rollout readiness rehearsal — 21 Jul 2026 (fresh production copy)
+
+**Files changed:** `verify-legacy-reports.mjs` (read-only `VERIFY_DB` override for clone
+rehearsals; default `tienhock` unchanged) and this plan. The development database was replaced
+with a fresh 21 Jul 2026 production import for this rehearsal and was left byte-untouched.
+
+- Fresh-copy inventory: 2,824 accounts; **zero** account/anchor changes after 21 Jul; OP
+  population exactly the pinned 63 invoices / 56 posted + 7 cancelled GP lines / 23 invoice
+  lines / RM28,632.92 + RM1,322.92; 580 January anchors with the 63 `CS_*` CR anchors intact;
+  no `closing_stock_values`; OP→LGP/V2/V3 all absent. **No drift against the 21 Jul pins
+  anywhere.**
+- Rehearsed on clone `tienhock_prod_rehearsal_20260721` in rollout order:
+  `2026-07-20_gp_op_to_lgp.sql` fresh pass (1/1/63/23/63) then final rerun (0 writes);
+  `2026-07-20_legacy_report_v2_opening_stock_prod.sql` fresh pass (63/62/125/1) then final
+  rerun (0/0/0/0); `2026-07-21_closing_stock_values.sql` seed (3 rows, RM708,083.85) then final
+  rerun (0 writes). Every guard domain passed: chart structure
+  `47b88863017669feb7dd3356eba3e051`, fresh mapping `6bafd6262089d7b217ab4ab2b5b1e4b4`, final
+  mapping `bd034913a5df1c2b9f54e7937cc9b87b`, 156 targets, staging, IMP, June checkpoints,
+  five-ledger movement.
+- End-state proof on the clone: `verify-legacy-reports.mjs` (VERIFY_DB override) **ALL STAGES
+  GREEN** — TB 880/880 exact + 2 named drift rows, TDL 150/150 exact, statements 36/40 + 4
+  named GP-drift lines, May BS RM8,980,756.68 / net assets RM6,090,429.60, all immutable gates
+  unchanged. Clone then dropped.
+- **Verdict: safe to run on production** in the rehearsed order (OP→LGP → V2 prod variant →
+  V3) inside a PM2 window, with the standard validated rollback backup. Re-verify only if
+  production drifts before the window (new accounts/anchors or backdated Jan–May journals would
+  trip the guards loudly anyway).
+
 ## 8. User decisions / questions — ANSWERED 17 Jul 2026
 
 1. **Stock roll in legacy after the export?** — *User: no idea; just make the ERP 1:1 with the

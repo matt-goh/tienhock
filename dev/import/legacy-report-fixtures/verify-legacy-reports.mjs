@@ -88,11 +88,13 @@ const cents = (s, where) => {
 };
 
 // Read-only SQL against the dev DB (CLAUDE.md rule 12). Returns array of
-// objects keyed by the query's column names.
+// objects keyed by the query's column names. VERIFY_DB overrides the database
+// for rehearsals on throwaway clones (default: the dev `tienhock`).
+const VERIFY_DB = process.env.VERIFY_DB || "tienhock";
 function query(sql) {
   const out = execFileSync(
     "docker",
-    ["exec", "-i", "tienhock_dev_db", "psql", "-U", "postgres", "-d", "tienhock",
+    ["exec", "-i", "tienhock_dev_db", "psql", "-U", "postgres", "-d", VERIFY_DB,
      "--csv", "-v", "ON_ERROR_STOP=1", "-c", sql],
     { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }
   );
