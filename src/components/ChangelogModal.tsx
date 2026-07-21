@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-21",
+    ms: "Pembelian luar negara (import) yang dimasukkan sebagai e-invois bil sendiri tidak lagi dicatat secara automatik ke dalam akaun dan tidak lagi dipaparkan dalam penyata kewangan. Sila rekodkan pembelian ini menggunakan jurnal pembelian manual anda sendiri seperti biasa. (Pembelian am tempatan tidak terjejas.)",
+    en: "Overseas (foreign) purchases entered as self-billed e-invoices are no longer posted automatically to the accounts and no longer appear in the financial statements. Please record these purchases using your own manual purchase journals as usual. (Local general purchases are unaffected.)",
+  },
+  {
+    date: "2026-07-21",
     ms: "Dua pembaharuan pada pemilih kod akaun. Pertama, carian di halaman Account Codes kini turut menemui akaun anak yang tiada anak sendiri (contohnya BRM dan MRM di bawah RM) — sebelum ini akaun anak sedemikian hanya muncul jika ditandakan sebagai kegemaran. Kedua, ruangan Account dalam borang Journal kini menggunakan pemilih hierarki yang sama seperti halaman Account Ledger, memaparkan akaun induk dan anak dalam bentuk pokok yang boleh dikembangkan, dengan butang + untuk menambah kod akaun baharu seperti sebelum ini.",
     en: "Two updates to the account code picker. First, searching on the Account Codes page now finds child accounts that have no children of their own (e.g. BRM and MRM under RM) — previously such child accounts only appeared if favourited. Second, the Account field in the Journal form now uses the same hierarchical picker as the Account Ledger page, showing parent and child accounts as an expandable tree, with the + button to add a new account code as before.",
   },
