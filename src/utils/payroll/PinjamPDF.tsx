@@ -32,7 +32,6 @@ interface PinjamPDFData {
   month: number;
   totalMidMonthPinjam: number;
   totalMonthlyPinjam: number;
-  companyName?: string;
 }
 
 const styles = StyleSheet.create({
@@ -43,23 +42,20 @@ const styles = StyleSheet.create({
     lineHeight: 1.4,
     color: "#1f2937",
   },
-  // Header Styles
-  headerSection: {
+  // Row of cards (single-sided cards pack 2 per row to save vertical space)
+  cardRow: {
+    flexDirection: "row",
+    gap: 12,
     marginBottom: 12,
-    paddingBottom: 6,
-    borderBottomWidth: 2,
+    alignItems: "flex-start",
   },
-  companyHeader: {
-    fontSize: 16,
-    fontFamily: "Helvetica-Bold",
-    marginBottom: 6,
-    textAlign: "left",
-    color: "#0f172a",
+  cardSpacer: {
+    flex: 1,
   },
 
   // Employee Card Styles
   employeeCard: {
-    marginBottom: 12,
+    flex: 1,
     borderWidth: 1,
     borderColor: "#d1d5db",
     borderRadius: 6,
@@ -181,28 +177,6 @@ const styles = StyleSheet.create({
   positiveAmount: {
     color: "#059669",
   },
-
-  // No Pinjam State
-  noPinjamSection: {
-    padding: 4,
-    textAlign: "center",
-    borderRadius: 4,
-    minHeight: 100,
-    justifyContent: "center",
-    alignItems: "center",
-    flex: 1,
-  },
-  noPinjamText: {
-    fontSize: 9,
-    color: "#9ca3af",
-    fontFamily: "Helvetica",
-  },
-  noPinjamTitle: {
-    fontSize: 9,
-    color: "#6b7280",
-    fontFamily: "Helvetica-Bold",
-    marginBottom: 2,
-  },
 });
 
 const formatCurrency = (amount: number): string => {
@@ -214,141 +188,153 @@ const formatCurrency = (amount: number): string => {
 
 const PinjamPDFDocument: React.FC<{ data: PinjamPDFData }> = ({ data }) => {
   const { employees, year, month } = data;
-  const companyName = data.companyName || "TIEN HOCK FOOD INDUSTRIES S/B";
   const monthName = getMonthName(month);
 
-  const renderEmployeeCard = (employee: PinjamEmployee) => (
-    // wrap={false} keeps each card whole — react-pdf moves it to the next page
-    // rather than splitting it across a page boundary.
-    <View key={employee.employee_id} style={styles.employeeCard} wrap={false}>
-      {/* Employee Header */}
-      <View style={styles.employeeHeader}>
-        <Text style={styles.employeeName}>{employee.employee_name}</Text>
-        <Text style={styles.employeeId}>{employee.employee_id}</Text>
-      </View>
+  const renderEmployeeCard = (employee: PinjamEmployee) => {
+    const hasMid = employee.midMonthPinjam > 0;
+    const hasMonthly = employee.monthlyPinjam > 0;
 
-      {/* Employee Content - Two Column Layout */}
-      <View style={styles.employeeContent}>
-        <View style={styles.employeeContentColumns}>
-          {/* Mid-Month Pay Column */}
-          <View style={styles.payColumn}>
-            {employee.midMonthPinjam > 0 ? (
-              <View style={styles.paySection}>
-                <Text style={styles.paySectionTitle}>Mid-Month Pay</Text>
+    const midColumn = (
+      <View style={styles.payColumn}>
+        <View style={styles.paySection}>
+          <Text style={styles.paySectionTitle}>Mid-Month Pay</Text>
 
-                <View style={styles.payRow}>
-                  <Text style={styles.payLabel}>Original Mid-Month Pay:</Text>
-                  <Text style={styles.payAmount}>
-                    {formatCurrency(employee.midMonthPay)}
-                  </Text>
-                </View>
-
-                {employee.midMonthPinjamDetails.length > 0 && (
-                  <View style={styles.pinjamDetailsSection}>
-                    <Text style={styles.pinjamDetailsTitle}>Pinjam Items:</Text>
-                    {employee.midMonthPinjamDetails.map((detail, idx) => (
-                      <Text key={idx} style={styles.pinjamItem}>
-                        • {detail}
-                      </Text>
-                    ))}
-                  </View>
-                )}
-
-                <View style={styles.payRow}>
-                  <Text style={styles.payLabel}>Total Pinjam:</Text>
-                  <Text style={[styles.payAmount, styles.deductionAmount]}>
-                    -{formatCurrency(employee.midMonthPinjam)}
-                  </Text>
-                </View>
-
-                <View style={styles.finalAmountRow}>
-                  <Text style={styles.finalAmountLabel}>
-                    Jumlah Bayaran Pendahuluan:
-                  </Text>
-                  <Text style={[styles.finalAmount, styles.positiveAmount]}>
-                    {formatCurrency(
-                      employee.midMonthPay - employee.midMonthPinjam
-                    )}
-                  </Text>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.noPinjamSection}>
-                <Text style={styles.noPinjamTitle}>Mid-Month Pay</Text>
-                <Text style={styles.noPinjamText}>No pinjam recorded</Text>
-              </View>
-            )}
+          <View style={styles.payRow}>
+            <Text style={styles.payLabel}>Original Mid-Month Pay:</Text>
+            <Text style={styles.payAmount}>
+              {formatCurrency(employee.midMonthPay)}
+            </Text>
           </View>
 
-          {/* Column Divider */}
-          <View style={styles.columnDivider} />
-
-          {/* Monthly Pay Column */}
-          <View style={styles.payColumn}>
-            {employee.monthlyPinjam > 0 ? (
-              <View style={styles.paySection}>
-                <Text style={styles.paySectionTitle}>
-                  Monthly Pay (Gaji Genap)
+          {employee.midMonthPinjamDetails.length > 0 && (
+            <View style={styles.pinjamDetailsSection}>
+              <Text style={styles.pinjamDetailsTitle}>Pinjam Items:</Text>
+              {employee.midMonthPinjamDetails.map((detail, idx) => (
+                <Text key={idx} style={styles.pinjamItem}>
+                  • {detail}
                 </Text>
+              ))}
+            </View>
+          )}
 
-                <View style={styles.payRow}>
-                  <Text style={styles.payLabel}>Original Gaji Genap:</Text>
-                  <Text style={styles.payAmount}>
-                    {formatCurrency(employee.gajiGenap)}
-                  </Text>
-                </View>
+          <View style={styles.payRow}>
+            <Text style={styles.payLabel}>Total Pinjam:</Text>
+            <Text style={[styles.payAmount, styles.deductionAmount]}>
+              -{formatCurrency(employee.midMonthPinjam)}
+            </Text>
+          </View>
 
-                {employee.monthlyPinjamDetails.length > 0 && (
-                  <View style={styles.pinjamDetailsSection}>
-                    <Text style={styles.pinjamDetailsTitle}>Pinjam Items:</Text>
-                    {employee.monthlyPinjamDetails.map((detail, idx) => (
-                      <Text key={idx} style={styles.pinjamItem}>
-                        • {detail}
-                      </Text>
-                    ))}
-                  </View>
-                )}
-
-                <View style={styles.payRow}>
-                  <Text style={styles.payLabel}>Total Pinjam:</Text>
-                  <Text style={[styles.payAmount, styles.deductionAmount]}>
-                    -{formatCurrency(employee.monthlyPinjam)}
-                  </Text>
-                </View>
-
-                <View style={styles.finalAmountRow}>
-                  <Text style={styles.finalAmountLabel}>
-                    Jumlah Masuk Bank:
-                  </Text>
-                  <Text style={[styles.finalAmount, styles.positiveAmount]}>
-                    {formatCurrency(
-                      employee.gajiGenap - employee.monthlyPinjam
-                    )}
-                  </Text>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.noPinjamSection}>
-                <Text style={styles.noPinjamTitle}>Monthly Pay</Text>
-                <Text style={styles.noPinjamText}>No pinjam recorded</Text>
-              </View>
-            )}
+          <View style={styles.finalAmountRow}>
+            <Text style={styles.finalAmountLabel}>
+              Jumlah Bayaran Pendahuluan:
+            </Text>
+            <Text style={[styles.finalAmount, styles.positiveAmount]}>
+              {formatCurrency(employee.midMonthPay - employee.midMonthPinjam)}
+            </Text>
           </View>
         </View>
       </View>
-    </View>
-  );
+    );
+
+    const monthlyColumn = (
+      <View style={styles.payColumn}>
+        <View style={styles.paySection}>
+          <Text style={styles.paySectionTitle}>Monthly Pay (Gaji Genap)</Text>
+
+          <View style={styles.payRow}>
+            <Text style={styles.payLabel}>Original Gaji Genap:</Text>
+            <Text style={styles.payAmount}>
+              {formatCurrency(employee.gajiGenap)}
+            </Text>
+          </View>
+
+          {employee.monthlyPinjamDetails.length > 0 && (
+            <View style={styles.pinjamDetailsSection}>
+              <Text style={styles.pinjamDetailsTitle}>Pinjam Items:</Text>
+              {employee.monthlyPinjamDetails.map((detail, idx) => (
+                <Text key={idx} style={styles.pinjamItem}>
+                  • {detail}
+                </Text>
+              ))}
+            </View>
+          )}
+
+          <View style={styles.payRow}>
+            <Text style={styles.payLabel}>Total Pinjam:</Text>
+            <Text style={[styles.payAmount, styles.deductionAmount]}>
+              -{formatCurrency(employee.monthlyPinjam)}
+            </Text>
+          </View>
+
+          <View style={styles.finalAmountRow}>
+            <Text style={styles.finalAmountLabel}>Jumlah Masuk Bank:</Text>
+            <Text style={[styles.finalAmount, styles.positiveAmount]}>
+              {formatCurrency(employee.gajiGenap - employee.monthlyPinjam)}
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+
+    return (
+      <View key={employee.employee_id} style={styles.employeeCard}>
+        {/* Employee Header */}
+        <View style={styles.employeeHeader}>
+          <Text style={styles.employeeName}>{employee.employee_name}</Text>
+          <Text style={styles.employeeId}>{employee.employee_id}</Text>
+        </View>
+
+        {/* Employee Content - only the pinjam half(s) that have records render.
+            A single-sided card takes the full width; both sides show side by side. */}
+        <View style={styles.employeeContent}>
+          <View style={styles.employeeContentColumns}>
+            {hasMid && midColumn}
+            {hasMid && hasMonthly && <View style={styles.columnDivider} />}
+            {hasMonthly && monthlyColumn}
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  // Pack cards into rows: single-sided cards go 2-per-row to save vertical
+  // space, while a double-sided card (both halves) keeps a full row to itself.
+  const isDoubleSided = (employee: PinjamEmployee): boolean =>
+    employee.midMonthPinjam > 0 && employee.monthlyPinjam > 0;
+
+  const rows: PinjamEmployee[][] = [];
+  let pendingSingle: PinjamEmployee | null = null;
+  employees.forEach((employee) => {
+    if (isDoubleSided(employee)) {
+      if (pendingSingle) {
+        rows.push([pendingSingle]);
+        pendingSingle = null;
+      }
+      rows.push([employee]);
+    } else if (pendingSingle) {
+      rows.push([pendingSingle, employee]);
+      pendingSingle = null;
+    } else {
+      pendingSingle = employee;
+    }
+  });
+  if (pendingSingle) rows.push([pendingSingle]);
 
   return (
     <Document title={`Pinjam Summary - ${monthName} ${year}`}>
       <Page size="A4" style={styles.page} wrap>
-        {/* Header - flows once at the top, so it appears only on the first page */}
-        <View style={styles.headerSection}>
-          <Text style={styles.companyHeader}>{companyName}</Text>
-        </View>
-
-        {/* Employee Cards - react-pdf flows these across pages automatically */}
-        {employees.map((employee) => renderEmployeeCard(employee))}
+        {/* Card rows - react-pdf flows these across pages automatically, and
+            wrap={false} keeps each row whole rather than splitting it across a
+            page boundary. No company header: slips are cut out per worker. */}
+        {rows.map((row, rowIndex) => (
+          <View key={rowIndex} style={styles.cardRow} wrap={false}>
+            {row.map((employee) => renderEmployeeCard(employee))}
+            {/* Lone single-sided card keeps half width via an empty spacer. */}
+            {row.length === 1 && !isDoubleSided(row[0]) && (
+              <View style={styles.cardSpacer} />
+            )}
+          </View>
+        ))}
       </Page>
     </Document>
   );

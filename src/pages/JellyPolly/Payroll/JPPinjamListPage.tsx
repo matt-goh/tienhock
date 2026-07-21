@@ -275,7 +275,6 @@ const JPPinjamListPage: React.FC = () => {
         month: currentMonth,
         totalMidMonthPinjam,
         totalMonthlyPinjam,
-        companyName: "JELLY POLLY",
       };
       await generatePinjamPDF(pdfData, action);
       toast.success(

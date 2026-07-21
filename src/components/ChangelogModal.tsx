@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-07-22",
+    ms: "Slip Pinjam yang dicetak kini lebih padat. Tajuk syarikat di bahagian atas telah dibuang (memandangkan slip dipotong untuk setiap pekerja), dan setiap slip kini hanya memaparkan bahagian yang ada rekod pinjam — jika pekerja hanya ada pinjam gaji pertengahan bulan, bahagian gaji bulanan tidak lagi dipaparkan, dan sebaliknya. Ini berlaku untuk Tien Hock, Green Target dan Jelly Polly.",
+    en: "Printed Pinjam slips are now more compact. The company header at the top has been removed (since slips are cut out per worker), and each slip now only shows the half that actually has a pinjam record — if a worker only has a mid-month pinjam, the monthly section is no longer shown, and vice versa. This applies to Tien Hock, Green Target and Jelly Polly.",
+  },
+  {
     date: "2026-07-21",
     ms: "Sistem kegemaran kod akaun kini turut hadir dalam pemilih akaun di halaman Account Ledger dan borang Journal. Tandakan bintang pada mana-mana akaun dalam senarai juntai bawah untuk menambahkannya sebagai kegemaran — akaun kegemaran dipaparkan di bahagian atas senarai dengan latar kuning, sama seperti di halaman Account Codes. Klik bintang sekali lagi untuk membuangnya.",
     en: "The account code favourites system is now available in the account pickers on the Account Ledger page and the Journal form. Click the star on any account in the dropdown to favourite it — favourited accounts are pinned to the top of the list with an amber background, just like on the Account Codes page. Click the star again to remove it.",
