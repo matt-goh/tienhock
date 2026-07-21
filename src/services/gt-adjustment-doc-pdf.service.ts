@@ -44,10 +44,11 @@ export interface GTAdjustmentDocFull {
 
 const formatIsoDate = (s: string | null | undefined): string => {
   if (!s) return "—";
-  const iso = s.slice(0, 10);
-  const [y, m, d] = iso.split("-").map(Number);
-  if (!y || !m || !d) return "—";
-  return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`;
+  // `s` may be a full UTC ISO string from a `date` column; read local fields
+  // (CLAUDE.md rule 17) — slicing would keep the UTC (previous) day.
+  const dt = new Date(s);
+  if (Number.isNaN(dt.getTime())) return "—";
+  return `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}/${dt.getFullYear()}`;
 };
 
 const fetchGTCustomer = async (customerId: number | null): Promise<any> => {
