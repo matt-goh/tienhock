@@ -2407,22 +2407,30 @@ export default function (pool, config) {
         input.purchase_kind === PURCHASE_KIND_LOCAL
           ? input.local_supplier_name
           : supplier?.supplier_name || input.supplier?.supplier_name;
-      const journalEntryId = await createGPJournalEntry(
-        client,
-        {
-          self_billed_no: selfBilledNo,
-          purchase_date: input.purchase_date,
-          account_code: input.account_code,
-          payable_amount_myr: input.payable_amount_myr,
-        },
-        savedLines,
-        supplierName,
-        req.staffId
-      );
-      await client.query(
-        `UPDATE self_billed_invoices SET journal_entry_id = $1 WHERE id = $2`,
-        [journalEntryId, invoiceId]
-      );
+      // Foreign purchases are NOT auto-journaled: their posting account (OP/LGP)
+      // carries no fs_note and the real accounting is keyed by the user as separate
+      // manual purchase journals, so an auto GP journal would double-count. Only
+      // LOCAL general purchases auto-post a GP journal. (Decision 21 Jul 2026 —
+      // docs/Account/LEGACY_REPORT_VERIFICATION_PLAN.md §8-7.)
+      let journalEntryId = null;
+      if (input.purchase_kind === PURCHASE_KIND_LOCAL) {
+        journalEntryId = await createGPJournalEntry(
+          client,
+          {
+            self_billed_no: selfBilledNo,
+            purchase_date: input.purchase_date,
+            account_code: input.account_code,
+            payable_amount_myr: input.payable_amount_myr,
+          },
+          savedLines,
+          supplierName,
+          req.staffId
+        );
+        await client.query(
+          `UPDATE self_billed_invoices SET journal_entry_id = $1 WHERE id = $2`,
+          [journalEntryId, invoiceId]
+        );
+      }
       await client.query("COMMIT");
 
       res.status(201).json({
@@ -2539,24 +2547,44 @@ export default function (pool, config) {
           : supplier?.supplier_name ||
             input.supplier?.supplier_name ||
             existing.supplier?.supplier_name;
-      const journalEntryId = await updateGPJournalEntry(
-        client,
-        {
-          self_billed_no: existing.self_billed_no,
-          purchase_date: input.purchase_date,
-          account_code: input.account_code,
-          payable_amount_myr: input.payable_amount_myr,
-          journal_entry_id: existing.journal_entry_id,
-        },
-        savedLines,
-        supplierName,
-        req.staffId
-      );
-      if (!existing.journal_entry_id) {
-        await client.query(
-          `UPDATE self_billed_invoices SET journal_entry_id = $1 WHERE id = $2`,
-          [journalEntryId, req.params.id]
+      // Only LOCAL general purchases auto-post/maintain a GP journal. Foreign
+      // purchases are recorded via the user's separate manual purchase journals
+      // (decision 21 Jul 2026 — LEGACY_REPORT_VERIFICATION_PLAN §8-7): never post one
+      // here, and if this invoice was switched local->foreign (or still carries a
+      // legacy posted GP journal) cancel and detach it.
+      let journalEntryId = existing.journal_entry_id;
+      if (input.purchase_kind === PURCHASE_KIND_LOCAL) {
+        journalEntryId = await updateGPJournalEntry(
+          client,
+          {
+            self_billed_no: existing.self_billed_no,
+            purchase_date: input.purchase_date,
+            account_code: input.account_code,
+            payable_amount_myr: input.payable_amount_myr,
+            journal_entry_id: existing.journal_entry_id,
+          },
+          savedLines,
+          supplierName,
+          req.staffId
         );
+        if (!existing.journal_entry_id) {
+          await client.query(
+            `UPDATE self_billed_invoices SET journal_entry_id = $1 WHERE id = $2`,
+            [journalEntryId, req.params.id]
+          );
+        }
+      } else if (existing.journal_entry_id) {
+        const cancelled = await cancelGPJournalEntry(
+          client,
+          existing.journal_entry_id
+        );
+        if (cancelled) {
+          await client.query(
+            `UPDATE self_billed_invoices SET journal_entry_id = NULL WHERE id = $1`,
+            [req.params.id]
+          );
+          journalEntryId = null;
+        }
       }
       await client.query("COMMIT");
 
