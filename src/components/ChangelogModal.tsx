@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-21",
+    ms: "Halaman Cash Bank-In (RV) kini boleh merekodkan jurnal drawing — wang pendahuluan yang dibayar balik oleh pekerja dan dibankkan. Klik \"New Drawing (CA_WA)\", isi tarikh, bank, nombor RV, jumlah dan keterangan (boleh diubah, lalai \"FROM DRAWING WORKERS\"), kemudian Post. Jurnal yang dihasilkan mendebitkan akaun bank dan mengkreditkan CA_WA (Worker's Advance), dan disenaraikan bersama bank-in biasa dengan lencana \"Drawing\".",
+    en: "The Cash Bank-In (RV) page can now record drawing journals — worker advance repayments that are banked in. Click \"New Drawing (CA_WA)\", fill in the date, bank, RV number, amount and description (editable, default \"FROM DRAWING WORKERS\"), then Post. The journal debits the bank account and credits CA_WA (Worker's Advance), and is listed alongside regular bank-ins with a \"Drawing\" badge.",
+  },
+  {
+    date: "2026-07-21",
     ms: "Bayaran lebih daripada pelanggan kini dipaparkan dengan jelas. Penyata Akaun pelanggan menunjukkan nota \"Unapplied overpayment held\" di bawah jumlah perlu dibayar, laporan Debtors menambah ruangan \"Overpayment Held\" pada ringkasan pelanggan, dan halaman Account Ledger memaparkan lencana \"Overpayment held\" apabila akaun pelanggan dibuka. Jumlah ini adalah bayaran lebih yang disimpan sebagai deposit pelanggan dan tidak mengubah sebarang baki atau laporan kewangan.",
     en: "Customer overpayments are now clearly visible. The customer Statement of Account shows an \"Unapplied overpayment held\" note below the total amount due, the Debtors report adds an \"Overpayment Held\" figure to the customer summary, and the Account Ledger page shows an \"Overpayment held\" badge when a customer's ledger is opened. This amount is the excess payment kept as a customer deposit and does not change any balances or financial reports.",
   },
