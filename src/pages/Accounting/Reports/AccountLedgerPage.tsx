@@ -584,6 +584,18 @@ const AccountLedgerPage: React.FC = () => {
           <span className="text-default-500 dark:text-gray-400">
             {statement.totals.count} transactions
           </span>
+          {(statement.unapplied_overpayment ?? 0) > 0.005 && (
+            <>
+              <span className="text-default-300 dark:text-gray-600">•</span>
+              <span
+                className="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-300"
+                title="Non-posting: overpaid amount held in CUST_DEP (Customer Deposits). Not part of this ledger's lines or balances."
+              >
+                Overpayment held: RM{" "}
+                {formatCurrency(statement.unapplied_overpayment ?? 0)}
+              </span>
+            </>
+          )}
         </div>
       )}
 
