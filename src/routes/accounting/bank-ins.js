@@ -51,39 +51,66 @@ export default function (pool) {
     }
   });
 
-  // --- GET /api/bank-ins — list ---
+  // --- GET /api/bank-ins — list (structured bank-ins + manually keyed RV journals) ---
   router.get("/", async (req, res) => {
     const { startDate, endDate, status, limit = "100" } = req.query;
     try {
       const params = [];
-      let where = "WHERE 1=1";
+      let biWhere = "WHERE 1=1";
+      // Manually keyed RV journals: entry_type 'RV' with no owning bank_ins row.
+      let jeWhere =
+        "WHERE je.entry_type = 'RV'" +
+        " AND NOT EXISTS (SELECT 1 FROM bank_ins x WHERE x.journal_entry_id = je.id)";
       if (startDate) {
         params.push(String(startDate).slice(0, 10));
-        where += ` AND bi.posting_date >= $${params.length}`;
+        biWhere += ` AND bi.posting_date >= $${params.length}`;
+        jeWhere += ` AND je.entry_date >= $${params.length}`;
       }
       if (endDate) {
         params.push(String(endDate).slice(0, 10));
-        where += ` AND bi.posting_date <= $${params.length}`;
+        biWhere += ` AND bi.posting_date <= $${params.length}`;
+        jeWhere += ` AND je.entry_date <= $${params.length}`;
       }
       if (status) {
         params.push(status);
-        where += ` AND bi.status = $${params.length}`;
+        biWhere += ` AND bi.status = $${params.length}`;
+        jeWhere += ` AND je.status = $${params.length}`;
       }
       params.push(Math.min(parseInt(limit, 10) || 100, 500));
       const result = await pool.query(
-        `SELECT bi.*, rv.rv_number, rv.rv_year, je.reference_no AS journal_reference_no,
-                (SELECT json_agg(json_build_object(
-                    'id', big.id, 'group_number', big.group_number,
-                    'holding_account', big.holding_account, 'amount', big.amount,
-                    'description', big.description
-                  ) ORDER BY big.group_number)
-                   FROM bank_in_groups big WHERE big.bank_in_id = bi.id) AS groups
-           FROM bank_ins bi
-           JOIN rv_registry rv ON rv.id = bi.rv_registry_id
-           LEFT JOIN journal_entries je ON je.id = bi.journal_entry_id
-          ${where}
-          ORDER BY bi.posting_date DESC, rv.rv_seq DESC
-          LIMIT $${params.length}`,
+        `SELECT * FROM (
+           SELECT bi.id, 'bank_in'::text AS kind, rv.rv_number, rv.rv_year, rv.rv_seq,
+                  bi.posting_date, bi.bank_account, bi.total_amount, bi.status,
+                  bi.notes AS description,
+                  je.reference_no AS journal_reference_no,
+                  (SELECT json_agg(json_build_object(
+                      'id', big.id, 'group_number', big.group_number,
+                      'holding_account', big.holding_account, 'amount', big.amount,
+                      'description', big.description
+                    ) ORDER BY big.group_number)
+                     FROM bank_in_groups big WHERE big.bank_in_id = bi.id) AS groups
+             FROM bank_ins bi
+             JOIN rv_registry rv ON rv.id = bi.rv_registry_id
+             LEFT JOIN journal_entries je ON je.id = bi.journal_entry_id
+            ${biWhere}
+           UNION ALL
+           SELECT je.id, 'manual_journal'::text AS kind, je.reference_no AS rv_number,
+                  NULL::int AS rv_year,
+                  (substring(je.reference_no from 'RV(\d+)/[0-9]{2}'))::int AS rv_seq,
+                  je.entry_date AS posting_date,
+                  (SELECT jel.account_code
+                     FROM journal_entry_lines jel
+                    WHERE jel.journal_entry_id = je.id AND jel.debit_amount > 0
+                    ORDER BY jel.line_number
+                    LIMIT 1) AS bank_account,
+                  je.total_debit AS total_amount, je.status, je.description,
+                  je.reference_no AS journal_reference_no,
+                  NULL::json AS groups
+             FROM journal_entries je
+            ${jeWhere}
+         ) combined
+         ORDER BY posting_date DESC, rv_seq DESC NULLS LAST, id DESC
+         LIMIT $${params.length}`,
         params
       );
       res.json(result.rows);
