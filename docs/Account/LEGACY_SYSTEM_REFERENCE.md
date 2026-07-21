@@ -65,7 +65,7 @@ Every code is a **prefix-based mnemonic**. The legacy system had no relational d
    Type-2 #6).
 5. **The PBB bank running ledger is just a specialised "Account Ledger".** The same view shape works for any account code — supplier, director (`CL_WSF`), prepayment (`CA_INS`), inter-company (`CL_GT`). One generic Account Ledger page solves many missing-report items at once (gap 1B-2).
 
-## Open classification questions (still unresolved)
+## Open classification questions (resolved 21 Jul 2026)
 
 1. **`THJ_CK` 2,013.60 / `THJ_SM` 1,919.25** (trial balance, Note 5-1) — Tien Hock paying salaries on behalf of Jelly Polly (inter-company recharge)? If yes, should sit under `CA_MBHJ` (receivable from Jelly Polly), not Note 5-1.
 2. **`NT_7484` 70,201.00** (Note 5) — handwriting links this to QR-281 (Quit Rent NT213077484). Confirm it's a quit-rent prepayment mis-classified under Note 5, should be Note 8.
@@ -73,6 +73,8 @@ Every code is a **prefix-based mnemonic**. The legacy system had no relational d
 4. **`BTRA` Transportation 10,731.89** — delivery-out cost (admin, Note 5) vs `BFT_KOW`/`BFT_LS` freight-in on raw materials (CoGM, Note 3-6)?
 
 These are trial-balance *classification* fixes, independent of the feature roadmap — best resolved when the Schedule B / account-ledger work is specced.
+
+**Resolved 21 Jul 2026** by the hash-validated Jan–May 2026 Trial Balance scans: **1** — `THJ_CK`/`THJ_SM` print APPX 5-1 (factory salaries; the inter-company recharge hypothesis rejected). **2** — `NT_7484` prints APPX 5 with a zero balance in all five scanned months (stays Note 5; no Note 8 reclass). **3** — `CL_GT` DR 12,415.60 / `CL_GF` DR 31,696.82 print APPX 8 (legacy convention kept; the V2 migration applied the fs_note move). **4** — `BTRA` prints APPX 5 (administrative transportation, not CoGM freight-in). Evidence: [LEGACY_TRIAL_BALANCE_CODE_ANALYSIS.md](LEGACY_TRIAL_BALANCE_CODE_ANALYSIS.md) addenda; regression-pinned by `dev/import/legacy-report-fixtures/verify-legacy-reports.mjs`.
 
 ---
 
