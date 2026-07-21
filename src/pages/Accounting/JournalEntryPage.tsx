@@ -27,6 +27,7 @@ import {
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
 import AccountCodeCombobox from "../../components/Accounting/AccountCodeCombobox";
+import useAccountCodeFavourites from "../../hooks/useAccountCodeFavourites";
 import {
   FormInput,
   FormListbox,
@@ -517,6 +518,11 @@ const JournalEntryPage: React.FC = () => {
   // Cached reference data
   const { entryTypes, isLoading: entryTypesLoading } = useJournalEntryTypesCache();
   const { accountCodes: cachedAccountCodes, isLoading: accountCodesLoading } = useAccountCodesCache();
+  const {
+    favouriteCodes,
+    pendingCodes: pendingFavouriteCodes,
+    toggleFavourite,
+  } = useAccountCodeFavourites();
   const { ledgerTypes: allLedgerTypes, isLoading: ledgerTypesLoading } = useLedgerTypesCache();
   const [optimisticAccountCodes, setOptimisticAccountCodes] = useState<AccountCode[]>([]);
 
@@ -1245,6 +1251,9 @@ const JournalEntryPage: React.FC = () => {
                             }
                             disabled={isSaving}
                             hierarchical
+                            favouriteCodes={favouriteCodes}
+                            pendingFavouriteCodes={pendingFavouriteCodes}
+                            onToggleFavourite={toggleFavourite}
                           />
                         </td>
 
