@@ -46,6 +46,9 @@ interface CustomerStatementData {
   transactions: Transaction[];
   total_amount_due: number;
   aging: Aging;
+  // Non-posting display extra: overpayment (receipt excess) held in CUST_DEP
+  // as at the statement date; never part of the transactions/balance above.
+  unapplied_overpayment?: number;
 }
 
 interface CustomerStatementPDFOptions {
@@ -179,6 +182,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Helvetica-Bold",
   },
+  overpaymentNote: {
+    fontSize: 8,
+    color: colors.textSecondary,
+    marginTop: 4,
+    textAlign: "right",
+  },
   // Aging Section
   agingSection: {
     marginTop: 15,
@@ -299,7 +308,7 @@ const CustomerStatementPDF: React.FC<{
   companyInfo?: CompanyInfo;
   companyName?: string;
 }> = ({ data, companyInfo = TIENHOCK_INFO, companyName }) => {
-  const { customer, statement_date, previous_balance, transactions, total_amount_due, aging } = data;
+  const { customer, statement_date, previous_balance, transactions, total_amount_due, aging, unapplied_overpayment } = data;
 
   // Build customer address string
   const addressLines: string[] = [];
@@ -381,6 +390,13 @@ const CustomerStatementPDF: React.FC<{
             <Text style={styles.totalLabel}>TOTAL AMOUNT DUE ($)</Text>
             <Text style={styles.totalValue}>{formatCurrency(total_amount_due)}</Text>
           </View>
+          {(unapplied_overpayment ?? 0) > 0.005 && (
+            <Text style={styles.overpaymentNote}>
+              Unapplied overpayment held in customer deposits: RM{" "}
+              {formatCurrencyFull(unapplied_overpayment ?? 0)} (not offset
+              against the balance above)
+            </Text>
+          )}
         </View>
 
         {/* Divider before Aging */}

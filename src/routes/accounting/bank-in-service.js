@@ -470,6 +470,95 @@ export async function createBankIn(client, payload, userId) {
 }
 
 /**
+ * Creates a manual "drawing" RV journal (worker advance repayment): one DR bank
+ * line and one CR CA_WA (WORKER'S ADVANCE) line, like the legacy RV021/06. The
+ * RV number is reserved in the shared registry with source_type 'manual_journal'
+ * and the journal stays source-less so it can be edited/cancelled from the
+ * Journal page like any other manual journal.
+ *
+ * payload: {
+ *   posting_date: 'yyyy-MM-dd', bank_account?: 'BANK_PBB',
+ *   rv_number?: 'RV021/06' (omit to auto-assign),
+ *   amount: number, description?: 'FROM DRAWING WORKERS'
+ * }
+ */
+export async function createDrawingJournal(client, payload, userId) {
+  const postingDate = String(payload.posting_date || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(postingDate)) {
+    throw new Error("posting_date must be yyyy-MM-dd");
+  }
+  const bankAccount = payload.bank_account || "BANK_PBB";
+  const year = parseInt(postingDate.slice(0, 4), 10);
+  const month = parseInt(postingDate.slice(5, 7), 10);
+
+  const amount = round2(payload.amount);
+  if (!(amount > 0)) throw new Error("Amount must be positive");
+  const description = (payload.description || "").trim() || "FROM DRAWING WORKERS";
+
+  const acctCheck = await client.query(
+    `SELECT code FROM account_codes WHERE code = ANY($1::text[]) AND is_active = true`,
+    [[bankAccount, "CA_WA"]]
+  );
+  const found = new Set(acctCheck.rows.map((r) => r.code));
+  if (!found.has(bankAccount)) throw new Error(`Bank account ${bankAccount} not found or inactive`);
+  if (!found.has("CA_WA")) throw new Error("Credit account CA_WA not found or inactive");
+
+  // ----- RV number: explicit (validated) or auto-assigned -----
+  let seq;
+  if (payload.rv_number) {
+    const parsed = parseRvNumber(payload.rv_number);
+    if (!parsed) {
+      throw new Error(`Invalid RV number "${payload.rv_number}" — expected RV###/MM (e.g. RV021/06)`);
+    }
+    if (parsed.month !== month) {
+      throw new Error(
+        `RV month /${String(parsed.month).padStart(2, "0")} must match the posting month /${String(month).padStart(2, "0")}`
+      );
+    }
+    seq = parsed.seq;
+  } else {
+    const next = await getNextRvNumber(client, year, month);
+    seq = next.rv_seq;
+  }
+  const registry = await reserveRvNumber(client, {
+    year,
+    month,
+    seq,
+    source_type: "manual_journal",
+    created_by: userId,
+  });
+  const rvNumber = registry.rv_number;
+
+  // ----- Journal (reference_no = RV number, matching legacy manual RVs) -----
+  const journalResult = await client.query(
+    `INSERT INTO journal_entries (
+       reference_no, entry_type, entry_date, description,
+       total_debit, total_credit, status, created_at, created_by
+     ) VALUES ($1, 'RV', $2, $3, $4, $4, 'posted', NOW(), $5)
+     RETURNING id`,
+    [rvNumber, postingDate, description, amount, userId || null]
+  );
+  const journalId = journalResult.rows[0].id;
+
+  await client.query(`UPDATE rv_registry SET journal_entry_id = $1 WHERE id = $2`, [
+    journalId,
+    registry.id,
+  ]);
+
+  // ----- Lines: DR bank / CR CA_WA -----
+  await client.query(
+    `INSERT INTO journal_entry_lines (
+       journal_entry_id, line_number, account_code, debit_amount, credit_amount,
+       reference, particulars, display_order, created_at
+     ) VALUES ($1, 1, $2, $3, 0, $4, $5, 1, NOW()),
+              ($1, 2, 'CA_WA', 0, $3, $4, $5, 2, NOW())`,
+    [journalId, bankAccount, amount, rvNumber, description]
+  );
+
+  return { rv_number: rvNumber, journal_entry_id: journalId, amount };
+}
+
+/**
  * Cancels a bank-in: cancels the journal, marks the registry entry cancelled
  * (the RV number stays reserved forever), and frees the source amounts back
  * to their pools/receipts (pool sums only count posted bank-ins).

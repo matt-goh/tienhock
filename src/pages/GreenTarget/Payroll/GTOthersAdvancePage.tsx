@@ -170,10 +170,9 @@ const GTOthersAdvancePage: React.FC = () => {
           return "";
         }
       })();
-      const dateIso =
-        typeof advance.commission_date === "string"
-          ? advance.commission_date.slice(0, 10)
-          : "";
+      const dateIso = advance.commission_date
+        ? format(new Date(advance.commission_date), "yyyy-MM-dd")
+        : "";
       const haystack = [
         advance.employee_id || "",
         advance.employee_name || "",

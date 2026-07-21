@@ -350,9 +350,8 @@ export default function (pool) {
         const entryResult = await pool.query(
           `INSERT INTO jellypolly.monthly_work_log_entries (
             monthly_log_id, employee_id, job_id, total_hours, overtime_hours,
-            ahad_hours, ahad_overtime_hours, umum_hours, umum_overtime_hours,
-            worked_days
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            ahad_hours, ahad_overtime_hours, umum_hours, umum_overtime_hours
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
           RETURNING id`,
           [
             workLogId,
@@ -364,7 +363,6 @@ export default function (pool) {
             ahadOvertimeHours || 0,
             umumHours || 0,
             umumOvertimeHours || 0,
-            entry.workedDays || null,
           ]
         );
 
@@ -553,9 +551,8 @@ export default function (pool) {
         const entryResult = await pool.query(
           `INSERT INTO jellypolly.monthly_work_log_entries (
             monthly_log_id, employee_id, job_id, total_hours, overtime_hours,
-            ahad_hours, ahad_overtime_hours, umum_hours, umum_overtime_hours,
-            worked_days
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            ahad_hours, ahad_overtime_hours, umum_hours, umum_overtime_hours
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
           RETURNING id`,
           [
             id,
@@ -567,7 +564,6 @@ export default function (pool) {
             ahadOvertimeHours || 0,
             umumHours || 0,
             umumOvertimeHours || 0,
-            entry.workedDays || null,
           ]
         );
 

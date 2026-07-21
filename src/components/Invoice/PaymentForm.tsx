@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { format } from "date-fns";
 import { IconX, IconTrash } from "@tabler/icons-react";
 import Button from "../../components/Button";
+import Checkbox from "../../components/Checkbox";
 import { FormInput, FormListbox } from "../../components/FormComponents";
 import { Payment, InvoiceData } from "../../types/types";
 import { api } from "../../routes/utils/api";
@@ -15,7 +16,7 @@ import TimeNavigator, {
 
 export type RecordablePaymentMethod = Exclude<
   Payment["payment_method"],
-  "contra"
+  "contra" | "overpayment"
 >;
 
 export interface PaymentFormInitialValues {
@@ -132,6 +133,10 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   initialValues,
   referenceGroup,
 }) => {
+  // Tien Hock uses the atomic grouped-receipt endpoint (one request = one
+  // receipt covering every selected invoice = one journal). Other companies
+  // keep the per-invoice payments endpoint.
+  const useGroupedReceipt: boolean = apiEndpoint === "/api/payments";
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
   const [availableInvoices, setAvailableInvoices] = useState<InvoiceData[]>([]);
@@ -241,10 +246,138 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     0
   );
 
-  // Tien Hock uses the atomic grouped-receipt endpoint (one request = one
-  // receipt covering every selected invoice = one journal). Other companies
-  // keep the per-invoice payments endpoint.
-  const useGroupedReceipt: boolean = apiEndpoint === "/api/payments";
+  // Overpayment add-on (TH only): each customer's held overpayment (CUST_DEP
+  // excess) can be applied to their own selected invoices alongside the money
+  // payment. Balances are fetched per selected customer; applyAmounts holds
+  // the user-editable amount per customer (0 = do not apply).
+  const selectedCustomerIds: string[] = [
+    ...new Set(selectedInvoices.map((item) => item.invoice.customerid)),
+  ].sort();
+  const selectedCustomerKey = selectedCustomerIds.join(",");
+  const [overpaymentBalances, setOverpaymentBalances] = useState<
+    Record<string, number>
+  >({});
+  const [applyAmounts, setApplyAmounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!useGroupedReceipt || !selectedCustomerKey) {
+      setOverpaymentBalances({});
+      return;
+    }
+    let cancelled = false;
+    Promise.all(
+      selectedCustomerKey.split(",").map((customerId) =>
+        api
+          .get(
+            `/api/payments/overpayment-balance/${encodeURIComponent(
+              customerId
+            )}`
+          )
+          .then(
+            (res: { unapplied_overpayment?: number }) =>
+              [customerId, Number(res?.unapplied_overpayment) || 0] as const
+          )
+          .catch((err: unknown) => {
+            console.error("Error fetching overpayment balance:", err);
+            return [customerId, 0] as const;
+          })
+      )
+    ).then((entries) => {
+      if (cancelled) return;
+      setOverpaymentBalances(Object.fromEntries(entries));
+      // Default: apply each customer's available excess in full; the user can
+      // lower or zero it. Capped against the selected settle total at submit.
+      setApplyAmounts((current) => {
+        const next = { ...current };
+        for (const [customerId, available] of entries) {
+          if (!(customerId in next)) next[customerId] = available;
+        }
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useGroupedReceipt, selectedCustomerKey]);
+
+  const roundMoney = (value: number): number => Math.round(value * 100) / 100;
+
+  /** Total the selected amounts settle of one customer's invoice balances. */
+  const settleSumForCustomer = (customerId: string): number =>
+    roundMoney(
+      selectedInvoices
+        .filter((item) => item.invoice.customerid === customerId)
+        .reduce(
+          (sum, item) =>
+            sum + Math.min(item.amountToPay, Number(item.invoice.balance_due)),
+          0
+        )
+    );
+
+  /**
+   * Splits the selection into overpayment applications (each customer's held
+   * excess, oldest invoice first) and the money allocations the receipt must
+   * cover. Pure applies produce no money allocations.
+   */
+  const computeSettlement = (): {
+    overpaymentAllocations: { invoice_id: string; amount: number }[];
+    moneyAllocations: Record<string, unknown>[];
+    totalApplied: number;
+  } => {
+    const appliedByInvoice = new Map<string, number>();
+    for (const [customerId, rawAmount] of Object.entries(applyAmounts)) {
+      let remaining = roundMoney(rawAmount);
+      if (!(remaining > 0)) continue;
+      const customerSelections = selectedInvoices
+        .filter((item) => item.invoice.customerid === customerId)
+        .sort(
+          (a, b) =>
+            Number(a.invoice.createddate) - Number(b.invoice.createddate)
+        );
+      for (const { invoice, amountToPay } of customerSelections) {
+        if (remaining <= 0.005) break;
+        const settle = Math.min(amountToPay, Number(invoice.balance_due));
+        const take = roundMoney(Math.min(remaining, settle));
+        if (take > 0.005) {
+          appliedByInvoice.set(invoice.id, take);
+          remaining = roundMoney(remaining - take);
+        }
+      }
+    }
+
+    const moneyAllocations: Record<string, unknown>[] = [];
+    for (const { invoice, amountToPay } of selectedInvoices) {
+      const balance = Number(invoice.balance_due);
+      const applied = appliedByInvoice.get(invoice.id) || 0;
+      const regular = roundMoney(Math.min(amountToPay, balance) - applied);
+      if (regular > 0.005) {
+        moneyAllocations.push({
+          type: "invoice",
+          invoice_id: invoice.id,
+          amount: regular,
+        });
+      }
+      if (amountToPay > balance) {
+        moneyAllocations.push({
+          type: "excess",
+          customer_id: invoice.customerid,
+          amount: roundMoney(amountToPay - balance),
+        });
+      }
+    }
+
+    const overpaymentAllocations = [...appliedByInvoice.entries()].map(
+      ([invoice_id, amount]) => ({ invoice_id, amount })
+    );
+    return {
+      overpaymentAllocations,
+      moneyAllocations,
+      totalApplied: roundMoney(
+        overpaymentAllocations.reduce((sum, a) => sum + a.amount, 0)
+      ),
+    };
+  };
 
   const handleSubmit = async (
     event: React.FormEvent<HTMLFormElement>
@@ -273,9 +406,38 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       return;
     }
 
+    // Overpayment add-on validation (TH only): each applied amount must fit
+    // the customer's available excess and their selected settle total.
+    if (useGroupedReceipt) {
+      for (const customerId of selectedCustomerIds) {
+        const applyAmount = roundMoney(applyAmounts[customerId] || 0);
+        if (!(applyAmount > 0)) continue;
+        const available = overpaymentBalances[customerId] || 0;
+        if (applyAmount > available + 0.005) {
+          toast.error(
+            `Overpayment applied for ${customerId} cannot exceed the available ${formatCurrency(
+              available
+            )}`
+          );
+          return;
+        }
+        const settleSum = settleSumForCustomer(customerId);
+        if (applyAmount > settleSum + 0.005) {
+          toast.error(
+            `Overpayment applied for ${customerId} cannot exceed the selected settle total of ${formatCurrency(
+              settleSum
+            )}`
+          );
+          return;
+        }
+      }
+    }
+
+    const { moneyAllocations } = computeSettlement();
     if (
       !formData.payment_reference.trim() &&
-      selectedInvoices.length > 1
+      selectedInvoices.length > 1 &&
+      moneyAllocations.length > 0
     ) {
       toast.error(
         "Payment reference is required for multiple invoice payments"
@@ -327,28 +489,17 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       const paymentReference: string = formData.payment_reference.trim();
       const notes: string = formData.notes.trim();
 
+      let appliedTotal = 0;
+      let moneyAllocationCount = 0;
       if (useGroupedReceipt) {
-        // One atomic receipt: invoice allocations up to each balance due,
-        // plus a customer-owned excess allocation for any overpayment.
-        const allocations: Record<string, unknown>[] = [];
-        for (const { invoice, amountToPay } of selectedInvoices) {
-          const balance = invoice.balance_due;
-          const regular = Math.min(amountToPay, balance);
-          if (regular > 0) {
-            allocations.push({
-              type: "invoice",
-              invoice_id: invoice.id,
-              amount: parseFloat(regular.toFixed(2)),
-            });
-          }
-          if (amountToPay > balance) {
-            allocations.push({
-              type: "excess",
-              customer_id: invoice.customerid,
-              amount: parseFloat((amountToPay - balance).toFixed(2)),
-            });
-          }
-        }
+        // One atomic request: each customer's held overpayment is applied to
+        // their invoices first, then the money receipt covers the remainder
+        // (invoice allocations up to each balance due, plus a customer-owned
+        // excess allocation for any new overpayment).
+        const { overpaymentAllocations, moneyAllocations, totalApplied } =
+          computeSettlement();
+        appliedTotal = totalApplied;
+        moneyAllocationCount = moneyAllocations.length;
 
         const result = await api.post("/api/receipts", {
           payment_method: formData.payment_method,
@@ -357,7 +508,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           display_reference: paymentReference || undefined,
           received_date: formData.payment_date,
           notes: notes || undefined,
-          allocations,
+          allocations: moneyAllocations,
+          overpayment_allocations:
+            overpaymentAllocations.length > 0
+              ? overpaymentAllocations
+              : undefined,
         });
         results.push(result);
       } else {
@@ -382,7 +537,18 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         : results.filter((result) => result.isOverpayment).length;
 
       let successMessage: string;
-      if (overpaymentCount > 0) {
+      if (appliedTotal > 0) {
+        if (moneyAllocationCount > 0) {
+          successMessage = `Payment recorded, including ${formatCurrency(
+            appliedTotal
+          )} overpayment applied`;
+        } else {
+          successMessage =
+            selectedInvoices.length === 1
+              ? "Overpayment applied to the invoice"
+              : `Overpayment applied to ${selectedInvoices.length} invoices`;
+        }
+      } else if (overpaymentCount > 0) {
         if (selectedInvoices.length === 1) {
           successMessage =
             "Payment recorded; the excess remains as customer credit";
@@ -843,6 +1009,77 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                           </div>
                         </div>
                       )}
+
+                    {/* Overpayment add-on: apply each customer's held excess
+                        alongside (or instead of) the money payment */}
+                    {useGroupedReceipt &&
+                      selectedInvoices.length > 0 &&
+                      selectedCustomerIds
+                        .filter(
+                          (customerId) =>
+                            (overpaymentBalances[customerId] ?? 0) > 0.005
+                        )
+                        .map((customerId) => {
+                          const available =
+                            overpaymentBalances[customerId] ?? 0;
+                          const applyAmount = applyAmounts[customerId] ?? 0;
+                          const applying = applyAmount > 0.005;
+                          return (
+                            <div
+                              key={customerId}
+                              className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/30"
+                            >
+                              <Checkbox
+                                checked={applying}
+                                onChange={(checked: boolean) =>
+                                  setApplyAmounts((current) => ({
+                                    ...current,
+                                    [customerId]: checked
+                                      ? Math.min(
+                                          available,
+                                          settleSumForCustomer(customerId)
+                                        )
+                                      : 0,
+                                  }))
+                                }
+                                disabled={isSubmitting}
+                                checkedColor="text-amber-600 dark:text-amber-400"
+                                label={
+                                  <span className="text-amber-900 dark:text-amber-100">
+                                    Apply held overpayment for {customerId}{" "}
+                                    (available {formatCurrency(available)})
+                                  </span>
+                                }
+                              />
+                              {applying && (
+                                <div className="mt-2 flex items-center gap-2 pl-7">
+                                  <span className="text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                                    Amount
+                                  </span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={applyAmount}
+                                    onChange={(
+                                      event: React.ChangeEvent<HTMLInputElement>
+                                    ) =>
+                                      setApplyAmounts((current) => ({
+                                        ...current,
+                                        [customerId]:
+                                          event.target.value === ""
+                                            ? 0
+                                            : Number(event.target.value),
+                                      }))
+                                    }
+                                    disabled={isSubmitting}
+                                    className="w-32 rounded-lg border border-amber-300 bg-white px-2 py-1 text-right text-sm font-medium focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-amber-700 dark:bg-gray-900 dark:text-gray-100"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                   </div>
                 )}
               </section>

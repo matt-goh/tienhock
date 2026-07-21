@@ -74,6 +74,10 @@ interface Customer {
   total_balance: number;
   credit_limit: number;
   credit_balance: number;
+  // Non-posting display extra (TH only): unapplied receipt overpayment held
+  // in CUST_DEP; 0/undefined when the customer has none or the backend
+  // doesn't track overpayments (e.g. Jelly Polly).
+  unapplied_overpayment?: number;
 }
 
 interface Salesman {
@@ -989,6 +993,21 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                                   RM {formatCurrency(customer.credit_balance)}
                                 </p>
                               </div>
+                              {(customer.unapplied_overpayment ?? 0) > 0.005 && (
+                                <div
+                                  title="Overpaid amount held in customer deposits (CUST_DEP). Not offset against the outstanding balance."
+                                >
+                                  <p className="text-xs text-amber-600 dark:text-amber-400 uppercase">
+                                    Overpayment Held
+                                  </p>
+                                  <p className="font-medium text-amber-700 dark:text-amber-300">
+                                    RM{" "}
+                                    {formatCurrency(
+                                      customer.unapplied_overpayment ?? 0
+                                    )}
+                                  </p>
+                                </div>
+                              )}
                             </div>
 
                             {/* Invoices Table */}

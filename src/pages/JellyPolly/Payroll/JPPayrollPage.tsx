@@ -30,11 +30,7 @@ import {
   JP_ALL_JOB_IDS,
   staffHoldsJPJob,
 } from "../../../configs/jpPayrollJobConfigs";
-import {
-  getMonthName,
-  type PayrollProcessingError,
-} from "../../../utils/payroll/payrollUtils";
-import PayrollProcessingErrorsDialog from "../../../components/Payroll/PayrollProcessingErrorsDialog";
+import { getMonthName } from "../../../utils/payroll/payrollUtils";
 
 interface JPMonthlyPayroll {
   id: number;
@@ -113,12 +109,6 @@ const JPPayrollPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  // Employees skipped by processing (e.g. July 2026+ OT-formula blocks)
-  const [processingErrors, setProcessingErrors] = useState<
-    PayrollProcessingError[]
-  >([]);
-  const [showProcessingErrorsDialog, setShowProcessingErrorsDialog] =
-    useState<boolean>(false);
   const [expandedSections, setExpandedSections] = useState<
     Record<string, boolean>
   >({});
@@ -201,12 +191,6 @@ const JPPayrollPage: React.FC = () => {
 
       if (result.success) {
         toast.success(`Processed ${result.processed_count} employee(s)`);
-        if ((result.errors?.length || 0) > 0) {
-          // Show the skipped employees with reasons and quick fix links
-          // (July 2026+ OT-formula blocks).
-          setProcessingErrors(result.errors || []);
-          setShowProcessingErrorsDialog(true);
-        }
         await fetchPayrollData();
       } else {
         toast.error(result.message || "Processing failed");
@@ -637,14 +621,6 @@ const JPPayrollPage: React.FC = () => {
           </div>
         )}
       </div>
-
-      {/* Skipped employees (July 2026+ OT-formula blocks etc.) */}
-      <PayrollProcessingErrorsDialog
-        isOpen={showProcessingErrorsDialog}
-        onClose={() => setShowProcessingErrorsDialog(false)}
-        errors={processingErrors}
-        staffFormBasePath="/jellypolly/catalogue/staff"
-      />
     </div>
   );
 };

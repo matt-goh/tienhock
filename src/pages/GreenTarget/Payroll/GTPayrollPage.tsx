@@ -36,11 +36,7 @@ import {
   type GTPayslipItem,
 } from "../../../utils/greenTarget/buildGTPayslipPayroll";
 import type { MidMonthPayroll } from "../../../utils/payroll/midMonthPayrollUtils";
-import {
-  getMonthName,
-  type PayrollProcessingError,
-} from "../../../utils/payroll/payrollUtils";
-import PayrollProcessingErrorsDialog from "../../../components/Payroll/PayrollProcessingErrorsDialog";
+import { getMonthName } from "../../../utils/payroll/payrollUtils";
 import { PrintBatchPayslipsButton } from "../../../utils/payroll/PayslipButtons";
 
 interface GTMonthlyPayroll {
@@ -299,12 +295,6 @@ const GTPayrollPage: React.FC = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  // Employees skipped by processing (e.g. July 2026+ OT-formula blocks)
-  const [processingErrors, setProcessingErrors] = useState<
-    PayrollProcessingError[]
-  >([]);
-  const [showProcessingErrorsDialog, setShowProcessingErrorsDialog] =
-    useState<boolean>(false);
   const [showManageModal, setShowManageModal] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState<string>(
     (): string => readPayrollListState(listStateStorageKey).searchTerm
@@ -572,10 +562,9 @@ const GTPayrollPage: React.FC = () => {
       if (result.success) {
         toast.success(`Processed ${result.processed_count} employee(s)`);
         if ((result.errors?.length || 0) > 0) {
-          // Show the skipped employees with reasons and quick fix links
-          // (e.g. July 2026+ OT-formula blocks).
-          setProcessingErrors(result.errors || []);
-          setShowProcessingErrorsDialog(true);
+          toast.error(
+            `${result.errors?.length || 0} error(s) occurred during processing`
+          );
         }
         await fetchPayrollData();
       } else {
@@ -1422,14 +1411,6 @@ const GTPayrollPage: React.FC = () => {
         onClose={() => setShowManageModal(false)}
         availableEmployees={allStaffs}
         onUpdate={fetchPayrollData}
-      />
-
-      {/* Skipped employees (July 2026+ OT-formula blocks etc.). GT staff are
-          managed in the shared Tien Hock catalogue. */}
-      <PayrollProcessingErrorsDialog
-        isOpen={showProcessingErrorsDialog}
-        onClose={() => setShowProcessingErrorsDialog(false)}
-        errors={processingErrors}
       />
     </div>
   );

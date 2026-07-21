@@ -1,5 +1,9 @@
 // src/routes/accounting/debtors.js
 import { Router } from "express";
+import {
+  fetchUnappliedOverpayments,
+  fetchUnappliedOverpaymentAsOf,
+} from "./overpayments.js";
 
 export default function (pool, config) {
   const router = Router();
@@ -159,6 +163,17 @@ export default function (pool, config) {
 
       const result = await pool.query(query, queryParams);
 
+      // Non-posting display extra: unapplied receipt overpayments (excess
+      // allocations) currently held in CUST_DEP per customer. Kept out of the
+      // SQL totals above so invoice/paid/balance figures are untouched.
+      const allCustomerIds = result.rows.flatMap((row) =>
+        (row.customers || []).map((customer) => customer.customer_id)
+      );
+      const overpaymentByCustomer = await fetchUnappliedOverpayments(
+        pool,
+        allCustomerIds
+      );
+
       let grand_total_amount = 0;
       let grand_total_paid = 0;
       let grand_total_balance = 0;
@@ -166,6 +181,8 @@ export default function (pool, config) {
       const salesmen = result.rows.map((row) => {
         const customers = row.customers || [];
         customers.forEach((customer) => {
+          customer.unapplied_overpayment =
+            overpaymentByCustomer.get(customer.customer_id) || 0;
           grand_total_amount += parseFloat(customer.total_amount || 0);
           grand_total_paid += parseFloat(customer.total_paid || 0);
           grand_total_balance += parseFloat(customer.total_balance || 0);
@@ -496,6 +513,15 @@ export default function (pool, config) {
         three_months_plus: 0,
       };
 
+      // Non-posting display extra: overpayments (receipt excess allocations)
+      // held in CUST_DEP as at the statement date. Never part of the ledger
+      // transactions or running balance above.
+      const unappliedOverpayment = await fetchUnappliedOverpaymentAsOf(
+        pool,
+        customerId,
+        endStr
+      );
+
       res.json({
         customer: {
           id: customer.id,
@@ -513,6 +539,7 @@ export default function (pool, config) {
         transactions,
         total_amount_due: runningBalance,
         aging,
+        unapplied_overpayment: unappliedOverpayment,
       });
     } catch (error) {
       console.error("Error fetching customer statement:", error);

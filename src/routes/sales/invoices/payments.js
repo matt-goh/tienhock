@@ -7,6 +7,8 @@ import {
   cancelReceipt,
   toLocalDateString,
 } from "../../accounting/receipt-service.js";
+import { fetchUnappliedOverpayments } from "../../accounting/overpayments.js";
+import { applyOverpayment } from "../../accounting/overpayment-apply.js";
 import { assertTienHockAccountingDateUnlocked } from "../../accounting/posting-lock.js";
 
 // Helper function (can be moved to a shared util if used elsewhere)
@@ -392,6 +394,64 @@ export default function (pool) {
     }
   });
 
+  // --- GET /api/payments/overpayment-balance/:customerId ---
+  // Unapplied overpayment (receipt excess held in CUST_DEP) available to apply
+  // to the customer's unpaid invoices.
+  router.get("/overpayment-balance/:customerId", async (req, res) => {
+    const { customerId } = req.params;
+    try {
+      const overpayments = await fetchUnappliedOverpayments(pool, [customerId]);
+      res.json({
+        customer_id: customerId,
+        unapplied_overpayment: overpayments.get(customerId) || 0,
+      });
+    } catch (error) {
+      console.error("Error fetching overpayment balance:", error);
+      res.status(500).json({
+        message: "Error fetching overpayment balance",
+        error: error.message,
+      });
+    }
+  });
+
+  // --- POST /api/payments/apply-overpayment ---
+  // Standalone overpayment application (no money portion): thin wrapper over
+  // the shared applyOverpayment service, which is also called inside
+  // POST /api/receipts when overpayment is applied alongside a money payment.
+  router.post("/apply-overpayment", async (req, res) => {
+    const { allocations, payment_date, notes } = req.body;
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await applyOverpayment(
+        client,
+        { allocations, payment_date, notes },
+        req.user?.id || null
+      );
+      await client.query("COMMIT");
+
+      res.status(201).json({
+        message:
+          result.payments.length === 1
+            ? "Overpayment applied successfully"
+            : `Overpayment applied to ${result.payments.length} invoices`,
+        payments: result.payments,
+        customer_id: result.customer_id,
+        total_applied: result.total_applied,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error applying overpayment:", error);
+      res.status(error.status || 500).json({
+        message: error.status ? error.message : "Error applying overpayment",
+        error: error.status ? undefined : error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
   // --- PUT /api/payments/:payment_id/confirm - Mark pending payment as paid ---
   router.put("/:payment_id/confirm", async (req, res) => {
     const { payment_id } = req.params;
@@ -751,6 +811,24 @@ export default function (pool) {
       // 2a. Cancel the associated journal entry if it exists
       if (cancelledPayment.journal_entry_id) {
         await cancelPaymentJournalEntry(client, cancelledPayment.journal_entry_id);
+      }
+
+      // 2b. An overpayment-application row also returns the applied amount to
+      // the customer's unapplied excess (FIFO distribution recorded on apply).
+      if (cancelledPayment.payment_method === "overpayment") {
+        const applicationsResult = await client.query(
+          `SELECT receipt_allocation_id, amount
+             FROM overpayment_applications WHERE payment_id = $1`,
+          [paymentIdNum]
+        );
+        for (const application of applicationsResult.rows) {
+          await client.query(
+            `UPDATE receipt_allocations
+                SET applied_amount = GREATEST(0, applied_amount - $2)
+              WHERE id = $1`,
+            [application.receipt_allocation_id, application.amount]
+          );
+        }
       }
 
       // 3. Update Invoice balance and status (only for active payments)

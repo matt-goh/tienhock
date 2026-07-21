@@ -15,6 +15,7 @@
 // movement, derived opening, period rows, totals). No date can ever produce
 // both a synthetic row and a real bank line.
 import { Router } from "express";
+import { fetchDebtorChildOverpayment } from "./overpayments.js";
 
 // Per-account link config. Keyed by the primary account being viewed.
 //   swap: linked codes that are credit-normal — their debit/credit columns are
@@ -260,8 +261,16 @@ export default function (pool) {
         return res.status(400).json({ message: "start must be on or before end" });
       }
       const ledger = await buildLedger(pool, accountCode, start, end);
+      // Non-posting display extra: unapplied receipt overpayments the customer
+      // has held in CUST_DEP (only for DEBTOR child ledgers; never part of the
+      // ledger lines or balances above).
+      const unappliedOverpayment = await fetchDebtorChildOverpayment(
+        pool,
+        accountCode
+      );
       res.json({
         ...ledger,
+        unapplied_overpayment: unappliedOverpayment,
         period: {
           mode: "range",
           year: parseInt(start.slice(0, 4), 10),

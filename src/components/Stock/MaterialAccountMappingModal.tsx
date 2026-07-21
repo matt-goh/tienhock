@@ -3,6 +3,7 @@
 // material stock records so purchases keyed in the journal system feed the
 // Material Stock page's Purchases column.
 import React, { useState, useEffect, Fragment, useMemo, useCallback } from "react";
+import { format } from "date-fns";
 import {
   Dialog,
   DialogPanel,
@@ -361,7 +362,7 @@ const MaterialAccountMappingModal: React.FC<MaterialAccountMappingModalProps> = 
                                     </div>
                                     {row.last_entry_date && (
                                       <div className="text-xs text-default-400 dark:text-gray-500">
-                                        last {row.last_entry_date.split("T")[0]}
+                                        last {format(new Date(row.last_entry_date), "yyyy-MM-dd")}
                                       </div>
                                     )}
                                   </td>
