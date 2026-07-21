@@ -264,6 +264,11 @@ const EPF_NATIONALITY_LABELS: Record<string, string> = {
   foreign: "Foreign",
   "": "Auto (from nationality)",
 };
+const OT_PAY_BASIS_LABELS: Record<string, string> = {
+  monthly_26: "Monthly salary (÷ 26)",
+  actual_days: "Actual worked days",
+  "": "Auto (from work records)",
+};
 
 // A single read-only label + value pair.
 const Field: React.FC<{ label: string; value?: React.ReactNode }> = ({
@@ -441,7 +446,7 @@ const StaffDetailsPage: React.FC = () => {
           </Section>
 
           <Section title="Work">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-5">
               <div className="space-y-1">
                 <p className="text-xs font-medium text-default-500 dark:text-gray-400">
                   Jobs
@@ -467,6 +472,10 @@ const StaffDetailsPage: React.FC = () => {
                 jobLocations={jobLocations}
               />
               <Field label="Date Joined" value={staff.dateJoined} />
+              <Field
+                label="OT Pay Basis (from July 2026)"
+                value={OT_PAY_BASIS_LABELS[staff.otPayBasis || ""]}
+              />
             </div>
             {/* Editable pay codes (the only interactive part of this page) */}
             <StaffPayCodesSection employee={staff} />

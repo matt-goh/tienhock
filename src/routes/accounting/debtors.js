@@ -208,24 +208,155 @@ export default function (pool, config) {
   const roundMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
 
   /**
-   * Invoice aging cannot see legacy/unallocated credits held in the customer
-   * debtor ledger. Put that difference in the oldest bucket so aging always
-   * reconciles to the authoritative statement closing balance.
+   * Legacy signed-ledger monthly FIFO aging (V3 parity with the scanned Trade
+   * Debtor List). Charges enter their calendar month as signed buckets
+   * (debits of S/DN/RN plus signed CN); payments (credits of S plus signed
+   * REC) normalize carried credits, then consume positive buckets
+   * oldest-first, any excess crediting the payment month. Buckets always sum
+   * to the customer's ledger close. The simulation rolls forward from each
+   * child's exact 2026-01-01 opening anchor (the debtor ledger starts in
+   * 2026); later checkpoint anchors are consistent with that roll-forward, so
+   * they are not re-seeded. Returns a Map of customerId ->
+   * { current_month, one_month, two_months, three_months_plus } (RM, 2dp).
    */
-  const reconcileAgingToLedger = (agingRow, ledgerBalance) => {
-    const current = roundMoney(agingRow.aging_current);
-    const oneMonth = roundMoney(agingRow.aging_1_month);
-    const twoMonths = roundMoney(agingRow.aging_2_months);
-    const threePlus = roundMoney(agingRow.aging_3_plus);
-    const agingTotal = roundMoney(current + oneMonth + twoMonths + threePlus);
-    const ledgerDifference = roundMoney(ledgerBalance - agingTotal);
+  const LEGACY_LEDGER_START = "2026-01-01";
 
-    return {
-      current_month: current,
-      one_month: oneMonth,
-      two_months: twoMonths,
-      three_months_plus: roundMoney(threePlus + ledgerDifference),
-    };
+  const computeLegacyFifoAging = async (endStr, periodYear, periodMonth) => {
+    const [childrenResult, anchorResult, monthlyResult] = await Promise.all([
+      pool.query(
+        `SELECT DISTINCT ON (ac.code)
+                ac.code AS child_code, c.id AS customer_id
+           FROM account_codes ac
+           JOIN customers c ON ac.code = c.id OR ac.code LIKE c.id || '-D%'
+          WHERE ac.parent_code = 'DEBTOR'
+          ORDER BY ac.code, (ac.code = c.id) DESC`
+      ),
+      pool.query(
+        `SELECT account_code, SUM(amount) AS amount
+           FROM account_opening_balances
+          WHERE as_of_date = $1
+          GROUP BY account_code`,
+        [LEGACY_LEDGER_START]
+      ),
+      pool.query(
+        `SELECT jel.account_code,
+                EXTRACT(YEAR FROM je.entry_date)::integer AS y,
+                EXTRACT(MONTH FROM je.entry_date)::integer AS m,
+                SUM(CASE WHEN COALESCE(je.legacy_entry_type, je.entry_type) IN ('S', 'DN', 'RN')
+                         THEN jel.debit_amount ELSE 0 END)
+              + SUM(CASE WHEN COALESCE(je.legacy_entry_type, je.entry_type) = 'CN'
+                         THEN jel.debit_amount - jel.credit_amount ELSE 0 END) AS current_amount,
+                SUM(CASE WHEN COALESCE(je.legacy_entry_type, je.entry_type) = 'S'
+                         THEN jel.credit_amount ELSE 0 END)
+              + SUM(CASE WHEN COALESCE(je.legacy_entry_type, je.entry_type) = 'REC'
+                         THEN jel.credit_amount - jel.debit_amount ELSE 0 END) AS payment_amount
+           FROM journal_entry_lines jel
+           JOIN journal_entries je ON je.id = jel.journal_entry_id
+           JOIN account_codes ac ON ac.code = jel.account_code
+          WHERE je.status = 'posted'
+            AND ac.parent_code = 'DEBTOR'
+            AND je.entry_date >= $1 AND je.entry_date <= $2
+          GROUP BY jel.account_code,
+                   EXTRACT(YEAR FROM je.entry_date),
+                   EXTRACT(MONTH FROM je.entry_date)`,
+        [LEGACY_LEDGER_START, endStr]
+      ),
+    ]);
+
+    const anchorCentsByChild = new Map(
+      anchorResult.rows.map((r) => [
+        r.account_code,
+        Math.round((parseFloat(r.amount) || 0) * 100),
+      ])
+    );
+    const monthlyByChild = new Map();
+    for (const r of monthlyResult.rows) {
+      let months = monthlyByChild.get(r.account_code);
+      if (!months) {
+        months = new Map();
+        monthlyByChild.set(r.account_code, months);
+      }
+      months.set(`${r.y}-${pad2(r.m)}`, {
+        currentCents: Math.round((parseFloat(r.current_amount) || 0) * 100),
+        paymentCents: Math.round((parseFloat(r.payment_amount) || 0) * 100),
+      });
+    }
+
+    // Calendar months from the ledger start through the selected period.
+    const monthKeys = [];
+    for (let y = 2026, m = 1; y < periodYear || (y === periodYear && m <= periodMonth); ) {
+      monthKeys.push(`${y}-${pad2(m)}`);
+      m += 1;
+      if (m === 13) {
+        y += 1;
+        m = 1;
+      }
+    }
+
+    const agingByCustomer = new Map();
+    for (const row of childrenResult.rows) {
+      const buckets = [
+        { key: "old", amountCents: anchorCentsByChild.get(row.child_code) || 0 },
+      ];
+      const months = monthlyByChild.get(row.child_code) || new Map();
+      for (const key of monthKeys) {
+        const movement = months.get(key) || { currentCents: 0, paymentCents: 0 };
+        let { currentCents, paymentCents } = movement;
+        if (paymentCents < 0) {
+          // Not seen in the pinned window: fold a net-outgoing month into the
+          // month's charges rather than carry a negative payment bucket.
+          currentCents += paymentCents;
+          paymentCents = 0;
+        }
+        if (paymentCents > 0) {
+          // Normalize carried credits, then consume positive buckets oldest-first.
+          for (const negative of buckets.filter((b) => b.amountCents < 0)) {
+            for (const positive of buckets) {
+              if (negative.amountCents >= 0) break;
+              if (positive.amountCents <= 0) continue;
+              const used = Math.min(-negative.amountCents, positive.amountCents);
+              negative.amountCents += used;
+              positive.amountCents -= used;
+            }
+          }
+          let remaining = paymentCents;
+          for (const bucket of buckets) {
+            if (remaining <= 0) break;
+            if (bucket.amountCents <= 0) continue;
+            const used = Math.min(remaining, bucket.amountCents);
+            bucket.amountCents -= used;
+            remaining -= used;
+          }
+          currentCents -= remaining;
+        }
+        if (currentCents !== 0) buckets.push({ key, amountCents: currentCents });
+      }
+
+      const ageOf = (key) => {
+        if (key === "old") return 3;
+        const [y, m] = key.split("-").map(Number);
+        return (periodYear - y) * 12 + (periodMonth - m);
+      };
+      let current = 0;
+      let oneMonth = 0;
+      let twoMonths = 0;
+      let threePlus = 0;
+      for (const bucket of buckets) {
+        const age = ageOf(bucket.key);
+        if (age === 0) current += bucket.amountCents;
+        else if (age === 1) oneMonth += bucket.amountCents;
+        else if (age === 2) twoMonths += bucket.amountCents;
+        else threePlus += bucket.amountCents;
+      }
+
+      agingByCustomer.set(row.customer_id, {
+        current_month: roundMoney(current / 100),
+        one_month: roundMoney(oneMonth / 100),
+        two_months: roundMoney(twoMonths / 100),
+        three_months_plus: roundMoney(threePlus / 100),
+      });
+    }
+    return agingByCustomer;
   };
 
   /** Resolve a customer's debtor child account code (same rule as debtorSync). */
@@ -266,50 +397,6 @@ export default function (pool, config) {
       (parseFloat(movementResult.rows[0].movement) || 0)
     );
   };
-
-  /**
-   * As-of-date invoice aging for one or all customers. Each open invoice's
-   * outstanding AS AT the period end = total − active receipts effective by
-   * the end date − credit notes ≤ end + debit notes ≤ end. Receipt-backed
-   * payments use the accounting posting/clearance date; legacy rows fall back
-   * to payment_date. Never use today's mutable balance_due here.
-   */
-  const agingSql = `
-    SELECT i.customerid,
-      COALESCE(SUM(CASE WHEN inv_date >= $2 THEN outstanding ELSE 0 END), 0) AS aging_current,
-      COALESCE(SUM(CASE WHEN inv_date >= ($2::date - INTERVAL '1 month') AND inv_date < $2 THEN outstanding ELSE 0 END), 0) AS aging_1_month,
-      COALESCE(SUM(CASE WHEN inv_date >= ($2::date - INTERVAL '2 months') AND inv_date < ($2::date - INTERVAL '1 month') THEN outstanding ELSE 0 END), 0) AS aging_2_months,
-      COALESCE(SUM(CASE WHEN inv_date < ($2::date - INTERVAL '2 months') THEN outstanding ELSE 0 END), 0) AS aging_3_plus
-    FROM (
-      SELECT i0.id, i0.customerid,
-             (to_timestamp(i0.createddate::bigint / 1000) AT TIME ZONE 'Asia/Kuala_Lumpur')::date AS inv_date,
-             i0.totalamountpayable
-             - COALESCE((SELECT SUM(p.amount_paid)
-                          FROM payments p
-                          LEFT JOIN receipt_allocations ra
-                            ON ra.id = p.receipt_allocation_id
-                          LEFT JOIN receipts r ON r.id = ra.receipt_id
-                          WHERE p.invoice_id = i0.id
-                            AND (p.status IS NULL OR p.status = 'active')
-                            AND COALESCE(r.posting_date, p.payment_date)::date <= $3), 0)
-             - COALESCE((SELECT SUM(ad.totalamountpayable) FROM adjustment_documents ad
-                          WHERE ad.original_invoice_id = i0.id AND ad.type = 'credit_note'
-                            AND ad.status = 'active' AND COALESCE(ad.is_consolidated, false) = false
-                            AND (to_timestamp(ad.createddate::bigint / 1000) AT TIME ZONE 'Asia/Kuala_Lumpur')::date <= $3), 0)
-             + COALESCE((SELECT SUM(ad.totalamountpayable) FROM adjustment_documents ad
-                          WHERE ad.original_invoice_id = i0.id AND ad.type = 'debit_note'
-                            AND ad.status = 'active' AND COALESCE(ad.is_consolidated, false) = false
-                            AND (to_timestamp(ad.createddate::bigint / 1000) AT TIME ZONE 'Asia/Kuala_Lumpur')::date <= $3), 0)
-             AS outstanding
-        FROM invoices i0
-       WHERE i0.invoice_status <> 'cancelled'
-         AND COALESCE(i0.is_consolidated, false) = false
-         AND (to_timestamp(i0.createddate::bigint / 1000) AT TIME ZONE 'Asia/Kuala_Lumpur')::date <= $3
-         AND ($1::varchar IS NULL OR i0.customerid = $1)
-    ) i
-    WHERE i.outstanding > 0.01
-    GROUP BY i.customerid
-  `;
 
   // GET /api/debtors/statement/:customerId - Customer statement for a month,
   // built from the customer's debtor child ledger (posted journal lines).
@@ -398,10 +485,16 @@ export default function (pool, config) {
         });
       }
 
-      // 4. Aging as at the period end (per-invoice as-of outstanding)
-      const agingResult = await pool.query(agingSql, [customerId, startStr, endStr]);
-      const agingRow = agingResult.rows[0] || {};
-      const aging = reconcileAgingToLedger(agingRow, runningBalance);
+      // 4. Aging as at the period end (legacy signed-ledger monthly FIFO —
+      //    the same model the printed Trade Debtor List uses; the buckets sum
+      //    to the ledger close by construction).
+      const agingByCustomer = await computeLegacyFifoAging(endStr, yearInt, monthInt);
+      const aging = agingByCustomer.get(customerId) || {
+        current_month: 0,
+        one_month: 0,
+        two_months: 0,
+        three_months_plus: 0,
+      };
 
       res.json({
         customer: {
@@ -465,9 +558,15 @@ export default function (pool, config) {
 
       // One bulk query over the customer DEBTOR child ledgers (no per-customer
       // round-trips): BAL B/F = latest anchor on/before the period start plus
-      // posted movement from the anchor to the start; the period columns are
-      // the child's posted debits (invoices/DN) and credits (receipts/CN/
-      // cash-bill settlements); TOTAL DUE = B/F + debits − credits.
+      // posted movement from the anchor to the start. CURRENT and PAYMENT
+      // follow the legacy Trade Debtor List column rules (V3 parity):
+      //   CURRENT = S/DN/RN debits net of CN credits (new charges);
+      //   PAYMENT = REC and S cash-auto-collection credits net of REC debits
+      //     (money received; positive).
+      // Other journal types never appear in either column. TOTAL DUE is the
+      // full ledger close (B/F + all movement) — identical to
+      // B/F + CURRENT − PAYMENT whenever only the five legacy document types
+      // moved, which is every month in the pinned Jan–May window.
       const query = `
         WITH children AS (
           -- One customer per child: the exact id match wins over the -D
@@ -495,9 +594,19 @@ export default function (pool, config) {
                             AND (a.as_of_date IS NULL OR je.entry_date >= a.as_of_date::date)
                           THEN jel.debit_amount - jel.credit_amount ELSE 0 END) AS pre_movement,
                  SUM(CASE WHEN je.entry_date >= $1 AND je.entry_date <= $2
-                          THEN jel.debit_amount ELSE 0 END) AS period_debits,
+                           AND COALESCE(je.legacy_entry_type, je.entry_type) IN ('S', 'DN', 'RN')
+                          THEN jel.debit_amount ELSE 0 END)
+               - SUM(CASE WHEN je.entry_date >= $1 AND je.entry_date <= $2
+                           AND COALESCE(je.legacy_entry_type, je.entry_type) = 'CN'
+                          THEN jel.credit_amount ELSE 0 END) AS current_invoices,
                  SUM(CASE WHEN je.entry_date >= $1 AND je.entry_date <= $2
-                          THEN jel.credit_amount ELSE 0 END) AS period_credits
+                           AND COALESCE(je.legacy_entry_type, je.entry_type) IN ('S', 'REC')
+                          THEN jel.credit_amount ELSE 0 END)
+               - SUM(CASE WHEN je.entry_date >= $1 AND je.entry_date <= $2
+                           AND COALESCE(je.legacy_entry_type, je.entry_type) = 'REC'
+                          THEN jel.debit_amount ELSE 0 END) AS payment,
+                 SUM(CASE WHEN je.entry_date >= $1 AND je.entry_date <= $2
+                          THEN jel.debit_amount - jel.credit_amount ELSE 0 END) AS period_net
             FROM journal_entry_lines jel
             JOIN journal_entries je ON je.id = jel.journal_entry_id
             JOIN children ch ON ch.child_code = jel.account_code
@@ -508,30 +617,23 @@ export default function (pool, config) {
         SELECT ch.customer_id,
                ch.customer_name,
                (COALESCE(a.amount, 0) + COALESCE(m.pre_movement, 0))::numeric(14,2) AS bal_bf,
-               COALESCE(m.period_debits, 0)::numeric(14,2) AS current_invoices,
-               COALESCE(m.period_credits, 0)::numeric(14,2) AS payment,
+               COALESCE(m.current_invoices, 0)::numeric(14,2) AS current_invoices,
+               COALESCE(m.payment, 0)::numeric(14,2) AS payment,
                (COALESCE(a.amount, 0) + COALESCE(m.pre_movement, 0)
-                + COALESCE(m.period_debits, 0) - COALESCE(m.period_credits, 0))::numeric(14,2) AS total_due
+                + COALESCE(m.period_net, 0))::numeric(14,2) AS total_due
           FROM children ch
           LEFT JOIN anchors a ON a.account_code = ch.child_code
           LEFT JOIN movement m ON m.account_code = ch.child_code
-         WHERE ABS(COALESCE(a.amount, 0) + COALESCE(m.pre_movement, 0)) > 0.005
-            OR COALESCE(m.period_debits, 0) > 0.005
-            OR COALESCE(m.period_credits, 0) > 0.005
          ORDER BY ch.customer_id ASC
       `;
       const result = await pool.query(query, [startStr, endStr]);
 
-      // As-of aging for all customers in one pass (per-invoice outstanding at
-      // the period end; never today's mutable balance_due).
-      const agingResult = await pool.query(agingSql, [null, startStr, endStr]);
-      const agingByCustomer = {};
-      for (const row of agingResult.rows) {
-        agingByCustomer[row.customerid] = row;
-      }
+      // Legacy signed-ledger monthly FIFO aging for every customer in one pass.
+      const agingByCustomer = await computeLegacyFifoAging(endStr, yearInt, monthInt);
 
-      // Process results and calculate totals
-      let totals = {
+      // Totals aggregate the FULL population, including the zero-close
+      // customers the printed body omits (legacy report behaviour).
+      const totals = {
         bal_bf: 0,
         current_invoices: 0,
         payment: 0,
@@ -542,12 +644,14 @@ export default function (pool, config) {
         aging_3_plus: 0,
       };
 
-      const customers = result.rows.map((row) => {
+      const allCustomers = result.rows.map((row) => {
         const totalDue = parseFloat(row.total_due) || 0;
-        const reconciledAging = reconcileAgingToLedger(
-          agingByCustomer[row.customer_id] || {},
-          totalDue
-        );
+        const aging = agingByCustomer.get(row.customer_id) || {
+          current_month: 0,
+          one_month: 0,
+          two_months: 0,
+          three_months_plus: 0,
+        };
         const customer = {
           account_no: row.customer_id,
           particular: row.customer_name || "UNNAMED",
@@ -555,13 +659,23 @@ export default function (pool, config) {
           current_invoices: parseFloat(row.current_invoices) || 0,
           payment: parseFloat(row.payment) || 0,
           total_due: totalDue,
-          aging_current: reconciledAging.current_month,
-          aging_1_month: reconciledAging.one_month,
-          aging_2_months: reconciledAging.two_months,
-          aging_3_plus: reconciledAging.three_months_plus,
+          aging_current: aging.current_month,
+          aging_1_month: aging.one_month,
+          aging_2_months: aging.two_months,
+          aging_3_plus: aging.three_months_plus,
         };
 
-        // Accumulate totals
+        const agingSum =
+          customer.aging_current +
+          customer.aging_1_month +
+          customer.aging_2_months +
+          customer.aging_3_plus;
+        if (Math.abs(agingSum - customer.total_due) > 0.005) {
+          console.warn(
+            `general-statement: FIFO aging ${agingSum.toFixed(2)} != ledger close ${customer.total_due.toFixed(2)} for ${customer.account_no}`
+          );
+        }
+
         totals.bal_bf += customer.bal_bf;
         totals.current_invoices += customer.current_invoices;
         totals.payment += customer.payment;
@@ -573,6 +687,14 @@ export default function (pool, config) {
 
         return customer;
       });
+
+      // The printed body lists only nonzero closes; the totals row above still
+      // aggregates the omitted zero-close rows.
+      const customers = allCustomers.filter((c) => Math.abs(c.total_due) > 0.005);
+
+      for (const key of Object.keys(totals)) {
+        totals[key] = roundMoney(totals[key]);
+      }
 
       res.json({
         statement_date: statementDate,

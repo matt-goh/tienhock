@@ -1016,6 +1016,94 @@ export default function (pool) {
     }
   });
 
+  // GET /closing-stock-reference - company-wide computed closing totals for the
+  // month, shown on the Material Stock page as the reference for confirming the
+  // financial-statement closing-stock values (closing_stock_values). Mirrors the
+  // /stock/with-opening accumulation (opening = all legacy purchase lines and
+  // journal-mapped purchases plus all adjustments before the month; closing =
+  // opening + the month's purchases + the month's adjustments) summed across
+  // the mee/bihun/shared buckets. Closing VALUE is linear in those sources, so
+  // grouping by category here is exact (display-row hiding on the page does not
+  // affect value sums). Informational only — nothing is written back.
+  router.get("/closing-stock-reference", async (req, res) => {
+    try {
+      const year = parseInt(req.query.year, 10);
+      const month = parseInt(req.query.month, 10);
+      if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+        return res.status(400).json({ message: "Valid year and month are required" });
+      }
+
+      const nextPeriod = getNextPeriod(year, month);
+      const nextPeriodStart = getPeriodStart(nextPeriod.year, nextPeriod.month);
+
+      const categoryResult = await pool.query(
+        `
+          WITH legacy_purchases AS (
+            SELECT pil.material_id, SUM(pil.amount) AS value
+            FROM purchase_invoice_lines pil
+            JOIN purchase_invoices pi ON pi.id = pil.purchase_invoice_id
+            WHERE pi.invoice_date < $1
+            GROUP BY pil.material_id
+          ),
+          journal_purchases AS (
+            SELECT mam.material_id,
+                   SUM(jel.debit_amount - jel.credit_amount) AS value
+            FROM journal_entry_lines jel
+            JOIN journal_entries je ON je.id = jel.journal_entry_id
+            JOIN material_account_mappings mam ON mam.account_code = jel.account_code
+            WHERE je.status = 'posted' AND mam.is_active = true
+              AND je.entry_date < $1
+            GROUP BY mam.material_id
+          ),
+          adjustments AS (
+            SELECT mse.material_id, SUM(mse.adjustment_value) AS value
+            FROM material_stock_entries mse
+            WHERE mse.year < $2 OR (mse.year = $2 AND mse.month <= $3)
+            GROUP BY mse.material_id
+          )
+          SELECT m.category,
+                 COALESCE(SUM(lp.value), 0)
+               + COALESCE(SUM(jp.value), 0)
+               + COALESCE(SUM(a.value), 0) AS closing_value
+          FROM materials m
+          LEFT JOIN legacy_purchases lp ON lp.material_id = m.id
+          LEFT JOIN journal_purchases jp ON jp.material_id = m.id
+          LEFT JOIN adjustments a ON a.material_id = m.id
+          WHERE m.is_active = true
+          GROUP BY m.category
+        `,
+        [nextPeriodStart, year, month]
+      );
+
+      const byCategory = {};
+      for (const row of categoryResult.rows) {
+        byCategory[row.category] = toNumber(row.closing_value);
+      }
+
+      const kilangResult = await pool.query(
+        `SELECT COALESCE(SUM(stock_value), 0) AS total
+         FROM material_stock_kilang_entries
+         WHERE year = $1 AND month = $2`,
+        [year, month]
+      );
+
+      const round2 = (n) => Math.round(n * 100) / 100;
+      res.json({
+        year,
+        month,
+        finished_goods: round2(toNumber(kilangResult.rows[0].total)),
+        raw_materials: round2((byCategory.ingredient || 0) + (byCategory.raw_material || 0)),
+        packing_materials: round2(byCategory.packing_material || 0),
+      });
+    } catch (error) {
+      console.error("Error computing closing-stock reference:", error);
+      res.status(500).json({
+        message: "Error computing closing-stock reference",
+        error: error.message,
+      });
+    }
+  });
+
   // POST /stock/batch - Batch upsert manual stock adjustments for a month
   router.post("/stock/batch", async (req, res) => {
     const { year, month, product_line, entries } = req.body;

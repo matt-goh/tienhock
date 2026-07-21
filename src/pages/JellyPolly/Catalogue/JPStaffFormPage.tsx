@@ -995,6 +995,23 @@ const JPStaffFormPage: React.FC = () => {
                   )}
                   {renderInput("dateJoined", "Date Joined", "date")}
                 </div>
+                <div className="border-t border-default-200 dark:border-gray-700 pt-6">
+                  <h3 className="text-base font-medium text-default-800 dark:text-gray-100 mb-1">
+                    Overtime Settings
+                  </h3>
+                  <p className="text-sm text-default-500 dark:text-gray-400 mb-4">
+                    Controls the divisor used by the OT salary formula from July
+                    2026. Leave as Auto to follow how this staff's work is
+                    recorded.
+                  </p>
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                    {renderListbox(
+                      "otPayBasis",
+                      "OT Pay Basis (from July 2026)",
+                      otPayBasisOptions
+                    )}
+                  </div>
+                </div>
                 <StaffPayCodesSection employee={formData} company="jellypolly" />
               </div>
               <div className="space-y-6 mt-5">
@@ -1064,12 +1081,6 @@ const JPStaffFormPage: React.FC = () => {
                       "sipAgeOverride",
                       "SIP Age",
                       contributionAgeOptions,
-                      "top"
-                    )}
-                    {renderListbox(
-                      "otPayBasis",
-                      "OT Pay Basis (from July 2026)",
-                      otPayBasisOptions,
                       "top"
                     )}
                   </div>

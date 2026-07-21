@@ -57,6 +57,18 @@ The hash-validated January–May Trial Balance scans have now settled the report
 - The other settled non-stock exceptions are `CL_ABB` → Note 11; `CL_AFI`, `CL_GF`, and `CL_GT` → Note 8; and `OC_CMK`/`OC_MIL` → Note 1.
 - These are direct `account_codes.fs_note` decisions, not report-only aliases. Together with 94 stock-family changes, the 31 named non-stock changes are guarded by the V2 migration. The journal engine remains the accounting source; these classifications only decide where each balance renders.
 
-Items still described above as unknown (for example the business meaning of `BTRA` and `NT_7484`) remain open unless they are explicitly settled in a later evidence document. Monthly closing-stock entry/valuation also remains Phase V3; V2 establishes only the evidenced fiscal opening values and classifications.
+The report *classifications* of `BTRA`, `NT_7484`, `THJ_CK`/`THJ_SM` and `CL_GT`/`CL_GF` were settled by the scans one day later — see the 21 Jul 2026 addendum below; their business *meanings* remain user-domain knowledge. Monthly closing-stock entry/valuation landed with Phase V3 (21 Jul 2026); V2 established the evidenced fiscal opening values and classifications.
+
+## Verified classification addendum — 21 Jul 2026
+
+The hash-validated scans and Phase V3 settled the remaining classification questions and the closing-stock mechanism:
+
+- `BTRA` and `MBTRA` print APPX 5 (administrative transportation expense; the May TB prints `BTRA` DR 2,230.00) — legacy never treats them as CoGM freight-in. The business *meaning* of the legacy balances remains user-domain knowledge.
+- `NT_7484` prints APPX 5 with a zero balance in all five scanned months — the guessed Note 8 (quit-rent prepayment) reclassification is rejected; legacy keeps it under Note 5.
+- `THJ_CK`, `THJ_SM`, `THJ_E`, `THJ_L` and `THJ_SC` print APPX 5-1 (factory salaries), extending the 20 Jul Note 5-1 prefix list above; the inter-company recharge hypothesis is rejected.
+- `CL_GT` (DR 12,415.60) and `CL_GF` (DR 31,696.82) print APPX 8 — the scanned May figures confirm the 20 Jul Note 8 move (receivables from Green Target / Green Family, legacy convention kept).
+- Monthly closing stock landed in Phase V3: exact-month values are keyed in `closing_stock_values` on the Material Stock page ("Closing Stock (Financial Statements)" card) and injected at report level only — never a GL posting. May 2026 is seeded from the scans (14-1: 188,979.60 · 14-2: 336,909.82 · 14-3: 182,194.43) and the May Balance Sheet balances at RM8,980,756.68.
+
+Every classification above is regression-pinned by `dev/import/legacy-report-fixtures/verify-legacy-reports.mjs` (ALL STAGES GREEN, 21 Jul 2026).
 
 Think from first principles and standard accounting/Malaysia auditing practice, let me know how should we implement the accounting system in this new ERP app

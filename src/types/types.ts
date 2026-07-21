@@ -698,8 +698,10 @@ export interface GTAdjDocSummary {
   type: "credit_note" | "debit_note" | "refund_note";
   total_amount: number;
   status: "active" | "cancelled";
+  einvoice_status?: EInvoiceStatus;
   is_consolidated: boolean;
   paired_with_id: string | null;
+  paired_doc_id?: string | null;
   paired_status?: string | null;
   refund_method?: string | null;
   refund_reference?: string | null;

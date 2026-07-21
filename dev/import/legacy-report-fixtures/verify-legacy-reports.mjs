@@ -12,8 +12,10 @@
 //         per month-end (report semantics: latest anchor <= period end +
 //         posted movement from the anchor date, TD children collapsed into
 //         DEBTOR). Classifies exact / constant offset / non-constant offset,
-//         hard-gates 880/880 exact accounts, the DEBTOR controls, and the
-//         balanced V2 January opening-anchor state.
+//         hard-gates 880/880 exact accounts plus the 2 named GP-202604-0001
+//         drift rows (LGP, TP — the genuine April invoice keyed 20 Jul 2026,
+//         after the scans), the DEBTOR controls, and the balanced V2 January
+//         opening-anchor state.
 //         Writes generated/tb-comparison.json.
 //   tdl   V1 step 3 — scanned Trade Debtor List vs each ERP debtor-child
 //         ledger at 31 May. Proves BAL B/F, May debits/credits, TOTAL DUE and
@@ -24,8 +26,9 @@
 //         V1 step 4 / V2 final state — scanned May BS / IS / CoGM note lines
 //         vs the three
 //         financial-report engines, reproduced query-for-query. Attributes
-//         with the exact 1 January opening-stock semantics. Requires 30/40
-//         exact lines; the remaining ten must be only the V3 closing-stock
+//         with the exact 1 January opening-stock semantics. Requires 28/40
+//         exact lines plus 2 named GP-202604-0001 drift lines (BS note 13,
+//         IS note 5); the remaining ten must be only the V3 closing-stock
 //         lines and their profit/CoGM cross-totals.
 //         Writes generated/statements-comparison.json.
 //   regressions
@@ -85,11 +88,13 @@ const cents = (s, where) => {
 };
 
 // Read-only SQL against the dev DB (CLAUDE.md rule 12). Returns array of
-// objects keyed by the query's column names.
+// objects keyed by the query's column names. VERIFY_DB overrides the database
+// for rehearsals on throwaway clones (default: the dev `tienhock`).
+const VERIFY_DB = process.env.VERIFY_DB || "tienhock";
 function query(sql) {
   const out = execFileSync(
     "docker",
-    ["exec", "-i", "tienhock_dev_db", "psql", "-U", "postgres", "-d", "tienhock",
+    ["exec", "-i", "tienhock_dev_db", "psql", "-U", "postgres", "-d", VERIFY_DB,
      "--csv", "-v", "ON_ERROR_STOP=1", "-c", sql],
     { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }
   );
@@ -310,6 +315,24 @@ const DEBTOR_CONTROLS_CENTS = { "01": 53453147, "02": 56171082, "03": 46679100, 
 // generated output to keep the approved correction arithmetic auditable.
 const PRE_V2_RESIDUE_CENTS = 145648037;
 const V2_EXPECTED_TB_ACCOUNTS = 880;
+// Approved post-scan business drift (user-confirmed genuine 20 Jul 2026):
+// GP-202604-0001 (journal 11829), self-billed April purchase SB2026070025
+// from SHANDONG STANDARD METAL PRODUCTS CO.,LTD, keyed in production on
+// 20 Jul 2026 with entry_date 2026-04-30 — DR LGP / CR TP RM7,261.51 (the
+// debit was OP until dev/migrations/2026-07-20_gp_op_to_lgp.sql). The May
+// scans were exported before this invoice was keyed, so they can never
+// contain it; every ±7,261.51 expectation shift below is this one document.
+const GP_DRIFT_REFERENCE = "GP-202604-0001";
+const GP_DRIFT_CENTS = 726151;
+const GP_DRIFT_ATTRIBUTION =
+  "Genuine April supplier invoice GP-202604-0001 (SB2026070025, Shandong " +
+  "Standard Metal Products) keyed 20 Jul 2026, after the May scans were " +
+  "exported: DR LGP / CR TP 7,261.51. User-confirmed genuine 20 Jul 2026.";
+// Expected scan−ERP diffs per TB month (Jan..May) for the two touched accounts.
+const GP_DRIFT_TB_PROFILE = {
+  LGP: [0, 0, 0, -726151, -726151],
+  TP: [0, 0, 0, 726151, 726151],
+};
 const V2_EXPECTED_JANUARY_ANCHORS = {
   total: 642,
   nonzero: 290,
@@ -544,10 +567,21 @@ function stageTb() {
     });
   }
 
+  // Reclassify the two approved GP-202604-0001 drift rows before bucketing:
+  // their exact Jan..May diff profile is pinned in GP_DRIFT_TB_PROFILE.
+  for (const r of rows) {
+    if (r.classification !== "non_constant_offset") continue;
+    const profile = GP_DRIFT_TB_PROFILE[r.erpCode];
+    if (profile && TB_MONTHS.every((mm, i) => r.diffCents[mm] === profile[i])) {
+      r.classification = "post_scan_gp_drift";
+      r.attribution = GP_DRIFT_ATTRIBUTION;
+    }
+  }
+
   // ---- Gates and report ----
-  const byClass = { exact: [], constant_offset: [], non_constant_offset: [] };
+  const byClass = { exact: [], constant_offset: [], non_constant_offset: [], post_scan_gp_drift: [] };
   for (const r of rows) byClass[r.classification].push(r);
-  console.log(`\n${rows.length} compared accounts: ${byClass.exact.length} exact, ${byClass.constant_offset.length} constant offset, ${byClass.non_constant_offset.length} non-constant offset`);
+  console.log(`\n${rows.length} compared accounts: ${byClass.exact.length} exact, ${byClass.constant_offset.length} constant offset, ${byClass.non_constant_offset.length} non-constant offset, ${byClass.post_scan_gp_drift.length} named GP drift`);
 
   // DEBTOR control must match at every month-end (V0 finding).
   const debtor = rows.find((r) => r.erpCode === "DEBTOR");
@@ -570,13 +604,14 @@ function stageTb() {
       fail(`${MONTH_ENDS[mm]}: Σ(scan − ERP) ${fmt(total)} != 0.00`);
   }
 
-  if (rows.length === V2_EXPECTED_TB_ACCOUNTS
+  if (rows.length === V2_EXPECTED_TB_ACCOUNTS + 2
     && byClass.exact.length === V2_EXPECTED_TB_ACCOUNTS
     && byClass.constant_offset.length === 0
-    && byClass.non_constant_offset.length === 0) {
-    ok("V2 TB final state is exact: 880 compared / 880 exact / 0 constant / 0 non-constant");
+    && byClass.non_constant_offset.length === 0
+    && byClass.post_scan_gp_drift.length === 2) {
+    ok("V2 TB final state is exact: 880 compared / 880 exact / 0 constant / 0 non-constant, plus the 2 named GP-202604-0001 drift rows (LGP, TP)");
   } else {
-    fail(`V2 TB final counts ${rows.length}/${byClass.exact.length}/${byClass.constant_offset.length}/${byClass.non_constant_offset.length} != 880/880/0/0`);
+    fail(`V2 TB final counts ${rows.length}/${byClass.exact.length}/${byClass.constant_offset.length}/${byClass.non_constant_offset.length}+${byClass.post_scan_gp_drift.length}d != 882/880/0/0+2d`);
   }
 
   const v2OpeningAnchors = verifyV2OpeningAnchorState();
@@ -1024,26 +1059,19 @@ const TDL_FULL_POPULATION_EXPECTED_CENTS = {
   legacySemanticPayment: -51808673,
   totalDue: 50769772,
 };
-// Filled after the first inspected comparison. A non-exact aging population is
-// allowed only when its complete per-customer diff remains byte-for-byte the
-// named V3 parity gap; any future data/rule change must fail this V1 gate.
-const EXPECTED_TDL_COLUMN_DIFF_FINGERPRINT = "3a9168d26b25a45e8e0048e7758ccf16f95409253fc58c5cddd461eb1d68c61b";
-const EXPECTED_TDL_AGING_DIFF_FINGERPRINT = "4514569fc2c30814ef505e0737e26fc1c02cbf22a057110f5b8013ea6f0d9817";
-const TDL_COLUMN_DIFF_REASONS = {
-  GUI: "Legacy excludes wrong-bank-in RV078/05 and its reversing contra PBE066/05 from both columns; the GL report includes the equal credit/debit.",
-  "MEEWOO-K": "Legacy nets May credit note THCN/26/13 out of CURRENT; the GL report puts its credit in PAYMENT.",
-  "MYSHOP(KM)": "Legacy nets May credit note THCN/26/15 out of CURRENT; the GL report puts its credit in PAYMENT.",
-  "MYSHOP-KM2": "Legacy nets May credit note THCN/26/16 out of CURRENT; the GL report puts its credit in PAYMENT.",
-  "MYSHOP-SKT": "Legacy nets May credit note THCN/26/14 out of CURRENT; the GL report puts its credit in PAYMENT.",
+// Full-population (all 191 debtor children) signed-ledger FIFO aging buckets —
+// the V3 endpoint's printed aging totals, reconciling to TOTAL DUE exactly.
+const TDL_FULL_POPULATION_AGING_EXPECTED_CENTS = {
+  ageCurrent: 31637689,
+  age1m: 12474050,
+  age2m: 2405571,
+  age3mPlus: 4252462,
 };
-const TDL_AGING_DEFAULT_REASON = "Legacy rolls signed debtor-ledger documents through the month buckets and applies receipts FIFO; ERP uses explicit invoice allocations and puts the remaining ledger bridge in 3 months+.";
-const TDL_AGING_DIFF_REASONS = {
-  "MEEWOO-K": "Legacy puts May credit note THCN/26/13 in CURRENT; ERP applies it to its linked April invoice, reducing 1 month instead.",
-  "MYSHOP(K2)": "Legacy carries the April -60.00 credit in 1 month; ERP has no positive invoice outstanding and puts the ledger bridge in 3 months+.",
-  "MYSHOP(P)": "Legacy FIFO clears the older 54.15 first and leaves March debt in 2 months; ERP's explicit payment allocation clears March and leaves the older invoice in 3 months+.",
-  "MYSHOP-P4": "Legacy FIFO clears January first and leaves 984.60 of March debt in 2 months; ERP's explicit payment allocation clears March and leaves January in 3 months+.",
-  SENANG: "ERP invoice aging includes unjournaled May invoice 2004882 (870.00), then offsets it through the oldest ledger bridge; the legacy ledger-based scan has only one 870.00 current balance.",
-};
+// V3: the ERP general statement now uses the legacy column semantics
+// (current = S/DN/RN debits − CN credits; payment = S+REC credits − REC debits)
+// and the same signed-ledger FIFO aging as the scans (computeLegacyFifoAging in
+// src/routes/accounting/debtors.js). The harness therefore expects ZERO
+// per-customer column and aging differences; any regression fails outright.
 
 function debtorLedgerRows() {
   const sql = `
@@ -1136,84 +1164,10 @@ function debtorLedgerRows() {
   }));
 }
 
-// Reproduces agingSql + reconcileAgingToLedger in
-// src/routes/accounting/debtors.js. Buckets are calendar months relative to
-// the selected report month, not rolling 30-day bands.
-function debtorAgingRows() {
-  const sql = `
-    WITH invoice_outstanding AS (
-      SELECT i0.customerid,
-             (to_timestamp(i0.createddate::bigint / 1000)
-                AT TIME ZONE 'Asia/Kuala_Lumpur')::date AS inv_date,
-             i0.totalamountpayable
-             - COALESCE((
-                 SELECT SUM(p.amount_paid)
-                   FROM payments p
-                   LEFT JOIN receipt_allocations ra ON ra.id = p.receipt_allocation_id
-                   LEFT JOIN receipts r ON r.id = ra.receipt_id
-                  WHERE p.invoice_id = i0.id
-                    AND (p.status IS NULL OR p.status = 'active')
-                    AND COALESCE(r.posting_date, p.payment_date)::date
-                          <= DATE '${TDL_PERIOD_END}'
-               ), 0)
-             - COALESCE((
-                 SELECT SUM(ad.totalamountpayable)
-                   FROM adjustment_documents ad
-                  WHERE ad.original_invoice_id = i0.id
-                    AND ad.type = 'credit_note'
-                    AND ad.status = 'active'
-                    AND COALESCE(ad.is_consolidated, false) = false
-                    AND (to_timestamp(ad.createddate::bigint / 1000)
-                           AT TIME ZONE 'Asia/Kuala_Lumpur')::date
-                          <= DATE '${TDL_PERIOD_END}'
-               ), 0)
-             + COALESCE((
-                 SELECT SUM(ad.totalamountpayable)
-                   FROM adjustment_documents ad
-                  WHERE ad.original_invoice_id = i0.id
-                    AND ad.type = 'debit_note'
-                    AND ad.status = 'active'
-                    AND COALESCE(ad.is_consolidated, false) = false
-                    AND (to_timestamp(ad.createddate::bigint / 1000)
-                           AT TIME ZONE 'Asia/Kuala_Lumpur')::date
-                          <= DATE '${TDL_PERIOD_END}'
-               ), 0) AS outstanding
-        FROM invoices i0
-       WHERE i0.invoice_status <> 'cancelled'
-         AND COALESCE(i0.is_consolidated, false) = false
-         AND (to_timestamp(i0.createddate::bigint / 1000)
-                AT TIME ZONE 'Asia/Kuala_Lumpur')::date
-               <= DATE '${TDL_PERIOD_END}'
-    )
-    SELECT customerid,
-           ROUND(COALESCE(SUM(CASE
-             WHEN inv_date >= DATE '${TDL_PERIOD_START}' THEN outstanding ELSE 0 END), 0) * 100)::bigint AS age_current_cents,
-           ROUND(COALESCE(SUM(CASE
-             WHEN inv_date >= DATE '${TDL_PERIOD_START}' - INTERVAL '1 month'
-              AND inv_date < DATE '${TDL_PERIOD_START}' THEN outstanding ELSE 0 END), 0) * 100)::bigint AS age_1m_cents,
-           ROUND(COALESCE(SUM(CASE
-             WHEN inv_date >= DATE '${TDL_PERIOD_START}' - INTERVAL '2 months'
-              AND inv_date < DATE '${TDL_PERIOD_START}' - INTERVAL '1 month'
-             THEN outstanding ELSE 0 END), 0) * 100)::bigint AS age_2m_cents,
-           ROUND(COALESCE(SUM(CASE
-             WHEN inv_date < DATE '${TDL_PERIOD_START}' - INTERVAL '2 months'
-             THEN outstanding ELSE 0 END), 0) * 100)::bigint AS age_3m_plus_cents
-      FROM invoice_outstanding
-     WHERE outstanding > 0.01
-     GROUP BY customerid
-     ORDER BY customerid`;
-
-  return new Map(query(sql).map((r) => [r.customerid, {
-    ageCurrentCents: parseInt(r.age_current_cents, 10),
-    age1mCents: parseInt(r.age_1m_cents, 10),
-    age2mCents: parseInt(r.age_2m_cents, 10),
-    age3mPlusCents: parseInt(r.age_3m_plus_cents, 10),
-  }]));
-}
-
-// Reconstructs the legacy scan's aging from the debtor ledger alone. The
-// legacy report does not honor explicit payment -> invoice links: it carries
-// signed monthly document buckets forward and consumes them FIFO.
+// Reconstructs the legacy scan's aging from the debtor ledger alone — signed
+// monthly document buckets carried forward and consumed FIFO. Since V3 this is
+// also the ERP endpoint model: computeLegacyFifoAging in
+// src/routes/accounting/debtors.js is a port of this reference.
 function debtorLegacyFifoAgingRows() {
   const sql = `
     WITH children AS (
@@ -1351,7 +1305,6 @@ function stageTdl() {
   console.log("\n=== stage tdl: scanned Trade Debtor List vs ERP debtor children ===");
   const fixture = loadTdlFixture();
   const ledgerRows = debtorLedgerRows();
-  const agingByCustomer = debtorAgingRows();
   const legacyFifoAgingByCustomer = debtorLegacyFifoAgingRows();
 
   if (fixture.length === TDL_EXPECTED_CUSTOMERS)
@@ -1420,6 +1373,8 @@ function stageTdl() {
     if (scan.particular !== erp.customerName)
       nameDifferences.push({ accountNo: scan.accountNo, erpCustomerId: resolvedCustomerId, scan: scan.particular, erp: erp.customerName });
 
+    // The endpoint's general-statement columns ARE the legacy semantics since
+    // V3, so this structural diff is also the report-column diff.
     const structuralLedgerDiffCents = {
       balBf: scan.balBfCents - erp.balBfCents,
       current: scan.currentCents - erp.legacyCurrentCents,
@@ -1429,33 +1384,7 @@ function stageTdl() {
       totalDue: scan.totalDueCents - erp.closeCents,
       checkpoint: scan.totalDueCents - (erp.checkpointCents ?? 0),
     };
-    const currentReportColumnDiffCents = {
-      current: scan.currentCents - erp.periodDebitsCents,
-      payment: scan.paymentCents - (-erp.periodCreditsCents),
-    };
 
-    const rawAging = agingByCustomer.get(resolvedCustomerId) || {
-      ageCurrentCents: 0,
-      age1mCents: 0,
-      age2mCents: 0,
-      age3mPlusCents: 0,
-    };
-    const rawAgingTotal = rawAging.ageCurrentCents + rawAging.age1mCents
-      + rawAging.age2mCents + rawAging.age3mPlusCents;
-    const ledgerBridgeCents = erp.closeCents - rawAgingTotal;
-    const reconciledAging = {
-      ageCurrentCents: rawAging.ageCurrentCents,
-      age1mCents: rawAging.age1mCents,
-      age2mCents: rawAging.age2mCents,
-      age3mPlusCents: rawAging.age3mPlusCents + ledgerBridgeCents,
-    };
-    const agingDiffCents = {
-      current: scan.ageCurrentCents - reconciledAging.ageCurrentCents,
-      oneMonth: scan.age1mCents - reconciledAging.age1mCents,
-      twoMonths: scan.age2mCents - reconciledAging.age2mCents,
-      threeMonthsPlus: scan.age3mPlusCents - reconciledAging.age3mPlusCents,
-    };
-    const hasAgingDifference = Object.values(agingDiffCents).some((v) => v !== 0);
     const legacyFifoAging = legacyFifoAgingByCustomer.get(resolvedCustomerId) || {
       anchorCount: 0,
       anchorCents: 0,
@@ -1498,17 +1427,8 @@ function stageTdl() {
         checkpoint: erp.checkpointCents,
       },
       structuralLedgerDiffCents,
-      currentReportColumnDiffCents,
-      currentReportColumnDifferenceReason: TDL_COLUMN_DIFF_REASONS[scan.accountNo] ?? null,
       erpLegacyFifoAgingCents: legacyFifoAging,
       legacyFifoAgingDiffCents,
-      erpRawInvoiceAgingCents: rawAging,
-      ledgerBridgeToOldestCents: ledgerBridgeCents,
-      erpReconciledAgingCents: reconciledAging,
-      agingDiffCents,
-      agingDifferenceReason: hasAgingDifference
-        ? (TDL_AGING_DIFF_REASONS[scan.accountNo] ?? TDL_AGING_DEFAULT_REASON)
-        : null,
     });
   }
 
@@ -1523,27 +1443,14 @@ function stageTdl() {
   else
     ok("all 150 rows exactly match BAL B/F + legacy-semantic May CURRENT/PAYMENT = 31 May close = 1 June anchor");
 
-  const currentReportColumnNonExact = comparisons.filter((r) =>
-    Object.values(r.currentReportColumnDiffCents).some((v) => v !== 0));
-  const canonicalColumnDiff = currentReportColumnNonExact
-    .map((r) => ({ accountNo: r.accountNo, diffCents: r.currentReportColumnDiffCents }))
-    .sort((a, b) => a.accountNo < b.accountNo ? -1 : a.accountNo > b.accountNo ? 1 : 0);
-  const currentReportColumnFingerprint = createHash("sha256")
-    .update(JSON.stringify(canonicalColumnDiff))
-    .digest("hex");
-  const unnamedColumnDifferences = currentReportColumnNonExact.filter((r) =>
-    r.currentReportColumnDifferenceReason === null);
-  if (unnamedColumnDifferences.length)
-    fail(`${unnamedColumnDifferences.length} current-report column difference(s) lack a named reason`);
-  if (currentReportColumnNonExact.length === 0) {
-    ok("the current ERP General Statement CURRENT/PAYMENT split matches the legacy columns");
-  } else if (EXPECTED_TDL_COLUMN_DIFF_FINGERPRINT === null) {
-    fail(`${currentReportColumnNonExact.length} current-report column split(s) differ; inspect and pin fingerprint ${currentReportColumnFingerprint}`);
-  } else if (currentReportColumnFingerprint === EXPECTED_TDL_COLUMN_DIFF_FINGERPRINT) {
-    note(`${currentReportColumnNonExact.length} rows retain the named V3 CURRENT/PAYMENT classification gap (${currentReportColumnFingerprint})`);
-  } else {
-    fail(`current-report column diff fingerprint ${currentReportColumnFingerprint} != pinned ${EXPECTED_TDL_COLUMN_DIFF_FINGERPRINT}`);
-  }
+  // The ERP general-statement columns ARE the legacy semantics since V3, so
+  // any column difference is a regression, not a named gap.
+  const columnNonExact = comparisons.filter((r) =>
+    r.structuralLedgerDiffCents.current !== 0 || r.structuralLedgerDiffCents.payment !== 0);
+  if (columnNonExact.length)
+    fail(`${columnNonExact.length} ERP general-statement CURRENT/PAYMENT split(s) differ from the legacy columns`);
+  else
+    ok("the ERP General Statement CURRENT/PAYMENT split matches the legacy columns");
 
   const erpOnlyActive = ledgerRows.filter((r) => !mappedCustomerIds.has(r.customerId)
     && (r.balBfCents !== 0 || r.periodDebitsCents !== 0 || r.periodCreditsCents !== 0 || r.closeCents !== 0));
@@ -1572,26 +1479,38 @@ function stageTdl() {
   const legacyFifoAgingNonExact = comparisons.filter((r) =>
     Object.values(r.legacyFifoAgingDiffCents).some((v) => v !== 0));
   if (legacyFifoAgingNonExact.length)
-    fail(`${legacyFifoAgingNonExact.length} legacy FIFO aging reconstruction(s) differ from the scan`);
+    fail(`${legacyFifoAgingNonExact.length} ERP FIFO aging row(s) differ from the scan`);
   else
-    ok("all 150 scan aging rows exactly match the reconstructed signed-ledger FIFO rules");
+    ok("all 150 scan aging rows exactly match the ERP signed-ledger FIFO aging (the V3 endpoint model)");
 
-  const agingNonExact = comparisons.filter((r) => Object.values(r.agingDiffCents).some((v) => v !== 0));
-  const canonicalAgingDiff = agingNonExact
-    .map((r) => ({ accountNo: r.accountNo, diffCents: r.agingDiffCents }))
-    .sort((a, b) => a.accountNo < b.accountNo ? -1 : a.accountNo > b.accountNo ? 1 : 0);
-  const agingFingerprint = createHash("sha256")
-    .update(JSON.stringify(canonicalAgingDiff))
-    .digest("hex");
-  if (agingNonExact.length === 0) {
-    ok("the current ERP invoice-aging output matches all scan buckets");
-  } else if (EXPECTED_TDL_AGING_DIFF_FINGERPRINT === null) {
-    fail(`${agingNonExact.length} current ERP aging row(s) differ; inspect and pin fingerprint ${agingFingerprint}`);
-  } else if (agingFingerprint === EXPECTED_TDL_AGING_DIFF_FINGERPRINT) {
-    note(`${agingNonExact.length} aging row(s) retain the named V3 allocation-model gap (${agingFingerprint})`);
-  } else {
-    fail(`aging diff fingerprint ${agingFingerprint} != pinned ${EXPECTED_TDL_AGING_DIFF_FINGERPRINT}`);
+  // Full-population FIFO aging totals: the endpoint prints every active child,
+  // so its aging buckets reconcile to TOTAL DUE exactly. The scan's printed
+  // current-aging total omits the zero-close rows' current buckets and stays
+  // informational only.
+  const fifoAgingTotals = {
+    ageCurrentCents: 0,
+    age1mCents: 0,
+    age2mCents: 0,
+    age3mPlusCents: 0,
+  };
+  for (const aging of legacyFifoAgingByCustomer.values())
+    for (const field of Object.keys(fifoAgingTotals))
+      fifoAgingTotals[field] += aging[field];
+  for (const [label, actual, expected] of [
+    ["current", fifoAgingTotals.ageCurrentCents, TDL_FULL_POPULATION_AGING_EXPECTED_CENTS.ageCurrent],
+    ["1 month", fifoAgingTotals.age1mCents, TDL_FULL_POPULATION_AGING_EXPECTED_CENTS.age1m],
+    ["2 months", fifoAgingTotals.age2mCents, TDL_FULL_POPULATION_AGING_EXPECTED_CENTS.age2m],
+    ["3 months+", fifoAgingTotals.age3mPlusCents, TDL_FULL_POPULATION_AGING_EXPECTED_CENTS.age3mPlus],
+  ]) {
+    if (actual === expected) ok(`full-population FIFO aging ${label} = ${fmt(actual)}`);
+    else fail(`full-population FIFO aging ${label} ${fmt(actual)} != pinned ${fmt(expected)}`);
   }
+  const fifoAgingGrandTotal = Object.values(fifoAgingTotals).reduce((s, v) => s + v, 0);
+  if (fifoAgingGrandTotal === TDL_CONTROL_CENTS)
+    ok(`full-population FIFO aging reconciles to TOTAL DUE ${fmt(TDL_CONTROL_CENTS)}`);
+  else
+    fail(`full-population FIFO aging total ${fmt(fifoAgingGrandTotal)} != TOTAL DUE ${fmt(TDL_CONTROL_CENTS)}`);
+  note(`the printed CURRENT aging total ${fmt(TDL_PRINTED_TOTALS_CENTS.ageCurrent)} omits zero-close rows' current buckets; the full-population FIFO current is ${fmt(fifoAgingTotals.ageCurrentCents)}`);
 
   const creditorFile = path.join(dataDir, "trade_creditor_list_2026-05-31.csv");
   const creditorRows = parseCsv(fs.readFileSync(creditorFile, "utf8"));
@@ -1635,42 +1554,29 @@ function stageTdl() {
   note(`the printed CURRENT total ${fmt(TDL_PRINTED_TOTALS_CENTS.current)} is internally invalid; the 191-row legacy-semantic total is ${fmt(erpAllChildTotalsCents.legacySemanticCurrentCents)}`);
 
   console.log(`\nledger comparison: ${comparisons.length - structuralNonExact.length} exact, ${structuralNonExact.length} non-exact`);
-  console.log(`current ERP column split: ${comparisons.length - currentReportColumnNonExact.length} exact, ${currentReportColumnNonExact.length} named classification differences`);
-  console.log(`legacy FIFO aging reconstruction: ${comparisons.length - legacyFifoAgingNonExact.length} exact, ${legacyFifoAgingNonExact.length} non-exact`);
-  console.log(`current ERP invoice aging: ${comparisons.length - agingNonExact.length} exact, ${agingNonExact.length} allocation-model differences`);
-  if (agingNonExact.length) {
-    const agingDiffTotals = {
-      current: agingNonExact.reduce((sum, r) => sum + r.agingDiffCents.current, 0),
-      oneMonth: agingNonExact.reduce((sum, r) => sum + r.agingDiffCents.oneMonth, 0),
-      twoMonths: agingNonExact.reduce((sum, r) => sum + r.agingDiffCents.twoMonths, 0),
-      threeMonthsPlus: agingNonExact.reduce((sum, r) => sum + r.agingDiffCents.threeMonthsPlus, 0),
-    };
-    console.log(`  scan - ERP aging totals: current ${fmt(agingDiffTotals.current)}, 1m ${fmt(agingDiffTotals.oneMonth)}, 2m ${fmt(agingDiffTotals.twoMonths)}, 3m+ ${fmt(agingDiffTotals.threeMonthsPlus)}`);
-  }
+  console.log(`ERP legacy-semantic column split: ${comparisons.length - columnNonExact.length} exact, ${columnNonExact.length} non-exact`);
+  console.log(`ERP FIFO aging (the V3 endpoint model): ${comparisons.length - legacyFifoAgingNonExact.length} exact, ${legacyFifoAgingNonExact.length} non-exact`);
 
   const outFile = path.join(genDir, "tdl-comparison.json");
   fs.writeFileSync(outFile, JSON.stringify({
     generatedAt: new Date().toISOString(),
     period: { start: TDL_PERIOD_START, end: TDL_PERIOD_END, checkpoint: TDL_CHECKPOINT_DATE },
     agingRules: {
-      current: "invoice date 2026-05-01..2026-05-31",
-      oneMonth: "invoice date 2026-04-01..2026-04-30",
-      twoMonths: "invoice date 2026-03-01..2026-03-31",
-      threeMonthsPlus: "opening/January/February for the legacy reconstruction; invoice date before 2026-03-01 plus the ledger bridge for the current ERP report",
-      legacyScanAllocation: "signed 1 January debtor anchor plus monthly S/DN/RN/CN document buckets; REC/S cash collections normalize carried credits and consume positive buckets FIFO; excess payment becomes a credit in its document month",
-      currentErpAllocation: "positive per-invoice outstanding as at 2026-05-31; explicit invoice-linked payments/CN/DN, then the complete debtor-ledger reconciliation bridge forced into 3 months+",
+      current: "document month 2026-05 (after FIFO consumption)",
+      oneMonth: "document month 2026-04",
+      twoMonths: "document month 2026-03",
+      threeMonthsPlus: "1 January opening anchor plus January/February document buckets",
+      allocation: "signed 1 January debtor anchor plus monthly S/DN/RN/CN document buckets; REC/S cash collections normalize carried credits and consume positive buckets FIFO; excess payment becomes a credit in its document month. Identical for the legacy scan and the V3 ERP endpoint (computeLegacyFifoAging, src/routes/accounting/debtors.js)",
     },
     counts: {
       fixtureDebtors: fixture.length,
       mappedDebtors: comparisons.length,
       exactLedger: comparisons.length - structuralNonExact.length,
       nonExactLedger: structuralNonExact.length,
-      exactCurrentReportColumnSplit: comparisons.length - currentReportColumnNonExact.length,
-      nonExactCurrentReportColumnSplit: currentReportColumnNonExact.length,
-      exactLegacyFifoAging: comparisons.length - legacyFifoAgingNonExact.length,
-      nonExactLegacyFifoAging: legacyFifoAgingNonExact.length,
-      exactCurrentErpAging: comparisons.length - agingNonExact.length,
-      nonExactCurrentErpAging: agingNonExact.length,
+      exactColumnSplit: comparisons.length - columnNonExact.length,
+      nonExactColumnSplit: columnNonExact.length,
+      exactFifoAging: comparisons.length - legacyFifoAgingNonExact.length,
+      nonExactFifoAging: legacyFifoAgingNonExact.length,
       erpOnlyZeroCloseActivity: erpOnlyActive.length - erpOnlyNonzeroClose.length,
       erpOnlyNonzeroClose: erpOnlyNonzeroClose.length,
       informationalCreditors: creditorRows.length,
@@ -1679,24 +1585,21 @@ function stageTdl() {
     legacyPrintedTotalsCents: TDL_PRINTED_TOTALS_CENTS,
     fixtureTotalsCents,
     erpAllChildTotalsCents,
+    erpFullPopulationFifoAgingTotalsCents: fifoAgingTotals,
     erpOnlyZeroCloseTotalsCents,
     informationalCreditorFixture: {
       rows: creditorRows.length,
       comparedToDb: false,
       reason: "The PDF's bonus creditor page is outside Trade Debtor List V1 step 3 and remains file-arithmetic evidence only.",
     },
-    currentReportColumnDifferenceFingerprint: currentReportColumnFingerprint,
-    agingDifferenceFingerprint: agingFingerprint,
     missingCustomers,
     accountMappings,
     nameDifferences,
     nonExactLedger: structuralNonExact,
-    namedCurrentReportColumnDifferences: currentReportColumnNonExact,
-    nonExactLegacyFifoAging: legacyFifoAgingNonExact,
-    namedCurrentErpAgingDifferences: agingNonExact,
+    nonExactColumnSplit: columnNonExact,
+    nonExactFifoAging: legacyFifoAgingNonExact,
     exactLedgerAccountNos: comparisons.filter((r) => !structuralNonExact.includes(r)).map((r) => r.accountNo),
-    exactLegacyFifoAgingAccountNos: comparisons.filter((r) => !legacyFifoAgingNonExact.includes(r)).map((r) => r.accountNo),
-    exactCurrentErpAgingAccountNos: comparisons.filter((r) => !agingNonExact.includes(r)).map((r) => r.accountNo),
+    exactFifoAgingAccountNos: comparisons.filter((r) => !legacyFifoAgingNonExact.includes(r)).map((r) => r.accountNo),
     erpOnlyZeroCloseActivity: erpOnlyActive.filter((r) => r.closeCents === 0),
     erpOnlyNonzeroClose,
   }, null, 2));
@@ -1709,7 +1612,10 @@ function stageTdl() {
 // src/routes/accounting/financial-reports.js), reproduced query-for-query:
 // the Balance Sheet reads anchored balances grouped by effective fs_note plus
 // a synthetic Current Year Profit row; the Income Statement and CoGM add only
-// exact fiscal-start 3-1/3-3/3-7 anchors to posted YTD movement.
+// exact fiscal-start 3-1/3-3/3-7 anchors to posted YTD movement. Since V3 all
+// three engines also inject the exact-month closing_stock_values rows (keyed
+// on the Material Stock page) at report level: BS 14-* assets, IS all three
+// notes as negative cogs, CoGM 14-2/14-3 as negative materials.
 const STMT_PERIOD_START = "2026-01-01";
 const STMT_PERIOD_END = "2026-05-31";
 const STMT_OPENING_NOTES = new Set(["3-1", "3-3", "3-7"]);
@@ -1718,29 +1624,34 @@ const STMT_SECTIONS = new Set(["balance_sheet", "income_statement", "cogm"]);
 // Historical V1 stock decomposition and the V2 final-state targets.
 const STMT_OS_OPENING_TOTAL_CENTS = 62687515;
 const PRE_V2_STMT_CS_ANCHOR_TOTAL_CENTS = -82960522;
-const STMT_EXPECTED_NET_PROFIT_CENTS = -42325884;
-const STMT_EXPECTED_COGM_CENTS = 299813452;
-const STMT_EXPECTED_NET_ASSETS_CENTS = 538960726;
-const STMT_EXPECTED_REVENUE_CENTS = 333464933;
-const STMT_EXPECTED_COGS_CENTS = 308252772;
-const STMT_EXPECTED_EXPENSE_CENTS = 67538045;
+// The V3 closing-stock injection: exact-month closing_stock_values rows,
+// pinned to the scanned May statement figures.
+const STMT_EXPECTED_CLOSING_BY_NOTE_CENTS = {
+  "14-1": 18897960,
+  "14-2": 33690982,
+  "14-3": 18219443,
+};
 const STMT_EXPECTED_CLOSINGS_CENTS = 70808385;
 const STMT_EXPECTED_RAW_PACKING_CLOSINGS_CENTS = 51910425;
+// The engine totals/net-assets pins below are the audited V3 final state
+// (closing stock injected) shifted by exactly the approved GP-202604-0001
+// drift (RM7,261.51 of April expense and trade payable keyed 20 Jul 2026,
+// after the scans): profit/net assets = scan figure − drift.
+const STMT_EXPECTED_NET_PROFIT_CENTS = 28482501 - GP_DRIFT_CENTS;
+const STMT_EXPECTED_COGM_CENTS = 247903027;
+const STMT_EXPECTED_NET_ASSETS_CENTS = 609769111 - GP_DRIFT_CENTS;
+const STMT_EXPECTED_REVENUE_CENTS = 333464933;
+const STMT_EXPECTED_COGS_CENTS = 237444387;
+const STMT_EXPECTED_EXPENSE_CENTS = 67538045 + GP_DRIFT_CENTS;
+// Statement note lines whose scan−ERP diff is exactly the GP-202604-0001
+// drift: BS note 13 (CR TP) and IS note 5 (DR LGP).
+const GP_DRIFT_NOTES = new Set(["bs:13", "is:5"]);
+// The only non-exact compared lines after V3, keyed report:lineNo: the two
+// GP-drift note lines plus the two profit cross-totals they flow into.
 const STMT_EXPECTED_RESIDUAL_KEYS = new Set([
-  "bs:2", "bs:3", "bs:4", "bs:23",
-  "is:3", "is:5", "is:20",
-  "cogm:6", "cogm:11", "cogm:14",
+  "bs:11", "bs:23",
+  "is:12", "is:20",
 ]);
-const STMT_ATTRIBUTIONS = {
-  openingStock:
-    "V2 renders only the exact fiscal-year-start anchor for this approved opening-stock note, once, alongside posted YTD movement.",
-  stockInjection:
-    "Scan closing-inventory value has no printed-TB backing (the CS_* rows print .00): the legacy system injects month-end stock at report level from its stock module. The ERP equivalent is the V3 monthly closing-stock mechanism (plan §7-1).",
-  profitIdentity:
-    "After V2, profit differs by exactly the three deferred V3 closing inventories.",
-  cogmIdentity:
-    "After V2, CoGM differs by exactly the deferred raw-material and packing-material closing inventories.",
-};
 // Category (c): accounts whose ERP fs_note differs from the printed TB APPX.
 // Every nonzero non-stock difference must be named here; the complete set is
 // fingerprint-pinned below. The printed statements are the 1:1 target (user
@@ -1957,6 +1868,17 @@ function stmtErpEffectiveNoteByCode() {
   ]));
 }
 
+// The V3 report-level injection: exact-month closing_stock_values rows keyed
+// on the Material Stock page (mirrors getClosingStockValues in
+// src/routes/accounting/financial-reports.js).
+function stmtClosingStockValues() {
+  const sql = `
+    SELECT fs_note, ROUND(amount * 100)::bigint AS amount_cents
+      FROM closing_stock_values
+     WHERE year = 2026 AND month = 5`;
+  return new Map(query(sql).map((r) => [r.fs_note, parseInt(r.amount_cents, 10)]));
+}
+
 function stageStatements() {
   console.log("\n=== stage statements: scanned May BS / IS / CoGM vs the ERP report engines ===");
   if (STMT_OS_OPENING_TOTAL_CENTS - PRE_V2_STMT_CS_ANCHOR_TOTAL_CENTS !== PRE_V2_RESIDUE_CENTS)
@@ -1987,6 +1909,34 @@ function stageStatements() {
   const erpAccountRows = stmtErpAccountRows();
   const effectiveNoteByCode = stmtErpEffectiveNoteByCode();
   ok(`loaded ${notesMeta.size} fs notes, ${erpBs.size} BS notes, ${erpPnl.size} P&L notes, ${erpAccountRows.length} ERP balance rows`);
+
+  // V3 closing stock: the keyed May values must equal the scanned statement
+  // figures, then enter the reproductions exactly as the engines inject them —
+  // BS 14-* note balances, IS all three as negative cogs, CoGM 14-2/14-3.
+  const closingStock = stmtClosingStockValues();
+  {
+    const closingStartFailures = failures;
+    for (const noteCode of STMT_CLOSING_NOTES) {
+      const keyed = closingStock.get(noteCode) ?? null;
+      const expected = STMT_EXPECTED_CLOSING_BY_NOTE_CENTS[noteCode];
+      if (keyed !== expected)
+        fail(`closing_stock_values 2026-05 ${noteCode} ${keyed === null ? "missing" : fmt(keyed)} != pinned ${fmt(expected)}`);
+    }
+    const keyedTotal = [...STMT_CLOSING_NOTES].reduce((sum, n) => sum + (closingStock.get(n) ?? 0), 0);
+    if (keyedTotal !== STMT_EXPECTED_CLOSINGS_CENTS)
+      fail(`keyed May closing stock total ${fmt(keyedTotal)} != ${fmt(STMT_EXPECTED_CLOSINGS_CENTS)}`);
+    if (failures === closingStartFailures)
+      ok(`closing_stock_values 2026-05 = the scanned figures (${fmt(STMT_EXPECTED_CLOSINGS_CENTS)} across 14-1/14-2/14-3)`);
+  }
+  // BS engine injection: keyed amounts land on the (GL-zero) 14-* note items.
+  for (const noteCode of STMT_CLOSING_NOTES) {
+    const n = erpBs.get(noteCode);
+    if (!n) {
+      fail(`BS engine does not serve closing-stock note ${noteCode}`);
+      continue;
+    }
+    n.balanceCents += closingStock.get(noteCode) ?? 0;
+  }
 
   // Statement sign convention (both engines): credit-normal notes flip net.
   const statementSign = (noteCode, netCents) =>
@@ -2101,7 +2051,7 @@ function stageStatements() {
   if (nonzeroClosingContributors.length !== 0)
     fail(`${nonzeroClosingContributors.length} account(s) still contribute a nonzero value to a 14-* closing-stock note`);
   if (csAnchorTotal === 0 && nonzeroClosingContributors.length === 0)
-    ok("all 63 CS anchors are explicit zero and the ERP closing-stock notes remain zero for V3");
+    ok("all 63 CS anchors are explicit zero; the GL closing-stock notes stay zero (V3 injects at report level only)");
 
   // --- Scan-APPX vs ERP effective-note audit across the whole mapped chart.
   // Gate the complete approved target set explicitly: after CS anchors become
@@ -2166,6 +2116,15 @@ function stageStatements() {
     else if (n.category === "cogs") erpCogsTotal += n.balanceCents;
     if (n.section === "cogm") erpCogmTotal += n.balanceCents;
   }
+  // V3 injection: the IS engine pushes all three closing notes as negative
+  // cogs items; the CoGM engine pushes 14-2/14-3 as negative materials.
+  const closingTotalCents = [...STMT_CLOSING_NOTES]
+    .reduce((sum, n) => sum + (closingStock.get(n) ?? 0), 0);
+  const closingRawPackingCents = (closingStock.get("14-2") ?? 0) + (closingStock.get("14-3") ?? 0);
+  if (closingRawPackingCents !== STMT_EXPECTED_RAW_PACKING_CLOSINGS_CENTS)
+    fail(`keyed raw+packing closing ${fmt(closingRawPackingCents)} != pinned ${fmt(STMT_EXPECTED_RAW_PACKING_CLOSINGS_CENTS)}`);
+  erpCogsTotal -= closingTotalCents;
+  erpCogmTotal -= closingRawPackingCents;
   const erpNetProfitCents = erpRevenueTotal - erpCogsTotal - erpExpenseTotal;
   const engineTotalStartFailures = failures;
   const expectedEngineTotals = {
@@ -2184,9 +2143,9 @@ function stageStatements() {
   };
   for (const [field, expected] of Object.entries(expectedEngineTotals))
     if (actualEngineTotals[field] !== expected)
-      fail(`V2 ${field} ${fmt(actualEngineTotals[field])} != ${fmt(expected)}`);
+      fail(`V3 ${field} ${fmt(actualEngineTotals[field])} != ${fmt(expected)}`);
   if (failures === engineTotalStartFailures)
-    ok("V2 report totals are exact: profit -423,258.84 and CoGM 2,998,134.52");
+    ok("V3 report totals are exact: profit 277,563.50 and CoGM 2,479,030.27 (closing stock injected; profit includes the named GP-202604-0001 drift)");
 
   // --- Per-line comparisons ---
   const lineComparisons = [];
@@ -2217,18 +2176,31 @@ function stageStatements() {
     lineComparisons.push(row);
     return row;
   };
-  // Every ordinary note line must be exact after V2. Only the explicitly
-  // enumerated V3 closing-stock lines and cross-totals may remain different.
+  // Every compared line must be exact after V3. The only tolerated
+  // differences carry the named GP-202604-0001 drift: the two note lines in
+  // GP_DRIFT_NOTES, and the two profit cross-totals the drift flows into.
   const compareNoteLine = (report, line, erpCents) => {
     if (line.amountCents === erpCents)
       return pushLine(report, line, erpCents, "exact");
+    if (GP_DRIFT_NOTES.has(`${report}:${line.note}`)
+      && line.amountCents - erpCents === -GP_DRIFT_CENTS)
+      return pushLine(report, line, erpCents, "post_scan_gp_drift", GP_DRIFT_ATTRIBUTION);
+    return pushLine(report, line, erpCents, "unexplained");
+  };
+  // Profit cross-totals: the scans predate GP-202604-0001, so scan − ERP is
+  // exactly +GP_DRIFT_CENTS (the drift expense sits in ERP profit only).
+  const compareCrossTotalLine = (report, line, erpCents) => {
+    if (line.amountCents === erpCents)
+      return pushLine(report, line, erpCents, "exact");
+    if (line.amountCents - erpCents === GP_DRIFT_CENTS)
+      return pushLine(report, line, erpCents, "post_scan_gp_drift", GP_DRIFT_ATTRIBUTION);
     return pushLine(report, line, erpCents, "unexplained");
   };
 
   // Balance Sheet
   for (const line of bs) {
     if (line.note === "DN") {
-      pushLine("bs", line, erpNetProfitCents, "v3_closing_stock_cross_total", STMT_ATTRIBUTIONS.profitIdentity);
+      compareCrossTotalLine("bs", line, erpNetProfitCents);
       continue;
     }
     if (line.isSubtotal || !line.note) continue;
@@ -2238,12 +2210,13 @@ function stageStatements() {
       continue;
     }
     if (STMT_CLOSING_NOTES.has(line.note)) {
-      const row = pushLine("bs", line, erp.balanceCents, "v3_closing_stock_line",
-        STMT_ATTRIBUTIONS.stockInjection);
+      // The GL 14-* notes stay zero (63 explicit-zero CS anchors); the keyed
+      // value enters only through the report-level injection above, so the
+      // line itself must now be exact.
       const anchored = csAnchorByNote.get(line.note) ?? 0;
-      if (erp.balanceCents !== 0 || anchored !== 0)
-        fail(`BS note ${line.note}: V2 closing-stock value ${fmt(erp.balanceCents)} / anchor ${fmt(anchored)} != 0.00`);
-      row.csAnchorCents = anchored;
+      if (anchored !== 0)
+        fail(`BS note ${line.note}: GL closing-stock anchor ${fmt(anchored)} != 0.00 (injection is report-level only)`);
+      compareNoteLine("bs", line, erp.balanceCents);
       continue;
     }
     compareNoteLine("bs", line, erp.balanceCents);
@@ -2253,12 +2226,12 @@ function stageStatements() {
   let isProfitLine = null;
   for (const line of isf) {
     if (line.note === "CH") {
-      pushLine("is", line, erpCogmTotal, "v3_closing_stock_cross_total", STMT_ATTRIBUTIONS.cogmIdentity);
+      compareNoteLine("is", line, erpCogmTotal);
       continue;
     }
     if (line.isSubtotal) {
       if (line.particular === "PROFIT FOR THE FINANCIAL YEAR") {
-        isProfitLine = pushLine("is", line, erpNetProfitCents, "v3_closing_stock_cross_total", STMT_ATTRIBUTIONS.profitIdentity);
+        isProfitLine = compareCrossTotalLine("is", line, erpNetProfitCents);
       }
       continue;
     }
@@ -2273,7 +2246,10 @@ function stageStatements() {
     if (STMT_CLOSING_NOTES.has(line.note)) {
       if (erpPnl.has(line.note))
         fail(`closing-stock note ${line.note} is unexpectedly served by the P&L engines`);
-      pushLine("is", line, 0, "v3_closing_stock_line", STMT_ATTRIBUTIONS.stockInjection);
+      // The fixture stores the printed LESS magnitude (positive); the engine
+      // renders the keyed value negated. The parity quantity is the keyed
+      // month-end value itself.
+      compareNoteLine("is", line, closingStock.get(line.note) ?? 0);
       continue;
     }
     const erp = erpPnl.get(line.note);
@@ -2289,7 +2265,7 @@ function stageStatements() {
   for (const line of cogmf) {
     if (line.isSubtotal) {
       if (line.particular === "TOTAL COST OF GOODS MANUFACTURED") {
-        cogmTotalLine = pushLine("cogm", line, erpCogmTotal, "v3_closing_stock_cross_total", STMT_ATTRIBUTIONS.cogmIdentity);
+        cogmTotalLine = compareNoteLine("cogm", line, erpCogmTotal);
       }
       continue;
     }
@@ -2304,7 +2280,9 @@ function stageStatements() {
     if (STMT_CLOSING_NOTES.has(line.note)) {
       if (erpPnl.has(line.note))
         fail(`closing-stock note ${line.note} is unexpectedly served by the P&L engines`);
-      pushLine("cogm", line, 0, "v3_closing_stock_line", STMT_ATTRIBUTIONS.stockInjection);
+      // Same printed-LESS convention as the IS: compare against the keyed
+      // month-end value.
+      compareNoteLine("cogm", line, closingStock.get(line.note) ?? 0);
       continue;
     }
     const erp = erpPnl.get(line.note);
@@ -2323,6 +2301,11 @@ function stageStatements() {
     fail("closing inventories disagree across BS/IS/CoGM fixtures (V0 tie broken)");
   if (openingsTotal !== STMT_OS_OPENING_TOTAL_CENTS)
     fail(`statement opening inventories ${fmt(openingsTotal)} != pinned OS total ${fmt(STMT_OS_OPENING_TOTAL_CENTS)}`);
+  if (closingsTotal !== STMT_EXPECTED_CLOSINGS_CENTS)
+    fail(`statement closing inventories ${fmt(closingsTotal)} != pinned ${fmt(STMT_EXPECTED_CLOSINGS_CENTS)}`);
+  for (const noteCode of STMT_CLOSING_NOTES)
+    if ((closingStock.get(noteCode) ?? 0) !== fx(bs, noteCode))
+      fail(`keyed closing stock ${noteCode} ${fmt(closingStock.get(noteCode) ?? 0)} != scanned BS line ${fmt(fx(bs, noteCode))}`);
   for (const [noteCode, scanCents] of Object.entries(osScanByNote)) {
     const stmtCents = noteCode === "3-1" ? fx(isf, "3-1") : fx(cogmf, noteCode);
     if (scanCents !== stmtCents)
@@ -2333,19 +2316,18 @@ function stageStatements() {
   if (isProfitLine === null || scanProfit !== isProfitLine.scanCents)
     fail("BS profit line and IS profit line disagree (V0 tie broken)");
   const profitDiff = scanProfit - erpNetProfitCents;
-  if (profitDiff === closingsTotal && closingsTotal === STMT_EXPECTED_CLOSINGS_CENTS)
-    ok(`profit: scan ${fmt(scanProfit)} − ERP ${fmt(erpNetProfitCents)} = ${fmt(profitDiff)} = deferred closings exactly`);
+  if (profitDiff === GP_DRIFT_CENTS)
+    ok(`profit: scan ${fmt(scanProfit)} − ERP ${fmt(erpNetProfitCents)} = ${fmt(profitDiff)} = the named GP-202604-0001 drift exactly`);
   else
-    fail(`profit difference ${fmt(profitDiff)} != deferred closings ${fmt(closingsTotal)}`);
+    fail(`profit difference ${fmt(profitDiff)} != GP drift ${fmt(GP_DRIFT_CENTS)}`);
 
-  // After V2, opening stock and the salary split are exact. Only the V3 raw
-  // and packing closing-stock deductions remain outside the CoGM engine.
-  const cogmExpectedDiff = -STMT_EXPECTED_RAW_PACKING_CLOSINGS_CENTS;
+  // After V3 the raw/packing closing-stock deductions are injected into the
+  // CoGM engine, so the total is exact.
   if (cogmTotalLine === null) fail("CoGM total line not found");
-  else if (cogmTotalLine.diffCents === cogmExpectedDiff)
-    ok(`CoGM: scan ${fmt(cogmTotalLine.scanCents)} − ERP ${fmt(erpCogmTotal)} = ${fmt(cogmTotalLine.diffCents)} = deferred raw/packing closings exactly`);
+  else if (cogmTotalLine.diffCents === 0)
+    ok(`CoGM: scan = ERP = ${fmt(erpCogmTotal)} (raw/packing closings injected)`);
   else
-    fail(`CoGM total difference ${fmt(cogmTotalLine?.diffCents ?? 0)} != ${fmt(cogmExpectedDiff)}`);
+    fail(`CoGM total difference ${fmt(cogmTotalLine?.diffCents ?? 0)} != 0.00`);
   const chLine = lineComparisons.find((l) => l.report === "is" && l.note === "CH");
   if (!chLine || !cogmTotalLine || chLine.scanCents !== cogmTotalLine.scanCents)
     fail("IS CoGM cross-reference line != CoGM statement total (V0 tie broken)");
@@ -2378,8 +2360,8 @@ function stageStatements() {
     ok("every nonzero 31-May balance reaches the statements through an active BS/IS/CoGM note");
   }
 
-  // --- V2 Balance Sheet boundary: balanced at the approved no-closing-stock
-  // level, with legacy-format net assets equal to financed-by. ---
+  // --- V3 Balance Sheet boundary: balanced with the keyed closing stock
+  // injected, legacy-format net assets equal to financed-by. ---
   let erpAssets = 0, erpLiabilities = 0, erpEquity = 0;
   for (const n of erpBs.values()) {
     if (n.category === "asset") erpAssets += n.balanceCents;
@@ -2390,15 +2372,15 @@ function stageStatements() {
   const erpNetAssets = erpAssets - erpLiabilities;
   const erpFinancedBy = erpEquity + erpNetProfitCents;
   if (erpImbalance !== 0)
-    fail(`V2 May BS imbalance ${fmt(erpImbalance)} != 0.00`);
+    fail(`V3 May BS imbalance ${fmt(erpImbalance)} != 0.00`);
   if (erpNetAssets !== STMT_EXPECTED_NET_ASSETS_CENTS)
-    fail(`V2 May net assets ${fmt(erpNetAssets)} != ${fmt(STMT_EXPECTED_NET_ASSETS_CENTS)}`);
+    fail(`V3 May net assets ${fmt(erpNetAssets)} != ${fmt(STMT_EXPECTED_NET_ASSETS_CENTS)}`);
   if (erpFinancedBy !== STMT_EXPECTED_NET_ASSETS_CENTS)
-    fail(`V2 May financed-by ${fmt(erpFinancedBy)} != ${fmt(STMT_EXPECTED_NET_ASSETS_CENTS)}`);
+    fail(`V3 May financed-by ${fmt(erpFinancedBy)} != ${fmt(STMT_EXPECTED_NET_ASSETS_CENTS)}`);
   if (erpImbalance === 0
     && erpNetAssets === STMT_EXPECTED_NET_ASSETS_CENTS
     && erpFinancedBy === STMT_EXPECTED_NET_ASSETS_CENTS)
-    ok("V2 May BS balances: net assets = financed-by = 5,389,607.26");
+    ok("V3 May BS balances: net assets = financed-by = 6,090,429.60 (scan 6,097,691.11 less the named GP-202604-0001 drift)");
 
   // --- ST-b closure: which printed statement lines are backed by printed TB
   // rows. Expected: every compared line except the closing-inventory lines ---
@@ -2448,37 +2430,36 @@ function stageStatements() {
   const byClass = {};
   for (const c of lineComparisons) byClass[c.classification] = (byClass[c.classification] ?? 0) + 1;
   console.log(`\n${lineComparisons.length} compared statement lines: ${Object.entries(byClass).map(([k, v]) => `${v} ${k}`).join(", ")}`);
-  const residualLines = lineComparisons.filter((c) => c.classification.startsWith("v3_closing_stock_"));
+  const residualLines = lineComparisons.filter((c) => c.classification === "post_scan_gp_drift");
   const residualKeys = residualLines.map((c) => `${c.report}:${c.lineNo}`).sort();
   const expectedResidualKeys = [...STMT_EXPECTED_RESIDUAL_KEYS].sort();
   const expectedResidualDiffs = {
-    "bs:2": 18897960, "bs:3": 33690982, "bs:4": 18219443, "bs:23": 70808385,
-    "is:3": -51910425, "is:5": 18897960, "is:20": 70808385,
-    "cogm:6": 33690982, "cogm:11": 18219443, "cogm:14": -51910425,
+    "bs:11": -GP_DRIFT_CENTS, "bs:23": GP_DRIFT_CENTS,
+    "is:12": -GP_DRIFT_CENTS, "is:20": GP_DRIFT_CENTS,
   };
-  if (lineComparisons.length !== 40 || (byClass.exact ?? 0) !== 30
-    || (byClass.v3_closing_stock_line ?? 0) !== 6
-    || (byClass.v3_closing_stock_cross_total ?? 0) !== 4)
-    fail(`statement final counts ${lineComparisons.length}/${byClass.exact ?? 0}/${byClass.v3_closing_stock_line ?? 0}/${byClass.v3_closing_stock_cross_total ?? 0} != 40/30/6/4`);
+  if (lineComparisons.length !== 40 || (byClass.exact ?? 0) !== 36
+    || (byClass.post_scan_gp_drift ?? 0) !== 4)
+    fail(`statement final counts ${lineComparisons.length}/${byClass.exact ?? 0}+${byClass.post_scan_gp_drift ?? 0}d != 40/36+4d`);
   if (JSON.stringify(residualKeys) !== JSON.stringify(expectedResidualKeys))
-    fail(`V3 residual keys ${residualKeys.join(", ")} != ${expectedResidualKeys.join(", ")}`);
+    fail(`post-scan drift keys ${residualKeys.join(", ")} != ${expectedResidualKeys.join(", ")}`);
   for (const line of residualLines) {
     const key = `${line.report}:${line.lineNo}`;
     if (line.diffCents !== expectedResidualDiffs[key])
-      fail(`${key} residual ${fmt(line.diffCents)} != ${fmt(expectedResidualDiffs[key])}`);
+      fail(`${key} drift ${fmt(line.diffCents)} != ${fmt(expectedResidualDiffs[key])}`);
   }
-  if (lineComparisons.length === 40 && (byClass.exact ?? 0) === 30
+  if (lineComparisons.length === 40 && (byClass.exact ?? 0) === 36
+    && (byClass.post_scan_gp_drift ?? 0) === 4
     && JSON.stringify(residualKeys) === JSON.stringify(expectedResidualKeys)
     && residualLines.every((line) => line.diffCents === expectedResidualDiffs[`${line.report}:${line.lineNo}`]))
-    ok("statement boundary is exact: 30/40 lines match; the exact ten V3-only lines remain");
+    ok("statement boundary is exact: 36/40 lines match the scans; the only differences are the 4 named GP-202604-0001 drift lines (BS note 13, IS note 5, and both profit cross-totals)");
 
   const outFile = path.join(genDir, "statements-comparison.json");
   fs.writeFileSync(outFile, JSON.stringify({
     generatedAt: new Date().toISOString(),
     period: { start: STMT_PERIOD_START, end: STMT_PERIOD_END },
     engineSemantics: {
-      balanceSheet: "latest anchor <= period end + posted movement from anchor date, grouped by effective fs_note (active balance_sheet notes), plus Current Year Profit from the V2 P&L calculation",
-      incomeStatementAndCogm: "posted YTD movement plus exact fiscal-start anchors for only 3-1/3-3/3-7; 3-1 is IS, while 3-3/3-7 are CoGM",
+      balanceSheet: "latest anchor <= period end + posted movement from anchor date, grouped by effective fs_note (active balance_sheet notes), plus the keyed exact-month closing_stock_values on the 14-* notes and Current Year Profit from the V3 P&L calculation",
+      incomeStatementAndCogm: "posted YTD movement plus exact fiscal-start anchors for only 3-1/3-3/3-7 (3-1 is IS, 3-3/3-7 are CoGM); the IS injects all three keyed closing notes as negative cogs, CoGM injects keyed 14-2/14-3 as negative materials",
     },
     counts: { comparedLines: lineComparisons.length, byClassification: byClass },
     noteMetadata: Object.fromEntries([...fixtureNoteCodes].sort().map((c) => [c, notesMeta.get(c) ?? null])),
@@ -2520,19 +2501,22 @@ function stageStatements() {
       csAnchorTotalCents: PRE_V2_STMT_CS_ANCHOR_TOTAL_CENTS,
       actionableMappingFingerprint: PRE_V2_STMT_MAPPING_DIFF_FINGERPRINT,
     },
-    v2FinalState: {
+    v3FinalState: {
       netProfitCents: erpNetProfitCents,
       cogmCents: erpCogmTotal,
       bsImbalanceCents: erpImbalance,
       netAssetsCents: erpNetAssets,
       financedByCents: erpFinancedBy,
       exactStatementLines: byClass.exact ?? 0,
+      postScanGpDriftLines: byClass.post_scan_gp_drift ?? 0,
     },
-    v3Remaining: {
-      note: "Monthly closing stock remains outside V2.",
-      scanMayBsTotalCents: bs.find((l) => l.particular === "TOTAL")?.amountCents ?? 0,
-      closingStockCents: closingsTotal,
-      residualKeys,
+    closingStock: {
+      source: "closing_stock_values 2026-05, keyed on the Material Stock page (Closing Stock (Financial Statements) card); injected at report level, never posted to the GL",
+      keyedByNoteCents: Object.fromEntries([...STMT_CLOSING_NOTES].sort().map((n) => [n, closingStock.get(n) ?? 0])),
+      keyedTotalCents: closingTotalCents,
+      keyedRawPackingCents: closingRawPackingCents,
+      scanBsTotalCents: bs.find((l) => l.particular === "TOTAL")?.amountCents ?? 0,
+      driftResidualKeys: residualKeys,
     },
     lineComparisons,
     leaks,

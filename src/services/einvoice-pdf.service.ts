@@ -156,7 +156,7 @@ const parseConsolidatedInvoiceReferences = (value: any): string[] => {
   return [];
 };
 
-const calculateSourceInvoiceAmounts = (
+export const calculateSourceInvoiceAmounts = (
   invoice: ConsolidatedSourceInvoice
 ): {
   subtotal: number;
