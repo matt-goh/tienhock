@@ -1,5 +1,6 @@
 // src/routes/jellypolly/invoices.js
 import { Router } from "express";
+import { format } from "date-fns";
 import JPEInvoiceApiClientFactory from "../../utils/JellyPolly/einvoice/JPEInvoiceApiClientFactory.js";
 
 // Helper function to update customer credit
@@ -973,16 +974,20 @@ export default function (pool, config) {
         const paymentReference = invoice.payment_reference || null;
         const paymentNotes =
           invoice.payment_notes || "Automatic payment for CASH invoice";
+        const paymentDate = format(
+          new Date(Number(createdInvoice.createddate)),
+          "yyyy-MM-dd"
+        );
 
         const paymentQuery = `
           INSERT INTO jellypolly.payments (
             invoice_id, payment_date, amount_paid, payment_method,
-            payment_reference, notes
-          ) VALUES ($1, $2, $3, $4, $5, $6)
+            payment_reference, notes, status, posting_date
+          ) VALUES ($1, $2, $3, $4, $5, $6, 'active', $2::date)
         `;
         await client.query(paymentQuery, [
           createdInvoice.id,
-          new Date().toISOString(),
+          paymentDate,
           totalPayable,
           paymentMethod, // Use provided payment method
           paymentReference, // Use provided reference
@@ -1428,7 +1433,7 @@ export default function (pool, config) {
 
       // 1. Get the current invoice to check status
       const invoiceCheckQuery = `
-      SELECT id, einvoice_status, invoice_status, uuid, submission_uid, datetime_validated, customerid, paymenttype, totalamountpayable
+      SELECT id, einvoice_status, invoice_status, uuid, submission_uid, datetime_validated, customerid, paymenttype, totalamountpayable, createddate
       FROM jellypolly.invoices 
       WHERE id = $1
     `;
@@ -1656,17 +1661,21 @@ export default function (pool, config) {
 
           // Create new payment for the updated amount (if amount > 0)
           if (newTotal > 0) {
+            const automaticPaymentDate = format(
+              new Date(Number(invoice.createddate)),
+              "yyyy-MM-dd"
+            );
             const insertNewPaymentQuery = `
             INSERT INTO jellypolly.payments (
               invoice_id, payment_date, amount_paid, payment_method,
-              payment_reference, notes, status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+              payment_reference, notes, status, posting_date
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $2::date)
             RETURNING payment_id
           `;
 
             const newPaymentResult = await client.query(insertNewPaymentQuery, [
               id,
-              new Date().toISOString().split("T")[0], // Today's date
+              automaticPaymentDate,
               newTotal,
               "cash",
               null,
@@ -1997,14 +2006,15 @@ export default function (pool, config) {
         // Create automatic payment for the outstanding balance only —
         // any real payments already recorded keep counting toward the total
         const paymentAmount = parseFloat(currentInvoice.balance_due || 0);
-        const paymentDate = new Date(Number(currentInvoice.createddate))
-          .toISOString()
-          .split("T")[0]; // YYYY-MM-DD format
+        const paymentDate = format(
+          new Date(Number(currentInvoice.createddate)),
+          "yyyy-MM-dd"
+        );
 
         if (paymentAmount > 0) {
           const insertPaymentQuery = `
-        INSERT INTO jellypolly.payments (invoice_id, payment_date, payment_method, amount_paid, notes, status)
-        VALUES ($1, $2, 'cash', $3, 'Automatic payment - converted from INVOICE to CASH', 'active')
+        INSERT INTO jellypolly.payments (invoice_id, payment_date, payment_method, amount_paid, notes, status, posting_date)
+        VALUES ($1, $2, 'cash', $3, 'Automatic payment - converted from INVOICE to CASH', 'active', $2::date)
         RETURNING payment_id
       `;
 

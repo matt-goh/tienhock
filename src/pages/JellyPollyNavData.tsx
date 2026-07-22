@@ -24,6 +24,7 @@ import JPAdjustmentDocsDetailsPage from "./JellyPolly/AdjustmentDocs/JPAdjustmen
 
 // Accounting related imports
 import DebtorsReportPage from "./JellyPolly/DebtorsReportPage";
+import AccountLedgerPage from "./Accounting/Reports/AccountLedgerPage";
 
 // Payroll related imports
 import JPPayrollPage from "./JellyPolly/Payroll/JPPayrollPage";
@@ -159,9 +160,16 @@ export const JellyPollyNavData: SidebarItem[] = [
     icon: IconReportMoney,
     subItems: [
       {
+        name: "Account Ledger",
+        path: "/accounting/reports/account-ledger",
+        component: () => <AccountLedgerPage company="jellypolly" />,
+        group: "Reports",
+      },
+      {
         name: "Debtors",
         path: "/sales/debtors",
         component: DebtorsReportPage,
+        group: "Reports",
       },
     ],
   },

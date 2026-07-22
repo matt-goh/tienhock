@@ -115,6 +115,7 @@ import jellypollyInvoiceRouter from "./jellypolly/invoices.js";
 import jellypollyPaymentRouter from "./jellypolly/payments.js";
 import jellypollyEInvoiceRouter from "./jellypolly/e-invoices.js";
 import jellypollyDebtorsRouter from "./jellypolly/debtors.js";
+import jellypollyAccountLedgerRouter from "./jellypolly/account-ledger.js";
 import jellypollyAdjustmentDocsRouter from "./jellypolly/adjustment-docs.js";
 import jellypollyMonthlyPayrollsRouter from "./jellypolly/monthly-payrolls.js";
 import jellypollyEmployeePayrollsRouter from "./jellypolly/employee-payrolls.js";
@@ -348,6 +349,12 @@ export default function setupRoutes(app, pool) {
     jellypollyEInvoiceRouter(pool, myInvoisJPConfig)
   );
   app.use("/jellypolly/api/debtors", jellypollyDebtorsRouter(pool));
+  app.use(
+    "/jellypolly/api/account-ledger",
+    authMiddleware(pool),
+    checkRestoreState,
+    jellypollyAccountLedgerRouter(pool)
+  );
   app.use(
     "/jellypolly/api/adjustment-docs",
     jellypollyAdjustmentDocsRouter(pool, myInvoisJPConfig)

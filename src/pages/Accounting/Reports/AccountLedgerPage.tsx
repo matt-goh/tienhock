@@ -35,6 +35,8 @@ import {
   AccountLedgerData,
   AccountLedgerTransaction,
 } from "../../../utils/accounting/AccountLedgerPDFMake";
+import { JELLYPOLLY_INFO } from "../../../utils/invoice/einvoice/companyInfo";
+import { type AccountCode } from "../../../types/types";
 import toast from "react-hot-toast";
 
 const formatCurrency = (amount: number): string =>
@@ -59,10 +61,29 @@ type RecentLedgerEntry = { code: string; openedAt: number };
 const RECENT_LEDGERS_STORAGE_KEY: string = "account-ledger-recent";
 const RECENT_LEDGERS_MAX: number = 12;
 
-const readRecentLedgers = (): RecentLedgerEntry[] => {
+export type AccountLedgerCompany = "tienhock" | "jellypolly";
+
+export interface AccountLedgerPageProps {
+  company?: AccountLedgerCompany;
+}
+
+interface JellyPollyLedgerAccount extends AccountCode {
+  transaction_count: number;
+}
+
+type JellyPollyLedgerAccountResponse = Omit<JellyPollyLedgerAccount, "id">;
+
+const getCompanyStorageKey = (
+  baseKey: string,
+  company: AccountLedgerCompany
+): string => (company === "tienhock" ? baseKey : `${baseKey}:${company}`);
+
+const readRecentLedgers = (
+  company: AccountLedgerCompany
+): RecentLedgerEntry[] => {
   try {
     const stored: string | null = localStorage.getItem(
-      RECENT_LEDGERS_STORAGE_KEY
+      getCompanyStorageKey(RECENT_LEDGERS_STORAGE_KEY, company)
     );
     if (!stored) return [];
     const parsed: unknown = JSON.parse(stored);
@@ -79,9 +100,15 @@ const readRecentLedgers = (): RecentLedgerEntry[] => {
   }
 };
 
-const saveRecentLedgers = (entries: RecentLedgerEntry[]): void => {
+const saveRecentLedgers = (
+  company: AccountLedgerCompany,
+  entries: RecentLedgerEntry[]
+): void => {
   try {
-    localStorage.setItem(RECENT_LEDGERS_STORAGE_KEY, JSON.stringify(entries));
+    localStorage.setItem(
+      getCompanyStorageKey(RECENT_LEDGERS_STORAGE_KEY, company),
+      JSON.stringify(entries)
+    );
   } catch {
     // Ignore storage failures so the page remains usable.
   }
@@ -95,10 +122,12 @@ const USAGE_COUNTS_CACHE_DURATION_MS: number = 60 * 60 * 1000;
 
 type UsageCountsCache = { data: Record<string, number>; timestamp: number };
 
-const readCachedUsageCounts = (): Record<string, number> | null => {
+const readCachedUsageCounts = (
+  company: AccountLedgerCompany
+): Record<string, number> | null => {
   try {
     const stored: string | null = localStorage.getItem(
-      USAGE_COUNTS_STORAGE_KEY
+      getCompanyStorageKey(USAGE_COUNTS_STORAGE_KEY, company)
     );
     if (!stored) return null;
     const { data, timestamp }: UsageCountsCache = JSON.parse(stored);
@@ -109,10 +138,16 @@ const readCachedUsageCounts = (): Record<string, number> | null => {
   }
 };
 
-const saveCachedUsageCounts = (data: Record<string, number>): void => {
+const saveCachedUsageCounts = (
+  company: AccountLedgerCompany,
+  data: Record<string, number>
+): void => {
   try {
     const cache: UsageCountsCache = { data, timestamp: Date.now() };
-    localStorage.setItem(USAGE_COUNTS_STORAGE_KEY, JSON.stringify(cache));
+    localStorage.setItem(
+      getCompanyStorageKey(USAGE_COUNTS_STORAGE_KEY, company),
+      JSON.stringify(cache)
+    );
   } catch {
     // Ignore storage failures so the page remains usable.
   }
@@ -122,14 +157,19 @@ const saveCachedUsageCounts = (data: Record<string, number>): void => {
 // page reopens the month they last looked at (unless a deep-link overrides it).
 const LAST_RANGE_STORAGE_KEY_PREFIX: string = "account-ledger-last-range";
 
-const getLastRangeStorageKey = (): string => {
+const getLastRangeStorageKey = (company: AccountLedgerCompany): string => {
   const staffId: string = sessionService.getStoredSession()?.staffId || "anon";
-  return `${LAST_RANGE_STORAGE_KEY_PREFIX}:${staffId}`;
+  const baseKey: string = `${LAST_RANGE_STORAGE_KEY_PREFIX}:${staffId}`;
+  return getCompanyStorageKey(baseKey, company);
 };
 
-const readLastRange = (): { start: string; end: string } | null => {
+const readLastRange = (
+  company: AccountLedgerCompany
+): { start: string; end: string } | null => {
   try {
-    const stored: string | null = localStorage.getItem(getLastRangeStorageKey());
+    const stored: string | null = localStorage.getItem(
+      getLastRangeStorageKey(company)
+    );
     if (!stored) return null;
     const parsed: unknown = JSON.parse(stored);
     if (
@@ -148,10 +188,14 @@ const readLastRange = (): { start: string; end: string } | null => {
   }
 };
 
-const saveLastRange = (start: string, end: string): void => {
+const saveLastRange = (
+  company: AccountLedgerCompany,
+  start: string,
+  end: string
+): void => {
   try {
     localStorage.setItem(
-      getLastRangeStorageKey(),
+      getLastRangeStorageKey(company),
       JSON.stringify({ start, end })
     );
   } catch {
@@ -159,9 +203,15 @@ const saveLastRange = (start: string, end: string): void => {
   }
 };
 
-const AccountLedgerPage: React.FC = () => {
+const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
+  company = "tienhock",
+}: AccountLedgerPageProps) => {
+  const isJellyPolly: boolean = company === "jellypolly";
   const navigate = useNavigate();
-  const { accountCodes, isLoading: accountsLoading } = useAccountCodesCache();
+  const {
+    accountCodes: tienHockAccountCodes,
+    isLoading: tienHockAccountsLoading,
+  } = useAccountCodesCache();
   const {
     favouriteCodes,
     pendingCodes: pendingFavouriteCodes,
@@ -177,29 +227,93 @@ const AccountLedgerPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState<boolean>(false);
-  const [recentLedgers, setRecentLedgers] =
-    useState<RecentLedgerEntry[]>(readRecentLedgers);
+  const [jellyPollyAccounts, setJellyPollyAccounts] = useState<
+    JellyPollyLedgerAccount[]
+  >([]);
+  const [jellyPollyAccountsLoading, setJellyPollyAccountsLoading] =
+    useState<boolean>(isJellyPolly);
+  const accountCodes: AccountCode[] = isJellyPolly
+    ? jellyPollyAccounts
+    : tienHockAccountCodes;
+  const accountsLoading: boolean = isJellyPolly
+    ? jellyPollyAccountsLoading
+    : tienHockAccountsLoading;
+  const [recentLedgers, setRecentLedgers] = useState<RecentLedgerEntry[]>(
+    () => readRecentLedgers(company)
+  );
   // Mini in-ledger search: filters the loaded transactions client-side.
   const [txSearch, setTxSearch] = useState<string>("");
   // Browse-all-accounts pagination shown in the launch (no ledger selected) state.
   const [browsePage, setBrowsePage] = useState<number>(1);
   const [usageCounts, setUsageCounts] = useState<Record<string, number>>(
-    () => readCachedUsageCounts() || {}
+    () => readCachedUsageCounts(company) || {}
   );
 
-  useEffect(() => {
-    const cached = readCachedUsageCounts();
+  useEffect((): void => {
+    setRecentLedgers(readRecentLedgers(company));
+    setUsageCounts(readCachedUsageCounts(company) || {});
+  }, [company]);
+
+  useEffect((): (() => void) | void => {
+    if (!isJellyPolly) return;
+
+    let isActive: boolean = true;
+    setJellyPollyAccountsLoading(true);
+
+    const fetchJellyPollyAccounts = async (): Promise<void> => {
+      try {
+        const response = await api.get<JellyPollyLedgerAccountResponse[]>(
+          "/jellypolly/api/account-ledger/accounts"
+        );
+        if (!isActive) return;
+
+        const accounts: JellyPollyLedgerAccount[] = response.map(
+          (
+            account: JellyPollyLedgerAccountResponse,
+            index: number
+          ): JellyPollyLedgerAccount => ({
+            ...account,
+            id: index + 1,
+          })
+        );
+        const counts: Record<string, number> = {};
+        accounts.forEach((account: JellyPollyLedgerAccount): void => {
+          counts[account.code] = account.transaction_count;
+        });
+
+        setJellyPollyAccounts(accounts);
+        setUsageCounts(counts);
+        saveCachedUsageCounts(company, counts);
+      } catch (err: unknown) {
+        if (!isActive) return;
+        console.error("Error fetching Jelly Polly debtor accounts:", err);
+        setJellyPollyAccounts([]);
+        setError("Failed to load customer debtors. Please try again later.");
+      } finally {
+        if (isActive) setJellyPollyAccountsLoading(false);
+      }
+    };
+
+    void fetchJellyPollyAccounts();
+    return (): void => {
+      isActive = false;
+    };
+  }, [company, isJellyPolly]);
+
+  useEffect((): void => {
+    if (isJellyPolly) return;
+    const cached = readCachedUsageCounts(company);
     if (cached) return;
     api
       .get("/api/bank-statement/usage-counts")
       .then((counts: Record<string, number>) => {
         setUsageCounts(counts);
-        saveCachedUsageCounts(counts);
+        saveCachedUsageCounts(company, counts);
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         console.error("Error fetching account usage counts:", err);
       });
-  }, []);
+  }, [company, isJellyPolly]);
 
   const toLocalIso = (d: Date): string =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
@@ -216,7 +330,7 @@ const AccountLedgerPage: React.FC = () => {
     const urlStart = parseIso(searchParams.get("start"));
     const urlEnd = parseIso(searchParams.get("end"));
     if (urlStart && urlEnd) return { start: urlStart, end: urlEnd };
-    const saved = readLastRange();
+    const saved = readLastRange(company);
     if (saved) {
       const savedStart = parseIso(saved.start);
       const savedEnd = parseIso(saved.end);
@@ -262,10 +376,14 @@ const AccountLedgerPage: React.FC = () => {
   // (no deep-link params) reopens the same month.
   useEffect(() => {
     if (range.start && range.end) {
-      saveLastRange(toLocalIso(range.start), toLocalIso(range.end));
+      saveLastRange(
+        company,
+        toLocalIso(range.start),
+        toLocalIso(range.end)
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [range.start?.getTime(), range.end?.getTime()]);
+  }, [company, range.start?.getTime(), range.end?.getTime()]);
 
   // Float a successfully opened ledger to the top of the quick-access list.
   const recordRecentLedger = useCallback((code: string): void => {
@@ -274,17 +392,17 @@ const AccountLedgerPage: React.FC = () => {
         { code, openedAt: Date.now() },
         ...prev.filter((entry) => entry.code !== code),
       ].slice(0, RECENT_LEDGERS_MAX);
-      saveRecentLedgers(next);
+      saveRecentLedgers(company, next);
       return next;
     });
-  }, []);
+  }, [company]);
 
   const handleRemoveRecent = (code: string): void => {
     setRecentLedgers((prev: RecentLedgerEntry[]) => {
       const next: RecentLedgerEntry[] = prev.filter(
         (entry) => entry.code !== code
       );
-      saveRecentLedgers(next);
+      saveRecentLedgers(company, next);
       return next;
     });
   };
@@ -297,9 +415,17 @@ const AccountLedgerPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get(
-        `/api/bank-statement/${selectedAccount}/range/${toLocalIso(range.start)}/${toLocalIso(range.end)}`
-      );
+      const accountPath: string = isJellyPolly
+        ? encodeURIComponent(selectedAccount)
+        : selectedAccount;
+      const endpoint: string = isJellyPolly
+        ? `/jellypolly/api/account-ledger/${accountPath}/range/${toLocalIso(
+            range.start
+          )}/${toLocalIso(range.end)}`
+        : `/api/bank-statement/${accountPath}/range/${toLocalIso(
+            range.start
+          )}/${toLocalIso(range.end)}`;
+      const response = await api.get<AccountLedgerData>(endpoint);
       setStatement(response);
       recordRecentLedger(selectedAccount);
     } catch (err) {
@@ -309,7 +435,13 @@ const AccountLedgerPage: React.FC = () => {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAccount, range.start?.getTime(), range.end?.getTime()]);
+  }, [
+    isJellyPolly,
+    recordRecentLedger,
+    selectedAccount,
+    range.start?.getTime(),
+    range.end?.getTime(),
+  ]);
 
   useEffect(() => {
     fetchStatement();
@@ -320,9 +452,15 @@ const AccountLedgerPage: React.FC = () => {
   const scrollKey = useMemo((): string => {
     const start = range.start ? toLocalIso(range.start) : "";
     const end = range.end ? toLocalIso(range.end) : "";
-    return `account-ledger:${selectedAccount}:${start}:${end}`;
+    const companySegment: string = isJellyPolly ? ":jellypolly" : "";
+    return `account-ledger${companySegment}:${selectedAccount}:${start}:${end}`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAccount, range.start?.getTime(), range.end?.getTime()]);
+  }, [
+    isJellyPolly,
+    selectedAccount,
+    range.start?.getTime(),
+    range.end?.getTime(),
+  ]);
   useScrollRestoration(scrollKey, !loading && !!statement);
 
   const selectedAccountDescription = useMemo(
@@ -394,6 +532,7 @@ const AccountLedgerPage: React.FC = () => {
   );
 
   const handleOpenOpeningModal = async (): Promise<void> => {
+    if (isJellyPolly) return;
     try {
       const res = await api.get(`/api/opening-balances/${selectedAccount}`);
       setCurrentAnchor(res?.opening_balance || null);
@@ -408,7 +547,20 @@ const AccountLedgerPage: React.FC = () => {
     if (!statement) return;
     setExporting(true);
     try {
-      await generateAccountLedgerPDF(statement, { title: "Account Ledger" });
+      await generateAccountLedgerPDF(
+        statement,
+        isJellyPolly
+          ? {
+              title: "Account Ledger",
+              companyInfo: JELLYPOLLY_INFO,
+              companyName: "JELLY POLLY FOOD INDUSTRIES",
+              includeLogo: false,
+              referenceLabel: "REFERENCE",
+              chequeLabel: "PAYMENT REF.",
+              derivedOpeningLabel: "Derived from prior customer activity",
+            }
+          : { title: "Account Ledger" }
+      );
     } catch (err) {
       console.error("Error printing PDF:", err);
       toast.error("Failed to generate PDF");
@@ -417,8 +569,44 @@ const AccountLedgerPage: React.FC = () => {
     }
   };
 
-  const handleOpenJournal = (journalEntryId: number): void => {
-    navigate(`/accounting/journal-entries/${journalEntryId}`);
+  const getTransactionPath = (
+    transaction: AccountLedgerTransaction
+  ): string | null => {
+    if (!isJellyPolly) {
+      return transaction.journal_entry_id == null
+        ? null
+        : `/accounting/journal-entries/${transaction.journal_entry_id}`;
+    }
+
+    if (
+      transaction.source_type === "invoice" &&
+      (transaction.invoice_id || transaction.source_id)
+    ) {
+      const invoiceId: string =
+        transaction.invoice_id || transaction.source_id || "";
+      return `/jellypolly/sales/invoice/${encodeURIComponent(invoiceId)}`;
+    }
+
+    if (transaction.source_type === "payment" && transaction.invoice_id) {
+      return `/jellypolly/sales/invoice/${encodeURIComponent(
+        transaction.invoice_id
+      )}`;
+    }
+
+    if (transaction.source_type === "adjustment" && transaction.source_id) {
+      return `/jellypolly/sales/adjustment-docs/${encodeURIComponent(
+        transaction.source_id
+      )}`;
+    }
+
+    return null;
+  };
+
+  const handleOpenTransaction = (
+    transaction: AccountLedgerTransaction
+  ): void => {
+    const path: string | null = getTransactionPath(transaction);
+    if (path) navigate(path);
   };
 
   return (
@@ -430,13 +618,20 @@ const AccountLedgerPage: React.FC = () => {
           <AccountCodeCombobox
             value={selectedAccount}
             onChange={handleAccountChange}
+            accounts={isJellyPolly ? accountCodes : undefined}
             disabled={accountsLoading}
-            placeholder="Search account code or name..."
+            placeholder={
+              isJellyPolly
+                ? "Search customer debtor..."
+                : "Search account code or name..."
+            }
             className="w-[28rem] max-w-full"
-            hierarchical
-            favouriteCodes={favouriteCodes}
-            pendingFavouriteCodes={pendingFavouriteCodes}
-            onToggleFavourite={toggleFavourite}
+            hierarchical={!isJellyPolly}
+            favouriteCodes={isJellyPolly ? undefined : favouriteCodes}
+            pendingFavouriteCodes={
+              isJellyPolly ? undefined : pendingFavouriteCodes
+            }
+            onToggleFavourite={isJellyPolly ? undefined : toggleFavourite}
           />
 
           {selectedAccount && (
@@ -507,15 +702,17 @@ const AccountLedgerPage: React.FC = () => {
           )}
           {selectedAccount && (
             <>
-              <Button
-                size="sm"
-                variant="outline"
-                icon={IconAnchor}
-                iconSize={16}
-                onClick={handleOpenOpeningModal}
-                disabled={accountsLoading}
-                title="Set opening balance"
-              />
+              {!isJellyPolly && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  icon={IconAnchor}
+                  iconSize={16}
+                  onClick={handleOpenOpeningModal}
+                  disabled={accountsLoading}
+                  title="Set opening balance"
+                />
+              )}
               <Button
                 size="sm"
                 variant="outline"
@@ -546,13 +743,19 @@ const AccountLedgerPage: React.FC = () => {
       {statement && (
         <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm px-0.5">
           <span className="font-medium text-default-700 dark:text-gray-200">
-            <Link
-              to={`/accounting/account-codes/${encodeURIComponent(statement.account.code)}`}
-              className="hover:text-sky-600 dark:hover:text-sky-400 hover:underline transition-colors"
-              title={`Open account code ${statement.account.code}`}
-            >
-              {statement.account.code}
-            </Link>
+            {isJellyPolly ? (
+              statement.account.code
+            ) : (
+              <Link
+                to={`/accounting/account-codes/${encodeURIComponent(
+                  statement.account.code
+                )}`}
+                className="hover:text-sky-600 dark:hover:text-sky-400 hover:underline transition-colors"
+                title={`Open account code ${statement.account.code}`}
+              >
+                {statement.account.code}
+              </Link>
+            )}
             <span className="ml-1.5 font-normal text-default-500 dark:text-gray-400">
               {statement.account.description}
             </span>
@@ -563,7 +766,9 @@ const AccountLedgerPage: React.FC = () => {
             title={
               statement.opening_source?.type === "anchored"
                 ? `Anchored as of ${formatDate(statement.opening_source.as_of_date)}`
-                : "Derived from prior postings"
+                : isJellyPolly
+                  ? "Derived from prior customer activity"
+                  : "Derived from prior postings"
             }
           >
             Opening{" "}
@@ -669,7 +874,7 @@ const AccountLedgerPage: React.FC = () => {
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-default-700 dark:text-gray-200">
-                All accounts
+                {isJellyPolly ? "Customer debtors" : "All accounts"}
               </h2>
               {browsableAccounts.length > 0 && (
                 <div className="flex items-center gap-1.5">
@@ -704,7 +909,9 @@ const AccountLedgerPage: React.FC = () => {
               </div>
             ) : browsableAccounts.length === 0 ? (
               <p className="text-sm text-default-500 dark:text-gray-400 text-center py-6">
-                No active accounts found
+                {isJellyPolly
+                  ? "No customer debtors found"
+                  : "No active accounts found"}
               </p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -732,7 +939,11 @@ const AccountLedgerPage: React.FC = () => {
                       {!!usageCounts[account.code] && (
                         <span
                           className="text-[10px] text-sky-600 dark:text-sky-400"
-                          title="Posted transactions"
+                          title={
+                            isJellyPolly
+                              ? "Customer ledger transactions"
+                              : "Posted transactions"
+                          }
                         >
                           {usageCounts[account.code]}×
                         </span>
@@ -763,13 +974,13 @@ const AccountLedgerPage: React.FC = () => {
                     Date
                   </th>
                   <th className="px-4 py-2.5 text-left font-semibold text-gray-700 dark:text-gray-300 w-36">
-                    Journal
+                    {isJellyPolly ? "Reference" : "Journal"}
                   </th>
                   <th className="px-4 py-2.5 text-left font-semibold text-gray-700 dark:text-gray-300">
                     Particulars
                   </th>
                   <th className="px-4 py-2.5 text-left font-semibold text-gray-700 dark:text-gray-300 w-28">
-                    Cheque
+                    {isJellyPolly ? "Payment Ref." : "Cheque"}
                   </th>
                   <th className="px-4 py-2.5 text-right font-semibold text-gray-700 dark:text-gray-300 w-32">
                     Debit (RM)
@@ -814,40 +1025,56 @@ const AccountLedgerPage: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredTransactions.map((t) => (
-                    <tr
-                      key={t.line_id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                    >
-                      <td className="px-4 py-2 text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                        {formatDate(t.entry_date)}
-                      </td>
-                      <td className="px-4 py-2 whitespace-nowrap">
-                        <button
-                          onClick={() => handleOpenJournal(t.journal_entry_id)}
-                          className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
-                          title="Open journal entry"
+                  filteredTransactions.map(
+                    (t: AccountLedgerTransaction): React.ReactNode => {
+                      const transactionPath: string | null =
+                        getTransactionPath(t);
+                      return (
+                        <tr
+                          key={t.line_id}
+                          className="hover:bg-gray-50 dark:hover:bg-gray-700/50"
                         >
-                          {t.reference_no}
-                        </button>
-                      </td>
-                      <td className="px-4 py-2 text-gray-700 dark:text-gray-300">
-                        {t.particulars}
-                      </td>
-                      <td className="px-4 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                        {t.cheque_no || "-"}
-                      </td>
-                      <td className="px-4 py-2 text-right text-gray-900 dark:text-white">
-                        {t.debit > 0 ? formatCurrency(t.debit) : "-"}
-                      </td>
-                      <td className="px-4 py-2 text-right text-gray-900 dark:text-white">
-                        {t.credit > 0 ? formatCurrency(t.credit) : "-"}
-                      </td>
-                      <td className="px-4 py-2 text-right text-gray-900 dark:text-white whitespace-nowrap">
-                        {formatBalance(t.balance)}
-                      </td>
-                    </tr>
-                  ))
+                          <td className="px-4 py-2 text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                            {formatDate(t.entry_date)}
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap">
+                            {transactionPath ? (
+                              <button
+                                onClick={(): void => handleOpenTransaction(t)}
+                                className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
+                                title={
+                                  isJellyPolly
+                                    ? "Open source document"
+                                    : "Open journal entry"
+                                }
+                              >
+                                {t.reference_no}
+                              </button>
+                            ) : (
+                              <span className="text-gray-700 dark:text-gray-300">
+                                {t.reference_no}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2 text-gray-700 dark:text-gray-300">
+                            {t.particulars}
+                          </td>
+                          <td className="px-4 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                            {t.cheque_no || "-"}
+                          </td>
+                          <td className="px-4 py-2 text-right text-gray-900 dark:text-white">
+                            {t.debit > 0 ? formatCurrency(t.debit) : "-"}
+                          </td>
+                          <td className="px-4 py-2 text-right text-gray-900 dark:text-white">
+                            {t.credit > 0 ? formatCurrency(t.credit) : "-"}
+                          </td>
+                          <td className="px-4 py-2 text-right text-gray-900 dark:text-white whitespace-nowrap">
+                            {formatBalance(t.balance)}
+                          </td>
+                        </tr>
+                      );
+                    }
+                  )
                 )}
               </tbody>
               <tfoot className="bg-gray-100 dark:bg-gray-900 border-t-2 border-gray-300 dark:border-gray-600 sticky bottom-0">
@@ -887,14 +1114,16 @@ const AccountLedgerPage: React.FC = () => {
         </div>
       )}
 
-      <OpeningBalanceModal
-        isOpen={showOpeningModal}
-        onClose={() => setShowOpeningModal(false)}
-        accountCode={selectedAccount}
-        accountDescription={selectedAccountDescription}
-        current={currentAnchor}
-        onSaved={fetchStatement}
-      />
+      {!isJellyPolly && (
+        <OpeningBalanceModal
+          isOpen={showOpeningModal}
+          onClose={() => setShowOpeningModal(false)}
+          accountCode={selectedAccount}
+          accountDescription={selectedAccountDescription}
+          current={currentAnchor}
+          onSaved={fetchStatement}
+        />
+      )}
     </div>
   );
 };

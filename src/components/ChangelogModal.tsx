@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-22",
+    ms: "Jelly Polly kini mempunyai halaman Account Ledger di bawah Accounting untuk menyemak lejar penghutang setiap pelanggan. Pilih pelanggan dan tempoh untuk melihat baki bawa ke hadapan, invois, bayaran selesai, nota kredit/debit, baki berjalan dan jumlah penutup, kemudian buka dokumen sumber atau cetak laporan untuk membandingkannya dengan laporan Debtors. Bayaran automatik bagi bil tunai juga kini menggunakan tarikh invois supaya baki bulanan dipaparkan pada tempoh yang betul.",
+    en: "Jelly Polly now has an Account Ledger page under Accounting for checking each customer's debtor ledger. Select a customer and period to see the brought-forward balance, invoices, completed payments, credit/debit notes, running balance and closing total, then open the source documents or print the report for comparison with the Debtors report. Automatic cash-bill payments now also use the invoice date so monthly balances appear in the correct period.",
+  },
+  {
+    date: "2026-07-22",
     ms: "Slip Pinjam yang dicetak kini lebih padat. Tajuk syarikat di bahagian atas telah dibuang (memandangkan slip dipotong untuk setiap pekerja), dan setiap slip kini hanya memaparkan bahagian yang ada rekod pinjam — jika pekerja hanya ada pinjam gaji pertengahan bulan, bahagian gaji bulanan tidak lagi dipaparkan, dan sebaliknya. Ini berlaku untuk Tien Hock, Green Target dan Jelly Polly.",
     en: "Printed Pinjam slips are now more compact. The company header at the top has been removed (since slips are cut out per worker), and each slip now only shows the half that actually has a pinjam record — if a worker only has a mid-month pinjam, the monthly section is no longer shown, and vice versa. This applies to Tien Hock, Green Target and Jelly Polly.",
   },
