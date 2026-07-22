@@ -17,10 +17,12 @@ import {
   IconCheck,
   IconX,
   IconStarFilled,
+  IconArrowsSort,
 } from "@tabler/icons-react";
 import MonthNavigator from "../../components/MonthNavigator";
 import clsx from "clsx";
 import { isOthProductionProduct } from "../../config/othProductionProducts";
+import ProductOrderModal from "../../components/Catalogue/ProductOrderModal";
 
 const FAVORITES_STORAGE_KEY = "stock-product-favorites";
 
@@ -59,6 +61,7 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
   const [selectedProductId, setSelectedProductId] = useState<string | null>(
     null
   );
+  const [showProductOrderModal, setShowProductOrderModal] = useState(false);
   const [viewType, setViewType] = useState<ViewType>("month");
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => new Date());
   const [customStartDate, setCustomStartDate] = useState<string>("");
@@ -328,6 +331,17 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
               showCategories={true}
               required
             />
+            {/* Quick access to the shared product display order */}
+            <div className="mt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowProductOrderModal(true)}
+                className="inline-flex items-center gap-1 text-xs font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300"
+              >
+                <IconArrowsSort size={14} />
+                Reorder products
+              </button>
+            </div>
             {/* Quick access favorite pills */}
             {favoriteProducts.length > 0 && (
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -679,6 +693,13 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
           </div>
         </div>
       )}
+
+      {/* Shared product display order modal */}
+      <ProductOrderModal
+        isOpen={showProductOrderModal}
+        onClose={() => setShowProductOrderModal(false)}
+        products={products}
+      />
 
       {/* Stock Movement Table */}
       {!selectedProductId ? (
