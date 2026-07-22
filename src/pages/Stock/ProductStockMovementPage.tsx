@@ -20,10 +20,7 @@ import {
 } from "@tabler/icons-react";
 import MonthNavigator from "../../components/MonthNavigator";
 import clsx from "clsx";
-import {
-  OTH_PRODUCTION_IDS,
-  isOthProductionProduct,
-} from "../../config/othProductionProducts";
+import { isOthProductionProduct } from "../../config/othProductionProducts";
 
 const FAVORITES_STORAGE_KEY = "stock-product-favorites";
 
@@ -163,9 +160,8 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
       else if (isOthProductionProduct(product.id)) oth.push(product);
     });
 
-    oth.sort(
-      (a, b) => OTH_PRODUCTION_IDS.indexOf(a.id) - OTH_PRODUCTION_IDS.indexOf(b.id)
-    );
+    // Products arrive in the shared display order (products.sort_order, then
+    // the default prefix/alphabetical order), so no local re-sorting here.
 
     return [
       { label: "Bihun Products", products: bh },

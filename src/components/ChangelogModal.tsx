@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-22",
+    ms: "Susunan produk kini boleh diubah dan dikongsi oleh semua pengguna: di halaman Catalogue → Product, klik butang Reorder, pilih jenis produk (Mee, Bihun, Bundle, Other atau Jelly Polly), seret produk mengikut susunan yang dikehendaki dan simpan. Susunan ini digunakan di semua halaman produk dan pengeluaran — pemilihan Production Entry, Product Stock, Production Records dan kotak carian produk. Susunan asal produk Mee: 1-350G, 1-3UDG, 1-2UDG, 1-MNL.",
+    en: "Product ordering is now adjustable and shared by all users: on the Catalogue → Product page, click the Reorder button, pick a product type (Mee, Bihun, Bundle, Other or Jelly Polly), drag the products into the desired order and save. This order is used across all product and production pages — the Production Entry selection, Product Stock, Production Records and the product search boxes. Initial Mee product order: 1-350G, 1-3UDG, 1-2UDG, 1-MNL.",
+  },
+  {
+    date: "2026-07-22",
     ms: "Halaman Production Records kini dipecahkan kepada lima halaman mengikut jenis produk — Mee, Bihun, Bundle, SBH & SMEE dan Empty Bag. Setiap hari kini memaparkan jumlah kuantiti yang dihasilkan, dan baris produk bermula dalam keadaan tertutup (klik untuk membuka butiran pekerja).",
     en: "The Production Records page is now split into five pages by product type — Mee, Bihun, Bundle, SBH & SMEE and Empty Bag. Each day now shows the total quantity produced, and product rows start collapsed (click to open worker details).",
   },
