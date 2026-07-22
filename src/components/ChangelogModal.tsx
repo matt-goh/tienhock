@@ -20,6 +20,21 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-22",
+    ms: "Susunan produk dan pekerja kini boleh diubah dan dikongsi oleh semua pengguna: klik butang Reorder di halaman Catalogue → Product, Production Entry, Stock Movement atau Production Records, pilih tab produk (Mee, Bihun, Bundle, Other atau Jelly Polly) atau tab pekerja (Mee/Bihun), seret mengikut susunan yang dikehendaki dan simpan. Susunan produk digunakan di semua halaman produk dan pengeluaran — pemilihan Production Entry, Product Stock, Production Records dan kotak carian produk; susunan pekerja disegerakkan dengan grid pekerja di halaman Production Entry. Susunan asal produk Mee: 1-350G, 1-3UDG, 1-2UDG, 1-MNL.",
+    en: "Product and worker ordering is now adjustable and shared by all users: click the Reorder button on the Catalogue → Product, Production Entry, Stock Movement or Production Records page, pick a product tab (Mee, Bihun, Bundle, Other or Jelly Polly) or a worker tab (Mee/Bihun), drag into the desired order and save. The product order is used across all product and production pages — the Production Entry selection, Product Stock, Production Records and the product search boxes; the worker order stays in sync with the worker grids on the Production Entry pages. Initial Mee product order: 1-350G, 1-3UDG, 1-2UDG, 1-MNL.",
+  },
+  {
+    date: "2026-07-22",
+    ms: "Halaman Production Records kini dipecahkan kepada lima halaman mengikut jenis produk — Mee, Bihun, Bundle, SBH & SMEE dan Empty Bag. Setiap hari kini memaparkan jumlah kuantiti yang dihasilkan, dan baris produk bermula dalam keadaan tertutup (klik untuk membuka butiran pekerja).",
+    en: "The Production Records page is now split into five pages by product type — Mee, Bihun, Bundle, SBH & SMEE and Empty Bag. Each day now shows the total quantity produced, and product rows start collapsed (click to open worker details).",
+  },
+  {
+    date: "2026-07-22",
+    ms: "Pembetulan data: enam invois lama yang sebenarnya telah dijelaskan (mengikut lejar akaun) tetapi masih kelihatan tertunggak kini ditandakan sebagai telah dibayar — CHANKOPI 2004676, AMY 15309, LEE YX 026127, SHAB 34704, HIAPLEE-SC 63599 dan LAI 34367. Jumlah tertunggak pelanggan-pelanggan ini (dan Laporan Debtors) turun sebanyak RM4,265.00 secara keseluruhan; tiada catatan akaun baharu dibuat kerana bayaran tersebut memang sudah ada dalam lejar.",
+    en: "Data correction: six old invoices that were actually settled (per the account ledger) but still showed as outstanding are now marked paid — CHANKOPI 2004676, AMY 15309, LEE YX 026127, SHAB 34704, HIAPLEE-SC 63599 and LAI 34367. These customers' outstanding totals (and the Debtors report) drop by RM4,265.00 in all; no new accounting entries were made because the payments were already in the ledger.",
+  },
+  {
+    date: "2026-07-22",
     ms: "Halaman butiran jurnal kini memaparkan butang pautan ke dokumen yang mewujudkan jurnal tersebut secara automatik — contohnya invois, nota kredit/debit/bayaran balik, resit, bank-in (RV), belian am atau bayaran pembekal. Klik butang berkenaan untuk terus membuka dokumen sumber.",
     en: "The journal details page now shows a link button to the document that automatically created the journal — such as an invoice, credit/debit/refund note, receipt, bank-in (RV), general purchase or supplier payment. Click it to jump straight to the source document.",
   },

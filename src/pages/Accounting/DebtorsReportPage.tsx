@@ -1,5 +1,11 @@
 // src/pages/Accounting/DebtorsReportPage.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useLayoutEffect,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import {
   IconDownload,
@@ -33,6 +39,7 @@ import toast from "react-hot-toast";
 import { AdjustmentDocTypeBadge } from "../../components/AdjustmentDocs/AdjustmentDocBadge";
 import type { AdjustmentDocType } from "../../types/types";
 import { formatAdjustmentDocDisplayId } from "../../utils/adjustments/formatDocId";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 
 interface Payment {
   payment_id: number;
@@ -311,9 +318,9 @@ const storeHideZeroBalances = (
   }
 };
 
-// By Customer view pagination: fixed 100 rows per page, current page kept per
+// By Customer view pagination: fixed 200 rows per page, current page kept per
 // company so it survives navigating away and back.
-const CUSTOMER_PAGE_LIMIT = 100;
+const CUSTOMER_PAGE_LIMIT = 200;
 
 const customerPageStorageKey = (debtorsEndpoint: string): string =>
   `debtorsReport.customerPage:${debtorsEndpoint}`;
@@ -340,6 +347,40 @@ const storeCustomerPage = (debtorsEndpoint: string, page: number): void => {
       customerPageStorageKey(debtorsEndpoint),
       String(page)
     );
+  } catch (_error: unknown) {
+    // Best-effort when browser storage is unavailable.
+  }
+};
+
+// Salesman-view accordion expand/collapse state is likewise preserved per
+// company so it survives navigating away and back.
+const expandedSalesmenStorageKey = (debtorsEndpoint: string): string =>
+  `debtorsReport.expandedSalesmen:${debtorsEndpoint}`;
+
+const expandedCustomersStorageKey = (debtorsEndpoint: string): string =>
+  `debtorsReport.expandedCustomers:${debtorsEndpoint}`;
+
+// null = nothing stored yet (first visit); an array (even empty) is the
+// user's own accordion state.
+const readStoredExpandedSet = (storageKey: string): string[] | null => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const stored: string | null = window.localStorage.getItem(storageKey);
+    if (stored === null) return null;
+    const parsed: unknown = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return null;
+    return parsed.filter((id: unknown): id is string => typeof id === "string");
+  } catch (_error: unknown) {
+    return null;
+  }
+};
+
+const storeExpandedSet = (storageKey: string, expanded: Set<string>): void => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify([...expanded]));
   } catch (_error: unknown) {
     // Best-effort when browser storage is unavailable.
   }
@@ -391,11 +432,21 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
   const [searchTerm, setSearchTerm] = useState<string>(() =>
     readStoredSearchTerm(config.debtorsEndpoint)
   );
+  // null = first visit: the fetch keeps its legacy expand-all-salesmen
+  // default; a stored array (even empty) is the user's own accordion state.
+  const [initialStoredSalesmen] = useState<string[] | null>(() =>
+    readStoredExpandedSet(expandedSalesmenStorageKey(config.debtorsEndpoint))
+  );
   const [expandedSalesmen, setExpandedSalesmen] = useState<Set<string>>(
-    new Set()
+    () => new Set(initialStoredSalesmen ?? [])
   );
   const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(
-    new Set()
+    () =>
+      new Set(
+        readStoredExpandedSet(
+          expandedCustomersStorageKey(config.debtorsEndpoint)
+        ) ?? []
+      )
   );
 
   // By Customer (default, an interactive Trade Debtor List over every
@@ -422,6 +473,12 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
   // Search only applies when the input loses focus (or Enter is pressed), so
   // typing does not fire the (ledger-heavy) customer-list fetch per keystroke.
   const [appliedSearch, setAppliedSearch] = useState<string>(searchTerm);
+
+  // Sticky list header measurement so the customer-table column header can
+  // stack directly beneath it while scrolling (same approach as
+  // JournalDetailsPage).
+  const listHeaderRef = useRef<HTMLDivElement>(null);
+  const [listHeaderHeight, setListHeaderHeight] = useState<number>(0);
 
   const handleSearchChange = (value: string): void => {
     setSearchTerm(value);
@@ -516,8 +573,14 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
 
         setDebtorsData(processedData);
 
-        const salesmenIds = data.salesmen.map((s: Salesman) => s.salesman_id);
-        setExpandedSalesmen(new Set(salesmenIds));
+        // First visit only: default to every salesman expanded. Once the
+        // user has their own stored accordion state it is left untouched.
+        if (initialStoredSalesmen === null) {
+          const salesmenIds = data.salesmen.map(
+            (s: Salesman) => s.salesman_id
+          );
+          setExpandedSalesmen(new Set(salesmenIds));
+        }
       } catch (err) {
         setError("Failed to fetch debtors data. Please try again later.");
         console.error("Error fetching debtors:", err);
@@ -525,7 +588,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
         setLoading(false);
       }
     },
-    [config.debtorsEndpoint]
+    [config.debtorsEndpoint, initialStoredSalesmen]
   );
 
   // Customer-view fetch: the general-statement endpoint with includeZero=1 so
@@ -591,6 +654,45 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
     appliedSearch,
     hideZeroBalances,
   ]);
+
+  // Preserve the salesman-view accordion state across navigations, keyed per
+  // company like the other report settings above.
+  useEffect(() => {
+    storeExpandedSet(
+      expandedSalesmenStorageKey(config.debtorsEndpoint),
+      expandedSalesmen
+    );
+  }, [expandedSalesmen, config.debtorsEndpoint]);
+
+  useEffect(() => {
+    storeExpandedSet(
+      expandedCustomersStorageKey(config.debtorsEndpoint),
+      expandedCustomers
+    );
+  }, [expandedCustomers, config.debtorsEndpoint]);
+
+  // Preserve the scroll position across navigations (same pattern as the
+  // Journal Entry list page), keyed per company. Ready once the active view
+  // has its data rendered.
+  useScrollRestoration(
+    `debtors-report:${config.debtorsEndpoint}`,
+    viewMode === "customer"
+      ? !customerListLoading && customerListData !== null
+      : !loading && debtorsData !== null
+  );
+
+  // Re-measure the sticky list header whenever its height can change so the
+  // column header sticks flush beneath it.
+  useLayoutEffect(() => {
+    const measure = (): void => {
+      if (listHeaderRef.current) {
+        setListHeaderHeight(listHeaderRef.current.offsetHeight);
+      }
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [customerListData, viewMode]);
 
   // Switch between the By Customer and By Salesman views
   const handleViewModeChange = useCallback(
@@ -949,7 +1051,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
     !isCustomerView && debtorsData ? filterData(debtorsData) : null;
 
   // Customer-view rows arrive already searched, zero-filtered and paginated
-  // by the server (100 per page).
+  // by the server (200 per page).
   const customerRows: CustomerListRow[] = customerListData?.customers ?? [];
   const customerTotalCount: number =
     customerListData?.total_customers ?? customerRows.length;
@@ -988,6 +1090,46 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
     filteredData.salesmen.every(
       (salesman: Salesman): boolean => isSalesmanFullyExpanded(salesman)
     );
+
+  // Search box and refresh action are shared by both views but rendered in
+  // different places: the top toolbar in Salesman view, the sticky list header
+  // in Customer view.
+  const searchInput = (
+    <div className="relative">
+      <input
+        type="text"
+        placeholder="Search customers..."
+        value={searchTerm}
+        onChange={(e) => handleSearchChange(e.target.value)}
+        onBlur={commitSearch}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
+        autoFocus
+        className="px-3 py-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-gray-900 dark:text-gray-100 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 w-[154px] placeholder-gray-400 dark:placeholder-gray-500"
+      />
+      {searchTerm && (
+        <button
+          type="button"
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-300 transition-colors"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={handleClearSearch}
+          title="Clear search"
+        >
+          ×
+        </button>
+      )}
+    </div>
+  );
+
+  const refreshButton = (
+    <Button
+      onClick={handleRefresh}
+      variant="outline"
+      size="sm"
+      icon={IconRefresh}
+    />
+  );
 
   return (
     <div className="space-y-3">
@@ -1080,31 +1222,9 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
 
         {/* Right side: Search + Actions */}
         <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search customers..."
-              value={searchTerm}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              onBlur={commitSearch}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") e.currentTarget.blur();
-              }}
-              autoFocus
-              className="px-3 py-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-gray-900 dark:text-gray-100 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 w-[154px] placeholder-gray-400 dark:placeholder-gray-500"
-            />
-            {searchTerm && (
-              <button
-                type="button"
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-300 transition-colors"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={handleClearSearch}
-                title="Clear search"
-              >
-                ×
-              </button>
-            )}
-          </div>
+          {/* Search + refresh live here in Salesman view; in Customer view they
+              move into the sticky list header above the table. */}
+          {!isCustomerView && searchInput}
           {!isCustomerView && filteredData && (
             <Button
               onClick={() => toggleAllDebtors(filteredData.salesmen)}
@@ -1114,13 +1234,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
             >
             </Button>
           )}
-          <Button
-            onClick={handleRefresh}
-            variant="outline"
-            size="sm"
-            icon={IconRefresh}
-          >
-          </Button>
+          {!isCustomerView && refreshButton}
           {!isCustomerView && (
             <Button
               onClick={handlePrint}
@@ -1147,29 +1261,21 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
       {/* Report Content */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700">
         {isCustomerView ? (
-          customerRows.length === 0 ? (
-            <div className="text-center py-8">
-              <IconUser size={48} className="text-default-400 dark:text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-default-800 dark:text-gray-100 mb-2">
-                No Results Found
-              </h3>
-              <p className="text-default-500 dark:text-gray-400">
-                {searchTerm
-                  ? "No customers match your search criteria."
-                  : hideZeroBalances
-                  ? "No customers with an outstanding balance for the selected period."
-                  : "No customers available for the selected period."}
+          <div>
+            {/* List header: count + customer-view controls (search, zero-balance
+                filter, refresh). Sticky so it — and the column header beneath —
+                stay in view while scrolling the customer list. */}
+            <div
+              ref={listHeaderRef}
+              className="sticky top-0 z-30 flex items-center justify-between flex-wrap gap-2 px-4 py-2.5 border-b border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-t-lg"
+            >
+              <p className="text-sm text-default-500 dark:text-gray-400">
+                {customerTotalCount} customer
+                {customerTotalCount !== 1 ? "s" : ""} • as at{" "}
+                {customerListData?.statement_date}
               </p>
-            </div>
-          ) : (
-            <div>
-              {/* List header: count + zero-balance filter */}
-              <div className="flex items-center justify-between flex-wrap gap-2 px-4 py-2.5 border-b border-default-200 dark:border-gray-700">
-                <p className="text-sm text-default-500 dark:text-gray-400">
-                  {customerTotalCount} customer
-                  {customerTotalCount !== 1 ? "s" : ""} • as at{" "}
-                  {customerListData?.statement_date}
-                </p>
+              <div className="flex items-center gap-2">
+                {searchInput}
                 <button
                   type="button"
                   onClick={handleHideZeroBalancesToggle}
@@ -1183,32 +1289,72 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                     ? "Zero balances hidden"
                     : "Hide zero balances"}
                 </button>
+                {refreshButton}
               </div>
+            </div>
 
-              {/* Customer table */}
-              <div className="overflow-x-auto">
+            {customerRows.length === 0 ? (
+              <div className="text-center py-8">
+                <IconUser size={48} className="text-default-400 dark:text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-default-800 dark:text-gray-100 mb-2">
+                  No Results Found
+                </h3>
+                <p className="text-default-500 dark:text-gray-400">
+                  {searchTerm
+                    ? "No customers match your search criteria."
+                    : hideZeroBalances
+                    ? "No customers with an outstanding balance for the selected period."
+                    : "No customers available for the selected period."}
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Customer table (no overflow wrapper so the column header can
+                    stick to the page scroll beneath the list header) */}
+                <div>
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="bg-default-100 dark:bg-gray-900/50">
-                      <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+                      <th
+                        style={{ top: listHeaderHeight }}
+                        className="sticky z-20 bg-default-100 dark:bg-gray-800 px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
+                      >
                         Account No
                       </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+                      <th
+                        style={{ top: listHeaderHeight }}
+                        className="sticky z-20 bg-default-100 dark:bg-gray-800 px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
+                      >
                         Customer
                       </th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+                      <th
+                        style={{ top: listHeaderHeight }}
+                        className="sticky z-20 bg-default-100 dark:bg-gray-800 px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
+                      >
                         Bal B/F
                       </th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+                      <th
+                        style={{ top: listHeaderHeight }}
+                        className="sticky z-20 bg-default-100 dark:bg-gray-800 px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
+                      >
                         Current
                       </th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+                      <th
+                        style={{ top: listHeaderHeight }}
+                        className="sticky z-20 bg-default-100 dark:bg-gray-800 px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
+                      >
                         Payment
                       </th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+                      <th
+                        style={{ top: listHeaderHeight }}
+                        className="sticky z-20 bg-default-100 dark:bg-gray-800 px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
+                      >
                         Total Due
                       </th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+                      <th
+                        style={{ top: listHeaderHeight }}
+                        className="sticky z-20 bg-default-100 dark:bg-gray-800 px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
+                      >
                         Actions
                       </th>
                     </tr>
@@ -1366,8 +1512,9 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                   </div>
                 </div>
               </div>
-            </div>
-          )
+              </>
+            )}
+          </div>
         ) : !filteredData || filteredData.salesmen.length === 0 ? (
           <div className="text-center py-8">
             <IconUser size={48} className="text-default-400 dark:text-gray-400 mx-auto mb-4" />

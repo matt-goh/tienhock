@@ -18,6 +18,15 @@ requires separate approval).
 
 ---
 
+## Applied 22 Jul 2026 — file still in `dev/migrations/`, prod PENDING
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-07-22_products_sort_order.sql` | Added `products.sort_order` (nullable integer) — the shared per-type product display order used by all product/production pickers, managed via PUT /api/products/order and the Catalogue Product page Reorder modal. Seeded the default Mee order: 1-350G=0, 1-3UDG=1, 1-2UDG=2, 1-MNL=3 (guarded, idempotent). | dev ✓, prod PENDING |
+| `2026-07-22_gl_settled_invoices_contra.sql` | "Bucket 3" debtors-report reconciliation: closed six operational invoices whose settlements already exist in the debtor ledger (per-customer GL↔operations difference equalled exactly the invoice residue) — `2004676` CHANKOPI 1,080.00, `15309` AMY 135.00, `026127` LEE YX 57.00, `34704` SHAB 870.00, `63599` HIAPLEE-SC 561.00, `34367` LAI 1,642.00. Five guarded NON-POSTING `contra` payment projections inserted; LAI's never-confirmed pending cheque payment `5469` converted in place to contra (NOT linked to IMP journal `6945`). No journal created/modified/cancelled; invoices set paid, `credit_used` recomputed. Guarded, idempotent, fail-closed. **Prod: re-pin the guard values against live data before running.** | dev ✓, prod PENDING |
+
+---
+
 ## Cleanup of 21 Jul 2026 — 20 files removed
 
 All twenty `.sql` files listed below were removed from `dev/migrations/` on 2026-07-21 after being

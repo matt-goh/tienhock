@@ -3,7 +3,12 @@ import { useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHan
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import WorkerEntryGrid from "./WorkerEntryGrid";
-import { ProductionEntry, ProductionWorker } from "../../types/types";
+import {
+  ProductionEntry,
+  ProductionPageContextResponse,
+  ProductionWorker,
+  ProductionWorkerOrderScope,
+} from "../../types/types";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { getBundleItems } from "../../config/specialItems";
 
@@ -94,6 +99,12 @@ const BundleEntrySection = forwardRef<BundleEntrySectionHandle, BundleEntrySecti
     BUNDLE_MEE: {},
   });
   const [isSaving, setIsSaving] = useState(false);
+  // Worker orders from the bundled page-context call, handed to the grid so
+  // it doesn't need its own GET (keyed by packing scope; the active tab
+  // picks its own scope).
+  const [workerOrdersByScope, setWorkerOrdersByScope] = useState<
+    Partial<Record<ProductionWorkerOrderScope, string[]>> | undefined
+  >(undefined);
 
   // Get staffs cache
   const { staffs, loading: isLoadingWorkers } = useStaffsCache();
@@ -153,7 +164,7 @@ const BundleEntrySection = forwardRef<BundleEntrySectionHandle, BundleEntrySecti
     hasUnsavedChanges: () => hasAnyUnsavedChanges,
   }), [hasAnyUnsavedChanges]);
 
-  // Fetch existing entries when date changes
+  // Fetch existing entries + worker orders in one bundled call when date changes
   useEffect(() => {
     const fetchExistingEntries = async () => {
       if (!selectedDate) return;
@@ -165,21 +176,26 @@ const BundleEntrySection = forwardRef<BundleEntrySectionHandle, BundleEntrySecti
       };
 
       try {
-        for (const bundleId of Object.keys(TAB_CONFIG) as BundleTab[]) {
-          const response = await api.get(
-            `/api/production-entries?date=${selectedDate}&product_id=${bundleId}`
-          );
+        const bundleIds = Object.keys(TAB_CONFIG) as BundleTab[];
+        const params: URLSearchParams = new URLSearchParams({
+          date: selectedDate,
+          product_ids: bundleIds.join(","),
+          scopes: "BH_PACKING,MEE_PACKING",
+        });
+        const response: ProductionPageContextResponse = await api.get(
+          `/api/production-entries/page-context?${params.toString()}`
+        );
 
-          const entriesMap: Record<string, number> = {};
-          (response || []).forEach((entry: ProductionEntry) => {
-            if (!entry.worker_id) return;
-            entriesMap[entry.worker_id] = Number(entry.bags_packed) || 0;
-          });
-          newEntries[bundleId] = entriesMap;
-        }
+        (response?.entries || []).forEach((entry: ProductionEntry) => {
+          if (!entry.worker_id) return;
+          const tab = entry.product_id as BundleTab;
+          if (!newEntries[tab]) return;
+          newEntries[tab][entry.worker_id] = Number(entry.bags_packed) || 0;
+        });
 
         setEntries(newEntries);
         setOriginalEntries(JSON.parse(JSON.stringify(newEntries)));
+        setWorkerOrdersByScope(response?.worker_orders || {});
       } catch (error) {
         console.error("Error fetching bundle entries:", error);
         setEntries({
@@ -298,6 +314,7 @@ const BundleEntrySection = forwardRef<BundleEntrySectionHandle, BundleEntrySecti
           unitLabel={activeConfig.unit}
           defaultValue={activeConfig.defaultValue}
           workerOrderScope={activeConfig.workerJob}
+          initialWorkerOrderIds={workerOrdersByScope?.[activeConfig.workerJob]}
           workerOrderRefreshKey={workerOrderRefreshKey}
           onSave={handleSave}
           onReset={handleReset}

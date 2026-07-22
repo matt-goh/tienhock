@@ -38,14 +38,14 @@ export default function (pool) {
         whereClause = activeFilter
           ? `WHERE ${typeFilter} AND ${activeFilter}`
           : `WHERE ${typeFilter}`;
-        query = `SELECT id, description, price_per_unit, type, is_active FROM products ${whereClause}`;
+        query = `SELECT id, description, price_per_unit, type, is_active, sort_order FROM products ${whereClause}`;
       } else {
         // Default: Return only BH, MEE, JP type products (excluding tax)
         const typeFilter = "type IN ('BH', 'MEE', 'JP')";
         whereClause = activeFilter
           ? `WHERE ${typeFilter} AND ${activeFilter}`
           : `WHERE ${typeFilter}`;
-        query = `SELECT id, description, price_per_unit, type, is_active FROM products ${whereClause}`;
+        query = `SELECT id, description, price_per_unit, type, is_active, sort_order FROM products ${whereClause}`;
       }
 
       const result = await pool.query(query);
@@ -61,16 +61,46 @@ export default function (pool) {
 
       // Custom sort order: "1-", "2-", "WE-", "S-", "MEQ-"
       const prefixOrder = ["1-", "2-", "WE-", "S-", "MEQ-"];
+      const getPrefixIndex = (id) => {
+        const prefix = prefixOrder.find((p) => id.startsWith(p));
+        return prefix ? prefixOrder.indexOf(prefix) : 999;
+      };
+
+      // Rank each product type by where it first appears in the legacy
+      // prefix/alphabetical order. Same-type products are then kept
+      // contiguous so the explicit per-type order (products.sort_order) can
+      // apply within a type, while the legacy cross-type order is preserved.
+      const typeRank = new Map();
+      [...productsWithNumberValues]
+        .sort((a, b) => {
+          const aIndex = getPrefixIndex(a.id);
+          const bIndex = getPrefixIndex(b.id);
+          if (aIndex !== bIndex) return aIndex - bIndex;
+          return a.id.localeCompare(b.id);
+        })
+        .forEach((product) => {
+          if (!typeRank.has(product.type)) {
+            typeRank.set(product.type, typeRank.size);
+          }
+        });
+
       const sortedProducts = productsWithNumberValues.sort((a, b) => {
-        const aPrefix = prefixOrder.find((prefix) => a.id.startsWith(prefix));
-        const bPrefix = prefixOrder.find((prefix) => b.id.startsWith(prefix));
+        const typeDiff = typeRank.get(a.type) - typeRank.get(b.type);
+        if (typeDiff !== 0) return typeDiff;
 
-        const aIndex = aPrefix ? prefixOrder.indexOf(aPrefix) : 999;
-        const bIndex = bPrefix ? prefixOrder.indexOf(bPrefix) : 999;
-
-        if (aIndex !== bIndex) {
-          return aIndex - bIndex;
+        // Explicit per-type display order (managed via PUT /api/products/order):
+        // ordered products first (by sort_order), unordered ones after.
+        const aHasOrder = a.sort_order !== null && a.sort_order !== undefined;
+        const bHasOrder = b.sort_order !== null && b.sort_order !== undefined;
+        if (aHasOrder || bHasOrder) {
+          if (!aHasOrder) return 1;
+          if (!bHasOrder) return -1;
+          if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
         }
+
+        const aIndex = getPrefixIndex(a.id);
+        const bIndex = getPrefixIndex(b.id);
+        if (aIndex !== bIndex) return aIndex - bIndex;
 
         // If same prefix or both don't match any prefix, sort alphabetically
         return a.id.localeCompare(b.id);
@@ -238,6 +268,76 @@ export default function (pool) {
       res
         .status(500)
         .json({ message: "Error processing products", error: error.message });
+    }
+  });
+
+  // Save the display order of products within a type (must be before /:id)
+  router.put("/order", async (req, res) => {
+    const VALID_ORDER_TYPES = new Set(["BH", "MEE", "JP", "OTH", "BUNDLE"]);
+    const { type, product_ids } = req.body;
+
+    if (typeof type !== "string" || !VALID_ORDER_TYPES.has(type)) {
+      return res.status(400).json({
+        message: "type must be one of BH, MEE, JP, OTH, BUNDLE",
+      });
+    }
+
+    if (!Array.isArray(product_ids)) {
+      return res.status(400).json({ message: "product_ids array is required" });
+    }
+
+    try {
+      const seen = new Set();
+      const normalizedIds = product_ids
+        .filter((id) => typeof id === "string" && id.trim())
+        .map((id) => id.trim())
+        .filter((id) => {
+          if (seen.has(id)) return false;
+          seen.add(id);
+          return true;
+        });
+
+      const client = await pool.connect();
+
+      try {
+        await client.query("BEGIN");
+
+        // Products of this type that are not listed lose their explicit order
+        // and fall back to the default prefix/alphabetical order (after the
+        // ordered ones).
+        await client.query(
+          "UPDATE products SET sort_order = NULL WHERE type = $1",
+          [type]
+        );
+
+        for (const [index, productId] of normalizedIds.entries()) {
+          await client.query(
+            "UPDATE products SET sort_order = $1 WHERE id = $2 AND type = $3",
+            [index, productId, type]
+          );
+        }
+
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+
+      // Invalidate cache
+      cache.invalidatePrefix(CACHE_KEYS.PRODUCTS);
+
+      res.json({
+        message: "Product order saved",
+        type,
+        product_ids: normalizedIds,
+      });
+    } catch (error) {
+      console.error("Error saving product order:", error);
+      res
+        .status(500)
+        .json({ message: "Error saving product order", error: error.message });
     }
   });
 

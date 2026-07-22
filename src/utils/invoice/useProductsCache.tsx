@@ -9,6 +9,7 @@ interface Product {
   price_per_unit: number;
   type: string;
   is_active?: boolean;
+  sort_order?: number | null;
 }
 
 interface CachedProducts {
