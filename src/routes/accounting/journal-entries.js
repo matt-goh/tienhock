@@ -33,6 +33,170 @@ function isLegacyImportEntry(entry) {
   );
 }
 
+const ADJUSTMENT_DOC_TYPE_LABELS = {
+  credit_note: "Credit Note",
+  debit_note: "Debit Note",
+  refund_note: "Refund Note",
+};
+
+/**
+ * Resolve the document that auto-created a journal entry into a display label
+ * and frontend path for the Journal Details "View Source" link. Returns null
+ * for manual journals, legacy imports, or when the source row no longer exists.
+ *
+ * @param {import("pg").Pool} pool
+ * @param {{ id: number, source_type?: string | null, source_id?: string | null }} entry
+ * @returns {Promise<{ type: string, label: string, path: string } | null>}
+ */
+async function resolveJournalSource(pool, entry) {
+  const { id, source_type, source_id } = entry;
+
+  if (source_type && source_type !== LEGACY_IMPORT_SOURCE_TYPE && source_id) {
+    switch (source_type) {
+      case "invoice":
+        return {
+          type: "invoice",
+          label: `Invoice ${source_id}`,
+          path: `/sales/invoice/${encodeURIComponent(source_id)}`,
+        };
+      case "adjustment":
+      case "jp_adjustment": {
+        const isJp = source_type === "jp_adjustment";
+        const table = isJp
+          ? "jellypolly.adjustment_documents"
+          : "adjustment_documents";
+        const basePath = isJp
+          ? "/jellypolly/sales/adjustment-docs"
+          : "/sales/adjustment-docs";
+        const docResult = await pool.query(
+          `SELECT display_id, type FROM ${table} WHERE id = $1`,
+          [source_id]
+        );
+        if (docResult.rows.length === 0) return null;
+        const doc = docResult.rows[0];
+        const docLabel = ADJUSTMENT_DOC_TYPE_LABELS[doc.type] || "Adjustment";
+        return {
+          type: source_type,
+          label: `${docLabel} ${doc.display_id || source_id}`,
+          path: `${basePath}/${encodeURIComponent(source_id)}`,
+        };
+      }
+      case "receipt": {
+        const receiptResult = await pool.query(
+          "SELECT display_reference FROM receipts WHERE id = $1::int",
+          [source_id]
+        );
+        if (receiptResult.rows.length === 0) return null;
+        const ref = receiptResult.rows[0].display_reference || source_id;
+        return {
+          type: "receipt",
+          label: `Receipt ${ref}`,
+          path: `/sales/payments?receipt=${encodeURIComponent(source_id)}`,
+        };
+      }
+      case "bank_in": {
+        const bankInResult = await pool.query(
+          `SELECT r.rv_number
+             FROM bank_ins bi
+             JOIN rv_registry r ON r.id = bi.rv_registry_id
+            WHERE bi.id = $1::int`,
+          [source_id]
+        );
+        if (bankInResult.rows.length === 0) return null;
+        return {
+          type: "bank_in",
+          label: `Bank-In ${bankInResult.rows[0].rv_number}`,
+          path: "/accounting/bank-in",
+        };
+      }
+      case "payment": {
+        const paymentResult = await pool.query(
+          "SELECT invoice_id, internal_reference FROM payments WHERE payment_id = $1::int",
+          [source_id]
+        );
+        if (paymentResult.rows.length === 0 || !paymentResult.rows[0].invoice_id)
+          return null;
+        const payment = paymentResult.rows[0];
+        const ref = payment.internal_reference
+          ? `${payment.internal_reference} `
+          : "";
+        return {
+          type: "payment",
+          label: `Payment ${ref}→ Invoice ${payment.invoice_id}`,
+          path: `/sales/invoice/${encodeURIComponent(payment.invoice_id)}`,
+        };
+      }
+      default:
+        return null;
+    }
+  }
+
+  // Reverse lookups: sources that only link back via their journal_entry_id FK.
+  const gpResult = await pool.query(
+    `SELECT id, self_billed_no, purchase_kind
+       FROM self_billed_invoices
+      WHERE journal_entry_id = $1`,
+    [id]
+  );
+  if (gpResult.rows.length > 0) {
+    const gp = gpResult.rows[0];
+    const basePath =
+      gp.purchase_kind === "local"
+        ? "/stock/general-purchases/local"
+        : "/stock/general-purchases";
+    return {
+      type: "self_billed_invoice",
+      label: `Purchase ${gp.self_billed_no}`,
+      path: `${basePath}/${gp.id}`,
+    };
+  }
+
+  const spResult = await pool.query(
+    `SELECT payment_id, internal_reference
+       FROM supplier_payments
+      WHERE journal_entry_id = $1`,
+    [id]
+  );
+  if (spResult.rows.length > 0) {
+    const sp = spResult.rows[0];
+    return {
+      type: "supplier_payment",
+      label: `Supplier Payment ${sp.internal_reference || sp.payment_id}`,
+      path: `/accounting/supplier-payments/${sp.payment_id}`,
+    };
+  }
+
+  // Legacy pre-cutover payments own their REC journal via journal_entry_id.
+  const legacyPaymentResult = await pool.query(
+    `SELECT invoice_id FROM payments
+      WHERE journal_entry_id = $1 AND invoice_id IS NOT NULL`,
+    [id]
+  );
+  if (legacyPaymentResult.rows.length > 0) {
+    const invoiceId = legacyPaymentResult.rows[0].invoice_id;
+    return {
+      type: "payment",
+      label: `Payment → Invoice ${invoiceId}`,
+      path: `/sales/invoice/${encodeURIComponent(invoiceId)}`,
+    };
+  }
+
+  // Manual/drawing RV journals reserved a number in the RV registry.
+  const rvResult = await pool.query(
+    "SELECT rv_number FROM rv_registry WHERE journal_entry_id = $1",
+    [id]
+  );
+  if (rvResult.rows.length > 0) {
+    return {
+      type: "bank_in",
+      label: `Bank-In ${rvResult.rows[0].rv_number}`,
+      path: "/accounting/bank-in",
+    };
+  }
+
+  return null;
+}
+
 export default function (pool) {
   const router = Router();
 
@@ -293,6 +457,7 @@ export default function (pool) {
           ${LEGACY_IMPORT_SQL} AS is_legacy_import,
           je.display_reference,
           je.source_type,
+          je.source_id,
           je.manual_override,
           je.entry_date,
           je.description, je.total_debit, je.total_credit, je.status,
@@ -330,9 +495,12 @@ export default function (pool) {
       `;
       const linesResult = await pool.query(linesQuery, [id]);
 
+      const source = await resolveJournalSource(pool, entryResult.rows[0]);
+
       res.json({
         ...entryResult.rows[0],
         lines: linesResult.rows,
+        source,
       });
     } catch (error) {
       console.error("Error fetching journal entry:", error);

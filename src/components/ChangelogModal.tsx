@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-22",
+    ms: "Halaman butiran jurnal kini memaparkan butang pautan ke dokumen yang mewujudkan jurnal tersebut secara automatik — contohnya invois, nota kredit/debit/bayaran balik, resit, bank-in (RV), belian am atau bayaran pembekal. Klik butang berkenaan untuk terus membuka dokumen sumber.",
+    en: "The journal details page now shows a link button to the document that automatically created the journal — such as an invoice, credit/debit/refund note, receipt, bank-in (RV), general purchase or supplier payment. Click it to jump straight to the source document.",
+  },
+  {
+    date: "2026-07-22",
     ms: "Laporan Debtors kini dibuka dengan paparan \"By Customer\" yang menyenaraikan semua pelanggan — termasuk yang tiada baki tertunggak — lengkap dengan baki bawa ke hadapan, invois semasa, bayaran dan jumlah perlu dibayar bagi bulan terpilih. Setiap pelanggan mempunyai butang Statement dan Invoices, dan anda boleh bertukar kembali ke paparan \"By Salesman\" seperti sebelum ini. Tab Transactions pada halaman pelanggan juga kini mempunyai butang Statement dengan pemilih bulan untuk mencetak penyata akaun pelanggan.",
     en: "The Debtors report now opens on a \"By Customer\" view listing every customer — including those with no outstanding balance — with the brought-forward balance, current invoices, payments and total due for the selected month. Each customer has Statement and Invoices buttons, and you can switch back to the \"By Salesman\" view as before.",
   },

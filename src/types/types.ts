@@ -1146,6 +1146,12 @@ export interface JournalEntryTypeInfo {
 }
 
 // Journal Entry Header
+export interface JournalSourceLink {
+  type: string; // e.g. invoice, adjustment, receipt, bank_in, self_billed_invoice
+  label: string; // e.g. "Invoice 64105", "Credit Note TH-CN-26-1"
+  path: string; // Frontend route to the source document
+}
+
 export interface JournalEntry {
   id: number;
   reference_no: string; // e.g., "PBE002/06"
@@ -1158,6 +1164,7 @@ export interface JournalEntry {
   is_legacy_import?: boolean;
   source_type?: string | null;
   source_id?: string | null;
+  source?: JournalSourceLink | null; // Resolved source document link (GET /:id only)
   manual_override?: boolean; // true = hand-edited sales journal, detached from its invoice's sync
   entry_date: string; // ISO date string
   description?: string;

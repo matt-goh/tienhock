@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { IconPlus, IconSearch } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -42,6 +42,27 @@ const PaymentPage: React.FC = () => {
   const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(
     null
   );
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Deep link (e.g. from a journal's "View Source" button): /sales/payments?receipt=<id>
+  // opens that receipt's details dialog directly.
+  useEffect(() => {
+    const receiptParam = searchParams.get("receipt");
+    if (receiptParam) {
+      const receiptId = Number(receiptParam);
+      if (Number.isInteger(receiptId) && receiptId > 0) {
+        setSelectedReceiptId(receiptId);
+      }
+    }
+  }, [searchParams]);
+
+  const handleReceiptDialogClose = (): void => {
+    setSelectedReceiptId(null);
+    if (searchParams.has("receipt")) {
+      searchParams.delete("receipt");
+      setSearchParams(searchParams, { replace: true });
+    }
+  };
 
   const [filters, setFilters] = useState<PaymentFilters>(() => {
     const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -309,12 +330,12 @@ const PaymentPage: React.FC = () => {
       <ReceiptDetailsDialog
         isOpen={selectedReceiptId !== null}
         receiptId={selectedReceiptId}
-        onClose={() => setSelectedReceiptId(null)}
+        onClose={handleReceiptDialogClose}
         onConfirmed={async (): Promise<void> => {
           await fetchPayments();
         }}
         onCancelled={async (): Promise<void> => {
-          setSelectedReceiptId(null);
+          handleReceiptDialogClose();
           await fetchPayments();
         }}
         onReferenceUpdated={async (): Promise<void> => {
