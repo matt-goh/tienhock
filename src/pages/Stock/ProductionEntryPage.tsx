@@ -17,7 +17,7 @@ import BundleEntrySection, {
   BundleEntrySectionHandle,
 } from "../../components/Stock/BundleEntrySection";
 import ProductionHelpDialog from "../../components/Stock/ProductionHelpDialog";
-import DateNavigator from "../../components/DateNavigator";
+import TimeNavigator from "../../components/TimeNavigator";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import {
@@ -27,7 +27,6 @@ import {
   StockProduct,
 } from "../../types/types";
 import {
-  IconCalendar,
   IconStarFilled,
   IconSettings,
   IconHelpCircle,
@@ -642,24 +641,6 @@ const ProductionEntryPage: React.FC = () => {
     resetWorkerSearchOnProductChange(); // Clear search when changing product
   };
 
-  const handleDateNavigatorChange = (date: Date): void => {
-    setSelectedDate(formatDateLocal(date));
-  };
-
-  const handleDateInputChange = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ): void => {
-    const nextDate: string = event.target.value;
-    if (!nextDate) return;
-    setSelectedDate(nextDate);
-  };
-
-  const formatNavigatorDisplay = (date: Date): string => {
-    return date.toLocaleDateString("ms-MY", {
-      weekday: "long",
-    });
-  };
-
   const productionProductFilter = useCallback(
     (product: StockProduct): boolean =>
       product.type !== "OTH" || OTH_PRODUCTION_IDS.includes(product.id),
@@ -690,26 +671,19 @@ const ProductionEntryPage: React.FC = () => {
               Production Entry
             </h1>
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
-            <div className="flex items-center gap-2">
-              <IconCalendar
-                size={16}
-                className="text-default-500 dark:text-gray-400"
-              />
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={handleDateInputChange}
-                max={formatDateLocal(new Date())}
-                className="rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-              />
-              <DateNavigator
-                selectedDate={parseLocalDate(selectedDate)}
-                onChange={handleDateNavigatorChange}
-                showGoToTodayButton={false}
-                formatDisplay={formatNavigatorDisplay}
-                size="sm"
-              />
-            </div>
+            <TimeNavigator
+              range={{
+                start: parseLocalDate(selectedDate),
+                end: parseLocalDate(selectedDate),
+              }}
+              onChange={(nextRange) =>
+                setSelectedDate(formatDateLocal(nextRange.start))
+              }
+              modes={["day"]}
+              presets={false}
+              allowFuture={false}
+              size="sm"
+            />
             {/* Machine Rosak Toggle - only show when viewing a regular BH/MEE product */}
             {isViewingProduct && (selectedProduct?.type === "BH" || selectedProduct?.type === "MEE") && (
               <>
