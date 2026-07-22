@@ -346,6 +346,40 @@ const storeCustomerPage = (debtorsEndpoint: string, page: number): void => {
   }
 };
 
+// Salesman-view accordion expand/collapse state is likewise preserved per
+// company so it survives navigating away and back.
+const expandedSalesmenStorageKey = (debtorsEndpoint: string): string =>
+  `debtorsReport.expandedSalesmen:${debtorsEndpoint}`;
+
+const expandedCustomersStorageKey = (debtorsEndpoint: string): string =>
+  `debtorsReport.expandedCustomers:${debtorsEndpoint}`;
+
+// null = nothing stored yet (first visit); an array (even empty) is the
+// user's own accordion state.
+const readStoredExpandedSet = (storageKey: string): string[] | null => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const stored: string | null = window.localStorage.getItem(storageKey);
+    if (stored === null) return null;
+    const parsed: unknown = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return null;
+    return parsed.filter((id: unknown): id is string => typeof id === "string");
+  } catch (_error: unknown) {
+    return null;
+  }
+};
+
+const storeExpandedSet = (storageKey: string, expanded: Set<string>): void => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify([...expanded]));
+  } catch (_error: unknown) {
+    // Best-effort when browser storage is unavailable.
+  }
+};
+
 const calculateCustomerTotals = (customers: Customer[]): DebtorsTotals => {
   return customers.reduce<DebtorsTotals>(
     (totals: DebtorsTotals, customer: Customer): DebtorsTotals => ({
@@ -392,11 +426,21 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
   const [searchTerm, setSearchTerm] = useState<string>(() =>
     readStoredSearchTerm(config.debtorsEndpoint)
   );
+  // null = first visit: the fetch keeps its legacy expand-all-salesmen
+  // default; a stored array (even empty) is the user's own accordion state.
+  const [initialStoredSalesmen] = useState<string[] | null>(() =>
+    readStoredExpandedSet(expandedSalesmenStorageKey(config.debtorsEndpoint))
+  );
   const [expandedSalesmen, setExpandedSalesmen] = useState<Set<string>>(
-    new Set()
+    () => new Set(initialStoredSalesmen ?? [])
   );
   const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(
-    new Set()
+    () =>
+      new Set(
+        readStoredExpandedSet(
+          expandedCustomersStorageKey(config.debtorsEndpoint)
+        ) ?? []
+      )
   );
 
   // By Customer (default, an interactive Trade Debtor List over every
@@ -517,8 +561,14 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
 
         setDebtorsData(processedData);
 
-        const salesmenIds = data.salesmen.map((s: Salesman) => s.salesman_id);
-        setExpandedSalesmen(new Set(salesmenIds));
+        // First visit only: default to every salesman expanded. Once the
+        // user has their own stored accordion state it is left untouched.
+        if (initialStoredSalesmen === null) {
+          const salesmenIds = data.salesmen.map(
+            (s: Salesman) => s.salesman_id
+          );
+          setExpandedSalesmen(new Set(salesmenIds));
+        }
       } catch (err) {
         setError("Failed to fetch debtors data. Please try again later.");
         console.error("Error fetching debtors:", err);
@@ -526,7 +576,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
         setLoading(false);
       }
     },
-    [config.debtorsEndpoint]
+    [config.debtorsEndpoint, initialStoredSalesmen]
   );
 
   // Customer-view fetch: the general-statement endpoint with includeZero=1 so
@@ -592,6 +642,22 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
     appliedSearch,
     hideZeroBalances,
   ]);
+
+  // Preserve the salesman-view accordion state across navigations, keyed per
+  // company like the other report settings above.
+  useEffect(() => {
+    storeExpandedSet(
+      expandedSalesmenStorageKey(config.debtorsEndpoint),
+      expandedSalesmen
+    );
+  }, [expandedSalesmen, config.debtorsEndpoint]);
+
+  useEffect(() => {
+    storeExpandedSet(
+      expandedCustomersStorageKey(config.debtorsEndpoint),
+      expandedCustomers
+    );
+  }, [expandedCustomers, config.debtorsEndpoint]);
 
   // Preserve the scroll position across navigations (same pattern as the
   // Journal Entry list page), keyed per company. Ready once the active view
