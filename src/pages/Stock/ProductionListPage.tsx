@@ -695,7 +695,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(280px,420px)_minmax(240px,360px)_auto]">
+        <div className="mt-4 grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(280px,420px)_minmax(240px,1fr)_auto]">
           <div>
             <ProductSelector
               value={selectedProductId}
@@ -733,7 +733,8 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
               </button>
             </div>
           </div>
-          <div className="relative">            <IconSearch
+          <div className="relative">
+            <IconSearch
               className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-500"
               size={16}
             />
@@ -761,7 +762,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
             type="button"
             onClick={toggleAllExpanded}
             disabled={visibleProductKeys.length === 0}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-default-300 px-3 py-2 text-sm font-medium leading-5 text-default-700 transition-colors hover:bg-default-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+            className="inline-flex items-center justify-center gap-1.5 justify-self-start rounded-lg border border-default-300 px-3 py-2 text-sm font-medium leading-5 text-default-700 transition-colors hover:bg-default-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700 sm:col-span-2 lg:col-span-1 lg:justify-self-end"
           >
             {areAllVisibleRowsExpanded ? (
               <IconChevronsUp size={15} />
