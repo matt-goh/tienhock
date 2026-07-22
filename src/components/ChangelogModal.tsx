@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-22",
+    ms: "Laporan Debtors kini dibuka dengan paparan \"By Customer\" yang menyenaraikan semua pelanggan — termasuk yang tiada baki tertunggak — lengkap dengan baki bawa ke hadapan, invois semasa, bayaran dan jumlah perlu dibayar bagi bulan terpilih. Setiap pelanggan mempunyai butang Statement dan Invoices, dan anda boleh bertukar kembali ke paparan \"By Salesman\" seperti sebelum ini. Tab Transactions pada halaman pelanggan juga kini mempunyai butang Statement dengan pemilih bulan untuk mencetak penyata akaun pelanggan.",
+    en: "The Debtors report now opens on a \"By Customer\" view listing every customer — including those with no outstanding balance — with the brought-forward balance, current invoices, payments and total due for the selected month. Each customer has Statement and Invoices buttons, and you can switch back to the \"By Salesman\" view as before.",
+  },
+  {
+    date: "2026-07-22",
     ms: "Jelly Polly kini mempunyai halaman Account Ledger di bawah Accounting untuk menyemak lejar penghutang setiap pelanggan. Pilih pelanggan dan tempoh untuk melihat baki bawa ke hadapan, invois, bayaran selesai, nota kredit/debit, baki berjalan dan jumlah penutup, kemudian buka dokumen sumber atau cetak laporan untuk membandingkannya dengan laporan Debtors. Bayaran automatik bagi bil tunai juga kini menggunakan tarikh invois supaya baki bulanan dipaparkan pada tempoh yang betul.",
     en: "Jelly Polly now has an Account Ledger page under Accounting for checking each customer's debtor ledger. Select a customer and period to see the brought-forward balance, invoices, completed payments, credit/debit notes, running balance and closing total, then open the source documents or print the report for comparison with the Debtors report. Automatic cash-bill payments now also use the invoice date so monthly balances appear in the correct period.",
   },
