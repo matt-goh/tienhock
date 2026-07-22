@@ -29,6 +29,100 @@ interface CacheData {
   timestamp: number;
 }
 
+const CACHE_KEY = "jpPayCodeData";
+const CACHE_DURATION = 1 * 60 * 60 * 1000; // 1 hour in milliseconds
+
+// Module-level memory cache + shared in-flight request so multiple mounted
+// consumers (and React StrictMode's double effect in dev) share one fetch
+// instead of each firing their own set of API calls.
+let memoryCache: CacheData | null = null;
+let pendingRequest: Promise<CacheData> | null = null;
+
+const getFreshCachedData = (): CacheData | null => {
+  const now: number = Date.now();
+
+  if (memoryCache && now - memoryCache.timestamp < CACHE_DURATION) {
+    return memoryCache;
+  }
+
+  try {
+    const cachedData: string | null = localStorage.getItem(CACHE_KEY);
+    if (!cachedData) return null;
+
+    const parsedData: CacheData = JSON.parse(cachedData) as CacheData;
+    if (now - parsedData.timestamp < CACHE_DURATION) {
+      memoryCache = parsedData;
+      return parsedData;
+    }
+  } catch (err) {
+    console.error("Error reading from localStorage:", err);
+  }
+
+  return null;
+};
+
+const saveCache = (cacheData: CacheData): void => {
+  memoryCache = cacheData;
+
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+  } catch (err) {
+    console.error("Error saving to localStorage:", err);
+  }
+};
+
+const fetchFromApi = async (): Promise<CacheData> => {
+  // Fetch job mappings
+  const response = await api.get("/jellypolly/api/job-pay-codes/all-mappings");
+
+  // Fetch employee mappings
+  const employeeResponse = await api.get(
+    "/jellypolly/api/employee-pay-codes/all-mappings"
+  );
+
+  // Fetch product mappings
+  const productResponse = await api.get(
+    "/jellypolly/api/product-pay-codes/all-mappings"
+  );
+
+  if (!response || !response.payCodes || !response.detailedMappings) {
+    throw new Error("Invalid response format from API");
+  }
+
+  const cacheData: CacheData = {
+    detailedMappings: response.detailedMappings,
+    employeeMappings: employeeResponse.detailedMappings || {},
+    productMappings: productResponse.detailedMappings || {},
+    payCodes: response.payCodes,
+    timestamp: Date.now(),
+  };
+  saveCache(cacheData);
+  return cacheData;
+};
+
+const getDataRequest = (force: boolean): Promise<CacheData> => {
+  if (!force && pendingRequest) {
+    return pendingRequest;
+  }
+
+  const request: Promise<CacheData> = fetchFromApi();
+  pendingRequest = request;
+  request.then(
+    (): void => {
+      if (pendingRequest === request) {
+        pendingRequest = null;
+      }
+    },
+    (): void => {
+      if (pendingRequest === request) {
+        pendingRequest = null;
+      }
+    }
+  );
+
+  return request;
+};
+
 export const useJPJobPayCodeMappings = () => {
   const [detailedMappings, setDetailedMappings] =
     useState<DetailedJobPayCodeMap>({});
@@ -40,10 +134,8 @@ export const useJPJobPayCodeMappings = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const CACHE_KEY = "jpPayCodeData";
-  const CACHE_DURATION = 1 * 60 * 60 * 1000; // 1 hour in milliseconds
-
   const clearCache = useCallback(() => {
+    memoryCache = null;
     try {
       localStorage.removeItem(CACHE_KEY);
     } catch (err) {
@@ -51,78 +143,42 @@ export const useJPJobPayCodeMappings = () => {
     }
   }, []);
 
-  const fetchData = useCallback(async (force = false) => {
-    // If forcing refresh, clear cache first
-    if (force) {
-      clearCache();
-    } else {
-      // Try to load from cache
-      try {
-        const cachedData = localStorage.getItem(CACHE_KEY);
-        if (cachedData) {
-          const parsedData = JSON.parse(cachedData) as CacheData;
-          const now = Date.now();
+  const applyCacheData = useCallback((cacheData: CacheData): void => {
+    setDetailedMappings(cacheData.detailedMappings);
+    setPayCodes(cacheData.payCodes);
+    setEmployeeMappings(cacheData.employeeMappings || {});
+    setProductMappings(cacheData.productMappings || {});
+  }, []);
 
-          if (now - parsedData.timestamp < CACHE_DURATION) {
-            setDetailedMappings(parsedData.detailedMappings);
-            setPayCodes(parsedData.payCodes);
-            setEmployeeMappings(parsedData.employeeMappings || {});
-            setProductMappings(parsedData.productMappings || {});
-            setLoading(false);
-            return;
-          }
-        }
-      } catch (err) {
-        console.error("Error reading from localStorage:", err);
-      }
-    }
-
-    setLoading(true);
-    try {
-      // Fetch job mappings
-      const response = await api.get("/jellypolly/api/job-pay-codes/all-mappings");
-
-      // Fetch employee mappings
-      const employeeResponse = await api.get(
-        "/jellypolly/api/employee-pay-codes/all-mappings"
-      );
-
-      // Fetch product mappings
-      const productResponse = await api.get(
-        "/jellypolly/api/product-pay-codes/all-mappings"
-      );
-
-      if (response && response.payCodes && response.detailedMappings) {
-        setPayCodes(response.payCodes);
-        setDetailedMappings(response.detailedMappings);
-        setEmployeeMappings(employeeResponse.detailedMappings || {});
-        setProductMappings(productResponse.detailedMappings || {});
-
-        // Cache the data
-        try {
-          const cacheData: CacheData = {
-            detailedMappings: response.detailedMappings,
-            employeeMappings: employeeResponse.detailedMappings || {},
-            productMappings: productResponse.detailedMappings || {},
-            payCodes: response.payCodes,
-            timestamp: Date.now(),
-          };
-          localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
-        } catch (err) {
-          console.error("Error saving to localStorage:", err);
-        }
+  const fetchData = useCallback(
+    async (force = false) => {
+      // If forcing refresh, clear cache first
+      if (force) {
+        clearCache();
       } else {
-        throw new Error("Invalid response format from API");
+        const cachedData: CacheData | null = getFreshCachedData();
+        if (cachedData) {
+          applyCacheData(cachedData);
+          setLoading(false);
+          setError(null);
+          return;
+        }
       }
 
-      setError(null);
-    } catch (err: any) {
-      console.error("Error fetching pay code data:", err);
-      setError(err.message || "Failed to fetch pay code data");
-    } finally {
-      setLoading(false);
-    }
-  }, [clearCache]);
+      setLoading(true);
+      try {
+        const cacheData: CacheData = await getDataRequest(force);
+        applyCacheData(cacheData);
+        setError(null);
+      } catch (err: any) {
+        console.error("Error fetching pay code data:", err);
+        setError(err.message || "Failed to fetch pay code data");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [applyCacheData, clearCache]
+  );
 
   // Load data on initial render
   useEffect(() => {
