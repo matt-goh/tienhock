@@ -553,7 +553,7 @@ export default function (pool, config) {
   // GET /api/debtors/general-statement - Get general debtor list for all customers
   // Shows all customers with any outstanding debt up to the specified month
   router.get("/general-statement", async (req, res) => {
-    const { month, year } = req.query;
+    const { month, year, includeZero } = req.query;
 
     // Default to current month if not provided
     const now = new Date();
@@ -716,8 +716,40 @@ export default function (pool, config) {
       });
 
       // The printed body lists only nonzero closes; the totals row above still
-      // aggregates the omitted zero-close rows.
-      const customers = allCustomers.filter((c) => Math.abs(c.total_due) > 0.005);
+      // aggregates the omitted zero-close rows. includeZero=1 (the interactive
+      // By Customer view) returns the full population instead.
+      let customers =
+        includeZero === "1"
+          ? allCustomers
+          : allCustomers.filter((c) => Math.abs(c.total_due) > 0.005);
+
+      // Interactive By Customer view extras (includeZero=1): server-side
+      // search, zero-balance filter and pagination over the full population.
+      // The totals above always aggregate every customer (legacy behaviour).
+      let totalCustomers = customers.length;
+      let page = 1;
+      if (includeZero === "1") {
+        const search = String(req.query.search || "")
+          .trim()
+          .toLowerCase();
+        if (search) {
+          customers = customers.filter(
+            (c) =>
+              c.account_no.toLowerCase().includes(search) ||
+              c.particular.toLowerCase().includes(search)
+          );
+        }
+        if (req.query.hideZero === "1") {
+          customers = customers.filter((c) => Math.abs(c.total_due) > 0.005);
+        }
+        totalCustomers = customers.length;
+        if (req.query.page || req.query.limit) {
+          const limit = Math.max(1, parseInt(req.query.limit, 10) || 100);
+          const maxPage = Math.max(1, Math.ceil(totalCustomers / limit));
+          page = Math.min(Math.max(1, parseInt(req.query.page, 10) || 1), maxPage);
+          customers = customers.slice((page - 1) * limit, page * limit);
+        }
+      }
 
       for (const key of Object.keys(totals)) {
         totals[key] = roundMoney(totals[key]);
@@ -730,6 +762,8 @@ export default function (pool, config) {
         statement_year: yearInt,
         customers,
         totals,
+        total_customers: totalCustomers,
+        page,
       });
     } catch (error) {
       console.error("Error fetching general statement:", error);

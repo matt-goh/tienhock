@@ -8,15 +8,21 @@ import pdfMake from "pdfmake/build/pdfmake";
 import * as pdfFonts from "pdfmake/build/vfs_fonts";
 import { TDocumentDefinitions, TableCell, Content } from "pdfmake/interfaces";
 import TienHockLogo from "../tienhock.png";
-import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
+import {
+  type CompanyInfo,
+  TIENHOCK_INFO,
+} from "../invoice/einvoice/companyInfo";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
 
 // Initialize pdfmake with the bundled fonts (same pattern as PaySlipPDFMake)
 (pdfMake as any).vfs = (pdfFonts as any).pdfMake?.vfs || pdfFonts;
 
 export interface AccountLedgerTransaction {
-  line_id: number;
-  journal_entry_id: number;
+  line_id: number | string;
+  journal_entry_id?: number | null;
+  source_type?: string;
+  source_id?: string;
+  invoice_id?: string;
   reference_no: string;
   entry_type: string;
   entry_date: string; // yyyy-MM-dd
@@ -116,7 +122,12 @@ const loadLogoDataUrl = async (): Promise<string | null> => {
 const buildDocDefinition = (
   data: AccountLedgerData,
   logoDataUrl: string | null,
-  reportTitle: string
+  reportTitle: string,
+  companyInfo: CompanyInfo,
+  companyName: string,
+  referenceLabel: string,
+  chequeLabel: string,
+  derivedOpeningLabel: string
 ): TDocumentDefinitions => {
   // Calendar months keep the "June 2026" label; arbitrary ranges show the dates.
   const periodLabel =
@@ -126,9 +137,9 @@ const buildDocDefinition = (
 
   const headerRow: TableCell[] = [
     { text: "DATE", style: "th" },
-    { text: "JOURNAL", style: "th" },
+    { text: referenceLabel, style: "th" },
     { text: "PARTICULARS", style: "th" },
-    { text: "CHEQUE", style: "th" },
+    { text: chequeLabel, style: "th" },
     { text: "DEBIT (RM)", style: "th", alignment: "right" },
     { text: "CREDIT (RM)", style: "th", alignment: "right" },
     { text: "BALANCE (RM)", style: "th", alignment: "right" },
@@ -201,11 +212,11 @@ const buildDocDefinition = (
       {
         width: "*",
         stack: [
-          { text: TIENHOCK_INFO.name, style: "companyName" },
-          { text: `(${TIENHOCK_INFO.reg_no})`, style: "companyDetail" },
-          { text: TIENHOCK_INFO.address_pdf, style: "companyDetail" },
+          { text: companyName, style: "companyName" },
+          { text: `(${companyInfo.reg_no})`, style: "companyDetail" },
+          { text: companyInfo.address_pdf, style: "companyDetail" },
           {
-            text: `Tel: ${TIENHOCK_INFO.phone}  ·  Email: ${TIENHOCK_INFO.email}`,
+            text: `Tel: ${companyInfo.phone}  ·  Email: ${companyInfo.email}`,
             style: "companyDetail",
           },
         ],
@@ -246,7 +257,7 @@ const buildDocDefinition = (
   const openingNote =
     data.opening_source?.type === "anchored"
       ? `Anchored as of ${fmtDate(data.opening_source.as_of_date)}`
-      : "Derived from prior postings";
+      : derivedOpeningLabel;
 
   const summaryStrip: Content = {
     table: {
@@ -284,7 +295,7 @@ const buildDocDefinition = (
   return {
     info: {
       title: `${reportTitle} ${data.account.code} ${periodLabel}`,
-      author: TIENHOCK_INFO.name,
+      author: companyName,
     },
     pageSize: "A4",
     pageOrientation: "portrait",
@@ -367,11 +378,35 @@ const buildDocDefinition = (
 // fallback opens the blob URL in a new tab instead.
 export const generateAccountLedgerPDF = async (
   data: AccountLedgerData,
-  options?: { title?: string }
+  options?: {
+    title?: string;
+    companyInfo?: CompanyInfo;
+    companyName?: string;
+    includeLogo?: boolean;
+    referenceLabel?: string;
+    chequeLabel?: string;
+    derivedOpeningLabel?: string;
+  }
 ): Promise<void> => {
-  const logoDataUrl = await loadLogoDataUrl();
+  const companyInfo: CompanyInfo = options?.companyInfo || TIENHOCK_INFO;
+  const companyName: string = options?.companyName || companyInfo.name;
+  const referenceLabel: string = options?.referenceLabel || "JOURNAL";
+  const chequeLabel: string = options?.chequeLabel || "CHEQUE";
+  const derivedOpeningLabel: string =
+    options?.derivedOpeningLabel || "Derived from prior postings";
+  const logoDataUrl: string | null =
+    options?.includeLogo !== false ? await loadLogoDataUrl() : null;
   const reportTitle: string = options?.title || "Bank Statement";
-  const docDefinition = buildDocDefinition(data, logoDataUrl, reportTitle);
+  const docDefinition = buildDocDefinition(
+    data,
+    logoDataUrl,
+    reportTitle,
+    companyInfo,
+    companyName,
+    referenceLabel,
+    chequeLabel,
+    derivedOpeningLabel
+  );
 
   const pdfBlob: Blob = await new Promise<Blob>((resolve) => {
     pdfMake.createPdf(docDefinition).getBlob(resolve);

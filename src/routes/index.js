@@ -49,7 +49,6 @@ import journalVouchersRouter from "./accounting/journal-vouchers.js";
 import financialReportsRouter from "./accounting/financial-reports.js";
 import bankStatementRouter from "./accounting/bank-statement.js";
 import openingBalancesRouter from "./accounting/opening-balances.js";
-import payrollPaymentsRouter from "./accounting/payroll-payments.js";
 import materialsRouter from "./accounting/materials.js";
 import suppliersRouter from "./accounting/suppliers.js";
 import purchaseInvoicesRouter from "./accounting/purchase-invoices.js";
@@ -115,6 +114,7 @@ import jellypollyInvoiceRouter from "./jellypolly/invoices.js";
 import jellypollyPaymentRouter from "./jellypolly/payments.js";
 import jellypollyEInvoiceRouter from "./jellypolly/e-invoices.js";
 import jellypollyDebtorsRouter from "./jellypolly/debtors.js";
+import jellypollyAccountLedgerRouter from "./jellypolly/account-ledger.js";
 import jellypollyAdjustmentDocsRouter from "./jellypolly/adjustment-docs.js";
 import jellypollyMonthlyPayrollsRouter from "./jellypolly/monthly-payrolls.js";
 import jellypollyEmployeePayrollsRouter from "./jellypolly/employee-payrolls.js";
@@ -218,7 +218,6 @@ export default function setupRoutes(app, pool) {
   app.use("/api/financial-reports", financialReportsRouter(pool));
   app.use("/api/bank-statement", bankStatementRouter(pool));
   app.use("/api/opening-balances", openingBalancesRouter(pool));
-  app.use("/api/payroll-payments", payrollPaymentsRouter(pool));
   app.use("/api/materials", materialsRouter(pool));
   app.use("/api/suppliers", suppliersRouter(pool));
   app.use("/api/purchase-invoices", purchaseInvoicesRouter(pool));
@@ -348,6 +347,12 @@ export default function setupRoutes(app, pool) {
     jellypollyEInvoiceRouter(pool, myInvoisJPConfig)
   );
   app.use("/jellypolly/api/debtors", jellypollyDebtorsRouter(pool));
+  app.use(
+    "/jellypolly/api/account-ledger",
+    authMiddleware(pool),
+    checkRestoreState,
+    jellypollyAccountLedgerRouter(pool)
+  );
   app.use(
     "/jellypolly/api/adjustment-docs",
     jellypollyAdjustmentDocsRouter(pool, myInvoisJPConfig)

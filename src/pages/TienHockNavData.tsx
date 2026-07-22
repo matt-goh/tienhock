@@ -18,7 +18,6 @@ import JournalEntryListPage from "./Accounting/JournalEntryListPage";
 import JournalEntryPage from "./Accounting/JournalEntryPage";
 import JournalDetailsPage from "./Accounting/JournalDetailsPage";
 import VoucherGeneratorPage from "./Accounting/VoucherGeneratorPage";
-import PayrollPaymentPage from "./Accounting/PayrollPaymentPage";
 import BankInPage from "./Accounting/BankInPage";
 
 // Accounting - Location Mappings
@@ -392,12 +391,6 @@ export const TienHockNavData: SidebarItem[] = [
         name: "Voucher Generator",
         path: "/accounting/voucher-generator",
         component: VoucherGeneratorPage,
-        group: "Generation",
-      },
-      {
-        name: "Payroll Bank Payment",
-        path: "/accounting/payroll-payment",
-        component: PayrollPaymentPage,
         group: "Generation",
       },
       {
