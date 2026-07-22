@@ -22,6 +22,7 @@ import {
   ProductionWorkerOrderResponse,
   ProductionWorkerOrderScope,
 } from "../../types/types";
+import { DEFAULT_WORKER_ORDERS } from "../../config/workerOrderDefaults";
 import Button from "../Button";
 
 const sortWorkersWithOrder = (
@@ -308,14 +309,22 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
         );
 
         if (isCurrent) {
-          applyWorkerOrderIds(response.worker_ids);
-          cacheWorkerOrder(workerOrderScope, response.worker_ids);
+          // Saved DB order wins; fall back to the baked-in default order
+          // when the scope has no saved order.
+          const effectiveWorkerIds: string[] =
+            response.worker_ids.length > 0
+              ? response.worker_ids
+              : DEFAULT_WORKER_ORDERS[workerOrderScope] || [];
+          applyWorkerOrderIds(effectiveWorkerIds);
+          cacheWorkerOrder(workerOrderScope, effectiveWorkerIds);
         }
       } catch (error) {
         console.error("Error fetching worker order:", error);
         if (isCurrent) {
           if (!cachedWorkerOrderIds) {
-            applyWorkerOrderIds([]);
+            applyWorkerOrderIds(
+              DEFAULT_WORKER_ORDERS[workerOrderScope] || []
+            );
           }
         }
       } finally {
