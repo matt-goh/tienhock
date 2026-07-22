@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   IconDownload,
   IconChevronDown,
+  IconChevronLeft,
   IconChevronRight,
   IconChevronsDown,
   IconChevronsUp,
@@ -101,6 +102,35 @@ interface DebtorsTotals {
   totalBalance: number;
 }
 
+// Row shape of the general-statement endpoint (also used by GeneralStatementPDF).
+interface CustomerListRow {
+  account_no: string;
+  particular: string;
+  bal_bf: number;
+  current_invoices: number;
+  payment: number;
+  total_due: number;
+}
+
+interface CustomerListTotals {
+  bal_bf: number;
+  current_invoices: number;
+  payment: number;
+  total_due: number;
+}
+
+interface CustomerListData {
+  statement_date: string;
+  statement_month: number;
+  statement_year: number;
+  customers: CustomerListRow[];
+  totals: CustomerListTotals;
+  total_customers: number;
+  page: number;
+}
+
+type DebtorsViewMode = "customer" | "salesman";
+
 export interface DebtorsReportPageConfig {
   debtorsEndpoint: string;
   statementEndpoint: (
@@ -191,6 +221,130 @@ const storeSelectedMonth = (debtorsEndpoint: string, date: Date): void => {
   }
 };
 
+// Keyed by the endpoint so each company's report keeps its own last-used view.
+const viewModeStorageKey = (debtorsEndpoint: string): string =>
+  `debtorsReport.viewMode:${debtorsEndpoint}`;
+
+const readStoredViewMode = (debtorsEndpoint: string): DebtorsViewMode => {
+  if (typeof window === "undefined") return "customer";
+
+  try {
+    const stored: string | null = window.localStorage.getItem(
+      viewModeStorageKey(debtorsEndpoint)
+    );
+    return stored === "salesman" ? "salesman" : "customer";
+  } catch (_error: unknown) {
+    return "customer";
+  }
+};
+
+const storeViewMode = (
+  debtorsEndpoint: string,
+  mode: DebtorsViewMode
+): void => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(viewModeStorageKey(debtorsEndpoint), mode);
+  } catch (_error: unknown) {
+    // View preservation is best-effort when browser storage is unavailable.
+  }
+};
+
+// Search term and zero-balance filter are likewise preserved per company so
+// they survive navigating away and back.
+const searchTermStorageKey = (debtorsEndpoint: string): string =>
+  `debtorsReport.searchTerm:${debtorsEndpoint}`;
+
+const readStoredSearchTerm = (debtorsEndpoint: string): string => {
+  if (typeof window === "undefined") return "";
+
+  try {
+    return (
+      window.localStorage.getItem(searchTermStorageKey(debtorsEndpoint)) ?? ""
+    );
+  } catch (_error: unknown) {
+    return "";
+  }
+};
+
+const storeSearchTerm = (debtorsEndpoint: string, value: string): void => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(searchTermStorageKey(debtorsEndpoint), value);
+  } catch (_error: unknown) {
+    // Best-effort when browser storage is unavailable.
+  }
+};
+
+const hideZeroBalancesStorageKey = (debtorsEndpoint: string): string =>
+  `debtorsReport.hideZeroBalances:${debtorsEndpoint}`;
+
+const readStoredHideZeroBalances = (debtorsEndpoint: string): boolean => {
+  if (typeof window === "undefined") return true;
+
+  try {
+    const stored: string | null = window.localStorage.getItem(
+      hideZeroBalancesStorageKey(debtorsEndpoint)
+    );
+    // Zero balances are hidden by default until the user toggles them on.
+    return stored === null ? true : stored === "1";
+  } catch (_error: unknown) {
+    return true;
+  }
+};
+
+const storeHideZeroBalances = (
+  debtorsEndpoint: string,
+  hide: boolean
+): void => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(
+      hideZeroBalancesStorageKey(debtorsEndpoint),
+      hide ? "1" : "0"
+    );
+  } catch (_error: unknown) {
+    // Best-effort when browser storage is unavailable.
+  }
+};
+
+// By Customer view pagination: fixed 100 rows per page, current page kept per
+// company so it survives navigating away and back.
+const CUSTOMER_PAGE_LIMIT = 100;
+
+const customerPageStorageKey = (debtorsEndpoint: string): string =>
+  `debtorsReport.customerPage:${debtorsEndpoint}`;
+
+const readStoredCustomerPage = (debtorsEndpoint: string): number => {
+  if (typeof window === "undefined") return 1;
+
+  try {
+    const stored: string | null = window.localStorage.getItem(
+      customerPageStorageKey(debtorsEndpoint)
+    );
+    const page: number = stored ? Number.parseInt(stored, 10) : 1;
+    return Number.isFinite(page) && page > 0 ? page : 1;
+  } catch (_error: unknown) {
+    return 1;
+  }
+};
+
+const storeCustomerPage = (debtorsEndpoint: string, page: number): void => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(
+      customerPageStorageKey(debtorsEndpoint),
+      String(page)
+    );
+  } catch (_error: unknown) {
+    // Best-effort when browser storage is unavailable.
+  }
+};
+
 const calculateCustomerTotals = (customers: Customer[]): DebtorsTotals => {
   return customers.reduce<DebtorsTotals>(
     (totals: DebtorsTotals, customer: Customer): DebtorsTotals => ({
@@ -234,13 +388,76 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
   const [debtorsData, setDebtorsData] = useState<DebtorsData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState<string>(() =>
+    readStoredSearchTerm(config.debtorsEndpoint)
+  );
   const [expandedSalesmen, setExpandedSalesmen] = useState<Set<string>>(
     new Set()
   );
   const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(
     new Set()
   );
+
+  // By Customer (default, an interactive Trade Debtor List over every
+  // customer incl. zero balances) vs the salesman-grouped outstanding view.
+  const [viewMode, setViewMode] = useState<DebtorsViewMode>(() =>
+    readStoredViewMode(config.debtorsEndpoint)
+  );
+  const [customerListData, setCustomerListData] =
+    useState<CustomerListData | null>(null);
+  // Starts true when the customer view is the initial view so the first
+  // render shows the spinner instead of a one-frame error flash.
+  const [customerListLoading, setCustomerListLoading] = useState<boolean>(
+    () => readStoredViewMode(config.debtorsEndpoint) === "customer"
+  );
+  const [customerListError, setCustomerListError] = useState<string | null>(
+    null
+  );
+  const [hideZeroBalances, setHideZeroBalances] = useState<boolean>(() =>
+    readStoredHideZeroBalances(config.debtorsEndpoint)
+  );
+  const [customerPage, setCustomerPage] = useState<number>(() =>
+    readStoredCustomerPage(config.debtorsEndpoint)
+  );
+  // Search only applies when the input loses focus (or Enter is pressed), so
+  // typing does not fire the (ledger-heavy) customer-list fetch per keystroke.
+  const [appliedSearch, setAppliedSearch] = useState<string>(searchTerm);
+
+  const handleSearchChange = (value: string): void => {
+    setSearchTerm(value);
+    storeSearchTerm(config.debtorsEndpoint, value);
+  };
+
+  const commitSearch = (): void => {
+    if (searchTerm === appliedSearch) return;
+    setAppliedSearch(searchTerm);
+    setCustomerPage(1);
+    storeCustomerPage(config.debtorsEndpoint, 1);
+  };
+
+  const handleClearSearch = (): void => {
+    handleSearchChange("");
+    if (appliedSearch !== "") {
+      setAppliedSearch("");
+      setCustomerPage(1);
+      storeCustomerPage(config.debtorsEndpoint, 1);
+    }
+  };
+
+  const handleHideZeroBalancesToggle = (): void => {
+    setHideZeroBalances((prev: boolean): boolean => {
+      const next: boolean = !prev;
+      storeHideZeroBalances(config.debtorsEndpoint, next);
+      return next;
+    });
+    setCustomerPage(1);
+    storeCustomerPage(config.debtorsEndpoint, 1);
+  };
+
+  const handleCustomerPageChange = (page: number): void => {
+    setCustomerPage(page);
+    storeCustomerPage(config.debtorsEndpoint, page);
+  };
 
   // Month selection state, restored from the last month this report was viewed
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
@@ -311,8 +528,51 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
     [config.debtorsEndpoint]
   );
 
-  // Initial data fetch for the restored (or current) month
+  // Customer-view fetch: the general-statement endpoint with includeZero=1 so
+  // every customer appears, server-side searched/filtered and paginated.
+  const fetchCustomerList = useCallback(
+    async (params: {
+      month: number;
+      year: number;
+      page: number;
+      search: string;
+      hideZero: boolean;
+    }): Promise<void> => {
+      try {
+        setCustomerListLoading(true);
+        setCustomerListError(null);
+
+        const url =
+          `${config.generalStatementEndpoint(params.month, params.year)}` +
+          `&includeZero=1&page=${params.page}&limit=${CUSTOMER_PAGE_LIMIT}` +
+          `&search=${encodeURIComponent(params.search)}` +
+          (params.hideZero ? "&hideZero=1" : "");
+        const data = await api.get(url);
+        setCustomerListData(data);
+      } catch (err) {
+        setCustomerListError(
+          "Failed to fetch customer list. Please try again later."
+        );
+        console.error("Error fetching customer list:", err);
+      } finally {
+        setCustomerListLoading(false);
+      }
+    },
+    [config.generalStatementEndpoint]
+  );
+
+  // Fetch the active view's dataset for the selected month
   useEffect(() => {
+    if (viewMode === "customer") {
+      fetchCustomerList({
+        month: selectedMonth.getMonth() + 1,
+        year: selectedMonth.getFullYear(),
+        page: customerPage,
+        search: appliedSearch,
+        hideZero: hideZeroBalances,
+      });
+      return;
+    }
     if (allTimeMode) {
       fetchDebtors();
     } else {
@@ -321,7 +581,33 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
         year: selectedMonth.getFullYear(),
       });
     }
-  }, [fetchDebtors, selectedMonth, allTimeMode]);
+  }, [
+    fetchDebtors,
+    fetchCustomerList,
+    selectedMonth,
+    allTimeMode,
+    viewMode,
+    customerPage,
+    appliedSearch,
+    hideZeroBalances,
+  ]);
+
+  // Switch between the By Customer and By Salesman views
+  const handleViewModeChange = useCallback(
+    (mode: DebtorsViewMode): void => {
+      if (mode === viewMode) return;
+      if (mode === "customer") {
+        // All Time has no meaning for the month-as-at customer list.
+        setAllTimeMode(false);
+        // The effect refetches on the viewMode change; show the spinner
+        // immediately so stale/no data never flashes the error block.
+        setCustomerListLoading(true);
+      }
+      setViewMode(mode);
+      storeViewMode(config.debtorsEndpoint, mode);
+    },
+    [viewMode, config.debtorsEndpoint]
+  );
 
   // Handle month selection change from MonthNavigator
   const handleMonthChange = useCallback(
@@ -339,6 +625,16 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
   }, []);
 
   const handleRefresh = () => {
+    if (viewMode === "customer") {
+      fetchCustomerList({
+        month: selectedMonth.getMonth() + 1,
+        year: selectedMonth.getFullYear(),
+        page: customerPage,
+        search: appliedSearch,
+        hideZero: hideZeroBalances,
+      });
+      return;
+    }
     if (allTimeMode) {
       fetchDebtors();
     } else {
@@ -510,7 +806,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
   };
 
   const handlePrint = async (): Promise<void> => {
-    if (!debtorsData) return;
+    if (!filteredData) return;
     try {
       const loadingToast = toast.loading("Generating PDF...");
       const filterName = allTimeMode
@@ -531,7 +827,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
     }
   };
 
-  const handlePrintStatement = async (customer: Customer): Promise<void> => {
+  const handlePrintStatement = async (customerId: string): Promise<void> => {
     if (allTimeMode) {
       toast.error("Please select a specific month to print statement");
       return;
@@ -543,7 +839,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
       const year = selectedMonth.getFullYear();
 
       const statementData = await api.get(
-        config.statementEndpoint(customer.customer_id, month, year)
+        config.statementEndpoint(customerId, month, year)
       );
 
       await generateCustomerStatementPDF(statementData, "print", {
@@ -615,7 +911,18 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
     return filtered;
   };
 
-  if (loading) {
+  const isCustomerView: boolean = viewMode === "customer";
+  const activeLoading: boolean = isCustomerView
+    ? customerListLoading
+    : loading;
+  const activeError: string | null = isCustomerView
+    ? customerListError
+    : error;
+  const activeDataMissing: boolean = isCustomerView
+    ? !customerListData
+    : !debtorsData;
+
+  if (activeLoading) {
     return (
       <div className="flex justify-center items-center h-96">
         <LoadingSpinner />
@@ -623,14 +930,14 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
     );
   }
 
-  if (error || !debtorsData) {
+  if (activeError || activeDataMissing) {
     return (
       <div className="text-center py-12 border border-default-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
         <IconAlertCircle size={48} className="text-rose-500 dark:text-rose-400 mb-4 mx-auto" />
         <h3 className="text-lg font-medium text-default-800 dark:text-gray-100 mb-2">
           Error Loading Report
         </h3>
-        <p className="text-default-500 dark:text-gray-400 mb-6">{error}</p>
+        <p className="text-default-500 dark:text-gray-400 mb-6">{activeError}</p>
         <Button onClick={handleRefresh} icon={IconRefresh} variant="outline">
           Refresh
         </Button>
@@ -638,7 +945,33 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
     );
   }
 
-  const filteredData = filterData(debtorsData);
+  const filteredData: DebtorsData | null =
+    !isCustomerView && debtorsData ? filterData(debtorsData) : null;
+
+  // Customer-view rows arrive already searched, zero-filtered and paginated
+  // by the server (100 per page).
+  const customerRows: CustomerListRow[] = customerListData?.customers ?? [];
+  const customerTotalCount: number =
+    customerListData?.total_customers ?? customerRows.length;
+  const customerTotalPages: number = Math.max(
+    1,
+    Math.ceil(customerTotalCount / CUSTOMER_PAGE_LIMIT)
+  );
+  const customerCurrentPage: number = Math.min(
+    customerListData?.page ?? customerPage,
+    customerTotalPages
+  );
+
+  // Header stats follow the active view.
+  const statsTotal: number = isCustomerView
+    ? customerListData?.totals.current_invoices ?? 0
+    : filteredData?.grand_total_amount ?? 0;
+  const statsPaid: number = isCustomerView
+    ? customerListData?.totals.payment ?? 0
+    : filteredData?.grand_total_paid ?? 0;
+  const statsOutstanding: number = isCustomerView
+    ? customerListData?.totals.total_due ?? 0
+    : filteredData?.grand_total_balance ?? 0;
   const statementEndDateLabel: string = new Date(
     selectedMonth.getFullYear(),
     selectedMonth.getMonth() + 1,
@@ -649,6 +982,8 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
     year: "numeric",
   });
   const allDebtorsExpanded =
+    !isCustomerView &&
+    filteredData !== null &&
     filteredData.salesmen.length > 0 &&
     filteredData.salesmen.every(
       (salesman: Salesman): boolean => isSalesmanFullyExpanded(salesman)
@@ -657,13 +992,36 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
   return (
     <div className="space-y-3">
       {/* Header Row */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2 mb-3">
-        {/* Left side: Month Navigator + Stats */}
-        <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
+      <div className="flex flex-col lg:flex-row lg:flex-wrap justify-between items-start lg:items-center gap-2 mb-3">
+        {/* Left side: View Toggle + Month Navigator + Stats */}
+        <div className="flex flex-col md:flex-row md:flex-wrap md:items-center gap-2 md:gap-3">
+          {/* View Toggle */}
+          <div className="flex items-center rounded-full border border-default-300 dark:border-gray-600 overflow-hidden text-sm font-medium self-start">
+            <button
+              type="button"
+              onClick={() => handleViewModeChange("customer")}
+              className={`px-3 py-1 transition-colors whitespace-nowrap ${
+                isCustomerView
+                  ? "bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300"
+                  : "bg-default-50 dark:bg-gray-700 text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-600"
+              }`}
+            >
+              Customer
+            </button>
+            <button
+              type="button"
+              onClick={() => handleViewModeChange("salesman")}
+              className={`px-3 py-1 transition-colors whitespace-nowrap ${
+                !isCustomerView
+                  ? "bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300"
+                  : "bg-default-50 dark:bg-gray-700 text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-600"
+              }`}
+            >
+              Salesman
+            </button>
+          </div>
+
           <div className="flex items-center gap-2">
-            <span className="whitespace-nowrap text-xs font-medium text-default-500 dark:text-gray-400">
-              Invoice month
-            </span>
             <MonthNavigator
               selectedMonth={selectedMonth}
               onChange={handleMonthChange}
@@ -681,7 +1039,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
             <div className="flex items-center gap-1.5">
               <IconReceipt size={16} className="text-sky-600 dark:text-sky-400" />
               <span className="font-semibold text-default-700 dark:text-gray-200">
-                RM {formatCurrency(filteredData.grand_total_amount)}
+                RM {formatCurrency(statsTotal)}
               </span>
               <span className="text-default-400 dark:text-gray-400">total</span>
             </div>
@@ -689,7 +1047,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
             <div className="flex items-center gap-1.5">
               <IconCheck size={16} className="text-emerald-600 dark:text-emerald-400" />
               <span className="font-semibold text-emerald-700 dark:text-emerald-300">
-                RM {formatCurrency(filteredData.grand_total_paid)}
+                RM {formatCurrency(statsPaid)}
               </span>
               <span className="text-default-400 dark:text-gray-400">paid</span>
             </div>
@@ -697,76 +1055,88 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
             <div className="flex items-center gap-1.5">
               <IconAlertCircle size={16} className="text-rose-600 dark:text-rose-400" />
               <span className="font-semibold text-rose-700 dark:text-rose-300">
-                RM {formatCurrency(filteredData.grand_total_balance)}
+                RM {formatCurrency(statsOutstanding)}
               </span>
               <span className="text-default-400 dark:text-gray-400">outstanding</span>
             </div>
-            <span className="text-default-300 dark:text-gray-600">|</span>
-            {/* All Time Toggle */}
-            <button
-              onClick={handleAllTimeToggle}
-              className={`px-3 py-1 rounded-full border text-sm font-medium transition-colors whitespace-nowrap ${
-                allTimeMode
-                  ? "bg-sky-100 dark:bg-sky-900/40 border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-300"
-                  : "bg-default-50 dark:bg-gray-700 border-default-300 dark:border-gray-600 text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-600"
-              }`}
-            >
-              All Time
-            </button>
+            {!isCustomerView && (
+              <>
+                <span className="text-default-300 dark:text-gray-600">|</span>
+                {/* All Time Toggle */}
+                <button
+                  onClick={handleAllTimeToggle}
+                  className={`px-3 py-1 rounded-full border text-sm font-medium transition-colors whitespace-nowrap ${
+                    allTimeMode
+                      ? "bg-sky-100 dark:bg-sky-900/40 border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-300"
+                      : "bg-default-50 dark:bg-gray-700 border-default-300 dark:border-gray-600 text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-600"
+                  }`}
+                >
+                  All Time
+                </button>
+              </>
+            )}
           </div>
         </div>
 
         {/* Right side: Search + Actions */}
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
           <div className="relative">
             <input
               type="text"
               placeholder="Search customers..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              onBlur={commitSearch}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+              }}
+              autoFocus
               className="px-3 py-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-gray-900 dark:text-gray-100 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 w-[154px] placeholder-gray-400 dark:placeholder-gray-500"
             />
             {searchTerm && (
               <button
                 type="button"
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-300 transition-colors"
-                onClick={() => setSearchTerm("")}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={handleClearSearch}
                 title="Clear search"
               >
                 ×
               </button>
             )}
           </div>
-          <Button
-            onClick={() => toggleAllDebtors(filteredData.salesmen)}
-            variant="outline"
-            size="sm"
-            icon={allDebtorsExpanded ? IconChevronsUp : IconChevronsDown}
-          >
-            {allDebtorsExpanded ? "Collapse All" : "Expand All"}
-          </Button>
+          {!isCustomerView && filteredData && (
+            <Button
+              onClick={() => toggleAllDebtors(filteredData.salesmen)}
+              variant="outline"
+              size="sm"
+              icon={allDebtorsExpanded ? IconChevronsUp : IconChevronsDown}
+            >
+            </Button>
+          )}
           <Button
             onClick={handleRefresh}
             variant="outline"
             size="sm"
             icon={IconRefresh}
           >
-            Refresh
           </Button>
-          <Button
-            onClick={handlePrint}
-            size="sm"
-            icon={IconDownload}
-            disabled={loading}
-          >
-            Report
-          </Button>
+          {!isCustomerView && (
+            <Button
+              onClick={handlePrint}
+              size="sm"
+              icon={IconDownload}
+              disabled={loading}
+            >
+              Report
+            </Button>
+          )}
           <Button
             onClick={handlePrintGeneralStatement}
             size="sm"
             variant="outline"
             icon={IconReceipt}
-            disabled={loading || allTimeMode}
+            disabled={activeLoading || allTimeMode}
             title={allTimeMode ? "Select a specific month to print debtor list" : "Print debtor list for all customers"}
           >
             Debtor List
@@ -776,7 +1146,229 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
 
       {/* Report Content */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700">
-        {filteredData.salesmen.length === 0 ? (
+        {isCustomerView ? (
+          customerRows.length === 0 ? (
+            <div className="text-center py-8">
+              <IconUser size={48} className="text-default-400 dark:text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-default-800 dark:text-gray-100 mb-2">
+                No Results Found
+              </h3>
+              <p className="text-default-500 dark:text-gray-400">
+                {searchTerm
+                  ? "No customers match your search criteria."
+                  : hideZeroBalances
+                  ? "No customers with an outstanding balance for the selected period."
+                  : "No customers available for the selected period."}
+              </p>
+            </div>
+          ) : (
+            <div>
+              {/* List header: count + zero-balance filter */}
+              <div className="flex items-center justify-between flex-wrap gap-2 px-4 py-2.5 border-b border-default-200 dark:border-gray-700">
+                <p className="text-sm text-default-500 dark:text-gray-400">
+                  {customerTotalCount} customer
+                  {customerTotalCount !== 1 ? "s" : ""} • as at{" "}
+                  {customerListData?.statement_date}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleHideZeroBalancesToggle}
+                  className={`px-3 py-1 rounded-full border text-xs font-medium transition-colors whitespace-nowrap ${
+                    hideZeroBalances
+                      ? "bg-sky-100 dark:bg-sky-900/40 border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-300"
+                      : "bg-default-50 dark:bg-gray-700 border-default-300 dark:border-gray-600 text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-600"
+                  }`}
+                >
+                  {hideZeroBalances
+                    ? "Zero balances hidden"
+                    : "Hide zero balances"}
+                </button>
+              </div>
+
+              {/* Customer table */}
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="bg-default-100 dark:bg-gray-900/50">
+                      <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+                        Account No
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+                        Customer
+                      </th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+                        Bal B/F
+                      </th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+                        Current
+                      </th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+                        Payment
+                      </th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+                        Total Due
+                      </th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-default-200 dark:divide-gray-700">
+                    {customerRows.map((row: CustomerListRow) => {
+                      const isZeroBalance: boolean =
+                        Math.abs(row.total_due) <= 0.005;
+                      return (
+                        <tr
+                          key={row.account_no}
+                          className={`hover:bg-default-50 dark:hover:bg-gray-700 ${
+                            isZeroBalance
+                              ? "text-default-400 dark:text-gray-500"
+                              : "text-default-800 dark:text-gray-100"
+                          }`}
+                        >
+                          <td className="px-3 py-2 font-medium whitespace-nowrap">
+                            {row.account_no}
+                          </td>
+                          <td className="px-3 py-2">
+                            <span
+                              className={`font-medium hover:text-sky-600 dark:hover:text-sky-400 hover:underline cursor-pointer ${
+                                isZeroBalance
+                                  ? "text-default-500 dark:text-gray-400"
+                                  : ""
+                              }`}
+                              title={row.particular}
+                              onClick={() =>
+                                navigate(
+                                  config.customerDetailsPath(row.account_no)
+                                )
+                              }
+                            >
+                              {row.particular}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-right whitespace-nowrap">
+                            RM {formatCurrency(row.bal_bf)}
+                          </td>
+                          <td className="px-3 py-2 text-right whitespace-nowrap">
+                            RM {formatCurrency(row.current_invoices)}
+                          </td>
+                          <td
+                            className={`px-3 py-2 text-right whitespace-nowrap ${
+                              isZeroBalance
+                                ? ""
+                                : "text-emerald-600 dark:text-emerald-400"
+                            }`}
+                          >
+                            RM {formatCurrency(row.payment)}
+                          </td>
+                          <td
+                            className={`px-3 py-2 text-right font-medium whitespace-nowrap ${
+                              isZeroBalance
+                                ? ""
+                                : "text-rose-600 dark:text-rose-400"
+                            }`}
+                          >
+                            RM {formatCurrency(row.total_due)}
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                icon={IconFileText}
+                                title={`Print statement as at ${statementEndDateLabel}`}
+                                onClick={() =>
+                                  handlePrintStatement(row.account_no)
+                                }
+                              >
+                                Statement
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() =>
+                                  handleCustomerClick(row.account_no)
+                                }
+                              >
+                                Invoices
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination bar */}
+              {customerTotalPages > 1 && (
+                <div className="flex items-center justify-between flex-wrap gap-2 px-4 py-2.5 border-t border-default-200 dark:border-gray-700">
+                  <p className="text-sm text-default-500 dark:text-gray-400">
+                    Page {customerCurrentPage} of {customerTotalPages}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      icon={IconChevronLeft}
+                      disabled={customerCurrentPage <= 1}
+                      onClick={() =>
+                        handleCustomerPageChange(customerCurrentPage - 1)
+                      }
+                    >
+                      Prev
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      icon={IconChevronRight}
+                      disabled={customerCurrentPage >= customerTotalPages}
+                      onClick={() =>
+                        handleCustomerPageChange(customerCurrentPage + 1)
+                      }
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Totals footer */}
+              <div className="p-4 bg-default-50 dark:bg-gray-900/40">
+                <div className="rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-4">
+                  <div className="flex justify-between py-1 text-sm text-default-600 dark:text-gray-300">
+                    <span>Total Bal B/F</span>
+                    <span className="font-semibold text-default-900 dark:text-gray-100">
+                      RM {formatCurrency(customerListData?.totals.bal_bf ?? 0)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1 text-sm text-default-600 dark:text-gray-300">
+                    <span>Total Current</span>
+                    <span className="font-semibold text-default-900 dark:text-gray-100">
+                      RM{" "}
+                      {formatCurrency(
+                        customerListData?.totals.current_invoices ?? 0
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1 text-sm text-default-600 dark:text-gray-300">
+                    <span>Total Payment</span>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                      RM {formatCurrency(customerListData?.totals.payment ?? 0)}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex justify-between border-t border-default-200 dark:border-gray-700 pt-3 text-base font-bold text-default-900 dark:text-gray-100">
+                    <span>Total Outstanding Balance</span>
+                    <span className="text-rose-600 dark:text-rose-400">
+                      RM{" "}
+                      {formatCurrency(customerListData?.totals.total_due ?? 0)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        ) : !filteredData || filteredData.salesmen.length === 0 ? (
           <div className="text-center py-8">
             <IconUser size={48} className="text-default-400 dark:text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-default-800 dark:text-gray-100 mb-2">
@@ -939,7 +1531,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                               }
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handlePrintStatement(customer);
+                                handlePrintStatement(customer.customer_id);
                               }}
                             >
                               Statement

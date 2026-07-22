@@ -382,7 +382,7 @@ const router = Router();
 
   // GET /jellypolly/api/debtors/general-statement - Get general debtor list for all customers
   router.get("/general-statement", async (req, res) => {
-    const { month, year } = req.query;
+    const { month, year, includeZero } = req.query;
     const now = new Date();
     const monthInt = month ? parseInt(month, 10) : now.getMonth() + 1;
     const yearInt = year ? parseInt(year, 10) : now.getFullYear();
@@ -521,7 +521,7 @@ const router = Router();
         aging_3_plus: 0,
       };
 
-      const customers = result.rows.map((row) => {
+      let customers = result.rows.map((row) => {
         const customer = {
           account_no: row.customer_id,
           particular: row.customer_name || "UNNAMED",
@@ -547,6 +547,60 @@ const router = Router();
         return customer;
       });
 
+      // includeZero=1 (the interactive By Customer view): the SQL above only
+      // returns customers with open JP invoices, so merge in every other
+      // customer (JP shares the public customers table) as a zero row.
+      if (includeZero === "1") {
+        const present = new Set(customers.map((c) => c.account_no));
+        const allResult = await pool.query(
+          `SELECT id, name FROM customers ORDER BY id ASC`
+        );
+        for (const row of allResult.rows) {
+          if (present.has(row.id)) continue;
+          customers.push({
+            account_no: row.id,
+            particular: row.name || "UNNAMED",
+            bal_bf: 0,
+            current_invoices: 0,
+            payment: 0,
+            total_due: 0,
+            aging_current: 0,
+            aging_1_month: 0,
+            aging_2_months: 0,
+            aging_3_plus: 0,
+          });
+        }
+        customers.sort((a, b) => a.account_no.localeCompare(b.account_no));
+      }
+
+      // Server-side search, zero-balance filter and pagination for the
+      // interactive By Customer view. Totals above always aggregate the
+      // customers with open invoices.
+      let totalCustomers = customers.length;
+      let page = 1;
+      if (includeZero === "1") {
+        const search = String(req.query.search || "")
+          .trim()
+          .toLowerCase();
+        if (search) {
+          customers = customers.filter(
+            (c) =>
+              c.account_no.toLowerCase().includes(search) ||
+              c.particular.toLowerCase().includes(search)
+          );
+        }
+        if (req.query.hideZero === "1") {
+          customers = customers.filter((c) => Math.abs(c.total_due) > 0.005);
+        }
+        totalCustomers = customers.length;
+        if (req.query.page || req.query.limit) {
+          const limit = Math.max(1, parseInt(req.query.limit, 10) || 100);
+          const maxPage = Math.max(1, Math.ceil(totalCustomers / limit));
+          page = Math.min(Math.max(1, parseInt(req.query.page, 10) || 1), maxPage);
+          customers = customers.slice((page - 1) * limit, page * limit);
+        }
+      }
+
       res.json({
         statement_date: statementDate,
         report_datetime: reportDateTime,
@@ -554,6 +608,8 @@ const router = Router();
         statement_year: yearInt,
         customers,
         totals,
+        total_customers: totalCustomers,
+        page,
       });
     } catch (error) {
       console.error("Error fetching JellyPolly general statement:", error);
