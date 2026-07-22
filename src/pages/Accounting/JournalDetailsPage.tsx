@@ -30,6 +30,7 @@ import {
   IconTrash,
   IconX,
   IconPrinter,
+  IconExternalLink,
 } from "@tabler/icons-react";
 
 const LEGACY_IMPORT_ENTRY_TYPE: string = "IMP";
@@ -402,6 +403,18 @@ const JournalDetailsPage: React.FC = () => {
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2">
+              {entry.source && (
+                <Button
+                  onClick={() => navigate(entry.source!.path)}
+                  variant="outline"
+                  color="sky"
+                  icon={IconExternalLink}
+                  iconPosition="left"
+                  title="Open the document that created this journal"
+                >
+                  {entry.source.label}
+                </Button>
+              )}
               {canPrintVoucher && (
                 <Button
                   onClick={handlePrintVoucher}
