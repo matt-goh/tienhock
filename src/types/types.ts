@@ -1307,6 +1307,14 @@ export interface ProductionWorkerOrderRequest {
   worker_ids: string[];
 }
 
+// Bundled production page data (GET /api/production-entries/page-context):
+// entries + per-scope worker orders + per-product machine status in one call.
+export interface ProductionPageContextResponse {
+  entries: ProductionEntry[];
+  worker_orders: Partial<Record<ProductionWorkerOrderScope, string[]>>;
+  machine_status: Record<string, boolean>;
+}
+
 // Special Item Configuration (for Hancur, Bundle entries)
 export type SpecialItemCategory = "HANCUR" | "KARUNG_HANCUR" | "BUNDLE";
 export type SpecialItemUnit = "kg" | "bags" | "pcs" | "sack" | "bundle";
