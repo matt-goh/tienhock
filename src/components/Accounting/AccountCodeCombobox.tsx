@@ -16,6 +16,7 @@ import { AccountCode } from "../../types/types";
 interface AccountCodeComboboxProps {
   value: string;
   onChange: (value: string) => void;
+  accounts?: AccountCode[];
   label?: string;
   required?: boolean;
   disabled?: boolean;
@@ -52,6 +53,7 @@ const sortAccounts = (left: AccountCode, right: AccountCode): number => {
 const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
   value,
   onChange,
+  accounts,
   label,
   required,
   disabled = false,
@@ -67,6 +69,7 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
   onToggleFavourite,
 }: AccountCodeComboboxProps) => {
   const { accountCodes: allAccountCodes } = useAccountCodesCache();
+  const availableAccounts: AccountCode[] = accounts ?? allAccountCodes;
   const [query, setQuery] = useState<string>("");
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [loadedCount, setLoadedCount] = useState<number>(ACCOUNT_LOAD_INCREMENT);
@@ -80,19 +83,19 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
   const listboxId: string = `${inputId}-listbox`;
 
   const selectableAccounts: AccountCode[] = useMemo(() => {
-    const activeAccounts: AccountCode[] = allAccountCodes.filter(
+    const activeAccounts: AccountCode[] = availableAccounts.filter(
       (account: AccountCode): boolean => account.is_active
     );
     return filter ? activeAccounts.filter(filter) : activeAccounts;
-  }, [allAccountCodes, filter]);
+  }, [availableAccounts, filter]);
 
   const allAccountMap: Map<string, AccountCode> = useMemo(() => {
     return new Map<string, AccountCode>(
-      allAccountCodes.map(
+      availableAccounts.map(
         (account: AccountCode): [string, AccountCode] => [account.code, account]
       )
     );
-  }, [allAccountCodes]);
+  }, [availableAccounts]);
 
   const selectableCodes: Set<string> = useMemo(() => {
     return new Set<string>(
@@ -127,11 +130,11 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
       }
     });
 
-    return allAccountCodes.filter((account: AccountCode): boolean =>
+    return availableAccounts.filter((account: AccountCode): boolean =>
       includedCodes.has(account.code)
     );
   }, [
-    allAccountCodes,
+    availableAccounts,
     allAccountMap,
     hierarchical,
     selectableAccounts,

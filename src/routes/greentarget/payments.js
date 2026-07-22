@@ -664,6 +664,7 @@ export default function (pool) {
   });
 
   router.get("/debtors/general-statement", async (req, res) => {
+    const includeZero = req.query.includeZero;
     const now = new Date();
     const monthInt = req.query.month
       ? parseInt(req.query.month, 10)
@@ -778,7 +779,7 @@ export default function (pool) {
         aging_3_plus: 0,
       };
 
-      const customers = result.rows.map((row) => {
+      let customers = result.rows.map((row) => {
         const customer = {
           account_no: String(row.customer_id),
           particular: row.customer_name || "UNNAMED",
@@ -804,6 +805,61 @@ export default function (pool) {
         return customer;
       });
 
+      // includeZero=1 (the interactive By Customer view): the SQL above only
+      // returns customers with open GT invoices, so merge in every other
+      // Green Target customer as a zero row.
+      if (includeZero === "1") {
+        const present = new Set(customers.map((c) => c.account_no));
+        const allResult = await pool.query(
+          `SELECT customer_id, name FROM greentarget.customers ORDER BY customer_id ASC`
+        );
+        for (const row of allResult.rows) {
+          const accountNo = String(row.customer_id);
+          if (present.has(accountNo)) continue;
+          customers.push({
+            account_no: accountNo,
+            particular: row.name || "UNNAMED",
+            bal_bf: 0,
+            current_invoices: 0,
+            payment: 0,
+            total_due: 0,
+            aging_current: 0,
+            aging_1_month: 0,
+            aging_2_months: 0,
+            aging_3_plus: 0,
+          });
+        }
+        customers.sort((a, b) => a.account_no.localeCompare(b.account_no));
+      }
+
+      // Server-side search, zero-balance filter and pagination for the
+      // interactive By Customer view. Totals above always aggregate the
+      // customers with open invoices.
+      let totalCustomers = customers.length;
+      let page = 1;
+      if (includeZero === "1") {
+        const search = String(req.query.search || "")
+          .trim()
+          .toLowerCase();
+        if (search) {
+          customers = customers.filter(
+            (c) =>
+              c.account_no.toLowerCase().includes(search) ||
+              c.particular.toLowerCase().includes(search)
+          );
+        }
+        if (req.query.hideZero === "1") {
+          customers = customers.filter((c) => Math.abs(c.total_due) > 0.005);
+        }
+        totalCustomers = customers.length;
+        if (req.query.page || req.query.limit) {
+          const limit = Math.max(1, parseInt(req.query.limit, 10) || 100);
+          const maxPage = Math.max(1, Math.ceil(totalCustomers / limit));
+          page = Math.min(Math.max(1, parseInt(req.query.page, 10) || 1), maxPage);
+          customers = customers.slice((page - 1) * limit, page * limit);
+        }
+      }
+
       res.json({
         statement_date: statementDate,
         report_datetime: reportDateTime,
@@ -811,6 +867,8 @@ export default function (pool) {
         statement_year: yearInt,
         customers,
         totals,
+        total_customers: totalCustomers,
+        page,
       });
     } catch (error) {
       console.error("Error fetching Green Target general statement:", error);

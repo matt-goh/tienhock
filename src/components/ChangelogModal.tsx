@@ -19,6 +19,26 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-07-22",
+    ms: "Halaman butiran jurnal kini memaparkan butang pautan ke dokumen yang mewujudkan jurnal tersebut secara automatik — contohnya invois, nota kredit/debit/bayaran balik, resit, bank-in (RV), belian am atau bayaran pembekal. Klik butang berkenaan untuk terus membuka dokumen sumber.",
+    en: "The journal details page now shows a link button to the document that automatically created the journal — such as an invoice, credit/debit/refund note, receipt, bank-in (RV), general purchase or supplier payment. Click it to jump straight to the source document.",
+  },
+  {
+    date: "2026-07-22",
+    ms: "Laporan Debtors kini dibuka dengan paparan \"By Customer\" yang menyenaraikan semua pelanggan — termasuk yang tiada baki tertunggak — lengkap dengan baki bawa ke hadapan, invois semasa, bayaran dan jumlah perlu dibayar bagi bulan terpilih. Setiap pelanggan mempunyai butang Statement dan Invoices, dan anda boleh bertukar kembali ke paparan \"By Salesman\" seperti sebelum ini. Tab Transactions pada halaman pelanggan juga kini mempunyai butang Statement dengan pemilih bulan untuk mencetak penyata akaun pelanggan.",
+    en: "The Debtors report now opens on a \"By Customer\" view listing every customer — including those with no outstanding balance — with the brought-forward balance, current invoices, payments and total due for the selected month. Each customer has Statement and Invoices buttons, and you can switch back to the \"By Salesman\" view as before.",
+  },
+  {
+    date: "2026-07-22",
+    ms: "Jelly Polly kini mempunyai halaman Account Ledger di bawah Accounting untuk menyemak lejar penghutang setiap pelanggan. Pilih pelanggan dan tempoh untuk melihat baki bawa ke hadapan, invois, bayaran selesai, nota kredit/debit, baki berjalan dan jumlah penutup, kemudian buka dokumen sumber atau cetak laporan untuk membandingkannya dengan laporan Debtors. Bayaran automatik bagi bil tunai juga kini menggunakan tarikh invois supaya baki bulanan dipaparkan pada tempoh yang betul.",
+    en: "Jelly Polly now has an Account Ledger page under Accounting for checking each customer's debtor ledger. Select a customer and period to see the brought-forward balance, invoices, completed payments, credit/debit notes, running balance and closing total, then open the source documents or print the report for comparison with the Debtors report. Automatic cash-bill payments now also use the invoice date so monthly balances appear in the correct period.",
+  },
+  {
+    date: "2026-07-22",
+    ms: "Slip Pinjam yang dicetak kini lebih padat. Tajuk syarikat di bahagian atas telah dibuang (memandangkan slip dipotong untuk setiap pekerja), dan setiap slip kini hanya memaparkan bahagian yang ada rekod pinjam — jika pekerja hanya ada pinjam gaji pertengahan bulan, bahagian gaji bulanan tidak lagi dipaparkan, dan sebaliknya. Ini berlaku untuk Tien Hock, Green Target dan Jelly Polly.",
+    en: "Printed Pinjam slips are now more compact. The company header at the top has been removed (since slips are cut out per worker), and each slip now only shows the half that actually has a pinjam record — if a worker only has a mid-month pinjam, the monthly section is no longer shown, and vice versa. This applies to Tien Hock, Green Target and Jelly Polly.",
+  },
+  {
     date: "2026-07-21",
     ms: "Sistem kegemaran kod akaun kini turut hadir dalam pemilih akaun di halaman Account Ledger dan borang Journal. Tandakan bintang pada mana-mana akaun dalam senarai juntai bawah untuk menambahkannya sebagai kegemaran — akaun kegemaran dipaparkan di bahagian atas senarai dengan latar kuning, sama seperti di halaman Account Codes. Klik bintang sekali lagi untuk membuangnya.",
     en: "The account code favourites system is now available in the account pickers on the Account Ledger page and the Journal form. Click the star on any account in the dropdown to favourite it — favourited accounts are pinned to the top of the list with an amber background, just like on the Account Codes page. Click the star again to remove it.",
