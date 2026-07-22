@@ -20,7 +20,7 @@ import { api } from "../../routes/utils/api";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import {
   ProductionEntry,
-  ProductionWorkerOrderResponse,
+  ProductionPageContextResponse,
   ProductionWorkerOrderScope,
   StockProduct,
 } from "../../types/types";
@@ -271,16 +271,29 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
   const fetchEntries = useCallback(async (): Promise<void> => {
     setIsLoading(true);
     try {
+      // Worker-order scopes worth bundling: JP pages need JP_PRODUCTION, TH
+      // packing pages need both packing scopes, stock-only (OTH) pages none.
+      const scopes: ProductionWorkerOrderScope[] = productTypes?.includes("JP")
+        ? ["JP_PRODUCTION"]
+        : !productTypes ||
+          productTypes.some((type: ProductSelectorProductType): boolean =>
+            ["MEE", "BH", "BUNDLE"].includes(type)
+          )
+        ? ["BH_PACKING", "MEE_PACKING"]
+        : [];
+
       const params: URLSearchParams = new URLSearchParams({
         start_date: formatDateLocal(dateRange.start),
         end_date: formatDateLocal(dateRange.end),
         include_machine_status: "true",
       });
+      if (scopes.length > 0) params.set("scopes", scopes.join(","));
 
-      const response: ProductionEntry[] = await api.get(
-        `${apiBasePath}?${params.toString()}`
+      // Single bundled call: entries + machine status + worker orders.
+      const response: ProductionPageContextResponse = await api.get(
+        `${apiBasePath}/page-context?${params.toString()}`
       );
-      const allEntries: ProductionEntry[] = response || [];
+      const allEntries: ProductionEntry[] = response?.entries || [];
       setEntries(
         allEntries.filter((entry: ProductionEntry): boolean => {
           if (productIds && !productIds.includes(entry.product_id)) {
@@ -294,6 +307,19 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
           );
         })
       );
+
+      const nextWorkerOrderByScope: Record<
+        ProductionWorkerOrderScope,
+        string[]
+      > = {
+        BH_PACKING: [],
+        MEE_PACKING: [],
+        JP_PRODUCTION: [],
+      };
+      scopes.forEach((scope: ProductionWorkerOrderScope): void => {
+        nextWorkerOrderByScope[scope] = response?.worker_orders?.[scope] || [];
+      });
+      setWorkerOrderByScope(nextWorkerOrderByScope);
     } catch (error) {
       console.error("Error fetching production records:", error);
       toast.error("Failed to load production records");
@@ -306,48 +332,6 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
   useEffect(() => {
     fetchEntries();
   }, [fetchEntries]);
-
-  // Load the shared worker order for both packing scopes so worker rows can be
-  // displayed in the same order as the Production Entry page.
-  useEffect(() => {
-    let isCurrent: boolean = true;
-    const scopes: ProductionWorkerOrderScope[] = productTypes?.includes("JP")
-      ? ["JP_PRODUCTION"]
-      : ["BH_PACKING", "MEE_PACKING"];
-
-    Promise.all(
-      scopes.map((scope: ProductionWorkerOrderScope) =>
-        api
-          .get(
-            `${apiBasePath}/worker-order?scope=${encodeURIComponent(
-              scope
-            )}`
-          )
-          .then((response: ProductionWorkerOrderResponse): string[] =>
-            response.worker_ids || []
-          )
-          .catch((): string[] => [])
-      )
-    ).then((results: string[][]) => {
-      if (!isCurrent) return;
-      const nextWorkerOrderByScope: Record<
-        ProductionWorkerOrderScope,
-        string[]
-      > = {
-        BH_PACKING: [],
-        MEE_PACKING: [],
-        JP_PRODUCTION: [],
-      };
-      scopes.forEach((scope: ProductionWorkerOrderScope, index: number): void => {
-        nextWorkerOrderByScope[scope] = results[index] || [];
-      });
-      setWorkerOrderByScope(nextWorkerOrderByScope);
-    });
-
-    return (): void => {
-      isCurrent = false;
-    };
-  }, [apiBasePath, productTypes]);
 
   const productionProductFilter = useCallback(
     (product: StockProduct): boolean =>

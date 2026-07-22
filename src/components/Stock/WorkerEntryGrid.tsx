@@ -208,6 +208,10 @@ interface WorkerEntryGridProps {
   hideFooter?: boolean;
   // Shared worker order persistence
   workerOrderScope?: ProductionWorkerOrderScope;
+  // Pre-fetched worker order (e.g. from the bundled page-context call). When
+  // defined, the grid uses it instead of issuing its own GET; manual refresh
+  // (workerOrderRefreshKey) still re-fetches from the API.
+  initialWorkerOrderIds?: string[];
   // API base for worker-order persistence (JP passes /jellypolly/api/production-entries)
   workerOrderApiBase?: string;
   workerOrderRefreshKey?: number;
@@ -230,6 +234,7 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
   onSearchChange,
   hideFooter = false,
   workerOrderScope,
+  initialWorkerOrderIds,
   workerOrderApiBase = "/api/production-entries",
   workerOrderRefreshKey = 0,
 }) => {
@@ -286,12 +291,21 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
         return;
       }
 
-      const cachedWorkerOrderIds: string[] | null =
-        isManualRefresh ? null : getCachedWorkerOrder(workerOrderScope);
-
       if (isManualRefresh) {
         invalidateWorkerOrderCache(workerOrderScope);
       }
+
+      // Pre-fetched order from the parent's bundled call wins over the cache
+      // and skips this grid's own GET; manual refresh always re-fetches.
+      if (!isManualRefresh && initialWorkerOrderIds !== undefined) {
+        applyWorkerOrderIds(initialWorkerOrderIds);
+        cacheWorkerOrder(workerOrderScope, initialWorkerOrderIds);
+        setIsLoadingWorkerOrder(false);
+        return;
+      }
+
+      const cachedWorkerOrderIds: string[] | null =
+        isManualRefresh ? null : getCachedWorkerOrder(workerOrderScope);
 
       if (cachedWorkerOrderIds) {
         applyWorkerOrderIds(cachedWorkerOrderIds);
@@ -339,7 +353,12 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
     return (): void => {
       isCurrent = false;
     };
-  }, [applyWorkerOrderIds, workerOrderRefreshKey, workerOrderScope]);
+  }, [
+    applyWorkerOrderIds,
+    initialWorkerOrderIds,
+    workerOrderRefreshKey,
+    workerOrderScope,
+  ]);
 
   useEffect(() => {
     return (): void => {
