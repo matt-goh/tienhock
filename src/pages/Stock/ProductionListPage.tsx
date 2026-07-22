@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   IconAlertTriangle,
+  IconArrowsSort,
   IconChevronDown,
   IconChevronRight,
   IconChevronsDown,
@@ -14,6 +15,7 @@ import {
 import clsx from "clsx";
 import TimeNavigator from "../../components/TimeNavigator";
 import ProductSelector from "../../components/Stock/ProductSelector";
+import ProductOrderModal from "../../components/Catalogue/ProductOrderModal";
 import { api } from "../../routes/utils/api";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import {
@@ -253,6 +255,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
   const [entries, setEntries] = useState<ProductionEntry[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+  const [showProductOrderModal, setShowProductOrderModal] = useState(false);
   const [workerOrderByScope, setWorkerOrderByScope] = useState<
     Record<ProductionWorkerOrderScope, string[]>
   >({ BH_PACKING: [], MEE_PACKING: [], JP_PRODUCTION: [] });
@@ -693,32 +696,44 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(280px,420px)_minmax(240px,360px)_auto]">
-          <ProductSelector
-            value={selectedProductId}
-            onChange={setSelectedProductId}
-            productTypes={productTypes || DEFAULT_PRODUCTION_PRODUCT_TYPES}
-            productFilter={
-              productTypes
-                ? (product: StockProduct): boolean => {
-                    if (productIds && !productIds.includes(product.id)) {
-                      return false;
+          <div>
+            <ProductSelector
+              value={selectedProductId}
+              onChange={setSelectedProductId}
+              productTypes={productTypes || DEFAULT_PRODUCTION_PRODUCT_TYPES}
+              productFilter={
+                productTypes
+                  ? (product: StockProduct): boolean => {
+                      if (productIds && !productIds.includes(product.id)) {
+                        return false;
+                      }
+                      const productType: string | undefined = product.type;
+                      return (
+                        isProductSelectorProductType(productType) &&
+                        productTypes.includes(productType)
+                      );
                     }
-                    const productType: string | undefined = product.type;
-                    return (
-                      isProductSelectorProductType(productType) &&
-                      productTypes.includes(productType)
-                    );
-                  }
-                : productIds
-                ? (product: StockProduct): boolean =>
-                    productIds.includes(product.id)
-                : productionProductFilter
-            }
-            placeholder="All production products"
-            showCategories
-          />
-          <div className="relative">
-            <IconSearch
+                  : productIds
+                  ? (product: StockProduct): boolean =>
+                      productIds.includes(product.id)
+                  : productionProductFilter
+              }
+              placeholder="All production products"
+              showCategories
+            />
+            {/* Quick access to the shared product display order */}
+            <div className="mt-1.5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowProductOrderModal(true)}
+                className="inline-flex items-center gap-1 text-xs font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300"
+              >
+                <IconArrowsSort size={14} />
+                Reorder products
+              </button>
+            </div>
+          </div>
+          <div className="relative">            <IconSearch
               className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-500"
               size={16}
             />
@@ -971,6 +986,13 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
           </div>
         )}
       </div>
+
+      {/* Shared product display order modal */}
+      <ProductOrderModal
+        isOpen={showProductOrderModal}
+        onClose={() => setShowProductOrderModal(false)}
+        products={orderedProducts}
+      />
     </div>
   );
 };

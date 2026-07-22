@@ -38,11 +38,13 @@ import {
   IconRefresh,
   IconDeviceFloppy,
   IconPackage,
+  IconArrowsSort,
 } from "@tabler/icons-react";
 import { Switch } from "@headlessui/react";
 import { format } from "date-fns";
 import Button from "../../components/Button";
 import ProductPayCodeMappingModal from "../../components/Stock/ProductPayCodeMappingModal";
+import ProductOrderModal from "../../components/Catalogue/ProductOrderModal";
 import { isSpecialItem } from "../../config/specialItems";
 import {
   OTH_PRODUCTION_IDS,
@@ -148,6 +150,7 @@ const ProductionEntryPage: React.FC = () => {
     Record<string, number>
   >({});
   const [showMappingModal, setShowMappingModal] = useState(false);
+  const [showProductOrderModal, setShowProductOrderModal] = useState(false);
   const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [specialSelection, setSpecialSelection] =
     useState<SpecialSelection>(getInitialSpecialSelection);
@@ -750,6 +753,14 @@ const ProductionEntryPage: React.FC = () => {
               }
             >
               Refresh Order
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              icon={IconArrowsSort}
+              onClick={() => setShowProductOrderModal(true)}
+            >
+              Reorder
             </Button>
             <Button
               variant="outline"
@@ -1429,6 +1440,13 @@ const ProductionEntryPage: React.FC = () => {
       <ProductPayCodeMappingModal
         isOpen={showMappingModal}
         onClose={() => setShowMappingModal(false)}
+      />
+
+      {/* Shared product display order modal */}
+      <ProductOrderModal
+        isOpen={showProductOrderModal}
+        onClose={() => setShowProductOrderModal(false)}
+        products={products}
       />
 
       {/* Help Dialog */}
