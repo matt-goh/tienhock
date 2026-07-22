@@ -33,6 +33,7 @@ import toast from "react-hot-toast";
 import { AdjustmentDocTypeBadge } from "../../components/AdjustmentDocs/AdjustmentDocBadge";
 import type { AdjustmentDocType } from "../../types/types";
 import { formatAdjustmentDocDisplayId } from "../../utils/adjustments/formatDocId";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 
 interface Payment {
   payment_id: number;
@@ -591,6 +592,16 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
     appliedSearch,
     hideZeroBalances,
   ]);
+
+  // Preserve the scroll position across navigations (same pattern as the
+  // Journal Entry list page), keyed per company. Ready once the active view
+  // has its data rendered.
+  useScrollRestoration(
+    `debtors-report:${config.debtorsEndpoint}`,
+    viewMode === "customer"
+      ? !customerListLoading && customerListData !== null
+      : !loading && debtorsData !== null
+  );
 
   // Switch between the By Customer and By Salesman views
   const handleViewModeChange = useCallback(
