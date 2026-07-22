@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-22",
+    ms: "Pembetulan data: enam invois lama yang sebenarnya telah dijelaskan (mengikut lejar akaun) tetapi masih kelihatan tertunggak kini ditandakan sebagai telah dibayar — CHANKOPI 2004676, AMY 15309, LEE YX 026127, SHAB 34704, HIAPLEE-SC 63599 dan LAI 34367. Jumlah tertunggak pelanggan-pelanggan ini (dan Laporan Debtors) turun sebanyak RM4,265.00 secara keseluruhan; tiada catatan akaun baharu dibuat kerana bayaran tersebut memang sudah ada dalam lejar.",
+    en: "Data correction: six old invoices that were actually settled (per the account ledger) but still showed as outstanding are now marked paid — CHANKOPI 2004676, AMY 15309, LEE YX 026127, SHAB 34704, HIAPLEE-SC 63599 and LAI 34367. These customers' outstanding totals (and the Debtors report) drop by RM4,265.00 in all; no new accounting entries were made because the payments were already in the ledger.",
+  },
+  {
+    date: "2026-07-22",
     ms: "Halaman butiran jurnal kini memaparkan butang pautan ke dokumen yang mewujudkan jurnal tersebut secara automatik — contohnya invois, nota kredit/debit/bayaran balik, resit, bank-in (RV), belian am atau bayaran pembekal. Klik butang berkenaan untuk terus membuka dokumen sumber.",
     en: "The journal details page now shows a link button to the document that automatically created the journal — such as an invoice, credit/debit/refund note, receipt, bank-in (RV), general purchase or supplier payment. Click it to jump straight to the source document.",
   },
