@@ -671,19 +671,26 @@ const ProductionEntryPage: React.FC = () => {
               Production Entry
             </h1>
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
-            <TimeNavigator
-              range={{
-                start: parseLocalDate(selectedDate),
-                end: parseLocalDate(selectedDate),
-              }}
-              onChange={(nextRange) =>
-                setSelectedDate(formatDateLocal(nextRange.start))
-              }
-              modes={["day"]}
-              presets={false}
-              allowFuture={false}
-              size="sm"
-            />
+            <div className="flex items-center gap-2">
+              <TimeNavigator
+                range={{
+                  start: parseLocalDate(selectedDate),
+                  end: parseLocalDate(selectedDate),
+                }}
+                onChange={(nextRange) =>
+                  setSelectedDate(formatDateLocal(nextRange.start))
+                }
+                modes={["day"]}
+                presets={false}
+                allowFuture={false}
+                size="sm"
+              />
+              <span className="text-sm font-medium text-default-500 dark:text-gray-400">
+                {parseLocalDate(selectedDate).toLocaleDateString("ms-MY", {
+                  weekday: "long",
+                })}
+              </span>
+            </div>
             {/* Machine Rosak Toggle - only show when viewing a regular BH/MEE product */}
             {isViewingProduct && (selectedProduct?.type === "BH" || selectedProduct?.type === "MEE") && (
               <>
