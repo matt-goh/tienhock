@@ -7,6 +7,7 @@ import StyledListbox from "../StyledListbox";
 import Button from "../Button";
 import {
   ProductionEntry,
+  ProductionPageContextResponse,
   ProductionWorker,
   ProductionWorkerOrderScope,
 } from "../../types/types";
@@ -62,6 +63,11 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
 
   const [isSaving, setIsSaving] = useState(false);
   const workerOrderScope: ProductionWorkerOrderScope = "BH_PACKING";
+  // Worker order from the bundled page-context call, handed to the grid so it
+  // doesn't need its own GET.
+  const [initialWorkerOrderIds, setInitialWorkerOrderIds] = useState<
+    string[] | undefined
+  >(undefined);
 
   // Get staffs cache
   const { staffs, loading: isLoadingWorkers } = useStaffsCache();
@@ -114,31 +120,36 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
     hasUnsavedChanges: () => hasUnsavedChanges,
   }), [hasUnsavedChanges]);
 
-  // Fetch existing entries when date changes
+  // Fetch existing entries + worker order in one bundled call when date changes
   useEffect(() => {
     const fetchExistingEntries = async () => {
       if (!selectedDate || !hancurConfig || !karungConfig) return;
 
       try {
-        // Fetch Hancur entries
-        const hancurResponse = await api.get(
-          `/api/production-entries?date=${selectedDate}&product_id=${hancurConfig.id}`
+        const params: URLSearchParams = new URLSearchParams({
+          date: selectedDate,
+          product_ids: `${hancurConfig.id},${karungConfig.id}`,
+          scopes: workerOrderScope,
+        });
+        const response: ProductionPageContextResponse = await api.get(
+          `/api/production-entries/page-context?${params.toString()}`
         );
+        const rows: ProductionEntry[] = response?.entries || [];
+
+        // Hancur entries
         const hancurMap: Record<string, number> = {};
-        (hancurResponse || []).forEach((entry: ProductionEntry) => {
-          if (!entry.worker_id) return;
+        rows.forEach((entry: ProductionEntry) => {
+          if (entry.product_id !== hancurConfig.id || !entry.worker_id) return;
           hancurMap[entry.worker_id] = Number(entry.bags_packed) || 0;
         });
         setHancurEntries(hancurMap);
         setOriginalHancurEntries(hancurMap);
 
-        // Fetch Karung Hancur entries
-        const karungResponse = await api.get(
-          `/api/production-entries?date=${selectedDate}&product_id=${karungConfig.id}`
+        // Karung Hancur entry (there should only be one per day)
+        const karungEntry = rows.find(
+          (entry: ProductionEntry) => entry.product_id === karungConfig.id
         );
-        if (karungResponse && karungResponse.length > 0) {
-          // Take the first entry (there should only be one per day)
-          const karungEntry = karungResponse[0] as ProductionEntry;
+        if (karungEntry) {
           const karungWorkerId: string =
             karungEntry.worker_id ||
             karungConfig.singleWorkerEntry?.defaultWorkerId ||
@@ -158,6 +169,10 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
           );
           setOriginalKarungValue(0);
         }
+
+        setInitialWorkerOrderIds(
+          response?.worker_orders?.[workerOrderScope] || []
+        );
       } catch (error) {
         console.error("Error fetching hancur entries:", error);
         setHancurEntries({});
@@ -289,6 +304,7 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
           searchQuery={searchQuery}
           onSearchChange={onSearchChange}
           workerOrderScope={workerOrderScope}
+          initialWorkerOrderIds={initialWorkerOrderIds}
           workerOrderRefreshKey={workerOrderRefreshKey}
           hideFooter
         />

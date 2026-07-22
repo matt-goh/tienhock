@@ -1253,6 +1253,9 @@ export interface StockProduct {
   type: "BH" | "MEE" | "JP" | "OTH" | "TAX" | "BUNDLE";
   price_per_unit?: number;
   is_active?: boolean;
+  // Explicit per-type display order (managed via the Catalogue Product page
+  // Reorder modal); null/undefined = default prefix/alphabetical order.
+  sort_order?: number | null;
 }
 
 // Production Entry
@@ -1302,6 +1305,14 @@ export interface ProductionWorkerOrderResponse {
 export interface ProductionWorkerOrderRequest {
   scope: ProductionWorkerOrderScope;
   worker_ids: string[];
+}
+
+// Bundled production page data (GET /api/production-entries/page-context):
+// entries + per-scope worker orders + per-product machine status in one call.
+export interface ProductionPageContextResponse {
+  entries: ProductionEntry[];
+  worker_orders: Partial<Record<ProductionWorkerOrderScope, string[]>>;
+  machine_status: Record<string, boolean>;
 }
 
 // Special Item Configuration (for Hancur, Bundle entries)

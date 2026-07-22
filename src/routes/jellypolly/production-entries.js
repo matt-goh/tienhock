@@ -239,6 +239,129 @@ export default function (pool) {
     }
   });
 
+  // GET /jellypolly/api/production-entries/page-context - Bundled page data in
+  // one call: entries (date or range, optional product filter) + JP worker
+  // order + per-product machine status. Used by the JP production records page.
+  router.get("/page-context", async (req, res) => {
+    try {
+      const {
+        date,
+        start_date,
+        end_date,
+        product_ids,
+        scopes,
+        include_machine_status,
+      } = req.query;
+      const includeMachineStatus = include_machine_status === "true";
+
+      const productIdList =
+        typeof product_ids === "string"
+          ? product_ids
+              .split(",")
+              .map((id) => id.trim())
+              .filter(Boolean)
+          : [];
+      const scopeList =
+        typeof scopes === "string"
+          ? scopes
+              .split(",")
+              .map((scope) => scope.trim())
+              .filter(validateWorkerOrderScope)
+          : [];
+
+      let query = `
+        SELECT
+          pe.id,
+          TO_CHAR(pe.entry_date, 'YYYY-MM-DD') as entry_date,
+          pe.product_id,
+          pe.worker_id,
+          pe.pay_code_id,
+          pe.bags_packed,
+          pe.created_at,
+          pe.updated_at,
+          pe.created_by,
+          s.name as worker_name,
+          p.description as product_description,
+          p.type as product_type
+          ${includeMachineStatus ? ", COALESCE(pms.machine_broken, false) as machine_broken" : ""}
+        FROM jellypolly.production_entries pe
+        LEFT JOIN jellypolly.staffs s ON pe.worker_id = s.id
+        LEFT JOIN products p ON pe.product_id = p.id
+        ${includeMachineStatus ? "LEFT JOIN production_machine_status pms ON pms.entry_date = pe.entry_date AND pms.product_id = pe.product_id" : ""}
+        WHERE 1=1
+      `;
+
+      const params = [];
+      let paramCount = 1;
+
+      if (date) {
+        query += ` AND pe.entry_date = $${paramCount++}`;
+        params.push(date);
+      }
+
+      if (start_date && end_date) {
+        query += ` AND pe.entry_date BETWEEN $${paramCount++} AND $${paramCount++}`;
+        params.push(start_date, end_date);
+      }
+
+      if (productIdList.length > 0) {
+        query += ` AND pe.product_id = ANY($${paramCount++})`;
+        params.push(productIdList);
+      }
+
+      query += ` ORDER BY pe.entry_date DESC, s.name ASC`;
+
+      if (scopeList.length > 0) {
+        await ensureWorkerOrderTable(pool);
+      }
+
+      const [entriesResult, workerOrderResult, machineStatusResult] =
+        await Promise.all([
+          pool.query(query, params),
+          scopeList.length > 0
+            ? pool.query(
+                `SELECT scope, worker_id
+                 FROM jellypolly.production_worker_orders
+                 WHERE scope = ANY($1::text[])
+                 ORDER BY scope ASC, sort_order ASC, worker_id ASC`,
+                [scopeList]
+              )
+            : Promise.resolve({ rows: [] }),
+          includeMachineStatus && date && productIdList.length > 0
+            ? pool.query(
+                `SELECT product_id, machine_broken
+                 FROM production_machine_status
+                 WHERE entry_date = $1 AND product_id = ANY($2::text[])`,
+                [date, productIdList]
+              )
+            : Promise.resolve({ rows: [] }),
+        ]);
+
+      const workerOrders = {};
+      for (const row of workerOrderResult.rows) {
+        if (!workerOrders[row.scope]) workerOrders[row.scope] = [];
+        workerOrders[row.scope].push(row.worker_id);
+      }
+
+      const machineStatus = {};
+      for (const row of machineStatusResult.rows) {
+        machineStatus[row.product_id] = row.machine_broken;
+      }
+
+      res.json({
+        entries: entriesResult.rows,
+        worker_orders: workerOrders,
+        machine_status: machineStatus,
+      });
+    } catch (error) {
+      console.error("Error fetching production page context:", error);
+      res.status(500).json({
+        message: "Error fetching production page context",
+        error: error.message,
+      });
+    }
+  });
+
   // GET /api/production-entries - List entries with filters
   router.get("/", async (req, res) => {
     try {

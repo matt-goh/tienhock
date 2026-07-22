@@ -17,17 +17,17 @@ import BundleEntrySection, {
   BundleEntrySectionHandle,
 } from "../../components/Stock/BundleEntrySection";
 import ProductionHelpDialog from "../../components/Stock/ProductionHelpDialog";
-import DateNavigator from "../../components/DateNavigator";
+import TimeNavigator from "../../components/TimeNavigator";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import {
   ProductionEntry,
+  ProductionPageContextResponse,
   ProductionWorker,
   ProductionWorkerOrderScope,
   StockProduct,
 } from "../../types/types";
 import {
-  IconCalendar,
   IconStarFilled,
   IconSettings,
   IconHelpCircle,
@@ -39,11 +39,13 @@ import {
   IconRefresh,
   IconDeviceFloppy,
   IconPackage,
+  IconArrowsSort,
 } from "@tabler/icons-react";
 import { Switch } from "@headlessui/react";
 import { format } from "date-fns";
 import Button from "../../components/Button";
 import ProductPayCodeMappingModal from "../../components/Stock/ProductPayCodeMappingModal";
+import ProductOrderModal from "../../components/Catalogue/ProductOrderModal";
 import { isSpecialItem } from "../../config/specialItems";
 import {
   OTH_PRODUCTION_IDS,
@@ -149,6 +151,7 @@ const ProductionEntryPage: React.FC = () => {
     Record<string, number>
   >({});
   const [showMappingModal, setShowMappingModal] = useState(false);
+  const [showProductOrderModal, setShowProductOrderModal] = useState(false);
   const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [specialSelection, setSpecialSelection] =
     useState<SpecialSelection>(getInitialSpecialSelection);
@@ -164,6 +167,11 @@ const ProductionEntryPage: React.FC = () => {
   const [workerOrderRefreshKey, setWorkerOrderRefreshKey] = useState(0);
   const [isMachineBroken, setIsMachineBroken] = useState(false);
   const [isLoadingMachineStatus, setIsLoadingMachineStatus] = useState(false);
+  // Worker order from the bundled page-context call, handed to the grid so it
+  // doesn't need its own GET.
+  const [initialWorkerOrderIds, setInitialWorkerOrderIds] = useState<
+    string[] | undefined
+  >(undefined);
 
   // Refs for checking unsaved changes in HANCUR and BUNDLE sections
   const hancurSectionRef = useRef<HancurEntrySectionHandle>(null);
@@ -313,24 +321,51 @@ const ProductionEntryPage: React.FC = () => {
       }));
   }, [staffs, selectedProduct]);
 
-  // Fetch existing entries when date or product changes
+  // Fetch existing entries + machine status + worker order in one bundled call
   useEffect(() => {
-    const fetchExistingEntries = async () => {
+    const fetchPageContext = async () => {
       if (!selectedDate || !selectedProductId) {
         setEntries({});
         setOriginalEntries({});
+        setIsMachineBroken(false);
+        setInitialWorkerOrderIds(undefined);
         return;
       }
 
+      const scope: ProductionWorkerOrderScope | undefined =
+        selectedProduct?.type === "MEE"
+          ? "MEE_PACKING"
+          : selectedProduct?.type === "BH"
+          ? "BH_PACKING"
+          : undefined;
+      // Machine status only applies to regular BH/MEE products
+      // (not BUNDLE, HANCUR, etc.)
+      const wantsMachineStatus: boolean =
+        specialSelection === null &&
+        !!selectedProduct &&
+        (selectedProduct.type === "BH" || selectedProduct.type === "MEE");
+
+      const params: URLSearchParams = new URLSearchParams({
+        date: selectedDate,
+        product_ids: selectedProductId,
+      });
+      if (scope) params.set("scopes", scope);
+      if (wantsMachineStatus) params.set("include_machine_status", "true");
+
+      if (wantsMachineStatus) setIsLoadingMachineStatus(true);
+      // Let the grid fall back to its cached order while the bundled call is
+      // in flight, so a stale order from the previous product never flashes.
+      setInitialWorkerOrderIds(undefined);
       try {
-        const response = await api.get(
-          `/api/production-entries?date=${selectedDate}&product_id=${selectedProductId}`
+        const response: ProductionPageContextResponse = await api.get(
+          `/api/production-entries/page-context?${params.toString()}`
         );
+        const rows: ProductionEntry[] = response?.entries || [];
 
         const entriesMap: Record<string, number> = {};
 
         if (isOthProductionProduct(selectedProductId)) {
-          const totalQuantity: number = (response || []).reduce(
+          const totalQuantity: number = rows.reduce(
             (sum: number, entry: ProductionEntry) =>
               sum + (Number(entry.bags_packed) || 0),
             0
@@ -340,7 +375,7 @@ const ProductionEntryPage: React.FC = () => {
             entriesMap[STOCK_ONLY_WORKER_ID] = totalQuantity;
           }
         } else {
-          (response || []).forEach((entry: ProductionEntry) => {
+          rows.forEach((entry: ProductionEntry) => {
             if (!entry.worker_id) return;
             entriesMap[entry.worker_id] = Number(entry.bags_packed) || 0;
           });
@@ -348,15 +383,26 @@ const ProductionEntryPage: React.FC = () => {
 
         setEntries(entriesMap);
         setOriginalEntries(entriesMap);
+        setIsMachineBroken(
+          wantsMachineStatus
+            ? response?.machine_status?.[selectedProductId] || false
+            : false
+        );
+        setInitialWorkerOrderIds(
+          scope ? response?.worker_orders?.[scope] || [] : undefined
+        );
       } catch (error) {
-        console.error("Error fetching existing entries:", error);
+        console.error("Error fetching production page context:", error);
         setEntries({});
         setOriginalEntries({});
+        setIsMachineBroken(false);
+      } finally {
+        if (wantsMachineStatus) setIsLoadingMachineStatus(false);
       }
     };
 
-    fetchExistingEntries();
-  }, [selectedDate, selectedProductId]);
+    fetchPageContext();
+  }, [selectedDate, selectedProductId, specialSelection, selectedProduct]);
 
   // A payroll deep link identifies the worker as well as the date. Find that
   // worker's production records so one matching product opens immediately and
@@ -425,38 +471,6 @@ const ProductionEntryPage: React.FC = () => {
       isCurrent = false;
     };
   }, [deepLinkWorkerId, selectedDate, selectedProductId, specialSelection]);
-
-  // Fetch machine broken status when date or product changes
-  useEffect(() => {
-    const fetchMachineStatus = async () => {
-      // Only fetch for regular BH/MEE products (not BUNDLE, HANCUR, etc.)
-      if (!selectedDate || !selectedProductId || specialSelection !== null) {
-        setIsMachineBroken(false);
-        return;
-      }
-
-      // Only fetch for BH and MEE product types
-      if (!selectedProduct || (selectedProduct.type !== "BH" && selectedProduct.type !== "MEE")) {
-        setIsMachineBroken(false);
-        return;
-      }
-
-      setIsLoadingMachineStatus(true);
-      try {
-        const response = await api.get(
-          `/api/production-entries/machine-broken?date=${selectedDate}&product_id=${selectedProductId}`
-        );
-        setIsMachineBroken(response.machine_broken || false);
-      } catch (error) {
-        console.error("Error fetching machine status:", error);
-        setIsMachineBroken(false);
-      } finally {
-        setIsLoadingMachineStatus(false);
-      }
-    };
-
-    fetchMachineStatus();
-  }, [selectedDate, selectedProductId, specialSelection, selectedProduct]);
 
   // Handle machine broken toggle
   const handleMachineBrokenToggle = async (
@@ -642,24 +656,6 @@ const ProductionEntryPage: React.FC = () => {
     resetWorkerSearchOnProductChange(); // Clear search when changing product
   };
 
-  const handleDateNavigatorChange = (date: Date): void => {
-    setSelectedDate(formatDateLocal(date));
-  };
-
-  const handleDateInputChange = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ): void => {
-    const nextDate: string = event.target.value;
-    if (!nextDate) return;
-    setSelectedDate(nextDate);
-  };
-
-  const formatNavigatorDisplay = (date: Date): string => {
-    return date.toLocaleDateString("ms-MY", {
-      weekday: "long",
-    });
-  };
-
   const productionProductFilter = useCallback(
     (product: StockProduct): boolean =>
       product.type !== "OTH" || OTH_PRODUCTION_IDS.includes(product.id),
@@ -691,24 +687,24 @@ const ProductionEntryPage: React.FC = () => {
             </h1>
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
             <div className="flex items-center gap-2">
-              <IconCalendar
-                size={16}
-                className="text-default-500 dark:text-gray-400"
-              />
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={handleDateInputChange}
-                max={formatDateLocal(new Date())}
-                className="rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-              />
-              <DateNavigator
-                selectedDate={parseLocalDate(selectedDate)}
-                onChange={handleDateNavigatorChange}
-                showGoToTodayButton={false}
-                formatDisplay={formatNavigatorDisplay}
+              <TimeNavigator
+                range={{
+                  start: parseLocalDate(selectedDate),
+                  end: parseLocalDate(selectedDate),
+                }}
+                onChange={(nextRange) =>
+                  setSelectedDate(formatDateLocal(nextRange.start))
+                }
+                modes={["day"]}
+                presets={false}
+                allowFuture={false}
                 size="sm"
               />
+              <span className="text-sm font-medium text-default-500 dark:text-gray-400">
+                {parseLocalDate(selectedDate).toLocaleDateString("ms-MY", {
+                  weekday: "long",
+                })}
+              </span>
             </div>
             {/* Machine Rosak Toggle - only show when viewing a regular BH/MEE product */}
             {isViewingProduct && (selectedProduct?.type === "BH" || selectedProduct?.type === "MEE") && (
@@ -769,6 +765,14 @@ const ProductionEntryPage: React.FC = () => {
               }
             >
               Refresh Order
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              icon={IconArrowsSort}
+              onClick={() => setShowProductOrderModal(true)}
+            >
+              Reorder
             </Button>
             <Button
               variant="outline"
@@ -1226,6 +1230,7 @@ const ProductionEntryPage: React.FC = () => {
               searchQuery={workerSearchQuery}
               onSearchChange={setWorkerSearchQuery}
               workerOrderScope={workerOrderScope}
+              initialWorkerOrderIds={initialWorkerOrderIds}
               workerOrderRefreshKey={workerOrderRefreshKey}
             />
           )}
@@ -1448,6 +1453,13 @@ const ProductionEntryPage: React.FC = () => {
       <ProductPayCodeMappingModal
         isOpen={showMappingModal}
         onClose={() => setShowMappingModal(false)}
+      />
+
+      {/* Shared product display order modal */}
+      <ProductOrderModal
+        isOpen={showProductOrderModal}
+        onClose={() => setShowProductOrderModal(false)}
+        products={products}
       />
 
       {/* Help Dialog */}

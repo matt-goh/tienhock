@@ -132,6 +132,12 @@ const CATALOGUE_DROPDOWN_COLUMNS = {
   productsMaterials: { key: "catalogue-products-materials", order: 2 },
 } as const;
 
+const STOCK_DROPDOWN_COLUMNS = {
+  productionRecords: { key: "stock-production-records", order: 1 },
+  products: { key: "stock-products", order: 2 },
+  materialsPurchases: { key: "stock-materials-purchases", order: 3 },
+} as const;
+
 // Function to generate payroll subitems for each job type
 const generatePayrollSubItems = (): SidebarItem[] => {
   const payrollSubItems: SidebarItem[] = [];
@@ -563,42 +569,120 @@ export const TienHockNavData: SidebarItem[] = [
         path: "/stock/movement",
         component: ProductStockMovementPage,
         group: "Products",
+        dropdownColumn: STOCK_DROPDOWN_COLUMNS.products.key,
+        dropdownColumnOrder: STOCK_DROPDOWN_COLUMNS.products.order,
       },
       {
-        name: "Production Records",
-        path: "/stock/production-records",
-        component: ProductionListPage,
-        group: "Products",
+        name: "Mee Records",
+        path: "/stock/production-records/mee",
+        component: (props: any) => (
+          <ProductionListPage
+            productTypes={["MEE"]}
+            title="Mee Production Records"
+            {...props}
+          />
+        ),
+        group: "Production Records",
+        dropdownColumn: STOCK_DROPDOWN_COLUMNS.productionRecords.key,
+        dropdownColumnOrder: STOCK_DROPDOWN_COLUMNS.productionRecords.order,
+      },
+      {
+        name: "Bihun Records",
+        path: "/stock/production-records/bihun",
+        component: (props: any) => (
+          <ProductionListPage
+            productTypes={["BH"]}
+            title="Bihun Production Records"
+            {...props}
+          />
+        ),
+        group: "Production Records",
+        dropdownColumn: STOCK_DROPDOWN_COLUMNS.productionRecords.key,
+        dropdownColumnOrder: STOCK_DROPDOWN_COLUMNS.productionRecords.order,
+      },
+      {
+        name: "Bundle Records",
+        path: "/stock/production-records/bundle",
+        component: (props: any) => (
+          <ProductionListPage
+            productTypes={["BUNDLE"]}
+            title="Bundle Production Records"
+            {...props}
+          />
+        ),
+        group: "Production Records",
+        dropdownColumn: STOCK_DROPDOWN_COLUMNS.productionRecords.key,
+        dropdownColumnOrder: STOCK_DROPDOWN_COLUMNS.productionRecords.order,
+      },
+      {
+        name: "SBH & SMEE Records",
+        path: "/stock/production-records/sbh-smee",
+        component: (props: any) => (
+          <ProductionListPage
+            productTypes={["OTH"]}
+            productIds={["SBH", "SMEE"]}
+            title="SBH & SMEE Production Records"
+            {...props}
+          />
+        ),
+        group: "Production Records",
+        dropdownColumn: STOCK_DROPDOWN_COLUMNS.productionRecords.key,
+        dropdownColumnOrder: STOCK_DROPDOWN_COLUMNS.productionRecords.order,
+      },
+      {
+        name: "Empty Bag Records",
+        path: "/stock/production-records/empty-bag",
+        component: (props: any) => (
+          <ProductionListPage
+            productTypes={["OTH"]}
+            productIds={["EMPTY_BAG", "EMPTY_BAG(S)"]}
+            title="Empty Bag Production Records"
+            {...props}
+          />
+        ),
+        group: "Production Records",
+        dropdownColumn: STOCK_DROPDOWN_COLUMNS.productionRecords.key,
+        dropdownColumnOrder: STOCK_DROPDOWN_COLUMNS.productionRecords.order,
       },
       {
         name: "Production Entry",
         path: "/stock/production",
         component: ProductionEntryPage,
         group: "Products",
+        dropdownColumn: STOCK_DROPDOWN_COLUMNS.products.key,
+        dropdownColumnOrder: STOCK_DROPDOWN_COLUMNS.products.order,
       },
       {
         name: "Product Adjustments",
         path: "/stock/adjustments",
         component: ProductStockAdjustmentEntryPage,
         group: "Products",
+        dropdownColumn: STOCK_DROPDOWN_COLUMNS.products.key,
+        dropdownColumnOrder: STOCK_DROPDOWN_COLUMNS.products.order,
       },
       {
         name: "Material Stock",
         path: "/stock/material-stock",
         component: MaterialStockPage,
         group: "Materials & Purchases",
+        dropdownColumn: STOCK_DROPDOWN_COLUMNS.materialsPurchases.key,
+        dropdownColumnOrder: STOCK_DROPDOWN_COLUMNS.materialsPurchases.order,
       },
       {
         name: "General Stock",
         path: "/stock/entry",
         component: GeneralStockPage,
         group: "Materials & Purchases",
+        dropdownColumn: STOCK_DROPDOWN_COLUMNS.materialsPurchases.key,
+        dropdownColumnOrder: STOCK_DROPDOWN_COLUMNS.materialsPurchases.order,
       },
       {
         name: "General Purchases",
         path: "/stock/general-purchases",
         component: GeneralPurchaseInvoiceListPage,
         group: "Materials & Purchases",
+        dropdownColumn: STOCK_DROPDOWN_COLUMNS.materialsPurchases.key,
+        dropdownColumnOrder: STOCK_DROPDOWN_COLUMNS.materialsPurchases.order,
         subItems: [
           {
             name: "New Local Purchase",

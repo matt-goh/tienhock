@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   IconAlertTriangle,
+  IconArrowsSort,
   IconChevronDown,
   IconChevronRight,
   IconChevronsDown,
@@ -14,10 +15,12 @@ import {
 import clsx from "clsx";
 import TimeNavigator from "../../components/TimeNavigator";
 import ProductSelector from "../../components/Stock/ProductSelector";
+import ProductOrderModal from "../../components/Catalogue/ProductOrderModal";
 import { api } from "../../routes/utils/api";
+import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import {
   ProductionEntry,
-  ProductionWorkerOrderResponse,
+  ProductionPageContextResponse,
   ProductionWorkerOrderScope,
   StockProduct,
 } from "../../types/types";
@@ -67,11 +70,17 @@ interface ProductGroup {
   machineBroken: boolean;
 }
 
+interface UnitTotal {
+  unitLabel: string;
+  total: number;
+}
+
 interface DateGroup {
   date: string;
   categories: Record<CategoryKey, ProductGroup[]>;
   productCount: number;
   rowCount: number;
+  totalsByUnit: UnitTotal[];
 }
 
 const CATEGORY_ORDER: CategoryKey[] = ["MEE", "BH", "HANCUR", "BUNDLE", "JP", "OTH"];
@@ -206,16 +215,34 @@ interface ProductionListPageProps {
   // Restrict the page to specific product types (e.g. ["JP"] for the Jelly
   // Polly production records page). Default: TH behaviour (all types).
   productTypes?: ProductSelectorProductType[];
+  // Further restrict the page to specific product ids (needed when several
+  // record pages share one product type, e.g. OTH: SBH/SMEE vs EMPTY_BAG).
+  productIds?: string[];
+  // Page heading. Default: "Production Records".
+  title?: string;
   // API base for entries/worker-order (JP passes /jellypolly/api/production-entries)
   apiBasePath?: string;
 }
 
 const ProductionListPage: React.FC<ProductionListPageProps> = ({
   productTypes,
+  productIds,
+  title = "Production Records",
   apiBasePath = "/api/production-entries",
 }) => {
   const navigate = useNavigate();
   const today: Date = useMemo(() => new Date(), []);
+  const { products: orderedProducts } = useProductsCache("all");
+
+  // Shared product display order (products.sort_order via /api/products),
+  // used to order each day's product groups within a category.
+  const productOrderIndex = useMemo(() => {
+    const index: Map<string, number> = new Map();
+    orderedProducts.forEach((product, position: number) => {
+      if (!index.has(product.id)) index.set(product.id, position);
+    });
+    return index;
+  }, [orderedProducts]);
 
   const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [selectedDate, setSelectedDate] = useState<Date>(today);
@@ -228,6 +255,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
   const [entries, setEntries] = useState<ProductionEntry[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+  const [showProductOrderModal, setShowProductOrderModal] = useState(false);
   const [workerOrderByScope, setWorkerOrderByScope] = useState<
     Record<ProductionWorkerOrderScope, string[]>
   >({ BH_PACKING: [], MEE_PACKING: [], JP_PRODUCTION: [] });
@@ -243,63 +271,43 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
   const fetchEntries = useCallback(async (): Promise<void> => {
     setIsLoading(true);
     try {
+      // Worker-order scopes worth bundling: JP pages need JP_PRODUCTION, TH
+      // packing pages need both packing scopes, stock-only (OTH) pages none.
+      const scopes: ProductionWorkerOrderScope[] = productTypes?.includes("JP")
+        ? ["JP_PRODUCTION"]
+        : !productTypes ||
+          productTypes.some((type: ProductSelectorProductType): boolean =>
+            ["MEE", "BH", "BUNDLE"].includes(type)
+          )
+        ? ["BH_PACKING", "MEE_PACKING"]
+        : [];
+
       const params: URLSearchParams = new URLSearchParams({
         start_date: formatDateLocal(dateRange.start),
         end_date: formatDateLocal(dateRange.end),
         include_machine_status: "true",
       });
+      if (scopes.length > 0) params.set("scopes", scopes.join(","));
 
-      const response: ProductionEntry[] = await api.get(
-        `${apiBasePath}?${params.toString()}`
+      // Single bundled call: entries + machine status + worker orders.
+      const response: ProductionPageContextResponse = await api.get(
+        `${apiBasePath}/page-context?${params.toString()}`
       );
-      const allEntries: ProductionEntry[] = response || [];
+      const allEntries: ProductionEntry[] = response?.entries || [];
       setEntries(
-        productTypes
-          ? allEntries.filter((entry: ProductionEntry): boolean => {
-              const productType: string | undefined = entry.product_type;
-              return (
-                isProductSelectorProductType(productType) &&
-                productTypes.includes(productType)
-              );
-            })
-          : allEntries
+        allEntries.filter((entry: ProductionEntry): boolean => {
+          if (productIds && !productIds.includes(entry.product_id)) {
+            return false;
+          }
+          if (!productTypes) return true;
+          const productType: string | undefined = entry.product_type;
+          return (
+            isProductSelectorProductType(productType) &&
+            productTypes.includes(productType)
+          );
+        })
       );
-    } catch (error) {
-      console.error("Error fetching production records:", error);
-      toast.error("Failed to load production records");
-      setEntries([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [dateRange.end, dateRange.start, productTypes, apiBasePath]);
 
-  useEffect(() => {
-    fetchEntries();
-  }, [fetchEntries]);
-
-  // Load the shared worker order for both packing scopes so worker rows can be
-  // displayed in the same order as the Production Entry page.
-  useEffect(() => {
-    let isCurrent: boolean = true;
-    const scopes: ProductionWorkerOrderScope[] = productTypes?.includes("JP")
-      ? ["JP_PRODUCTION"]
-      : ["BH_PACKING", "MEE_PACKING"];
-
-    Promise.all(
-      scopes.map((scope: ProductionWorkerOrderScope) =>
-        api
-          .get(
-            `${apiBasePath}/worker-order?scope=${encodeURIComponent(
-              scope
-            )}`
-          )
-          .then((response: ProductionWorkerOrderResponse): string[] =>
-            response.worker_ids || []
-          )
-          .catch((): string[] => [])
-      )
-    ).then((results: string[][]) => {
-      if (!isCurrent) return;
       const nextWorkerOrderByScope: Record<
         ProductionWorkerOrderScope,
         string[]
@@ -308,16 +316,22 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
         MEE_PACKING: [],
         JP_PRODUCTION: [],
       };
-      scopes.forEach((scope: ProductionWorkerOrderScope, index: number): void => {
-        nextWorkerOrderByScope[scope] = results[index] || [];
+      scopes.forEach((scope: ProductionWorkerOrderScope): void => {
+        nextWorkerOrderByScope[scope] = response?.worker_orders?.[scope] || [];
       });
       setWorkerOrderByScope(nextWorkerOrderByScope);
-    });
+    } catch (error) {
+      console.error("Error fetching production records:", error);
+      toast.error("Failed to load production records");
+      setEntries([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [dateRange.end, dateRange.start, productTypes, productIds, apiBasePath]);
 
-    return (): void => {
-      isCurrent = false;
-    };
-  }, [apiBasePath, productTypes]);
+  useEffect(() => {
+    fetchEntries();
+  }, [fetchEntries]);
 
   const productionProductFilter = useCallback(
     (product: StockProduct): boolean =>
@@ -460,12 +474,24 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
           OTH: [],
         };
 
+        const totalsByUnitMap: Map<string, number> = new Map();
         Array.from(productMap.values())
           .sort((first: ProductGroup, second: ProductGroup) => {
             const categoryDiff: number =
               CATEGORY_ORDER.indexOf(first.category) -
               CATEGORY_ORDER.indexOf(second.category);
             if (categoryDiff !== 0) return categoryDiff;
+            const firstOrder: number | undefined = productOrderIndex.get(
+              first.productId
+            );
+            const secondOrder: number | undefined = productOrderIndex.get(
+              second.productId
+            );
+            if (firstOrder !== undefined && secondOrder !== undefined) {
+              return firstOrder - secondOrder;
+            }
+            if (firstOrder !== undefined) return -1;
+            if (secondOrder !== undefined) return 1;
             return first.productId.localeCompare(second.productId);
           })
           .forEach((group: ProductGroup) => {
@@ -478,6 +504,10 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
               compareRows(orderIndex, first, second)
             );
             categories[group.category].push(group);
+            totalsByUnitMap.set(
+              group.unitLabel,
+              (totalsByUnitMap.get(group.unitLabel) || 0) + group.totalQuantity
+            );
           });
 
         return {
@@ -488,9 +518,15 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
             (sum: number, group: ProductGroup) => sum + group.rows.length,
             0
           ),
+          totalsByUnit: Array.from(totalsByUnitMap.entries()).map(
+            ([unitLabel, total]: [string, number]): UnitTotal => ({
+              unitLabel,
+              total,
+            })
+          ),
         };
       });
-  }, [entries, productMatchesFilter, searchMatchesEntry, workerOrderByScope]);
+  }, [entries, productMatchesFilter, searchMatchesEntry, workerOrderByScope, productOrderIndex]);
 
   const summaryStats = useMemo(() => {
     const productCount: number = dateGroups.reduce(
@@ -519,10 +555,6 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
     });
     return keys;
   }, [dateGroups]);
-
-  useEffect(() => {
-    setExpandedKeys(new Set(visibleProductKeys));
-  }, [visibleProductKeys]);
 
   const areAllVisibleRowsExpanded = useMemo(() => {
     return (
@@ -620,7 +652,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
-                Production Records
+                {title}
               </h1>
               <span className="hidden text-default-300 dark:text-gray-600 sm:inline">
                 |
@@ -647,25 +679,44 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(280px,420px)_minmax(240px,360px)_auto]">
-          <ProductSelector
-            value={selectedProductId}
-            onChange={setSelectedProductId}
-            productTypes={productTypes || DEFAULT_PRODUCTION_PRODUCT_TYPES}
-            productFilter={
-              productTypes
-                ? (product: StockProduct): boolean => {
-                    const productType: string | undefined = product.type;
-                    return (
-                      isProductSelectorProductType(productType) &&
-                      productTypes.includes(productType)
-                    );
-                  }
-                : productionProductFilter
-            }
-            placeholder="All production products"
-            showCategories
-          />
+        <div className="mt-4 grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(280px,420px)_minmax(240px,1fr)_auto]">
+          <div>
+            <ProductSelector
+              value={selectedProductId}
+              onChange={setSelectedProductId}
+              productTypes={productTypes || DEFAULT_PRODUCTION_PRODUCT_TYPES}
+              productFilter={
+                productTypes
+                  ? (product: StockProduct): boolean => {
+                      if (productIds && !productIds.includes(product.id)) {
+                        return false;
+                      }
+                      const productType: string | undefined = product.type;
+                      return (
+                        isProductSelectorProductType(productType) &&
+                        productTypes.includes(productType)
+                      );
+                    }
+                  : productIds
+                  ? (product: StockProduct): boolean =>
+                      productIds.includes(product.id)
+                  : productionProductFilter
+              }
+              placeholder="All production products"
+              showCategories
+            />
+            {/* Quick access to the shared product display order */}
+            <div className="mt-1.5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowProductOrderModal(true)}
+                className="inline-flex items-center gap-1 text-xs font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300"
+              >
+                <IconArrowsSort size={14} />
+                Reorder products
+              </button>
+            </div>
+          </div>
           <div className="relative">
             <IconSearch
               className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-500"
@@ -695,7 +746,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
             type="button"
             onClick={toggleAllExpanded}
             disabled={visibleProductKeys.length === 0}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-default-300 px-3 py-2 text-sm font-medium leading-5 text-default-700 transition-colors hover:bg-default-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+            className="inline-flex items-center justify-center gap-1.5 justify-self-start rounded-lg border border-default-300 px-3 py-2 text-sm font-medium leading-5 text-default-700 transition-colors hover:bg-default-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700 sm:col-span-2 lg:col-span-1 lg:justify-self-end"
           >
             {areAllVisibleRowsExpanded ? (
               <IconChevronsUp size={15} />
@@ -735,6 +786,17 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
                     </h2>
                     <p className="text-xs text-default-500 dark:text-gray-400">
                       {dateGroup.productCount} products, {dateGroup.rowCount} rows
+                      {dateGroup.totalsByUnit.length > 0 && (
+                        <span className="ml-2 font-semibold text-default-700 dark:text-gray-200">
+                          Total:{" "}
+                          {dateGroup.totalsByUnit
+                            .map(
+                              (unitTotal: UnitTotal): string =>
+                                `${formatQuantity(unitTotal.total)} ${unitTotal.unitLabel}`
+                            )
+                            .join(" · ")}
+                        </span>
+                      )}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -909,6 +971,13 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
           </div>
         )}
       </div>
+
+      {/* Shared product display order modal */}
+      <ProductOrderModal
+        isOpen={showProductOrderModal}
+        onClose={() => setShowProductOrderModal(false)}
+        products={orderedProducts}
+      />
     </div>
   );
 };
