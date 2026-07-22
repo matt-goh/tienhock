@@ -744,7 +744,7 @@ export default function (pool, config) {
         }
         totalCustomers = customers.length;
         if (req.query.page || req.query.limit) {
-          const limit = Math.max(1, parseInt(req.query.limit, 10) || 100);
+          const limit = Math.max(1, parseInt(req.query.limit, 10) || 200);
           const maxPage = Math.max(1, Math.ceil(totalCustomers / limit));
           page = Math.min(Math.max(1, parseInt(req.query.page, 10) || 1), maxPage);
           customers = customers.slice((page - 1) * limit, page * limit);
