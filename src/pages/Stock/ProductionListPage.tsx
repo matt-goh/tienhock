@@ -67,11 +67,17 @@ interface ProductGroup {
   machineBroken: boolean;
 }
 
+interface UnitTotal {
+  unitLabel: string;
+  total: number;
+}
+
 interface DateGroup {
   date: string;
   categories: Record<CategoryKey, ProductGroup[]>;
   productCount: number;
   rowCount: number;
+  totalsByUnit: UnitTotal[];
 }
 
 const CATEGORY_ORDER: CategoryKey[] = ["MEE", "BH", "HANCUR", "BUNDLE", "JP", "OTH"];
@@ -206,12 +212,19 @@ interface ProductionListPageProps {
   // Restrict the page to specific product types (e.g. ["JP"] for the Jelly
   // Polly production records page). Default: TH behaviour (all types).
   productTypes?: ProductSelectorProductType[];
+  // Further restrict the page to specific product ids (needed when several
+  // record pages share one product type, e.g. OTH: SBH/SMEE vs EMPTY_BAG).
+  productIds?: string[];
+  // Page heading. Default: "Production Records".
+  title?: string;
   // API base for entries/worker-order (JP passes /jellypolly/api/production-entries)
   apiBasePath?: string;
 }
 
 const ProductionListPage: React.FC<ProductionListPageProps> = ({
   productTypes,
+  productIds,
+  title = "Production Records",
   apiBasePath = "/api/production-entries",
 }) => {
   const navigate = useNavigate();
@@ -254,15 +267,17 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
       );
       const allEntries: ProductionEntry[] = response || [];
       setEntries(
-        productTypes
-          ? allEntries.filter((entry: ProductionEntry): boolean => {
-              const productType: string | undefined = entry.product_type;
-              return (
-                isProductSelectorProductType(productType) &&
-                productTypes.includes(productType)
-              );
-            })
-          : allEntries
+        allEntries.filter((entry: ProductionEntry): boolean => {
+          if (productIds && !productIds.includes(entry.product_id)) {
+            return false;
+          }
+          if (!productTypes) return true;
+          const productType: string | undefined = entry.product_type;
+          return (
+            isProductSelectorProductType(productType) &&
+            productTypes.includes(productType)
+          );
+        })
       );
     } catch (error) {
       console.error("Error fetching production records:", error);
@@ -271,7 +286,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [dateRange.end, dateRange.start, productTypes, apiBasePath]);
+  }, [dateRange.end, dateRange.start, productTypes, productIds, apiBasePath]);
 
   useEffect(() => {
     fetchEntries();
@@ -460,6 +475,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
           OTH: [],
         };
 
+        const totalsByUnitMap: Map<string, number> = new Map();
         Array.from(productMap.values())
           .sort((first: ProductGroup, second: ProductGroup) => {
             const categoryDiff: number =
@@ -478,6 +494,10 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
               compareRows(orderIndex, first, second)
             );
             categories[group.category].push(group);
+            totalsByUnitMap.set(
+              group.unitLabel,
+              (totalsByUnitMap.get(group.unitLabel) || 0) + group.totalQuantity
+            );
           });
 
         return {
@@ -487,6 +507,12 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
           rowCount: Array.from(productMap.values()).reduce(
             (sum: number, group: ProductGroup) => sum + group.rows.length,
             0
+          ),
+          totalsByUnit: Array.from(totalsByUnitMap.entries()).map(
+            ([unitLabel, total]: [string, number]): UnitTotal => ({
+              unitLabel,
+              total,
+            })
           ),
         };
       });
@@ -519,10 +545,6 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
     });
     return keys;
   }, [dateGroups]);
-
-  useEffect(() => {
-    setExpandedKeys(new Set(visibleProductKeys));
-  }, [visibleProductKeys]);
 
   const areAllVisibleRowsExpanded = useMemo(() => {
     return (
@@ -620,7 +642,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
-                Production Records
+                {title}
               </h1>
               <span className="hidden text-default-300 dark:text-gray-600 sm:inline">
                 |
@@ -655,12 +677,18 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
             productFilter={
               productTypes
                 ? (product: StockProduct): boolean => {
+                    if (productIds && !productIds.includes(product.id)) {
+                      return false;
+                    }
                     const productType: string | undefined = product.type;
                     return (
                       isProductSelectorProductType(productType) &&
                       productTypes.includes(productType)
                     );
                   }
+                : productIds
+                ? (product: StockProduct): boolean =>
+                    productIds.includes(product.id)
                 : productionProductFilter
             }
             placeholder="All production products"
@@ -735,6 +763,17 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
                     </h2>
                     <p className="text-xs text-default-500 dark:text-gray-400">
                       {dateGroup.productCount} products, {dateGroup.rowCount} rows
+                      {dateGroup.totalsByUnit.length > 0 && (
+                        <span className="ml-2 font-semibold text-default-700 dark:text-gray-200">
+                          Total:{" "}
+                          {dateGroup.totalsByUnit
+                            .map(
+                              (unitTotal: UnitTotal): string =>
+                                `${formatQuantity(unitTotal.total)} ${unitTotal.unitLabel}`
+                            )
+                            .join(" · ")}
+                        </span>
+                      )}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
