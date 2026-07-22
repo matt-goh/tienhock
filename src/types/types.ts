@@ -1253,6 +1253,9 @@ export interface StockProduct {
   type: "BH" | "MEE" | "JP" | "OTH" | "TAX" | "BUNDLE";
   price_per_unit?: number;
   is_active?: boolean;
+  // Explicit per-type display order (managed via the Catalogue Product page
+  // Reorder modal); null/undefined = default prefix/alphabetical order.
+  sort_order?: number | null;
 }
 
 // Production Entry

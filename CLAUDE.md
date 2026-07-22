@@ -128,7 +128,7 @@ This is a comprehensive ERP system supporting three companies:
 
 **Products & Inventory:**
 
-- `products` - id, description, price_per_unit, type, tax, is_active
+- `products` - id, description, price_per_unit, type, tax, is_active, sort_order (nullable integer; explicit display order within the product's own type, shared by all product/production pickers — Production Entry selection, Product Stock picker, Production Records, ProductSelector. Managed via PUT /api/products/order and the Reorder modal on the Catalogue Product page; NULL = default prefix/alphabetical order after the ordered ones. GET /api/products keeps each type contiguous (ranked by first appearance in the legacy prefix order) and applies sort_order within the type)
 - `production_entries` - id, entry_date, product_id, worker_id (nullable for stock-only OTH production records), bags_packed, created_at, updated_at, created_by
 - `production_machine_status` - id, entry_date, product_id (FK products), machine_broken, notes, created_at, updated_at, created_by (tracks machine broken status per date/product for production bonus threshold override - when machine_broken=true, workers below threshold still receive bonus pay codes)
 - `production_worker_orders` - scope (BH_PACKING/MEE_PACKING/JP_PRODUCTION), worker_id (FK staffs), sort_order, updated_at, updated_by (shared drag-and-drop worker card order for Production Entry worker grids; JP_PRODUCTION scope is the Jelly Polly production page)

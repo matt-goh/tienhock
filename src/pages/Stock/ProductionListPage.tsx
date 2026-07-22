@@ -15,6 +15,7 @@ import clsx from "clsx";
 import TimeNavigator from "../../components/TimeNavigator";
 import ProductSelector from "../../components/Stock/ProductSelector";
 import { api } from "../../routes/utils/api";
+import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import {
   ProductionEntry,
   ProductionWorkerOrderResponse,
@@ -229,6 +230,17 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
 }) => {
   const navigate = useNavigate();
   const today: Date = useMemo(() => new Date(), []);
+  const { products: orderedProducts } = useProductsCache("all");
+
+  // Shared product display order (products.sort_order via /api/products),
+  // used to order each day's product groups within a category.
+  const productOrderIndex = useMemo(() => {
+    const index: Map<string, number> = new Map();
+    orderedProducts.forEach((product, position: number) => {
+      if (!index.has(product.id)) index.set(product.id, position);
+    });
+    return index;
+  }, [orderedProducts]);
 
   const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [selectedDate, setSelectedDate] = useState<Date>(today);
@@ -482,6 +494,17 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
               CATEGORY_ORDER.indexOf(first.category) -
               CATEGORY_ORDER.indexOf(second.category);
             if (categoryDiff !== 0) return categoryDiff;
+            const firstOrder: number | undefined = productOrderIndex.get(
+              first.productId
+            );
+            const secondOrder: number | undefined = productOrderIndex.get(
+              second.productId
+            );
+            if (firstOrder !== undefined && secondOrder !== undefined) {
+              return firstOrder - secondOrder;
+            }
+            if (firstOrder !== undefined) return -1;
+            if (secondOrder !== undefined) return 1;
             return first.productId.localeCompare(second.productId);
           })
           .forEach((group: ProductGroup) => {
@@ -516,7 +539,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
           ),
         };
       });
-  }, [entries, productMatchesFilter, searchMatchesEntry, workerOrderByScope]);
+  }, [entries, productMatchesFilter, searchMatchesEntry, workerOrderByScope, productOrderIndex]);
 
   const summaryStats = useMemo(() => {
     const productCount: number = dateGroups.reduce(

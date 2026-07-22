@@ -5,6 +5,7 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import ProductModal from "../../components/Catalogue/ProductModal";
+import ProductOrderModal from "../../components/Catalogue/ProductOrderModal";
 import {
   refreshProductsCache,
   useProductsCache,
@@ -16,6 +17,7 @@ import {
   IconCheck,
   IconX,
   IconRefresh,
+  IconArrowsSort,
 } from "@tabler/icons-react";
 import { FormListbox } from "../../components/FormComponents";
 import { useCustomersCache } from "../../utils/catalogue/useCustomerCache";
@@ -39,6 +41,7 @@ const ProductPage: React.FC = () => {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState<boolean>(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<boolean>(false);
@@ -300,9 +303,18 @@ const ProductPage: React.FC = () => {
             </div>
           </div>
 
-          <Button onClick={handleCreateProduct} icon={IconPlus} color="sky">
-            Add Product
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setIsOrderModalOpen(true)}
+              icon={IconArrowsSort}
+              variant="outline"
+            >
+              Reorder
+            </Button>
+            <Button onClick={handleCreateProduct} icon={IconPlus} color="sky">
+              Add Product
+            </Button>
+          </div>
         </div>
 
         <div className="w-full border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
@@ -462,6 +474,12 @@ const ProductPage: React.FC = () => {
         onSave={handleSaveProduct}
         product={selectedProduct}
         mode={modalMode}
+      />
+
+      <ProductOrderModal
+        isOpen={isOrderModalOpen}
+        onClose={() => setIsOrderModalOpen(false)}
+        products={products}
       />
 
       <ConfirmationDialog
