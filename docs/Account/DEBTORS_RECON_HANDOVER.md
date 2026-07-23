@@ -1,17 +1,20 @@
 # Debtors GL ↔ Operations Reconciliation — Handover
 
-**Date written:** 2026-07-22
-**Status:** Bucket 3 DONE (dev; prod PENDING). Buckets 1 & 2 await staff answers. Everything else is documented noise or user-level cleanup.
-**How to use this doc:** when the staff answers arrive, start a fresh session, paste/reference this doc together with the answers, and ask for the corresponding fix in §4/§5.
+**Date written:** 2026-07-22 · **Last updated:** 2026-07-23
+**Status:**
+- Bucket 3 DONE (dev ✓ / prod PENDING) — see §3.
+- 2026-07-23 batch DONE (dev ✓ / prod PENDING) — **21 invoices reconciled** (all of Bucket 1 + 11 of the 14 Bucket 2 customers + all 6 §6 cases: NEVER-S, A MARKET, CLS, UTEA, and MYSHOP-KM2 ×2), see §4.
+- **§6 REMAINING is now EMPTY** — the last 3 bills (UTEA 62155, MYSHOP-KM2 62394 & 62952) were answered and applied on 2026-07-23 as CASES 19-21. The actionable ops-only category is now RM0.00 (re-run §2 filter returns 0 rows). The only recon gap left is the structural "leave alone" categories (legacy-only + mixed differences, §8).
+- Documentation for the batch is DONE: changelog, `docs/MIGRATIONS_LOG.md` row, and the AGENTS/CLAUDE dated entry are all written (§10).
 
-> **Numbers are a snapshot, not live truth.** Every amount in this doc comes from the
-> dev database, which is a production copy as of 20 Jul 2026. Live prod data entry has
-> continued since, so current outstanding totals (and possibly some per-customer
-> balances) WILL differ. Before applying any fix below — and before running the
-> bucket-3 migration on prod — re-run the §2 reconciliation against the CURRENT
-> target database and re-pin every guard value to what it returns. Treat this doc's
-> amounts as evidence of what each case looked like on 2026-07-22, and its invoice /
-> customer IDs as the stable identifiers.
+**How to use this doc:** the actionable work is complete. If a further disputed invoice surfaces, start a fresh session, paste/reference this doc + the staff answer, apply the matching pattern from §5, and append the case to `dev/migrations/2026-07-23_debtors_recon_corrections.sql`.
+
+> **Numbers are a snapshot, not live truth.** Amounts come from the dev database (a
+> production copy as of 20 Jul 2026). Live prod data entry has continued, so current
+> totals and some per-customer balances WILL differ. Before running any migration on
+> prod, re-run the §2 reconciliation against the CURRENT target DB and re-pin every
+> guard value. Treat this doc's amounts as evidence of what each case looked like, and
+> its invoice / customer IDs as the stable identifiers.
 
 ---
 
@@ -22,16 +25,26 @@ The Debtors report has two views with different data sources:
 - **By Customer view** (default) — GL/ledger-based (debtor child account opening anchors + posted journal lines). This is the authoritative accounting position.
 - **By Salesman view / invoice list / `customers.credit_used`** — operational subledger (`invoices.balance_due`).
 
-A customer can diverge when one side recorded something the other did not. On 2026-07-22 the full population was itemized (**dev DB snapshot — expect drift on live prod**):
+A customer diverges when one side recorded something the other did not. Original 2026-07-22 itemization (**dev DB snapshot — historical**):
 
 | Component | Amount (RM) | Meaning |
 |---|---|---|
 | GL total (all TD debtor children) | 598,818.18 | |
 | Operational open invoices total | 590,983.08 | |
-| **Net gap** | **7,835.10** | = the three rows below |
-| Legacy-only accounts | +29,147.93 | GL balances for customers with NO keyed invoices (BTS-*, SHIFANA, MADINAH-N, FOOKHING, YNWA, AC, ALDIE, DYNASTY, 68-K, etc.) — real pre-system debts, **structural, not an error, no action** |
-| Ops-only invoices (GL = 0) | −12,410.00 | Bucket 1 + Bucket 2 below |
-| Mixed differences | −8,902.83 | NOOR, SHOP(1), SABINDO-K, SENANG, RED, HIAPLEE-M, SHOP(2), MYSHOP(2), PUBLIC, C-CARE(3), MYSHOP-QL, … — case-by-case, left to users |
+| **Net gap** | **7,835.10** | |
+| Legacy-only accounts | +29,147.93 | GL balances for customers with NO keyed invoices — real pre-system debts, **structural, no action** |
+| Ops-only invoices (GL = 0) | −12,410.00 | Bucket 1 + Bucket 2 — the actionable category (mostly fixed, see §4/§6) |
+| Mixed differences | −8,902.83 | case-by-case, left to users / auditor |
+
+**Current dev status after the 2026-07-23 batch** (re-run of §2, categorized):
+
+| Category | Accounts | Net diff (RM) | Action |
+|---|---|---|---|
+| Ops-only (GL=0) — **actionable** | 0 | 0.00 | **DONE — all reconciled (CASES 1-21)** |
+| Legacy-only (no invoices) | 37 | +33,478.25 | structural, no action (§8) |
+| Mixed difference | 44 | −13,233.14 | case-by-case / auditor (§8) |
+
+*(Ops-only is now empty after CASES 19-21 closed the last 3 §6 bills; the actionable category totalled exactly RM12,410.00 across CASES 1-21, matching the §1 snapshot's −12,410.00 ops-only line. The legacy-only / mixed rows are the original snapshot and unaffected by this batch.)*
 
 ## 2. Re-run the reconciliation (exact SQL)
 
@@ -67,53 +80,122 @@ SELECT COALESCE(g.code, o.code) AS acct, g.gl_balance, o.open_total,
  ORDER BY ABS(COALESCE(g.gl_balance,0) - COALESCE(o.open_total,0)) DESC;
 ```
 
+To list only the **actionable** ops-only gaps (GL = 0, ops > 0), wrap the same `gl`/`ops`
+CTEs and filter `WHERE ABS(gl_balance) < 0.01 AND open_total > 0.01`.
+
 ## 3. DONE — Bucket 3 (2026-07-22, dev ✓ / prod PENDING)
 
 Six invoices whose settlements already existed in the GL (legacy import) but were never keyed/confirmed operationally were closed with NON-POSTING `contra` payment rows (MYSHOP-SKT pattern). No journal was created/modified/cancelled.
 
-- Migration: `dev/migrations/2026-07-22_gl_settled_invoices_contra.sql` (guarded, idempotent, fail-closed)
+- Migration: `dev/migrations/2026-07-22_gl_settled_invoices_contra.sql` (guarded, idempotent, fail-closed). **This migration also adds `contra` to the `payments.payment_method` CHECK constraint** — a prerequisite for every contra below.
 - Invoices: CHANKOPI `2004676` 1,080.00 · AMY `15309` 135.00 · LEE YX `026127` 57.00 · SHAB `34704` 870.00 · HIAPLEE-SC `63599` 561.00 · LAI `34367` 1,642.00 (LAI via in-place conversion of pending cheque payment `5469`, deliberately NOT linked to IMP journal `6945`)
 - Post-fix recon: five customers diff 0.00; LAI keeps a documented pre-existing RM0.35 residual (out of scope)
 - Documented in: `AGENTS.md` / `CLAUDE.md` dated entry, `docs/MIGRATIONS_LOG.md` ("Applied 22 Jul 2026"), changelog
 - **Prod rollout: PENDING — re-pin guard values against live data before running.**
 
-## 4. Bucket 1 — 2026 sales MISSING from the GL (RM1,020.60) — awaits staff answers
+## 4. DONE — 2026-07-23 recon corrections (dev ✓ / prod PENDING)
 
-The only remaining item where the audited books themselves are wrong (receivables + revenue understated). All three are 2026 operational invoices with NO GL posting at all:
+**Migration: `dev/migrations/2026-07-23_debtors_recon_corrections.sql`** (guarded, idempotent, fail-closed; one atomic `BEGIN…COMMIT`). 21 invoices reconciled: all of Bucket 1, 11 of the 14 Bucket 2 customers, and all 6 staff-answered §6 cases (CASES 16-21).
 
-| Invoice | Customer | Amount (RM) |
-|---|---|---|
-| `2004628` | AFRID | 870.00 |
-| `2004559` | KY | 115.80 |
-| `2004601` | 1M | 34.80 |
+Every case is **operational-only** — the debtor GL balance was already 0.00, so **no journal is posted** into the locked, hash-pinned pre-cutover ledger; only the operational subledger is aligned. Two patterns (see §5 for when to use which):
 
-**Question asked of staff:** did the sale really happen and goods delivered?
+| CASE | Invoice | Customer | Amount | Pattern | Note |
+|---|---|---|---|---|---|
+| 1 | 2004628 | AFRID | 870.00 | A cash | Bucket 1 |
+| 2 | 2004559 | KY | 115.80 | A cash | Bucket 1 |
+| 3 | 2004601 | 1M | 34.80 | A cash | Bucket 1 |
+| 4 | 33909 | SABANAH-S | 1,916.00 | A cash | Bucket 2 |
+| 5 | 34135 | SABANAH-S | 1,576.00 | A cash | Bucket 2 (2nd invoice — drove the two-pass design) |
+| 6 | 2004297 | ANGELA | 1,608.00 | A cash | valid individual e-Invoice, untouched |
+| 7 | 62959 | MYSHOP-KD2 | 15.40 | B contra | residual offset by CN `TH/CN/41`; anchor 497.60 = 513 − 15.40; kept TF pmt 3352 |
+| 8 | 2004210 | KOPI 148 | 330.00 | B contra | transfer `TR041025` 04/10/2025; anchors 0.00 |
+| 9 | 62643 | KELUARGA | 435.00 | B contra | cash 11/12/2025; anchors 1235/870 net to 0; cancelled pmt 1444 preserved |
+| 10 | 013543 | WONG-KM | 975.00 | B contra | cash 10/12/2025; anchors 0.00 |
+| 11 | 62681 | 83 MM | 88.50 | A cash | Bucket 2 |
+| 12 | 34094 | BARAKAH | 348.00 | A cash | Bucket 2 |
+| 13 | 62866 | A&A | 372.00 | A cash | `credit_used` drift (was 0) corrected by recompute |
+| 14 | 2004275 | MING-P | 867.00 | A cash | Bucket 2 |
+| 15 | 2004424 | TAY | 17.40 | A cash | Bucket 2 |
+| 16 | 2004285 | NEVER-S | 1,086.00 | A cash | §6 staff answer: cash sale (was Consolidated child) |
+| 17 | 2004226 | A MARKET | 365.00 | A cash | §6 staff answer: cash sale |
+| 18 | 026261 | CLS | 976.00 | B contra | §6 staff answer: online 04/11/2025 (salesman book); anchor 2026-06-01=0.00 (no 2026-01-01 anchor) |
+| 19 | 62155 | UTEA | 342.00 | B contra | §6: whole bill, online 15/07/2025 `TF150725-1`; anchor 2026-01-01=0.00; preserved cancelled bank_transfer pmt 174 |
+| 20 | 62394 | MYSHOP-KM2 | 50.15 | B contra | §6: residual after RM1,621.35 online (`TF161225-3`, pmt 2553); 3% discount CN `TH/CN/25/38` (26/08/2025) |
+| 21 | 62952 | MYSHOP-KM2 | 21.95 | B contra | §6: residual after RM709.55 online (`TF110226-5`, pmt 3351); 3% discount CN `TH/CN/25/49`. Latest anchor 2026-06-01=803.65 nets to GL 0.00 |
 
-- **If REAL** → post the missing S-sale journals, dated to the invoice dates, matching the contract shape (DR debtor child / CR CR_SALES or CASH_SALES per payment type, tax lines as on the invoice). Use a guarded migration; verify each customer's recon diff closes to 0.00 afterwards.
-- **If NOT real (test/duplicate/undelivered)** → cancel the operational invoice through the normal app flow (or a guarded cancellation migration if the app blocks it), which restores balance/credit and cancels any invoice-owned journal.
+**File structure (how to extend it):**
+- **CASE 1** — standalone `DO` block (AFRID).
+- **CASES 2-6, 11-15, 16, 17** — one two-pass `DO` block driven by a `_recon_cash_cases` temp table: Pass 1 converts each invoice INVOICE→CASH; Pass 2 verifies the recon per **DISTINCT** customer (so a customer with two invoices, like SABANAH-S, isn't asserted to zero mid-way). **To add a Pattern-A case: append one row to the `INSERT INTO _recon_cash_cases VALUES` list** — Pass 2 picks up the customer automatically.
+- **CASES 7, 8, 9, 10, 18, 19** — separate `DO` blocks (single-invoice Pattern B contras). **To add a Pattern-B case: copy the closest block** (CASE 8 = zero-anchor/no-prior-payment with a 2026-01-01 anchor; CASE 18 = settled by online transfer where the customer has ONLY a 2026-06-01 anchor at 0.00, no 2026-01-01 anchor — pins the latest anchor instead; CASE 9 = non-zero anchors + a preserved cancelled payment; CASE 19 = whole-bill contra with a preserved cancelled payment AND a 2026-01-01 anchor at 0.00; CASE 7 = partial residual with a prior active payment).
+- **CASES 20-21** — one two-pass `DO` block for MYSHOP-KM2's two partial residual contras (both 3% prompt-payment-discount CNs), driven by a `_km2_contra_cases` temp table: Pass 1 inserts each residual contra + closes the invoice; Pass 2 recomputes `credit_used` once and verifies the customer recon (pins the latest 2026-06-01 anchor 803.65, netted to GL 0.00). Same "don't assert a multi-invoice customer to zero mid-way" design as the cash block. **To add another same-customer residual contra: append a row to the `INSERT INTO _km2_contra_cases VALUES` list.**
+- Remember to add the new invoice/customer IDs to the three verification `SELECT`s at the bottom.
+- Re-apply after each edit: `docker exec -i tienhock_dev_db psql -U postgres -d tienhock -v ON_ERROR_STOP=1 < dev/migrations/2026-07-23_debtors_recon_corrections.sql` — already-applied cases no-op; new cases apply; any drift aborts the whole transaction.
 
-Useful evidence when deciding: `invoices` row (`einvoice_status`, `uuid`, `createddate`), `order_details` lines, who keyed it, and whether the customer remembers the delivery.
+## 5. Decision guide — how to treat a staff answer
 
-## 5. Bucket 2 — 2025 bills with GL = 0 (~RM11,396.90) — awaits staff answers
+Always **verify the debtor GL balance is 0.00 first** (or that an opening anchor covers the settlement). If the GL still shows the debt, closing it is a **write-off** → flag back to the user, do NOT apply.
 
-Operational invoices still showing outstanding while the customer's ledger balance is exactly zero. Either genuinely owed (pre-system debt never captured in the books) or long settled.
+| Staff answer | Treatment |
+|---|---|
+| "It's a **cash sale**" (paid at point of sale; invoice mis-keyed as credit) | **Pattern A** — flip `paymenttype` INVOICE→CASH, add a non-posting auto-collection `cash` payment dated to the invoice, recompute `credit_used`. (CASE 1-6, 11-15.) |
+| "**Paid later** by transfer / online / cheque / cash" (with ref + date) | **Pattern B** — keep INVOICE, add a non-posting `contra` payment citing the ref+date, invoice→paid, recompute `credit_used`. (CASE 8, 9, 10.) |
+| "Offset by a **CN / 3% prompt-payment discount**" | **Pattern B** — contra citing the CN/discount. (CASE 7.) |
+| "**Not real** / test / duplicate / undelivered" | Cancel the invoice via the app (or a guarded cancellation migration if the period lock blocks it) — restores balance/credit, cancels any invoice-owned journal. |
+| "**Still owed**" (customer genuinely hasn't paid) | Leave the invoice open; the books never captured the receivable. Flag for the auditor; do NOT force-post without approval. |
 
-| Customer | Open (RM) | | Customer | Open (RM) |
-|---|---|---|---|---|
-| SABANAH-S | 3,492.00 | | A&A | 372.00 |
-| ANGELA | 1,608.00 | | A MARKET | 365.00 |
-| NEVER-S | 1,086.00 | | BARAKAH | 348.00 |
-| CLS | 976.00 | | KOPI 148 | 330.00 |
-| WONG-KM | 975.00 | | 83 MM | 88.50 |
-| MING-P | 867.00 | | TAY | 17.40 |
-| KELUARGA | 435.00 | | MYSHOP-KD2 | 15.40 |
+Both patterns are **operational-only, non-posting** here because the settlement (if any) is already in the pre-cutover GL / opening anchors; posting a fresh journal would double-count in the locked, hash-pinned ledger. The `contra` method is the system marker for "already in accounting, non-posting subledger alignment" (regardless of the original cash/transfer/CN method).
 
-**Per customer, staff answers "still owed" or "settled":**
+## 6. DONE — the last staff-answered bills (2 customers / 3 bills, RM414.10)
 
-- **"Settled"** → same safe treatment as Bucket 3: guarded NON-POSTING `contra` payment row citing the settlement evidence, invoice → paid, `credit_used` recomputed. Copy the pattern from `dev/migrations/2026-07-22_gl_settled_invoices_contra.sql`. IMPORTANT: a contra is only legitimate when GL settlement evidence exists (receipt credit or an opening anchor covering it) — verify per customer first, exactly like Bucket 3; if NO evidence exists, closing would be a write-off and must be flagged back to the user instead.
-- **"Still owed"** → leave the invoice open; the books never captured the receivable. Keep on a list for the auditor conversation; do NOT force a posting without user approval.
+All answered and applied on 2026-07-23 (CASES 16-21, §4). This section is now empty of pending work.
 
-## 6. Optional cosmetic — self-cancelling sibling pairs (~RM77)
+| # | Customer | Bill | Amount (RM) | Answer → treatment | CASE |
+|---|---|---|---|---|---|
+| 1 | UTEA (U TEA RESOURCES) | 62155 | 342.00 | Paid online 15/07/2025 `TF150725-1` (original pmt 174 was cancelled) → Pattern B contra, whole bill | 19 |
+| 2 | MYSHOP-KM2 (MY SHOP-KOTA MARUDU 2) | 62394 | 50.15 | RM1,621.35 paid online 16/12/2025 (`TF161225`); residual = 3% prompt-payment discount, CN `TH/CN/25/38` (26/08/2025) → Pattern B contra | 20 |
+| 3 | MYSHOP-KM2 | 62952 | 21.95 | RM709.55 paid online 11/02/2026; residual = 3% prompt-payment discount, CN `TH/CN/25/49` → Pattern B contra | 21 |
+
+`UTEA` and `MYSHOP-KM2` were **not** in the original §5 Bucket 2 list (its 20 Jul numbers weren't exhaustive). MYSHOP-KM2's two residuals were **partial** balances after large online payments and equal exactly 3% of each bill — confirmed prompt-payment discounts, closed as Pattern B contras citing the CN.
+
+**Earlier that day** (CASES 16-18, §4): NEVER-S `2004285` RM1,086.00 → cash sale (Pattern A); A MARKET `2004226` RM365.00 → cash sale (Pattern A); CLS `026261` RM976.00 → online transfer 04/11/2025 per the salesman's cash/cheque book (Pattern B contra).
+
+BM message sent to staff on 2026-07-23 to collect these answers (paid? how/when/ref? discount/contra? or still owed?):
+
+```
+Salam, ada 6 bil lagi yang masih outstanding dalam sistem tapi mungkin dah selesai. Mohon semak rekod & maklumkan untuk setiap bil sama ada:
+(a) sudah dibayar — nyatakan cara (tunai / bank transfer / online / cheque), tarikh, & no rujukan;
+(b) ada diskaun / potongan / contra (cth CN atau prompt payment 3%); atau
+(c) memang masih belum bayar (customer berhutang lagi).
+
+1. NEVER CLOSE SUPERMARKET (Kota Belud) — Bil 2004285, 29/10/2025 — RM1,086.00
+2. CLS GEMILANG ENTERPRISE — Bil 026261, 27/10/2025 — RM976.00
+3. A MARKET - BENONI — Bil 2004226, 08/10/2025 — RM365.00
+4. U TEA RESOURCES S/B — Bil 62155, 12/07/2025 — RM342.00
+5. MY SHOP - KOTA MARUDU 2 — Bil 62394, 25/08/2025 — baki RM50.15 (drpd RM1,671.50)
+6. MY SHOP - KOTA MARUDU 2 — Bil 62952, 08/12/2025 — baki RM21.95 (drpd RM731.50)
+
+Nota: baki #5 & #6 tepat 3% drpd jumlah bil — kemungkinan besar diskaun prompt payment. Mohon sahkan.
+
+Terima kasih.
+```
+
+## 7. Prod rollout (both migrations)
+
+Two migrations, both **dev ✓ / prod PENDING**:
+1. `2026-07-22_gl_settled_invoices_contra.sql` (Bucket 3) — **must run first**, because it enables the `contra` payment method that the 2026-07-23 contras depend on.
+2. `2026-07-23_debtors_recon_corrections.sql` (this batch, CASES 1-21) — its contra cases (7-10, 18-21) guard-check that `contra` is permitted and abort with a clear message if it isn't.
+
+Before running on prod:
+- **Re-pin** every guard value against the CURRENT prod DB (re-run §2). Both files are **fail-closed and atomic** — if any before-state doesn't match, the whole transaction rolls back (nothing changes) and names the failing case. Fix that case's pinned values and re-run; already-correct cases no-op.
+- The 2026-07-23 file is now **final** (all 21 cases in; §6 is empty) — roll out once.
+
+## 8. Explicitly NOT to do
+
+- Do not key payments through the app to "fix" any of the above — a keyed payment posts a real receipt journal on top of the mismatch. Staff have been told (BM notices 2026-07-22 and 2026-07-23) to flag, not fix.
+- Do not touch the **legacy-only accounts** (37 accts, ~+33k) — real pre-system debts with no keyed invoices; the By Customer view surfaces them correctly.
+- Do not chase the **mixed-difference** customers (44 accts, ~−13k) or sub-RM100 residuals without a specific user request / staff answer.
+
+## 9. Optional cosmetic — self-cancelling sibling pairs (~RM77)
 
 Receipts posted to the wrong sibling account; combined Trade Debtors unaffected:
 
@@ -122,16 +204,12 @@ Receipts posted to the wrong sibling account; combined Trade Debtors unaffected:
 
 Fix = small re-point migration in the style of `2026-07-16_myshop_km5_64072_debtor_reassign.sql` (git history). Only do it if the user asks.
 
-## 7. Explicitly NOT to do
+## 10. Definition of done for any fix above
 
-- Do not key payments through the app to "fix" any of the above — a keyed payment posts a real receipt journal on top of the mismatch. Staff have been told (BM notice sent 2026-07-22) to flag, not fix.
-- Do not touch the legacy-only accounts (+29,147.93) — real pre-system debts with no keyed invoices; the By Customer view surfaces them correctly.
-- Do not chase the mixed-difference customers (§1) or sub-RM100 residuals without a specific user request.
-
-## 8. Definition of done for any fix above
-
-1. Guarded, idempotent migration file in `dev/migrations/`, applied to dev with all guards passing.
-2. §2 recon query re-run: affected customers diff 0.00 (or a documented, pre-existing residual).
+1. Guarded, idempotent migration in `dev/migrations/`, applied to dev with all guards passing.
+2. §2 recon re-run: affected customers diff 0.00 (or a documented, pre-existing residual).
 3. `credit_used` recomputed and equal to each customer's open-invoice total.
 4. Dated entries in `AGENTS.md` + `CLAUDE.md`, row in `docs/MIGRATIONS_LOG.md`, changelog entry (`CHANGELOG_ENTRIES` in `src/components/ChangelogModal.tsx`, ms + en, prepended).
 5. Prod marked PENDING with a re-pin note — prod rollout is a separate approved step.
+
+**DONE for the 2026-07-23 batch** (2026-07-23, batch now final at CASES 1-21): item 4 above is complete — changelog entry prepended (`CHANGELOG_ENTRIES`, ms + en, RM12,410.00 summary), `docs/MIGRATIONS_LOG.md` row added, and the "Debtors recon corrections (2026-07-23)" dated entry written into `AGENTS.md` + `CLAUDE.md`. Only the prod rollout (§7) remains, as a separate approved step with guard re-pinning.
