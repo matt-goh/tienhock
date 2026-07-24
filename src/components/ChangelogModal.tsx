@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-24",
+    ms: "Senarai dan butiran jurnal kini memaparkan nombor rujukan sebenar resit (contohnya T130726) — sama seperti yang dipaparkan pada penyata bank dan jurnal lama yang diimport — bukannya nombor dalaman REC-.... Carian jurnal juga kini menemui jurnal melalui nombor rujukan sebenar tersebut.",
+    en: "The journal list and details now show the receipt's actual reference number (e.g. T130726) — matching what the bank statement and imported legacy journals already show — instead of the internal REC-... number. Journal search now also finds journals by that actual reference number.",
+  },
+  {
+    date: "2026-07-24",
     ms: "Bayaran pelanggan dalam tempoh lama yang dikunci kini boleh digunakan untuk menjelaskan invois tertunggak apabila nombor rujukan, pelanggan, invois dan amaun sepadan tepat dengan bayaran yang sudah ada dalam lejar lama. Sistem menunjukkan tarikh lejar sebenar untuk pengesahan, menambah sejarah bayaran baca sahaja, mengemas kini baki/status invois dan mengira semula baki kredit pelanggan — wang dan catatan akaun tidak direkodkan kali kedua. Jika padanan tidak tepat atau meragukan, tempoh kekal dikunci. Contohnya, invois HIAPLEE-M 62586 boleh dipadankan dengan PBB111306 berjumlah RM523.50 pada tarikh lejar 15/04/2026 walaupun tarikh 13/04/2026 dimasukkan.",
     en: "Customer payments from the locked historical period can now clear outstanding invoices when the reference, customer, invoice and amount exactly match a payment already present in the old ledger. The system shows the authoritative ledger date for confirmation, adds a read-only payment-history record, updates the invoice balance/status and recalculates customer credit — it does not record the money or accounting entry a second time. If the match is not exact or is ambiguous, the period stays locked. For example, HIAPLEE-M invoice 62586 can be matched to PBB111306 for RM523.50 on the ledger date 15/04/2026 even when 13/04/2026 was entered.",
   },
