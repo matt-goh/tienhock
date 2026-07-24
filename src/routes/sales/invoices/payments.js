@@ -10,6 +10,7 @@ import {
 import { fetchUnappliedOverpayments } from "../../accounting/overpayments.js";
 import { applyOverpayment } from "../../accounting/overpayment-apply.js";
 import { assertTienHockAccountingDateUnlocked } from "../../accounting/posting-lock.js";
+import { reconcileImportedPayment } from "../../accounting/imported-payment-reconciliation.js";
 
 // Helper function (can be moved to a shared util if used elsewhere)
 const updateCustomerCredit = async (client, customerId, amount) => {
@@ -254,6 +255,49 @@ export default function (pool) {
     }
   });
 
+  // --- POST /api/payments/reconcile-imported ---
+  // Confirm an exact pre-cutover receipt already present in the imported GL.
+  router.post("/reconcile-imported", async (req, res) => {
+    const confirmerId =
+      req.session?.staff?.id || req.session?.staff_id || null;
+    if (!confirmerId) {
+      return res.status(403).json({
+        code: "STAFF_SESSION_REQUIRED",
+        message:
+          "A signed-in staff session is required to confirm an imported ledger payment.",
+      });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await reconcileImportedPayment(
+        client,
+        req.body,
+        confirmerId
+      );
+      await client.query("COMMIT");
+      res.status(result.already_reconciled ? 200 : 201).json({
+        message: result.already_reconciled
+          ? `Invoice ${result.preview.invoice_id} was already cleared using this imported ledger payment.`
+          : `Invoice ${result.preview.invoice_id} was cleared using the existing imported ledger payment. No new receipt or journal was created.`,
+        no_new_journal: true,
+        ...result,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error reconciling imported payment:", error);
+      res.status(error.status || 500).json({
+        code: error.code,
+        message: error.status
+          ? error.message
+          : "Error reconciling the imported ledger payment",
+      });
+    } finally {
+      client.release();
+    }
+  });
+
   // --- POST /api/payments (Create Payment) ---
   router.post("/", async (req, res) => {
     const {
@@ -319,6 +363,16 @@ export default function (pool) {
         throw new Error(
           `Invoice ${invoice_id} is cancelled and cannot receive payments.`
         );
+      }
+      if (
+        String(invoice.invoice_status || "").toLowerCase() === "paid" ||
+        currentBalance <= 0.005
+      ) {
+        const error = new Error(
+          `Invoice ${invoice_id} is already settled. Reload the payment list before recording another payment.`
+        );
+        error.status = 409;
+        throw error;
       }
 
       // 3. Split into an invoice allocation (up to balance due) plus a
@@ -388,6 +442,8 @@ export default function (pool) {
             ? error.message
             : "Error creating payment",
           error: error.status ? undefined : error.message,
+          requires_confirmation: error.requires_confirmation || undefined,
+          candidate: error.candidate || undefined,
         });
     } finally {
       client.release();

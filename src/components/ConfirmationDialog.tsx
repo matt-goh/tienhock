@@ -18,6 +18,7 @@ interface ConfirmationDialogProps {
   variant?: "danger" | "success" | "default";
   hideCancelButton?: boolean;
   allowContentOverflow?: boolean;
+  isConfirming?: boolean;
 }
 
 const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
@@ -30,6 +31,7 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   variant = "danger",
   hideCancelButton = false,
   allowContentOverflow = false,
+  isConfirming = false,
 }) => {
   // Define button styles based on variant
   const buttonStyles = {
@@ -76,6 +78,7 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
             leaveTo="opacity-0 scale-95"
           >
             <DialogPanel
+              aria-busy={isConfirming}
               className={`inline-block w-full max-w-md p-6 my-8 text-left align-middle transition-all transform bg-white dark:bg-gray-800 border border-transparent dark:border-gray-700 shadow-xl rounded-2xl ${
                 allowContentOverflow ? "overflow-visible" : "overflow-hidden"
               }`}
@@ -95,16 +98,18 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
                 {!hideCancelButton && (
                   <button
                     type="button"
-                    className="inline-flex justify-center px-4 py-2 text-sm font-medium text-default-700 dark:text-gray-200 bg-default-100 dark:bg-gray-700 border border-transparent rounded-full hover:bg-default-200 dark:hover:bg-gray-600 active:bg-default-300 dark:active:bg-gray-500 focus:outline-none"
+                    className="inline-flex justify-center px-4 py-2 text-sm font-medium text-default-700 dark:text-gray-200 bg-default-100 dark:bg-gray-700 border border-transparent rounded-full hover:bg-default-200 dark:hover:bg-gray-600 active:bg-default-300 dark:active:bg-gray-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
                     onClick={onClose}
+                    disabled={isConfirming}
                   >
                     Cancel
                   </button>
                 )}
                 <button
                   type="button"
-                  className={`inline-flex justify-center px-4 py-2 text-sm font-medium border border-transparent rounded-full focus:outline-none ${buttonStyles[variant]}`}
+                  className={`inline-flex justify-center px-4 py-2 text-sm font-medium border border-transparent rounded-full focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${buttonStyles[variant]}`}
                   onClick={onConfirm}
+                  disabled={isConfirming}
                 >
                   {confirmButtonText}
                 </button>

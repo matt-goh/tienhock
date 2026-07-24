@@ -116,6 +116,8 @@ export default function (pool) {
       res.status(error.status || 400).json({
         code: error.code,
         message: error.message || "Error creating receipt",
+        requires_confirmation: error.requires_confirmation || undefined,
+        candidate: error.candidate || undefined,
       });
     } finally {
       client.release();
