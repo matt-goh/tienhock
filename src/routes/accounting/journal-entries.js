@@ -9,10 +9,11 @@ const CHEQUE_NO_ENTRY_TYPES = ["C", "B"];
 const LEGACY_IMPORT_SQL =
   `(je.entry_type = '${LEGACY_IMPORT_ENTRY_TYPE}' OR ` +
   `je.source_type = '${LEGACY_IMPORT_SOURCE_TYPE}')`;
-const VISIBLE_REFERENCE_SQL =
-  `CASE WHEN ${LEGACY_IMPORT_SQL} ` +
-  "THEN COALESCE(je.display_reference, je.reference_no) " +
-  "ELSE je.reference_no END";
+// Every journal type may carry a repeatable auditor-facing display_reference
+// (legacy imports, bank-in RVs, receipts keyed with the real payment reference
+// like T130726, adjustment doc numbers, ...). reference_no stays the hidden
+// unique internal tracking id (IMP-… / BI-… / REC-…).
+const VISIBLE_REFERENCE_SQL = "COALESCE(je.display_reference, je.reference_no)";
 const DISPLAY_ENTRY_TYPE_SQL =
   `CASE WHEN ${LEGACY_IMPORT_SQL} ` +
   "THEN COALESCE(je.legacy_entry_type, je.entry_type) " +
@@ -300,7 +301,7 @@ export default function (pool) {
       if (search) {
         query += ` AND (
           ${VISIBLE_REFERENCE_SQL} ILIKE $${paramIndex}
-          OR (je.entry_type = 'RV' AND COALESCE(je.display_reference, '') ILIKE $${paramIndex})
+          OR je.reference_no ILIKE $${paramIndex}
           OR je.description ILIKE $${paramIndex}
           OR (${LEGACY_IMPORT_SQL} AND ${DISPLAY_ENTRY_TYPE_SQL} ILIKE $${paramIndex})
           OR (${LEGACY_IMPORT_SQL} AND jet.name ILIKE $${paramIndex})
@@ -479,10 +480,7 @@ export default function (pool) {
         SELECT
           jel.id, jel.line_number, jel.account_code, jel.debit_amount,
           jel.credit_amount,
-          CASE WHEN ${LEGACY_IMPORT_SQL}
-            THEN COALESCE(jel.display_reference, je.display_reference, jel.reference)
-            ELSE jel.reference
-          END AS reference,
+          COALESCE(jel.display_reference, je.display_reference, jel.reference) AS reference,
           jel.reference AS internal_reference,
           jel.display_reference,
           jel.particulars,

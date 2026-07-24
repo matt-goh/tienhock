@@ -18,6 +18,25 @@ requires separate approval).
 
 ---
 
+## Ran 24 Jul 2026 — REC journals display_reference backfill (no migration file kept)
+
+One-time data backfill executed directly (never committed as a `.sql` file — the exact statement is
+preserved below). Companion code change: `VISIBLE_REFERENCE_SQL` in
+`src/routes/accounting/journal-entries.js` now resolves `COALESCE(display_reference, reference_no)`
+for ALL journal types, so receipt (REC) journals display/search the keyed payment reference (e.g.
+`T130726`) like legacy imports while `REC-YYYYMM-NNNN` stays the hidden unique internal id.
+Receipt-owned REC journals already carried `display_reference`; this backfill covered the
+payment-owned ones (pre-Phase-2 payment journals and overpayment journals) from the linked
+`payments.payment_reference`. Dev updated 932 rows (20 posted + 912 cancelled); remaining NULLs are
+cancelled cash-payment journals with no keyed reference — expected. Only `display_reference` was
+touched (repeatable, auditor-facing); no amounts, lines, `reference_no` or status changed.
+
+| What it did | Status |
+|-------------|--------|
+| `UPDATE journal_entries je SET display_reference = p.payment_reference FROM payments p WHERE p.journal_entry_id = je.id AND je.entry_type = 'REC' AND je.display_reference IS NULL AND p.payment_reference IS NOT NULL AND BTRIM(p.payment_reference) <> '';` — guarded by a pre-check (no journal linked to payments with conflicting refs) and a post-check (no posted REC journal left with NULL display_reference). Idempotent. | dev ✓, prod ✓ |
+
+---
+
 ## Removed 23 Jul 2026 — applied 22 Jul 2026 on dev, prod applied 23 Jul 2026
 
 Both files below were removed from `dev/migrations/` on 2026-07-23 (commit `de070f2f`) after being
