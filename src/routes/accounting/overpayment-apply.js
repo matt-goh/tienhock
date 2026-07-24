@@ -14,6 +14,7 @@ import { generateReceiptReference } from "./payment-journal.js";
 import { getCustomerDebtorAccountCode } from "./debtorSync.js";
 import { toLocalDateString } from "./receipt-service.js";
 import { assertTienHockAccountingDateUnlocked } from "./posting-lock.js";
+import { assertNoUnrepresentedImportedPaymentEvidence } from "./imported-payment-reconciliation.js";
 
 const round2 = (v) => Math.round(parseFloat(v || 0) * 100) / 100;
 
@@ -64,6 +65,7 @@ export async function applyOverpayment(client, payload, userId) {
     invoice_id,
     amount,
   }));
+  const applyDate = toLocalDateString(payload.payment_date || new Date());
 
   // 2. Lock invoices; require one customer and per-invoice balance caps
   const invoiceIds = allocs.map((a) => a.invoice_id).sort();
@@ -113,6 +115,19 @@ export async function applyOverpayment(client, payload, userId) {
   }
   const totalApply = round2(allocs.reduce((s, a) => s + a.amount, 0));
 
+  for (const allocation of allocs) {
+    await assertNoUnrepresentedImportedPaymentEvidence(
+      client,
+      {
+        allocations: [{ type: "invoice", ...allocation }],
+        payment_reference: "",
+        received_date: applyDate,
+        payment_method: "cash",
+      },
+      "Overpayment application"
+    );
+  }
+
   // 3. Lock the customer's excess allocations FIFO and check coverage
   const excessResult = await client.query(
     `SELECT ra.id,
@@ -145,7 +160,6 @@ export async function applyOverpayment(client, payload, userId) {
   }
 
   // 4. Posting date guard + accounts
-  const applyDate = toLocalDateString(payload.payment_date || new Date());
   assertTienHockAccountingDateUnlocked(applyDate, "Overpayment application");
   const debtorAccount = await getCustomerDebtorAccountCode(client, customerId);
 

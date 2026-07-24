@@ -26,10 +26,15 @@
 import { generateReceiptReference } from "./payment-journal.js";
 import { determineBankAccount } from "../../utils/payment-helpers.js";
 import { getCustomerDebtorAccountCode } from "./debtorSync.js";
+import { assertTienHockAccountingDateUnlocked } from "./posting-lock.js";
 import {
-  assertTienHockAccountingDateUnlocked,
-  toLocalAccountingDateString,
-} from "./posting-lock.js";
+  IMPORTED_PAYMENT_EVIDENCE_NOT_FOUND_CODE,
+  IMPORTED_PAYMENT_RECONCILIATION_MATCH_CODE,
+  assertNoExactImportedAccountCredit,
+  assertNoExactImportedDebitMovement,
+  assertNoUnrepresentedImportedPaymentEvidence,
+  previewImportedPaymentReconciliation,
+} from "./imported-payment-reconciliation.js";
 import { requireChequeClearanceDate } from "../utils/cheque-clearance-date.js";
 
 const round2 = (v) => Math.round(parseFloat(v || 0) * 100) / 100;
@@ -323,6 +328,91 @@ export async function createReceipt(client, payload, userId) {
         : toLocalDateString(payload.posting_date || payload.received_date);
   }
   const debitAccount = method === "cash" ? "CH_REV2" : determineBankAccount(method, payload.bank_account);
+
+  // Never post a second receipt when the same invoice/reference/amount is
+  // already proven by the immutable legacy import. This preflight runs before
+  // the period guard and for open-period dates too, so changing the entered
+  // date cannot bypass the duplicate-ledger protection.
+  const importedCandidateAllocations = allocs.filter(
+    (allocation) => allocation.type === "invoice"
+  );
+  for (const importedCandidateAllocation of importedCandidateAllocations) {
+    const importedCandidateReference =
+      method === "cash"
+        ? `C${importedCandidateAllocation.invoice_id}`
+        : String(
+            payload.display_reference || payload.payment_reference || ""
+          ).trim();
+    try {
+      const candidate = await previewImportedPaymentReconciliation(client, {
+        allocations: [
+          {
+            type: "invoice",
+            invoice_id: importedCandidateAllocation.invoice_id,
+            amount: importedCandidateAllocation.amount,
+          },
+        ],
+        payment_reference: importedCandidateReference,
+        received_date: receivedDate,
+        payment_method: method,
+        bank_account: payload.bank_account || null,
+        notes: payload.notes || null,
+      });
+      const recordSeparately =
+        allocs.length === 1
+          ? ""
+          : ` Record invoice ${candidate.invoice_id} by itself to review and confirm the imported match.`;
+      const error = new Error(
+        `Payment ${candidate.payment_reference} is already in the imported ledger on ${candidate.ledger_payment_date}. Confirm the match to clear invoice ${candidate.invoice_id} without creating another receipt or journal.${recordSeparately}`
+      );
+      error.status = 409;
+      error.code = IMPORTED_PAYMENT_RECONCILIATION_MATCH_CODE;
+      error.requires_confirmation = true;
+      error.candidate = candidate;
+      throw error;
+    } catch (error) {
+      if (error.code !== IMPORTED_PAYMENT_EVIDENCE_NOT_FOUND_CODE) {
+        throw error;
+      }
+    }
+  }
+
+  const importedDebitReference =
+    String(
+      payload.display_reference || payload.payment_reference || ""
+    ).trim() ||
+    (method === "cash" && importedCandidateAllocations.length === 1
+      ? `C${importedCandidateAllocations[0].invoice_id}`
+      : "");
+  for (const accountAllocation of allocs.filter(
+    (allocation) => allocation.type === "account"
+  )) {
+    await assertNoExactImportedAccountCredit(
+      client,
+      accountAllocation.target_account,
+      accountAllocation.amount,
+      importedDebitReference
+    );
+  }
+  if (method === "cash") {
+    for (const allocation of allocs.filter(
+      (candidate) => candidate.type !== "invoice"
+    )) {
+      await assertNoExactImportedDebitMovement(
+        client,
+        debitAccount,
+        allocation.amount,
+        importedDebitReference
+      );
+    }
+  } else {
+    await assertNoExactImportedDebitMovement(
+      client,
+      debitAccount,
+      total,
+      importedDebitReference
+    );
+  }
 
   // A posted-immediately cheque is the compatibility conversion of an
   // existing pending payment. Its received date is historical; only its new
@@ -888,6 +978,57 @@ export async function confirmReceipt(client, receiptId, options, userId) {
     amount: round2(r.amount),
     allocation_id: r.id,
   }));
+
+  for (const allocation of allocs.filter(
+    (candidate) => candidate.type === "invoice"
+  )) {
+    await assertNoUnrepresentedImportedPaymentEvidence(
+      client,
+      {
+        allocations: [
+          {
+            type: "invoice",
+            invoice_id: allocation.invoice_id,
+            amount: allocation.amount,
+          },
+        ],
+        payment_reference: String(receipt.display_reference || "").trim(),
+        received_date: receipt.received_date,
+        payment_method: receipt.payment_method,
+        bank_account: receipt.debit_account,
+      },
+      `Cheque receipt ${receiptId} confirmation`
+    );
+  }
+  for (const allocation of allocs.filter(
+    (candidate) => candidate.type === "account"
+  )) {
+    await assertNoExactImportedAccountCredit(
+      client,
+      allocation.target_account,
+      allocation.amount,
+      receipt.display_reference
+    );
+  }
+  if (receipt.payment_method === "cash") {
+    for (const allocation of allocs.filter(
+      (candidate) => candidate.type !== "invoice"
+    )) {
+      await assertNoExactImportedDebitMovement(
+        client,
+        receipt.debit_account,
+        allocation.amount,
+        receipt.display_reference
+      );
+    }
+  } else {
+    await assertNoExactImportedDebitMovement(
+      client,
+      receipt.debit_account,
+      round2(allocs.reduce((sum, allocation) => sum + allocation.amount, 0)),
+      receipt.display_reference
+    );
+  }
 
   receipt.posting_date = postingDate;
   if (options && options.cheque_reference) {

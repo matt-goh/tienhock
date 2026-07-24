@@ -209,6 +209,55 @@ interface CustomerChangeApiErrorData {
   currentEInvoiceStatus?: string;
 }
 
+interface ImportedPaymentCandidate {
+  invoice_id: string;
+  customer_name: string;
+  amount: number;
+  payment_reference: string;
+  entered_payment_date: string;
+  ledger_payment_date: string;
+  evidence_journal_id: number;
+  evidence_line_id: number;
+}
+
+interface ImportedPaymentConfirmation {
+  candidate: ImportedPaymentCandidate;
+  request: {
+    allocations: Array<{
+      type: "invoice";
+      invoice_id: string;
+      amount: number;
+    }>;
+    payment_reference: string;
+    received_date: string;
+    payment_method: "cash" | "cheque" | "bank_transfer" | "online";
+    bank_account?: string;
+    notes?: string;
+    expected_journal_id: number;
+    expected_line_id: number;
+  };
+}
+
+interface ImportedPaymentApiErrorData {
+  code?: string;
+  requires_confirmation?: boolean;
+  candidate?: ImportedPaymentCandidate;
+}
+
+const getImportedPaymentApiErrorData = (
+  error: unknown
+): ImportedPaymentApiErrorData | null => {
+  if (!error || typeof error !== "object") return null;
+  const apiError = error as {
+    data?: unknown;
+    response?: { data?: unknown };
+  };
+  const data = apiError.response?.data ?? apiError.data;
+  return data && typeof data === "object"
+    ? (data as ImportedPaymentApiErrorData)
+    : null;
+};
+
 type EInvoiceCancelAction =
   | {
       type: "customer";
@@ -281,6 +330,10 @@ const InvoiceDetailsPage: React.FC = () => {
     internal_reference: undefined, // Not managed by frontend
   });
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [importedPaymentConfirmation, setImportedPaymentConfirmation] =
+    useState<ImportedPaymentConfirmation | null>(null);
+  const [isConfirmingImportedPayment, setIsConfirmingImportedPayment] =
+    useState<boolean>(false);
   const [showCancelPaymentConfirm, setShowCancelPaymentConfirm] =
     useState(false);
   const [paymentToCancel, setPaymentToCancel] = useState<Payment | null>(null);
@@ -1281,13 +1334,106 @@ const InvoiceDetailsPage: React.FC = () => {
       setShowOverpaymentConfirm(false);
       setOverpaymentDetails(null);
       await fetchDetails();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error recording payment:", error);
+      const importedErrorData = getImportedPaymentApiErrorData(error);
+      const importedCandidate = importedErrorData?.candidate;
+      const recordablePaymentMethods = [
+        "cash",
+        "cheque",
+        "bank_transfer",
+        "online",
+      ] as const;
+      const recordablePaymentMethod = recordablePaymentMethods.find(
+        (method) => method === paymentFormData.payment_method
+      );
+      if (
+        importedErrorData?.code ===
+          "IMPORTED_PAYMENT_RECONCILIATION_MATCH" &&
+        importedErrorData.requires_confirmation === true &&
+        importedCandidate &&
+        recordablePaymentMethod &&
+        Math.abs(paymentFormData.amount_paid - importedCandidate.amount) <=
+          0.005
+      ) {
+        setImportedPaymentConfirmation({
+          candidate: importedCandidate,
+          request: {
+            allocations: [
+              {
+                type: "invoice",
+                invoice_id: importedCandidate.invoice_id,
+                amount: importedCandidate.amount,
+              },
+            ],
+            payment_reference: importedCandidate.payment_reference,
+            received_date: paymentFormData.payment_date,
+            payment_method: recordablePaymentMethod,
+            bank_account:
+              recordablePaymentMethod === "cash"
+                ? undefined
+                : paymentFormData.bank_account,
+            notes: paymentFormData.notes?.trim() || undefined,
+            expected_journal_id: importedCandidate.evidence_journal_id,
+            expected_line_id: importedCandidate.evidence_line_id,
+          },
+        });
+        toast.dismiss(toastId);
+        return;
+      }
       // Handle both axios-style errors and our custom API utility errors
-      const errorMessage = error.response?.data?.message || error.data?.message || error.message || "Failed to record payment.";
+      const errorObject = error as {
+        message?: string;
+        data?: { message?: string };
+        response?: { data?: { message?: string } };
+      };
+      const errorMessage =
+        errorObject.response?.data?.message ||
+        errorObject.data?.message ||
+        errorObject.message ||
+        "Failed to record payment.";
       toast.error(errorMessage, { id: toastId });
     } finally {
       setIsProcessingPayment(false);
+    }
+  };
+
+  const handleConfirmImportedPayment = async (): Promise<void> => {
+    if (!importedPaymentConfirmation || isConfirmingImportedPayment) return;
+
+    setIsConfirmingImportedPayment(true);
+    const toastId: string = toast.loading(
+      "Clearing invoice from the existing ledger payment..."
+    );
+    try {
+      await api.post(
+        "/api/payments/reconcile-imported",
+        importedPaymentConfirmation.request
+      );
+      toast.success(
+        `Invoice ${importedPaymentConfirmation.candidate.invoice_id} cleared using ${importedPaymentConfirmation.candidate.payment_reference}. No new receipt or journal was created.`,
+        { id: toastId, duration: 7000 }
+      );
+      setImportedPaymentConfirmation(null);
+      setShowPaymentForm(false);
+      setShowOverpaymentConfirm(false);
+      setOverpaymentDetails(null);
+      await fetchDetails();
+    } catch (error: unknown) {
+      const errorObject = error as {
+        message?: string;
+        data?: { message?: string };
+        response?: { data?: { message?: string } };
+      };
+      toast.error(
+        errorObject.response?.data?.message ||
+          errorObject.data?.message ||
+          errorObject.message ||
+          "Failed to confirm the imported ledger payment.",
+        { id: toastId }
+      );
+    } finally {
+      setIsConfirmingImportedPayment(false);
     }
   };
 
@@ -2335,7 +2481,9 @@ const InvoiceDetailsPage: React.FC = () => {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 capitalize">
-                          {p.payment_method.replace("_", " ")}
+                          {p.payment_method === "contra"
+                            ? "Imported ledger match"
+                            : p.payment_method.replace("_", " ")}
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap font-mono text-sm text-gray-600 dark:text-gray-400">
@@ -2417,6 +2565,10 @@ const InvoiceDetailsPage: React.FC = () => {
                           {p.status === "cancelled" ? (
                             <span className="italic text-gray-500 dark:text-gray-400 text-sm">
                               Cancelled
+                            </span>
+                          ) : p.payment_method === "contra" ? (
+                            <span className="text-sm text-gray-500 dark:text-gray-400">
+                              Read-only
                             </span>
                           ) : p.status === "pending" ? (
                             <>
@@ -3327,6 +3479,83 @@ const InvoiceDetailsPage: React.FC = () => {
             : "Cancel E-Invoice & Continue"
         }
         variant="danger"
+      />
+      <ConfirmationDialog
+        isOpen={importedPaymentConfirmation !== null}
+        onClose={() => {
+          if (!isConfirmingImportedPayment) {
+            setImportedPaymentConfirmation(null);
+          }
+        }}
+        onConfirm={() => void handleConfirmImportedPayment()}
+        title="Payment already found in imported ledger"
+        message={
+          importedPaymentConfirmation ? (
+            <div className="space-y-3">
+              <p>
+                The old ledger already contains this exact payment. Continuing
+                clears the invoice without creating another receipt or journal.
+              </p>
+              <div className="space-y-1 rounded-lg border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-800 dark:bg-emerald-950/30">
+                <div className="flex justify-between gap-4">
+                  <span>Invoice</span>
+                  <span className="font-mono font-medium">
+                    {importedPaymentConfirmation.candidate.invoice_id}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <span>Reference</span>
+                  <span className="font-mono font-medium">
+                    {importedPaymentConfirmation.candidate.payment_reference}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <span>Amount</span>
+                  <span className="font-medium">
+                    {formatCurrency(
+                      importedPaymentConfirmation.candidate.amount
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <span>Entered date</span>
+                  <span>
+                    {
+                      importedPaymentConfirmation.candidate
+                        .entered_payment_date
+                    }
+                  </span>
+                </div>
+                <div className="flex justify-between gap-4 border-t border-emerald-200 pt-1 dark:border-emerald-800">
+                  <span>Ledger date used</span>
+                  <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+                    {
+                      importedPaymentConfirmation.candidate
+                        .ledger_payment_date
+                    }
+                  </span>
+                </div>
+              </div>
+              <a
+                href={`/accounting/journal-entries/${importedPaymentConfirmation.candidate.evidence_journal_id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex font-medium text-sky-600 hover:underline dark:text-sky-400"
+              >
+                Review the existing journal
+              </a>
+            </div>
+          ) : (
+            ""
+          )
+        }
+        confirmButtonText={
+          isConfirmingImportedPayment
+            ? "Clearing Invoice..."
+            : "Use Existing Ledger Payment"
+        }
+        isConfirming={isConfirmingImportedPayment}
+        variant="success"
       />
       {/* Overpayment Confirmation Dialog */}
       <ConfirmationDialog

@@ -1,9 +1,10 @@
 # Debtors GL ↔ Operations Reconciliation — Handover
 
-**Date written:** 2026-07-22 · **Last updated:** 2026-07-23
+**Date written:** 2026-07-22 · **Last updated:** 2026-07-24
 **Status:**
-- Bucket 3 DONE (dev ✓ / prod PENDING) — see §3.
-- 2026-07-23 batch DONE (dev ✓ / prod PENDING) — **21 invoices reconciled** (all of Bucket 1 + 11 of the 14 Bucket 2 customers + all 6 §6 cases: NEVER-S, A MARKET, CLS, UTEA, and MYSHOP-KM2 ×2), see §4.
+- Controlled exact-match app workflow DONE (24 Jul 2026) — see §5a. Ordinary locked-period receipts remain blocked; a payment already proven by the immutable import can now be confirmed as a non-posting operational settlement.
+- Bucket 3 DONE (dev ✓ / prod ✓) — see §3 and `docs/MIGRATIONS_LOG.md`.
+- 2026-07-23 batch DONE (dev ✓ / prod ✓) — **21 invoices reconciled** (all of Bucket 1 + 11 of the 14 Bucket 2 customers + all 6 §6 cases: NEVER-S, A MARKET, CLS, UTEA, and MYSHOP-KM2 ×2), see §4 and `docs/MIGRATIONS_LOG.md`.
 - **§6 REMAINING is now EMPTY** — the last 3 bills (UTEA 62155, MYSHOP-KM2 62394 & 62952) were answered and applied on 2026-07-23 as CASES 19-21. The actionable ops-only category is now RM0.00 (re-run §2 filter returns 0 rows). The only recon gap left is the structural "leave alone" categories (legacy-only + mixed differences, §8).
 - Documentation for the batch is DONE: changelog, `docs/MIGRATIONS_LOG.md` row, and the AGENTS/CLAUDE dated entry are all written (§10).
 
@@ -83,7 +84,7 @@ SELECT COALESCE(g.code, o.code) AS acct, g.gl_balance, o.open_total,
 To list only the **actionable** ops-only gaps (GL = 0, ops > 0), wrap the same `gl`/`ops`
 CTEs and filter `WHERE ABS(gl_balance) < 0.01 AND open_total > 0.01`.
 
-## 3. DONE — Bucket 3 (2026-07-22, dev ✓ / prod PENDING)
+## 3. DONE — Bucket 3 (2026-07-22, dev ✓ / prod ✓)
 
 Six invoices whose settlements already existed in the GL (legacy import) but were never keyed/confirmed operationally were closed with NON-POSTING `contra` payment rows (MYSHOP-SKT pattern). No journal was created/modified/cancelled.
 
@@ -91,9 +92,9 @@ Six invoices whose settlements already existed in the GL (legacy import) but wer
 - Invoices: CHANKOPI `2004676` 1,080.00 · AMY `15309` 135.00 · LEE YX `026127` 57.00 · SHAB `34704` 870.00 · HIAPLEE-SC `63599` 561.00 · LAI `34367` 1,642.00 (LAI via in-place conversion of pending cheque payment `5469`, deliberately NOT linked to IMP journal `6945`)
 - Post-fix recon: five customers diff 0.00; LAI keeps a documented pre-existing RM0.35 residual (out of scope)
 - Documented in: `AGENTS.md` / `CLAUDE.md` dated entry, `docs/MIGRATIONS_LOG.md` ("Applied 22 Jul 2026"), changelog
-- **Prod rollout: PENDING — re-pin guard values against live data before running.**
+- **Prod rollout: completed** (recorded in `docs/MIGRATIONS_LOG.md`). Re-pin guard values before applying to any rebuilt or different database.
 
-## 4. DONE — 2026-07-23 recon corrections (dev ✓ / prod PENDING)
+## 4. DONE — 2026-07-23 recon corrections (dev ✓ / prod ✓)
 
 **Migration: `dev/migrations/2026-07-23_debtors_recon_corrections.sql`** (guarded, idempotent, fail-closed; one atomic `BEGIN…COMMIT`). 21 invoices reconciled: all of Bucket 1, 11 of the 14 Bucket 2 customers, and all 6 staff-answered §6 cases (CASES 16-21).
 
@@ -145,6 +146,27 @@ Always **verify the debtor GL balance is 0.00 first** (or that an opening anchor
 
 Both patterns are **operational-only, non-posting** here because the settlement (if any) is already in the pre-cutover GL / opening anchors; posting a fresh journal would double-count in the locked, hash-pinned ledger. The `contra` method is the system marker for "already in accounting, non-posting subledger alignment" (regardless of the original cash/transfer/CN method).
 
+## 5a. Controlled app workflow for an exact imported receipt (24 Jul 2026)
+
+Payment Management now handles the narrow Pattern-B case without a one-off migration when all evidence is exact. Normal receipt creation first checks a single selected invoice/reference/amount against the immutable Jan-May import. If one match is proven, the UI shows the imported ledger date and asks the user to confirm that existing payment. Confirmation calls `POST /api/payments/reconcile-imported`; it inserts one non-posting, immutable `contra` payment projection, sets the invoice paid, and recomputes `customers.credit_used`. It creates and links **no receipt and no journal**.
+
+This is not a period unlock. The match fails closed unless all of these agree:
+
+- one open, unconsolidated INVOICE with no owned journal, payment/receipt history, or adjustment-document history;
+- full invoice total = current balance = selected amount;
+- one active TD account for the invoice customer;
+- one posted pre-2026-06-01 `IMP`/legacy-`REC` journal with the exact visible reference;
+- exactly two nonzero journal lines: the selected bank/holding-account debit and customer-debtor credit, both with exact invoice/customer particulars;
+- exactly two matching `import_legacy_rows` transaction rows, both unrepaired `source_csv` rows with pinned hashes, exact date/reference/accounts/cents/particulars;
+- invoice date ≤ entered received date ≤ imported ledger date; and
+- current operational open invoices minus the customer's debtor GL equals exactly this invoice amount, with both totals equal after the simulated close.
+
+Ambiguous, partial, previously adjusted, mixed-difference, chronology-invalid, or multi-invoice cases remain manual review. The preflight runs even when the user enters an open-period date, so changing the date cannot post a duplicate of an imported receipt. Confirmation is idempotent and deliberately leaves `payments.journal_entry_id`, `receipt_allocation_id`, `bank_account`, and `internal_reference` NULL so the projection can never claim ownership of or cancel the immutable imported journal.
+
+The duplicate-evidence boundary also runs before held-overpayment application and pending-cheque confirmation. Pure customer-deposit (`excess`) receipts and debtor `account` allocations cannot replay an exact approved imported debit/credit reference and amount. These guards block duplicate accounting; only the exact single-invoice workflow above can create a non-posting confirmation candidate.
+
+First proven case: HIAPLEE-M invoice `62586`, RM523.50. Imported journal `6645` already contains `PBB111306` on 15/04/2026 (DR `BANK_PBB`, CR `HIAPLEE-M`) while the user entered 13/04/2026. The confirmation uses 15/04/2026 in payment history, retains 13/04/2026 in the audit note, and changes operations from RM1,857.90 to RM1,334.40, exactly matching the unchanged debtor GL RM1,334.40.
+
 ## 6. DONE — the last staff-answered bills (2 customers / 3 bills, RM414.10)
 
 All answered and applied on 2026-07-23 (CASES 16-21, §4). This section is now empty of pending work.
@@ -179,19 +201,19 @@ Nota: baki #5 & #6 tepat 3% drpd jumlah bil — kemungkinan besar diskaun prompt
 Terima kasih.
 ```
 
-## 7. Prod rollout (both migrations)
+## 7. Prod rollout (completed)
 
-Two migrations, both **dev ✓ / prod PENDING**:
+Both migrations are recorded as **dev ✓ / prod ✓** in `docs/MIGRATIONS_LOG.md`:
 1. `2026-07-22_gl_settled_invoices_contra.sql` (Bucket 3) — **must run first**, because it enables the `contra` payment method that the 2026-07-23 contras depend on.
 2. `2026-07-23_debtors_recon_corrections.sql` (this batch, CASES 1-21) — its contra cases (7-10, 18-21) guard-check that `contra` is permitted and abort with a clear message if it isn't.
 
-Before running on prod:
+For a future rebuild or another environment:
 - **Re-pin** every guard value against the CURRENT prod DB (re-run §2). Both files are **fail-closed and atomic** — if any before-state doesn't match, the whole transaction rolls back (nothing changes) and names the failing case. Fix that case's pinned values and re-run; already-correct cases no-op.
-- The 2026-07-23 file is now **final** (all 21 cases in; §6 is empty) — roll out once.
+- The 2026-07-23 file is final (all 21 cases in; §6 is empty).
 
 ## 8. Explicitly NOT to do
 
-- Do not key payments through the app to "fix" any of the above — a keyed payment posts a real receipt journal on top of the mismatch. Staff have been told (BM notices 2026-07-22 and 2026-07-23) to flag, not fix.
+- Do not force an ordinary receipt through the app to "fix" any of the above — it would post a real receipt journal on top of the mismatch. Use the controlled §5a confirmation only when the app presents an exact imported-ledger match; otherwise flag the case for review.
 - Do not touch the **legacy-only accounts** (37 accts, ~+33k) — real pre-system debts with no keyed invoices; the By Customer view surfaces them correctly.
 - Do not chase the **mixed-difference** customers (44 accts, ~−13k) or sub-RM100 residuals without a specific user request / staff answer.
 
@@ -210,6 +232,6 @@ Fix = small re-point migration in the style of `2026-07-16_myshop_km5_64072_debt
 2. §2 recon re-run: affected customers diff 0.00 (or a documented, pre-existing residual).
 3. `credit_used` recomputed and equal to each customer's open-invoice total.
 4. Dated entries in `AGENTS.md` + `CLAUDE.md`, row in `docs/MIGRATIONS_LOG.md`, changelog entry (`CHANGELOG_ENTRIES` in `src/components/ChangelogModal.tsx`, ms + en, prepended).
-5. Prod marked PENDING with a re-pin note — prod rollout is a separate approved step.
+5. Prod rollout status recorded in `docs/MIGRATIONS_LOG.md`; any future target is re-pinned and approved separately.
 
 **DONE for the 2026-07-23 batch** (2026-07-23, batch now final at CASES 1-21): item 4 above is complete — changelog entry prepended (`CHANGELOG_ENTRIES`, ms + en, RM12,410.00 summary), `docs/MIGRATIONS_LOG.md` row added, and the "Debtors recon corrections (2026-07-23)" dated entry written into `AGENTS.md` + `CLAUDE.md`. Only the prod rollout (§7) remains, as a separate approved step with guard re-pinning.

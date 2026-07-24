@@ -58,14 +58,63 @@ interface PaymentCreationResult {
   isOverpayment?: boolean;
 }
 
+interface ReceiptPaymentAllocation {
+  type: "invoice" | "excess";
+  invoice_id?: string;
+  customer_id?: string;
+  amount: number;
+}
+
+interface ImportedPaymentReconciliationPreview {
+  code: "IMPORTED_PAYMENT_RECONCILIATION_MATCH";
+  invoice_id: string;
+  customer_id: string;
+  customer_name: string;
+  amount: number;
+  payment_reference: string;
+  invoice_date: string;
+  entered_payment_date: string;
+  ledger_payment_date: string;
+  payment_date_corrected: boolean;
+  debit_account: string;
+  evidence_journal_id: number;
+  evidence_line_id: number;
+  gl_balance: number;
+  operational_balance: number;
+  operational_balance_after: number;
+  no_new_journal: true;
+}
+
+interface ImportedPaymentReconciliationRequest {
+  allocations: ReceiptPaymentAllocation[];
+  payment_reference: string;
+  received_date: string;
+  payment_method: RecordablePaymentMethod;
+  bank_account?: string;
+  notes?: string;
+  expected_journal_id?: number;
+  expected_line_id?: number;
+}
+
+interface ImportedPaymentReconciliationState {
+  preview: ImportedPaymentReconciliationPreview;
+  request: ImportedPaymentReconciliationRequest;
+}
+
 interface ApiErrorShape {
   message?: string;
   data?: {
+    code?: string;
     message?: string;
+    requires_confirmation?: boolean;
+    candidate?: ImportedPaymentReconciliationPreview;
   };
   response?: {
     data?: {
+      code?: string;
       message?: string;
+      requires_confirmation?: boolean;
+      candidate?: ImportedPaymentReconciliationPreview;
     };
   };
 }
@@ -108,6 +157,17 @@ const getPaymentDateRange = (value: string): TimeRange => {
   const end: Date = new Date(start);
   end.setHours(23, 59, 59, 999);
   return { start, end };
+};
+
+const formatLocalDateLabel = (value: string): string => {
+  const match: RegExpMatchArray | null = value.match(
+    /^(\d{4})-(\d{2})-(\d{2})$/
+  );
+  if (!match) return value;
+  return format(
+    new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])),
+    "dd MMM yyyy"
+  );
 };
 
 const getApiErrorMessage = (error: unknown): string => {
@@ -158,6 +218,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       }[]
     | null
   >(null);
+  const [importedReconciliation, setImportedReconciliation] =
+    useState<ImportedPaymentReconciliationState | null>(null);
   const invoiceRequestIdRef = useRef<number>(0);
 
   const [formData, setFormData] = useState<PaymentFormData>(() => ({
@@ -322,7 +384,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
    */
   const computeSettlement = (): {
     overpaymentAllocations: { invoice_id: string; amount: number }[];
-    moneyAllocations: Record<string, unknown>[];
+    moneyAllocations: ReceiptPaymentAllocation[];
     totalApplied: number;
   } => {
     const appliedByInvoice = new Map<string, number>();
@@ -346,7 +408,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       }
     }
 
-    const moneyAllocations: Record<string, unknown>[] = [];
+    const moneyAllocations: ReceiptPaymentAllocation[] = [];
     for (const { invoice, amountToPay } of selectedInvoices) {
       const balance = Number(invoice.balance_due);
       const applied = appliedByInvoice.get(invoice.id) || 0;
@@ -483,6 +545,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   const processPayments = async (): Promise<void> => {
     setIsSubmitting(true);
     const toastId = toast.loading("Processing payment...");
+    let reconciliationRequest: ImportedPaymentReconciliationRequest | null =
+      null;
 
     try {
       const results: PaymentCreationResult[] = [];
@@ -500,6 +564,24 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           computeSettlement();
         appliedTotal = totalApplied;
         moneyAllocationCount = moneyAllocations.length;
+
+        if (
+          overpaymentAllocations.length === 0 &&
+          moneyAllocations.length === 1 &&
+          moneyAllocations[0].type === "invoice"
+        ) {
+          reconciliationRequest = {
+            allocations: moneyAllocations,
+            payment_reference: paymentReference,
+            received_date: formData.payment_date,
+            payment_method: formData.payment_method,
+            bank_account:
+              formData.payment_method === "cash"
+                ? undefined
+                : formData.bank_account,
+            notes: notes || undefined,
+          };
+        }
 
         const result = await api.post("/api/receipts", {
           payment_method: formData.payment_method,
@@ -573,6 +655,42 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       onSuccess();
     } catch (error: unknown) {
       console.error("Error creating payment:", error);
+      const apiError: ApiErrorShape =
+        typeof error === "object" && error !== null
+          ? (error as ApiErrorShape)
+          : {};
+      const errorData = apiError.response?.data || apiError.data;
+      const importedCandidate = errorData?.candidate;
+      if (
+        useGroupedReceipt &&
+        reconciliationRequest &&
+        errorData?.code === "IMPORTED_PAYMENT_RECONCILIATION_MATCH" &&
+        errorData.requires_confirmation === true &&
+        importedCandidate
+      ) {
+        setImportedReconciliation({
+          preview: importedCandidate,
+          request: {
+            ...reconciliationRequest,
+            payment_reference: importedCandidate.payment_reference,
+            expected_journal_id: importedCandidate.evidence_journal_id,
+            expected_line_id: importedCandidate.evidence_line_id,
+          },
+        });
+        toast.dismiss(toastId);
+        return;
+      }
+      if (
+        useGroupedReceipt &&
+        errorData?.code === "IMPORTED_PAYMENT_RECONCILIATION_MATCH" &&
+        importedCandidate
+      ) {
+        toast.error(
+          `Record invoice ${importedCandidate.invoice_id} by itself, without applying held overpayment or grouping other invoices, then review the imported-ledger match again.`,
+          { id: toastId, duration: 7000 }
+        );
+        return;
+      }
       toast.error(getApiErrorMessage(error), {
         id: toastId,
       });
@@ -584,6 +702,32 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   const handleConfirmOverpayment = async (): Promise<void> => {
     setShowOverpaymentConfirm(false);
     await processPayments();
+  };
+
+  const handleConfirmImportedReconciliation = async (): Promise<void> => {
+    if (!importedReconciliation || isSubmitting) return;
+
+    setIsSubmitting(true);
+    const toastId: string = toast.loading(
+      "Clearing invoice from the existing ledger payment..."
+    );
+    try {
+      await api.post(
+        "/api/payments/reconcile-imported",
+        importedReconciliation.request
+      );
+      toast.success(
+        `Invoice ${importedReconciliation.preview.invoice_id} cleared using ${importedReconciliation.preview.payment_reference}. No new receipt or journal was created.`,
+        { id: toastId, duration: 7000 }
+      );
+      setImportedReconciliation(null);
+      onSuccess();
+    } catch (error: unknown) {
+      console.error("Error reconciling imported payment:", error);
+      toast.error(getApiErrorMessage(error), { id: toastId });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleInvoiceSelect = (invoice: InvoiceData): void => {
@@ -1262,6 +1406,89 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           overpaymentDetails && overpaymentDetails.length > 1 ? "s" : ""
         }`}
         variant="default"
+      />
+      <ConfirmationDialog
+        isOpen={importedReconciliation !== null}
+        onClose={() => {
+          if (!isSubmitting) setImportedReconciliation(null);
+        }}
+        onConfirm={() => void handleConfirmImportedReconciliation()}
+        title="Payment already found in imported ledger"
+        message={
+          importedReconciliation ? (
+            <div className="space-y-3 text-default-600 dark:text-gray-300">
+              <p>
+                The old ledger already contains this exact payment. Continuing
+                will clear the invoice only; it will not create another receipt
+                or journal.
+              </p>
+              <div className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-800 dark:bg-emerald-950/30">
+                <div className="flex justify-between gap-4">
+                  <span>Invoice</span>
+                  <span className="font-mono font-medium text-gray-900 dark:text-gray-100">
+                    {importedReconciliation.preview.invoice_id}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <span>Customer</span>
+                  <span className="text-right font-medium text-gray-900 dark:text-gray-100">
+                    {importedReconciliation.preview.customer_name}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <span>Reference</span>
+                  <span className="font-mono font-medium text-gray-900 dark:text-gray-100">
+                    {importedReconciliation.preview.payment_reference}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <span>Amount</span>
+                  <span className="font-medium text-gray-900 dark:text-gray-100">
+                    {formatCurrency(importedReconciliation.preview.amount)}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <span>Entered date</span>
+                  <span>
+                    {formatLocalDateLabel(
+                      importedReconciliation.preview.entered_payment_date
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-4 border-t border-emerald-200 pt-2 dark:border-emerald-800">
+                  <span>Ledger date used</span>
+                  <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+                    {formatLocalDateLabel(
+                      importedReconciliation.preview.ledger_payment_date
+                    )}
+                  </span>
+                </div>
+              </div>
+              {importedReconciliation.preview.payment_date_corrected && (
+                <p className="text-amber-700 dark:text-amber-300">
+                  The entered date differs from the imported ledger. The ledger
+                  date above is authoritative and will be used in payment
+                  history.
+                </p>
+              )}
+              <a
+                href={`/accounting/journal-entries/${importedReconciliation.preview.evidence_journal_id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex font-medium text-sky-600 hover:underline dark:text-sky-400"
+              >
+                Review the existing journal
+              </a>
+            </div>
+          ) : (
+            ""
+          )
+        }
+        confirmButtonText={
+          isSubmitting ? "Clearing Invoice..." : "Use Existing Ledger Payment"
+        }
+        isConfirming={isSubmitting}
+        variant="success"
       />
     </div>
   );
