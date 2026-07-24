@@ -656,7 +656,8 @@ const JournalEntryPage: React.FC = () => {
         id: line.id,
         line_number: line.line_number,
         account_code: line.account_code,
-        reference: line.reference || "",
+        // Edit the STORED reference, not the resolved display value
+        reference: line.internal_reference || line.reference || "",
         particulars: line.particulars || "",
         debit_amount: line.debit_amount > 0 ? line.debit_amount.toString() : "",
         credit_amount:
@@ -669,7 +670,9 @@ const JournalEntryPage: React.FC = () => {
       }
 
       const fetchedFormData: JournalEntryFormData = {
-        reference_no: entry.reference_no,
+        // Edit the STORED internal reference_no, not the resolved display
+        // reference (display_reference, e.g. a receipt's keyed T130726)
+        reference_no: entry.internal_reference_no || entry.reference_no,
         entry_type: entry.entry_type,
         // Serialized date columns are UTC midnight-shifted; format in local TZ
         // so the date doesn't slip back a day on every edit

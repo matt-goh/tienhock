@@ -40,11 +40,9 @@ const isLegacyImportEntry = (entry: JournalEntry): boolean =>
   entry.entry_type === LEGACY_IMPORT_ENTRY_TYPE;
 
 const getVisibleReference = (entry: JournalEntry): string =>
-  // Legacy imports and bank-in RV journals keep a hidden unique reference_no
-  // (IMP-… / BI-…) and carry the visible Journal No. in display_reference.
-  isLegacyImportEntry(entry) || entry.entry_type === "RV"
-    ? entry.display_reference?.trim() || entry.reference_no
-    : entry.reference_no;
+  // Every journal keeps a hidden unique reference_no (IMP-… / BI-… / REC-…)
+  // for internal tracking; the visible Journal No. is display_reference when set.
+  entry.display_reference?.trim() || entry.reference_no;
 
 const getDisplayEntryType = (entry: JournalEntry): string =>
   isLegacyImportEntry(entry)
@@ -55,7 +53,8 @@ const getVisibleLineReference = (
   line: JournalEntryLine,
   entry: JournalEntry
 ): string | undefined => {
-  if (!isLegacyImportEntry(entry)) return line.reference;
+  // Per-line override (e.g. C{invoice} on grouped cash receipts) first,
+  // otherwise the entry's visible Journal No.
   return line.display_reference?.trim() || getVisibleReference(entry);
 };
 
