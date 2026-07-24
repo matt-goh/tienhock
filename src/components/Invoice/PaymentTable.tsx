@@ -48,6 +48,13 @@ const createTodayClearanceRange = (): TimeRange => {
   return { start: today, end: today };
 };
 
+const formatPaymentMethodLabel = (
+  paymentMethod: Payment["payment_method"]
+): string =>
+  paymentMethod === "contra"
+    ? "Imported ledger match"
+    : paymentMethod.replace("_", " ");
+
 const PaymentTable: React.FC<PaymentTableProps> = ({
   payments,
   onViewPayment,
@@ -419,7 +426,9 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                         </td>
                         <td className="px-3 py-3">
                           <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400 capitalize">
-                            {firstPayment.payment_method.replace("_", " ")}
+                            {formatPaymentMethodLabel(
+                              firstPayment.payment_method
+                            )}
                           </span>
                         </td>
                         <td className="px-3 py-3">
@@ -607,7 +616,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                       </td>
                       <td className="px-3 py-3">
                         <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400 capitalize">
-                          {payment.payment_method.replace("_", " ")}
+                          {formatPaymentMethodLabel(payment.payment_method)}
                         </span>
                       </td>
                       <td className="px-3 py-3">
@@ -699,7 +708,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
             <div className="space-y-3">
               <p>
                 Confirm the pending{" "}
-                {selectedPayment.payment_method.replace("_", " ")} payment of{" "}
+                {formatPaymentMethodLabel(selectedPayment.payment_method)} payment of{" "}
                 <span className="font-semibold text-default-800 dark:text-gray-100">
                   {formatCurrency(selectedPayment.amount_paid)}
                 </span>
