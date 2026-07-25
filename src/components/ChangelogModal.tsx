@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-25",
+    ms: "Pergerakan Stok: jualan kini dikira mengikut tarikh sebenar bil, bukan lagi terawal 8 jam. Sebelum ini setiap bil yang dikeluarkan sebelum pukul 8 pagi dikira jatuh pada hari sebelumnya, jadi baris harian tersasar dan bil awal pagi pada 1 haribulan tertolak ke bulan sebelumnya — menyebabkan stok tutup bulan itu tersalah kira. Angka pergerakan stok dan stok tutup kini betul tanpa perlu apa-apa tindakan.",
+    en: "Stock Movement: sales are now counted on the bill's actual date instead of 8 hours early. Previously every bill issued before 8am was counted on the previous day, so the daily rows were off and early-morning bills on the 1st of a month fell into the previous month — throwing off that month's closing stock. Stock movement and closing stock figures are now correct, with nothing for you to do.",
+  },
+  {
+    date: "2026-07-25",
     ms: "Jelly Polly: bil TUNAI kini boleh disimpan semula. Sebelum ini menyimpan bil tunai baharu gagal dengan mesej ralat, dan ralat yang sama juga berlaku semasa mengubah produk pada bil tunai sedia ada atau menukar invois kredit kepada tunai.",
     en: "Jelly Polly: CASH bills can be saved again. Previously, saving a new cash bill failed with an error message, and the same error also occurred when editing the products on an existing cash bill or converting a credit invoice to cash.",
   },
