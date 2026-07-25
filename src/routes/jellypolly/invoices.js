@@ -983,7 +983,7 @@ export default function (pool, config) {
           INSERT INTO jellypolly.payments (
             invoice_id, payment_date, amount_paid, payment_method,
             payment_reference, notes, status, posting_date
-          ) VALUES ($1, $2, $3, $4, $5, $6, 'active', $2::date)
+          ) VALUES ($1, $2, $3, $4, $5, $6, 'active', $7)
         `;
         await client.query(paymentQuery, [
           createdInvoice.id,
@@ -992,6 +992,7 @@ export default function (pool, config) {
           paymentMethod, // Use provided payment method
           paymentReference, // Use provided reference
           paymentNotes, // Use provided notes or default
+          paymentDate, // posting_date (own parameter: date column, not timestamp)
         ]);
       }
 
@@ -1669,7 +1670,7 @@ export default function (pool, config) {
             INSERT INTO jellypolly.payments (
               invoice_id, payment_date, amount_paid, payment_method,
               payment_reference, notes, status, posting_date
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $2::date)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING payment_id
           `;
 
@@ -1681,6 +1682,7 @@ export default function (pool, config) {
               null,
               "Automatic payment - order details updated",
               "active",
+              automaticPaymentDate, // posting_date (own parameter: date column, not timestamp)
             ]);
 
             newPaymentCreated = true;
@@ -2014,7 +2016,7 @@ export default function (pool, config) {
         if (paymentAmount > 0) {
           const insertPaymentQuery = `
         INSERT INTO jellypolly.payments (invoice_id, payment_date, payment_method, amount_paid, notes, status, posting_date)
-        VALUES ($1, $2, 'cash', $3, 'Automatic payment - converted from INVOICE to CASH', 'active', $2::date)
+        VALUES ($1, $2, 'cash', $3, 'Automatic payment - converted from INVOICE to CASH', 'active', $4)
         RETURNING payment_id
       `;
 
@@ -2022,6 +2024,7 @@ export default function (pool, config) {
             id,
             paymentDate,
             paymentAmount,
+            paymentDate, // posting_date (own parameter: date column, not timestamp)
           ]);
 
           // Reduce customer credit usage by the settled outstanding amount

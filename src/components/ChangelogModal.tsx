@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-07-25",
+    ms: "Jelly Polly: bil TUNAI kini boleh disimpan semula. Sebelum ini menyimpan bil tunai baharu gagal dengan mesej ralat, dan ralat yang sama juga berlaku semasa mengubah produk pada bil tunai sedia ada atau menukar invois kredit kepada tunai.",
+    en: "Jelly Polly: CASH bills can be saved again. Previously, saving a new cash bill failed with an error message, and the same error also occurred when editing the products on an existing cash bill or converting a credit invoice to cash.",
+  },
+  {
     date: "2026-07-24",
     ms: "Senarai dan butiran jurnal kini memaparkan nombor rujukan sebenar resit (contohnya T130726) — sama seperti yang dipaparkan pada penyata bank dan jurnal lama yang diimport — bukannya nombor dalaman REC-.... Carian jurnal juga kini menemui jurnal melalui nombor rujukan sebenar tersebut.",
     en: "The journal list and details now show the receipt's actual reference number (e.g. T130726) — matching what the bank statement and imported legacy journals already show — instead of the internal REC-... number. Journal search now also finds journals by that actual reference number.",
