@@ -81,6 +81,7 @@ import eCarumanRouter from "./payroll/e-caruman.js";
 // Stock routes
 import productionEntriesRouter from "./stock/production-entries.js";
 import stockRouter from "./stock/stock.js";
+import estimatedReportRouter from "./stock/estimated-report.js";
 
 // Green Target routes
 import greenTargetCustomerRouter from "./greentarget/customers.js";
@@ -257,6 +258,7 @@ export default function setupRoutes(app, pool) {
   // Stock routes
   app.use("/api/production-entries", productionEntriesRouter(pool));
   app.use("/api/stock", stockRouter(pool));
+  app.use("/api/estimated-report", estimatedReportRouter(pool));
 
   // Green Target routes
   app.use("/greentarget/api/dashboard", greenTargetDashboardRouter(pool));
