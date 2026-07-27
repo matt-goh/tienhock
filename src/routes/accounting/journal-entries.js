@@ -5,6 +5,9 @@ const LEGACY_IMPORT_ENTRY_TYPE = "IMP";
 const LEGACY_IMPORT_SOURCE_TYPE = "legacy_import";
 // Entry types that carry a cheque number: Cash Payment (C) and Bank Payment (B)
 const CHEQUE_NO_ENTRY_TYPES = ["C", "B"];
+// Only Cash Payment (C) draws on the physical cheque book; Bank Payment (B)
+// keys the bank's transaction id into the same column.
+const PHYSICAL_CHEQUE_ENTRY_TYPE = "C";
 
 const LEGACY_IMPORT_SQL =
   `(je.entry_type = '${LEGACY_IMPORT_ENTRY_TYPE}' OR ` +
@@ -471,11 +474,16 @@ export default function (pool) {
   // GET /next-cheque-no - Get next sequential cheque number (for Cash Payment / C entries)
   // Cheque numbers are a continuous physical cheque-book sequence (e.g. PBB350779 -> PBB350780),
   // independent of month/reference. Returns the seed PBB350779 when none exist yet.
+  // Scoped to Cash Payment (C) entries: Bank Payment (B) entries store bank
+  // transaction ids in the same column (PBE2607240364268553), whose numeric
+  // suffix dwarfs the cheque book and would otherwise win this scan.
   router.get("/next-cheque-no", async (req, res) => {
     const SEED_CHEQUE_NO = "PBB350779";
     try {
       const result = await pool.query(
-        "SELECT cheque_no FROM journal_entries WHERE cheque_no IS NOT NULL AND cheque_no <> ''"
+        `SELECT cheque_no FROM journal_entries
+          WHERE entry_type = $1 AND cheque_no IS NOT NULL AND cheque_no <> ''`,
+        [PHYSICAL_CHEQUE_ENTRY_TYPE]
       );
 
       let best = null; // { prefix, num, width }
