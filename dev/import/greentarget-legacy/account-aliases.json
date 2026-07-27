@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 1,
+  "_comment": "Green Target legacy ledger import. Analogue of dev/import/legacy-jan-may/account-aliases.json. Every entry here is an audited decision; prepare-staging.mjs fails loudly if the source stops matching it.",
+
+  "aliases": [],
+  "_aliasesNote": "EMPTY BY DESIGN. Tien Hock needed aliases because its legacy codes had to land in the SHARED public.account_codes, which already contained conflicting ERP codes. Green Target gets its own greentarget.account_codes (handover decision R1), so all 502 legacy codes are imported verbatim with no renaming. Do not add an alias here without user approval.",
+
+  "requiredExactCodes": [
+    { "source": "GTDB", "code": "AE ENTERPRISE", "reason": "Legacy debtor code contains a space; it is imported verbatim, not squashed." },
+    { "source": "GTDB", "code": "LEE DECOR", "reason": "Legacy debtor code contains a space; it is imported verbatim, not squashed." },
+    { "source": "GTDB", "code": "RUMAH MERAH", "reason": "Legacy debtor code contains a space; it is imported verbatim, not squashed." },
+    { "source": "GTDB", "code": "SUN TARGET", "reason": "Legacy debtor code contains a space; it is imported verbatim, not squashed." },
+    { "source": "GTLD", "code": "PBB_1", "reason": "The only active bank account. Closes at 28,468.37 = June Balance Sheet 'Cash at bank' (note 19). The dormant lookalikes PBB1 and PBB_2 must NOT be merged into it." }
+  ],
+
+  "excludedSections": [
+    {
+      "source": "GTLD",
+      "code": "DEBTOR",
+      "reason": "Static trade-debtor CONTROL section, superseded by the GTDB per-customer detail. Its printed BALANCE C/FWD is 156,782.22, which is the 30-Jun-2026 debtor total (= the June Balance Sheet note 22), not a 1-Jan-2026 opening: the GTDB detail opens at 159,409.32 and moves -2,627.10 to close at exactly 156,782.22. Importing both would double-count the receivable. Same decision as the Tien Hock import made for its own DEBTOR section.",
+      "evidence": {
+        "printedOpeningCents": 15678222,
+        "gtdbDetailOpeningCents": 15940932,
+        "gtdbDetailClosingCents": 15678222,
+        "transactionRows": 0
+      }
+    }
+  ],
+
+  "openingDateExceptions": [
+    {
+      "source": "GTDB",
+      "code": "CD_SD",
+      "description": "CASH DEBTORS (SUNDRY DEBTORS)",
+      "cfwdDate": "2026-06-30",
+      "balanceCents": 6570540,
+      "transactionRows": 0,
+      "reason": "The ONLY section in either workbook whose BALANCE C/FWD is not dated 2026-01-01. It is a static snapshot carrying the 30-Jun-2026 figure with no transaction detail, so the export does not evidence this account's true 1-Jan-2026 opening. It is nonetheless part of the June trade-receivable total that reconciles to 156,782.22. Tien Hock's import carried the same class of exception (THDB SUN at 2026-05-31). RAISE WITH THE USER BEFORE G4 decides which date to anchor it at.",
+      "status": "NAMED, NOT RESOLVED"
+    }
+  ],
+
+  "journalFamilies": [
+    {
+      "pattern": "#/#",
+      "example": "2026/00001",
+      "rows": 1015,
+      "meaning": "CASH / COUNTER SALES INVOICE. Credits revenue only: TGA 'POTONG KAYU/SAMPAH/TONG RENTAL (TONG A)' (906 rows) and TGB 'SISA BATU & TANAH (TONG B)' (109 rows). Particulars read 'INV/NO : 2026/00001 /CD-LIST' or '/CD-CASH'. No cheque reference. THE DEBIT LEG IS NOT PRINTED IN THIS EXPORT - see unbalancedFamilies below.",
+      "selfBalancing": false
+    },
+    {
+      "pattern": "I#/#",
+      "example": "I2026/0001",
+      "rows": 189,
+      "meaning": "CREDIT SALES INVOICE to a registered debtor. Fully double-entry ACROSS THE TWO FILES: GTLD credits revenue (WS_OTH 70, TGA 24, WS_OTH4 6) and GTDB debits the debtor (89 rows). Both sides total exactly 46,848.20.",
+      "selfBalancing": true
+    },
+    {
+      "pattern": "RV#/#/#",
+      "example": "RV26/01/01",
+      "rows": 566,
+      "meaning": "RECEIPT VOUCHER. Always debits the bank PBB_1 (472 GTLD rows, 277,825.30). 49,475.30 of that is credited to GTDB debtors (94 rows) and settles credit sales; the remaining 228,350.00 is the banking of counter cash and its credit leg is not printed - see unbalancedFamilies below. No cheque reference.",
+      "selfBalancing": false
+    },
+    {
+      "pattern": "PB#/#",
+      "example": "PB005/03",
+      "rows": 789,
+      "meaning": "CHEQUE PAYMENT VOUCHER. Debits expense/asset accounts, credits PBB_1. EVERY row carries a physical cheque number in column E (e.g. PB350442). Balanced: DR 95,914.55 = CR 95,914.55.",
+      "selfBalancing": true
+    },
+    {
+      "pattern": "PBEB#/#",
+      "example": "PBEB011/06",
+      "rows": 223,
+      "meaning": "ELECTRONIC BANK PAYMENT. Same shape as PB but column E carries the bank's transaction id (e.g. PBEB26062303512251) rather than a cheque number. Balanced: DR 171,442.29 = CR 171,442.29.",
+      "selfBalancing": true
+    },
+    {
+      "pattern": "PBE#/#",
+      "example": "PBE009/06",
+      "rows": 2,
+      "meaning": "One single electronic payment (half-month salary, 06/2026, 2,400.00) whose reference was keyed 'PBE' instead of 'PBEB'; its column-E value is a PBEB-format bank transaction id. Treated as PBEB. Balanced.",
+      "selfBalancing": true
+    },
+    {
+      "pattern": "JBSL/#/#",
+      "example": "JBSL/01/26",
+      "rows": 130,
+      "meaning": "MONTHLY PAYROLL JOURNAL (salary, EPF, SOCSO, SIP accruals across the BWS_*/BWE_*/SS_* families). One per month. Balanced: DR 110,737.50 = CR 110,737.50.",
+      "selfBalancing": true
+    },
+    {
+      "pattern": "JWDR/#/#",
+      "example": "JWDR/01/26",
+      "rows": 43,
+      "meaning": "MONTHLY DIRECTORS' REMUNERATION JOURNAL (salary/EPF/SOCSO to BWDR* against the BW_AD* payables). One per month. Balanced: DR 23,299.90 = CR 23,299.90.",
+      "selfBalancing": true
+    },
+    {
+      "pattern": "JV#/#/#",
+      "example": "JV26/01/01",
+      "rows": 11,
+      "meaning": "JOURNAL VOUCHER. Ten rows are the five monthly bank-charge pairs (DR BWBC / CR PBB_1, Jan-May). The eleventh, JV26/06/77 dated 2026-06-30, is a 720.00 DEBIT to PBB_1 whose particulars cite four counter-sales invoice numbers ('REF : 2026/00338/2026/00365/2026/00527/2026/00583') - it is a cash-sales banking keyed as a JV instead of an RV, and shares the missing credit leg described in unbalancedFamilies.",
+      "selfBalancing": false
+    }
+  ],
+
+  "unbalancedFamilies": {
+    "_summary": "ONE structural gap explains every imbalance in both workbooks: the export prints no CASH-IN-HAND account activity. Counter sales credit revenue with no debit; bankings debit the bank with no credit. Nothing else in either file is unbalanced.",
+    "cashInHand": {
+      "cashSaleRevenueCreditsCents": 21836000,
+      "bankDebitsFromCashCents": 22907000,
+      "impliedMovementCents": -1071000,
+      "impliedOpening20260101Cents": 1071000,
+      "impliedMonthEndBalancesCents": {
+        "2026-01-31": 2021000,
+        "2026-02-28": 719000,
+        "2026-03-31": 367200,
+        "2026-04-30": 625000,
+        "2026-05-31": 74000,
+        "2026-06-30": 0
+      },
+      "chartAccountPresent": "CH_REV2 'CAH RECEIVED (2)' exists in the printed GTLD chart but is shown with a 0.00 opening and ZERO transactions.",
+      "corroboration": "The June Balance Sheet prints 'Cash in hand (note 6) .00', which agrees with the implied 2026-06-30 balance of 0.00. The six implied month-end balances above are a falsifiable prediction that G1 must test against the six Trial Balance scans.",
+      "consequence": "The 30-Jun-2026 closing trial balance balances EXACTLY (DR = CR = 2,896,809.54) without any adjustment, but the 1-Jan-2026 opening set is short 10,710.00 on the debit side and the Jan-May month-end trial balances do not balance.",
+      "status": "NAMED, NOT RESOLVED - do not synthesise these rows without user approval. G0 deliberately stages the source verbatim.",
+      "questionForUser": "Should the import create a derived GT cash-in-hand account (CH_REV2 or a new code) with a 2026-01-01 opening anchor of DR 10,710.00 plus derived movement rows, or is a further legacy cash-book export available?"
+    }
+  },
+
+  "duplicateJournalGroups": {
+    "_comment": "Handover section 7 asks whether grouping by (journal_ref, entry_date) merges genuinely separate legacy documents. Measured: it does not, materially.",
+    "groupsAcrossBothFiles": 1705,
+    "refDateCollisionsWithinTheHashFamily": 4,
+    "note": "1,015 '#/#' rows collapse into 1,011 groups. Populated by prepare-staging.mjs into the validation report as collidingJournalGroups so G4 can review the exact four."
+  },
+
+  "malformedRows": {
+    "_comment": "Tien Hock needed line normalizations and had two sections whose balance chain would not walk. Green Target needs none.",
+    "count": 0,
+    "note": "All 502 sections walk BALANCE C/FWD -> printed close exactly. No control bytes, no split fields, no unparsable balances, no unparsable dates."
+  }
+}

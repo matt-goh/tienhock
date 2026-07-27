@@ -109,6 +109,8 @@ import greenTargetSalaryReportRouter from "./greentarget/salary-report.js";
 import greenTargetLeaveManagementRouter from "./greentarget/leave-management.js";
 import greenTargetECarumanRouter from "./greentarget/e-caruman.js";
 import greenTargetCustomerSignupsRouter from "./greentarget/customer-signups.js";
+import greenTargetFinancialReportsRouter from "./greentarget/accounting/financial-reports.js";
+import greenTargetAccountLedgerRouter from "./greentarget/accounting/account-ledger.js";
 
 // Jellypolly routes
 import jellypollyInvoiceRouter from "./jellypolly/invoices.js";
@@ -336,6 +338,17 @@ export default function setupRoutes(app, pool) {
   app.use(
     "/greentarget/api/customer-signups",
     greenTargetCustomerSignupsRouter(pool, myInvoisGTConfig)
+  );
+  // Green Target accounting reports (G5). Read-only over the `greentarget`
+  // schema; "bank-statement" mirrors Tien Hock's path so the shared Account
+  // Ledger page only needs a base-path swap (handover R7).
+  app.use(
+    "/greentarget/api/financial-reports",
+    greenTargetFinancialReportsRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/bank-statement",
+    greenTargetAccountLedgerRouter(pool)
   );
 
   // Jellypolly routes

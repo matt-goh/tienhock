@@ -17,6 +17,7 @@ import {
   IconTrash,
   IconRefresh,
   IconX,
+  IconAlertTriangle,
 } from "@tabler/icons-react";
 
 type JournalEntryListItem = JournalEntry;
@@ -52,6 +53,11 @@ const getDisplayEntryType = (entry: JournalEntry): string =>
   isLegacyImportEntry(entry)
     ? entry.display_entry_type || entry.entry_type
     : entry.entry_type;
+
+// Cash Payment (C) / Bank Payment (B) entries whose cheque number is already
+// used on another entry — the legacy programme's "ALREADY ISSUED ON" check.
+const getChequeDuplicateCount = (entry: JournalEntry): number =>
+  entry.cheque_duplicate_count ?? 0;
 
 // Load cached filters (search, date range, and type/status pill selections) from localStorage
 const loadCachedFilters = (): CachedListFilters => {
@@ -652,6 +658,19 @@ const JournalEntryListPage: React.FC = () => {
                       {isLegacyImportEntry(entry) && (
                         <span className="ml-2 inline-flex rounded bg-default-100 dark:bg-gray-700 px-1.5 py-0.5 text-[10px] font-medium text-default-500 dark:text-gray-400 align-middle">
                           Legacy
+                        </span>
+                      )}
+                      {getChequeDuplicateCount(entry) > 0 && (
+                        <span
+                          className="ml-2 inline-flex items-center gap-0.5 rounded bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300 align-middle"
+                          title={`Cheque ${entry.cheque_no} is also used on ${
+                            getChequeDuplicateCount(entry) === 1
+                              ? "1 other entry"
+                              : `${getChequeDuplicateCount(entry)} other entries`
+                          }`}
+                        >
+                          <IconAlertTriangle size={11} stroke={2} />
+                          Cheque re-used
                         </span>
                       )}
                     </td>

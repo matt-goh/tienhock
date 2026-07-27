@@ -19,6 +19,16 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-07-27",
+    ms: "Jurnal: Bayaran Tunai (C) kini mengisi nombor cek fizikal yang betul semula, jadi tidak perlu lagi menaip ganti nombor tersebut. Sebelum ini ruangan cek terisi dengan nombor rujukan bank yang panjang (contohnya PBE2607240364268554) kerana sistem turut mengambil kira nombor transaksi bank daripada Bayaran Bank (B). Kini hanya buku cek Bayaran Tunai dikira, jadi nombor seterusnya terisi dengan betul (contohnya PBB350787). Tiada rekod sedia ada yang terjejas.",
+    en: "Journals: Cash Payment (C) entries now prefill the correct physical cheque number again, so you no longer have to type over it. Previously the cheque field filled in with a long bank reference (e.g. PBE2607240364268554) because the system was also counting the bank transaction ids keyed on Bank Payment (B) entries. It now looks only at the Cash Payment cheque book, so the next number fills in correctly (e.g. PBB350787). No existing records are affected.",
+  },
+  {
+    date: "2026-07-27",
+    ms: "Jurnal: sistem kini memberi amaran apabila nombor cek yang sama telah digunakan pada Bayaran Bank (B) atau Bayaran Tunai (C) yang lain — sama seperti mesej \"ALREADY ISSUED ON\" dalam sistem lama. Semasa memasukkan nombor cek, amaran terus dipaparkan di bawah ruangan tersebut berserta pautan ke jurnal berkenaan; halaman butiran jurnal turut menandakan nombor cek berwarna kuning, dan senarai jurnal memaparkan label \"Cheque re-used\". Amaran ini hanya sebagai peringatan dan tidak menghalang penyimpanan. Jurnal yang telah dibatalkan turut disenaraikan dengan label \"Cancelled\". Nombor rujukan ringkas lama (contohnya PBE26060 yang dikongsi oleh banyak bayaran Jun) tidak diberi amaran.",
+    en: "Journals: the system now warns when the same cheque number has already been used on another Bank Payment (B) or Cash Payment (C) — just like the old programme's \"ALREADY ISSUED ON\" message. While you are keying the cheque number, the warning appears right under the field with links to the entries concerned; the journal details page also highlights the cheque number in amber, and the journal list shows a \"Cheque re-used\" label. The warning is a reminder only and never blocks saving. Cancelled journals are listed too, marked \"Cancelled\". Old shorthand references (such as PBE26060, shared by many June payments) are not flagged.",
+  },
+  {
     date: "2026-07-25",
     ms: "Pergerakan Stok: jualan kini dikira mengikut tarikh sebenar bil, bukan lagi terawal 8 jam. Sebelum ini setiap bil yang dikeluarkan sebelum pukul 8 pagi dikira jatuh pada hari sebelumnya, jadi baris harian tersasar dan bil awal pagi pada 1 haribulan tertolak ke bulan sebelumnya — menyebabkan stok tutup bulan itu tersalah kira. Angka pergerakan stok dan stok tutup kini betul tanpa perlu apa-apa tindakan.",
     en: "Stock Movement: sales are now counted on the bill's actual date instead of 8 hours early. Previously every bill issued before 8am was counted on the previous day, so the daily rows were off and early-morning bills on the 1st of a month fell into the previous month — throwing off that month's closing stock. Stock movement and closing stock figures are now correct, with nothing for you to do.",

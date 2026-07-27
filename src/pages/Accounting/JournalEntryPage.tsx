@@ -13,6 +13,7 @@ import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import {
   AccountCode,
+  ChequeDuplicate,
   JournalEntry,
   JournalEntryType,
   JournalEntryLineInput,
@@ -27,6 +28,7 @@ import {
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
 import AccountCodeCombobox from "../../components/Accounting/AccountCodeCombobox";
+import ChequeReuseWarning from "../../components/Accounting/ChequeReuseWarning";
 import useAccountCodeFavourites from "../../hooks/useAccountCodeFavourites";
 import {
   FormInput,
@@ -641,6 +643,45 @@ const JournalEntryPage: React.FC = () => {
     }
   }, []);
 
+  // Warn while the cheque number is being keyed when it is already issued on
+  // another Cash/Bank Payment entry - the legacy programme's
+  // "CHEQUE … ALREADY ISSUED ON …" message. Warning only, never blocks saving.
+  const [chequeDuplicates, setChequeDuplicates] = useState<ChequeDuplicate[]>(
+    []
+  );
+
+  useEffect(() => {
+    const chequeNo: string = formData.cheque_no.trim();
+    if (!CHEQUE_NO_ENTRY_TYPES.includes(formData.entry_type) || !chequeNo) {
+      setChequeDuplicates([]);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ cheque_no: chequeNo });
+        if (id) params.append("exclude_id", id);
+        const response = await api.get(
+          `/api/journal-entries/cheque-usage?${params.toString()}`
+        );
+        if (!cancelled) {
+          setChequeDuplicates(
+            (response as { duplicates: ChequeDuplicate[] }).duplicates
+          );
+        }
+      } catch (err: unknown) {
+        console.error("Error checking cheque usage:", err);
+        if (!cancelled) setChequeDuplicates([]);
+      }
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [formData.cheque_no, formData.entry_type, id]);
+
   // Fetch entry data for editing
   const fetchEntryData = useCallback(async () => {
     if (!id) return;
@@ -1197,11 +1238,21 @@ const JournalEntryPage: React.FC = () => {
                       }
                       placeholder="e.g., PBB350779"
                       disabled={isSaving}
-                      className={`${HEADER_FIELD_CLASSNAME} placeholder:text-gray-400 dark:placeholder:text-gray-500`}
+                      className={`${HEADER_FIELD_CLASSNAME} placeholder:text-gray-400 dark:placeholder:text-gray-500 ${
+                        chequeDuplicates.length > 0
+                          ? "!border-amber-400 dark:!border-amber-600"
+                          : ""
+                      }`}
                     />
                   </div>
                 )}
               </div>
+
+              <ChequeReuseWarning
+                chequeNo={formData.cheque_no.trim()}
+                duplicates={chequeDuplicates}
+                className="mt-3"
+              />
             </div>
 
             {/* Spreadsheet-Style Line Items Table */}

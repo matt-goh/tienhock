@@ -22,6 +22,7 @@ import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
+import ChequeReuseWarning from "../../components/Accounting/ChequeReuseWarning";
 import { printCashReceiptVoucherPDF } from "../../utils/accounting/CashReceiptVoucherPDF";
 import { generateJournalVoucherPDF } from "../../utils/accounting/JournalVoucherPDFMake";
 import {
@@ -352,6 +353,8 @@ const JournalDetailsPage: React.FC = () => {
     !isLegacyImport &&
     (entry.entry_type as string) === "REC" &&
     entry.status !== "cancelled";
+  // Other Cash/Bank Payment entries already carrying this cheque number
+  const chequeDuplicates = entry.cheque_duplicates ?? [];
 
   return (
     <div className="space-y-3">
@@ -394,8 +397,20 @@ const JournalDetailsPage: React.FC = () => {
                 <p className="mt-0.5 text-sm text-default-500 dark:text-gray-400">
                   {getEntryTypeName(displayEntryType)} |{" "}
                   {formatDate(entry.entry_date)} | {entry.description || "-"}
-                  {entry.cheque_no &&
-                    ` | Cheque: ${entry.cheque_no}`}
+                  {entry.cheque_no && (
+                    <>
+                      {" | Cheque: "}
+                      <span
+                        className={
+                          chequeDuplicates.length > 0
+                            ? "font-semibold text-amber-700 dark:text-amber-400"
+                            : ""
+                        }
+                      >
+                        {entry.cheque_no}
+                      </span>
+                    </>
+                  )}
                 </p>
               </div>
             </div>
@@ -480,6 +495,13 @@ const JournalDetailsPage: React.FC = () => {
 
         {/* Line Items */}
         <div className="p-6">
+          {entry.cheque_no && (
+            <ChequeReuseWarning
+              chequeNo={entry.cheque_no}
+              duplicates={chequeDuplicates}
+              className="mb-4"
+            />
+          )}
           <div className="rounded-lg border border-default-200 dark:border-gray-700">
             <table className="min-w-full">
               <thead>
