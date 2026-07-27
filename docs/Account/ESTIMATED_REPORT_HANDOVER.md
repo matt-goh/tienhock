@@ -1,6 +1,13 @@
 # ESTIMATED REPORT HANDOVER — Closing Stock P&L / Estimated Unit Cost (MEE & BIHUN)
 
-Status: **Round 2 answers recorded — co-worker confirmations still pending; Phase 1 NOT started** | Started: 2026-07-23 | Owner: Kimi (planning/Q&A) → GPT 5.6 Sol (Phase 1+)
+Status: **Phase 2 COMPLETE — backend live at `/api/estimated-report`; Phase 3 (parity) next** | Started: 2026-07-23 | Owner: Kimi (planning/Q&A) → Claude (Phase 1) → Claude (Phase 2) → Phase 3+
+
+Nothing blocks Phase 3. The report now computes end to end from live data (§8), and
+**both product lines reproduce the printed June SALES total to the cent** — the old
+"sales deltas" turned out to be a UTC month-window artefact, not a data difference
+(§8.3). Every remaining difference against the print is one of the already-documented
+items in §6.2/§7. Outstanding: Q14/Q15 to send, the §5 data fixes to apply, and the
+Phase 3 parity pass.
 
 This doc tracks the implementation of the boss-only "Estimated P&L & Unit Cost" report
 (legacy names: "MEE/BIHUN ESTIMATED" + "ESTIMATED/COST"). It is updated at every phase
@@ -87,11 +94,11 @@ Unit-cost page:
 |---|---|
 | PRODUCT | `invoices`+`order_details` (same filter as `/api/invoices/sales/products`) |
 | CLOSING STOCK | `material_stock_entries` month M `adjustment_value` per mapped material/variant/bucket; `CS_MFIN/CS_BFIN` = Σ `material_stock_kilang_entries.stock_value` month M |
-| OPENING STOCK | same, month M−1 |
+| OPENING STOCK | same, month M−1 — since Phase 1 the CS and OS rows are ONE `estimated_report_lines` row (`code`/`description` + `opening_code`/`opening_description`) so both sides can never drift apart |
 | PURCHASE | posted journal lines on `PU_*`/`PM_*`/`BFT_*` accounts, Σ(debit−credit), month window |
 | RETURNS (`MRET`/`BRET`) | physical returns from `order_details.returnproduct × order_details.price`, mapped by `products.type` (`MEE` → MRET, `BH` → BRET), using the PRODUCT invoice filters |
 | Expenses (journal rows) | posted journal lines per account-code set × 50% |
-| Salary machine/packing | exact legacy account formula: salary + employer EPF/SOCSO/SIP + levy for the mapped locations. June payroll/JV math plus the posted levy lines reproduces all four legacy values exactly, but the salary/employer expense accounts themselves have no June posting; authoritative journal-vs-bridge policy remains pending Q12 co-worker confirmation |
+| Salary machine/packing | exact legacy account formula, read **from posted journals only — no payroll fallback** (Q12 answered). Salary + employer EPF/SOCSO/SIP reach those accounts through the **JVSL payroll voucher generator** (`location_account_mappings`), which maps to precisely the formula codes; levy (`ML_*`/`BL_*`) is keyed by hand and must never be entered twice |
 | Add Back | new keyed input per month per product line |
 | Accumulative | anchored seed + monthly P/L accumulation |
 
@@ -124,14 +131,50 @@ the LS line), BTAP→B17, BPMS/BPMB→packing split, BFIN→kilang.
 2. ~~Missing June entries PU_MSD 540.00 / MRET 1,519.10 / BRET 265.10~~ **SUPERSEDED by Round 2:** only PU_MSD may need a real PUR journal after source-document confirmation. MRET/BRET are derived sales-return report rows and must not be keyed as manual journals merely to feed this report (see Q11).
 3. ~~Sales deltas (1-MNL +20/+146.00, 2-BCM3 +205/+3,499.00)~~ **CONFIRMED: DB is truth.**
 4. ~~OTHERS row~~ **ANSWERED (C.1):** OTHERS = EMPTY_BAG + EMPTY_BAG(S) sales only, split 50/50 MEE/BIHUN. (SISA stays its own row.)
-5. ~~Salary machine/packing (C.2)~~ User: derived from **account codes** in the formula pages (e.g. SALARY & WAGES = MBS_O+MBS_PK+MBS_TS+MBS_M+…), not directly from payroll. Verified: **no June journal postings exist for salary accounts** (Jan–May only, via IMP) → account-code route yields 0 for June. The payroll/JV bridge alone was within ~1%; Q12 subsequently proved the entire June residual is the posted levy, so numeric parity is resolved while the authoritative source/fallback policy remains open.
+5. ~~Salary machine/packing (C.2)~~ User: derived from **account codes** in the formula pages (e.g. SALARY & WAGES = MBS_O+MBS_PK+MBS_TS+MBS_M+…), not directly from payroll. Verified: **no June journal postings exist for salary accounts** (Jan–May only, via IMP) → account-code route yields 0 for June. The payroll/JV bridge alone was within ~1%; Q12 subsequently proved the entire June residual is the posted levy. **Settled 2026-07-25: the source is the account codes, populated by the JVSL payroll voucher — no bridge, no fallback.**
 6. ~~Machine repair split (C.3)~~ User's formula: MEE = `(MBRM+MBUM)/2 + MRM+MUM`; BIHUN = `(MBRM+MBUM)/2 + BRM+BUM`. Tested against June journals — **doesn't add up → Q13.**
 7. ~~Accumulative seeds~~ **CONFIRMED:** MEE −166,900.31 / BIHUN 404,935.44 @ 2026-06-01.
 8. ~~SMALL/BIG packing assignment~~ **CONFIRMED:** MEE BIG = {M14,M15,M16,M17,M20,M21,M28,M29,M31} (ids 56,58,59,60,63,66,64,65,57); BIHUN BIG = {B12,B13,B14,B15,B18A,B29,B31} (ids 79,81,82,85,84,83,80). The 0.30 June delta is a keyed typo — **FIX-2 in §5 approved ("use SQL to fix the 0.30").**
 9. ~~SAGO family on CS_LS line~~ **CONFIRMED** (report implies it).
 10. P&L EXPENSES vs unit-cost residue (~216.61/~207.21) — user: reconcile after the system is implemented (Phase 3).
 
-### Round 2 (answered by user 2026-07-24; co-worker confirmations remain)
+### Round 2 (answered by user 2026-07-24; **co-worker answers received 2026-07-25 — all three CLOSED**)
+
+> **Q11 — CLOSED.** Co-worker: *"ini bahan tiada sudah kena guna untuk Mee… Dan tiada
+> pembelian"* — Sodium Tripolyphosphate is no longer used for Mee and there was **no
+> purchase**. So no PUR journal is to be keyed, and the printed June RM540.00 is a
+> legacy-only figure our data will never reproduce. `PU_MSD`/`CS_MSD`/`OS_MSD` and the
+> unit-cost SODIUM TRIPOLYPHOSPHATE row stay in the report and stay permanently 0.00,
+> and must never raise a missing-data warning. **Permanent expected deltas:** unit-cost
+> MEE ingredient row 540.00 → 0.00, MEE ingredients subtotal 65,641.64 → 65,101.64,
+> MEE purchase total 50,440.00 → 49,900.00. No seed change was needed; the line `notes`
+> now record the answer.
+>
+> **Q12 — CLOSED. Policy: journal-only, no payroll fallback.** Co-worker: the salary
+> reference JV is the **"voucher generator"**, which holds all director and employee
+> salaries; and *"I do not need to key in the levy JV for July 2026."* Verified in the
+> DB: `location_account_mappings` maps the **JVSL** voucher (salary / overtime /
+> epf_employer / socso_employer / sip_employer / bonus / commission) onto exactly the
+> accounts the legacy formulas name — `MS_MM`/`ME_MM`/`MSC_MM`/`MBSIP_MM`,
+> `MS_PM`/`ME_PM`/`MSC_PM`/`MBSIP_PM`, `BS_MB`/`BE_MB`/`BSC_MB`/`BSIP_MB`,
+> `BS_PB`/`BE_PB`/`BSC_PB`/`BSIP_PB`, plus `MBS_*`/`MBE_*`/`MBSC_*`/`MBSIP_*` — and
+> **JVDR** onto `MBDRS`/`MBDRE`/`MBDRSC`/`MBDRSIP`. It even reproduces the legacy
+> formula's odd asymmetry (`MBSIP_MM` for mee vs `BSIP_MB` for bihun), which is strong
+> independent confirmation that the seeded account sets are right. **Levy is not in the
+> voucher mapping and stays manual — do not key it twice.** The report therefore just
+> sums posted journal lines; nothing else is needed in Phase 2. See the ACTION in §7.
+>
+> **Q13 — CLOSED, formula confirmed verbatim.** Co-worker: *"MBRM + MBUM = 50%, MRM +
+> MUM = 100%, MBRMB 50% tidak masuk dalam Machine Repair, Masuk dalam EXPENSES"* —
+> which is **exactly what Phase 1 already seeded**, for both product lines
+> (bihun uses `BRM`/`BUM` at 100%). `MBRMB` stays at 50% inside the EXPENSES row
+> "REPAIR AND MAINTENANCE (BOILER)" and never in MACHINE REPAIR. No seed change needed.
+> The remaining RM191.29 (MEE) / RM273.24 (BIHUN) difference against the June print is
+> therefore **not** a formula problem — it is a June source-classification difference,
+> and moves to Phase 3 parity (see §7).
+
+*Items 11–13 below record the state before the co-worker replied. They are kept for the
+audit trail and are SUPERSEDED by the answers above — do not act on them directly.*
 
 11. **PU_MSD source check pending; MRET/BRET mapped with deltas deferred to Phase 3.**
 
@@ -183,15 +226,34 @@ the LS line), BTAP→B17, BPMS/BPMB→packing split, BFIN→kilang.
     `MUM`/`MBUM`/`BUM` have zero postings all-time. Await the co-worker's exact source,
     transaction reclassification, missing journal, or legacy override.
 
+### Round 3 (raised by the Phase 1 baseline replay, 2026-07-25 — not yet sent)
+
+14. **June MEE small-packing stock is RM883.60 higher in the system than printed.**
+    `CS_MPMS` seeds to 82,769.54 against a printed 81,885.94. The mapping is not at
+    fault: the same membership reproduces `CS_MPMB`, `OS_MPMB`, `CS_BPMS` and `OS_BPMS`
+    exactly and `OS_MPMS` to within RM0.08. This is a June keying difference on the MEE
+    packing sheet, the same class as FIX-2, and needs a line-by-line comparison against
+    the June source sheet. Do not adjust the mapping to close it.
+
+15. **VRE-DIESEL (LORI SALESMAN SAHAJA) is RM20.00 short.** The six-vehicle salesman set
+    (2962, 6893, 6389, 4688, 9901, 1016) is proven correct by its sister row —
+    VRE-OTHERS lands on 357.20 exactly only because `R9901` is included. With the same
+    six vehicles VRE-DIESEL gives 1,065.85 against a printed 1,085.85, i.e. RM40.00
+    missing from the pool, and no June `OIL*` posting accounts for RM40.00. Ask whether a
+    salesman-lorry diesel entry is missing or was booked to another vehicle/account.
+
 **Fixture-metadata handoff note:** `expected-june-2026.json` still contains the earlier
 labels that call PU_MSD/MRET/BRET "missing June entries" and say salary "must come from
 processed payroll." Those printed fixture amounts remain valid, but the old source labels
 are superseded by Q11/Q12 above. Per this round's handover-only scope, the JSON was not
 edited; update its metadata after the co-worker answers Q12, before parity automation.
 
-### 2.1 Ready-to-send Bahasa Melayu messages
+### 2.1 Bahasa Melayu messages
 
-**Q11 — PU_MSD RM540**
+Q11 / Q12 / Q13 were **sent and answered** (answers above); kept for the record.
+Q14 / Q15 are **still to send**.
+
+**Q11 — PU_MSD RM540** *(answered: no purchase, material discontinued)*
 
 > Hi, boleh tolong semak pembelian Sodium Tripolyphosphate (PU_MSD) RM540 untuk Jun
 > 2026? Amaun ini ada dalam Estimated Report lama tetapi belum ada jurnal dalam sistem.
@@ -202,7 +264,7 @@ edited; update its metadata after the co-worker answers Q12, before parity autom
 > lain, jangan key lagi supaya tidak duplicate — bagitahu saya dahulu. Sekali boleh
 > confirm ya, bahan ini memang sudah tidak digunakan lagi sekarang?
 
-**Q12 — jurnal gaji Jun**
+**Q12 — jurnal gaji Jun** *(answered: salaries come from the JVSL voucher generator)*
 
 > Hi, nak confirm jurnal gaji untuk Estimated Cost Jun 2026. Jurnal levy `JV26/06/07`
 > sudah ada dalam sistem: Mee Mesin RM146.09, Mee Packing RM117.90, Bihun Mesin
@@ -214,7 +276,7 @@ edited; update its metadata after the co-worker answers Q12, before parity autom
 > jurnal? Kalau sebenarnya sudah direkod dalam jurnal atau akaun lain, boleh share
 > rujukan itu dahulu supaya kami tidak duplicate.
 
-**Q13 — Machine Repair**
+**Q13 — Machine Repair** *(answered: formula confirmed exactly as seeded)*
 
 > Hi, saya nak minta tolong semak kiraan Machine Repair dalam laporan Estimated/Cost
 > bulan Jun. Formula lama yang tercetak ialah:
@@ -231,21 +293,44 @@ edited; update its metadata after the co-worker answers Q12, before parity autom
 > kongsi 50/50, bukan masukkan sekali lagi dalam Machine Repair, supaya tidak dikira dua
 > kali. Kalau ada breakdown lama, boleh share sekali. Terima kasih.
 
+**Q14 — stock plastik kecil Mee Jun**
+
+> Hi, boleh tolong semak stock plastik kecil (SMALL PLASTIC-MEE) bagi Jun 2026? Ikut
+> sistem jumlahnya RM82,769.54, tetapi laporan lama tunjuk RM81,885.94 — beza
+> RM883.60. Untuk Mei jumlahnya hampir sama (beza RM0.08 sahaja), dan plastik besar Mee
+> serta plastik kecil/besar Bihun pula padan tepat, jadi masalahnya cuma pada key-in
+> bulan Jun. Boleh tolong banding senarai stock plastik kecil Mee Jun satu per satu
+> dengan borang asal, dan bagitahu item mana yang tersalah kuantiti atau harga? Terima
+> kasih.
+
+**Q15 — diesel lori salesman Jun**
+
+> Hi, nak semak diesel untuk lori salesman bulan Jun 2026. Ikut jurnal, diesel untuk
+> lori salesman (SAB2962, SAB6893, SAB6389, SAB4688, SAB9901Y, SD1016T) berjumlah
+> RM2,131.70, jadi 50% ialah RM1,065.85. Tetapi laporan lama tunjuk RM1,085.85, bermakna
+> ada lagi RM40.00 yang belum masuk. Boleh tolong semak sama ada ada satu resit diesel
+> lori salesman Jun yang belum key in, atau yang tersalah masuk ke lori/akaun lain?
+> Terima kasih.
+
 ---
 
 ## 3. Phase checklist
 
 - [x] **Phase 0 — Fixtures & handover** (2026-07-23): PDF + page PNGs +
       `expected-june-2026.json` + README in `dev/import/closing-stock-report/`; this doc.
-- [ ] **Phase 1 — Migration**: tables `estimated_report_lines`,
-      `estimated_report_line_materials`, `estimated_report_expense_rows`,
-      `estimated_report_inputs`, `estimated_report_anchors` + seeds; AGENTS/CLAUDE schema.
-- [ ] **Phase 2 — Backend**: `src/routes/stock/estimated-report.js` mounted
-      `/api/estimated-report` (report data, add-back PUT, mappings GET/PUT,
-      journal formula evaluation, sales-return mapping, and the salary journal/fallback
-      policy after the pending Q12 co-worker confirmation).
+- [x] **Phase 1 — Migration** (2026-07-25): `dev/migrations/2026-07-25_estimated_report_foundation.sql`
+      creates and seeds `estimated_report_lines`, `estimated_report_line_sources`,
+      `estimated_report_inputs`, `estimated_report_anchors`; AGENTS.md/CLAUDE.md schema
+      updated (88 → 92 tables). Applied to the dev DB and verified idempotent. See §6.
+- [x] **Phase 2 — Backend** (2026-07-25): `src/routes/stock/estimated-report-engine.js`
+      (computation) + `src/routes/stock/estimated-report.js` (router) mounted
+      `/api/estimated-report` in `src/routes/index.js`. Report data, Add Back
+      GET/PUT, mappings GET/PUT + options, journal formula evaluation, sales-return
+      mapping, multi-month ACCUMULATIVE. Salary is journal-only, as Q12 settled.
+      See §8.
 - [ ] **Phase 3 — Parity verification**: `verify-estimated-report.mjs` vs fixture;
-      delta table here; user/co-worker review of open questions.
+      delta table here; apply the §5 data fixes; user/co-worker review of open
+      questions. The Phase 2 baseline in §8.2 is the starting delta table.
 - [ ] **Phase 4 — Frontend**: `src/pages/Stock/Reports/EstimatedReportPage.tsx`,
       nav "Reports" group in `src/pages/TienHockNavData.tsx`, drilldowns, Add Back input,
       mappings modal.
@@ -256,6 +341,15 @@ edited; update its metadata after the co-worker answers Q12, before parity autom
 
 ## 4. Progress log
 
+- 2026-07-25 — **Phase 2 done.** Backend engine + router delivered and verified
+  against the June fixture (§8). No schema, journal, stock, sales or payroll row was
+  touched, and no data was keyed. **Root-caused the long-standing "sales deltas":
+  they were a UTC month-window artefact — on the correct Asia/Kuala_Lumpur window
+  both product lines hit the printed SALES total exactly.** `expected-june-2026.json`
+  metadata was corrected accordingly (the superseded Q11/Q12 labels too). Test
+  fixtures cleaned up: the ten `pages/cs-p*.png` renders were deleted (regenerable
+  from the PDF, and the transcription has no `ocr_uncertain` values left); the source
+  PDF and the JSON stay until Phase 3 signs off.
 - 2026-07-23 — Plan approved. All 10 pages transcribed and reverse-engineered; the
   June figures originally marked `verified_db` in the fixture were reproduced (see §1).
   Phase 0 done; later live-source/formula deltas are tracked in Q11–Q13.
@@ -264,6 +358,30 @@ edited; update its metadata after the co-worker answers Q12, before parity autom
   confirmed PUR leg conventions and that PU_MSD/MRET/BRET have no posting history
   (→ Q11). User: Phase 1 implementation goes to GPT 5.6 Sol; SQL fixes below are
   approved but NOT yet applied.
+- 2026-07-25 — **Q12 fully verified against fresh production data.** A production DB
+  import brought `JVSL/06/26` into dev (the voucher had only ever existed in prod, which
+  is why dev showed zero salary). The Phase 1 tables, seed and every material/product/
+  account reference survived the import untouched, and the stock replay is identical to
+  before. **All twelve journal-derived payroll rows now equal the printed June figures to
+  the cent**, and the salesman group's only remaining difference is Q15's RM20.00. The
+  EXPENSES residual collapsed from −34,325.94 to +20.91. Nothing in the schema or seeds
+  needed changing. Added a deployment/DB-refresh note to §7.1.
+- 2026-07-25 — **Q11/Q12/Q13 answered and closed.** No mapping or formula change was
+  needed: Q13's confirmed formula is exactly what Phase 1 had already seeded, and Q11
+  confirms `PU_MSD` is permanently zero. Q12 resolved the last policy question —
+  **journal-only, no payroll fallback** — after verifying that `location_account_mappings`
+  wires the JVSL/JVDR voucher generator onto precisely the legacy formula accounts. The
+  migration was amended in place (line `notes` only, no schema or mapping change) and
+  re-applied. Root cause of the salary gap identified: **no JVSL voucher has ever been
+  generated**, for any month. Open items consolidated into the new §7.
+- 2026-07-25 — **Phase 1 done.** Schema + seeds applied to dev (135 lines, 447 source
+  members); no data, journal, stock or sales row was touched. Every legacy formula
+  account code from pages 3–8 was checked against `account_codes` — **all exist**, so
+  there is nothing to report back on missing codes. The seeded mappings were replayed
+  against June/May data and reproduce the printed stock, kilang and purchase figures
+  exactly, apart from the deltas tabulated in §6.2. Two mapping assumptions and four
+  legacy-formula quirks are recorded in §6.3/§6.4 for the co-worker round. The §5 data
+  fixes are still **NOT applied** — they belong to Phase 3 parity work.
 - 2026-07-24 — Round-2 Q&A only; **no Phase 1/code/data changes made**. PU_MSD remains
   an optional formula account, with its printed June RM540 pending source confirmation.
   MRET/BRET are now mapped to physical sales returns rather than manual journals; the
@@ -310,16 +428,355 @@ UPDATE material_stock_entries
  WHERE id = 171 AND unit_cost = 282.50;  -- 0 rows = already fixed
 ```
 
-### PENDING CO-WORKER CHECK (not yet an approved fix): PU_MSD RM540.00
+### RESOLVED — NO journal to be created: PU_MSD RM540.00
 
-Do not create a journal merely to force June parity. The report keeps PU_MSD in its
-formula and accepts zero without warning. If the co-worker confirms the printed RM540
-was a genuine June purchase not recorded elsewhere, they should key a normal balanced
-PUR journal through the journal workflow: DR `PU_MSD`, CR the real supplier/control
-account, with the source document's actual date/reference/particulars. This June entry
-would not affect `LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md`, which covers Jan–May IMP
-journals only.
+**Closed 2026-07-25.** The co-worker confirmed the material is no longer used for Mee
+and that **no purchase exists** (*"ini bahan tiada sudah kena guna untuk Mee… Dan tiada
+pembelian"*). No PUR journal is to be keyed — doing so would invent a transaction. The
+printed June RM540.00 stays a legacy-only figure; `PU_MSD` and the `MSD` stock line
+remain in the report at a permanent 0.00 and must never raise a missing-data warning.
 
 MRET/BRET are explicitly removed from this pending-journal list. They are mapped from
 sales `returnproduct × invoice-line price` as described in Q11; manual return journals
 would risk double-counting.
+
+---
+
+## 6. Phase 1 — delivered schema, verified baseline, and open assumptions
+
+Migration: `dev/migrations/2026-07-25_estimated_report_foundation.sql` (applied to dev
+2026-07-25, re-run clean → idempotent). It creates schema and mappings ONLY: no journal
+is posted, and no sales / stock / journal / payroll row is modified.
+
+### 6.1 Schema as built (differs from the Phase-1 sketch — read this)
+
+Four tables, not five. Column detail lives in CLAUDE.md/AGENTS.md; the two deliberate
+departures from the original plan are:
+
+- **`estimated_report_expense_rows` was not created.** Expense rows are ordinary
+  `estimated_report_lines` (`page='unit_cost'`, `section='expenses'`). A separate table
+  would have duplicated the same shape for no gain.
+- **`estimated_report_line_materials` became `estimated_report_line_sources`.** A report
+  line's members are not only materials — they are also account codes, products, product
+  types and other lines. One polymorphic child table with a `source_type` discriminator
+  and a shape CHECK (the existing `receipt_allocations` pattern) replaces what would have
+  been four near-identical child tables, and gives Phase 4 a single mappings surface.
+
+Three structural decisions worth knowing before Phase 2:
+
+1. **CS and OS are one row.** `estimated_report_lines.section='stock'` carries
+   `code`/`description` (closing) plus `opening_code`/`opening_description`, with a CHECK
+   that only stock rows have them. Opening stock of month M *is* closing stock of month
+   M−1, so one mapping serves both and they cannot be edited out of sync.
+2. **`product_line='shared'` expresses the legacy 50/50 split.** A MEE report reads
+   `product_line IN ('mee','shared')`. The split itself lives in
+   `estimated_report_line_sources.percentage` (50.00 shared-pool, 100.00 product-specific
+   such as `MTRA`/`BTRA`, `MS_SM`/`BS_SM`, `MRM`/`BRM`). This is why the shared expense
+   pool is seeded once, not twice.
+3. **`source_kind` on the line says how to evaluate it**, `sign` on the member says
+   whether it adds or subtracts. `stock_flow` rows (the 16 unit-cost ingredient/packing
+   rows) are pure line references: a referenced *stock* line contributes
+   `opening − closing`, a referenced *purchase* line contributes its amount. All 16
+   legacy formulas collapse to that shape with no exceptions.
+
+Seeded volume: 135 lines / 447 source members —
+pl.stock 23/86, pl.purchase 20/20, pl.product 8/10, unit_cost.expenses 47/160,
+unit_cost.salesman 8/68, unit_cost.habuk 5/32, unit_cost.ingredient 10/27,
+unit_cost.packing 6/12, unit_cost.salary 4/20, unit_cost.machine_repair 2/8,
+unit_cost.production 2/4.
+
+**Every account code printed on formula pages 3–8 exists in `account_codes`.** There is
+nothing missing for the user to create. (`OILBFORK` is the one code the legacy VRE-DIESEL
+formula omits relative to its sister formulas — and no such account exists, so the
+omission is correct, not a transcription gap.)
+
+### 6.2 Baseline replay: seeded mappings vs the printed June report
+
+Replayed straight from the seeded tables against June (closing) / May (opening) data.
+Everything not listed below is **exact**: BERAS 194,663.40 / 208,934.50, JAGUNG
+21,546.00 / 38,829.00, CS_LS 67,370.40 / OS_LS 57,072.30, both kilang lines,
+CS_MPMB 23,461.25 / OS_MPMB 27,531.25, CS_BPMS 30,183.94 / OS_BPMS 45,167.88, both
+selotape lines, all TEPUNG/GARAM/SODA lines, `PU_BJAG` 17,280.00, `PU_BSAG` 107,580.00,
+`PU_MTEP` 49,900.00, `BTRA` 509.00, and production 20,691 / 30,092 bags.
+
+| Row | Seeded mapping gives | Printed | Delta | Status |
+|---|---|---|---|---|
+| `CS_MPMS` (June MEE small packing) | 82,769.54 | 81,885.94 | **+883.60** | NEW — see below |
+| `OS_MPMS` (May MEE small packing) | 85,789.29 | 85,789.37 | +0.08 | keying noise |
+| `CS_BPMB` (June BIHUN big packing) | 16,891.75 | 16,891.45 | +0.30 | FIX-2 (§5), not applied |
+| `PU_BBER` | 495,131.40 | 130,631.40 | +364,500.00 | FIX-1 (§5), not applied |
+| MEE MACHINE REPAIR | 4,391.59 | 4,200.30 | −191.29 | Q13 formula CLOSED; residual = source classification |
+| BIHUN MACHINE REPAIR | 2,045.98 | 2,319.22 | +273.24 | Q13 formula CLOSED; residual = source classification |
+| EXPENSES line (MEE) | 63,750.73 | 63,729.82 | +20.91 | Q12 CLOSED; small payroll residual — see below |
+| EXPENSES line (BIHUN) | 64,259.73 | 64,238.82 | +20.91 | Q12 CLOSED; same residual |
+| `PU_MSD` | 0.00 | 540.00 | −540.00 | Q11 CLOSED — permanent, expected, correct |
+| VRE-DIESEL (LORI SALESMAN SAHAJA) | 1,065.85 | 1,085.85 | −20.00 | Q15, open |
+
+**Re-verified 2026-07-25 after a fresh production DB was imported into dev, which brought
+the June `JVSL/06/26` payroll voucher (RM181,699.10, posted) with it.** The Phase 1
+tables and seed survived the import intact (135 lines / 447 members / 2 anchors) and
+every material, variant, product and account reference still resolves — the stock replay
+is byte-identical to the pre-import run. **All twelve journal-derived payroll rows now
+land on the printed June figures exactly:**
+
+| Row | Ours | Printed |
+|---|---|---|
+| MEE SALARY MACHINE / PACKING | 17,068.69 / 14,551.85 | identical ✓ |
+| BIHUN SALARY MACHINE / PACKING | 28,793.96 / 22,390.70 | identical ✓ |
+| SALARY SALESMAN (MEE / BIHUN) | 7,414.01 / 7,414.03 | identical ✓ |
+| SALARY IKUT LORI (MEE / BIHUN) | 5,374.34 / 5,374.35 | identical ✓ |
+| SALARY JAGA API / SALARY HABUK | 2,605.06 / 0.00 | identical ✓ |
+| STAFF MESSING / BURNING MATERIALS | 1,287.00 / 1,943.90 | identical ✓ |
+
+Subtotals follow: MEE salary 31,620.54 ✓, BIHUN salary 51,184.66 ✓, habuk 4,548.96 ✓.
+The salesman subtotal is 15,498.40 / 15,498.43 against a printed 15,518.40 / 15,518.43 —
+**the entire group delta is Q15's RM20.00 and nothing else.** This is decisive
+confirmation that the seeded account sets, the 50/100 percentage split and the
+journal-only policy are all correct.
+
+The EXPENSES residual shrank from −34,325.94 to **+20.91** (both lines identically, so
+still entirely inside the shared pool = +RM41.82 before the 50% split). Its whole source
+is the four JVSL-fed rows, which post RM68,693.70 where the print implies RM68,651.88:
+SALARY & WAGES 62,325.05, EPF 5,321.00, SOCSO 951.55, SIP 96.10. No `_PK` (PEKEBUN)
+account has a June posting, so the legacy formula's omission of `MBSIP_PK` costs nothing
+this month. RM41.82 on RM68,693.70 is 0.06% and is almost certainly a payroll figure that
+moved after the legacy report was printed — a Phase 3 parity item, not a mapping fault.
+It is unrelated to Q15 (different account families; 41.82 ≠ 40.00).
+
+Three results are worth stating plainly:
+
+- **The packing SMALL/BIG membership rule is correct.** Q8's BIG sets reproduce
+  `CS_MPMB`, `OS_MPMB`, `CS_BPMS` and `OS_BPMS` exactly, and `OS_MPMS` to within RM0.08.
+  The **RM883.60 on June `CS_MPMS` is therefore a June keying difference, not a mapping
+  error** — it is the same class of problem as FIX-2 and should be chased the same way
+  (compare the June MEE packing sheet line by line). It was not previously quantified.
+- **The EXPENSES gap was identical to the cent on both product lines**, which proved the
+  whole shortfall sat in the *shared* 50% pool and none of it in the product-specific
+  transportation members — i.e. RM68,651.88 of June payroll expense missing from
+  `MBS_*`/`MBE_*`/`MBSC_*`/`MBSIP_*`. **Root cause: the `JVSL` payroll voucher existed
+  only in production, never in dev.** Jan–May salary reached these accounts through the
+  legacy `IMP` import (RM103k–110k/month); dev's June had only the manual levy JV plus
+  `JVDR/06/26`. Once the production DB was imported, `JVSL/06/26` arrived and every
+  salary row snapped to the printed value — resolved, see the re-verification above.
+- **The salesman VRE-OTHERS set is confirmed to run past the scan's right-margin cut.**
+  Including vehicles `9901` and `1016` makes June land on 357.20 exactly
+  (`R6389` 509.60 + `R6893` 197.60 + `R9901` 7.20 = 714.40 × 50%). The companion
+  VRE-DIESEL row is nonetheless RM20.00 short (RM40.00 in the pool) with the same six
+  vehicles, and no June `OIL*` posting accounts for RM40.00 — **new, unexplained, and
+  worth adding to the co-worker round.**
+
+### 6.3 Mapping assumptions the co-worker should confirm
+
+Both are unverifiable from data (the materials have no entries in any month), so the seed
+records a defensible choice rather than leaving stock able to vanish silently:
+
+- **`M23D` "Stork W - Johor Bahru" → `CS_MTEP3`/`OS_MTEP3` (STORK W).** Mapped on the
+  label match. `MTEP3` currently resolves entirely from `M23` "Flour - Lahad Datu", which
+  is what reproduces the printed 7,486.08 / 14,392.88.
+- **`B18` "Tepung Beras 25KG" is deliberately left UNMAPPED.** It has no obvious legacy
+  line (the BIHUN report has no rice-flour row), and guessing `BBER` would silently
+  inflate BERAS. If it is ever keyed it will not appear in the report until mapped.
+
+Also seeded on the same reasoning: `SODIUM_TRIP`→`MSD`, `JAGUNG_1..4`→`BJAG`,
+`SODIUM_2`/`B1`→`BSDM`, `TH2`/`TH2_2`→`BTH2`, `BERAS`→`BBER`, `SAGO`→`BSAG`, and the
+generic `PM_SMALL`/`PM_BIG`/`SELOTAPE` materials into the small/big/tape lines of both
+buckets. The inactive pre-system materials (`GARAM`, `GARAM_2`, `TH1`, `SODA_ASH_1/2`,
+`TEPUNG`) are intentionally not mapped — they are superseded and have never been keyed.
+
+### 6.4 Legacy-formula quirks preserved as printed (do not "fix" in Phase 2)
+
+- **`MBKH` is counted twice**, at 50% each: once inside EXPENSES row 23 "REPAIR AND
+  MAINTENANCE (BOILER)" (`MBRMB+PU_CHEM+MBKH`) and again as the HABUK group's "BURNING
+  MATERIALS (HABUK/KAYU)" (`MBKH`). June: RM1,943.90 lands in both. Q13 confirmed
+  `MBRMB` belongs in EXPENSES but said nothing about `MBKH`; keeping the double count
+  is also what best fits the printed June EXPENSES total (it leaves the small ~RM216.61
+  / ~RM207.21 residue of Q10 rather than a ~RM1,727 one). Seeded as printed — flag it to
+  the boss rather than silently deduplicating.
+- **SIP omits `MBSIP_PK`** while SALARY & WAGES, EPF and SOCSO all include their `_PK`
+  (PEKEBUN) member. Seeded as printed.
+- **The fixture JSON calls the TH-1 stock code `CS_MTHT1`/`OS_MTHT1`.** Both the P&L page
+  and the formula page print `MTH11`; the seed uses `CS_MTH11`/`OS_MTH11`. Fix the JSON
+  when its metadata is refreshed.
+- The `PU_MSD` purchase line and the `MSD` stock line carry an explicit "permanently
+  zero — never warn" note in `estimated_report_lines.notes` (Q11 answered: material
+  discontinued for Mee, no purchase exists or is expected).
+
+---
+
+## 7. What is still open
+
+**Nothing blocks Phase 2.** The report is journal-only with no fallback policy left to
+decide, and every mapping is seeded and verified.
+
+### 7.1 Actions
+
+- ~~Generate and post the June 2026 `JVSL` payroll voucher.~~ **DONE 2026-07-25** — it
+  already existed in production; the dev DB simply did not have it. A fresh production
+  import brought `JVSL/06/26` (RM181,699.10, posted) into dev and all twelve payroll rows
+  now match the print exactly. No voucher needs generating.
+- **Apply the §5 data fixes** (FIX-1 `PU_BBER` 405,000.00 → 40,500.00, FIX-2 the RM0.30
+  on `material_stock_entries` id 171) when Phase 3 parity starts. Still not applied.
+- **Deployment / DB-refresh note:** `dev/migrations/2026-07-25_estimated_report_foundation.sql`
+  must be applied to **production** before the report ships, and **re-applied after any
+  production→dev database import** if that import ever drops the `estimated_report_*`
+  tables. The 2026-07-25 import left them intact and every material/variant/product/account
+  reference still resolved, but that is not guaranteed for future imports. The migration is
+  idempotent, so re-running it is always safe — note only that re-running **resets the
+  seeded mappings to their defaults**, discarding later edits made through the Phase 4
+  mappings modal.
+
+### 7.2 Questions still to ask the co-worker
+
+- **Q14** — June MEE small-packing stock is RM883.60 higher than the print. Mapping is
+  proven correct; needs a line-by-line check of the June MEE packing sheet.
+- **Q15** — VRE-DIESEL (LORI SALESMAN SAHAJA) is RM20.00 short (RM40.00 in the pool) and
+  no June `OIL*` posting explains it.
+
+Both have ready-to-send Bahasa Melayu messages in §2.1.
+
+### 7.3 Deferred to Phase 3 parity (no question needed yet)
+
+- **Q10** — P&L EXPENSES vs the unit-cost group sum leaves ~RM216.61 (MEE) / ~RM207.21
+  (BIHUN). The user already chose to reconcile this after the system is built.
+- **EXPENSES payroll residual** — +RM20.91 on both lines (+RM41.82 in the shared pool),
+  0.06% of the RM68,693.70 the JVSL voucher posts to SALARY & WAGES / EPF / SOCSO / SIP.
+  Almost certainly a payroll figure that changed after the legacy report was printed.
+- **Q13 residual** — RM191.29 (MEE) / RM273.24 (BIHUN) on MACHINE REPAIR. The formula is
+  now confirmed, so this is a June source-classification difference between the legacy
+  system and ours. Net across both lines is only RM81.95; the `MBRM`/`MRM`/`BRM` June
+  lines are all small itemised purchases, and no single line or clean subset matches the
+  deltas, so this needs the legacy breakdown rather than more DB digging.
+- **MRET/BRET** — MEE −RM1.30 / BIHUN +RM3.20 versus the print (Q11, Round 2). These
+  are genuine and are NOT affected by the month-window fix below.
+- ~~**Sales deltas** — 1-MNL +20 bags/+RM146.00 and 2-BCM3 +205 bags/+RM3,499.00.~~
+  **CLOSED 2026-07-25 — there is no delta.** Round 1 concluded "the DB is truth, the
+  print is stale"; that conclusion was wrong. Both figures came from deriving the
+  invoice month with `DATE(TO_TIMESTAMP(createddate/1000))`, which the UTC database
+  session evaluates 8 hours behind KL and which therefore swallows the first eight
+  hours of 1 July. On the correct Asia/Kuala_Lumpur epoch-ms window (what
+  `/api/invoices/sales/products` already uses, and what the engine uses) 1-MNL is
+  16,943 / RM121,393.50 and 2-BCM3 is 18,564 / RM307,748.10 — **exactly as printed**,
+  and both P&L SALES totals land on the print to the cent. See §8.3.
+
+### 7.4 Low-stakes confirmations (nice to have, not blocking)
+
+- The two mapping assumptions in §6.3 (`M23D` → `MTEP3`; `B18` deliberately unmapped).
+  Neither material has ever been keyed, so nothing is affected today.
+- Whether the boss is happy that `MBKH` is counted twice by the legacy formulas (§6.4).
+
+---
+
+## 8. Phase 2 — delivered backend
+
+Two new files, one new mount. **No schema change, no migration, no data written** —
+the report reads and derives only.
+
+- `src/routes/stock/estimated-report-engine.js` — all SQL and all arithmetic, with no
+  Express dependency, so the Phase 3 verifier can import it directly.
+- `src/routes/stock/estimated-report.js` — the router.
+- `src/routes/index.js` — mounted at `/api/estimated-report` (behind the global
+  `authMiddleware`; the boss-only restriction is a Phase 4 nav concern, there is no
+  role primitive in the backend to hang it on today).
+
+### 8.1 API surface
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/estimated-report?year=&month=[&productLine=mee\|bihun]` | The whole report: both pages, both product lines unless filtered |
+| GET | `/api/estimated-report/inputs?year=&month=` | Keyed Add Back rows for a month |
+| PUT | `/api/estimated-report/add-back` | Upsert `{ productLine, year, month, addBack, notes }` |
+| GET | `/api/estimated-report/mappings` | All 135 lines with their resolved source members (material/variant/account/product names included) |
+| GET | `/api/estimated-report/mappings/options` | Pickable materials (+variants), account codes, products, product types, stock buckets and referenceable P&L lines |
+| PUT | `/api/estimated-report/mappings/:lineId` | Replace one line's members atomically; optional `isActive` / `notes` |
+
+Response shape, per product line: `pl` (products / closingStock / openingStock /
+purchases / returns, their totals, `usage`, `gross`, `expenses` + `expenseBreakdown`,
+`profitLoss`, `addBack`, `finalProfitLoss`, `accumulative`), `unitCost` (`bagsSold`,
+`sales`, `production`, the six cost `groups` each with rows + subtotal,
+`totalBeforeRepair`, `machineRepair`, `total`, `addBack`, `finalUnitCost`), plus
+`anchor`, `monthlyTrail` and `warnings`.
+
+### 8.2 Phase 2 baseline — engine output vs the printed June report
+
+Everything not listed is **exact**, including both SALES totals, both bag counts,
+every stock and kilang row, every purchase row except `PU_BBER`, all twelve payroll
+rows, production 20,691 / 30,092, and both `expenseBreakdown` salary/habuk subtotals.
+
+| Row | Engine | Printed | Delta | Status |
+|---|---|---|---|---|
+| MEE `CS_MPMS` (in CLOSING total) | +883.60 | — | +883.60 | Q14, open |
+| MEE `OS_MPMS` (in OPENING total) | −0.08 | — | −0.08 | keying noise |
+| MEE `PU_MSD` | 0.00 | 540.00 | −540.00 | Q11 CLOSED — permanent and correct |
+| MEE `MRET` | 1,517.80 | 1,519.10 | −1.30 | Phase 3 |
+| BIHUN `PU_BBER` | 495,131.40 | 130,631.40 | +364,500.00 | FIX-1 (§5), **not applied** |
+| BIHUN `CS_BPMB` | 16,891.75 | 16,891.45 | +0.30 | FIX-2 (§5), **not applied** |
+| BIHUN `BRET` | 268.30 | 265.10 | +3.20 | Phase 3 |
+| SALESMAN subtotal (both lines) | −20.00 | — | −20.00 | Q15, open |
+| MACHINE REPAIR MEE / BIHUN | 4,391.59 / 2,045.98 | 4,200.30 / 2,319.22 | −191.29 / +273.24 | Q13 CLOSED, residual is source classification |
+| EXPENSES line (both lines) | 63,750.76 / 64,259.76 | 63,729.82 / 64,238.82 | +20.94 | payroll residual (§7.3) + 0.03 rounding, see below |
+
+The EXPENSES line is **RM0.03 above** the RM20.91 residual recorded in §6.2. That is
+policy, not drift: seven shared expense rows land on an exact half-cent when the 50%
+split is applied (`CLEANING`, `ELECTRICITY AND WATER`, `OFFICE REFRESHMENT`,
+`PRINTING AND STATIONERY`, `SALARY & WAGES`, `SOCSO`, `VRE-DIESEL`). The engine
+rounds each **printed row** to the cent and then sums in sen, so the EXPENSES total
+always equals the sum of the rows shown above it; the §6.2 SQL replay summed the raw
+values and rounded once at the end. Do not "fix" this by rounding later — a total
+that disagrees with its own visible rows reads as a bug to the boss.
+
+### 8.3 What Phase 2 settled
+
+- **The sales deltas do not exist.** See §7.3. The engine derives the invoice month
+  from an Asia/Kuala_Lumpur epoch-ms window, exactly like
+  `/api/invoices/sales/products`; the earlier comparison used a UTC calendar date and
+  reached 8 hours into July. Both product lines now match the printed SALES total and
+  bag count to the cent. **Note for Phase 3 and beyond: `src/routes/stock/stock.js`
+  still derives its month from `DATE(TO_TIMESTAMP(createddate/1000))` on a UTC
+  session, so its sales figures carry the same 8-hour shift. Out of scope here, but
+  worth raising with the user separately — it is not this report's bug to fix.**
+- **`OTHERS` is exact.** EMPTY_BAG + EMPTY_BAG(S) at 50% each = RM75.00 on both pages,
+  as seeded. The fixture's old "DB OTH codes total 9,198.40" note was wrong and has
+  been corrected.
+- **P&L EXPENSES is derived, not read.** It is the sum of the unit-cost cost groups
+  (salary + salesman + habuk + expenses + machine repair). That is what leaves Q10's
+  ~RM216.61 / ~RM207.21 legacy residue, and it keeps the two pages consistent by
+  construction.
+- **ACCUMULATIVE walks the months.** `anchor.accumulative` + every month's P/L from
+  the anchor month through the requested month, returned as `monthlyTrail`. Stock is
+  fetched once per month and reused as the next month's opening, so a July request
+  costs one extra month of queries, not two full runs. A request before any anchor
+  returns a warning instead of a silent zero, and a runaway anchor (>120 months) is
+  rejected rather than looping.
+- **A mapped source with no data stays silent.** There are no missing-data warnings at
+  all, so `PU_MSD` / `CS_MSD` / `OS_MSD` can never raise one (Q11).
+
+### 8.4 Phase 2 verification performed
+
+Engine run against the dev DB for June 2026 and diffed against
+`expected-june-2026.json`; every endpoint exercised over HTTP; `PUT /mappings/:lineId`
+round-tripped (write, read back, restore) and its rejections checked — unknown
+`source_type`, an unknown account code / material / product, a variant that belongs to
+another material, a self-reference and a reference to a non-P&L line all return a
+readable 400 and leave the line's members untouched.
+Add Back was exercised inside a rolled-back transaction (MEE 9,658.83 flows to FINAL
+and to a 0.466813 unit, matching the boss's handwriting), as were a July request (two
+months in the trail) and a pre-anchor May request (warning, no crash).
+
+**Dev DB state is unchanged: 135 lines / 447 members / 2 anchors / 0 keyed inputs.**
+The June Add Back values the boss wrote on the printout (MEE 9,658.83 / BIHUN
+6,662.66) are still **not keyed** — they are the user's to enter in Phase 4, or on
+request.
+
+### 8.5 Known limitations to watch
+
+- `HANCUR_BH` and `KARUNG_HANCUR` are type `BH` and are excluded from PRODUCTION by
+  the seed, but nothing excludes them from the BIHUN sales expansion. They have never
+  been sold, so June is unaffected; if they ever are, they will appear as their own
+  zero-value product rows and add bags to the printed bag total. Visible, not silent —
+  decide with the boss if it ever happens.
+- The `sales_products` rows are ordered by `products.sort_order` then id, which is the
+  app-wide product order. The legacy print used its own order (it puts `2-BNL(5)`
+  before `2-BNL`). Presentation only.
+- Add Back is stored per product line per month; there is no company-wide fallback.
+- No changelog entry yet — Phase 2 ships nothing a user can see. The entry belongs
+  with the Phase 4 page.

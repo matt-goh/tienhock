@@ -5,6 +5,14 @@ import { Router } from "express";
 // Initial balance represents stock as of this date
 const STOCK_SYSTEM_START_DATE = "2026-01-01";
 
+// Local (Asia/Kuala_Lumpur) calendar date of an invoice, for the sales sources
+// aliased as `s`. invoices.createddate is epoch ms, and the pool forces
+// `SET timezone = 'UTC'` on every connection, so casting the timestamp straight
+// to DATE yields the UTC day - 8 hours behind, which files every invoice created
+// before 08:00 KL under the previous day (and, at a month boundary, the previous
+// month). See CLAUDE.md rule 17.
+const INVOICE_LOCAL_DATE = `(TO_TIMESTAMP(CAST(s.createddate AS bigint) / 1000) AT TIME ZONE 'Asia/Kuala_Lumpur')::date`;
+
 export default function (pool) {
   const router = Router();
 
@@ -218,8 +226,8 @@ export default function (pool) {
           AND s.invoice_status != 'cancelled'
           AND s.issubtotal IS NOT TRUE
           AND (s.is_consolidated = false OR s.is_consolidated IS NULL)
-          AND DATE(TO_TIMESTAMP(CAST(s.createddate AS bigint) / 1000)) >= $2::date
-          AND DATE(TO_TIMESTAMP(CAST(s.createddate AS bigint) / 1000)) < $3::date
+          AND ${INVOICE_LOCAL_DATE} >= $2::date
+          AND ${INVOICE_LOCAL_DATE} < $3::date
       `;
       const priorSalesResult = await pool.query(priorSalesQuery, [
         product_id,
@@ -285,7 +293,7 @@ export default function (pool) {
       // Use DATE comparison for consistency with prior sales query
       const salesQuery = `
         SELECT
-          DATE(TO_TIMESTAMP(CAST(s.createddate AS bigint) / 1000))::text as date,
+          ${INVOICE_LOCAL_DATE}::text as date,
           SUM(s.quantity) as sold,
           SUM(COALESCE(s.freeproduct, 0)) as foc,
           SUM(COALESCE(s.returnproduct, 0)) as returns
@@ -294,8 +302,8 @@ export default function (pool) {
           AND s.invoice_status != 'cancelled'
           AND s.issubtotal IS NOT TRUE
           AND (s.is_consolidated = false OR s.is_consolidated IS NULL)
-          AND DATE(TO_TIMESTAMP(CAST(s.createddate AS bigint) / 1000)) BETWEEN $2::date AND $3::date
-        GROUP BY DATE(TO_TIMESTAMP(CAST(s.createddate AS bigint) / 1000))
+          AND ${INVOICE_LOCAL_DATE} BETWEEN $2::date AND $3::date
+        GROUP BY ${INVOICE_LOCAL_DATE}
         ORDER BY date
       `;
       const salesResult = await pool.query(salesQuery, [
@@ -549,8 +557,8 @@ export default function (pool) {
                  AND s.invoice_status != 'cancelled'
                  AND s.issubtotal IS NOT TRUE
                  AND (s.is_consolidated = false OR s.is_consolidated IS NULL)
-                 AND DATE(TO_TIMESTAMP(CAST(s.createddate AS bigint) / 1000)) >= $2::date
-                 AND DATE(TO_TIMESTAMP(CAST(s.createddate AS bigint) / 1000)) <= $3::date`,
+                 AND ${INVOICE_LOCAL_DATE} >= $2::date
+                 AND ${INVOICE_LOCAL_DATE} <= $3::date`,
               [product_id, anchorDate, endDateStr]
             );
             const totalSold = parseInt(salesResult.rows[0]?.sold) || 0;
