@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-07-27",
+    ms: "Jurnal: sistem kini memberi amaran apabila nombor cek yang sama telah digunakan pada Bayaran Bank (B) atau Bayaran Tunai (C) yang lain — sama seperti mesej \"ALREADY ISSUED ON\" dalam sistem lama. Semasa memasukkan nombor cek, amaran terus dipaparkan di bawah ruangan tersebut berserta pautan ke jurnal berkenaan; halaman butiran jurnal turut menandakan nombor cek berwarna kuning, dan senarai jurnal memaparkan label \"Cheque re-used\". Amaran ini hanya sebagai peringatan dan tidak menghalang penyimpanan. Jurnal yang telah dibatalkan turut disenaraikan dengan label \"Cancelled\". Nombor rujukan ringkas lama (contohnya PBE26060 yang dikongsi oleh banyak bayaran Jun) tidak diberi amaran.",
+    en: "Journals: the system now warns when the same cheque number has already been used on another Bank Payment (B) or Cash Payment (C) — just like the old programme's \"ALREADY ISSUED ON\" message. While you are keying the cheque number, the warning appears right under the field with links to the entries concerned; the journal details page also highlights the cheque number in amber, and the journal list shows a \"Cheque re-used\" label. The warning is a reminder only and never blocks saving. Cancelled journals are listed too, marked \"Cancelled\". Old shorthand references (such as PBE26060, shared by many June payments) are not flagged.",
+  },
+  {
     date: "2026-07-25",
     ms: "Pergerakan Stok: jualan kini dikira mengikut tarikh sebenar bil, bukan lagi terawal 8 jam. Sebelum ini setiap bil yang dikeluarkan sebelum pukul 8 pagi dikira jatuh pada hari sebelumnya, jadi baris harian tersasar dan bil awal pagi pada 1 haribulan tertolak ke bulan sebelumnya — menyebabkan stok tutup bulan itu tersalah kira. Angka pergerakan stok dan stok tutup kini betul tanpa perlu apa-apa tindakan.",
     en: "Stock Movement: sales are now counted on the bill's actual date instead of 8 hours early. Previously every bill issued before 8am was counted on the previous day, so the daily rows were off and early-morning bills on the 1st of a month fell into the previous month — throwing off that month's closing stock. Stock movement and closing stock figures are now correct, with nothing for you to do.",

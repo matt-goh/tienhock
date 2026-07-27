@@ -19,6 +19,72 @@ const DISPLAY_ENTRY_TYPE_SQL =
   "THEN COALESCE(je.legacy_entry_type, je.entry_type) " +
   "ELSE je.entry_type END";
 
+// A cheque number is only tracked for re-use when it is a full instrument
+// reference: a physical cheque (PBB350779) or a bank transaction id
+// (PBE2607170362129269). Shorter values are the bare "PBE" prefill or the
+// June 2026 shorthand batch (PBE26060, keyed once as a batch marker across 23
+// payments with the real reference in each description), so they are ignored
+// rather than flagging 60 historical entries that were never actually re-used.
+const MIN_TRACKED_CHEQUE_LENGTH = 9;
+const TRACKED_CHEQUE_SQL =
+  `je.cheque_no IS NOT NULL AND ` +
+  `LENGTH(TRIM(je.cheque_no)) >= ${MIN_TRACKED_CHEQUE_LENGTH}`;
+// Journals sharing one cheque number, joined so the list can flag re-use
+// without a subquery in the SELECT list (the count query rewrites that list).
+const CHEQUE_DUPLICATE_JOIN_SQL = `
+        LEFT JOIN (
+          SELECT UPPER(TRIM(je.cheque_no)) AS cheque_key, COUNT(*) - 1 AS other_count
+          FROM journal_entries je
+          WHERE ${TRACKED_CHEQUE_SQL}
+          GROUP BY 1
+          HAVING COUNT(*) > 1
+        ) chq ON chq.cheque_key = UPPER(TRIM(je.cheque_no))`;
+
+/**
+ * Normalise a cheque number for re-use matching, or return null when it is
+ * blank or too short to be a real instrument reference.
+ *
+ * @param {string | null | undefined} chequeNo
+ * @returns {string | null}
+ */
+function normaliseChequeNo(chequeNo) {
+  const trimmed = String(chequeNo ?? "").trim().toUpperCase();
+  return trimmed.length >= MIN_TRACKED_CHEQUE_LENGTH ? trimmed : null;
+}
+
+/**
+ * Other Cash Payment (C) / Bank Payment (B) journals already carrying this
+ * cheque number — the legacy programme's "CHEQUE … ALREADY ISSUED ON …" check.
+ * Cancelled journals are included and carry their status, so a cheque that was
+ * legitimately voided and re-issued reads as such instead of as a clash.
+ *
+ * @param {import("pg").Pool} pool
+ * @param {string | null | undefined} chequeNo
+ * @param {number | null} excludeId Journal being viewed/edited, excluded from its own match
+ * @returns {Promise<Array<object>>}
+ */
+async function fetchChequeDuplicates(pool, chequeNo, excludeId) {
+  const chequeKey = normaliseChequeNo(chequeNo);
+  if (!chequeKey) return [];
+
+  const result = await pool.query(
+    `SELECT
+       je.id,
+       ${VISIBLE_REFERENCE_SQL} AS reference_no,
+       ${DISPLAY_ENTRY_TYPE_SQL} AS entry_type,
+       je.entry_date,
+       je.description,
+       je.status,
+       je.cheque_no
+     FROM journal_entries je
+     WHERE UPPER(TRIM(je.cheque_no)) = $1
+       AND ($2::integer IS NULL OR je.id <> $2::integer)
+     ORDER BY je.entry_date, ${VISIBLE_REFERENCE_SQL}`,
+    [chequeKey, excludeId ?? null]
+  );
+  return result.rows;
+}
+
 /**
  * Imported journals keep their operational IMP type, while source_type is the
  * durable provenance marker after the legacy presentation migration. Accept
@@ -252,9 +318,10 @@ export default function (pool) {
           je.entry_date,
           je.description, je.total_debit, je.total_credit, je.status,
           je.cheque_no, je.created_at, je.updated_at, je.posted_at,
+          COALESCE(chq.other_count, 0) AS cheque_duplicate_count,
           jet.name as entry_type_name
         FROM journal_entries je
-        LEFT JOIN journal_entry_types jet ON ${DISPLAY_ENTRY_TYPE_SQL} = jet.code
+        LEFT JOIN journal_entry_types jet ON ${DISPLAY_ENTRY_TYPE_SQL} = jet.code${CHEQUE_DUPLICATE_JOIN_SQL}
         WHERE 1=1
       `;
       const params = [];
@@ -441,6 +508,29 @@ export default function (pool) {
     }
   });
 
+  // GET /cheque-usage - Report other Cash/Bank Payment journals already using a
+  // cheque number, so the entry form can warn while it is being keyed. Warning
+  // only: the legacy programme allowed the save and so does this.
+  // Declared before /:id so the literal path is not swallowed by the id route.
+  router.get("/cheque-usage", async (req, res) => {
+    try {
+      const { cheque_no, exclude_id } = req.query;
+      const parsedExcludeId = Number.parseInt(exclude_id, 10);
+      const duplicates = await fetchChequeDuplicates(
+        pool,
+        cheque_no,
+        Number.isNaN(parsedExcludeId) ? null : parsedExcludeId
+      );
+      res.json({ duplicates });
+    } catch (error) {
+      console.error("Error checking cheque usage:", error);
+      res.status(500).json({
+        message: "Error checking cheque usage",
+        error: error.message,
+      });
+    }
+  });
+
   // GET /:id - Get single journal entry with lines
   router.get("/:id", async (req, res) => {
     try {
@@ -494,11 +584,17 @@ export default function (pool) {
       const linesResult = await pool.query(linesQuery, [id]);
 
       const source = await resolveJournalSource(pool, entryResult.rows[0]);
+      const chequeDuplicates = await fetchChequeDuplicates(
+        pool,
+        entryResult.rows[0].cheque_no,
+        entryResult.rows[0].id
+      );
 
       res.json({
         ...entryResult.rows[0],
         lines: linesResult.rows,
         source,
+        cheque_duplicates: chequeDuplicates,
       });
     } catch (error) {
       console.error("Error fetching journal entry:", error);

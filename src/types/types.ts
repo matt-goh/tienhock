@@ -1172,6 +1172,8 @@ export interface JournalEntry {
   total_credit: number;
   status: "draft" | "posted" | "cancelled";
   cheque_no?: string; // Sequential cheque number, Cash Payment (C) entries only
+  cheque_duplicate_count?: number; // Other journals using this cheque (list only)
+  cheque_duplicates?: ChequeDuplicate[]; // The journals themselves (GET /:id only)
   created_at?: string;
   updated_at?: string;
   created_by?: string;
@@ -1179,6 +1181,17 @@ export interface JournalEntry {
   posted_at?: string;
   posted_by?: string;
   lines?: JournalEntryLine[]; // Line items
+}
+
+// Another Cash/Bank Payment journal already carrying the same cheque number
+export interface ChequeDuplicate {
+  id: number;
+  reference_no: string;
+  entry_type: JournalEntryType;
+  entry_date: string;
+  description?: string | null;
+  status: "draft" | "posted" | "cancelled";
+  cheque_no: string;
 }
 
 // Journal Entry Line Item
