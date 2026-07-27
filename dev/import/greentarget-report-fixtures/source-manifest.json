@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "_comment": "Green Target legacy report scans (phase G1). Analogue of dev/import/legacy-report-fixtures/source-manifest.json. Scan hashes were pinned during G0; do not recompute them, and never edit a fixture to make a gate pass.",
+
+  "scans": {
+    "GT_TRIAL_BALANCE_JAN26.pdf": { "pages": 11, "sha256": "83da8578c90b0a86e655d8a0a305d957a5726e352aea70209fa846ad334e499a", "byteLength": 8136452, "fixture": "gt-tb-2026-01.csv", "period": "2026-01" },
+    "GT_TRIAL_BALANCE_FEB26.pdf": { "pages": 11, "sha256": "ea803709311596ca4ec742fea61b67f1b0cd326947703bc0893ccfe055ea8bab", "byteLength": 8258276, "fixture": "gt-tb-2026-02.csv", "period": "2026-02" },
+    "GT_TRIAL_BALANCE_MAR26.pdf": { "pages": 11, "sha256": "657be0af3935c752bf230859bbb1a72be87ff473d6ba75bf0e588685b4599aee", "byteLength": 8124351, "fixture": "gt-tb-2026-03.csv", "period": "2026-03" },
+    "GT_TRIAL_BALANCE_APR26.pdf": { "pages": 11, "sha256": "202cd44038ae05ba01de99f50c13d4507e6c0b515430ecf4dbbca014ebede077", "byteLength": 8070434, "fixture": "gt-tb-2026-04.csv", "period": "2026-04" },
+    "GT_TRIAL_BALANCE_MAY26.pdf": { "pages": 11, "sha256": "2cd418c70201dd4c6b1e90d2f479ffe9531bb7c3132fab3f6b8748dd709c11f0", "byteLength": 8028214, "fixture": "gt-tb-2026-05.csv", "period": "2026-05" },
+    "GT_TRIAL_BALANCE_JUN26.pdf": { "pages": 11, "sha256": "aefdc059d4b9108981d96e8504f7840ab160ab64aca5df9520be55e3b75fe1d8", "byteLength": 8235786, "fixture": "gt-tb-2026-06.csv", "period": "2026-06" },
+    "GT_INCOME_STATEMENT.pdf": { "pages": 2, "sha256": "fc44d8c17cd2ba06c7e5089ef63878e5a7ea184ab22f9581de8129d6b395bccd", "byteLength": 811481, "fixture": "gt-is-2026-06.csv", "period": "2026-06" },
+    "GT_BALANCE_SHEET.pdf": { "pages": 1, "sha256": "3288889a81de92facd574b33f6bbab52c45c546f034970841910c4481ee584fd", "byteLength": 492964, "fixture": "gt-bs-2026-06.csv", "period": "2026-06" },
+    "GT_ACCOUNTCODE.pdf": { "pages": 24, "sha256": "c4d4a2144f1051c150badcbd60d3af0fac21837e2ae53d34209f839e20405d40", "byteLength": 16198107, "fixture": null, "period": null, "transcribe": false, "reason": "DOWNGRADED IN G1 SCAFFOLDING. Its header reads 'PAGE 1  09:47:12  01 MAR 2010' - it is a 2010-vintage GL master list with only two columns (GL.MASTER, PARTICULAR) and NO note/classification column. It lists accounts that no longer exist in the 2026 ledger. The six 2026 Trial Balances already carry the full chart WITH descriptions AND the APPX note number, so they supersede it for every G3 purpose. Keep as historical reference; transcribe only if the user asks." }
+  },
+
+  "printedTrialBalanceExpectations": {
+    "_comment": "Derived in G0 from the two ledger workbooks and independently CONFIRMED against the Jan, Feb and Jun scans (page 11 of each) during the G1 scaffolding pass. Mar/Apr/May are arithmetic predictions of the same model and are what G1 must confirm. See handover section 9.",
+    "model": "The printed TB lists every GTLD account at its month-end balance PLUS one netted 'DEBTOR / TRADE DEBTOR / APPX 22' control line. The GTLD DEBTOR section's own static 156,782.22 C/FWD in the ledger export is a stale snapshot and is excluded. The control line nets debtor credit balances (a combined 1.01 across KBOX and RUMAH MERAH), which is why the printed grand total is 1.01 below a per-account trial balance.",
+    "periods": [
+      { "period": "2026-01", "asOf": "2026-01-31", "debtorControlCents": 18116672, "grandTotalCents": 268118633, "scanConfirmed": true },
+      { "period": "2026-02", "asOf": "2026-02-28", "debtorControlCents": 16199537, "grandTotalCents": 272028458, "scanConfirmed": true },
+      { "period": "2026-03", "asOf": "2026-03-31", "debtorControlCents": 15905157, "grandTotalCents": 276568673, "scanConfirmed": false },
+      { "period": "2026-04", "asOf": "2026-04-30", "debtorControlCents": 16281137, "grandTotalCents": 280912998, "scanConfirmed": false },
+      { "period": "2026-05", "asOf": "2026-05-31", "debtorControlCents": 15618077, "grandTotalCents": 285232138, "scanConfirmed": false },
+      { "period": "2026-06", "asOf": "2026-06-30", "debtorControlCents": 15678222, "grandTotalCents": 289680853, "scanConfirmed": true }
+    ]
+  },
+
+  "printedIncomeStatementExpectations": {
+    "_comment": "GT_INCOME_STATEMENT.pdf page 1 was read during the G1 scaffolding pass. Every line below was reconstructed EXACTLY from the G0 ledger using the APPX note numbers printed on the Trial Balance, which validates the whole G3 account-to-note mapping in advance.",
+    "period": "2026-01-01..2026-06-30",
+    "periodNote": "YEAR TO DATE, not the month of June. The printed header says 'FOR THE MONTH OF 06/2026' but revenue 265,208.20 is the SIX-MONTH movement of TGA + TGB + WS_OTH + WS_OTH4, and page 2 is titled 'PROFIT FOR THE FINANCIAL YEAR'. This CORRECTS the answer to open question 6 in handover section 4.",
+    "_matching": "Each expectation is matched against the fixture by `ref` when the fixture row carries one (used for the report's unlabelled rule-lines), otherwise by the verbatim printed `particular`.",
+    "lines": [
+      { "key": "REVENUE", "note": "7", "amountCents": 26520820, "ledgerAccounts": ["TGA", "TGB", "WS_OTH", "WS_OTH4"] },
+      { "key": "BURNING MATERIAL", "note": "2", "amountCents": 0 },
+      { "key": "DEPRECIATION OF PLANT AND EQUIPMENT", "note": "15", "amountCents": 0 },
+      { "key": "EMPLOYEE'S PROVIDENT FUND CONTRIBUTION", "note": "2-1", "amountCents": 820600, "ledgerAccounts": ["BWE_LH", "SE_LH"] },
+      { "key": "FREIGHT CHARGES", "note": "2-2", "amountCents": 0 },
+      { "key": "HIRING OF PLANTS", "note": "2-3", "amountCents": 0 },
+      { "key": "INSPECTION FEE", "note": "2-4", "amountCents": 0 },
+      { "key": "PURCHASE OF CHEMICAL", "note": "2-5", "amountCents": 0 },
+      { "key": "REPAIR AND MAINTENANCE", "note": "2-6", "amountCents": 6586830, "ledgerAccounts": ["R2035", "R6312", "R6326", "R8726", "ROTH_B", "BWRM", "SV2035", "SV6312", "SV8183"] },
+      { "key": "REPAIR AND PARTS", "note": "2-7", "amountCents": 0 },
+      { "key": "SALARIES AND WAGES", "note": "2-8", "amountCents": 6348550, "ledgerAccounts": ["BWS_LH", "SS_LH", "BWS_M"] },
+      { "key": "SOCSO CONTRIBUTION", "note": "2-9", "amountCents": 123810, "ledgerAccounts": ["BWSC_LH", "SSC_LH", "BWSIPC_LH", "SSIP_LH"] },
+      { "key": "VEHICLE RUNNING EXPENSES", "note": "2-10", "amountCents": 3792935, "ledgerAccounts": ["OIL2035", "OIL6312", "OIL6326", "OIL8726", "OILOTH_B", "OIL4T_B", "PT2035", "PT6312", "PT6326", "PT8726", "PTOTH", "TY2035", "TY6326", "TY8726", "BT2035", "BT8726", "TAX2035", "TAX6312", "TAX6326", "TAX8726"] },
+      { "key": "direct_costs_total", "amountCents": 17672725 },
+      { "key": "GROSS (LOSS)/ PROFIT", "amountCents": 8848095 },
+      { "key": "OTHER INCOME", "note": "18-3", "amountCents": 0 },
+      { "key": "INSTALLATION SERVICES", "note": "18-2", "amountCents": 0 },
+      { "key": "other_income_total", "amountCents": 0 },
+      { "key": "after_other_income", "amountCents": 8848095 },
+      { "key": "(SCHEDULE 5)", "note": "5", "amountCents": 7211134, "ledgerAccounts": ["BWAD", "BWBC", "BWLC", "BWPS", "BWSA", "BWSEC", "BWSF", "BWTEL", "BWTRA", "BWS_O", "BWE_O", "BWSC_O", "BWSIP_O", "BWDRS", "BWDRE", "BWDRSC", "INS2035", "INS6312", "INS6326", "INS8183", "INSHT75", "INSKOM"] },
+      { "key": "operating_profit", "amountCents": 1636961 },
+      { "key": "HIRE PURCHASE INTEREST", "amountCents": 0 },
+      { "key": "TERM LOAN", "note": "23", "amountCents": 0 },
+      { "key": "finance_costs_total", "amountCents": 0 },
+      { "key": "PROFIT BEFORE TAXATION", "amountCents": 1636961 },
+      { "key": "LESS : TAX EXPENSES", "note": "3", "amountCents": 0 },
+      { "key": "PROFIT FOR THE FINANCIAL YEAR", "amountCents": 1636961 }
+    ],
+    "arithmetic": [
+      { "check": "REVENUE - direct_costs_total = GROSS (LOSS)/ PROFIT" },
+      { "check": "GROSS (LOSS)/ PROFIT + other_income_total = after_other_income" },
+      { "check": "after_other_income - (SCHEDULE 5) = operating_profit" },
+      { "check": "operating_profit - finance_costs_total = PROFIT BEFORE TAXATION" },
+      { "check": "PROFIT BEFORE TAXATION - LESS : TAX EXPENSES = PROFIT FOR THE FINANCIAL YEAR" }
+    ],
+    "schedule5Note": "The printed Income Statement REFERENCES '(SCHEDULE 5)' but the schedule itself is NOT in this PDF. The administrative-expense breakdown must come from the Trial Balance accounts carrying APPX 5. Their sum is 72,111.34, confirmed exactly."
+  },
+
+  "printedBalanceSheetExpectations": {
+    "_comment": "From handover section 2c; six of its lines were independently confirmed against the raw ledger in G0.",
+    "period": "2026-06-30",
+    "netAssetsCents": 28038614,
+    "financedByCents": 28038614,
+    "_matching": "Matched by `ref` when the fixture row carries one, otherwise by the verbatim printed `particular`. The scan prints its five subtotal lines as bare amounts under a rule with no label, which is what the refs are for.",
+    "lines": [
+      { "key": "PROPERTY,PLANT AND EQUIPMENT", "note": "4", "amountCents": 1812900 },
+      { "key": "TRADE RECEIVABLE", "note": "22", "amountCents": 15678222, "g0Confirmed": true },
+      { "key": "NON-TRADE RECEIVABLES,DEPOSIT & PREPAYMENTS", "note": "8", "amountCents": 0 },
+      { "key": "AMOUNT DUE TO DIRECTORS", "note": "9", "amountCents": 13881210 },
+      { "key": "TAX RECOVERABLE", "note": "25", "amountCents": 2413950, "g0Confirmed": true },
+      { "key": "INPUT TAX", "note": "17", "amountCents": 0 },
+      { "key": "CASH IN HAND", "note": "6", "amountCents": 0, "g0Confirmed": true },
+      { "key": "CASH AT BANK", "note": "19", "amountCents": 2846837, "g0Confirmed": true },
+      { "key": "current_assets_total", "amountCents": 34820219 },
+      { "key": "TRADE PAYABLE", "note": "13", "amountCents": -562120 },
+      { "key": "ACCRUALS", "note": "1", "amountCents": 0 },
+      { "key": "OTHER CREDITORS", "note": "10", "amountCents": 9156625 },
+      { "key": "HIRE PURCHASE PAYABLE", "note": "16", "amountCents": 0 },
+      { "key": "TERM LOANS", "note": "11", "amountCents": 0 },
+      { "key": "current_liabilities_total", "amountCents": -8594505 },
+      { "key": "NET CURRENT ASSETS/(LIABILITIES)", "amountCents": 26225714 },
+      { "key": "net_assets", "amountCents": 28038614 },
+      { "key": "SHARE CAPITAL", "note": "21", "amountCents": 10000000, "g0Confirmed": true },
+      { "key": "RETAINED PROFIT - B/F", "note": "20", "amountCents": 22694453, "g0Confirmed": true },
+      { "key": "PROFIT FOR THE FINANCIAL YEAR", "note": "DN", "amountCents": 1636961 },
+      { "key": "shareholders_funds_total", "amountCents": 34331414 },
+      { "key": "DEFERRED TAX LIABILITIES", "note": "12", "amountCents": -6292800 },
+      { "key": "long_term_liabilities_total", "amountCents": -6292800 },
+      { "key": "financed_by", "amountCents": 28038614 }
+    ],
+    "bracketConvention": "The legacy printer uses brackets for TWO different things on this report, and G5's Balance Sheet engine must reproduce both. On a LINE item a bracket is an ordinary sign (TRADE PAYABLE '( 5,621.20)' is a debit balance sitting in a payable account). On a SUBTOTAL it is a 'less' marker: the current-liabilities subtotal prints '( 85,945.05)' while the lines above it sum to +85,945.05, so the subtotal is the NEGATED sum. The validator therefore checks `-sum(lines) = current_liabilities_total`. The long-term-liabilities block has a single bracketed line and a bracketed subtotal that agree in sign, so it needs no such adjustment.",
+    "arithmetic": [
+      { "check": "sum(TRADE RECEIVABLE .. CASH AT BANK) = current_assets_total" },
+      { "check": "-sum(TRADE PAYABLE .. TERM LOANS) = current_liabilities_total (see bracketConvention)" },
+      { "check": "current_assets_total + current_liabilities_total = NET CURRENT ASSETS/(LIABILITIES)" },
+      { "check": "PROPERTY,PLANT AND EQUIPMENT + NET CURRENT ASSETS/(LIABILITIES) = net_assets" },
+      { "check": "SHARE CAPITAL + RETAINED PROFIT - B/F + PROFIT FOR THE FINANCIAL YEAR = shareholders_funds_total" },
+      { "check": "shareholders_funds_total + long_term_liabilities_total = financed_by" },
+      { "check": "net_assets = financed_by = 280,386.14" }
+    ]
+  },
+
+  "accountCodeNormalization": {
+    "rule": "A printed GTLD account code maps to its ledger code by replacing every SPACE with an UNDERSCORE. Printed 'AC 2010' -> ledger 'AC_2010'; 'BKSC KH' -> 'BKSC_KH'; 'WS OTH4' -> 'WS_OTH4'. Codes printed without a space are unchanged. The single 'DEBTOR' control line has no ledger counterpart in staging (the GTLD DEBTOR section is excluded) and is validated against printedTrialBalanceExpectations instead.",
+    "doesNotApplyTo": "The 28 GTDB debtor codes, four of which contain genuine spaces (AE ENTERPRISE, LEE DECOR, RUMAH MERAH, SUN TARGET). Debtors are never printed individually on the Trial Balance - they are netted into the DEBTOR control line - so this rule and those codes never meet."
+  },
+
+  "fixtures": {
+    "_comment": "Populated by G1 as each fixture is completed. Each entry: { sha256, byteLength, rows }. validate-fixtures.mjs pins them once present, and reports MISSING for the ones not yet transcribed so the harness can be run incrementally."
+  }
+}

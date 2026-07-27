@@ -1,0 +1,251 @@
+{
+  "schemaVersion": 1,
+  "_comment": "Green Target legacy debtor code -> greentarget.customers mapping (handover R6). Created in G3 alongside the chart-of-accounts load, which created the 28 debtor accounts from the GTDB LEDGER sections - never from greentarget.customers. This file records which of them additionally have an ERP customer, and NOTHING consumes it yet.",
+  "rules": [
+    "R6: the legacy ledger is the authority for who owes Green Target money. These 28 accounts are import-owned.",
+    "Any future debtor sync must be NON-DESTRUCTIVE: it may never delete or rename an import-owned child, and it may not mint a child for an ERP customer that has no ledger presence without explicit approval.",
+    "A mapping is only usable once approved:true. G3 approves nothing - both candidates below are inexact (handover 3e) and need the user to confirm they are the same legal entity.",
+    "Handover question 4: the TH debtor is Tien Hock Food Ind. S/B. The two companies are INDEPENDENT - never auto-post one company document into the other ledger; reconcile by hand."
+  ],
+  "status": "DRAFT - no mapping approved. 2 of 28 legacy debtors have an ERP candidate; 26 have none.",
+  "debtors": [
+    {
+      "legacy_code": "AE ENTERPRISE",
+      "legacy_description": "AE ENTERPRISE",
+      "gt_account_code": "AE ENTERPRISE",
+      "sort_order": 1001,
+      "closing_2026_06_30": "0.00",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "ALPS",
+      "legacy_description": "GT POLYMER (M) S/B",
+      "gt_account_code": "ALPS",
+      "sort_order": 1002,
+      "closing_2026_06_30": "0.00",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "BAJA-STONE",
+      "legacy_description": "THE STONE SHOP",
+      "gt_account_code": "BAJA-STONE",
+      "sort_order": 1003,
+      "closing_2026_06_30": "0.00",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "BAKTI",
+      "legacy_description": "SYARIKAT PERKAPALAN & PENGHANTARAN",
+      "gt_account_code": "BAKTI",
+      "sort_order": 1004,
+      "closing_2026_06_30": "510.00",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "BW",
+      "legacy_description": "BIG WHEEL GREEN TYRES SDN BHD (48447-D)",
+      "gt_account_code": "BW",
+      "sort_order": 1005,
+      "closing_2026_06_30": "0.00",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "BWL",
+      "legacy_description": "BIGWHEEL GREEN TYRES SDN BHD",
+      "gt_account_code": "BWL",
+      "sort_order": 1006,
+      "closing_2026_06_30": "80968.58",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "CD",
+      "legacy_description": "CASH DEBTOR 2016(SUNDRY DEBTORS)",
+      "gt_account_code": "CD",
+      "sort_order": 1007,
+      "closing_2026_06_30": "0.00",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "CD2014",
+      "legacy_description": "CASH DEBTOR 2014",
+      "gt_account_code": "CD2014",
+      "sort_order": 1008,
+      "closing_2026_06_30": "0.00",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "CD2015",
+      "legacy_description": "CASH DEBTOR 2015",
+      "gt_account_code": "CD2015",
+      "sort_order": 1009,
+      "closing_2026_06_30": "0.00",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "CD_SD",
+      "legacy_description": "CASH DEBTORS (SUNDRY DEBTORS)",
+      "gt_account_code": "CD_SD",
+      "sort_order": 1010,
+      "closing_2026_06_30": "65705.40",
+      "erp_customer": null,
+      "notes": "Not a trade debtor: cash debtors (sundry). Carries the unbanked counter-sale cash; see the account notes and handover section 9 G1."
+    },
+    {
+      "legacy_code": "CHARM",
+      "legacy_description": "CHARMELON ENTERPRISE",
+      "gt_account_code": "CHARM",
+      "sort_order": 1011,
+      "closing_2026_06_30": "160.00",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "GREAT",
+      "legacy_description": "THE GREAT EMPIRE(LEONG'S EMPIRE)",
+      "gt_account_code": "GREAT",
+      "sort_order": 1012,
+      "closing_2026_06_30": "0.00",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "INNOSURIA",
+      "legacy_description": "INNOSURIA SDN BHD",
+      "gt_account_code": "INNOSURIA",
+      "sort_order": 1013,
+      "closing_2026_06_30": "0.00",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "ITCC",
+      "legacy_description": "GOODHELP ENTERPRISE (M) SDN BHD",
+      "gt_account_code": "ITCC",
+      "sort_order": 1014,
+      "closing_2026_06_30": "0.00",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "JAARI",
+      "legacy_description": "JARRI ENGINEERING S/B",
+      "gt_account_code": "JAARI",
+      "sort_order": 1015,
+      "closing_2026_06_30": "480.00",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "KBOX",
+      "legacy_description": "KOTABOX PACKAGING SDN BHD",
+      "gt_account_code": "KBOX",
+      "sort_order": 1016,
+      "closing_2026_06_30": "-0.01",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "KEN",
+      "legacy_description": "KEN FATT FURNITURE S/B",
+      "gt_account_code": "KEN",
+      "sort_order": 1017,
+      "closing_2026_06_30": "0.00",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "LEE DECOR",
+      "legacy_description": "LEE DECOR SDN BHD",
+      "gt_account_code": "LEE DECOR",
+      "sort_order": 1018,
+      "closing_2026_06_30": "420.00",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "MARCOCO",
+      "legacy_description": "MARCOCO (SABAH) SDN BHD",
+      "gt_account_code": "MARCOCO",
+      "sort_order": 1019,
+      "closing_2026_06_30": "1420.00",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "NURI",
+      "legacy_description": "SYT PERNIAGAAN PERABOT NURI S/B",
+      "gt_account_code": "NURI",
+      "sort_order": 1020,
+      "closing_2026_06_30": "1080.00",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "PAN",
+      "legacy_description": "KINABUILD (SABAH) SDN. BHD.",
+      "gt_account_code": "PAN",
+      "sort_order": 1021,
+      "closing_2026_06_30": "0.00",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "PAUMIN",
+      "legacy_description": "PAUMIN HARDWARE SDN. BHD.",
+      "gt_account_code": "PAUMIN",
+      "sort_order": 1022,
+      "closing_2026_06_30": "0.00",
+      "erp_customer": {
+        "customer_id": 17,
+        "customer_name": "PAUMIN HARDWARE SDN BHD",
+        "confidence": "strong",
+        "basis": "Legacy description \"PAUMIN HARDWARE SDN. BHD.\" matches the ERP customer name modulo punctuation.",
+        "approved": false
+      }
+    },
+    {
+      "legacy_code": "RUMAH MERAH",
+      "legacy_description": "RUMAH MERAH MENGGATAL",
+      "gt_account_code": "RUMAH MERAH",
+      "sort_order": 1023,
+      "closing_2026_06_30": "-1.00",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "SABARINA",
+      "legacy_description": "SABARINA CORPORATION S/B",
+      "gt_account_code": "SABARINA",
+      "sort_order": 1024,
+      "closing_2026_06_30": "0.00",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "SOGORAYA",
+      "legacy_description": "SOGORAYA SDN BHD",
+      "gt_account_code": "SOGORAYA",
+      "sort_order": 1025,
+      "closing_2026_06_30": "0.00",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "SUN TARGET",
+      "legacy_description": "DECO VALLEY SDN BHD",
+      "gt_account_code": "SUN TARGET",
+      "sort_order": 1026,
+      "closing_2026_06_30": "0.00",
+      "erp_customer": null
+    },
+    {
+      "legacy_code": "SUTERA",
+      "legacy_description": "SUTERA MEGAH SDN BHD",
+      "gt_account_code": "SUTERA",
+      "sort_order": 1027,
+      "closing_2026_06_30": "2108.00",
+      "erp_customer": {
+        "customer_id": 20,
+        "customer_name": "SUTERA SERIMEWAH SDN BHD",
+        "confidence": "weak",
+        "basis": "Short code matches but the legacy description is \"SUTERA MEGAH SDN BHD\" while the ERP customer is \"SUTERA SERIMEWAH SDN BHD\" - a DIFFERENT company name. Handover 3e already flagged both candidates as inexact. Do not treat as proven.",
+        "approved": false
+      }
+    },
+    {
+      "legacy_code": "TH",
+      "legacy_description": "TIEN HOCK FOOD IND. S/B",
+      "gt_account_code": "TH",
+      "sort_order": 1028,
+      "closing_2026_06_30": "3931.25",
+      "erp_customer": null,
+      "notes": "Intercompany: Tien Hock Food Ind. S/B. Independent books - reconcile by hand, never auto-post."
+    }
+  ]
+}

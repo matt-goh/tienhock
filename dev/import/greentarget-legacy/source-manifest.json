@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "_comment": "Hash pins for the Green Target legacy ledger exports. prepare-staging.mjs refuses to run if any pinned value changes. Never open these workbooks in Excel and re-save: it would rewrite the numeric date cells and destroy the recovery rule in handover section 3a.",
+  "period": { "start": "2026-01-01", "end": "2026-06-30" },
+  "sources": {
+    "GTLD": {
+      "filename": "EXCEL_GTLD_(JAN-JUNE_2026).xlsx",
+      "originalFilename": "EXCEL GTLD (JAN-JUNE 2026).xlsx",
+      "role": "General ledger (analogue of Tien Hock's THLD)",
+      "sha256": "71e32a0189c34fa75f404ca6a702662963c4bd508997da1359cc35e0a62e3f01",
+      "byteLength": 237078,
+      "worksheet": "xl/worksheets/sheet1.xml",
+      "sheetDimension": "A1:H5158",
+      "definedName": "GTLD26",
+      "expectedCounts": {
+        "worksheetRows": 5158,
+        "accountSections": 474,
+        "transactionRows": 2785,
+        "numericDateCells": 1464,
+        "textDateCells": 1795
+      }
+    },
+    "GTDB": {
+      "filename": "EXCEL_GTDB_(JAN-JUNE_2026).xlsx",
+      "originalFilename": "EXCEL GTDB (JAN-JUNE 2026).xlsx",
+      "role": "Trade-debtor ledger (analogue of Tien Hock's THDB)",
+      "sha256": "fa735c756748e74601605ed479ead44f461ee468a53f99c070857f1c4bf9ab6b",
+      "byteLength": 23335,
+      "worksheet": "xl/worksheets/sheet1.xml",
+      "sheetDimension": "A1:H326",
+      "definedName": "GTDB26",
+      "expectedCounts": {
+        "worksheetRows": 326,
+        "accountSections": 28,
+        "transactionRows": 183,
+        "numericDateCells": 106,
+        "textDateCells": 105
+      }
+    }
+  },
+  "workbookInvariants": {
+    "date1904": false,
+    "dateCellStyleIndex": 2,
+    "dateNumberFormatId": 14,
+    "amountNumberFormatIds": [0, 4],
+    "columnLayout": "A row_index, B ACC/NO or date, C JOURNAL, D PARTICULAR, E CHEQUE, F DR, G CR, H BALANCE",
+    "titleRow": "LEDGER REPORT"
+  },
+  "expectedCombinedSource": {
+    "accountSections": 502,
+    "transactionRows": 2968,
+    "journalGroups": 1705,
+    "openingDebitCents": 262193699,
+    "openingCreditCents": 263264699,
+    "movementDebitCents": 72930514,
+    "movementCreditCents": 71859514,
+    "closingDebitCents": 289680954,
+    "closingCreditCents": 289680954,
+    "_note": "Opening and movement figures EXCLUDE the GTLD DEBTOR control section (see account-aliases.json excludedSections). The closing trial balance balances exactly; the opening set is short 10,710.00 DR because the export omits the cash-in-hand account - see account-aliases.json unbalancedFamilies.cashInHand."
+  },
+  "expectedStagingSha256": "694553057e6251895a34c0a5cc530643849e24e4ef758fc4d1002e427a2ffecd",
+  "reportScans": {
+    "_comment": "The nine scanned PDFs live in dev/import/greentarget-report-fixtures/data/ and are transcribed in phase G1. Pinned here so G0 records the complete source set it was handed.",
+    "directory": "dev/import/greentarget-report-fixtures/data",
+    "files": [
+      { "filename": "GT_ACCOUNTCODE.pdf", "pages": 24, "content": "Chart of accounts", "sha256": "c4d4a2144f1051c150badcbd60d3af0fac21837e2ae53d34209f839e20405d40", "byteLength": 16198107 },
+      { "filename": "GT_TRIAL_BALANCE_JAN26.pdf", "pages": 11, "content": "Trial Balance 01/2026", "sha256": "83da8578c90b0a86e655d8a0a305d957a5726e352aea70209fa846ad334e499a", "byteLength": 8136452 },
+      { "filename": "GT_TRIAL_BALANCE_FEB26.pdf", "pages": 11, "content": "Trial Balance 02/2026", "sha256": "ea803709311596ca4ec742fea61b67f1b0cd326947703bc0893ccfe055ea8bab", "byteLength": 8258276 },
+      { "filename": "GT_TRIAL_BALANCE_MAR26.pdf", "pages": 11, "content": "Trial Balance 03/2026", "sha256": "657be0af3935c752bf230859bbb1a72be87ff473d6ba75bf0e588685b4599aee", "byteLength": 8124351 },
+      { "filename": "GT_TRIAL_BALANCE_APR26.pdf", "pages": 11, "content": "Trial Balance 04/2026", "sha256": "202cd44038ae05ba01de99f50c13d4507e6c0b515430ecf4dbbca014ebede077", "byteLength": 8070434 },
+      { "filename": "GT_TRIAL_BALANCE_MAY26.pdf", "pages": 11, "content": "Trial Balance 05/2026", "sha256": "2cd418c70201dd4c6b1e90d2f479ffe9531bb7c3132fab3f6b8748dd709c11f0", "byteLength": 8028214 },
+      { "filename": "GT_TRIAL_BALANCE_JUN26.pdf", "pages": 11, "content": "Trial Balance 06/2026", "sha256": "aefdc059d4b9108981d96e8504f7840ab160ab64aca5df9520be55e3b75fe1d8", "byteLength": 8235786 },
+      { "filename": "GT_INCOME_STATEMENT.pdf", "pages": 2, "content": "Detail Income Statement, 06/2026 only (not year-to-date)", "sha256": "fc44d8c17cd2ba06c7e5089ef63878e5a7ea184ab22f9581de8129d6b395bccd", "byteLength": 811481 },
+      { "filename": "GT_BALANCE_SHEET.pdf", "pages": 1, "content": "Balance Sheet 06/2026", "sha256": "3288889a81de92facd574b33f6bbab52c45c546f034970841910c4481ee584fd", "byteLength": 492964 }
+    ]
+  }
+}

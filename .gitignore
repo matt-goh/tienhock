@@ -19,3 +19,14 @@ dev/import/legacy-jan-may/generated/
 # private legacy report scans (contain customer data) + transcription fixtures
 dev/import/legacy-report-fixtures/data/
 dev/import/legacy-report-fixtures/generated/
+
+# private Green Target legacy accounting imports and generated preflight artifacts
+dev/import/greentarget-legacy/data/
+dev/import/greentarget-legacy/generated/
+
+# private Green Target legacy report scans (contain customer data) + transcription fixtures
+dev/import/greentarget-report-fixtures/data/
+dev/import/greentarget-report-fixtures/generated/
+
+# private closing-stock / estimated-report scans (the tracked README + fixture JSON stay)
+dev/import/closing-stock-report/*.pdf
