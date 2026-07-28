@@ -651,6 +651,53 @@ const orderVariantsWithinMaterial = (
   });
 };
 
+interface NumericCellInputProps {
+  value: number;
+  onChange: (value: string) => void;
+  onClick?: (event: React.MouseEvent<HTMLInputElement>) => void;
+  className: string;
+  placeholder: string;
+  allowNegative: boolean;
+}
+
+// The stock rows hold numbers, so a plain controlled input wipes half-typed
+// values: "0.005" round-trips through parseFloat as 0 on the first keystroke and
+// re-renders as empty. Keep the raw text locally while the field is focused and
+// mirror the row value again on blur.
+const NumericCellInput: React.FC<NumericCellInputProps> = ({
+  value,
+  onChange,
+  onClick,
+  className,
+  placeholder,
+  allowNegative,
+}) => {
+  const [draft, setDraft] = useState<string | null>(null);
+  const pattern: RegExp = allowNegative ? /^-?\d*\.?\d*$/ : /^\d*\.?\d*$/;
+  const text: string = draft ?? (value ? String(value) : "");
+
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
+    const raw: string = event.target.value;
+    if (raw !== "" && !pattern.test(raw)) return;
+
+    setDraft(raw);
+    onChange(raw);
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={text}
+      onChange={handleChange}
+      onBlur={() => setDraft(null)}
+      onClick={onClick}
+      className={className}
+      placeholder={placeholder}
+    />
+  );
+};
+
 const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
   mode,
   generalHeaderActions,
@@ -2442,14 +2489,13 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     onChange: (value: string) => void,
     onClick?: (event: React.MouseEvent<HTMLInputElement>) => void
   ): React.ReactNode => (
-    <input
-      type="number"
-      value={value || ""}
-      onChange={(event) => onChange(event.target.value)}
+    <NumericCellInput
+      value={value}
+      onChange={onChange}
       onClick={onClick}
       className="w-full px-2 py-1 text-right font-mono text-sm border border-sky-200 dark:border-sky-800 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
-      step="1"
       placeholder="0"
+      allowNegative={true}
     />
   );
 
@@ -2458,15 +2504,13 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     onChange: (value: string) => void,
     onClick?: (event: React.MouseEvent<HTMLInputElement>) => void
   ): React.ReactNode => (
-    <input
-      type="number"
-      value={value || ""}
-      onChange={(event) => onChange(event.target.value)}
+    <NumericCellInput
+      value={value}
+      onChange={onChange}
       onClick={onClick}
       className="w-full px-2 py-1 text-right font-mono text-sm border border-default-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
-      step="any"
-      min="0"
       placeholder="0.00"
+      allowNegative={false}
     />
   );
 
