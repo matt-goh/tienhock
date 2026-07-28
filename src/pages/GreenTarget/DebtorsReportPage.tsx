@@ -5,22 +5,30 @@ import AccountingDebtorsReportPage, {
 } from "../Accounting/DebtorsReportPage";
 import { GREENTARGET_INFO } from "../../utils/invoice/einvoice/companyInfo";
 
+// Ledger-backed GT debtors (phase G6): the receivable lives in the imported
+// legacy ledger's 28 DEBTOR child accounts, not in the operational
+// invoice/payment subledger (see docs/Account/GT_OPERATIONAL_BRIDGE.md).
+// customerDetailsPath/customerInvoicesPath deep-link the debtor's account
+// ledger; invoiceDetailsPath is omitted because the bill rows are legacy
+// journal references, not ERP invoices, so row clicks stay inert.
 const GREEN_TARGET_DEBTORS_CONFIG: DebtorsReportPageConfig = {
-  debtorsEndpoint: "/greentarget/api/payments/debtors",
+  debtorsEndpoint: "/greentarget/api/debtors",
   statementEndpoint: (
     customerId: string,
     month: number,
     year: number
   ): string =>
-    `/greentarget/api/payments/debtors/statement/${customerId}?month=${month}&year=${year}`,
+    `/greentarget/api/debtors/statement/${customerId}?month=${month}&year=${year}`,
   generalStatementEndpoint: (month: number, year: number): string =>
-    `/greentarget/api/payments/debtors/general-statement?month=${month}&year=${year}`,
+    `/greentarget/api/debtors/general-statement?month=${month}&year=${year}`,
   customerDetailsPath: (customerId: string): string =>
-    `/greentarget/customers/${customerId}`,
+    `/greentarget/accounting/reports/account-ledger?account=${encodeURIComponent(
+      customerId
+    )}`,
   customerInvoicesPath: (customerId: string): string =>
-    `/greentarget/invoices?customer_id=${customerId}&status=active,overdue`,
-  invoiceDetailsPath: (invoiceId: string): string =>
-    `/greentarget/invoices/${invoiceId}`,
+    `/greentarget/accounting/reports/account-ledger?account=${encodeURIComponent(
+      customerId
+    )}`,
   companyName: GREENTARGET_INFO.name,
   statementCompanyInfo: GREENTARGET_INFO,
   statementCompanyName: `${GREENTARGET_INFO.name} (${GREENTARGET_INFO.reg_no})`,

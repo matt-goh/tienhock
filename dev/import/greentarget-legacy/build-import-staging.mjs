@@ -657,9 +657,12 @@ BEGIN
     RAISE EXCEPTION 'greentarget.account_opening_balances is missing - apply the G2 foundation migration first';
   END IF;
 
-  IF (SELECT COUNT(*) FROM greentarget.account_codes) <> 503 THEN
-    RAISE EXCEPTION 'greentarget.account_codes holds % rows, expected the 503-account G3 chart',
-      (SELECT COUNT(*) FROM greentarget.account_codes);
+  -- G3's 503 evidence-derived codes are a required subset of the live chart.
+  -- The 501 postable identities are checked against gt_desired_anchors below;
+  -- these are the two deliberate non-anchor identities.
+  IF (SELECT COUNT(*) FROM greentarget.account_codes
+       WHERE code IN ('DEBTOR', 'BTFS')) <> 2 THEN
+    RAISE EXCEPTION 'The required legacy DEBTOR/BTFS chart identities are missing';
   END IF;
 
   IF EXISTS (

@@ -9,7 +9,10 @@ import pdfMake from "pdfmake/build/pdfmake";
 import * as pdfFonts from "pdfmake/build/vfs_fonts";
 import { TDocumentDefinitions, TableCell, Content } from "pdfmake/interfaces";
 import TienHockLogo from "../tienhock.png";
-import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
+import {
+  CompanyInfo,
+  TIENHOCK_INFO,
+} from "../invoice/einvoice/companyInfo";
 import { printPdfBlob } from "../pdfPrintFallback";
 
 // Initialize pdfmake with the bundled fonts (same pattern as AccountLedgerPDFMake)
@@ -38,6 +41,9 @@ export interface JournalVoucherPDFData {
   // code -> account description, for the DESCRIPTION fallback when a line has
   // no particulars text
   accountDescriptions: Record<string, string>;
+  // Optional branding override (defaults to Tien Hock letterhead/logo)
+  companyInfo?: CompanyInfo;
+  logoUrl?: string;
 }
 
 const colors = {
@@ -74,23 +80,26 @@ const fmtDate = (value: string): string => {
 };
 
 // pdfMake needs images as data URLs (same cached loader as the other reports)
-let cachedLogoDataUrl: string | null | undefined;
-const loadLogoDataUrl = async (): Promise<string | null> => {
-  if (cachedLogoDataUrl !== undefined) return cachedLogoDataUrl;
+const logoDataUrlCache = new Map<string, string | null>();
+const loadLogoDataUrl = async (logoUrl: string): Promise<string | null> => {
+  const cached = logoDataUrlCache.get(logoUrl);
+  if (cached !== undefined) return cached;
   try {
-    const response = await fetch(TienHockLogo);
+    const response = await fetch(logoUrl);
     const blob = await response.blob();
-    cachedLogoDataUrl = await new Promise<string>((resolve, reject) => {
+    const dataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = () => reject(new Error("Failed to read logo"));
       reader.readAsDataURL(blob);
     });
+    logoDataUrlCache.set(logoUrl, dataUrl);
+    return dataUrl;
   } catch (err) {
     console.warn("Journal voucher PDF: could not load logo", err);
-    cachedLogoDataUrl = null;
+    logoDataUrlCache.set(logoUrl, null);
+    return null;
   }
-  return cachedLogoDataUrl;
 };
 
 const buildDocDefinition = (
@@ -100,6 +109,7 @@ const buildDocDefinition = (
   const statusLabel =
     data.status === "cancelled" ? "CANCELLED" : "POSTED";
   const reportTitle = getReportTitle(data.entry_type);
+  const companyInfo = data.companyInfo ?? TIENHOCK_INFO;
 
   const headerRow: TableCell[] = [
     { text: "ACC/CODE", style: "th" },
@@ -164,11 +174,11 @@ const buildDocDefinition = (
       {
         width: "*",
         stack: [
-          { text: TIENHOCK_INFO.name, style: "companyName" },
-          { text: `(${TIENHOCK_INFO.reg_no})`, style: "companyDetail" },
-          { text: TIENHOCK_INFO.address_pdf, style: "companyDetail" },
+          { text: companyInfo.name, style: "companyName" },
+          { text: `(${companyInfo.reg_no})`, style: "companyDetail" },
+          { text: companyInfo.address_pdf, style: "companyDetail" },
           {
-            text: `Tel: ${TIENHOCK_INFO.phone}  ·  Email: ${TIENHOCK_INFO.email}`,
+            text: `Tel: ${companyInfo.phone}  ·  Email: ${companyInfo.email}`,
             style: "companyDetail",
           },
         ],
@@ -208,7 +218,7 @@ const buildDocDefinition = (
   return {
     info: {
       title: `Journal Voucher ${data.reference_no}`,
-      author: TIENHOCK_INFO.name,
+      author: companyInfo.name,
     },
     pageSize: "A4",
     pageOrientation: "portrait",
@@ -294,7 +304,7 @@ const buildDocDefinition = (
 export const generateJournalVoucherPDF = async (
   data: JournalVoucherPDFData
 ): Promise<void> => {
-  const logoDataUrl = await loadLogoDataUrl();
+  const logoDataUrl = await loadLogoDataUrl(data.logoUrl ?? TienHockLogo);
   const docDefinition = buildDocDefinition(data, logoDataUrl);
 
   const pdfBlob: Blob = await new Promise<Blob>((resolve) => {

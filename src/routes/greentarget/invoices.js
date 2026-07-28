@@ -1,6 +1,8 @@
 // src/routes/greentarget/invoices.js
 import { Router } from "express";
 import GTEInvoiceApiClientFactory from "../../utils/greenTarget/einvoice/GTEInvoiceApiClientFactory.js";
+import { syncGTSalesJournalEntry } from "./accounting/sales-journal.js";
+import { assertGreenTargetAccountingDateUnlocked } from "./accounting/posting-lock.js";
 
 // Map to track pending invoices with their timeout handlers
 const pendingInvoiceTimeouts = new Map();
@@ -861,6 +863,10 @@ export default function (pool, defaultConfig) {
         [customer_id]
       );
 
+      // G7: post the invoice-owned S journal. The posting lock on date_issued
+      // fires inside, so a pre-cutover invoice cannot be created.
+      await syncGTSalesJournalEntry(client, createdInvoice, null);
+
       await client.query("COMMIT");
 
       console.log('Invoice created successfully:', createdInvoice.invoice_id, createdInvoice.invoice_number);
@@ -880,10 +886,11 @@ export default function (pool, defaultConfig) {
       // Send specific error messages back if validation failed
       res
         .status(
-          error.message.includes("Missing required") ||
+          error.status ||
+            (error.message.includes("Missing required") ||
             error.message.includes("Invalid")
-            ? 400
-            : 500
+              ? 400
+              : 500)
         )
         .json({
           message: "Error creating invoice",
@@ -1063,6 +1070,15 @@ export default function (pool, defaultConfig) {
         [customer_id]
       );
 
+      // G7: the posting lock guards the invoice's EXISTING accounting date
+      // (editing a pre-cutover invoice is a locked-period mutation), then the
+      // invoice-owned journal is re-synced (which locks the NEW date).
+      assertGreenTargetAccountingDateUnlocked(
+        invoiceCheck.rows[0].date_issued,
+        `Invoice ${finalInvoiceNumber} edit`
+      );
+      await syncGTSalesJournalEntry(client, updateResult.rows[0], null);
+
       await client.query("COMMIT");
 
       res.json({
@@ -1072,9 +1088,9 @@ export default function (pool, defaultConfig) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error(`Error updating Green Target invoice ${invoice_id}:`, error);
-      res.status(error.message.includes("Missing required") ||
+      res.status(error.status || (error.message.includes("Missing required") ||
         error.message.includes("Invalid") ||
-        error.message.includes("already exists") ? 400 : 500).json({
+        error.message.includes("already exists") ? 400 : 500)).json({
         message: error.message || "Error updating invoice",
         error: error.message,
       });
@@ -1099,7 +1115,7 @@ export default function (pool, defaultConfig) {
 
       // Check if invoice exists and get current status
       const invoiceCheck = await client.query(
-        "SELECT status, total_amount, uuid, einvoice_status FROM greentarget.invoices WHERE invoice_id = $1 FOR UPDATE", // Lock the row
+        "SELECT status, total_amount, uuid, einvoice_status, date_issued FROM greentarget.invoices WHERE invoice_id = $1 FOR UPDATE", // Lock the row
         [numericInvoiceId]
       );
 
@@ -1148,6 +1164,14 @@ export default function (pool, defaultConfig) {
           "Cannot cancel invoice: it has active payments. Cancel the payments first."
         );
       }
+
+      // G7: the posting lock must fire BEFORE the MyInvois API side effect —
+      // a locked-period cancel must roll back without having cancelled an
+      // e-invoice externally.
+      assertGreenTargetAccountingDateUnlocked(
+        invoice.date_issued,
+        "Invoice cancellation"
+      );
 
       // NEW CODE: Handle e-Invoice cancellation
       let einvoiceCancelledApi = false;
@@ -1202,6 +1226,10 @@ export default function (pool, defaultConfig) {
         numericInvoiceId,
       ]);
 
+      // G7: cancel the invoice-owned S journal (the row is now cancelled, so
+      // the sync cancels rather than posts).
+      await syncGTSalesJournalEntry(client, updateResult.rows[0], null);
+
       await client.query("COMMIT");
 
       // Prepare response object
@@ -1222,7 +1250,7 @@ export default function (pool, defaultConfig) {
         `Error cancelling Green Target invoice ${invoice_id}:`,
         error
       );
-      res.status(error.message.includes("active payments") ? 400 : 500).json({
+      res.status(error.status || (error.message.includes("active payments") ? 400 : 500)).json({
         // Use 400 for payment error
         message: error.message || "Error cancelling invoice",
         error: error.message,
@@ -1247,7 +1275,7 @@ export default function (pool, defaultConfig) {
 
       // Check if invoice exists and is cancelled
       const invoiceCheck = await client.query(
-        "SELECT status, total_amount FROM greentarget.invoices WHERE invoice_id = $1 FOR UPDATE",
+        "SELECT status, total_amount, date_issued FROM greentarget.invoices WHERE invoice_id = $1 FOR UPDATE",
         [numericInvoiceId]
       );
 
@@ -1264,6 +1292,12 @@ export default function (pool, defaultConfig) {
           message: "Only cancelled invoices can be deleted"
         });
       }
+
+      // G7: deleting accounting-linked history is a locked-period mutation.
+      assertGreenTargetAccountingDateUnlocked(
+        invoice.date_issued,
+        "Invoice deletion"
+      );
 
       // Block hard-delete when any adjustment documents (even cancelled ones)
       // still FK-reference this invoice — DB FK would block the DELETE anyway;
@@ -1321,7 +1355,7 @@ export default function (pool, defaultConfig) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error(`Error deleting Green Target invoice ${invoice_id}:`, error);
-      res.status(500).json({
+      res.status(error.status || 500).json({
         message: "Error deleting invoice",
         error: error.message,
       });

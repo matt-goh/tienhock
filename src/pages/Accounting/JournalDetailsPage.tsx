@@ -12,6 +12,8 @@ import { api } from "../../routes/utils/api";
 import {
   JournalEntry,
   JournalEntryLine,
+  JournalEntryTypeInfo,
+  AccountCode,
   CashReceiptVoucherData,
 } from "../../types/types";
 import {
@@ -25,6 +27,8 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import ChequeReuseWarning from "../../components/Accounting/ChequeReuseWarning";
 import { printCashReceiptVoucherPDF } from "../../utils/accounting/CashReceiptVoucherPDF";
 import { generateJournalVoucherPDF } from "../../utils/accounting/JournalVoucherPDFMake";
+import { GREENTARGET_INFO } from "../../utils/invoice/einvoice/companyInfo";
+import GreenTargetLogo from "../../utils/GreenTargetLogo.png";
 import {
   IconFileText,
   IconPencil,
@@ -32,6 +36,7 @@ import {
   IconX,
   IconPrinter,
   IconExternalLink,
+  IconArrowBackUp,
 } from "@tabler/icons-react";
 
 const LEGACY_IMPORT_ENTRY_TYPE: string = "IMP";
@@ -59,13 +64,27 @@ const getVisibleLineReference = (
   return line.display_reference?.trim() || getVisibleReference(entry);
 };
 
-const JournalDetailsPage: React.FC = () => {
+interface JournalDetailsContentProps {
+  // Cached Tien Hock reference data; Green Target has no types endpoint and its
+  // account codes live in the GT schema, so it passes empty lists and skips
+  // the TH fetches entirely (line-level account_description covers display).
+  entryTypes: JournalEntryTypeInfo[];
+  accountCodes: AccountCode[];
+  isGreenTarget: boolean;
+}
+
+const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
+  entryTypes,
+  accountCodes,
+  isGreenTarget,
+}) => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
 
-  // Cached reference data
-  const { entryTypes } = useJournalEntryTypesCache();
-  const { accountCodes } = useAccountCodesCache();
+  const apiBase: string = isGreenTarget ? "/greentarget/api" : "/api";
+  const journalEntriesPath: string = isGreenTarget
+    ? "/greentarget/accounting/journal-entries"
+    : "/accounting/journal-entries";
 
   // Data state
   const [entry, setEntry] = useState<JournalEntry | null>(null);
@@ -89,9 +108,10 @@ const JournalDetailsPage: React.FC = () => {
   // Dialog states
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showRestoreDialog, setShowRestoreDialog] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showDeleteErrorDialog, setShowDeleteErrorDialog] = useState(false);
-  const [deleteErrorData, setDeleteErrorData] = useState<{
+  const [showActionErrorDialog, setShowActionErrorDialog] = useState(false);
+  const [actionErrorData, setActionErrorData] = useState<{
     message: string;
     detail?: string;
     payment_id?: number;
@@ -113,7 +133,7 @@ const JournalDetailsPage: React.FC = () => {
     setError(null);
 
     try {
-      const response = await api.get(`/api/journal-entries/${id}`);
+      const response = await api.get(`${apiBase}/journal-entries/${id}`);
       setEntry(response as JournalEntry);
     } catch (err: unknown) {
       console.error("Error fetching journal entry:", err);
@@ -122,7 +142,7 @@ const JournalDetailsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, apiBase]);
 
   useEffect(() => {
     fetchEntry();
@@ -134,10 +154,16 @@ const JournalDetailsPage: React.FC = () => {
     return type ? `${code} - ${type.name}` : code;
   };
 
-  // Get account description
-  const getAccountDescription = (code: string): string => {
+  // Get account description. The cached chart wins; otherwise fall back to the
+  // per-line description the detail endpoint returns (Green Target's chart is
+  // not cached here, so this is what labels GT lines).
+  const getAccountDescription = (
+    code: string,
+    lineDescription?: string
+  ): string => {
     const account = accountCodes.find((a) => a.code === code);
-    return account ? `${code} - ${account.description}` : code;
+    if (account) return `${code} - ${account.description}`;
+    return lineDescription ? `${code} - ${lineDescription}` : code;
   };
 
   // Format date
@@ -172,11 +198,11 @@ const JournalDetailsPage: React.FC = () => {
 
   // Handlers
   const handleBack = () => {
-    navigate("/accounting/journal-entries");
+    navigate(journalEntriesPath);
   };
 
   const handleEdit = () => {
-    navigate(`/accounting/journal-entries/${id}/edit`);
+    navigate(`${journalEntriesPath}/${id}/edit`);
   };
 
   const handleConfirmCancel = async () => {
@@ -184,7 +210,7 @@ const JournalDetailsPage: React.FC = () => {
 
     setIsProcessing(true);
     try {
-      await api.post(`/api/journal-entries/${id}/cancel`);
+      await api.post(`${apiBase}/journal-entries/${id}/cancel`);
       toast.success("Journal entry cancelled successfully");
       setShowCancelDialog(false);
       fetchEntry();
@@ -198,6 +224,39 @@ const JournalDetailsPage: React.FC = () => {
     }
   };
 
+  // Undo a cancellation. The server refuses when the cancellation was the
+  // source document's doing, and explains why in the shared error dialog.
+  const handleConfirmRestore = async () => {
+    if (!id) return;
+
+    setIsProcessing(true);
+    try {
+      await api.post(`${apiBase}/journal-entries/${id}/restore`);
+      toast.success("Journal entry restored successfully");
+      setShowRestoreDialog(false);
+      fetchEntry();
+    } catch (err: unknown) {
+      console.error("Error restoring entry:", err);
+      setShowRestoreDialog(false);
+
+      const errorData = (err as any)?.data;
+      if (errorData?.message) {
+        setActionErrorData({
+          message: errorData.message,
+          detail: errorData.detail,
+          suggestion: errorData.suggestion,
+        });
+        setShowActionErrorDialog(true);
+      } else {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to restore entry";
+        toast.error(errorMessage);
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleConfirmDelete = async () => {
     if (!id) return;
 
@@ -206,7 +265,7 @@ const JournalDetailsPage: React.FC = () => {
       await api.delete(`/api/journal-entries/${id}`);
       toast.success("Journal entry deleted successfully");
       setShowDeleteDialog(false);
-      navigate("/accounting/journal-entries");
+      navigate(journalEntriesPath);
     } catch (err: unknown) {
       console.error("Error deleting entry:", err);
 
@@ -218,14 +277,14 @@ const JournalDetailsPage: React.FC = () => {
 
       if (errorData) {
         // Store error data and show error dialog
-        setDeleteErrorData({
+        setActionErrorData({
           message: errorData.message || "Failed to delete journal entry",
           detail: errorData.detail,
           payment_id: errorData.payment_id,
           invoice_id: errorData.invoice_id,
           suggestion: errorData.suggestion,
         });
-        setShowDeleteErrorDialog(true);
+        setShowActionErrorDialog(true);
       } else {
         // Fallback to simple toast error
         const errorMessage = err instanceof Error ? err.message : "Unknown error";
@@ -238,9 +297,9 @@ const JournalDetailsPage: React.FC = () => {
 
   // Handle navigation to invoice from error dialog
   const handleGoToInvoice = () => {
-    if (deleteErrorData?.invoice_id) {
-      setShowDeleteErrorDialog(false);
-      navigate(`/sales/invoice/${deleteErrorData.invoice_id}`);
+    if (actionErrorData?.invoice_id) {
+      setShowActionErrorDialog(false);
+      navigate(`/sales/invoice/${actionErrorData.invoice_id}`);
     }
   };
 
@@ -270,7 +329,8 @@ const JournalDetailsPage: React.FC = () => {
       const accountDescriptions: Record<string, string> = {};
       (entry.lines || []).forEach((line) => {
         const account = accountCodes.find((a) => a.code === line.account_code);
-        if (account) accountDescriptions[line.account_code] = account.description;
+        const description = account?.description ?? line.account_description;
+        if (description) accountDescriptions[line.account_code] = description;
       });
       const visibleReference: string = getVisibleReference(entry);
       const displayEntryType: string = getDisplayEntryType(entry);
@@ -292,6 +352,10 @@ const JournalDetailsPage: React.FC = () => {
         total_debit: entry.total_debit,
         total_credit: entry.total_credit,
         accountDescriptions,
+        // Green Target prints the same voucher on its own letterhead/logo
+        ...(isGreenTarget
+          ? { companyInfo: GREENTARGET_INFO, logoUrl: GreenTargetLogo }
+          : {}),
       });
     } catch (err: unknown) {
       console.error("Error printing journal voucher:", err);
@@ -345,11 +409,15 @@ const JournalDetailsPage: React.FC = () => {
   const isLegacyImport: boolean = isLegacyImportEntry(entry);
   const visibleReference: string = getVisibleReference(entry);
   const displayEntryType: string = getDisplayEntryType(entry);
-  const canEdit: boolean =
-    entry.status !== "cancelled" && !isLegacyImport;
+  const canEdit: boolean = entry.status !== "cancelled" && !isLegacyImport;
   const canCancel: boolean = entry.status !== "cancelled" && !isLegacyImport;
-  const canDelete: boolean = !isLegacyImport;
+  // Offered on every cancelled entry; the server decides whether this
+  // particular cancellation may be undone and explains any refusal.
+  const canRestore: boolean = entry.status === "cancelled" && !isLegacyImport;
+  // Green Target has no DELETE journal route — its journals are cancelled only.
+  const canDelete: boolean = !isLegacyImport && !isGreenTarget;
   const canPrintVoucher: boolean =
+    !isGreenTarget &&
     !isLegacyImport &&
     (entry.entry_type as string) === "REC" &&
     entry.status !== "cancelled";
@@ -477,6 +545,18 @@ const JournalDetailsPage: React.FC = () => {
                   Cancel Entry
                 </Button>
               )}
+              {canRestore && (
+                <Button
+                  onClick={() => setShowRestoreDialog(true)}
+                  variant="outline"
+                  color="sky"
+                  icon={IconArrowBackUp}
+                  iconPosition="left"
+                  disabled={isProcessing}
+                >
+                  Restore Entry
+                </Button>
+              )}
               {canDelete && (
                 <Button
                   onClick={() => setShowDeleteDialog(true)}
@@ -556,7 +636,10 @@ const JournalDetailsPage: React.FC = () => {
                       </td>
                       <td className="px-4 py-2.5">
                         <div className="text-sm font-medium text-default-900 dark:text-gray-100">
-                          {getAccountDescription(line.account_code)}
+                          {getAccountDescription(
+                            line.account_code,
+                            line.account_description
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-2.5 text-sm text-default-600 dark:text-gray-300">
@@ -666,17 +749,27 @@ const JournalDetailsPage: React.FC = () => {
         variant="danger"
       />
 
+      <ConfirmationDialog
+        isOpen={showRestoreDialog}
+        onClose={() => setShowRestoreDialog(false)}
+        onConfirm={handleConfirmRestore}
+        title="Restore Journal Entry"
+        message={`Restore entry "${visibleReference}"? It will go back onto the ledger exactly as it was before it was cancelled.`}
+        confirmButtonText="Restore Entry"
+        variant="default"
+      />
+
       {/* Delete Error Dialog */}
-      {deleteErrorData && (
+      {actionErrorData && (
         <div
           className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200 ${
-            showDeleteErrorDialog ? "opacity-100" : "opacity-0 pointer-events-none"
+            showActionErrorDialog ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
         >
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => setShowDeleteErrorDialog(false)}
+            onClick={() => setShowActionErrorDialog(false)}
           />
 
           {/* Dialog */}
@@ -684,41 +777,41 @@ const JournalDetailsPage: React.FC = () => {
             {/* Header */}
             <div className="px-6 py-4 border-b border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20">
               <h3 className="text-lg font-semibold text-red-900 dark:text-red-100">
-                {deleteErrorData.message}
+                {actionErrorData.message}
               </h3>
             </div>
 
             {/* Body */}
             <div className="px-6 py-4 space-y-3">
-              {deleteErrorData.detail && (
+              {actionErrorData.detail && (
                 <p className="text-sm text-default-700 dark:text-gray-300">
-                  {deleteErrorData.detail}
+                  {actionErrorData.detail}
                 </p>
               )}
 
-              {deleteErrorData.suggestion && (
+              {actionErrorData.suggestion && (
                 <p className="text-sm text-default-600 dark:text-gray-400 italic">
-                  {deleteErrorData.suggestion}
+                  {actionErrorData.suggestion}
                 </p>
               )}
             </div>
 
             {/* Footer */}
             <div className="px-6 py-4 border-t border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/30 flex justify-end gap-3">
-              {deleteErrorData.invoice_id && (
+              {actionErrorData.invoice_id && (
                 <Button
                   onClick={handleGoToInvoice}
                   color="sky"
                   variant="filled"
                   size="md"
                 >
-                  Go to Invoice #{deleteErrorData.invoice_id}
+                  Go to Invoice #{actionErrorData.invoice_id}
                 </Button>
               )}
               <Button
                 onClick={() => {
-                  setShowDeleteErrorDialog(false);
-                  setDeleteErrorData(null);
+                  setShowActionErrorDialog(false);
+                  setActionErrorData(null);
                 }}
                 color="default"
                 variant="outline"
@@ -733,6 +826,62 @@ const JournalDetailsPage: React.FC = () => {
 
     </div>
   );
+};
+
+// Tien Hock fetches its cached entry types and chart of accounts; Green Target
+// fetches its own entry types (G7 added the endpoint) and skips the chart —
+// the GT detail payload carries per-line account descriptions.
+const TienHockJournalDetails: React.FC = () => {
+  const { entryTypes } = useJournalEntryTypesCache();
+  const { accountCodes } = useAccountCodesCache();
+  return (
+    <JournalDetailsContent
+      entryTypes={entryTypes}
+      accountCodes={accountCodes}
+      isGreenTarget={false}
+    />
+  );
+};
+
+const GreenTargetJournalDetails: React.FC = () => {
+  const [entryTypes, setEntryTypes] = useState<JournalEntryTypeInfo[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadTypes = async () => {
+      try {
+        const response = await api.get("/greentarget/api/journal-entries/types");
+        if (!cancelled) setEntryTypes(response as JournalEntryTypeInfo[]);
+      } catch (err: unknown) {
+        console.error("Error fetching Green Target journal entry types:", err);
+      }
+    };
+    loadTypes();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <JournalDetailsContent
+      entryTypes={entryTypes}
+      accountCodes={[]}
+      isGreenTarget
+    />
+  );
+};
+
+interface JournalDetailsPageProps {
+  company?: "tienhock" | "greentarget";
+}
+
+const JournalDetailsPage: React.FC<JournalDetailsPageProps> = ({
+  company = "tienhock",
+}) => {
+  if (company === "greentarget") {
+    return <GreenTargetJournalDetails />;
+  }
+  return <TienHockJournalDetails />;
 };
 
 export default JournalDetailsPage;

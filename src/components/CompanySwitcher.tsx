@@ -143,8 +143,8 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ onNavigate }) => {
         <span className="font-semibold text-sm">
           {activeCompany.id === "greentarget" ? (
             <>
-              <span className="2xl:hidden">GT</span>
-              <span className="hidden 2xl:inline">{activeCompany.name}</span>
+              <span className="xl:hidden">GT</span>
+              <span className="hidden xl:inline">{activeCompany.name}</span>
             </>
           ) : (
             activeCompany.name

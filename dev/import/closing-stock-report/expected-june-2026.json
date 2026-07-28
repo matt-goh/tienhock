@@ -4,7 +4,7 @@
     "Values are the PRINTED legacy values. Handwritten boss corrections are recorded separately in *_handwritten fields.",
     "Codes are shown as printed (spaces instead of underscores, e.g. 'CS MGRM1' = CS_MGRM1).",
     "Our system derives values from the dev DB; every printed value that the DB reproduces is marked verified_db: true.",
-    "Struck-through/ambiguous prints are marked ocr_uncertain: true."
+    "OCR or struck-through ambiguities are preserved in ocr_note fields; no value remains ocr_uncertain."
   ],
   "mee": {
     "page": 1,
@@ -21,30 +21,30 @@
     "totals": { "bags": 22367, "amount": 176035.10 },
     "closing_stock": [
       { "code": "CS_MGRM1", "description": "GARAM", "amount": 287.99, "verified_db": true, "maps_to": "material M1 (mee)" },
-      { "code": "CS_MTHT1", "description": "TH-1", "amount": 0.00, "verified_db": true, "maps_to": "material M2 (mee)" },
+      { "code": "CS_MTH11", "description": "TH-1", "amount": 0.00, "verified_db": true, "maps_to": "material M2 (mee)" },
       { "code": "CS_MSOD1", "description": "SODA ASH", "amount": 188.50, "verified_db": true, "maps_to": "material M3 variant 1 (mee)" },
       { "code": "CS_MSOD2", "description": "SODA ASH", "amount": 0.00, "verified_db": true, "maps_to": "material M3 variant 2 (mee)" },
       { "code": "CS_MSD", "description": "SODIUM TRIPOLYPHOSPHATE", "amount": 0.00, "verified_db": true, "maps_to": "material M3B (mee)" },
       { "code": "CS_MTEP1", "description": "TEPUNG", "amount": 7482.72, "verified_db": true, "maps_to": "material M23B (mee)" },
       { "code": "CS_MTEP2", "description": "TEPUNG", "amount": 0.00, "verified_db": true, "maps_to": "material M23C (mee)" },
       { "code": "CS_MTEP3", "description": "STORK W", "amount": 7486.08, "verified_db": true, "maps_to": "material M23 (mee)" },
-      { "code": "CS_MPMS", "description": "PACKING MATERIAL SMALL", "amount": 81885.94, "verified_db": false, "maps_to": "subset of mee packing_material materials (assignment TBD)" },
-      { "code": "CS_MPMB", "description": "PACKING MATERIAL BIG", "amount": 23461.25, "verified_db": false, "maps_to": "subset of mee packing_material materials (assignment TBD)" },
+      { "code": "CS_MPMS", "description": "PACKING MATERIAL SMALL", "amount": 81885.94, "verified_db": false, "maps_to": "Q8-confirmed mee SMALL packing membership", "delta_note": "system is RM883.60 higher; Q14 source-sheet check remains open" },
+      { "code": "CS_MPMB", "description": "PACKING MATERIAL BIG", "amount": 23461.25, "verified_db": true, "maps_to": "Q8-confirmed mee BIG packing membership" },
       { "code": "CS_MTAP", "description": "SELOTAPE", "amount": 69.30, "verified_db": true, "maps_to": "material M22 (mee)" },
       { "code": "CS_MFIN", "description": "STOCK LORRY & KILANG", "amount": 58277.70, "verified_db": true, "maps_to": "material_stock_kilang_entries mee sum" }
     ],
     "closing_stock_subtotals": { "packing": 105416.49, "with_finished": 179139.48, "grand_total_with_sales": 355174.58 },
     "opening_stock": [
       { "code": "OS_MGRM1", "description": "GARAM", "amount": 629.76, "verified_db": true },
-      { "code": "OS_MTHT1", "description": "TH-1", "amount": 0.00, "verified_db": true },
+      { "code": "OS_MTH11", "description": "TH-1", "amount": 0.00, "verified_db": true },
       { "code": "OS_MSOD1", "description": "SODA ASH", "amount": 436.15, "verified_db": true },
       { "code": "OS_MSOD2", "description": "SODA ASH", "amount": 0.00, "verified_db": true },
       { "code": "OS_MSD", "description": "SODIUM TRIPOLYPHOSPHATE", "amount": 0.00, "verified_db": true },
       { "code": "OS_MTEP1", "description": "TEPUNG 50KG", "amount": 15188.14, "verified_db": true },
       { "code": "OS_MTEP2", "description": "TEPUNG 50KG", "amount": 0.00, "verified_db": true },
       { "code": "OS_MTEP3", "description": "STORK W 25KG", "amount": 14392.88, "verified_db": true },
-      { "code": "OS_MPMS", "description": "SMALL PLASTIC-MEE", "amount": 85789.37, "verified_db": false },
-      { "code": "OS_MPMB", "description": "BIG PLASTIC-MEE", "amount": 27531.25, "verified_db": false },
+      { "code": "OS_MPMS", "description": "SMALL PLASTIC-MEE", "amount": 85789.37, "verified_db": false, "delta_note": "system is RM0.08 lower; documented May keying noise" },
+      { "code": "OS_MPMB", "description": "BIG PLASTIC-MEE", "amount": 27531.25, "verified_db": true },
       { "code": "OS_MTAP", "description": "SELOTAPE-MEE", "amount": 74.55, "verified_db": true },
       { "code": "OS_MFIN", "description": "FINISH PRODUCTS", "amount": 72110.10, "verified_db": true }
     ],
@@ -53,12 +53,12 @@
       { "code": "PU_MGRM", "description": "GARAM", "amount": 0.00, "verified_db": true },
       { "code": "PU_MTH1", "description": "TH-1", "amount": 0.00, "verified_db": true },
       { "code": "PU_MSOD", "description": "SODA ASH", "amount": 0.00, "verified_db": true },
-      { "code": "PU_MSD", "description": "SODIUM TRIPOLYPHOSPHATE", "amount": 540.00, "verified_db": false, "delta_note": "entry missing in dev DB (books-only)" },
+      { "code": "PU_MSD", "description": "SODIUM TRIPOLYPHOSPHATE", "amount": 540.00, "verified_db": false, "delta_note": "legacy-only; Q11 confirmed the material is discontinued and no purchase exists, so the live report correctly stays 0.00" },
       { "code": "PU_MTEP", "description": "TEPUNG", "amount": 49900.00, "verified_db": true },
       { "code": "PM_MPMS", "description": "SMALL PLASTIC-MEE", "amount": 0.00, "verified_db": true },
       { "code": "PM_MPMB", "description": "BIG PLASTIC-MEE", "amount": 0.00, "verified_db": true },
       { "code": "PM_MTAP", "description": "SELOTAPE-MEE", "amount": 0.00, "verified_db": true },
-      { "code": "MRET", "description": "RETURN OFF OF GOODS", "amount": 1519.10, "verified_db": false, "delta_note": "entry missing in dev DB (books-only)" }
+      { "code": "MRET", "description": "RETURN OFF OF GOODS", "amount": 1519.10, "verified_db": false, "delta_note": "derived from returnproduct x invoice-line price; live June source gives 1,517.80" }
     ],
     "purchase_total": 50440.00,
     "footer": {
@@ -94,8 +94,8 @@
       { "code": "CS_BSAG", "description": "SAGO", "amount": 0.00, "verified_db": true },
       { "code": "CS_KOW", "description": "KOWAS TRANSPORT SDN BHD", "amount": 0.00, "verified_db": true },
       { "code": "CS_LS", "description": "LEASING LOGISTIC (EM) SDN BHD", "amount": 67370.40, "verified_db": true, "maps_to": "material B20 Sago + Transport (bihun)" },
-      { "code": "CS_BPMS", "description": "PACKING MATERIAL SMALL", "amount": 30183.94, "verified_db": false, "maps_to": "subset of bihun packing_material materials (assignment TBD)" },
-      { "code": "CS_BPMB", "description": "PACKING MATERIAL BIG", "amount": 16891.45, "verified_db": false, "maps_to": "subset of bihun packing_material materials (assignment TBD)" },
+      { "code": "CS_BPMS", "description": "PACKING MATERIAL SMALL", "amount": 30183.94, "verified_db": true, "maps_to": "Q8-confirmed bihun SMALL packing membership" },
+      { "code": "CS_BPMB", "description": "PACKING MATERIAL BIG", "amount": 16891.45, "verified_db": true, "maps_to": "Q8-confirmed bihun BIG packing membership", "delta_note": "matches after the approved B14 RM282.20 correction" },
       { "code": "CS_BTAP", "description": "SELOTAPE", "amount": 811.20, "verified_db": true, "maps_to": "material B17 (bihun)" },
       { "code": "CS_BFIN", "description": "STOCK LORRY & KILANG", "amount": 81409.52, "verified_db": true, "maps_to": "material_stock_kilang_entries bihun sum" }
     ],
@@ -108,8 +108,8 @@
       { "code": "OS_BSAG", "description": "SAGO", "amount": 0.00, "verified_db": true },
       { "code": "OS_KOW", "description": "KOWAS TRANSPORT SDN BHD", "amount": 0.00, "verified_db": true },
       { "code": "OS_LS", "description": "LEASING LOGISTIC (EM) SDN BHD", "amount": 57072.30, "verified_db": true },
-      { "code": "OS_BPMS", "description": "SMALL PLASTICK-BIHUN", "amount": 45167.88, "verified_db": false },
-      { "code": "OS_BPMB", "description": "BIG PLASTIC-BIHUN", "amount": 22047.98, "verified_db": false },
+      { "code": "OS_BPMS", "description": "SMALL PLASTICK-BIHUN", "amount": 45167.88, "verified_db": true },
+      { "code": "OS_BPMB", "description": "BIG PLASTIC-BIHUN", "amount": 22047.98, "verified_db": true },
       { "code": "OS_BTAP", "description": "SELOTAPE-BIHUN", "amount": 1583.40, "verified_db": true },
       { "code": "OS_BFIN", "description": "FINISH PRODUCTS", "amount": 116869.50, "verified_db": true }
     ],
@@ -118,14 +118,14 @@
       { "code": "PU_BJAG", "description": "JAGUNG", "amount": 17280.00, "verified_db": true },
       { "code": "PU_BSDM", "description": "SODIUM METALBISULPHITE", "amount": 0.00, "verified_db": true },
       { "code": "PU_BTH2", "description": "TH-2", "amount": 0.00, "verified_db": true },
-      { "code": "PU_BBER", "description": "BERAS", "amount": 130631.40, "verified_db": false, "delta_note": "DB journal 000199 has 405,000.00 where particulars say 300BAG XRM135 = 40,500.00; 130,631.40 only with the corrected 40,500.00" },
+      { "code": "PU_BBER", "description": "BERAS", "amount": 130631.40, "verified_db": true, "delta_note": "matches after journal 000199 was corrected to 300 bags x RM135 = RM40,500.00" },
       { "code": "PU_BSAG", "description": "SAGO", "amount": 107580.00, "verified_db": true },
       { "code": "BFT_KOW", "description": "KOWAS TRANSPORT SDN BHD", "amount": 0.00, "verified_db": true },
       { "code": "BFT_LS", "description": "LEASING LOGISTIC (EM) SDN BHD", "amount": 0.00, "verified_db": true },
       { "code": "PM_BPMS", "description": "SMALL PLASTICK-BIHUN", "amount": 0.00, "verified_db": true },
       { "code": "PM_BPMB", "description": "BIG PLASTIC-BIHUN", "amount": 0.00, "verified_db": true },
       { "code": "PM_BTAP", "description": "SELOTAPE-BIHUN", "amount": 0.00, "verified_db": true },
-      { "code": "BRET", "description": "RETURN OFF OF GOODS", "amount": 265.10, "verified_db": false, "delta_note": "entry missing in dev DB (books-only)" }
+      { "code": "BRET", "description": "RETURN OFF OF GOODS", "amount": 265.10, "verified_db": false, "delta_note": "derived from returnproduct x invoice-line price; live June source gives 268.30" }
     ],
     "purchase_total": 255491.40,
     "footer": {
@@ -152,18 +152,18 @@
         { "name": "GARAM", "amount": 341.77, "unit": 0.016518, "verified_db": true },
         { "name": "TH-1", "amount": 0.00, "unit": 0.0, "verified_db": true },
         { "name": "SODA ASH", "amount": 247.65, "unit": 0.011969, "verified_db": true },
-        { "name": "SODIUM TRIPOLYPHOSPHATE", "amount": 540.00, "unit": 0.026098, "verified_db": false, "delta_note": "needs missing PU_MSD 540.00 entry" }
+        { "name": "SODIUM TRIPOLYPHOSPHATE", "amount": 540.00, "unit": 0.026098, "verified_db": false, "delta_note": "legacy-only amount; Q11 confirmed no purchase exists, so the live unit-cost row correctly stays 0.00" }
       ],
       "ingredients_subtotal": { "amount": 65641.64, "unit": 3.172473 },
       "packing": [
         { "name": "SELOTAPE", "amount": 5.25, "unit": 0.000254, "verified_db": true },
         { "name": "PLASTIC (SMALL)", "amount": 3903.43, "unit": 0.188654, "verified_db": false },
-        { "name": "PLASTIC (BIG)", "amount": 4070.00, "unit": 0.196704, "verified_db": false }
+        { "name": "PLASTIC (BIG)", "amount": 4070.00, "unit": 0.196704, "verified_db": true }
       ],
       "packing_subtotal": { "amount": 7978.68, "unit": 0.385611 },
       "salary": [
-        { "name": "SALARY MACHINE", "amount": 17068.69, "unit": 0.824933, "verified_db": false, "delta_note": "payroll composition TBD" },
-        { "name": "SALARY PACKING", "amount": 14551.85, "unit": 0.703294, "verified_db": false, "delta_note": "payroll composition TBD" }
+        { "name": "SALARY MACHINE", "amount": 17068.69, "unit": 0.824933, "verified_db": true, "delta_note": "matches the posted JVSL voucher plus manually keyed levy" },
+        { "name": "SALARY PACKING", "amount": 14551.85, "unit": 0.703294, "verified_db": true, "delta_note": "matches the posted JVSL voucher plus manually keyed levy" }
       ],
       "salary_subtotal": { "amount": 31620.54, "unit": 1.528227 },
       "salesman_group": [
@@ -205,13 +205,13 @@
       "ingredients_subtotal": { "amount_printed": 276004.54, "amount_handwritten": 270744.54, "unit_handwritten": 8.997226, "ocr_note": "component sum with printed JAGUNG is 276,904.54 - 900.00 OCR ambiguity on the struck figure" },
       "packing": [
         { "name": "SELOTAPE", "amount": 772.20, "unit": 0.025661, "verified_db": true },
-        { "name": "PLASTIC (SMALL)", "amount": 14983.94, "unit": 0.497938, "verified_db": false },
-        { "name": "PLASTIC (BIG)", "amount": 5156.53, "unit": 0.171359, "verified_db": false }
+        { "name": "PLASTIC (SMALL)", "amount": 14983.94, "unit": 0.497938, "verified_db": true },
+        { "name": "PLASTIC (BIG)", "amount": 5156.53, "unit": 0.171359, "verified_db": true }
       ],
       "packing_subtotal": { "amount": 20912.67, "unit": 0.694958 },
       "salary": [
-        { "name": "SALARY MACHINE", "amount": 28793.96, "unit": 0.956864, "verified_db": false, "delta_note": "payroll composition TBD" },
-        { "name": "SALARY PACKING", "amount": 22390.70, "unit": 0.744075, "verified_db": false, "delta_note": "payroll composition TBD" }
+        { "name": "SALARY MACHINE", "amount": 28793.96, "unit": 0.956864, "verified_db": true, "delta_note": "matches the posted JVSL voucher plus manually keyed levy" },
+        { "name": "SALARY PACKING", "amount": 22390.70, "unit": 0.744075, "verified_db": true, "delta_note": "matches the posted JVSL voucher plus manually keyed levy" }
       ],
       "salary_subtotal": { "amount": 51184.66, "unit": 1.700939 },
       "salesman_group": [
@@ -232,15 +232,15 @@
       ],
       "habuk_subtotal": { "amount": 4548.96, "unit": 0.151168 },
       "expenses_line": { "amount": 64238.82, "unit": 2.134747, "delta_note": "50% shared expense pool + BTRA 509.00" },
-      "total_before_repair": { "amount": 427148.08, "unit": 14.194694, "ocr_note": "printed 114,519.52 struck over 108,359.52 (bad scan); component sum is 427,148.08 and unit 14.194694 x 30,092 = 427,107 - ~40 OCR ambiguity" },
+      "total_before_repair": { "amount": 427148.08, "unit": 14.194694, "scenario": "handwritten_jagung_alternate", "ocr_note": "handwritten alternate using the JAGUNG adjustment; it is RM6,160 below the printed atomic-row sum 433,308.08 and is not the canonical verifier target" },
       "machine_repair": { "amount": 2319.22, "unit": 0.077071 },
-      "total": { "amount": 429467.30, "unit": 14.271765, "ocr_note": "printed ~112,200.30 (bad scan); component sum is 429,467.30" },
-      "add_back_handwritten": { "amount": 6662.66, "unit": 0.221409 },
+      "total": { "amount": 429467.30, "unit": 14.271765, "scenario": "handwritten_jagung_alternate", "ocr_note": "handwritten alternate using the JAGUNG adjustment; it is RM6,160 below the printed atomic-row sum 435,627.30 and is not the canonical verifier target" },
+      "add_back_handwritten": { "amount": 6662.66, "unit": 0.221409, "rounding_note": "handwritten unit is preserved as scanned; 6,662.66 / 30,092 rounds to the canonical live engine value 0.221410" },
       "final_unit_cost_handwritten": 14.050356
     }
   },
   "data_issues_confirmed": [
-    "journal 000199 (2026-06-22): PU_BBER 405,000.00 should be 40,500.00 per particulars '300BAG XRM135' (CR_PN leg likewise)",
+    "CORRECTED IN DEV 2026-07-28: journal 000199 PU_BBER/CR_PN now records 40,500.00 per particulars '300BAG XRM135'; production application remains pending",
     "PU_MSD 540.00 is legacy-only and permanently 0.00 in our data - the material is discontinued for Mee and no purchase exists (Q11, answered 2026-07-25). Never treat it as missing data",
     "MRET/BRET are derived sales returns (returnproduct x invoice-line price), not journals. June: MEE 1,517.80 vs printed 1,519.10, BIHUN 268.30 vs printed 265.10 - genuine source deltas, unaffected by the month window",
     "SUPERSEDED 2026-07-25 (Phase 2): the '1-MNL +20 bags/+146.00' and '2-BCM3 +205 bags/+3,499.00' sales deltas were an artefact of deriving the invoice month from the UTC calendar date, which pulls in 2026-07-01 00:00-08:00 KL. With the correct Asia/Kuala_Lumpur epoch-ms window both products, and both product-line sales totals, match the print to the cent. The print was right",

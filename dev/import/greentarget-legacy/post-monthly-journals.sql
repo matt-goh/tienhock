@@ -134,16 +134,18 @@ BEGIN
     RAISE EXCEPTION 'The active IMP journal type is missing from greentarget.journal_entry_types';
   END IF;
 
-  IF (SELECT COUNT(*) FROM greentarget.account_codes) <> 503 THEN
-    RAISE EXCEPTION 'greentarget.account_codes is not the 503-account G3 chart';
-  END IF;
+  -- The exact imported account identities used by this batch are checked
+  -- against desired_import_lines below. The live chart may legitimately hold
+  -- additional post-cutover accounts beyond G3's 503-code legacy subset.
 
-  -- Green Target's ledger starts empty and posts organically only from
-  -- 2026-07-01 (R2). Anything else already in it is unexplained - stop.
+  -- Green Target posts organically only from 2026-07-01 (R2). A post-cutover
+  -- journal is legitimate beside a rerun; only unexplained historical rows
+  -- must stop the immutable Jan-Jun import.
   IF EXISTS (
-    SELECT 1 FROM greentarget.journal_entries WHERE entry_type <> 'IMP'
+    SELECT 1 FROM greentarget.journal_entries
+     WHERE entry_type <> 'IMP' AND entry_date < DATE '2026-07-01'
   ) THEN
-    RAISE EXCEPTION 'A non-IMP journal already exists in greentarget.journal_entries';
+    RAISE EXCEPTION 'A non-IMP journal exists before the 2026-07-01 cutover';
   END IF;
 END
 $preflight$;

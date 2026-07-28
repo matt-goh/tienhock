@@ -16,6 +16,7 @@ import {
   ChequeDuplicate,
   JournalEntry,
   JournalEntryType,
+  JournalEntryTypeInfo,
   JournalEntryLineInput,
   LedgerType,
 } from "../../types/types";
@@ -73,6 +74,7 @@ interface JournalEntryFormData {
 }
 
 const LAST_ENTRY_TYPE_KEY = "journalEntryLastType";
+const GT_LAST_ENTRY_TYPE_KEY = "gtJournalEntryLastType";
 const LEGACY_IMPORT_ENTRY_TYPE: JournalEntryType = "IMP";
 // Entry types that expose the Cheque No field. Cash Payment (C) pre-fills the
 // next sequential cheque number; Bank Payment (B) pre-fills the static "PBE".
@@ -87,16 +89,19 @@ const HEADER_TIME_NAVIGATOR_TRIGGER_CLASSNAME: string =
 const ACCOUNT_CODE_PATTERN: RegExp = /^[A-Za-z0-9\-_.]+$/;
 
 // Load the last journal type the user selected (shared cache with the list page session)
-const loadLastEntryType = (): JournalEntryType => {
+const loadLastEntryType = (
+  storageKey: string = LAST_ENTRY_TYPE_KEY,
+  fallback: JournalEntryType = "J"
+): JournalEntryType => {
   try {
-    const cached = localStorage.getItem(LAST_ENTRY_TYPE_KEY);
+    const cached = localStorage.getItem(storageKey);
     if (cached && cached !== LEGACY_IMPORT_ENTRY_TYPE) {
       return cached as JournalEntryType;
     }
   } catch (e) {
     console.error("Error loading last entry type:", e);
   }
-  return "J";
+  return fallback;
 };
 
 const emptyLine = (lineNumber: number): JournalLineFormData => ({
@@ -508,7 +513,16 @@ const QuickAddAccountCodeModal: React.FC<QuickAddAccountCodeModalProps> = ({
   );
 };
 
-const JournalEntryPage: React.FC = () => {
+interface JournalEntryPageProps {
+  // Green Target reuses this form over its own journal routes; it fetches GT
+  // types/accounts directly (the TH caches are left firing, unused) and has
+  // no inline account quick-add/favourites and no journal delete.
+  company?: "tienhock" | "greentarget";
+}
+
+const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
+  company = "tienhock",
+}) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
@@ -517,9 +531,20 @@ const JournalEntryPage: React.FC = () => {
   const isEditMode = !!id && location.pathname.includes("/edit");
   const isCreateMode = location.pathname.endsWith("/new");
 
-  // Cached reference data
-  const { entryTypes, isLoading: entryTypesLoading } = useJournalEntryTypesCache();
-  const { accountCodes: cachedAccountCodes, isLoading: accountCodesLoading } = useAccountCodesCache();
+  const isGreenTarget: boolean = company === "greentarget";
+  const apiBase: string = isGreenTarget ? "/greentarget/api" : "/api";
+  const journalEntriesPath: string = isGreenTarget
+    ? "/greentarget/accounting/journal-entries"
+    : "/accounting/journal-entries";
+  const lastEntryTypeKey: string = isGreenTarget
+    ? GT_LAST_ENTRY_TYPE_KEY
+    : LAST_ENTRY_TYPE_KEY;
+  const defaultEntryType: JournalEntryType = isGreenTarget ? "JV" : "J";
+
+  // Cached reference data (Tien Hock). On Green Target these hooks still fire
+  // but their values are overridden by the GT lists fetched below.
+  const { entryTypes: thEntryTypes, isLoading: thEntryTypesLoading } = useJournalEntryTypesCache();
+  const { accountCodes: cachedAccountCodes, isLoading: thAccountCodesLoading } = useAccountCodesCache();
   const {
     favouriteCodes,
     pendingCodes: pendingFavouriteCodes,
@@ -528,11 +553,60 @@ const JournalEntryPage: React.FC = () => {
   const { ledgerTypes: allLedgerTypes, isLoading: ledgerTypesLoading } = useLedgerTypesCache();
   const [optimisticAccountCodes, setOptimisticAccountCodes] = useState<AccountCode[]>([]);
 
+  // Green Target reference data, fetched from the GT routes (no GT caches).
+  const [gtEntryTypes, setGtEntryTypes] = useState<JournalEntryTypeInfo[]>([]);
+  const [gtAccountCodes, setGtAccountCodes] = useState<AccountCode[]>([]);
+  const [gtReferenceLoading, setGtReferenceLoading] =
+    useState<boolean>(isGreenTarget);
+
+  useEffect(() => {
+    if (!isGreenTarget) return;
+
+    let cancelled = false;
+    const loadGreenTargetReference = async () => {
+      setGtReferenceLoading(true);
+      try {
+        const [typesResponse, accountsResponse] = await Promise.all([
+          api.get(`${apiBase}/journal-entries/types`),
+          api.get(`${apiBase}/account-codes?flat=true`),
+        ]);
+        if (cancelled) return;
+        setGtEntryTypes(typesResponse as JournalEntryTypeInfo[]);
+        setGtAccountCodes(accountsResponse as AccountCode[]);
+      } catch (err: unknown) {
+        console.error("Error fetching Green Target reference data:", err);
+        if (!cancelled) {
+          toast.error("Failed to load Green Target accounts and journal types");
+        }
+      } finally {
+        if (!cancelled) setGtReferenceLoading(false);
+      }
+    };
+
+    loadGreenTargetReference();
+    return () => {
+      cancelled = true;
+    };
+  }, [isGreenTarget, apiBase]);
+
+  const entryTypes: JournalEntryTypeInfo[] = isGreenTarget
+    ? gtEntryTypes
+    : thEntryTypes;
+  const entryTypesLoading: boolean = isGreenTarget
+    ? gtReferenceLoading
+    : thEntryTypesLoading;
+  const accountCodesLoading: boolean = isGreenTarget
+    ? gtReferenceLoading
+    : thAccountCodesLoading;
+  const baseAccountCodes: AccountCode[] = isGreenTarget
+    ? gtAccountCodes
+    : cachedAccountCodes;
+
   const allAccountCodes = useMemo((): AccountCode[] => {
-    if (optimisticAccountCodes.length === 0) return cachedAccountCodes;
+    if (optimisticAccountCodes.length === 0) return baseAccountCodes;
 
     const cachedCodes: Set<string> = new Set(
-      cachedAccountCodes.map((accountCode: AccountCode): string =>
+      baseAccountCodes.map((accountCode: AccountCode): string =>
         accountCode.code.toUpperCase()
       )
     );
@@ -542,9 +616,9 @@ const JournalEntryPage: React.FC = () => {
         (accountCode: AccountCode): boolean =>
           !cachedCodes.has(accountCode.code.toUpperCase())
       ),
-      ...cachedAccountCodes,
+      ...baseAccountCodes,
     ];
-  }, [cachedAccountCodes, optimisticAccountCodes]);
+  }, [baseAccountCodes, optimisticAccountCodes]);
 
   const ledgerTypes = useMemo(
     () => allLedgerTypes.filter((lt: LedgerType) => lt.is_active),
@@ -554,7 +628,9 @@ const JournalEntryPage: React.FC = () => {
   // Form state - new entries default to the last journal type used
   const [formData, setFormData] = useState<JournalEntryFormData>({
     reference_no: "",
-    entry_type: isCreateMode ? loadLastEntryType() : "J",
+    entry_type: isCreateMode
+      ? loadLastEntryType(lastEntryTypeKey, defaultEntryType)
+      : defaultEntryType,
     entry_date: format(new Date(), "yyyy-MM-dd"),
     description: "",
     cheque_no: "",
@@ -621,7 +697,7 @@ const JournalEntryPage: React.FC = () => {
     async (entryType: JournalEntryType) => {
       try {
         const response = await api.get(
-          `/api/journal-entries/next-reference/${entryType}`
+          `${apiBase}/journal-entries/next-reference/${entryType}`
         );
         const data = response as { reference_no: string };
         setFormData((prev) => ({ ...prev, reference_no: data.reference_no }));
@@ -629,7 +705,7 @@ const JournalEntryPage: React.FC = () => {
         console.error("Error fetching next reference:", err);
       }
     },
-    []
+    [apiBase]
   );
 
   // Fetch next sequential cheque number (Cash Payment / C entries only)
@@ -690,7 +766,7 @@ const JournalEntryPage: React.FC = () => {
     setError(null);
 
     try {
-      const response = await api.get(`/api/journal-entries/${id}`);
+      const response = await api.get(`${apiBase}/journal-entries/${id}`);
       const entry = response as JournalEntry;
 
       const lines: JournalLineFormData[] = (entry.lines || []).map((line) => ({
@@ -733,7 +809,7 @@ const JournalEntryPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, apiBase]);
 
   // Initial data loading
   useEffect(() => {
@@ -777,7 +853,7 @@ const JournalEntryPage: React.FC = () => {
     const newType = value as JournalEntryType;
     // Remember the last selected type for the next new entry
     try {
-      localStorage.setItem(LAST_ENTRY_TYPE_KEY, newType);
+      localStorage.setItem(lastEntryTypeKey, newType);
     } catch (e) {
       console.error("Error caching last entry type:", e);
     }
@@ -896,13 +972,13 @@ const JournalEntryPage: React.FC = () => {
     if (isFormChanged) {
       setShowBackConfirmation(true);
     } else {
-      navigate("/accounting/journal-entries");
+      navigate(journalEntriesPath);
     }
   };
 
   const handleConfirmBack = () => {
     setShowBackConfirmation(false);
-    navigate("/accounting/journal-entries");
+    navigate(journalEntriesPath);
   };
 
   // Validation
@@ -998,11 +1074,11 @@ const JournalEntryPage: React.FC = () => {
       let entryId: string | number | undefined = id;
 
       if (isEditMode) {
-        await api.put(`/api/journal-entries/${id}`, payload);
+        await api.put(`${apiBase}/journal-entries/${id}`, payload);
         toast.success("Journal entry updated successfully");
       } else {
         const response = (await api.post(
-          "/api/journal-entries",
+          `${apiBase}/journal-entries`,
           payload
         )) as { entry?: { id: number } };
         entryId = response?.entry?.id;
@@ -1011,9 +1087,7 @@ const JournalEntryPage: React.FC = () => {
 
       // Lead the user to the saved entry's details page
       navigate(
-        entryId
-          ? `/accounting/journal-entries/${entryId}`
-          : "/accounting/journal-entries"
+        entryId ? `${journalEntriesPath}/${entryId}` : journalEntriesPath
       );
     } catch (err: unknown) {
       console.error("Error saving journal entry:", err);
@@ -1033,10 +1107,10 @@ const JournalEntryPage: React.FC = () => {
 
     setIsSaving(true);
     try {
-      await api.delete(`/api/journal-entries/${id}`);
+      await api.delete(`${apiBase}/journal-entries/${id}`);
       toast.success("Journal entry deleted successfully");
       setShowDeleteDialog(false);
-      navigate("/accounting/journal-entries");
+      navigate(journalEntriesPath);
     } catch (err: unknown) {
       console.error("Error deleting journal entry:", err);
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
@@ -1072,7 +1146,7 @@ const JournalEntryPage: React.FC = () => {
   if (error) {
     return (
       <div className="space-y-3">
-        <BackButton onClick={() => navigate("/accounting/journal-entries")} />
+        <BackButton onClick={() => navigate(journalEntriesPath)} />
         <div className="p-4 border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-lg">
           {error}
         </div>
@@ -1297,17 +1371,28 @@ const JournalEntryPage: React.FC = () => {
                         <td className="px-1 py-1">
                           <AccountCodeCombobox
                             value={line.account_code}
+                            accounts={allAccountCodes}
+                            company={company}
                             onChange={(value: string) =>
                               handleLineChange(index, "account_code", value)
                             }
-                            onAddAccount={(query: string) =>
-                              handleOpenQuickAddAccount(index, query)
+                            onAddAccount={
+                              isGreenTarget
+                                ? undefined
+                                : (query: string) =>
+                                    handleOpenQuickAddAccount(index, query)
                             }
                             disabled={isSaving}
                             hierarchical
-                            favouriteCodes={favouriteCodes}
-                            pendingFavouriteCodes={pendingFavouriteCodes}
-                            onToggleFavourite={toggleFavourite}
+                            favouriteCodes={
+                              isGreenTarget ? undefined : favouriteCodes
+                            }
+                            pendingFavouriteCodes={
+                              isGreenTarget ? undefined : pendingFavouriteCodes
+                            }
+                            onToggleFavourite={
+                              isGreenTarget ? undefined : toggleFavourite
+                            }
                           />
                         </td>
 
@@ -1476,7 +1561,8 @@ const JournalEntryPage: React.FC = () => {
               <div>
                 {isEditMode &&
                   entryStatus !== "cancelled" &&
-                  formData.entry_type !== LEGACY_IMPORT_ENTRY_TYPE && (
+                  formData.entry_type !== LEGACY_IMPORT_ENTRY_TYPE &&
+                  !isGreenTarget && (
                     <Button
                       type="button"
                       color="rose"
@@ -1508,15 +1594,19 @@ const JournalEntryPage: React.FC = () => {
       </div>
 
       {/* Dialogs */}
-      <QuickAddAccountCodeModal
-        isOpen={quickAddTargetLineIndex !== null}
-        initialQuery={quickAddInitialQuery}
-        existingAccountCodes={allAccountCodes}
-        ledgerTypes={ledgerTypes}
-        ledgerTypesLoading={ledgerTypesLoading}
-        onClose={handleCloseQuickAddAccount}
-        onCreated={handleQuickAddAccountCreated}
-      />
+      {/* Quick-add creates Tien Hock account codes only. Green Target account
+          codes are maintained from Accounting -> Chart of Accounts. */}
+      {!isGreenTarget && (
+        <QuickAddAccountCodeModal
+          isOpen={quickAddTargetLineIndex !== null}
+          initialQuery={quickAddInitialQuery}
+          existingAccountCodes={allAccountCodes}
+          ledgerTypes={ledgerTypes}
+          ledgerTypesLoading={ledgerTypesLoading}
+          onClose={handleCloseQuickAddAccount}
+          onCreated={handleQuickAddAccountCreated}
+        />
+      )}
 
       <ConfirmationDialog
         isOpen={showDeleteDialog}

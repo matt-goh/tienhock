@@ -65,6 +65,8 @@ import ProductionEntryPage from "./Stock/ProductionEntryPage";
 import ProductionListPage from "./Stock/ProductionListPage";
 import ProductStockMovementPage from "./Stock/ProductStockMovementPage";
 import ProductStockAdjustmentEntryPage from "./Stock/ProductStockAdjustmentEntryPage";
+import EstimatedPLPage from "./Stock/Reports/EstimatedPLPage";
+import EstimatedUnitCostPage from "./Stock/Reports/EstimatedUnitCostPage";
 
 // Payroll - DailyLog
 import DailyLogListPage from "./Payroll/DailyLog/DailyLogListPage";
@@ -136,6 +138,14 @@ const STOCK_DROPDOWN_COLUMNS = {
   productionRecords: { key: "stock-production-records", order: 1 },
   products: { key: "stock-products", order: 2 },
   materialsPurchases: { key: "stock-materials-purchases", order: 3 },
+} as const;
+
+// Accounting: ungrouped columns take their order from the first item's index
+// (Generation = 0, Reports = 4), so the shared Setup column uses order 10 to
+// keep its place after them. It stacks the Setup and Estimated Reports groups
+// in one column.
+const ACCOUNTING_DROPDOWN_COLUMNS = {
+  setup: { key: "accounting-setup", order: 10 },
 } as const;
 
 // Function to generate payroll subitems for each job type
@@ -459,6 +469,8 @@ export const TienHockNavData: SidebarItem[] = [
         path: "/accounting/account-codes",
         component: AccountCodeListPage,
         group: "Setup",
+        dropdownColumn: ACCOUNTING_DROPDOWN_COLUMNS.setup.key,
+        dropdownColumnOrder: ACCOUNTING_DROPDOWN_COLUMNS.setup.order,
         subItems: [
           {
             name: "New Account",
@@ -478,6 +490,24 @@ export const TienHockNavData: SidebarItem[] = [
         path: "/accounting/location-account-mappings",
         component: LocationAccountMappingsPage,
         group: "Setup",
+        dropdownColumn: ACCOUNTING_DROPDOWN_COLUMNS.setup.key,
+        dropdownColumnOrder: ACCOUNTING_DROPDOWN_COLUMNS.setup.order,
+      },
+      {
+        name: "Estimated P&L",
+        path: "/stock/reports/estimated-pl",
+        component: EstimatedPLPage,
+        group: "Estimated Reports",
+        dropdownColumn: ACCOUNTING_DROPDOWN_COLUMNS.setup.key,
+        dropdownColumnOrder: ACCOUNTING_DROPDOWN_COLUMNS.setup.order,
+      },
+      {
+        name: "Estimated Unit Cost",
+        path: "/stock/reports/estimated-unit-cost",
+        component: EstimatedUnitCostPage,
+        group: "Estimated Reports",
+        dropdownColumn: ACCOUNTING_DROPDOWN_COLUMNS.setup.key,
+        dropdownColumnOrder: ACCOUNTING_DROPDOWN_COLUMNS.setup.order,
       },
     ],
   },

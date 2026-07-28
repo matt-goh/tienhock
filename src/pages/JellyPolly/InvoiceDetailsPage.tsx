@@ -849,17 +849,10 @@ const InvoiceDetailsPage: React.FC = () => {
     const toastId = toast.loading("Cancelling invoice...");
 
     try {
-      const cancelledInvoiceData = await cancelInvoice(invoiceData.id);
-
-      // Preserve the products array when updating the state
-      setInvoiceData((prevData) => {
-        if (!prevData) return cancelledInvoiceData;
-
-        return {
-          ...cancelledInvoiceData,
-          products: prevData.products, // Keep the existing products array
-        };
-      });
+      await cancelInvoice(invoiceData.id);
+      // Reload from the server: cancelling zeroes the line items as well as the
+      // totals, so the previously held products array is stale.
+      await fetchDetails();
 
       toast.success("Invoice cancelled successfully.", { id: toastId });
       setShowPaymentForm(false); // Hide payment form
