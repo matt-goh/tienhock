@@ -26,6 +26,10 @@ import clsx from "clsx";
 import { FormCombobox, SelectOption } from "../../../components/FormComponents";
 import SubmissionResultsModal from "../../../components/Invoice/SubmissionResultsModal";
 import { EInvoiceSubmissionResult } from "../../../types/types";
+import type {
+  CreateGreenTargetPaymentInput,
+  GreenTargetPayment,
+} from "../../../types/greenTargetTypes";
 
 // Interfaces
 interface Customer {
@@ -114,7 +118,14 @@ const InvoiceFormPage: React.FC = () => {
 
   // Payment/E-invoice State (only for create mode)
   const [isPaid, setIsPaid] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [paymentDate, setPaymentDate] = useState<string>(
+    format(new Date(), "yyyy-MM-dd")
+  );
+  const [paymentMethod, setPaymentMethod] = useState<
+    GreenTargetPayment["payment_method"]
+  >("cash");
+  const [paymentInternalReference, setPaymentInternalReference] =
+    useState<string>("");
   const [paymentReference, setPaymentReference] = useState("");
   const [submitAsEinvoice, setSubmitAsEinvoice] = useState(false);
   const [showSubmissionResultsModal, setShowSubmissionResultsModal] =
@@ -546,8 +557,13 @@ const InvoiceFormPage: React.FC = () => {
       }));
     }
   };
-  const handlePaymentMethodChange = (methodIdString: string) => {
-    setPaymentMethod(methodIdString);
+  const handlePaymentMethodChange = (methodIdString: string): void => {
+    const nextPaymentMethod =
+      methodIdString as GreenTargetPayment["payment_method"];
+    setPaymentMethod(nextPaymentMethod);
+    if (nextPaymentMethod === "cash") {
+      setPaymentReference("");
+    }
   };
   const handleBackClick = () => {
     if (isFormChanged) setShowBackConfirmation(true);
@@ -608,14 +624,24 @@ const InvoiceFormPage: React.FC = () => {
       toast.error("Select payment method.");
       return false;
     }
-    if (
-      isPaid &&
-      (paymentMethod === "cheque" || paymentMethod === "bank_transfer") &&
-      !paymentReference
-    ) {
-      toast.error(
-        `Enter ${paymentMethod === "cheque" ? "Cheque No" : "Reference"}.`
-      );
+    if (isPaid && !paymentDate) {
+      toast.error("Enter the payment received date.");
+      return false;
+    }
+    if (isPaid && formData.date_issued && paymentDate < formData.date_issued) {
+      toast.error("Payment received date cannot be before the invoice date.");
+      return false;
+    }
+    if (isPaid && !paymentInternalReference.trim()) {
+      toast.error("Enter the Green Target reference number.");
+      return false;
+    }
+    if (isPaid && paymentInternalReference.trim().length > 50) {
+      toast.error("Green Target reference number cannot exceed 50 characters.");
+      return false;
+    }
+    if (isPaid && paymentReference.trim().length > 50) {
+      toast.error("Cheque / transaction reference cannot exceed 50 characters.");
       return false;
     }
     return true;
@@ -626,6 +652,16 @@ const InvoiceFormPage: React.FC = () => {
     setIsSaving(true);
     const totalAmount = formData.amount_before_tax + formData.tax_amount;
     try {
+      if (isPaid) {
+        const referenceAvailability =
+          await greenTargetApi.checkInternalPaymentRef(
+            paymentInternalReference.trim()
+          );
+        if (referenceAvailability.exists) {
+          toast.error("This Green Target reference number is already in use.");
+          return;
+        }
+      }
       const invData: Omit<Invoice, "invoice_id"> & {
         total_amount: number;
         invoice_id?: number;
@@ -757,27 +793,13 @@ const InvoiceFormPage: React.FC = () => {
           if (isPaid && navId) {
             const pTid = toast.loading("Recording payment...");
             try {
-              const allP = await greenTargetApi.getPayments();
-              const y = new Date().getFullYear().toString().slice(-2);
-              const m = (new Date().getMonth() + 1).toString().padStart(2, "0");
-              const re = new RegExp(`^RV${y}/${m}/(\\d+)$`);
-              const nums = new Set<number>();
-              allP.forEach((p: { internal_reference: string | null }) => {
-                if (p.internal_reference) {
-                  const ma = p.internal_reference.match(re);
-                  if (ma) nums.add(parseInt(ma[1], 10));
-                }
-              });
-              let n = 1;
-              while (nums.has(n)) n++;
-              const ref = `RV${y}/${m}/${n.toString().padStart(2, "0")}`;
-              const pData = {
+              const pData: CreateGreenTargetPaymentInput = {
                 invoice_id: navId,
-                payment_date: format(new Date(), "yyyy-MM-dd"),
+                payment_date: paymentDate,
                 amount_paid: totalAmount,
                 payment_method: paymentMethod,
-                payment_reference: paymentReference || null,
-                internal_reference: ref,
+                payment_reference: paymentReference.trim() || null,
+                internal_reference: paymentInternalReference.trim(),
               };
               await greenTargetApi.createPayment(pData);
               toast.success("Payment recorded", { id: pTid });
@@ -1231,7 +1253,7 @@ const InvoiceFormPage: React.FC = () => {
                         />
                       )}
                       <span className="ml-2 text-sm font-medium text-default-700 dark:text-gray-100">
-                        Mark as Paid
+                        Record Payment
                       </span>
                     </button>
                   </div>
@@ -1244,9 +1266,62 @@ const InvoiceFormPage: React.FC = () => {
           {!isEditMode && isPaid && (
             <div className="mt-6 border-t dark:border-gray-700 pt-6">
               <h2 className="text-lg font-medium mb-4 dark:text-gray-100">
-                Payment Info (Optional)
+                Payment Info
               </h2>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+              {paymentMethod === "cheque" && (
+                <p className="mb-4 text-sm text-default-500 dark:text-gray-400">
+                  Cheque payments remain pending until they are confirmed.
+                </p>
+              )}
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="space-y-2">
+                  <label
+                    htmlFor="payment_date_paid"
+                    className="block text-sm font-medium text-default-700 dark:text-gray-200"
+                  >
+                    Date Received <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    id="payment_date_paid"
+                    name="payment_date_paid"
+                    value={paymentDate}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
+                      setPaymentDate(event.target.value)
+                    }
+                    required
+                    className={clsx(
+                      "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
+                      "bg-white dark:bg-gray-700",
+                      "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                    )}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label
+                    htmlFor="internal_reference_paid"
+                    className="block text-sm font-medium text-default-700 dark:text-gray-200"
+                  >
+                    Green Target Reference No. <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="internal_reference_paid"
+                    name="internal_reference_paid"
+                    value={paymentInternalReference}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
+                      setPaymentInternalReference(event.target.value)
+                    }
+                    placeholder="e.g. RV26/06/62"
+                    maxLength={50}
+                    required
+                    className={clsx(
+                      "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
+                      "bg-white dark:bg-gray-700",
+                      "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                    )}
+                  />
+                </div>
                 <div className="space-y-2">
                   <label
                     htmlFor="pm-paid"
@@ -1327,21 +1402,25 @@ const InvoiceFormPage: React.FC = () => {
                     </div>
                   </Listbox>
                 </div>
-                {(paymentMethod === "cheque" ||
-                  paymentMethod === "bank_transfer") && (
+                {paymentMethod !== "cash" && (
                   <div className="space-y-2">
                     <label
                       htmlFor="payment_reference"
                       className="block text-sm font-medium text-default-700 dark:text-gray-200"
                     >
-                      {paymentMethod === "cheque" ? "Cheque No" : "Reference"}{" "}
+                      {paymentMethod === "cheque"
+                        ? "Cheque No. (Optional)"
+                        : "Transaction Reference (Optional)"}
                     </label>
                     <input
                       type="text"
                       id="payment_reference"
                       name="payment_reference"
                       value={paymentReference}
-                      onChange={(e) => setPaymentReference(e.target.value)}
+                      maxLength={50}
+                      onChange={(
+                        event: React.ChangeEvent<HTMLInputElement>
+                      ): void => setPaymentReference(event.target.value)}
                       className={clsx(
                         "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
                         "bg-white dark:bg-gray-700",

@@ -423,14 +423,13 @@ const ReportSourceGuide: React.FC<ReportSourceGuideProps> = ({ report }) => {
   return (
     <>
       <Button
-        onClick={() => setIsOpen(true)}
+        size="sm"
         variant="outline"
-        additionalClasses="flex-shrink-0"
+        icon={IconHelpCircle}
+        iconSize={16}
+        onClick={() => setIsOpen(true)}
       >
-        <span className="flex items-center justify-center whitespace-nowrap">
-          <IconHelpCircle className="h-4 w-4 mr-2" />
-          {lang === "ms" ? "Panduan" : "Guide"}
-        </span>
+        {lang === "ms" ? "Panduan" : "Guide"}
       </Button>
 
       <Transition appear show={isOpen} as={Fragment}>

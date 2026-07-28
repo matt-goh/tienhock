@@ -1,11 +1,12 @@
 # ESTIMATED REPORT HANDOVER — Closing Stock P&L / Estimated Unit Cost (MEE & BIHUN)
 
-Status: **Phase 5 COMPLETE — PDF printing shipped (2026-07-28); Phase 6 wrap-up next (production rollout, §9.4 checklist)** | Started: 2026-07-23 | Owner: Kimi (planning/Q&A) → Claude (Phase 1) → Claude (Phase 2) → GPT-5.6 Sol (Phase 3) → Kimi (Phase 4) → Kimi (Phase 5)
+Status: **ALL PHASES COMPLETE — production rollout done 2026-07-28 (§9.4 checklist executed during the GT G8 window); the report is live** | Started: 2026-07-23 | Owner: Kimi (planning/Q&A) → Claude (Phase 1) → Claude (Phase 2) → GPT-5.6 Sol (Phase 3) → Kimi (Phase 4) → Kimi (Phase 5)
 
 Phase 3 runs the shipped engine against the complete June fixture with **392 exact
 checks, 70 explicitly derived/documented deltas and 0 failures** (§9). Both approved
-data fixes are applied to dev through a guarded, idempotent migration; production is
-still pending. Every remaining delta is explicitly classified and gated — no formula
+data fixes are applied to dev and production through a guarded, idempotent migration
+(prod: 2026-07-28, re-pinned read-only first, ALREADY FINAL on rerun). Every remaining
+delta is explicitly classified and gated — no formula
 or mapping guess was added. Q15 was resolved on 2026-07-28 (co-worker keyed the
 mis-posted RM40 diesel difference correctly in production — see §2 item 15); Q14
 remains deliberately deferred under §7.2 and can be corrected from source evidence
@@ -137,14 +138,14 @@ BIHUN packing materials, BFIN→kilang.
 
 ### Round 1 (answered by user 2026-07-23)
 
-1. ~~Journal `000199` PU_BBER 405,000.00 → 40,500.00~~ **APPLIED TO DEV 2026-07-28 through §5 FIX-1; production pending.**
+1. ~~Journal `000199` PU_BBER 405,000.00 → 40,500.00~~ **APPLIED TO DEV AND PRODUCTION 2026-07-28 through §5 FIX-1.**
 2. ~~Missing June entries PU_MSD 540.00 / MRET 1,519.10 / BRET 265.10~~ **SUPERSEDED by Round 2:** only PU_MSD may need a real PUR journal after source-document confirmation. MRET/BRET are derived sales-return report rows and must not be keyed as manual journals merely to feed this report (see Q11).
 3. ~~Sales deltas (1-MNL +20/+146.00, 2-BCM3 +205/+3,499.00)~~ **CONFIRMED: DB is truth.**
 4. ~~OTHERS row~~ **ANSWERED (C.1):** OTHERS = EMPTY_BAG + EMPTY_BAG(S) sales only, split 50/50 MEE/BIHUN. (SISA stays its own row.)
 5. ~~Salary machine/packing (C.2)~~ User: derived from **account codes** in the formula pages (e.g. SALARY & WAGES = MBS_O+MBS_PK+MBS_TS+MBS_M+…), not directly from payroll. Verified: **no June journal postings exist for salary accounts** (Jan–May only, via IMP) → account-code route yields 0 for June. The payroll/JV bridge alone was within ~1%; Q12 subsequently proved the entire June residual is the posted levy. **Settled 2026-07-25: the source is the account codes, populated by the JVSL payroll voucher — no bridge, no fallback.**
 6. ~~Machine repair split (C.3)~~ User's formula: MEE = `(MBRM+MBUM)/2 + MRM+MUM`; BIHUN = `(MBRM+MBUM)/2 + BRM+BUM`. Tested against June journals — **doesn't add up → Q13.**
 7. ~~Accumulative seeds~~ **CONFIRMED:** MEE −166,900.31 / BIHUN 404,935.44 @ 2026-06-01.
-8. ~~SMALL/BIG packing assignment~~ **CONFIRMED:** MEE BIG = {M14,M15,M16,M17,M20,M21,M28,M29,M31} (ids 56,58,59,60,63,66,64,65,57); BIHUN BIG = {B12,B13,B14,B15,B18A,B29,B31} (ids 79,81,82,85,84,83,80). The 0.30 June keyed typo was **corrected in dev by §5 FIX-2 on 2026-07-28**; production pending.
+8. ~~SMALL/BIG packing assignment~~ **CONFIRMED:** MEE BIG = {M14,M15,M16,M17,M20,M21,M28,M29,M31} (ids 56,58,59,60,63,66,64,65,57); BIHUN BIG = {B12,B13,B14,B15,B18A,B29,B31} (ids 79,81,82,85,84,83,80). The 0.30 June keyed typo was **corrected by §5 FIX-2 on 2026-07-28, dev and production**.
 9. ~~SAGO family on CS_LS line~~ **CONFIRMED** (report implies it).
 10. ~~P&L EXPENSES vs unit-cost residue (216.61/207.21)~~ **CLOSED AS FAR AS AVAILABLE EVIDENCE ALLOWS IN PHASE 3:** the legacy pages contradict one another and expose no P&L account breakdown; keep the internally auditable engine formula (§7.3/§9.3).
 
@@ -479,23 +480,26 @@ RM53 on OIL6389, the missing RM40 parked on CA_WA; Rosa re-pointed it in product
   policy awaits co-worker confirmation. MBRMB is confirmed once
   in the shared 50/50 expense pool; the separate machine-repair split remains open.
 
-## 5. Approved data fixes — APPLIED TO DEV 2026-07-28; PRODUCTION PENDING
+## 5. Approved data fixes — APPLIED TO DEV AND PRODUCTION 2026-07-28
 
 Canonical migration: `dev/migrations/2026-07-28_estimated_report_parity_data_fixes.sql`.
 It runs both corrections in one serializable transaction, locks the exact rows, accepts
 only the complete old or complete final state, rejects partial/drifted data, asserts
-row counts and runs postflight checks. The first dev run applied both changes; a second
-run completed as an exact no-op. These are data corrections only — no schema/table-count
-change. Apply the same migration to production before the report ships.
+row counts and runs postflight checks. The first run on each environment applied both
+changes; a second run completed as an exact no-op (FIX-1/FIX-2 ALREADY FINAL). These are
+data corrections only — no schema/table-count change. **Applied to production
+(`tienhock_prod`) on 2026-07-28 during the GT G8 window, after the read-only re-pin
+confirmed journal 3902 = 405,000.00 and stock row 171 = 282.5000; the live June report
+now shows the pinned PU_BBER 130,631.40 / CS_BBER 194,663.40.**
 
-### FIX-1 — DONE IN DEV (approved A.1): journal `000199` PU_BBER 405,000.00 → 40,500.00
+### FIX-1 — DONE IN DEV AND PROD (approved A.1): journal `000199` PU_BBER 405,000.00 → 40,500.00
 
 Journal id 3902, entry_type PUR, 2026-06-22, manual (source_type NULL — no source
 rebuild can overwrite the edit). Particulars `300BAG XRM135` prove 40,500.00. The
 guarded migration corrected both `PU_BBER` / `CR_PN` lines and the cached header totals;
 the June `PU_BBER` report row is now **130,631.40**, matching the print exactly.
 
-### FIX-2 — DONE IN DEV (approved B.3): June bihun packing B14 unit cost 282.50 → 282.20
+### FIX-2 — DONE IN DEV AND PROD (approved B.3): June bihun packing B14 unit cost 282.50 → 282.20
 
 `material_stock_entries` id 171 (2026/6, bihun, material 82 = B14, variant 118 =
 `8.50 x 33.2KG (SG)`): 1 bag × 8.50/kg × 33.2 kg = **282.20**, keyed as 282.50. May used
@@ -696,18 +700,21 @@ decide, every mapping is seeded, and the Phase 3 parity gate is green (§9).
   now match the print exactly. No voucher needs generating.
 - ~~**Apply the §5 data fixes to dev.**~~ **DONE 2026-07-28** through the guarded
   `2026-07-28_estimated_report_parity_data_fixes.sql`; rerun verified idempotent.
-  Production application remains a Phase 6 deployment action.
+  ~~Production application remains a Phase 6 deployment action.~~ **Also DONE
+  2026-07-28** (prod re-pinned read-only, migration applied, ALREADY FINAL on rerun).
 - **Deployment / DB-refresh note:** `dev/migrations/2026-07-25_estimated_report_foundation.sql`
-  must be applied to **production** before the report ships, and **re-applied after any
+  (applied to dev and prod; **removed from the tree after the 2026-07-28 rollout — recover with
+  `git show 50e63344:dev/migrations/<filename>`**) must be **re-applied after any
   production→dev database import** if that import ever drops the `estimated_report_*`
   tables. The 2026-07-25 import left them intact and every material/variant/product/account
   reference still resolved, but that is not guaranteed for future imports. The migration is
   idempotent, so re-running it is always safe — note only that re-running **resets the
   seeded mappings to their defaults**, discarding later edits made through the Phase 4
   mappings modal.
-- **Production rollout:** also apply
+- **Production rollout:** ~~also apply
   `dev/migrations/2026-07-28_estimated_report_parity_data_fixes.sql` before exposing the
-  report. It is safe to rerun and aborts on any state other than the exact old/final rows.
+  report.~~ **DONE 2026-07-28.** It is safe to rerun and aborts on any state other than
+  the exact old/final rows.
 
 ### 7.2 Questions still to ask the co-worker
 
@@ -1021,13 +1028,25 @@ original legacy P&L configuration/account breakdown could close this further.
 - Q14 does not block UI work (Q15 was resolved in production on 2026-07-28). When Q14
   evidence arrives, correct the June source rows and rerun the verifier under §7.2; do
   not add report-only overrides.
-- Before production exposure, apply both the Phase 1 foundation migration and the
-  Phase 3 parity data-fix migration. Add the user-facing changelog entry with Phase 4.
+- ~~Before production exposure, apply both the Phase 1 foundation migration and the
+  Phase 3 parity data-fix migration.~~ **DONE 2026-07-28** (§9.4 checklist executed;
+  the foundation was already live in prod, the parity fixes were applied and
+  re-verified ALREADY FINAL). Add the user-facing changelog entry with Phase 4.
 - Connected limitation needing separate user approval: variant 118 still has
   `default_unit_cost = 282.50`, so a future unsaved month can reuse the old fallback;
   the approved correction covered only June stock row 171.
 
-Production rollout checklist (Phase 6, not performed in Phase 3):
+Production rollout checklist (Phase 6) — **COMPLETED 2026-07-28** during the GT G8
+maintenance window: backup confirmed, read-only re-pin matched the documented old
+state (journal 3902 = 405,000.00; stock row 171 = 282.5000), the data-fix migration
+ran with `ON_ERROR_STOP` and a rerun printed both `ALREADY FINAL` notices (the Phase 1
+foundation was already live in production — the 2026-07-28 prod dump contained the 135
+seeded lines), the doc statuses in §2/§5, `docs/MIGRATIONS_LOG.md`, AGENTS.md and
+CLAUDE.md were updated, and the live June report was spot-checked at the pinned
+PU_BBER 130,631.40 / CS_BBER 194,663.40. §4's historical note that production was
+untouched during Phase 3 stands.
+
+Historical checklist (for the record):
 
 1. Take/confirm the approved backup and maintenance window; verify the nine owner
    tables queried by the data-fix guard exist in the production schema.

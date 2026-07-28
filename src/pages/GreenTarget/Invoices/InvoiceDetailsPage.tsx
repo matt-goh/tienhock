@@ -43,6 +43,9 @@ import clsx from "clsx"; // Added clsx
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import SubmissionResultsModal from "../../../components/Invoice/SubmissionResultsModal";
 import { SelectOption } from "../../../components/FormComponents";
+import TimeNavigator, {
+  type TimeRange,
+} from "../../../components/TimeNavigator";
 import {
   EInvoiceSubmissionResult,
   InvoiceGT,
@@ -54,6 +57,10 @@ import { generateGTPDFFilename } from "../../../utils/greenTarget/PDF/generateGT
 import { pdf, Document } from "@react-pdf/renderer";
 import { generateQRDataUrl } from "../../../utils/invoice/einvoice/generateQRCode";
 import GTInvoiceAdjustmentDocsSection from "../../../components/AdjustmentDocs/GTInvoiceAdjustmentDocsSection";
+import type {
+  CreateGreenTargetPaymentInput,
+  GreenTargetPayment,
+} from "../../../types/greenTargetTypes";
 
 interface Payment {
   payment_id: number;
@@ -71,7 +78,7 @@ interface Payment {
 interface PaymentFormData {
   amount_paid: number;
   payment_date: string;
-  payment_method: string; // Keep as string ('cash', 'cheque', etc.)
+  payment_method: GreenTargetPayment["payment_method"];
   payment_reference: string;
   internal_reference: string;
 }
@@ -92,6 +99,20 @@ const toLocalDateString = (value: string): string => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return format(date, "yyyy-MM-dd");
+};
+
+const getPaymentDateRange = (value: string): TimeRange => {
+  const match: RegExpMatchArray | null = value.match(
+    /^(\d{4})-(\d{2})-(\d{2})$/
+  );
+  const start: Date = match
+    ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+    : new Date();
+  start.setHours(0, 0, 0, 0);
+
+  const end: Date = new Date(start);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
 };
 
 type GTDisplayStatus =
@@ -355,30 +376,33 @@ const InvoiceDetailsPage: React.FC = () => {
   // Debounced validation for internal reference
   const validateInternalRef = useCallback(
     async (ref: string, paymentId: number) => {
-      if (!ref) {
+      const normalizedReference = ref.trim();
+      if (!normalizedReference) {
         setRefValidation({
           isValidating: false,
-          isDuplicate: false,
-          message: "",
+          isDuplicate: true,
+          message: "Green Target reference number is required.",
         });
         return;
       }
       setRefValidation((prev) => ({ ...prev, isValidating: true }));
       try {
         const result = await greenTargetApi.checkInternalPaymentRef(
-          ref,
+          normalizedReference,
           paymentId
         );
         setRefValidation({
           isValidating: false,
           isDuplicate: result.exists,
-          message: result.exists ? "This reference is already in use." : "",
+          message: result.exists
+            ? "This Green Target reference is already in use."
+            : "",
         });
       } catch (error) {
         setRefValidation({
           isValidating: false,
           isDuplicate: true, // Assume invalid on error
-          message: "Could not validate reference.",
+          message: "Could not validate the Green Target reference.",
         });
       }
     },
@@ -386,17 +410,25 @@ const InvoiceDetailsPage: React.FC = () => {
   );
 
   useEffect(() => {
-    if (editingPaymentId && editedRefValue) {
+    if (editingPaymentId !== null) {
       const handler = setTimeout(() => {
         const originalPayment = payments.find(
           (p) => p.payment_id === editingPaymentId
         );
+        const normalizedReference = editedRefValue.trim();
         // Only validate if the value has changed
         if (
           originalPayment &&
-          originalPayment.internal_reference !== editedRefValue
+          (originalPayment.internal_reference || "").trim() !==
+            normalizedReference
         ) {
-          validateInternalRef(editedRefValue, editingPaymentId);
+          validateInternalRef(normalizedReference, editingPaymentId);
+        } else if (!normalizedReference) {
+          setRefValidation({
+            isValidating: false,
+            isDuplicate: true,
+            message: "Green Target reference number is required.",
+          });
         } else {
           // If value is same as original, it's not a duplicate of itself
           setRefValidation({
@@ -497,17 +529,26 @@ const InvoiceDetailsPage: React.FC = () => {
   };
 
   const handleSaveInternalRef = async (paymentId: number) => {
+    const normalizedReference = editedRefValue.trim();
+    if (!normalizedReference) {
+      toast.error("Green Target reference number is required.");
+      return;
+    }
+    if (normalizedReference.length > 50) {
+      toast.error("Green Target reference number cannot exceed 50 characters.");
+      return;
+    }
     if (refValidation.isDuplicate) {
-      toast.error("This reference number is already in use.");
+      toast.error("This Green Target reference number is already in use.");
       return;
     }
 
     setIsUpdatingPayment(true);
     try {
       await greenTargetApi.updatePayment(paymentId, {
-        internal_reference: editedRefValue,
+        internal_reference: normalizedReference,
       });
-      toast.success("Internal reference updated.");
+      toast.success("Green Target reference updated for the full receipt.");
       handleCancelEdit(); // Exit edit mode
       if (id) fetchInvoiceDetails(parseInt(id)); // Refresh data
     } catch (error: any) {
@@ -1074,11 +1115,19 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   };
 
-  // Specific handler for Listbox change
-  const handlePaymentMethodChange = (value: string) => {
-    setPaymentFormData((prev) => ({
+  const handlePaymentDateChange = (range: TimeRange): void => {
+    setPaymentFormData((prev: PaymentFormData): PaymentFormData => ({
       ...prev,
-      payment_method: value,
+      payment_date: format(range.start, "yyyy-MM-dd"),
+    }));
+  };
+
+  // Specific handler for Listbox change
+  const handlePaymentMethodChange = (value: string): void => {
+    setPaymentFormData((prev: PaymentFormData): PaymentFormData => ({
+      ...prev,
+      payment_method: value as GreenTargetPayment["payment_method"],
+      payment_reference: value === "cash" ? "" : prev.payment_reference,
     }));
   };
 
@@ -1088,8 +1137,16 @@ const InvoiceDetailsPage: React.FC = () => {
       return false;
     }
 
-    if (paymentFormData.amount_paid <= 0) {
-      toast.error("Payment amount must be greater than zero");
+    if (
+      paymentFormData.amount_paid < 0.01 ||
+      Math.abs(
+        paymentFormData.amount_paid * 100 -
+          Math.round(paymentFormData.amount_paid * 100)
+      ) > 0.0000001
+    ) {
+      toast.error(
+        "Payment amount must be at least RM0.01 and use no more than two decimal places"
+      );
       return false;
     }
 
@@ -1103,10 +1160,25 @@ const InvoiceDetailsPage: React.FC = () => {
       return false;
     }
 
+    if (!paymentFormData.internal_reference.trim()) {
+      toast.error("Green Target reference number is required");
+      return false;
+    }
+    if (paymentFormData.internal_reference.trim().length > 50) {
+      toast.error("Green Target reference number cannot exceed 50 characters");
+      return false;
+    }
+    if (paymentFormData.payment_reference.trim().length > 50) {
+      toast.error("Cheque / transaction reference cannot exceed 50 characters");
+      return false;
+    }
+
     return true;
   };
 
-  const handleSubmitPayment = async (e: React.FormEvent) => {
+  const handleSubmitPayment = async (
+    e: React.FormEvent<HTMLFormElement>
+  ): Promise<void> => {
     e.preventDefault();
 
     if (!validatePaymentForm() || !invoice) {
@@ -1116,53 +1188,13 @@ const InvoiceDetailsPage: React.FC = () => {
     setIsProcessingPayment(true);
 
     try {
-      // Fetch all payments to find unused reference numbers (including cancelled ones)
-      const allPayments = await greenTargetApi.getPayments({
-        includeCancelled: true,
-      });
-
-      // Get year and month from the INVOICE'S issued date, not payment date
-      const invoiceDate = new Date(invoice.date_issued);
-      const invoiceYear = invoiceDate.getFullYear().toString().slice(-2);
-      const invoiceMonth = (invoiceDate.getMonth() + 1)
-        .toString()
-        .padStart(2, "0");
-
-      // Regular expression to match the format RV{year}/{month}/{number}
-      const regex = new RegExp(`^RV${invoiceYear}/${invoiceMonth}/(\\d+)$`);
-
-      // Find the highest used number for the invoice month and year
-      // (including cancelled payments)
-      let highestNumber = 0;
-      allPayments.forEach(
-        (payment: { internal_reference: string | null; status?: string }) => {
-          // Handle potential null and consider ALL payments regardless of status
-          if (payment.internal_reference) {
-            const match = payment.internal_reference.match(regex);
-            if (match) {
-              const currentNumber = parseInt(match[1], 10);
-              if (currentNumber > highestNumber) {
-                highestNumber = currentNumber;
-              }
-            }
-          }
-        }
-      );
-
-      // Increment by 1 to get the next number
-      const nextNumber = highestNumber + 1;
-
-      // Format the reference number using invoice date's year/month
-      const paddedNumber = nextNumber.toString().padStart(2, "0");
-      const referenceNumber = `RV${invoiceYear}/${invoiceMonth}/${paddedNumber}`;
-
-      const paymentData = {
+      const paymentData: CreateGreenTargetPaymentInput = {
         invoice_id: invoice.invoice_id,
-        amount_paid: paymentFormData.amount_paid, // Use values from state
+        amount_paid: paymentFormData.amount_paid,
         payment_date: paymentFormData.payment_date,
         payment_method: paymentFormData.payment_method,
-        payment_reference: paymentFormData.payment_reference || null, // Ensure null if empty
-        internal_reference: referenceNumber,
+        payment_reference: paymentFormData.payment_reference.trim() || null,
+        internal_reference: paymentFormData.internal_reference.trim(),
       };
 
       await greenTargetApi.createPayment(paymentData);
@@ -1198,7 +1230,7 @@ const InvoiceDetailsPage: React.FC = () => {
       // Call the new cancelPayment method
       await greenTargetApi.cancelPayment(paymentToCancel.payment_id);
 
-      toast.success("Payment cancelled successfully");
+      toast.success("Receipt cancelled successfully");
 
       // Refresh the invoice details to update balances
       fetchInvoiceDetails(invoice.invoice_id);
@@ -1234,13 +1266,15 @@ const InvoiceDetailsPage: React.FC = () => {
     try {
       await greenTargetApi.confirmPayment(paymentToConfirm.payment_id);
 
-      toast.success("Payment confirmed successfully");
+      toast.success("Receipt confirmed successfully");
 
       // Refresh the invoice details to update balances
       fetchInvoiceDetails(invoice.invoice_id);
     } catch (error) {
       console.error("Error confirming payment:", error);
-      toast.error("Failed to confirm payment");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to confirm receipt"
+      );
     } finally {
       setIsConfirmingPayment(false);
       setShowConfirmPaymentDialog(false);
@@ -2158,21 +2192,39 @@ const InvoiceDetailsPage: React.FC = () => {
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
               {/* Payment Date Input */}
               <div className="space-y-2">
+                <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
+                  Date Received
+                </label>
+                <TimeNavigator
+                  range={getPaymentDateRange(paymentFormData.payment_date)}
+                  onChange={handlePaymentDateChange}
+                  modes={["day"]}
+                  presets={false}
+                  showArrows={false}
+                  allowFuture
+                  disabled={isProcessingPayment}
+                  className="flex w-full"
+                  triggerClassName="min-w-0 flex-1 justify-between"
+                />
+              </div>
+
+              <div className="space-y-2">
                 <label
-                  htmlFor="payment_date"
+                  htmlFor="internal_reference"
                   className="block text-sm font-medium text-default-700 dark:text-gray-200"
                 >
-                  Payment Date
+                  Green Target Reference No.
                 </label>
                 <input
-                  type="date"
-                  id="payment_date"
-                  name="payment_date"
-                  value={paymentFormData.payment_date}
+                  type="text"
+                  id="internal_reference"
+                  name="internal_reference"
+                  value={paymentFormData.internal_reference}
                   onChange={handlePaymentFormChange}
-                  required // Added required
+                  placeholder="e.g. RV26/06/62"
+                  maxLength={50}
+                  required
                   className={clsx(
-                    // Use clsx for consistency
                     "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
                     "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                   )}
@@ -2313,6 +2365,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     name="payment_reference"
                     value={paymentFormData.payment_reference}
                     onChange={handlePaymentFormChange}
+                    maxLength={50}
                     className={clsx(
                       // Use clsx for consistency
                       "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
@@ -2858,7 +2911,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 <thead className="bg-default-50 dark:bg-gray-900/50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                      Date
+                      Date Received
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                       Amount
@@ -2867,10 +2920,10 @@ const InvoiceDetailsPage: React.FC = () => {
                       Method
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                      Reference
+                      Cheque / Transaction Ref
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                      Internal Ref
+                      GT Reference No.
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                       Status
@@ -2933,6 +2986,7 @@ const InvoiceDetailsPage: React.FC = () => {
                               <input
                                 type="text"
                                 value={editedRefValue}
+                                maxLength={50}
                                 onChange={(e) =>
                                   setEditedRefValue(e.target.value)
                                 }
@@ -2980,7 +3034,7 @@ const InvoiceDetailsPage: React.FC = () => {
                               <button
                                 onClick={() => handleEditInternalRef(payment)}
                                 className="p-1 rounded-md text-default-500 dark:text-gray-400 hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 hover:text-sky-600 dark:hover:text-sky-400"
-                                title="Edit Internal Reference"
+                                title="Edit Green Target Reference No. for this receipt"
                               >
                                 <IconPencil size={14} />
                               </button>
@@ -3245,14 +3299,12 @@ const InvoiceDetailsPage: React.FC = () => {
         isOpen={isCancelPaymentDialogOpen}
         onClose={() => setIsCancelPaymentDialogOpen(false)}
         onConfirm={handleCancelPayment}
-        title="Cancel Payment"
-        message={`Are you sure you want to cancel this payment of ${
-          paymentToCancel
-            ? formatCurrency(parseFloat(paymentToCancel.amount_paid.toString()))
-            : ""
-        }? This will increase the invoice balance.`}
+        title="Cancel Receipt"
+        message={`Are you sure you want to cancel receipt ${
+          paymentToCancel?.internal_reference || "for this payment"
+        }? All payment allocations under this Green Target reference will be cancelled. Settled balances will be restored; pending balances stay unchanged.`}
         confirmButtonText={
-          isCancellingPayment ? "Cancelling..." : "Cancel Payment"
+          isCancellingPayment ? "Cancelling..." : "Cancel Receipt"
         }
         variant="danger"
       />
@@ -3277,18 +3329,12 @@ const InvoiceDetailsPage: React.FC = () => {
         isOpen={showConfirmPaymentDialog}
         onClose={() => setShowConfirmPaymentDialog(false)}
         onConfirm={handleConfirmPayment}
-        title="Confirm Payment"
-        message={`Are you sure you want to confirm this ${
-          paymentToConfirm?.payment_method === "cheque" ? "cheque" : ""
-        } payment of ${
-          paymentToConfirm
-            ? formatCurrency(
-                parseFloat(paymentToConfirm.amount_paid.toString())
-              )
-            : ""
-        }? This will update the invoice balance and mark the payment as active.`}
+        title="Confirm Receipt"
+        message={`Are you sure you want to confirm receipt ${
+          paymentToConfirm?.internal_reference || "for this payment"
+        }? All pending allocations under this Green Target reference will be confirmed and their invoice balances updated.`}
         confirmButtonText={
-          isConfirmingPayment ? "Confirming..." : "Confirm Payment"
+          isConfirmingPayment ? "Confirming..." : "Confirm Receipt"
         }
         variant="default"
       />

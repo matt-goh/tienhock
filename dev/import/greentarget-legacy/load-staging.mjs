@@ -10,7 +10,9 @@
  * user-approved DERIVED CD_SD rows - see build-import-staging.mjs for why they
  * exist and why the derivation is forced rather than chosen.
  *
- * Prerequisites, in order:
+ * Prerequisites, in order (the three migrations were removed from dev/migrations/
+ * after the 2026-07-28 production rollout - recover with
+ * `git show 50e63344:dev/migrations/<filename>`; see docs/MIGRATIONS_LOG.md):
  *   1. dev/migrations/2026-07-26_greentarget_accounting_foundation.sql   (G2)
  *   2. dev/migrations/2026-07-26_greentarget_chart_of_accounts.sql       (G3)
  *   3. dev/migrations/2026-07-27_greentarget_import_date_encoding.sql    (G4)

@@ -13,7 +13,8 @@
  *
  * Outputs (both deterministic - a rerun is byte-identical):
  *   generated/gt-chart-of-accounts.csv                       (gitignored)
- *   dev/migrations/2026-07-26_greentarget_chart_of_accounts.sql   (tracked)
+ *   dev/migrations/2026-07-26_greentarget_chart_of_accounts.sql   (recreated here on a rerun;
+ *     the 2026-07-28 original was removed after the G8 prod rollout - recover at commit 50e63344)
  *
  * Then prove it with:  node dev/import/greentarget-legacy/verify-chart.mjs
  *

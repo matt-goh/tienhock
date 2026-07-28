@@ -232,52 +232,41 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
 
   return (
     <div className="w-full">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Balance Sheet
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Statement of Financial Position as of the selected period
-        </p>
-      </div>
-
-      {/* Controls */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      {/* Header: period on the left, actions on the right */}
+      <div className="mb-4 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <MonthNavigator
             selectedMonth={selectedMonth}
             onChange={handleMonthChange}
+            size="sm"
           />
+        </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            {!isGT && <ReportSourceGuide report="balance_sheet" />}
+        {/* Actions */}
+        <div className="flex flex-wrap items-center gap-2">
+          {!isGT && <ReportSourceGuide report="balance_sheet" />}
 
-            <Button
-              onClick={fetchData}
-              variant="outline"
-              disabled={loading}
-              additionalClasses="flex-shrink-0"
-            >
-              <span className="flex items-center justify-center whitespace-nowrap">
-                <IconRefresh className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-                Refresh
-              </span>
-            </Button>
-
-            <Button
-              onClick={handlePrintPDF}
-              variant="filled"
-              color="sky"
-              disabled={exporting || (isGT ? !gtData : !data)}
-              additionalClasses="flex-shrink-0"
-            >
-              <span className="flex items-center justify-center whitespace-nowrap">
-                <IconPrinter className="h-4 w-4 mr-2" />
-                {exporting ? "Preparing..." : "Print PDF"}
-              </span>
-            </Button>
-          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            icon={IconRefresh}
+            iconSize={16}
+            onClick={fetchData}
+            disabled={loading}
+            title="Refresh"
+            additionalClasses={loading ? "[&_svg]:animate-spin" : ""}
+          />
+          <Button
+            size="sm"
+            variant="filled"
+            color="sky"
+            icon={IconPrinter}
+            iconSize={16}
+            onClick={handlePrintPDF}
+            disabled={exporting || (isGT ? !gtData : !data)}
+          >
+            {exporting ? "Preparing..." : "Print"}
+          </Button>
         </div>
       </div>
 

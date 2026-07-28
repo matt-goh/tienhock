@@ -566,10 +566,10 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
             (payment: {
               payment_date: any;
               payment_method: any;
-              payment_reference: string;
-              internal_reference: any;
+              payment_reference?: string | null;
+              internal_reference?: any;
               payment_id: any;
-              amount_paid: number;
+              amount_paid: number | string;
               invoice_id: any;
             }) => ({
               date: toLocalDateString(payment.payment_date),

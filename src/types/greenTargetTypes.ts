@@ -27,18 +27,58 @@ export interface GreenTargetInvoice {
 export interface GreenTargetPayment {
   payment_id: number;
   invoice_id: string | number;
+  invoice_number?: string;
   payment_date: string;
-  amount_paid: number;
+  amount_paid: number | string;
   payment_method: "cash" | "cheque" | "bank_transfer" | "online";
-  payment_reference?: string;
-  internal_reference?: string;
-  bank_account?: "CASH" | "BANK_PBB" | "BANK_ABB";
-  journal_entry_id?: number;
-  journal_reference_no?: string; // Reference number from associated journal entry (e.g., REC001/01)
-  notes?: string;
-  status?: "active" | "pending" | "cancelled" | "overpaid";
+  payment_reference?: string | null;
+  internal_reference?: string | null;
+  bank_account?: "PBB_1" | null;
+  journal_entry_id?: number | null;
+  journal_reference_no?: string | null;
+  notes?: string | null;
+  status?: "active" | "pending" | "cancelled" | null;
   customer_name?: string;
   customerid?: string;
   created_at?: string;
-  cancellation_date?: string;
+  cancellation_date?: string | null;
+}
+
+export interface GreenTargetPaymentAllocationInput {
+  invoice_id: number;
+  amount_paid: number;
+}
+
+export interface CreateGreenTargetPaymentInput {
+  invoice_id: number;
+  payment_date: string;
+  amount_paid: number;
+  payment_method: GreenTargetPayment["payment_method"];
+  payment_reference: string | null;
+  internal_reference: string;
+}
+
+export interface CreateGreenTargetPaymentBatchInput {
+  payment_date: string;
+  payment_method: GreenTargetPayment["payment_method"];
+  payment_reference: string | null;
+  internal_reference: string;
+  allocations: GreenTargetPaymentAllocationInput[];
+}
+
+export interface GreenTargetPaymentMutationResponse {
+  message: string;
+  payment: GreenTargetPayment;
+  payments?: GreenTargetPayment[];
+}
+
+export interface GreenTargetPaymentBatchResponse {
+  message: string;
+  payments: GreenTargetPayment[];
+}
+
+export interface GreenTargetPaymentReferenceAvailability {
+  available: boolean;
+  exists: boolean;
+  existing_id: number | null;
 }
