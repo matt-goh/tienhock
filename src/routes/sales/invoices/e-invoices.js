@@ -233,43 +233,28 @@ export default function (pool, config) {
         });
       }
 
-      // Returns-only bills (every line has zero sold/free quantity and at least
-      // one return) carry no sales value. MyInvois rejects them because each
-      // line goes out with quantity 0 and amount 0.00, so they are never
-      // submitted individually - the monthly consolidated e-Invoice covers them.
-      const returnsOnlyResult = await client.query(
+      // A bill totalling RM0.00 carries no sales value - whether it records
+      // returns, gives goods away free, or has no quantities at all. MyInvois
+      // rejects every one of them, so they are never submitted individually;
+      // the monthly consolidated e-Invoice covers them instead.
+      const zeroValueResult = await client.query(
         `SELECT i.id
            FROM invoices i
           WHERE i.id = ANY($1::varchar[])
-            AND EXISTS (
-              SELECT 1 FROM order_details ro
-               WHERE ro.invoiceid = i.id AND ro.issubtotal = false
-                 AND COALESCE(ro.returnproduct, 0) > 0
-            )
-            AND NOT EXISTS (
-              SELECT 1 FROM order_details ro
-               WHERE ro.invoiceid = i.id AND ro.issubtotal = false
-                 AND (
-                   COALESCE(ro.quantity, 0) > 0
-                   OR COALESCE(ro.freeproduct, 0) > 0
-                   -- 'OTH'/'LESS' lines carry their value in the price with no
-                   -- quantity, so a bill holding one is a real sale
-                   OR (ro.code IN ('OTH', 'LESS') AND COALESCE(ro.price, 0) <> 0)
-                 )
-            )
+            AND COALESCE(i.totalamountpayable, 0) = 0
           ORDER BY i.id`,
         [lockInvoiceIds]
       );
 
-      if (returnsOnlyResult.rows.length > 0) {
+      if (zeroValueResult.rows.length > 0) {
         await client.query("COMMIT");
         transactionStarted = false;
         return res.status(409).json({
           success: false,
-          code: "RETURNS_ONLY_INVOICES",
+          code: "ZERO_VALUE_INVOICES",
           message:
-            "One or more invoices only record returned products and have no sales value, so they cannot be submitted as individual e-Invoices. They are covered by the monthly consolidated e-Invoice instead.",
-          invoices: returnsOnlyResult.rows.map((row) => ({ id: row.id })),
+            "One or more bills total RM0.00 and have no sales value, so they cannot be submitted as individual e-Invoices. They are covered by the monthly consolidated e-Invoice instead.",
+          invoices: zeroValueResult.rows.map((row) => ({ id: row.id })),
           overallStatus: "Invalid",
         });
       }

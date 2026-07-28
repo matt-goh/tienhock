@@ -24,6 +24,7 @@ import { useCompany } from "../../contexts/CompanyContext";
 import {
   getInvoiceDisplayStatus,
   getInvoiceDisplayStatusLabel,
+  isZeroValueBill,
 } from "../../utils/invoice/invoiceDisplayStatus";
 import type { InvoiceDisplayStatus } from "../../utils/invoice/invoiceDisplayStatus";
 
@@ -158,6 +159,8 @@ const getInvoiceStatusStyles = (
         label: getInvoiceDisplayStatusLabel(status as InvoiceDisplayStatus),
       };
     case "returns_only":
+    case "free_goods":
+    case "zero_value":
       return {
         bg: "bg-slate-100 dark:bg-slate-700/40",
         text: "text-slate-700 dark:text-slate-300",
@@ -199,13 +202,13 @@ const getInvoiceStatusStyles = (
 // Helper to get e-invoice status styles and icon
 const getEInvoiceStatusInfo = (
   status: EInvoiceStatus,
-  isReturnsOnly: boolean
+  isZeroValue: boolean
 ): EInvoiceStatusStyle | null => {
-  // Returns-only bills carry no sales value, so a rejected/pending submission
-  // is expected noise rather than something the user must act on.
-  if (isReturnsOnly && (status === "invalid" || status === "pending")) {
+  // RM0.00 bills carry no sales value, so a rejected/pending submission is
+  // expected noise rather than something the user must act on.
+  if (isZeroValue && (status === "invalid" || status === "pending")) {
     return {
-      text: "Not Applicable (returns only)",
+      text: "Not Applicable (no sales value)",
       label: "e-Invoice: N/A",
       color: "text-default-500 dark:text-gray-400",
       icon: IconMinus,
@@ -274,10 +277,10 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
   );
   const invoiceStatusStyle: InvoiceStatusStyle =
     getInvoiceStatusStyles(invoiceDisplayStatus);
-  const isReturnsOnly: boolean = invoiceDisplayStatus === "returns_only";
+  const isZeroValue: boolean = isZeroValueBill(invoice);
   const eInvoiceStatusInfo = getEInvoiceStatusInfo(
     invoice.einvoice_status,
-    isReturnsOnly
+    isZeroValue
   );
   const EInvoiceIcon = eInvoiceStatusInfo?.icon;
   const consolidatedStatusInfo = getConsolidatedStatusInfo(
