@@ -293,6 +293,20 @@ const createTodayClearanceRange = (): TimeRange => {
   return { start: today, end: today };
 };
 
+const getPaymentDateRange = (value: string): TimeRange => {
+  const match: RegExpMatchArray | null = value.match(
+    /^(\d{4})-(\d{2})-(\d{2})$/
+  );
+  const start: Date = match
+    ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+    : new Date();
+  start.setHours(0, 0, 0, 0);
+
+  const end: Date = new Date(start);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+};
+
 const InvoiceDetailsPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -1208,6 +1222,13 @@ const InvoiceDetailsPage: React.FC = () => {
     setPaymentFormData((prev) => ({
       ...prev,
       [name]: type === "number" ? parseFloat(value) || 0 : value,
+    }));
+  };
+
+  const handlePaymentDateChange = (range: TimeRange): void => {
+    setPaymentFormData((prev) => ({
+      ...prev,
+      payment_date: format(range.start, "yyyy-MM-dd"),
     }));
   };
 
@@ -2155,14 +2176,22 @@ const InvoiceDetailsPage: React.FC = () => {
               <form onSubmit={handleSubmitPayment} className="space-y-4">
                 {/* Row 1: Date and Amount */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <FormInput
-                    name="payment_date"
-                    label="Payment Date"
-                    type="date"
-                    value={paymentFormData.payment_date}
-                    onChange={handlePaymentFormChange}
-                    disabled={isProcessingPayment}
-                  />
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                      Payment Date
+                    </label>
+                    <TimeNavigator
+                      range={getPaymentDateRange(paymentFormData.payment_date)}
+                      onChange={handlePaymentDateChange}
+                      modes={["day"]}
+                      presets={false}
+                      showArrows={false}
+                      allowFuture
+                      disabled={isProcessingPayment}
+                      className="flex w-full"
+                      triggerClassName="min-w-0 flex-1 justify-between"
+                    />
+                  </div>
                   <FormInput
                     name="amount_paid"
                     label="Amount Paid (RM)"

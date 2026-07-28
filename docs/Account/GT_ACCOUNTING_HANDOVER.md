@@ -1,7 +1,7 @@
 # Green Target Accounting — Build-Out & Legacy Jan–Jun 2026 Import (Handover Plan)
 
-**Created 25 Jul 2026. Status: PHASES G0, G1, G2, G3, G4, G5, G6 and G7 COMPLETE (G4 and G5 on 27 Jul
-2026, G6 and G7 on 28 Jul 2026) —
+**Created 25 Jul 2026. Status: PHASES G0–G8 COMPLETE — LIVE IN PRODUCTION since 28 Jul 2026 (G4 and G5 on 27 Jul
+2026, G6 and G7 on 28 Jul 2026, G8 production rollout 28 Jul night — record in §10f) —
 see the execution records in §9. Source intake and the staging pipeline exist and pass every gate; all
 66 scan pages are transcribed and validated; the `greentarget` accounting tables, the 34-note GT
 catalogue and the 503-account chart of accounts are all loaded; **the Jan–Jun 2026 legacy ledger is
@@ -21,8 +21,9 @@ at the imported ledger (June 2026 total RM156,782.22). G7 enabled journal mainte
 and providing no delete workflow. **G7 shipped organic posting: GT
 invoices, payments and adjustments dated on/after 2026-07-01 now own balanced journals in the
 `greentarget` schema, manual journals are keyed from the shared Journal pages, and the R8 posting
-lock rejects every pre-July GT mutation with 409. The bridge §5 process decision was made: enter
-everything in the ERP.** The one outstanding input across the whole project is still the user
+lock protects every pre-July accounting mutation. The 29 Jul payment-entry follow-up deliberately
+allows non-posting payment-history rows against pre-cutover invoices; it never changes the imported
+ledger. The bridge §5 process decision was made: enter everything in the ERP.** The one outstanding input across the whole project is still the user
 approval of `debtor-map.json` (both mappings stay unapproved; every organic receivable falls back to
 `CD_SD` until then). ⚠ **The dev database was then replaced with production data,
 which removed every GT accounting row G2/G3/G4 created — see §10 for what survives and how to rebuild
@@ -1318,9 +1319,10 @@ the GT IS/BS PDF print output against the scans (data path verified; visual chec
 **Green Target now posts its own journals.** Every GT invoice, payment and adjustment dated on/after
 **2026-07-01** owns a balanced journal in the `greentarget` schema, synced from the operational
 lifecycle; manual journals are created/edited/cancelled/restored from the shared Journal pages; and a
-hard posting lock (R8) rejects **every** GT mutation dated before 2026-07-01 with HTTP 409
-(`ACCOUNTING_PERIOD_LOCKED`). The Jan–Jun import stays immutable — proven by all three harnesses,
-re-pinned to the legacy subset and green. Changelog entry shipped (rule 16).
+hard posting lock (R8) rejects every GT **accounting** mutation dated before 2026-07-01 with HTTP
+409 (`ACCOUNTING_PERIOD_LOCKED`). The narrow exception is a non-posting historical payment-history
+entry described below; it cannot alter the ledger. The Jan–Jun import stays immutable — proven by
+all three harnesses, re-pinned to the legacy subset and green. Changelog entry shipped (rule 16).
 
 #### The two pre-G7 decisions, settled
 
@@ -1353,12 +1355,15 @@ backfill itself:** invoice `2026/01012`'s rental is tong `B17` → `TGB`; `2026/
 the imported one), falling back to the rule above.
 
 **Cutover / straddle rules.** Invoice create/update/cancel/delete dated before the open date → 409.
-A payment posts a journal **only when its owning invoice is dated on/after the open date** — a
-pre-cutover invoice's money already lives in the immutable import, so an organic receipt would
-double it (the operational balance update still proceeds). Pending cheques post nothing until
-confirmed; the journal then dates to `payment_date`. **The lock is stricter than Tien Hock's**: it
-guards ALL GT mutations including hand-keyed journals, per the G7 gate "pre-1-Jul mutations return
-409". `posting_sequence` for organic journals is MAX+1 within the entry month, keeping the dense
+A payment posts a journal whenever its **Date Received is on/after 2026-07-01**, including when it
+settles an older invoice. A Date Received before the cutover is accepted only when every allocated
+invoice is also pre-cutover; that row is operational history only and posts no journal, so it cannot
+alter the locked ledger. Pending cheques post nothing until the full receipt is confirmed; each
+allocation journal then dates to `payment_date`. **The lock is stricter than Tien Hock's**: it guards
+all GT **accounting** mutations including hand-keyed journals. The historical exception exists only
+for the non-posting path; the imported books and opening activity remain authoritative without
+claiming that every operational payment has a one-to-one imported receipt.
+`posting_sequence` for organic journals is MAX+1 within the entry month, keeping the dense
 1..N invariant the ledger's (month, sequence, display_order) ordering relies on.
 
 **System journals detach exactly like TH**: hand-editing an S/REC/CN/DN/RN journal (or any journal
@@ -1561,6 +1566,11 @@ Prerequisite: `greentarget-legacy/generated/` must be populated. It survived the
 is ever empty, `node dev/import/greentarget-legacy/prepare-staging.mjs` regenerates it from the
 workbooks.
 
+**The migration `.sql` files referenced below were removed from `dev/migrations/` after the G8
+production rollout (2026-07-28) — recover any of them with
+`git show 50e63344:dev/migrations/<filename>` (see docs/MIGRATIONS_LOG.md, "Removed 28 Jul 2026
+(third batch)").**
+
 ```bash
 # 1. G2 — schema, lookups, the 34-note catalogue        (baseline-independent, applies as-is)
 docker exec -i tienhock_dev_db psql -U postgres -d tienhock -v ON_ERROR_STOP=1 \
@@ -1594,10 +1604,9 @@ nothing about the GT ledger needs to be taken on trust after the swap.
 - **G6 (frontend) is unaffected** as a code task, but it cannot be tested end-to-end until the rebuild
   is done — the GT routes will return empty or error against a database with no `greentarget`
   accounting tables.
-- **G8 (production cutover) is unchanged and still owns applying these migrations to production.**
-  Note that `.github/workflows/deploy.yml` does **not** run migrations: merging the GT branch to
-  `production` ships the read-only routes only. Nothing calls them until G6, so there is no user
-  impact, but any direct call would error until G8 applies the schema.
+- **G8 (production cutover) is DONE — see §10f.** Every migration reached `tienhock_prod` on
+  2026-07-28 and all four verifiers passed there. `.github/workflows/deploy.yml` still does **not**
+  run migrations: any future GT migration needs the same manual prod apply.
 
 ### 10e. Second refresh + measured re-baseline (28 Jul 2026, G8 rehearsal)
 
@@ -1630,6 +1639,85 @@ frozen June five-ledger fingerprint — all five account aggregates (lines/zeroL
 byte-identical to the frozen V2 expectation and the IMP projection/checkpoints/statements are exact;
 only the content hash moved, consistent with today's legitimate prod metadata changes (the 2991
 restore). Re-pinning that hash is a TH-side decision, not a GT signal.
+
+### 10f. Phase G8 — production rollout — ✅ COMPLETE (28 Jul 2026, ~23:00–24:00 KL)
+
+Everything §10e rehearsed was applied to `tienhock_prod` on the Hetzner server the same night,
+after a BackupModal safety backup and with the office offline. G2/G3 were NOT re-run (they were
+already live since 27 Jul 15:18 and G2's data-tables-empty guard would have aborted by design).
+Apply order and results — every number identical to the rehearsal:
+
+1. `2026-07-27_greentarget_import_date_encoding.sql` → `G4 date_encoding OK` (the TH-baseline guard
+   passing here confirmed prod was still at 2,827 / 8,238 / 33).
+2. `load-staging.mjs` → staging CSV sha256 `6e42b830…` validated, COPY 4,903, same summary table.
+3. `post-monthly-journals.sql` × 6 → 1,705 journals / 4,401 lines.
+4. `2026-07-27_greentarget_opening_anchors.sql` → 501 anchors summing to exactly 0.00.
+5. `2026-07-28_greentarget_g7_organic_posting.sql`.
+6. `backfill-g7-organic.mjs` → journals 1706/1707/1708 (invoice 325 `2026/01012` RM200 S,
+   invoice 326 `2026/01014` RM250 S, payment 197 `RV26/07/01` RM250 REC), balanced, back-linked,
+   `posting_sequence` 1–3 — the same three pre-G7 documents as dev.
+7. All four verifiers green: `verify-import.sql` **G4 VERIFY OK** (six month-ends exact),
+   `verify-chart.mjs` **59 gates**, `verify-import.mjs` **64 gates + 2,850 comparisons**,
+   `verify-legacy-reports.mjs` **ALL STAGES GREEN (123 gates)** — including the Tien Hock
+   isolation gates (2,827 / 8,238 / 33 unmoved).
+
+**Three server-environment gotchas, now documented so the next rollout doesn't rediscover them:**
+(a) `verify-chart.mjs` and `verify-import.mjs` were docker-only; they were patched with the same
+`GT_IMPORT_DB_MODE=direct` support `load-staging.mjs` already had (default unchanged = dev docker,
+re-verified locally after the patch). (b) The gitignored inputs the verifiers read —
+`generated/validation-report.json` and `greentarget-report-fixtures/data/*.csv` — are not in the
+repo and had to be scp'd to the server. (c) The `postgres` user could not traverse
+`/home/tienhock` until `chmod o+x ~` and `chmod -R a+rX ~/tienhock-app` were applied (scp-created
+directories come down `750`).
+
+**Live spot-check passed:** GT Trial Balance 06/2026 (2,896,808.53 balanced, DEBTOR 156,782.22),
+CD_SD ledger June close 65,705.40, GT Debtors report 156,782.22 with ledger deep-links, and the TH
+Estimated P&L June values (PU_BBER 130,631.40 / CS_BBER 194,663.40, the verifier-pinned figures —
+the estimated parity fixes were applied to prod in the same window, see
+ESTIMATED_REPORT_HANDOVER.md §5). The GT ledger in production is now live and authoritative;
+the only outstanding GT input remains the unapproved `debtor-map.json` (receivables fall back to
+`CD_SD` until the user approves mappings).
+
+### 10g. Payment received entry follow-up — COMPLETE (29 Jul 2026)
+
+The Green Target Payments page now follows the supplied legacy `CASH RECEIVED ENTRY` workflow:
+the user keys one **Date Received**, one **Green Target Reference No.** (for example
+`RV26/06/62`), one method and an optional cheque/transaction reference, then allocates that receipt
+to one or more selected invoices. The whole submission is one database transaction — either every
+invoice payment and balance update succeeds, or none does. All allocation rows share the keyed GT
+reference, so the list renders one receipt header with the invoice lines underneath. The invoice
+details page uses the same manual-reference rule; the old invoice-month RV auto-generator is gone.
+
+This follow-up deliberately adds **no table or column**. `greentarget.payments` remains one row per
+invoice allocation; the shared `internal_reference`, received date and method identify the visible
+receipt, while hidden `REC-{payment_id}` values remain unique per organic journal. Editing the GT
+reference, confirming a pending cheque, or cancelling from any allocation now updates the full
+receipt atomically, so it cannot split into partially confirmed/cancelled invoice lines.
+`payment_reference` keeps its separate meaning: cheque number or bank/online transaction reference,
+never the Green Target RV number.
+
+Accounting behaviour is intentionally split at the existing cutover boundary:
+
+- A receipt received on/after 2026-07-01 keeps G7 intact: every active allocation posts its balanced
+  REC journal (DR `PBB_1` / CR receivable), even when it settles a pre-cutover invoice. A cheque
+  posts every allocation when the receipt is confirmed.
+- A receipt received before 2026-07-01 is accepted only when every selected invoice is also
+  pre-cutover. It updates operational payment history and invoice balances but posts no journal;
+  create/confirm/cancel bypasses R8 only for this non-posting path, while every pre-cutover
+  accounting mutation remains locked. A received date cannot precede any selected invoice date.
+- Amounts must be at least RM0.01 with no more than two decimal places. GT references are trimmed,
+  limited to 50 characters, checked case-insensitively and remain reserved after cancellation so two
+  receipt histories can never merge.
+
+**Files:** `src/routes/greentarget/payments.js`,
+`src/routes/greentarget/accounting/payment-journal.js`, `src/routes/greentarget/api.ts`,
+`src/types/greenTargetTypes.ts`, `src/components/GreenTarget/GreenTargetPaymentForm.tsx`,
+`src/components/GreenTarget/GreenTargetPaymentTable.tsx`,
+`src/pages/GreenTarget/Payments/GreenTargetPaymentPage.tsx`,
+`src/pages/GreenTarget/Invoices/InvoiceDetailsPage.tsx`,
+`src/pages/GreenTarget/Invoices/InvoiceFormPage.tsx`,
+`dev/import/greentarget-report-fixtures/verify-legacy-reports.mjs`, AGENTS/CLAUDE guidance, and the
+29 Jul changelog entry.
 
 ---
 

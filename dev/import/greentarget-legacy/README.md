@@ -34,6 +34,11 @@ node dev/import/greentarget-legacy/verify-import.mjs                    # G4: st
 
 ## G4 runbook — the order matters
 
+> The two `dev/migrations/2026-07-27_greentarget_*.sql` files below were removed from the tree
+> after the 2026-07-28 production rollout — recover them with
+> `git show 50e63344:dev/migrations/<filename>` (docs/MIGRATIONS_LOG.md, "Removed 28 Jul 2026
+> (third batch)"). `build-import-staging.mjs` also regenerates the anchors migration.
+
 ```
 # 1. schema: the date_encoding provenance column
 docker exec -i tienhock_dev_db psql -U postgres -d tienhock -v ON_ERROR_STOP=1 \

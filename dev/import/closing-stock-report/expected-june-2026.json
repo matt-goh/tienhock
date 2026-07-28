@@ -240,7 +240,7 @@
     }
   },
   "data_issues_confirmed": [
-    "CORRECTED IN DEV 2026-07-28: journal 000199 PU_BBER/CR_PN now records 40,500.00 per particulars '300BAG XRM135'; production application remains pending",
+    "CORRECTED IN DEV AND PRODUCTION 2026-07-28: journal 000199 PU_BBER/CR_PN now records 40,500.00 per particulars '300BAG XRM135'",
     "PU_MSD 540.00 is legacy-only and permanently 0.00 in our data - the material is discontinued for Mee and no purchase exists (Q11, answered 2026-07-25). Never treat it as missing data",
     "MRET/BRET are derived sales returns (returnproduct x invoice-line price), not journals. June: MEE 1,517.80 vs printed 1,519.10, BIHUN 268.30 vs printed 265.10 - genuine source deltas, unaffected by the month window",
     "SUPERSEDED 2026-07-25 (Phase 2): the '1-MNL +20 bags/+146.00' and '2-BCM3 +205 bags/+3,499.00' sales deltas were an artefact of deriving the invoice month from the UTC calendar date, which pulls in 2026-07-01 00:00-08:00 KL. With the correct Asia/Kuala_Lumpur epoch-ms window both products, and both product-line sales totals, match the print to the cent. The print was right",

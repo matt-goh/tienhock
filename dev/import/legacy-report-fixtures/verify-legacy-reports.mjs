@@ -642,7 +642,11 @@ function stageTb() {
 // change. These are portable semantic checks (no database IDs in fingerprints).
 const V2_EXPECTED_JUNE_CHECKPOINT_FINGERPRINT = "147c022cef7b4a4c90735718860a60eb";
 const V2_EXPECTED_IMP_ACCOUNTING_FINGERPRINT = "9c0d5c6b141af5d102f5a31c590f6f82";
-const V2_EXPECTED_JUNE_FIVE_LEDGER_FINGERPRINT = "c27dbd5a5db93bf08823ae4e0f22cad4";
+// Re-pinned 2026-07-28 from c27dbd5a5db93bf08823ae4e0f22cad4: the restore of
+// sales journal 2991 (invoice 015375, VIVIANA, RM34.00, DR VIVIANA / CR
+// CR_SALES — CR_SALES is one of the five accounts) legitimately moved the
+// content hash while every aggregate below stayed byte-identical.
+const V2_EXPECTED_JUNE_FIVE_LEDGER_FINGERPRINT = "3ad61192db058b1246ace1a20c2e073a";
 const V2_EXPECTED_LEGACY_TYPES = {
   S: 2121, PUR: 83, B: 383, C: 45, RV: 410,
   REC: 758, J: 53, JVDR: 5, JVSL: 5,

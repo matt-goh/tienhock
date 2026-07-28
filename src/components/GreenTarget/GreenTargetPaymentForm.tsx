@@ -4,6 +4,7 @@ import { IconTrash, IconX } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import { greenTargetApi } from "../../routes/greentarget/api";
 import {
+  CreateGreenTargetPaymentBatchInput,
   GreenTargetInvoice,
   GreenTargetPayment,
 } from "../../types/greenTargetTypes";
@@ -15,7 +16,7 @@ import GreenTargetInvoiceSelectionTable from "./GreenTargetInvoiceSelectionTable
 interface GreenTargetPaymentFormProps {
   payment: GreenTargetPayment | null;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (paymentDate: string) => void;
   dateRange: {
     start: Date | null;
     end: Date | null;
@@ -30,6 +31,7 @@ interface InvoicePaymentAllocation {
 interface PaymentFormData {
   payment_date: string;
   payment_method: GreenTargetPayment["payment_method"];
+  internal_reference: string;
   payment_reference: string;
 }
 
@@ -111,7 +113,8 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
 
   const [formData, setFormData] = useState<PaymentFormData>({
     payment_date: format(new Date(), "yyyy-MM-dd"),
-    payment_method: "cheque",
+    payment_method: "cash",
+    internal_reference: "",
     payment_reference: "",
   });
 
@@ -191,75 +194,25 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
       amountToPay > Number(invoice.current_balance)
   );
 
-  const generateInternalReference = async (
-    invoiceDateValue: string
-  ): Promise<string> => {
-    const paymentsResponse: unknown = await greenTargetApi.getPayments({
-      includeCancelled: true,
-    });
-    const allPayments: GreenTargetPayment[] = Array.isArray(paymentsResponse)
-      ? (paymentsResponse as GreenTargetPayment[])
-      : [];
-    const dateMatch: RegExpMatchArray | null = invoiceDateValue.match(
-      /^(\d{4})-(\d{2})/
-    );
-    const parsedDate: Date = new Date(invoiceDateValue);
-
-    if (!dateMatch && Number.isNaN(parsedDate.getTime())) {
-      throw new Error("The selected invoice has an invalid issue date.");
-    }
-
-    const invoiceYear: string = dateMatch
-      ? dateMatch[1].slice(-2)
-      : parsedDate.getFullYear().toString().slice(-2);
-    const invoiceMonth: string = dateMatch
-      ? dateMatch[2]
-      : (parsedDate.getMonth() + 1).toString().padStart(2, "0");
-    const referencePattern: RegExp = new RegExp(
-      `^RV${invoiceYear}/${invoiceMonth}/(\\d+)$`
-    );
-    let highestNumber: number = 0;
-
-    allPayments.forEach((existingPayment: GreenTargetPayment): void => {
-      if (!existingPayment.internal_reference) {
-        return;
-      }
-
-      const referenceMatch: RegExpMatchArray | null =
-        existingPayment.internal_reference.match(referencePattern);
-      if (referenceMatch) {
-        highestNumber = Math.max(
-          highestNumber,
-          Number.parseInt(referenceMatch[1], 10)
-        );
-      }
-    });
-
-    return `RV${invoiceYear}/${invoiceMonth}/${(highestNumber + 1)
-      .toString()
-      .padStart(2, "0")}`;
-  };
-
   const processPayments = async (): Promise<void> => {
     setIsSubmitting(true);
     const toastId: string = toast.loading("Processing payment...");
 
     try {
       const paymentReference: string = formData.payment_reference.trim();
-
-      for (const allocation of selectedInvoices) {
-        const internalReference: string = await generateInternalReference(
-          allocation.invoice.date_issued
-        );
-        await greenTargetApi.createPayment({
-          invoice_id: allocation.invoice.invoice_id,
-          payment_date: formData.payment_date,
-          amount_paid: allocation.amountToPay,
-          payment_method: formData.payment_method,
-          payment_reference: paymentReference || null,
-          internal_reference: internalReference,
-        });
-      }
+      const paymentData: CreateGreenTargetPaymentBatchInput = {
+        payment_date: formData.payment_date,
+        payment_method: formData.payment_method,
+        payment_reference: paymentReference || null,
+        internal_reference: formData.internal_reference.trim(),
+        allocations: selectedInvoices.map(
+          ({ invoice, amountToPay }: InvoicePaymentAllocation) => ({
+            invoice_id: invoice.invoice_id,
+            amount_paid: amountToPay,
+          })
+        ),
+      };
+      await greenTargetApi.createPaymentBatch(paymentData);
 
       toast.success(
         selectedInvoices.length === 1
@@ -267,7 +220,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
           : `Payments recorded for ${selectedInvoices.length} invoices`,
         { id: toastId, duration: 6000 }
       );
-      onSuccess();
+      onSuccess(formData.payment_date);
     } catch (error: unknown) {
       console.error("Error creating payment:", error);
       toast.error(getApiErrorMessage(error), { id: toastId });
@@ -295,6 +248,8 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
         ({ invoice, amountToPay }: InvoicePaymentAllocation): boolean =>
           !Number.isFinite(amountToPay) ||
           amountToPay <= 0 ||
+          Math.abs(amountToPay * 100 - Math.round(amountToPay * 100)) >
+            0.0000001 ||
           amountToPay > Number(invoice.current_balance)
       );
 
@@ -310,17 +265,22 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
         );
       } else {
         toast.error(
-          `Enter a payment amount greater than RM0 for invoice ${invalidAllocation.invoice.invoice_number}`
+          `Enter a payment amount of at least RM0.01 using no more than two decimal places for invoice ${invalidAllocation.invoice.invoice_number}`
         );
       }
       return;
     }
 
-    if (
-      !formData.payment_reference.trim() &&
-      selectedInvoices.length > 1
-    ) {
-      toast.error("Payment reference is required for multiple invoice payments");
+    if (!formData.internal_reference.trim()) {
+      toast.error("Green Target reference number is required");
+      return;
+    }
+    if (formData.internal_reference.trim().length > 50) {
+      toast.error("Green Target reference number cannot exceed 50 characters");
+      return;
+    }
+    if (formData.payment_reference.trim().length > 50) {
+      toast.error("Cheque / transaction reference cannot exceed 50 characters");
       return;
     }
 
@@ -444,7 +404,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                 <div className="space-y-4 p-4">
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">
-                      Payment Date <span className="text-red-500">*</span>
+                      Date Received <span className="text-red-500">*</span>
                     </label>
                     <TimeNavigator
                       range={paymentDateRange}
@@ -457,6 +417,24 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                       triggerClassName="min-w-0 flex-1 justify-between"
                     />
                   </div>
+                  <FormInput
+                    name="internal_reference"
+                    label="Green Target Reference No."
+                    placeholder="e.g. RV26/06/62"
+                    value={formData.internal_reference}
+                    onChange={(
+                      event: React.ChangeEvent<HTMLInputElement>
+                    ): void =>
+                      setFormData(
+                        (currentFormData: PaymentFormData): PaymentFormData => ({
+                          ...currentFormData,
+                          internal_reference: event.target.value,
+                        })
+                      )
+                    }
+                    disabled={isSubmitting}
+                    required
+                  />
                   <FormListbox
                     name="payment_method"
                     label="Payment Method"
@@ -467,42 +445,47 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                           ...currentFormData,
                           payment_method:
                             value as GreenTargetPayment["payment_method"],
+                          payment_reference:
+                            value === "cash"
+                              ? ""
+                              : currentFormData.payment_reference,
                         })
                       )
                     }
                     options={paymentMethodOptions}
                     disabled={isSubmitting}
                   />
-                  <FormInput
-                    name="payment_reference"
-                    label={`Payment Reference ${
-                      selectedInvoices.length > 1
-                        ? "(Required)"
-                        : "(Optional)"
-                    }`}
-                    placeholder={
-                      formData.payment_method === "cheque"
-                        ? "Cheque number"
-                        : formData.payment_method === "bank_transfer"
-                        ? "Transaction reference"
-                        : formData.payment_method === "online"
-                        ? "Transaction ID"
-                        : "Reference number"
-                    }
-                    value={formData.payment_reference}
-                    onChange={(
-                      event: React.ChangeEvent<HTMLInputElement>
-                    ): void =>
-                      setFormData(
-                        (currentFormData: PaymentFormData): PaymentFormData => ({
-                          ...currentFormData,
-                          payment_reference: event.target.value,
-                        })
-                      )
-                    }
-                    disabled={isSubmitting}
-                    required={selectedInvoices.length > 1}
-                  />
+                  {formData.payment_method !== "cash" && (
+                    <FormInput
+                      name="payment_reference"
+                      label={
+                        formData.payment_method === "cheque"
+                          ? "Cheque No. (Optional)"
+                          : "Transaction Reference (Optional)"
+                      }
+                      placeholder={
+                        formData.payment_method === "cheque"
+                          ? "Cheque number"
+                          : formData.payment_method === "online"
+                          ? "Transaction ID"
+                          : "Transaction reference"
+                      }
+                      value={formData.payment_reference}
+                      onChange={(
+                        event: React.ChangeEvent<HTMLInputElement>
+                      ): void =>
+                        setFormData(
+                          (
+                            currentFormData: PaymentFormData
+                          ): PaymentFormData => ({
+                            ...currentFormData,
+                            payment_reference: event.target.value,
+                          })
+                        )
+                      }
+                      disabled={isSubmitting}
+                    />
+                  )}
                 </div>
               </section>
 

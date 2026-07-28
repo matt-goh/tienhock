@@ -116,6 +116,7 @@ import createGreenTargetAccountCodesRouter, {
   createGreenTargetLedgerTypesRouter,
 } from "./greentarget/accounting/account-codes.js";
 import createGreenTargetDebtorsRouter from "./greentarget/accounting/debtors.js";
+import greenTargetJournalVouchersRouter from "./greentarget/accounting/journal-vouchers.js";
 
 // Jellypolly routes
 import jellypollyInvoiceRouter from "./jellypolly/invoices.js";
@@ -380,6 +381,14 @@ export default function setupRoutes(app, pool) {
   app.use(
     "/greentarget/api/debtors",
     createGreenTargetDebtorsRouter(pool)
+  );
+  // GT salary Voucher Generator (JBSL/JWDR). Mutates the GT books, so it sits
+  // behind the same session auth + restore guard as the journal-entries mount.
+  app.use(
+    "/greentarget/api/journal-vouchers",
+    authMiddleware(pool),
+    checkRestoreState,
+    greenTargetJournalVouchersRouter(pool)
   );
 
   // Jellypolly routes
