@@ -1,13 +1,22 @@
 // src/pages/Accounting/Reports/TrialBalancePage.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { Fragment, useState, useEffect, useCallback } from "react";
+import {
+  Listbox,
+  ListboxButton,
+  ListboxOption,
+  ListboxOptions,
+  Transition,
+} from "@headlessui/react";
 import {
   IconPrinter,
   IconRefresh,
   IconFilter,
   IconSearch,
   IconCheck,
+  IconChevronDown,
   IconX,
 } from "@tabler/icons-react";
+import clsx from "clsx";
 import MonthNavigator from "../../../components/MonthNavigator";
 import Button from "../../../components/Button";
 import Checkbox from "../../../components/Checkbox";
@@ -69,6 +78,14 @@ const LEDGER_TYPE_LABELS: Record<string, string> = {
   TC: "Trade Creditor",
   TD: "Trade Debtor",
 };
+
+const ledgerTypeOptions: { value: string; label: string }[] = [
+  { value: "", label: "All Ledger Types" },
+  ...Object.entries(LEDGER_TYPE_LABELS).map(([code, label]) => ({
+    value: code,
+    label: `${label} (${code})`,
+  })),
+];
 
 export interface TrialBalancePageProps {
   company?: "tienhock" | "greentarget";
@@ -213,95 +230,123 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
 
   return (
     <div className="w-full">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Trial Balance
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          View account balances for the selected period
-        </p>
-      </div>
-
-      {/* Controls */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* Month Navigator */}
+      {/* Header: period + filters on the left, actions on the right */}
+      <div className="mb-4 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <MonthNavigator
             selectedMonth={selectedMonth}
             onChange={handleMonthChange}
+            size="sm"
           />
 
-          {/* Filters and Actions */}
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Search */}
-            <div className="relative">
-              <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search code or description..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 pr-4 py-2 w-64 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-900/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Ledger Type Filter */}
-            <div className="relative">
-              <IconFilter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <select
-                value={selectedLedgerType}
-                onChange={(e) => handleLedgerTypeChange(e.target.value)}
-                className="pl-9 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none cursor-pointer"
-              >
-                <option value="">All Ledger Types</option>
-                {Object.entries(LEDGER_TYPE_LABELS).map(([code, label]) => (
-                  <option key={code} value={code}>
-                    {label} ({code})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Hide Zero Balance Toggle */}
-            <Checkbox
-              checked={hideZeroBalance}
-              onChange={handleHideZeroChange}
-              label="Hide zero"
-              size={18}
-              className="flex-shrink-0"
+          {/* Search */}
+          <div className="relative">
+            <IconSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search code or description..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-8 pr-3 py-1.5 w-56 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
-
-            {/* Source Guide (TH-specific) */}
-            {!isGreenTarget && <ReportSourceGuide report="trial_balance" />}
-
-            {/* Refresh Button */}
-            <Button
-              onClick={fetchTrialBalance}
-              variant="outline"
-              disabled={loading}
-              additionalClasses="flex-shrink-0"
-            >
-              <span className="flex items-center justify-center whitespace-nowrap">
-                <IconRefresh className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-                Refresh
-              </span>
-            </Button>
-
-            {/* Print PDF Button */}
-            <Button
-              onClick={handlePrintPDF}
-              variant="filled"
-              color="sky"
-              disabled={exporting || !trialBalance || totalFiltered === 0}
-              additionalClasses="flex-shrink-0"
-            >
-              <span className="flex items-center justify-center whitespace-nowrap">
-                <IconPrinter className="h-4 w-4 mr-2" />
-                {exporting ? "Preparing..." : "Print PDF"}
-              </span>
-            </Button>
           </div>
+
+          {/* Ledger Type Filter */}
+          <Listbox value={selectedLedgerType} onChange={handleLedgerTypeChange}>
+            <div className="relative">
+              <ListboxButton className="relative w-48 cursor-pointer rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 pl-8 pr-8 text-left text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <IconFilter className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <span className="block truncate">
+                  {selectedLedgerType
+                    ? `${LEDGER_TYPE_LABELS[selectedLedgerType]} (${selectedLedgerType})`
+                    : "All Ledger Types"}
+                </span>
+                <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                  <IconChevronDown
+                    className="h-4 w-4 text-gray-400"
+                    aria-hidden="true"
+                  />
+                </span>
+              </ListboxButton>
+              <Transition
+                as={Fragment}
+                leave="transition ease-in duration-100"
+                leaveFrom="opacity-100"
+                leaveTo="opacity-0"
+              >
+                <ListboxOptions className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none">
+                  {ledgerTypeOptions.map((option) => (
+                    <ListboxOption
+                      key={option.value}
+                      value={option.value}
+                      className={({ active }) =>
+                        clsx(
+                          "relative cursor-pointer select-none py-1.5 pl-3 pr-9",
+                          active
+                            ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-200"
+                            : "text-gray-900 dark:text-gray-100"
+                        )
+                      }
+                    >
+                      {({ selected }) => (
+                        <>
+                          <span
+                            className={`block truncate ${
+                              selected ? "font-medium" : "font-normal"
+                            }`}
+                          >
+                            {option.label}
+                          </span>
+                          {selected && (
+                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600 dark:text-sky-400">
+                              <IconCheck className="h-4 w-4" aria-hidden="true" />
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </ListboxOption>
+                  ))}
+                </ListboxOptions>
+              </Transition>
+            </div>
+          </Listbox>
+
+          {/* Hide Zero Balance Toggle */}
+          <Checkbox
+            checked={hideZeroBalance}
+            onChange={handleHideZeroChange}
+            label="Hide zero"
+            size={18}
+            className="flex-shrink-0"
+          />
+        </div>
+
+        {/* Actions */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Source Guide (TH-specific) */}
+          {!isGreenTarget && <ReportSourceGuide report="trial_balance" />}
+
+          <Button
+            size="sm"
+            variant="outline"
+            icon={IconRefresh}
+            iconSize={16}
+            onClick={fetchTrialBalance}
+            disabled={loading}
+            title="Refresh"
+            additionalClasses={loading ? "[&_svg]:animate-spin" : ""}
+          />
+          <Button
+            size="sm"
+            variant="filled"
+            color="sky"
+            icon={IconPrinter}
+            iconSize={16}
+            onClick={handlePrintPDF}
+            disabled={exporting || !trialBalance || totalFiltered === 0}
+          >
+            {exporting ? "Preparing..." : "Print"}
+          </Button>
         </div>
       </div>
 
