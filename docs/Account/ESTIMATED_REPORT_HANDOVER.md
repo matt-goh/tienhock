@@ -1,13 +1,15 @@
 # ESTIMATED REPORT HANDOVER — Closing Stock P&L / Estimated Unit Cost (MEE & BIHUN)
 
-Status: **Phase 3 COMPLETE — parity gate green; Phase 4 frontend next (handoff to Kimi)** | Started: 2026-07-23 | Owner: Kimi (planning/Q&A) → Claude (Phase 1) → Claude (Phase 2) → GPT-5.6 Sol (Phase 3) → Kimi (Phase 4)
+Status: **Phase 4 COMPLETE — frontend shipped (2026-07-28); Phase 5 PDF next (handoff ready in §11 — start there in a fresh session)** | Started: 2026-07-23 | Owner: Kimi (planning/Q&A) → Claude (Phase 1) → Claude (Phase 2) → GPT-5.6 Sol (Phase 3) → Kimi (Phase 4)
 
 Phase 3 runs the shipped engine against the complete June fixture with **392 exact
 checks, 70 explicitly derived/documented deltas and 0 failures** (§9). Both approved
 data fixes are applied to dev through a guarded, idempotent migration; production is
 still pending. Every remaining delta is explicitly classified and gated — no formula
-or mapping guess was added. Q14/Q15 remain deliberately deferred under §7.2 and can
-be corrected from source evidence during any later phase.
+or mapping guess was added. Q15 was resolved on 2026-07-28 (co-worker keyed the
+mis-posted RM40 diesel difference correctly in production — see §2 item 15); Q14
+remains deliberately deferred under §7.2 and can be corrected from source evidence
+during any later phase.
 
 This doc tracks the implementation of the boss-only "Estimated P&L & Unit Cost" report
 (legacy names: "MEE/BIHUN ESTIMATED" + "ESTIMATED/COST"). It is updated at every phase
@@ -243,12 +245,23 @@ audit trail and are SUPERSEDED by the answers above — do not act on them direc
     packing sheet, the same class as FIX-2, and needs a line-by-line comparison against
     the June source sheet. Do not adjust the mapping to close it.
 
-15. **VRE-DIESEL (LORI SALESMAN SAHAJA) is RM20.00 short.** The six-vehicle salesman set
-    (2962, 6893, 6389, 4688, 9901, 1016) is proven correct by its sister row —
-    VRE-OTHERS lands on 357.20 exactly only because `R9901` is included. With the same
-    six vehicles VRE-DIESEL gives 1,065.85 against a printed 1,085.85, i.e. RM40.00
-    missing from the pool, and no June `OIL*` posting accounts for RM40.00. Ask whether a
-    salesman-lorry diesel entry is missing or was booked to another vehicle/account.
+15. ~~**VRE-DIESEL (LORI SALESMAN SAHAJA) is RM20.00 short.**~~ **CLOSED 2026-07-28 —
+    co-worker answered and fixed it in production.** Rosa: *"Kurang key in RM40 di
+    PV003/06, Bill amount RM 93..tapi Rosa key in RM53... Sekarang Rosa cari RM40 dia
+    masuk apa account Ok jumpa sudah...Rosa key in CA_WA @ RM40, sudah ubah sini...boleh
+    check balik sana"*. Root cause confirmed against the dev DB: the journal is
+    **PCE003/06** (C-type, id 2963, 2026-06-10, total RM10,258.65) — line 16 debits
+    `OIL6389` **RM53.00** for a PETRON MININTOD bill (23/05/2026) whose real amount was
+    **RM93.00**, and line 67 parks the balancing **RM40.00 on `CA_WA`** with blank
+    particulars. Rosa re-pointed the RM40 in **production**; the six-vehicle salesman
+    diesel pool gains exactly RM40.00, i.e. **+RM20.00 per product line after the 50%
+    split — precisely the Q15 delta.** The dev DB still holds the unfixed rows (CA_WA
+    40.00 + OIL6389 53.00), so the verifier keeps showing this delta until the next
+    production→dev refresh; re-run `verify-estimated-report.mjs` after that refresh and
+    expect the VRE-DIESEL/SALESMAN rows to go exact. *(Original analysis: the six-vehicle
+    salesman set (2962, 6893, 6389, 4688, 9901, 1016) is proven correct by its sister
+    row — VRE-OTHERS lands on 357.20 exactly only because `R9901` is included. With the
+    same six vehicles VRE-DIESEL gave 1,065.85 against a printed 1,085.85.)*
 
 ~~**Fixture-metadata handoff note:** the JSON still used superseded PU_MSD/MRET/BRET and
 payroll labels.~~ **DONE IN PHASE 3:** the printed amounts remain intact, while the
@@ -258,7 +271,9 @@ and the applied dev data fixes.
 ### 2.1 Bahasa Melayu messages
 
 Q11 / Q12 / Q13 were **sent and answered** (answers above); kept for the record.
-Q14 / Q15 are **still to send**.
+Q14 is **still to send**. Q15 was **answered directly by the co-worker on 2026-07-28**
+(Rosa found and fixed the RM40 mis-keying in production — §2 item 15), so its message
+below was never sent and stays for the record only.
 
 **Q11 — PU_MSD RM540** *(answered: no purchase, material discontinued)*
 
@@ -310,7 +325,9 @@ Q14 / Q15 are **still to send**.
 > dengan borang asal, dan bagitahu item mana yang tersalah kuantiti atau harga? Terima
 > kasih.
 
-**Q15 — diesel lori salesman Jun**
+**Q15 — diesel lori salesman Jun** *(answered 2026-07-28: PCE003/06 bill RM93 keyed as
+RM53 on OIL6389, the missing RM40 parked on CA_WA; Rosa re-pointed it in production —
+§2 item 15. Message below never sent, kept for the record.)*
 
 > Hi, nak semak diesel untuk lori salesman bulan Jun 2026. Ikut jurnal, diesel untuk
 > lori salesman (SAB2962, SAB6893, SAB6389, SAB4688, SAB9901Y, SD1016T) berjumlah
@@ -340,19 +357,50 @@ Q14 / Q15 are **still to send**.
       engine against the June fixture and guards all atomic/derived values; §5 fixes
       applied to dev and proven idempotent; Q10 reconciled as an irreducible legacy
       page-to-page discrepancy; Q14/Q15 explicitly deferred per the user. See §9.
-- [ ] **Phase 4 — Frontend**: `src/pages/Stock/Reports/EstimatedReportPage.tsx`,
-      nav "Reports" group in `src/pages/TienHockNavData.tsx`, drilldowns, Add Back input,
-      mappings modal. Render live API/engine values only; fixture targets are verifier
-      references. Resolve and enforce the boss-only authorization policy before exposure
-      because nav hiding is not access control and the backend currently has no boss role.
+- [x] **Phase 4 — Frontend** (2026-07-28): `src/pages/Stock/Reports/EstimatedReportPage.tsx`,
+      nav "Reports" group in `src/pages/TienHockNavData.tsx` (`/stock/reports/estimated`),
+      drilldowns (join on the engine-emitted `lineId`), Add Back input, mappings modal
+      (`src/components/Stock/EstimatedReportMappingModal.tsx`). Renders live API/engine
+      values only; fixture targets remain verifier references. **Authorization decision
+      (user, 2026-07-28): the report is for ALL logged-in staff** — no boss-only rule,
+      so the existing global `authMiddleware` is the whole policy and the nav item is
+      visible to everyone. Changelog entry shipped with the page. See §10.
 - [ ] **Phase 5 — PDF printing**: `src/utils/stock/EstimatedReportPDF.tsx` via
-      `printPdfBlob` (P&L + unit cost pages per product line).
+      `printPdfBlob` (P&L + unit cost pages per product line). Full handoff in §11.
 - [ ] **Phase 6 — Wrap-up**: apply any evidence-backed Q14/Q15 corrections received,
       production migration rollout, changelog entry,
       AGENTS.md/CLAUDE.md updates, bug-scan offer.
 
 ## 4. Progress log
 
+- 2026-07-28 — **Post-Phase-4 UI fixes (user feedback).** (1) The mappings modal's
+  `SearchableCombobox` rendered every matching option with no cap, so the account
+  picker mounted ~600 options at once and stalled the page; it now renders at most
+  50 with a "type to narrow down" hint (same idea as `AccountCodeCombobox`'s
+  load-increment). (2) The Add Back input existed but was an unlabeled box with no
+  placeholder in the P&L footer — the user could not find it. It is now a
+  highlighted sky panel labelled ADD BACK with a `0.00` placeholder and a hint,
+  sitting between P/L and FINAL P/L. **Handover prepared for Phase 5 (§11)** the
+  same day; Phase 5 starts in a fresh session.
+- 2026-07-28 — **Phase 4 done.** Frontend shipped: the report page
+  (`/stock/reports/estimated`, Stock → Reports nav group), the mappings modal,
+  drilldowns joined on the engine's `lineId`, the Add Back input, and the changelog
+  entry. **Authorization resolved by the user: all logged-in staff** — no boss-only
+  guard was added anywhere. Verified the page's TypeScript interfaces field-by-field
+  against `estimated-report-engine.js`'s actual response. One API limitation found:
+  a line's `notes` cannot be cleared through `PUT /mappings/:lineId` (the router's
+  `COALESCE` keeps the old value on null) — setting/changing works. See §10.
+- 2026-07-28 — **Q15 CLOSED (co-worker fix in production).** Rosa traced the missing
+  RM40.00 in the salesman diesel pool to **PCE003/06** (C journal id 2963,
+  2026-06-10): a PETRON MININTOD bill of RM93.00 was keyed as RM53.00 on `OIL6389`
+  (line 16) and the balancing RM40.00 was parked on `CA_WA` (line 67, blank
+  particulars). She re-pointed the RM40 in **production**; the six-vehicle pool gains
+  RM40.00 = +RM20.00 per product line after the 50% split, exactly the Q15 delta.
+  Verified against dev that the pre-fix rows are as described; dev itself is
+  deliberately left unfixed, so the dev verifier keeps reporting the VRE-DIESEL /
+  SALESMAN delta until the next production→dev refresh, after which
+  `verify-estimated-report.mjs` must show those rows exact. **Phase 4 started** the
+  same day, without waiting for Q14.
 - 2026-07-28 — **Phase 3 done.** Added the standalone June parity verifier, which
   imports the production engine directly, forces the Kuala Lumpur invoice window,
   compares money in sen and units at six decimals, exercises both handwritten Add
@@ -525,7 +573,7 @@ selotape lines, all TEPUNG/GARAM/SODA lines, `PU_BJAG` 17,280.00, `PU_BSAG` 107,
 | EXPENSES line (MEE) | 63,750.73 | 63,729.82 | +20.91 | Q12 CLOSED; small payroll residual — see below |
 | EXPENSES line (BIHUN) | 64,259.73 | 64,238.82 | +20.91 | Q12 CLOSED; same residual |
 | `PU_MSD` | 0.00 | 540.00 | −540.00 | Q11 CLOSED — permanent, expected, correct |
-| VRE-DIESEL (LORI SALESMAN SAHAJA) | 1,065.85 | 1,085.85 | −20.00 | Q15, open |
+| VRE-DIESEL (LORI SALESMAN SAHAJA) | 1,065.85 | 1,085.85 | −20.00 | Q15 CLOSED 2026-07-28 — RM40 mis-key fixed in production; dev retains the delta until the next prod→dev refresh |
 
 **Re-verified 2026-07-25 after a fresh production DB was imported into dev, which brought
 the June `JVSL/06/26` payroll voucher (RM181,699.10, posted) with it.** The Phase 1
@@ -648,10 +696,14 @@ decide, every mapping is seeded, and the Phase 3 parity gate is green (§9).
 
 - **Q14** — June MEE small-packing stock is RM883.60 higher than the print. Mapping is
   proven correct; needs a line-by-line check of the June MEE packing sheet.
-- **Q15** — VRE-DIESEL (LORI SALESMAN SAHAJA) is RM20.00 short (RM40.00 in the pool) and
-  no June `OIL*` posting explains it.
+- ~~**Q15** — VRE-DIESEL (LORI SALESMAN SAHAJA) is RM20.00 short (RM40.00 in the pool) and
+  no June `OIL*` posting explains it.~~ **CLOSED 2026-07-28** — Rosa traced it to
+  PCE003/06 (bill RM93 keyed as RM53 on `OIL6389`, the RM40 balance parked on `CA_WA`)
+  and re-pointed the RM40 in production; see §2 item 15. The dev DB still shows the
+  unfixed rows until the next production→dev refresh.
 
-Both have ready-to-send Bahasa Melayu messages in §2.1.
+Q14 has a ready-to-send Bahasa Melayu message in §2.1 (the Q15 message was never
+needed and is kept for the record).
 
 **Deferred-fix protocol (user decision, 2026-07-28):** the answers to Q14/Q15 are NOT
 required before Phase 3 and may arrive at any time — during any phase or after
@@ -665,10 +717,14 @@ this handover with the co-worker's answers, the workflow is:
   −RM883.60 on the `CS_MPMS` bucket). Key the correction into June 2026 itself,
   NOT the current month, and note that it shifts June closing stock and therefore
   every later month's derived opening stock by the same amount.
-- **Q15** — key the missing RM40.00 June diesel posting (or reclassify the
+- ~~**Q15** — key the missing RM40.00 June diesel posting (or reclassify the
   mis-posted one) onto the correct salesman-lorry `OIL*` account(s) with a June
   2026 date, per the co-worker's evidence; target delta: +RM20.00 per product line
-  after the 50% split.
+  after the 50% split.~~ **DONE 2026-07-28 by the co-worker directly in production**
+  (PCE003/06: the RM40 was re-pointed off `CA_WA` onto the diesel account — §2 item
+  15). No migration or code change from our side was needed; the report picks the
+  correction up live. The dev DB is intentionally untouched, so the dev verifier
+  still reports this delta until the next production→dev refresh.
 - After either fix, re-run `verify-estimated-report.mjs` and update the Phase 3
   delta table (§9.2) plus this section to close the item.
 
@@ -722,10 +778,12 @@ the report reads and derives only.
   Express dependency, so the Phase 3 verifier can import it directly.
 - `src/routes/stock/estimated-report.js` — the router.
 - `src/routes/index.js` — mounted at `/api/estimated-report` behind the global
-  `authMiddleware`. **Known authorization limitation:** every authenticated user can
+  `authMiddleware`. ~~**Known authorization limitation:** every authenticated user can
   currently call it; hiding the Phase 4 nav item does not make the report boss-only.
   Kimi must obtain the user's intended boss identity/role rule and enforce it at the
-  route/API layer before production exposure.
+  route/API layer before production exposure.~~ **RESOLVED 2026-07-28: the user decided
+  the report is for ALL logged-in staff**, so the global `authMiddleware` is the
+  intended policy and no role guard exists by design.
 
 ### 8.1 API surface
 
@@ -761,7 +819,7 @@ rows, production 20,691 / 30,092, and both `expenseBreakdown` salary/habuk subto
 | BIHUN `PU_BBER` | 495,131.40 | 130,631.40 | +364,500.00 | FIX-1 applied to dev in Phase 3 |
 | BIHUN `CS_BPMB` | 16,891.75 | 16,891.45 | +0.30 | FIX-2 applied to dev in Phase 3 |
 | BIHUN `BRET` | 268.30 | 265.10 | +3.20 | documented source snapshot delta |
-| SALESMAN subtotal (both lines) | −20.00 | — | −20.00 | Q15, open |
+| SALESMAN subtotal (both lines) | −20.00 | — | −20.00 | Q15 CLOSED 2026-07-28 — fixed in production; dev keeps the delta until refresh |
 | MACHINE REPAIR MEE / BIHUN | 4,391.59 / 2,045.98 | 4,200.30 / 2,319.22 | +191.29 / −273.24 | Q13 CLOSED, residual is source classification |
 | EXPENSES line (both lines) | 63,750.76 / 64,259.76 | 63,729.82 / 64,238.82 | +20.94 | payroll residual (§7.3) + 0.03 rounding, see below |
 
@@ -883,7 +941,7 @@ deltas: `PU_BBER` is 130,631.40 on both sides and `CS_BPMB` is 16,891.45 on both
 | MEE `PU_MSD` | 0.00 | 540.00 | −540.00 | Q11 permanent/correct: no purchase exists |
 | MEE `MRET` | 1,517.80 | 1,519.10 | −1.30 | physical-return snapshot delta |
 | BIHUN `BRET` | 268.30 | 265.10 | +3.20 | physical-return snapshot delta |
-| SALESMAN diesel (each line) | 1,065.85 | 1,085.85 | −20.00 | Q15 deferred; RM40 shared pool source |
+| SALESMAN diesel (each line) | 1,065.85 | 1,085.85 | −20.00 | Q15 CLOSED 2026-07-28 — co-worker fixed the RM40 mis-key in production; dev retains this delta until the next prod→dev refresh, then it must go exact |
 | Unit EXPENSES MEE / BIHUN | 63,750.76 / 64,259.76 | 63,729.82 / 64,238.82 | +20.94 / +20.94 | JVSL snapshot + visible-row rounding |
 | MACHINE REPAIR MEE / BIHUN | 4,391.59 / 2,045.98 | 4,200.30 / 2,319.22 | +191.29 / −273.24 | Q13 formula confirmed; source classification |
 
@@ -939,11 +997,13 @@ original legacy P&L configuration/account breakdown could close this further.
 - Render **only live API/engine values**. Printed-source fixture targets exist only for
   verifier comparisons; never copy either those targets or BIHUN's alternate handwritten
   JAGUNG totals into UI defaults. Preserve API `warnings` and engine-provided row totals.
-- Do not describe nav hiding as boss-only security. The current API has global
+- ~~Do not describe nav hiding as boss-only security. The current API has global
   authentication only; obtain the user's boss identity/role rule and add server-side
-  authorization before production exposure.
-- Q14/Q15 do not block UI work. When evidence arrives, correct the June source rows and
-  rerun the verifier under §7.2; do not add report-only overrides.
+  authorization before production exposure.~~ **RESOLVED 2026-07-28 — user: all
+  logged-in staff.** No authorization work remained for Phase 4.
+- Q14 does not block UI work (Q15 was resolved in production on 2026-07-28). When Q14
+  evidence arrives, correct the June source rows and rerun the verifier under §7.2; do
+  not add report-only overrides.
 - Before production exposure, apply both the Phase 1 foundation migration and the
   Phase 3 parity data-fix migration. Add the user-facing changelog entry with Phase 4.
 - Connected limitation needing separate user approval: variant 118 still has
@@ -965,3 +1025,169 @@ Production rollout checklist (Phase 6, not performed in Phase 3):
    `expected-june-2026.json`, AGENTS.md and CLAUDE.md, and record the migration's
    applied/removal lifecycle in `docs/MIGRATIONS_LOG.md`. Keep §4's historical note
    that production was untouched during Phase 3.
+
+---
+
+## 10. Phase 4 — delivered frontend (2026-07-28)
+
+Two new files, two edited files. **No backend change** — the user decided on
+2026-07-28 that the report is for **all logged-in staff**, so the existing global
+`authMiddleware` is the whole authorization policy and nothing was added.
+
+- `src/pages/Stock/Reports/EstimatedReportPage.tsx` (new, ~1,064 lines) — the report
+  page at `/stock/reports/estimated`. MonthNavigator clamped to June 2026
+  (`minDate`), a MEE/BIHUN segmented switcher (one fetch returns both lines), Refresh
+  and Mappings buttons. The selected line renders two stacked cards matching the
+  legacy printout order: ESTIMATED P&L (products, closing/opening stock, purchases,
+  returns, then USAGE → GROSS → EXPENSES breakdown → P/L → Add Back → FINAL P/L →
+  ACCUMULATIVE with the anchor caption) and ESTIMATED UNIT COST (production/sales
+  summary, the six cost groups with per-row 6-dp units, machine repair, totals,
+  FINAL ESTIMATED UNIT COST). API `warnings` render in an amber banner. Money is
+  en-MY 2dp, unit costs 6dp, P/L figures use the green/red convention.
+- `src/components/Stock/EstimatedReportMappingModal.tsx` (new, ~1,118 lines) —
+  groups all 135 lines by page → section → product_line with search; per-line inline
+  editor replaces the full `sources` array through `PUT /mappings/:lineId` (plus
+  `isActive`/`notes`), surfaces the server's 400 `{message}` via toast, blocks close
+  while saving, and triggers a report + mappings refetch on save.
+- `src/pages/TienHockNavData.tsx` — new `STOCK_DROPDOWN_COLUMNS.reports` (order 4)
+  and the "Estimated P&L & Unit Cost" item under Stock, group "Reports". Routes
+  auto-generate from this file, so no separate route registration exists.
+- `src/components/ChangelogModal.tsx` — prepended the 2026-07-28 ms/en entry.
+
+Decisions and details worth knowing:
+
+- **Drilldowns join on the engine-emitted `lineId`** (numeric
+  `estimated_report_lines.id`), not `line_key`. The engine reuses the stock line's
+  `lineId` for its closing AND opening rows (one mapping row carries both
+  presentations — §6.1), so both drill into the same member list. The page fetches
+  `GET /mappings` once; if that call fails the report still renders, rows just lose
+  their chevrons. P&L expense-breakdown figures have no lineIds (they are derived
+  from the unit-cost groups), so their drilldown lives in the Unit Cost card.
+- **Stacked sections, not sub-tabs**, matching the legacy print order; the product
+  line switcher does not refetch.
+- `GET /inputs` is intentionally unused — the Add Back value already arrives inside
+  the report response.
+- **API limitation found (not fixed; backend frozen in Phase 4):** a line's `notes`
+  cannot be cleared through `PUT /mappings/:lineId` — the router's
+  `COALESCE($3, notes)` keeps the old value when null is sent. Setting or changing
+  notes works; clearing is a silent no-op. Flag to the user only if clearing notes
+  ever matters.
+- Nothing was keyed: the June Add Back values (MEE 9,658.83 / BIHUN 6,662.66) remain
+  the user's to enter on the page, as recorded in §8.4.
+- TypeScript interfaces on the page were verified field-by-field against the
+  engine's actual response shape (products/stock/purchase/returns rows, totals,
+  expenseBreakdown, unit-cost groups, anchor, monthlyTrail, warnings). No build or
+  typecheck was run (project rule — the user tests manually).
+
+### 10.1 Post-Phase-4 fixes (user feedback, 2026-07-28)
+
+- **Mappings modal dropdown lag:** `SearchableCombobox`
+  (`src/components/Stock/EstimatedReportMappingModal.tsx:272`) rendered every
+  matching option with no cap — the account picker mounted ~600 options at once.
+  It now renders at most 50 options plus a "N more — type to narrow down" hint;
+  typing still filters the full list.
+- **Add Back input was unfindable:** it was an unlabeled box with no placeholder in
+  the P&L footer. It is now a highlighted sky panel labelled ADD BACK (with a
+  `0.00` placeholder and a helper line) between P/L and FINAL P/L.
+
+### 10.2 Split into two pages + compact redesign (user feedback, 2026-07-28)
+
+- The single "Estimated P&L & Unit Cost" page is now **two nav pages** under
+  **Accounting → Estimated Reports** (a new group stacked under the Setup group
+  in the Accounting dropdown, sharing the `accounting-setup` dropdown column;
+  first placed under Stock → Reports, moved the same day on user request):
+  "Estimated P&L" (`/stock/reports/estimated-pl`) and
+  "Estimated Unit Cost" (`/stock/reports/estimated-unit-cost`). The old
+  `/stock/reports/estimated` route no longer exists; the `/stock/...` paths were
+  kept unchanged even though the pages now live in the Accounting menu.
+- `src/pages/Stock/Reports/EstimatedReportPage.tsx` is now a shared component
+  taking a `view: "pl" | "unitCost"` prop; `EstimatedPLPage.tsx` and
+  `EstimatedUnitCostPage.tsx` are thin wrappers (same pattern as the GT
+  accounting page wrappers). Each page keeps its own MEE/BIHUN switcher,
+  MonthNavigator, Refresh and Mappings buttons; one fetch still returns both
+  product lines.
+- Redesigned to the compact `AccountLedgerPage` idiom: no big header/controls
+  card — one controls row (line switcher + month left, icon actions right), a
+  compact •-separated summary strip carrying the headline figures (P&L: Sales /
+  Usage / P/L / Final P/L / Accumulative; unit cost: production / bags sold /
+  total / final unit cost), then one card with tighter spacing (`p-4`, compact
+  section titles, `TotalRow`/`InfoRow`/`BandRow` helpers). The unit-cost
+  production/sales summary cards moved into the strip.
+- Add Back stays **editable on the P&L page only**; the unit-cost page shows it
+  read-only (as before). The P&L expenses footnote now links to the unit-cost
+  page.
+- The 2026-07-28 changelog entry was updated in place (same-day refinement of
+  the just-shipped feature).
+
+---
+
+## 11. Phase 5 handoff — PDF printing (start here in the fresh session)
+
+**Goal:** print the report as a PDF — the P&L page and the Estimated Unit Cost page
+per product line — from the Phase 4 page. The user's original prompt (§0) requires
+PDF printing, 1:1 **content** with the live report (not 1:1 legacy visuals), and a
+modern clean design.
+
+### 11.1 What to build
+
+1. **`src/utils/stock/EstimatedReportPDF.tsx` (new)** — export
+   `generateEstimatedReportPDF(...)` following the established statement-PDF pattern
+   in `src/utils/accounting/IncomeStatementPDF.tsx` (read it first): built with
+   `@react-pdf/renderer` (already a project dependency — copy how
+   `IncomeStatementPDF` imports/uses it), returns/produces a Blob, and prints
+   through **`printPdfBlob` from `src/utils/pdfPrintFallback.ts`** (AGENTS.md rule
+   19: hidden iframe + new-tab fallback for mobile). Do not invent another print
+   path.
+2. **Print button in the shared `src/pages/Stock/Reports/EstimatedReportPage.tsx`**
+   header actions (it backs BOTH the P&L and unit-cost pages via the `view`
+   prop — §10.2), mirroring `IncomeStatementPage.handlePrintPDF`
+   (`src/pages/Accounting/Reports/IncomeStatementPage.tsx:142`): `exporting` state,
+   `IconPrinter`, "Preparing..." label, `toast.error` on failure. The page already
+   holds the full `EstimatedReportResponse` for the selected month — pass that data
+   to the generator; **do not refetch and do not hardcode anything**. Since the two
+   views are now separate pages, decide with the user whether each page prints only
+   its own view or the full four-page set (§11.2 default assumed the single page).
+
+### 11.2 Content decisions (defaults — confirm with the user only if you deviate)
+
+- Print **both product lines** in one PDF (MEE then BIHUN), each with its P&L page
+  and its Unit Cost page — four logical pages, matching the legacy printout set.
+  (The page's MEE/BIHUN switcher is a view filter only.)
+- Content = the live response exactly as rendered on screen: product/stock/
+  purchase/returns tables with totals, USAGE → GROSS → EXPENSES breakdown → P/L →
+  keyed Add Back → FINAL P/L → ACCUMULATIVE on the P&L page; production/sales
+  summary, the six cost groups (amount + unit), machine repair, totals, Add Back,
+  FINAL ESTIMATED UNIT COST on the unit-cost page. Unit costs at 6dp, money at 2dp.
+- Include a header with report name, product line, and month label
+  (`report.period.label`), and a generated-on timestamp if the sibling PDFs do.
+- Drilldown/member detail is screen-only; the PDF shows the printed rows like the
+  legacy report did. API `warnings` may be printed as a footnote line if trivial,
+  otherwise skip.
+- Legacy scans for layout reference only: `dev/import/closing-stock-report/`.
+  **Never** copy fixture/printed target numbers into the PDF — those exist solely
+  for the verifier (§9).
+
+### 11.3 After it works
+
+- Add a changelog entry (`CHANGELOG_ENTRIES` in `src/components/ChangelogModal.tsx`,
+  prepend, ms + en, end-user wording) — printing is user-facing.
+- Update this handover: mark Phase 5 `[x]`, add a §12 (or extend §11) with what was
+  delivered, and log it in §4.
+
+### 11.4 Open items Phase 5 must NOT try to fix (context only)
+
+- **Q14** (June MEE small-packing +RM883.60) is still open — §7.2 protocol applies.
+- **Q15 is closed in production**, but the dev DB intentionally keeps the unfixed
+  rows, so `verify-estimated-report.mjs` still shows the VRE-DIESEL/SALESMAN delta
+  in dev until the next prod→dev refresh (§2 item 15).
+- API limitation: a mapping line's `notes` cannot be cleared via
+  `PUT /mappings/:lineId` (§10).
+- The June Add Back values (MEE 9,658.83 / BIHUN 6,662.66) are still unkeyed — the
+  user enters them on the page; the PDF must print whatever is keyed, never the
+  handwritten values by default.
+- Connected limitation needing separate user approval: material variant 118 still
+  has `default_unit_cost = 282.50` (§5 FIX-2 note; §9.4 last bullet).
+- Production rollout (Phase 6) checklist is in §9.4 — both migrations
+  (`2026-07-25_estimated_report_foundation.sql`,
+  `2026-07-28_estimated_report_parity_data_fixes.sql`) must reach production before
+  the report is exposed there.
