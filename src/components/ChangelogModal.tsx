@@ -30,6 +30,11 @@ const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   },
   {
     date: "2026-07-28",
+    ms: "Perakaunan: laporan baharu Estimated P&L dan Estimated Unit Cost kini tersedia sebagai dua halaman berasingan di bawah Accounting → Estimated Reports — laporan untung/rugi bulanan bagi MEE & BIHUN, dan laporan kos unit sebag, lengkap dengan input Add Back dan tetapan pemetaan laporan yang boleh diubah.",
+    en: "Accounting: the new Estimated P&L and Estimated Unit Cost reports are now available as two separate pages under Accounting → Estimated Reports — a monthly MEE & BIHUN profit/loss report, and a per-bag unit cost report, with an Add Back input and editable report mappings.",
+  },
+  {
+    date: "2026-07-28",
     ms: "Payment Management: tarikh bayaran yang tersilap kunci kini boleh dibetulkan terus dari senarai bayaran — klik ikon kalendar di sebelah tarikh. Jika satu cek meliputi beberapa invois, semua bayaran di bawah rujukan itu berpindah ke tarikh baharu serentak supaya kumpulan itu kekal pada satu baris. Bagi Jelly Polly, tarikh perakaunan (tarikh cek dijelaskan bank) juga boleh dibetulkan dan tidak boleh lebih awal daripada tarikh bayaran. Bagi Tien Hock hanya bayaran cek boleh dibetulkan, dan catatan jurnal tidak berubah kerana cek sentiasa direkod pada tarikh ia dijelaskan bank; bagi tunai, pindahan bank dan online, sila batalkan bayaran dan kunci semula pada tarikh yang betul. Jumlah bayaran dan baki invois tidak berubah.",
     en: "Payment Management: a mis-keyed payment date can now be corrected straight from the payments list — click the calendar icon next to the date. When one cheque covers several invoices, every payment under that reference moves to the new date together so the group stays on one row. For Jelly Polly the accounting date (the date the cheque cleared the bank) can also be corrected, and it cannot be earlier than the payment date. For Tien Hock only cheque payments can be corrected, and the journal entry does not change because a cheque is always recorded on the date it cleared the bank; for cash, bank transfer and online payments, cancel the payment and record it again on the correct date. Payment amounts and invoice balances are never changed.",
   },
