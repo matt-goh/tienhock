@@ -355,10 +355,16 @@ export default function setupRoutes(app, pool) {
     "/greentarget/api/bank-statement",
     greenTargetAccountLedgerRouter(pool)
   );
-  // Green Target accounting lookups (G6). Same read-only `greentarget` schema
-  // isolation; paths mirror Tien Hock's so the shared pages swap base path only.
+  // Green Target accounting lookups (G6) and journal mutations (G7). Same
+  // `greentarget` schema isolation; paths mirror Tien Hock's so the shared
+  // pages swap base path only. Since G7 this router also MUTATES the GT
+  // books, so it sits behind the same session auth + restore guard TH gets
+  // (the JP account-ledger mount is the per-route precedent). The shared
+  // frontend api helper already sends x-session-id on every request.
   app.use(
     "/greentarget/api/journal-entries",
+    authMiddleware(pool),
+    checkRestoreState,
     greenTargetJournalEntriesRouter(pool)
   );
   app.use(

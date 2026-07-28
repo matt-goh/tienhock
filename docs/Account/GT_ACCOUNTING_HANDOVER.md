@@ -1,7 +1,7 @@
 # Green Target Accounting — Build-Out & Legacy Jan–Jun 2026 Import (Handover Plan)
 
-**Created 25 Jul 2026. Status: PHASES G0, G1, G2, G3, G4, G5 and G6 COMPLETE (G4 and G5 on 27 Jul
-2026, G6 on 28 Jul 2026) —
+**Created 25 Jul 2026. Status: PHASES G0, G1, G2, G3, G4, G5, G6 and G7 COMPLETE (G4 and G5 on 27 Jul
+2026, G6 and G7 on 28 Jul 2026) —
 see the execution records in §9. Source intake and the staging pipeline exist and pass every gate; all
 66 scan pages are transcribed and validated; the `greentarget` accounting tables, the 34-note GT
 catalogue and the 503-account chart of accounts are all loaded; **the Jan–Jun 2026 legacy ledger is
@@ -13,14 +13,16 @@ resolved by evidence during G1. G3 settled the `BTFS` disposition and the APPX-v
 mapping (`fs_note` holds the printed APPX verbatim — see §9, G3). G4 settled the derived CD_SD cash
 leg (user-approved), the four `(ref, date)` collisions, and `posting_sequence`. G5 settled the
 backend-clone question and produced the §3d operational bridge
-([GT_OPERATIONAL_BRIDGE.md](GT_OPERATIONAL_BRIDGE.md)). **G6 shipped the frontend: the GT Accounting
+([GT_OPERATIONAL_BRIDGE.md](GT_OPERATIONAL_BRIDGE.md)). G6 shipped the frontend: the GT Accounting
 nav section (Journal Entries, Account Ledger, Trial Balance, Income Statement, Balance Sheet, Chart
 of Accounts) runs the shared TH pages read-only over GT route clones, and the GT Debtors report is
-re-pointed at the imported ledger (June 2026 total RM156,782.22).** G7 (organic posting) is now the
-critical path; the one outstanding input across the whole project is the user approval of
-`debtor-map.json`, which G7 needs. **A decision the user must make before G7 ships is named in the
-bridge §5 and in §7 here: whether GT will enter *every* invoice and payment from 1 July, or keep
-posting from manually keyed journals.** ⚠ **The dev database was then replaced with production data,
+re-pointed at the imported ledger (June 2026 total RM156,782.22). **G7 shipped organic posting: GT
+invoices, payments and adjustments dated on/after 2026-07-01 now own balanced journals in the
+`greentarget` schema, manual journals are keyed from the shared Journal pages, and the R8 posting
+lock rejects every pre-July GT mutation with 409. The bridge §5 process decision was made: enter
+everything in the ERP.** The one outstanding input across the whole project is still the user
+approval of `debtor-map.json` (both mappings stay unapproved; every organic receivable falls back to
+`CD_SD` until then). ⚠ **The dev database was then replaced with production data,
 which removed every GT accounting row G2/G3/G4 created — see §10 for what survives and how to rebuild
 it** (the rebuild has since been done; all 230 gates are green). This
 document is the entry point for the Green Target (GT) accounting project. It is
@@ -1295,6 +1297,123 @@ the GT IS/BS PDF print output against the scans (data path verified; visual chec
 3. The RM50.00 `2026/00099` disagreement remains named, not resolved.
 4. The old operational `/greentarget/api/payments/debtors*` endpoints are now unused by any page;
    removal is a G7 cleanup, not G6 scope.
+
+---
+
+### Phase G7 — organic posting + posting lock — ✅ COMPLETE (28 Jul 2026)
+
+**Green Target now posts its own journals.** Every GT invoice, payment and adjustment dated on/after
+**2026-07-01** owns a balanced journal in the `greentarget` schema, synced from the operational
+lifecycle; manual journals are created/edited/cancelled/restored from the shared Journal pages; and a
+hard posting lock (R8) rejects **every** GT mutation dated before 2026-07-01 with HTTP 409
+(`ACCOUNTING_PERIOD_LOCKED`). The Jan–Jun import stays immutable — proven by all three harnesses,
+re-pinned to the legacy subset and green. Changelog entry shipped (rule 16).
+
+#### The two pre-G7 decisions, settled
+
+1. **Bridge §5 process decision (user): "Enter everything in the ERP."** Operational entry is the
+   source of truth from 1 July; G7's posting services keep the GL complete. No parallel manual
+   journal workflow.
+2. **`debtor-map.json` stays at 0 approved mappings** (the approval question went unanswered). Safe
+   default: every organic receivable falls back to `CD_SD`, the same sundry-debtors account that
+   carried all 1,011 legacy counter sales. Approving a mapping later is a file edit; only
+   *subsequent* journals use it — posted journals are never rewritten (R6: no account is ever
+   created or back-mutated).
+
+#### Journal shapes (new; the import contained zero adjustment journals and zero tax postings)
+
+| Document | Type | Shape | reference_no | display_reference |
+|---|---|---|---|---|
+| Invoice | `S` | DR receivable / CR revenue (gross; **no tax line** — all 153 operational invoices carry tax 0) | `invoice_number` | `invoice_number` |
+| Payment | `REC` | DR `PBB_1` / CR receivable (legacy keyed every receipt against PBB_1 — GT's books have no cash-in-hand account) | `REC-{payment_id}` (hidden unique) | `internal_reference` (e.g. `RV26/07/01`) |
+| Credit Note | `CN` | DR revenue / CR receivable | doc id `GT-CN-26-1` | `GT/CN/26/1` |
+| Debit Note | `DN` | DR receivable / CR revenue | doc id | slash-rendered id |
+| Refund Note (paired) | `RN` | DR receivable / CR `PBB_1` | doc id | slash-rendered id |
+
+**Account resolution.** Receivable: the customer's APPROVED debtor-map link, else `CD_SD`. Revenue:
+mapped debtor → `WS_OTH` (`WS_OTH4` for the TH intercompany debtor); unmapped counter sale → `TGB`
+when any linked rental uses a B-prefixed tong (B1–B17 = TONG B), else `TGA`. The B-prefix rule is
+consistent with all 35 ERP-matched legacy counter sales (every one `TGA` with a plain-numbered
+tong); the `TGB` branch rests on the structural tong split. **First live proof came from the
+backfill itself:** invoice `2026/01012`'s rental is tong `B17` → `TGB`; `2026/01014`'s is tong `29`
+→ `TGA`. Adjustment revenue resolves from the original invoice's own journal (organic first, then
+the imported one), falling back to the rule above.
+
+**Cutover / straddle rules.** Invoice create/update/cancel/delete dated before the open date → 409.
+A payment posts a journal **only when its owning invoice is dated on/after the open date** — a
+pre-cutover invoice's money already lives in the immutable import, so an organic receipt would
+double it (the operational balance update still proceeds). Pending cheques post nothing until
+confirmed; the journal then dates to `payment_date`. **The lock is stricter than Tien Hock's**: it
+guards ALL GT mutations including hand-keyed journals, per the G7 gate "pre-1-Jul mutations return
+409". `posting_sequence` for organic journals is MAX+1 within the entry month, keeping the dense
+1..N invariant the ledger's (month, sequence, display_order) ordering relies on.
+
+**System journals detach exactly like TH**: hand-editing an S/REC/CN/DN/RN journal (or any journal
+with a source) sets `manual_override`, preserves the entry type, and the owning service stops
+re-syncing it — but cancelling the source document still cancels it. Verified live below.
+
+#### The backfill — three documents, posted through the shipped services
+
+Exactly three documents existed between the 1 July cutover and G7 going live, and zero adjustment
+documents. `dev/import/greentarget-legacy/backfill-g7-organic.mjs` posts them by calling the REAL
+services (never hand-built SQL), so the backfill proves the same code path every future document
+takes: invoices `325` (`2026/01012`, RM200) and `326` (`2026/01014`, RM250) via
+`syncGTSalesJournalEntry`, payment `197` (`RV26/07/01`, RM250, online) via `syncGTPaymentJournalEntry`.
+Result: journals `3712`–`3714`, balanced, back-linked, `posting_sequence` 1–3. The script is
+idempotent (the services adopt by back-link/source first).
+
+#### Files changed
+
+| Path | What |
+|---|---|
+| `dev/migrations/2026-07-28_greentarget_g7_organic_posting.sql` | Applied to dev. Adds `journal_entry_id` to `greentarget.invoices`/`payments`/`adjustment_documents`, `bank_account` to `payments`; seeds entry types `S/REC/CN/DN/RN/JV`; guards the 1,705-journal import first. |
+| `src/routes/greentarget/accounting/posting-lock.js` | New. `GREEN_TARGET_ACCOUNTING_OPEN_DATE = '2026-07-01'`; the error carries both `status` and `statusCode` 409; `toLocalAccountingDateString` (rule-17-safe local formatting). |
+| `src/routes/greentarget/accounting/debtor-map.js` | New. Reads `debtor-map.json`, exposes APPROVED mappings only + `GT_SUNDRY_DEBTOR_ACCOUNT = 'CD_SD'`. |
+| `src/routes/greentarget/accounting/posting-utils.js` | New. `ensureGTAccountsExist` (never mints, R6), `nextGTPostingSequence`, `insertGTJournal`, `replaceGTJournal`, `cancelGTJournal`. |
+| `src/routes/greentarget/accounting/{sales,payment,adjustment}-journal.js` | New. The three sync/cancel services above; payment adds `updateGTPaymentJournalReference` for reference-only edits. |
+| `src/routes/greentarget/{invoices,payments,adjustment-docs}.js` | Sync/cancel wired into every lifecycle path; lock asserted BEFORE any MyInvois side effect; **the three old `/payments/debtors*` endpoints removed** (G6 open item 4). |
+| `src/routes/greentarget/accounting/journal-entries.js` | Mutation half: `GET /types`, `GET /next-reference/:type`, `POST /`, `PUT /:id` (detach semantics), `POST /:id/cancel`, `POST /:id/restore` — all behind the lock; `GET /:id` now resolves a real `source` link (invoice/payment/adjustment) instead of `null`. No DELETE (posted-on-create) and no cheque endpoints (GT cheques are per-line). |
+| `src/routes/index.js` | The GT journal-entries mount now sits behind `authMiddleware` + `checkRestoreState` (JP precedent) since it mutates. |
+| `src/pages/Accounting/JournalEntryPage.tsx` | `company` prop: GT fetches its own types + `?flat=true` accounts directly (TH caches still fire, unused — known waste), company-scoped last-type key (`gtJournalEntryLastType`, default `JV`), no quick-add/favourites/delete for GT. |
+| `src/pages/Accounting/{JournalEntryListPage,JournalDetailsPage}.tsx` | GT: New/edit/cancel/restore enabled (delete stays TH-only); details page fetches GT types; list empty-state offers "create a new entry". |
+| `src/pages/GreenTarget/Accounting/GTJournalEntryPage.tsx`, `src/pages/GreenTargetNavData.tsx` | New wrapper + `/accounting/journal-entries/new` and `/:id/edit` routes (`/new` declared before `/:id`). |
+| `src/types/types.ts` | `"JV"` added to `JournalEntryType`. |
+| `dev/import/greentarget-report-fixtures/verify-legacy-reports.mjs` | Regressions stage re-pinned to the LEGACY subset; isolation scan now covers all six G7 service files; new lock gate "no organic journal before 2026-07-01"; ledger transaction-count gate = 4,401 + measured organic lines. |
+| `dev/import/greentarget-legacy/verify-import.{mjs,sql}` | Every population/provenance/cheque/total gate scoped to `source_type='legacy_import'`; mirror R8 gate added. The dense `posting_sequence` gate stays global on purpose — organic posting must keep it. |
+
+#### Gate results — all green
+
+| Gate | Result |
+|---|---|
+| `verify-legacy-reports.mjs` | ✅ `ALL STAGES GREEN (123 gates)` — every Jan–Jun reproduction gate unchanged |
+| `verify-import.mjs` | ✅ `ALL CHECKS PASSED (63 gates, 2,850 per-account comparisons)` |
+| `verify-import.sql` | ✅ runs to COMMIT |
+| Lock | ✅ pre-cutover invoice create → 409; pre-cutover manual journal → 409 (`ACCOUNTING_PERIOD_LOCKED`) |
+| Manual journal lifecycle over HTTP | ✅ create 201 / edit 200 / cancel / restore; balanced; `posting_sequence` assigned |
+| Invoice → S journal | ✅ DR `CD_SD` / CR `TGA` RM100, back-linked, seq assigned |
+| Payment → REC journal | ✅ DR `PBB_1` (cheque_reference carried) / CR `CD_SD`, `REC-{id}` + `RV26/07/99` display, `bank_account` back-filled |
+| Detach | ✅ hand-edit of an S journal via the journal route sets `manual_override`, keeps type `S` |
+| Cancel cascades | ✅ payment cancel cancels its REC; invoice cancel cancels its S **despite the detach** |
+| Invoice delete | ✅ post-cutover delete cancels the journal and removes the document |
+| Backfill | ✅ 3 journals, balanced, linked; idempotent re-run safe |
+| Debtor ledger ties to debtors report | ✅ July: `CD_SD` 65,705.40 B/F + 200 + 250 − 250 = **65,905.40**; debtors grand total **156,982.22** = TB DEBTOR control (June 156,782.22 + 200.00) |
+| CD_SD account ledger | ✅ opening 65,705.40 (anchor semantics across the cutover); organic rows in (month, posting_sequence, display_order) order with correct running balances; `REC-197` internals hidden behind `RV26/07/01` |
+
+**Not verified:** browser click-through of the GT journal form (per rule 10 the user tests
+manually); adjustment-document posting is exercised only by the service code (zero adjustment
+documents exist yet — first live CN/DN/RN will be the user's).
+
+#### Open items for later phases
+
+1. **`debtor-map.json` still has 0 approved mappings** — approving PAUMIN (strong evidence) / SUTERA
+   (weak) is a file edit that changes only future journals.
+2. The RM50.00 `2026/00099` disagreement remains named, not resolved.
+3. TH caches (types/accounts/favourites) still fetch in the background on the GT journal form —
+   accepted waste, same as the JP precedent; results never applied to GT views.
+4. **G8 (production cutover)**: the G7 migration (`2026-07-28_greentarget_g7_organic_posting.sql`)
+   joins the production apply list, and production's post-cutover documents need the same backfill —
+   re-run `backfill-g7-organic.mjs` there AFTER the schema migration (it calls the shipped services,
+   so it needs the server code deployed, or run it on the server).
 
 ---
 

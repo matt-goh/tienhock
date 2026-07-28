@@ -563,7 +563,8 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
         {/* Filters - own row below the title/date controls; all pills flow in one wrapping line */}
         <div className="order-4 w-full flex flex-wrap items-center gap-1.5 min-w-0">
           {/* Type pills - toggle each journal type on/off (none selected = show all).
-              Hidden for Green Target: its ledger holds only IMP entries. */}
+              Hidden for Green Target: these pills come from the Tien Hock type
+              cache; GT users filter by search instead. */}
           {!isGreenTarget &&
             entryTypes
               .filter((type) => type.code !== LEGACY_IMPORT_ENTRY_TYPE)
@@ -644,18 +645,16 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
             onChange={handleTimeNavigatorChange}
           />
 
-          {!isGreenTarget && (
-            <Button
-              onClick={handleCreateNew}
-              color="sky"
-              variant="filled"
-              icon={IconPlus}
-              iconPosition="left"
-              size="md"
-            >
-              New
-            </Button>
-          )}
+          <Button
+            onClick={handleCreateNew}
+            color="sky"
+            variant="filled"
+            icon={IconPlus}
+            iconPosition="left"
+            size="md"
+          >
+            New
+          </Button>
         </div>
       </div>
 
@@ -751,7 +750,7 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center space-x-2">
-                        {!isGreenTarget && !isLegacyImportEntry(entry) && (
+                        {!isLegacyImportEntry(entry) && (
                           <>
                             <button
                               onClick={(e) => {
@@ -763,13 +762,17 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
                             >
                               <IconPencil size={18} />
                             </button>
-                            <button
-                              onClick={(e) => handleDeleteClick(entry, e)}
-                              className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
-                              title="Delete"
-                            >
-                              <IconTrash size={18} />
-                            </button>
+                            {/* GT journals are posted-on-create with no draft
+                                state, so delete stays a Tien Hock action */}
+                            {!isGreenTarget && (
+                              <button
+                                onClick={(e) => handleDeleteClick(entry, e)}
+                                className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
+                                title="Delete"
+                              >
+                                <IconTrash size={18} />
+                              </button>
+                            )}
                           </>
                         )}
                       </div>
@@ -784,21 +787,15 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
                   >
                     No journal entries found.{" "}
                     {hasActiveFilters && (
-                      <span>
-                        Try adjusting your filters{isGreenTarget ? "." : " or "}
-                      </span>
+                      <span>Try adjusting your filters or </span>
                     )}
-                    {!isGreenTarget && (
-                      <>
-                        <button
-                          onClick={handleCreateNew}
-                          className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 font-medium"
-                        >
-                          create a new entry
-                        </button>
-                        .
-                      </>
-                    )}
+                    <button
+                      onClick={handleCreateNew}
+                      className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 font-medium"
+                    >
+                      create a new entry
+                    </button>
+                    .
                   </td>
                 </tr>
               )}

@@ -155,8 +155,17 @@ console.log("Green Target G4 - imported ledger vs the six printed Trial Balances
 // ---------------------------------------------------------------------------
 console.log("-- 0. import population --------------------------------------------");
 {
-  const journals = scalar("SELECT count(*) FROM greentarget.journal_entries");
-  const lines = scalar("SELECT count(*) FROM greentarget.journal_entry_lines");
+  // G7 scopes every population gate to the legacy import: organic journals
+  // (invoices, payments, adjustments, manual) grow both tables from
+  // 2026-07-01 onward by design, so only the import subset stays pinned.
+  const journals = scalar(
+    "SELECT count(*) FROM greentarget.journal_entries WHERE source_type = 'legacy_import'"
+  );
+  const lines = scalar(
+    `SELECT count(*) FROM greentarget.journal_entry_lines jel
+       JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
+      WHERE je.source_type = 'legacy_import'`
+  );
   const anchors = scalar("SELECT count(*) FROM greentarget.account_opening_balances");
   const staging = scalar("SELECT count(*) FROM greentarget.import_legacy_rows");
   check(journals === "1705", "1,705 imported journals", `found ${journals}`);
@@ -344,7 +353,9 @@ console.log("\n-- 3. the derived CD_SD cash path -------------------------------
 
   const legs = query(
     `SELECT count(*), SUM(ROUND(debit_amount*100))::bigint, SUM(ROUND(credit_amount*100))::bigint
-       FROM greentarget.journal_entry_lines WHERE account_code='CD_SD'`,
+       FROM greentarget.journal_entry_lines jel
+       JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
+      WHERE jel.account_code='CD_SD' AND je.source_type = 'legacy_import'`,
     ["count", "debit", "credit"]
   )[0];
   check(legs.count === "1433", "exactly 1,433 derived CD_SD lines, one per unbalanced source group", `found ${legs.count}`);
@@ -354,10 +365,12 @@ console.log("\n-- 3. the derived CD_SD cash path -------------------------------
     `DR ${money(Number(legs.debit))} / CR ${money(Number(legs.credit))}`
   );
 
-  // Every derived line is traceable to a marked staging row.
+  // Every derived line is traceable to a marked staging row (organic G7 CD_SD
+  // lines are operational postings, not derived legs, and are excluded).
   const untraceable = scalar(`
     SELECT count(*) FROM greentarget.journal_entry_lines l
      WHERE l.account_code = 'CD_SD'
+       AND (SELECT h.source_type FROM greentarget.journal_entries h WHERE h.id = l.journal_entry_id) = 'legacy_import'
        AND NOT EXISTS (
          SELECT 1 FROM greentarget.import_legacy_rows s
           WHERE s.source_kind = 'DERIVED'
@@ -365,7 +378,7 @@ console.log("\n-- 3. the derived CD_SD cash path -------------------------------
             AND s.journal_group_key = (
               SELECT h.source_id FROM greentarget.journal_entries h WHERE h.id = l.journal_entry_id
             ))`);
-  check(untraceable === "0", "every posted CD_SD line traces to a DERIVED staging row", `found ${untraceable}`);
+  check(untraceable === "0", "every posted legacy CD_SD line traces to a DERIVED staging row", `found ${untraceable}`);
 
   // ...and no derived row hid inside another account.
   const strayDerived = scalar(
@@ -428,15 +441,15 @@ console.log("\n-- 4. June 2026 Balance Sheet tie-outs --------------------------
 console.log("\n-- 5. provenance and print order -----------------------------------");
 {
   const noSource = scalar(
-    "SELECT count(*) FROM greentarget.journal_entries WHERE source_type IS DISTINCT FROM 'legacy_import' OR source_id IS NULL"
+    "SELECT count(*) FROM greentarget.journal_entries WHERE source_type = 'legacy_import' AND source_id IS NULL"
   );
-  check(noSource === "0", "every journal carries source_type='legacy_import' + its staging group key", `found ${noSource}`);
+  check(noSource === "0", "every imported journal carries its staging group key", `found ${noSource}`);
 
-  const noFamily = scalar("SELECT count(*) FROM greentarget.journal_entries WHERE legacy_entry_type IS NULL");
-  check(noFamily === "0", "every journal carries its decoded legacy family", `found ${noFamily}`);
+  const noFamily = scalar("SELECT count(*) FROM greentarget.journal_entries WHERE source_type = 'legacy_import' AND legacy_entry_type IS NULL");
+  check(noFamily === "0", "every imported journal carries its decoded legacy family", `found ${noFamily}`);
 
   const families = query(
-    "SELECT legacy_entry_type, count(*) FROM greentarget.journal_entries GROUP BY 1 ORDER BY 1",
+    "SELECT legacy_entry_type, count(*) FROM greentarget.journal_entries WHERE source_type = 'legacy_import' GROUP BY 1 ORDER BY 1",
     ["family", "count"]
   );
   check(families.length === 9, "all nine G0-decoded families are represented", `found ${families.length}`);
@@ -465,9 +478,15 @@ console.log("\n-- 5. provenance and print order --------------------------------
   check(noLineAccounts === "0", "DEBTOR and BTFS have no posted journal line", `found ${noLineAccounts}`);
 
   const outside = scalar(
-    "SELECT count(*) FROM greentarget.journal_entries WHERE entry_date < DATE '2026-01-01' OR entry_date >= DATE '2026-07-01'"
+    "SELECT count(*) FROM greentarget.journal_entries WHERE source_type = 'legacy_import' AND (entry_date < DATE '2026-01-01' OR entry_date >= DATE '2026-07-01')"
   );
-  check(outside === "0", "nothing posts outside 2026-01-01..2026-06-30 (R2 cutover)", `found ${outside}`);
+  check(outside === "0", "no imported journal posts outside 2026-01-01..2026-06-30 (R2 cutover)", `found ${outside}`);
+
+  // G7's mirror rule: organic journals only ever live on/after the open date.
+  const organicEarly = scalar(
+    "SELECT count(*) FROM greentarget.journal_entries WHERE source_type IS DISTINCT FROM 'legacy_import' AND entry_date < DATE '2026-07-01'"
+  );
+  check(organicEarly === "0", "no organic journal posts before the 2026-07-01 open date (R8)", `found ${organicEarly}`);
 }
 
 console.log("\n-- 6. Tien Hock isolation ------------------------------------------");

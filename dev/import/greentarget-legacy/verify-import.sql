@@ -470,19 +470,24 @@ BEGIN
     RAISE EXCEPTION 'One or more imported journal headers differ from staging';
   END IF;
 
+  -- Only IMPORTED journals must come from staging; organic G7 journals
+  -- (source_type invoice/payment/adjustment, or NULL for manual ones) live
+  -- beside the import from 2026-07-01 onward by design.
   IF EXISTS (
     SELECT 1
       FROM greentarget.journal_entries actual
       LEFT JOIN desired_import_headers desired
         ON desired.reference_no = actual.reference_no
-     WHERE desired.reference_no IS NULL
+     WHERE actual.source_type = 'legacy_import'
+       AND desired.reference_no IS NULL
   ) THEN
     RAISE EXCEPTION 'An unexpected journal exists in greentarget.journal_entries';
   END IF;
 
   -- Every family decoded in G0 must have resolved; a NULL means a new one.
   IF EXISTS (
-    SELECT 1 FROM greentarget.journal_entries WHERE legacy_entry_type IS NULL
+    SELECT 1 FROM greentarget.journal_entries
+     WHERE source_type = 'legacy_import' AND legacy_entry_type IS NULL
   ) THEN
     RAISE EXCEPTION 'An imported journal has no decoded legacy family';
   END IF;
@@ -517,15 +522,20 @@ BEGIN
       LEFT JOIN desired_import_lines desired
         ON desired.reference_no = header.reference_no
        AND desired.line_number = actual.line_number
-     WHERE desired.reference_no IS NULL
+     WHERE header.source_type = 'legacy_import'
+       AND desired.reference_no IS NULL
   ) THEN
     RAISE EXCEPTION 'An imported journal contains an extra line';
   END IF;
 
   -- The 789 PB cheque numbers and 225 PBEB/PBE bank transaction ids are
-  -- per-LINE evidence G5 has to reprint (named trap 5).
-  IF (SELECT COUNT(*) FROM greentarget.journal_entry_lines
-       WHERE cheque_reference IS NOT NULL) <> 1014 THEN
+  -- per-LINE evidence G5 has to reprint (named trap 5). Organic G7 receipts
+  -- carry their own payment references, so the count is scoped to the import.
+  IF (SELECT COUNT(*) FROM greentarget.journal_entry_lines lines
+       JOIN greentarget.journal_entries header
+         ON header.id = lines.journal_entry_id
+       WHERE header.source_type = 'legacy_import'
+         AND lines.cheque_reference IS NOT NULL) <> 1014 THEN
     RAISE EXCEPTION 'The 1,014 per-line cheque/bank references did not all survive the import';
   END IF;
 
@@ -547,30 +557,43 @@ BEGIN
     INTO v_journals, v_lines
     FROM greentarget.journal_entries header
     JOIN greentarget.journal_entry_lines lines
-      ON lines.journal_entry_id = header.id;
+      ON lines.journal_entry_id = header.id
+   WHERE header.source_type = 'legacy_import';
 
   IF (v_journals, v_lines) IS DISTINCT FROM (1705::bigint, 4401::bigint) THEN
-    RAISE EXCEPTION 'Final posted population is % journals / % lines, expected 1705 / 4401',
+    RAISE EXCEPTION 'Final imported population is % journals / % lines, expected 1705 / 4401',
       v_journals, v_lines;
   END IF;
 
-  SELECT SUM(ROUND(debit_amount * 100))::bigint,
-         SUM(ROUND(credit_amount * 100))::bigint
+  SELECT SUM(ROUND(lines.debit_amount * 100))::bigint,
+         SUM(ROUND(lines.credit_amount * 100))::bigint
     INTO v_debit_cents, v_credit_cents
-    FROM greentarget.journal_entry_lines;
+    FROM greentarget.journal_entry_lines lines
+    JOIN greentarget.journal_entries header
+      ON header.id = lines.journal_entry_id
+   WHERE header.source_type = 'legacy_import';
 
   IF v_debit_cents IS DISTINCT FROM v_credit_cents
      OR v_debit_cents IS DISTINCT FROM 94766514::numeric THEN
-    RAISE EXCEPTION 'Global posted DR % <> CR % (expected 94,766,514 cents each)',
+    RAISE EXCEPTION 'Global imported DR % <> CR % (expected 94,766,514 cents each)',
       v_debit_cents, v_credit_cents;
   END IF;
 
-  -- Everything is inside the import period and nothing posts after cutover.
+  -- The import stays inside its window; organic G7 journals own 2026-07-01+.
   IF EXISTS (
     SELECT 1 FROM greentarget.journal_entries
-     WHERE entry_date < DATE '2026-01-01' OR entry_date >= DATE '2026-07-01'
+     WHERE source_type = 'legacy_import'
+       AND (entry_date < DATE '2026-01-01' OR entry_date >= DATE '2026-07-01')
   ) THEN
-    RAISE EXCEPTION 'A journal falls outside the 2026-01-01..2026-06-30 import window';
+    RAISE EXCEPTION 'An imported journal falls outside the 2026-01-01..2026-06-30 import window';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM greentarget.journal_entries
+     WHERE source_type IS DISTINCT FROM 'legacy_import'
+       AND entry_date < DATE '2026-07-01'
+  ) THEN
+    RAISE EXCEPTION 'An organic journal predates the 2026-07-01 open date (R8)';
   END IF;
 
   -- 9. Opening anchors ------------------------------------------------------

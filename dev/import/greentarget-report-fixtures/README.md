@@ -42,7 +42,7 @@ not, so the verified logic and the served logic cannot diverge. It connects with
 | `statements` | `buildIncomeStatement` + `buildBalanceSheet` vs the printed June statements, line by line, incl. the three APPX overrides and each line's account composition | 17 |
 | `ledger` | `buildAccountLedger` for **all 501 accounts**: printed row order, month-end running balances, derived-row flagging, the five bank statements | 17 |
 | `bridge` | the §3d operational-bridge counts, so [`GT_OPERATIONAL_BRIDGE.md`](../../../docs/Account/GT_OPERATIONAL_BRIDGE.md) cannot rot | 12 |
-| `regressions` | the engines are schema-isolated (static scan), GT's population is unmoved, Tien Hock is untouched | 13 |
+| `regressions` | the engines + the G7 posting services are schema-isolated (static scan), the LEGACY population is unmoved (organic journals may accrue beside it), no organic journal predates the 2026-07-01 open date, Tien Hock is untouched | 24 |
 
 Two gates are worth knowing about because they look surprising:
 

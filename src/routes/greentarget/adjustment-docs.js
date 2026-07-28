@@ -5,8 +5,10 @@
 //   - integer invoice_id PK + string invoice_number (vs TH single-string id)
 //   - date_issued (date) vs createddate (unix ms text)
 //   - column names: amount_before_tax / tax_amount / total_amount
-//   - no salesperson, no `journal_entries`, no customers.credit_used
+//   - no salesperson, no customers.credit_used
 //   - no 'overpaid' payment status — paired RN only (standalone RN out of scope)
+// Since G7 every active document owns one CN/DN/RN journal in the greentarget
+// ledger (see accounting/adjustment-journal.js).
 // Mirrors TH endpoint shape (next-number, list, get, create, cancel,
 // submit-einvoice, update-status, cancel-einvoice, clear-einvoice-status,
 // eligible-for-consolidation, submit-consolidated, consolidated-history).
@@ -18,6 +20,14 @@ import GTEInvoiceSubmissionHandler from "../../utils/greenTarget/einvoice/GTEInv
 import { GTEInvoiceAdjustmentNoteTemplate } from "../../utils/greenTarget/einvoice/GTEInvoiceAdjustmentNoteTemplate.js";
 import { GTEInvoiceConsolidatedAdjustmentTemplate } from "../../utils/greenTarget/einvoice/GTEInvoiceConsolidatedAdjustmentTemplate.js";
 import { GREENTARGET_INFO } from "../../utils/invoice/einvoice/companyInfo.js";
+import {
+  postGTAdjustmentJournalEntry,
+  cancelGTAdjustmentJournalEntry,
+} from "./accounting/adjustment-journal.js";
+import {
+  assertGreenTargetAccountingDateUnlocked,
+  toLocalAccountingDateString,
+} from "./accounting/posting-lock.js";
 
 const VALID_TYPES = ["credit_note", "debit_note", "refund_note"];
 const MONEY_TOLERANCE = 0.005;
@@ -1113,8 +1123,9 @@ export default function (pool, myInvoisGTConfig) {
 
       const year = new Date().getFullYear();
       const docId = await generateNextDocId(client, type, year);
+      // Local KL date, never a UTC slice (rule 17) — the journal consumes it.
       const docDate =
-        date_issued || new Date().toISOString().slice(0, 10);
+        date_issued || toLocalAccountingDateString(new Date());
 
       const doc = {
         id: docId,
@@ -1143,6 +1154,10 @@ export default function (pool, myInvoisGTConfig) {
 
       await applyAccountingForCreate(client, doc);
       await insertDoc(client, doc);
+
+      // G7: post the document-owned CN/DN/RN journal (the posting lock on
+      // date_issued fires inside).
+      await postGTAdjustmentJournalEntry(client, doc, invoice, doc.created_by);
 
       if (replacementCreditNote) {
         await client.query(
@@ -1195,6 +1210,14 @@ export default function (pool, myInvoisGTConfig) {
         await applyAccountingForCreate(client, rnDoc);
         await insertDoc(client, rnDoc);
 
+        // G7: the paired Refund Note posts its own RN journal.
+        await postGTAdjustmentJournalEntry(
+          client,
+          rnDoc,
+          invoice,
+          rnDoc.created_by
+        );
+
         await client.query(
           `UPDATE greentarget.adjustment_documents
               SET paired_with_id = $1 WHERE id = $2`,
@@ -1233,7 +1256,7 @@ export default function (pool, myInvoisGTConfig) {
       await client.query("ROLLBACK");
       console.error("Error creating GT adjustment document:", error);
       res
-        .status(400)
+        .status(error.status || error.statusCode || 400)
         .json({ message: error.message || "Error creating adjustment document" });
     } finally {
       client.release();
@@ -1325,6 +1348,16 @@ export default function (pool, myInvoisGTConfig) {
       }
 
       // Child / standalone cancellation — reverse balance impact.
+      // G7: cancelling the document is a locked-period mutation when dated
+      // pre-cutover, and its CN/DN/RN journal is cancelled with it.
+      assertGreenTargetAccountingDateUnlocked(
+        doc.date_issued,
+        `Adjustment ${id} cancellation`
+      );
+      if (doc.journal_entry_id) {
+        await cancelGTAdjustmentJournalEntry(client, doc.journal_entry_id);
+      }
+
       const totalAmt = parseFloat(doc.total_amount);
       switch (doc.type) {
         case "credit_note":
@@ -1359,7 +1392,7 @@ export default function (pool, myInvoisGTConfig) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error(`Error cancelling GT adjustment doc ${id}:`, error);
-      res.status(400).json({ message: error.message });
+      res.status(error.status || error.statusCode || 400).json({ message: error.message });
     } finally {
       client.release();
     }
