@@ -10,13 +10,17 @@ import {
   IconStar,
   IconStarFilled,
 } from "@tabler/icons-react";
-import { useAccountCodesCache } from "../../utils/accounting/useAccountingCache";
+import {
+  type AccountingCacheCompany,
+  useAccountCodesCache,
+} from "../../utils/accounting/useAccountingCache";
 import { AccountCode } from "../../types/types";
 
 interface AccountCodeComboboxProps {
   value: string;
   onChange: (value: string) => void;
   accounts?: AccountCode[];
+  company?: AccountingCacheCompany;
   label?: string;
   required?: boolean;
   disabled?: boolean;
@@ -54,6 +58,7 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
   value,
   onChange,
   accounts,
+  company = "tienhock",
   label,
   required,
   disabled = false,
@@ -68,7 +73,10 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
   pendingFavouriteCodes,
   onToggleFavourite,
 }: AccountCodeComboboxProps) => {
-  const { accountCodes: allAccountCodes } = useAccountCodesCache();
+  const { accountCodes: allAccountCodes } = useAccountCodesCache(
+    company,
+    accounts === undefined
+  );
   const availableAccounts: AccountCode[] = accounts ?? allAccountCodes;
   const [query, setQuery] = useState<string>("");
   const [isOpen, setIsOpen] = useState<boolean>(false);

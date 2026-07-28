@@ -15,8 +15,10 @@ leg (user-approved), the four `(ref, date)` collisions, and `posting_sequence`. 
 backend-clone question and produced the §3d operational bridge
 ([GT_OPERATIONAL_BRIDGE.md](GT_OPERATIONAL_BRIDGE.md)). G6 shipped the frontend: the GT Accounting
 nav section (Journal Entries, Account Ledger, Trial Balance, Income Statement, Balance Sheet, Chart
-of Accounts) runs the shared TH pages read-only over GT route clones, and the GT Debtors report is
-re-pointed at the imported ledger (June 2026 total RM156,782.22). **G7 shipped organic posting: GT
+of Accounts) runs the shared TH pages over GT route clones, and the GT Debtors report is re-pointed
+at the imported ledger (June 2026 total RM156,782.22). G7 enabled journal maintenance, and the
+28 Jul follow-up enabled Chart of Accounts create/edit maintenance while keeping codes immutable
+and providing no delete workflow. **G7 shipped organic posting: GT
 invoices, payments and adjustments dated on/after 2026-07-01 now own balanced journals in the
 `greentarget` schema, manual journals are keyed from the shared Journal pages, and the R8 posting
 lock rejects every pre-July GT mutation with 409. The bridge §5 process decision was made: enter
@@ -300,6 +302,11 @@ Do not re-litigate these.
 | R6 ✅ **(revised — read carefully)** | **The 28 GTDB debtor sections become `greentarget` debtor child accounts created by the import, from the ledger — NOT auto-generated from `greentarget.customers`.** Do not port TH's `debtorSync` behaviour as-is. Instead: (a) the import creates one debtor child per legacy code; (b) a tracked, user-approved `debtor-map.json` links a legacy code to a `greentarget.customers.customer_id` where one genuinely exists; (c) any future sync is **non-destructive** — it may never delete or rename an import-owned child, and it may not mint a child for an ERP customer that has no ledger presence without approval. | §3e: only 2 of 28 legacy debtors match an ERP customer. TH's 1:1 `customers`→child sync assumed near-total overlap; applying it here would create ~47 parallel debtor accounts beside the 28 real ones and split the receivable in two. The legacy ledger is the authority for who owes GT money (user-confirmed: ERP customer data is incomplete, GTDB is the debtor evidence). |
 | R7 ✅ | **Reports/pages are built by parameterizing the existing TH pages** (the `DebtorsReportPage` config-prop pattern), not by forking them. | One code path, two companies; GT gets fixes for free. Isolation is a *data* rule, not a code rule. |
 | R8 ✅ | **Apply a GT posting lock before 2026-07-01**, mirroring TH's narrow application-level `ACCOUNTING_PERIOD_LOCKED` guard (HTTP 409) on GT accounting mutations. | Consistent with TH, and the imported Jan–Jun ledger is immutable evidence that must not be edited through ordinary screens. Keep it as narrow and honest as TH's: it is not a full period close, and direct SQL/migrations bypass it by design (TH plan §9). |
+
+**R6 clarification (28 Jul 2026):** authorised users may manually create a GT account from Chart of
+Accounts, including a manually approved debtor child. R6 still forbids *automatic* account creation
+by invoice/payment posting or a customer sync. The application never renames or deletes a code; a
+posted service must continue to resolve an already-existing active account.
 
 ### The seven blocking questions — ANSWERED 25 Jul 2026
 
@@ -790,18 +797,23 @@ foreign key that will fail loudly on any account whose APPX does not resolve.
 
 ### Phase G3 — chart of accounts + note mapping — ✅ COMPLETE (26 Jul 2026)
 
-**503 accounts loaded. No journal, no line, no opening anchor — those tables are still empty and the
-migration asserts it.** The chart is **generated, not hand-typed**: a typed chart could not be
+**503 accounts were loaded. At the original G3 phase boundary there was no journal, line or opening
+anchor.** The chart is **generated, not hand-typed**: a typed chart could not be
 re-verified against its sources, and every field it needs (code, description, printed APPX note,
 printed order) was already machine-readable in two independently-validated artifacts.
+
+The 28 Jul runtime-maintenance update changes only the rerun contract: those 503 codes are now a
+required legacy subset of a growing live chart. The migration no longer asserts later-phase tables
+are empty, rejects extra accounts, or repairs an existing row. It inserts a missing legacy identity
+and otherwise preserves all user-managed fields byte-for-byte.
 
 **Files changed**
 
 | Path | Tracked | What |
 |---|---|---|
-| `dev/import/greentarget-legacy/verify-chart.mjs` | yes | **Written before the loader.** 55 property-based gates read out of the database and compared to the sources — coverage both ways, field fidelity, the three named traps, note integrity, hierarchy, phase boundaries, TH baseline, and the headline printed-statement reconciliation. |
+| `dev/import/greentarget-legacy/verify-chart.mjs` | yes | **Written before the loader.** Property-based gates read the database and independent sources — required legacy identity/provenance, exact untouched-seed fidelity, structural validation of intentional overrides/live rows, the named traps, hierarchy, phase boundaries, TH baseline, and printed-statement reconciliation from the immutable evidence mapping. |
 | `dev/import/greentarget-legacy/build-chart.mjs` | yes | Derives the 503 rows and **writes the migration itself**. `--check-only` proves the file on disk still matches the sources. |
-| `dev/migrations/2026-07-26_greentarget_chart_of_accounts.sql` | yes | Generated. Guarded, idempotent, non-destructive, one transaction. sha256 `52d16e50…` |
+| `dev/migrations/2026-07-26_greentarget_chart_of_accounts.sql` | yes | Generated. Guarded, idempotent, non-destructive, one transaction. The live-safe rerun uses `ON CONFLICT DO NOTHING`; current sha256 `abe56e5f…`. |
 | `dev/import/greentarget-legacy/debtor-map.json` | yes | R6 artifact. 28 debtors, 2 ERP candidates, **0 approved** — see the open question below. |
 | `dev/import/greentarget-legacy/generated/gt-chart-of-accounts.csv` | no | The reviewable 503-row chart. sha256 `ce4274b4…` |
 | `CLAUDE.md`, `AGENTS.md` | yes | GT accounting block updated, byte-identical in both (rule 13). |
@@ -865,17 +877,17 @@ TD↔subledger) so R7's shared pages behave identically, and it makes the TH tri
 
 | Gate | Result |
 |---|---|
-| Every one of the 474 TB accounts resolves to a chart row; no unmatched code either way | ✅ 0 missing, 0 invented, 0 orphan GTLD/GTDB sections |
+| Every one of the 474 TB accounts plus the 28 GTDB debtors resolves | ✅ all 503 legacy identities required; post-cutover accounts are allowed beside them |
 | Every account reaches an ACTIVE note; no NULL `fs_note`; the FK was not dropped | ✅ |
 | **June closes grouped by mapped note reproduce every printed IS and BS line** | ✅ **exact, every line, no residual** — revenue 265,208.20 · EPF 8,206.00 · R&M 65,868.30 · salaries 63,485.50 · SOCSO 1,238.10 · vehicle 37,929.35 · Schedule 5 72,111.34 · trade receivable 156,782.22 · and all 16 BS notes |
 | Printed `DEBTOR` control, all six months | ✅ debtor children + the **named** CD_SD cash gap (20,210.00 / 7,190.00 / 3,672.00 / 6,250.00 / 740.00 / .00) = the printed control, to the cent |
-| Migration applies cleanly | ✅ `G3 OK: 503 GT accounts (TD 29 / BK 5 / TC 29 / GL 440), DEBTOR + 28 children, 503 surfaced by the hierarchy view` |
-| Rerun is an **exact** no-op | ✅ `INSERT 0 0`; md5 over all 503 rows **including `created_at`/`updated_at`** identical before/after: `7bc6fd999dbc6e7a9dc32b012e485792` |
+| Migration applies cleanly | ✅ original 503-row load proven; current payload remains exactly 503 evidence-derived rows |
+| Rerun is a non-destructive no-op for existing codes | `ON CONFLICT DO NOTHING`: seeded/edited rows and additional live accounts are never overwritten or rejected; only a missing legacy identity is inserted |
 | Zero impact on Tien Hock | ✅ asserted inside the transaction (`public.account_codes` 2,825 / `journal_entries` 8,188 / `financial_statement_notes` 33 unmoved) |
-| G3 stays in its lane | ✅ `journal_entries`, `journal_entry_lines`, `account_opening_balances`, `import_legacy_rows` all still 0 |
+| G3 stays in its lane | It never writes `journal_entries`, `journal_entry_lines`, `account_opening_balances` or `import_legacy_rows`; their later G4/G7 population is tolerated on rerun |
 | TH `validate-fixtures.mjs` / `verify-legacy-reports.mjs` | ✅ `ALL CHECKS PASSED` / `ALL STAGES GREEN` |
 | GT `validate-fixtures.mjs` | ✅ unchanged: the same 6 known `BTFS` failures + 6 coverage WARNs; `473 balances compared to the ledger, 0 mismatched` every month |
-| Guards are not decorative | ✅ 7 fault injections: unresolvable `fs_note` rejected / a valid one accepted · unknown `ledger_type` rejected · duplicate code rejected · missing parent rejected · a planted foreign account **aborts the rerun instead of being deleted** (R6) and survives the abort · moving `PBB_1` from note 19 to note 6 makes the verifier name **both** residuals at ±28,468.37 and the migration repairs exactly that one row (`INSERT 0 1`) |
+| Guards are not decorative | Payload faults still fail loudly: unresolvable `fs_note`, unknown `ledger_type`, duplicate code and missing payload parent. Live extras and intentional overrides are outside the payload's ownership; the verifier byte-checks untouched `G3_CHART_LOAD` rows and structurally validates overridden/live rows. |
 
 #### Findings and open items for later phases
 
@@ -1216,18 +1228,19 @@ actually injected.**
 
 ### Phase G6 — frontend pages + debtors re-point — ✅ COMPLETE (28 Jul 2026)
 
-**The GT Accounting section is live: six shared TH pages now serve Green Target through an optional
-`company="greentarget"` prop (R7), backed by new read-only GT route clones, and the GT Debtors
+**At G6 completion, the GT Accounting section went live: six shared TH pages served Green Target through an optional
+`company="greentarget"` prop (R7), backed by initial read-only GT route clones, and the GT Debtors
 report is re-pointed at the imported ledger.** TH behaviour is unchanged — every prop defaults to
 Tien Hock and every TH config/endpoint/localStorage key keeps its original value. Changelog entry
-shipped (rule 16).
+shipped (rule 16). G7 subsequently enabled journal mutations; the 28 Jul chart-maintenance follow-up
+subsequently enabled account create/edit.
 
 **Files changed**
 
 | Path | Tracked | What |
 |---|---|---|
 | `src/routes/greentarget/accounting/journal-entries.js` | yes | New read-only clone: `GET /` (TH's `{ entries, total, limit, offset }` envelope, same filters) and `GET /:id` (lines with per-line display refs + joined account descriptions, `source: null`). |
-| `src/routes/greentarget/accounting/account-codes.js` | yes | New read-only clone: `GET /?flat=true` (503 accounts, `fs_note_name` joined) and the `/ledger-types` router (6 rows). |
+| `src/routes/greentarget/accounting/account-codes.js` | yes | Initially a read-only `GET /?flat=true` clone plus the `/ledger-types` router; the 28 Jul follow-up added authenticated create/edit endpoints. |
 | `src/routes/greentarget/accounting/debtors.js` | yes | New ledger-backed debtors: `GET /`, `GET /statement/:code`, `GET /general-statement` emitting the shared page's exact shapes from the 28 TD children; aging as a monthly FIFO roll-forward from the 2026-01-01 anchors. |
 | `src/routes/index.js` | yes | Mounts `/greentarget/api/journal-entries`, `/account-codes`, `/ledger-types`, `/debtors`. |
 | `src/pages/Accounting/{JournalEntryListPage,JournalDetailsPage,AccountCodeListPage,DebtorsReportPage}.tsx`, `src/pages/Accounting/Reports/{TrialBalancePage,AccountLedgerPage,IncomeStatementPage,BalanceSheetPage}.tsx` | yes | Optional `company` prop (or, for Debtors, the existing config) with TH defaults; GT branches swap base paths, hide mutating/TH-only UI, and keep TH byte-identical when the prop is absent. |
@@ -1242,7 +1255,7 @@ shipped (rule 16).
 
 **Decisions**
 
-- **Everything is read-only.** All 1,705 GT journals are `IMP`, which TH already renders read-only;
+- **At G6, everything was read-only (superseded by G7/chart maintenance).** All 1,705 GT journals are `IMP`, which TH already renders read-only;
   GT adds belt-and-braces gates. No create/edit forms (JournalEntryPage, AccountCodeFormPage stay
   TH-only); the R8 posting lock and mutations are G7's. "Bank Statement" and "Opening Balances" need
   no GT pages — a bank statement is the Account Ledger pointed at a BK account, and anchors surface
@@ -1414,6 +1427,65 @@ documents exist yet — first live CN/DN/RN will be the user's).
    joins the production apply list, and production's post-cutover documents need the same backfill —
    re-run `backfill-g7-organic.mjs` there AFTER the schema migration (it calls the shipped services,
    so it needs the server code deployed, or run it on the server).
+
+---
+
+### Post-G7 — Chart of Accounts maintenance — ✅ COMPLETE (28 Jul 2026)
+
+Green Target users can now add an account and edit an existing account from Accounting → Chart of
+Accounts. The shared account form is company-aware and uses GT's own account/ledger-type/report-note
+routes and cache. The backend exposes authenticated `POST /greentarget/api/account-codes` and
+`PUT /greentarget/api/account-codes/:code` endpoints plus the detail/children/overview reads needed
+by the form.
+
+**Live maintenance policy**
+
+- Create requires a unique code, non-empty description, an active GT ledger type and an active GT
+  financial-statement note. An optional parent must exist and be active. `NEW`, `CHILDREN`, `.` and
+  `..` are reserved by the page routes and cannot be used as account codes.
+- Edit may change description, ledger type, parent, report note, sort order, status and notes. Parent
+  changes reject self/descendant cycles and recalculate the branch's denormalised `level` values.
+  Every save supplies the row's `expected_updated_at`; a stale edit receives 409 and must reload
+  instead of silently overwriting another user's work.
+- The account code is the immutable identity. It is disabled on edit, the API rejects a rename, and
+  GT has no delete endpoint or delete button.
+- A system account keeps its active status, parent, ledger type and report note. An ordinary account
+  with journal history or an opening anchor must remain active so historical balances stay visible;
+  an account with children must be emptied/re-parented before deactivation.
+- A trade-debtor (`TD`) account is always a direct child of the `DEBTOR` system control, always uses
+  report note `22`, and must remain a leaf. A TD child cannot be selected as another account's parent.
+- Posting services still never create an account automatically (R6). Manual creation is an explicit
+  user decision and does not connect an ERP customer to a debtor automatically.
+
+**Legacy/rebuild contract**
+
+- G3 still derives and validates exactly **503** evidence rows. Those codes (and their
+  `created_by='G3_CHART_LOAD'` provenance) remain mandatory identities; additional live accounts are
+  allowed and are not counted as import drift.
+- The G3 migration now inserts missing legacy identities with `ON CONFLICT DO NOTHING`. A rerun does
+  not overwrite a seeded row's user-managed fields, does not reject an extra account, and does not
+  require the later G4/G7 tables to be empty.
+- The G3 migration and `verify-chart.mjs` byte-check untouched G3 rows. A row whose `updated_by`
+  records a user/API actor is treated as an intentional override and instead receives live
+  structural/FK/no-null checks; the exact original APPX/description/order/hierarchy remains verified
+  from the immutable source payload.
+- G4's anchor and monthly-posting guards validate the exact legacy identities they consume rather
+  than asserting the whole live chart has 503 rows. The Jan–Jun staging, 501 anchors, 1,705 imported
+  journals, 4,401 imported lines and every per-account close remain pinned exactly; organic accounts
+  and post-1-Jul journals are outside those population counts.
+- The G5 fixture harness continues exact Trial Balance/statement comparisons while the seeded report
+  metadata is untouched. After an intentional report-shaping seed edit, those historical engine
+  comparisons are explicitly reported as not applicable; immutable fixtures, source payload,
+  imported lines and historical closes are still verified independently.
+
+**Read-only verification (28 Jul 2026):** G3 generator `--check-only` matched both generated files;
+G4 staging/anchor `--check-only` passed; `verify-chart.mjs` passed 59 gates; `verify-import.mjs`
+passed 64 gates and 2,850 per-account comparisons; and the full G5 harness passed all 123 gates.
+JavaScript syntax checks and `git diff --check` also passed. No build/type/lint command was run.
+
+No schema or database migration was added for this follow-up: the existing table already carries all
+required fields and constraints. The tracked G3/opening migrations were regenerated from their
+updated generators; no database mutation was run as part of this maintenance change.
 
 ---
 

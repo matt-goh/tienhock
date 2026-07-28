@@ -46,6 +46,7 @@ import GTTrialBalancePage from "./GreenTarget/Accounting/GTTrialBalancePage";
 import GTIncomeStatementPage from "./GreenTarget/Accounting/GTIncomeStatementPage";
 import GTBalanceSheetPage from "./GreenTarget/Accounting/GTBalanceSheetPage";
 import GTAccountCodeListPage from "./GreenTarget/Accounting/GTAccountCodeListPage";
+import GTAccountCodeFormPage from "./GreenTarget/Accounting/GTAccountCodeFormPage";
 
 // Top-level order mirrors the other two companies (Tien Hock / Jelly Polly):
 // Accounting -> Payroll -> Sales -> operational/catalogue menus.
@@ -119,6 +120,19 @@ export const GreenTargetNavData: SidebarItem[] = [
         path: "/accounting/account-codes",
         component: GTAccountCodeListPage,
         group: "Setup",
+        subItems: [
+          {
+            name: "New Account",
+            path: "/accounting/account-codes/new",
+            component: GTAccountCodeFormPage,
+            showInPopover: true,
+          },
+          {
+            name: "Edit Account",
+            path: "/accounting/account-codes/:code",
+            component: GTAccountCodeFormPage,
+          },
+        ],
       },
     ],
   },

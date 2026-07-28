@@ -36,6 +36,14 @@ these fixtures. Tien Hock's harness re-implements its engines' SQL query-for-que
 not, so the verified logic and the served logic cannot diverge. It connects with `pg` using the
 `DB_*` values in the repo-root `.env`, and is strictly read-only.
 
+The exact `tb` and `statements` comparisons apply while the live G3 seed fields still match the
+pinned evidence. If a user intentionally changes a seeded description, ledger type, parent, report
+note, sort order or active status, those two stages report the affected codes and pass as explicitly
+not applicable: current reports are then expected to follow the approved live chart. Notes-only edits
+or a field restored to its evidence value do not disable the comparisons. `verify-chart.mjs` and
+`verify-import.mjs` continue to prove the immutable 503-code payload, imported ledger and historical
+closes independently, while the `ledger`, `bridge` and `regressions` stages still run normally.
+
 | Stage | What it proves | Gates |
 |---|---|---:|
 | `tb` | `buildTrialBalance` vs all six printed Trial Balances — every printed line, **in printed order**, the netted DEBTOR control, and grand totals | 54 |

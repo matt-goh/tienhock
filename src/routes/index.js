@@ -355,7 +355,7 @@ export default function setupRoutes(app, pool) {
     "/greentarget/api/bank-statement",
     greenTargetAccountLedgerRouter(pool)
   );
-  // Green Target accounting lookups (G6) and journal mutations (G7). Same
+  // Green Target accounting lookups (G6) and mutations (G7+). Same
   // `greentarget` schema isolation; paths mirror Tien Hock's so the shared
   // pages swap base path only. Since G7 this router also MUTATES the GT
   // books, so it sits behind the same session auth + restore guard TH gets
@@ -369,6 +369,8 @@ export default function setupRoutes(app, pool) {
   );
   app.use(
     "/greentarget/api/account-codes",
+    authMiddleware(pool),
+    checkRestoreState,
     createGreenTargetAccountCodesRouter(pool)
   );
   app.use(
