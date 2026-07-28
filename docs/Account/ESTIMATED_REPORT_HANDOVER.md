@@ -366,10 +366,11 @@ RM53 on OIL6389, the missing RM40 parked on CA_WA; Rosa re-pointed it in product
       so the existing global `authMiddleware` is the whole policy and the nav item is
       visible to everyone. Changelog entry shipped with the page. See §10.
 - [x] **Phase 5 — PDF printing** (2026-07-28): `src/utils/stock/EstimatedReportPDF.tsx`
-      via `printPdfBlob`; Print button on the shared report page prints the full
-      four-page set (MEE P&L, MEE Unit Cost, BIHUN P&L, BIHUN Unit Cost) from the
-      already-fetched report response — user-confirmed scope. Changelog entry
-      shipped. See §12.
+      via `printPdfBlob`; Print button on the shared report page. Each page prints
+      its OWN view for both product lines (P&L page → MEE + BIHUN P&L; unit-cost
+      page → MEE + BIHUN unit cost — user decision, revised same-day from the
+      initial combined four-page set) from the already-fetched report response.
+      Changelog entry shipped. See §12.
 - [ ] **Phase 6 — Wrap-up**: apply any evidence-backed Q14/Q15 corrections received,
       production migration rollout, changelog entry,
       AGENTS.md/CLAUDE.md updates, bug-scan offer.
@@ -377,14 +378,18 @@ RM53 on OIL6389, the missing RM40 parked on CA_WA; Rosa re-pointed it in product
 ## 4. Progress log
 
 - 2026-07-28 — **Phase 5 done.** PDF printing shipped:
-  `src/utils/stock/EstimatedReportPDF.tsx` (new) renders the full four-page set —
-  MEE P&L, MEE Unit Cost, BIHUN P&L, BIHUN Unit Cost — straight from the
-  already-fetched `EstimatedReportResponse` (no refetch, nothing hardcoded), and a
-  Print button (`exporting` state, "Preparing..." label, `toast.error` on failure)
-  sits in the shared page's header actions on both the P&L and unit-cost pages.
-  Print scope was confirmed with the user (full set from either page, over the
-  other §11.1 options). Prints through `printPdfBlob` per AGENTS.md rule 19.
-  Changelog entry prepended. See §12.
+  `src/utils/stock/EstimatedReportPDF.tsx` (new) renders the report straight from
+  the already-fetched `EstimatedReportResponse` (no refetch, nothing hardcoded),
+  and a Print button (`exporting` state, "Preparing..." label, `toast.error` on
+  failure) sits in the shared page's header actions on both the P&L and unit-cost
+  pages. **Print scope (user decision, same-day revision): each page prints its
+  OWN view for both product lines** — the P&L page prints MEE + BIHUN P&L, the
+  unit-cost page prints MEE + BIHUN unit cost. The generator takes the page's
+  `view` prop (`generateEstimatedReportPDF(report, view)`). This replaced the
+  initially shipped combined four-page set (the §11.2 default the user first
+  confirmed, then revised on seeing it). Prints through `printPdfBlob` per
+  AGENTS.md rule 19. Changelog entry prepended, then updated in place for the
+  scope revision (same-day refinement, §10.2 precedent). See §12.
 - 2026-07-28 — **Post-Phase-4 UI fixes (user feedback).** (1) The mappings modal's
   `SearchableCombobox` rendered every matching option with no cap, so the account
   picker mounted ~600 options at once and stalled the page; it now renders at most
@@ -1227,12 +1232,17 @@ One new file, one edited file, one changelog entry. **No backend change.**
 
 Decisions and details worth knowing:
 
-- **Print scope (user-confirmed 2026-07-28): the full four-page set from either
-  page** — MEE P&L, MEE Unit Cost, BIHUN P&L, BIHUN Unit Cost — matching the
-  legacy printout set (the §11.2 default), chosen over printing only the current
-  view/line. The MEE/BIHUN switcher and the P&L/unit-cost page split remain
-  screen-only view filters. A product line absent from the response is simply
-  skipped (`reports` is a `Partial<Record<...>>`).
+- **Print scope (user decision 2026-07-28, revised same-day): each page prints
+  its OWN view for both product lines** — the P&L page's Print produces MEE P&L +
+  BIHUN P&L, the unit-cost page's Print produces MEE + BIHUN Unit Cost. The
+  MEE/BIHUN switcher stays a screen-only view filter (§11.2), so a print always
+  covers both lines; only the view is scoped to the page. The generator signature
+  is `generateEstimatedReportPDF(data, view)` with `view: "pl" | "unitCost"`,
+  passed straight from the page's own `view` prop. (Initially shipped as the
+  combined four-page set per the user's first pick of the §11.2 default; the user
+  revised to per-view printing on seeing it, and the changelog entry was updated
+  in place — same-day refinement, §10.2 precedent.) A product line absent from
+  the response is simply skipped (`reports` is a `Partial<Record<...>>`).
 - Content is 1:1 with the live response as rendered on screen (§11.2): P&L page =
   product table (bags) + Total Sales, closing/opening stock tables + totals +
   the Closing+Sales info row, purchase + returns tables + totals + the

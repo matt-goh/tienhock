@@ -1,7 +1,8 @@
 // src/utils/stock/EstimatedReportPDF.tsx
 // PDF printout of the monthly "Estimated P&L & Unit Cost" report (MEE & BIHUN).
-// Prints the full four-page set: MEE P&L, MEE Unit Cost, BIHUN P&L, BIHUN
-// Unit Cost — content is 1:1 with the live report response, never hardcoded.
+// Each report page prints its OWN view for both product lines: the P&L page
+// prints MEE P&L + BIHUN P&L, the Unit Cost page prints MEE + BIHUN Unit Cost.
+// Content is 1:1 with the live report response, never hardcoded.
 // Doc: docs/Account/ESTIMATED_REPORT_HANDOVER.md (Phase 5)
 import React from "react";
 import {
@@ -18,6 +19,8 @@ import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfBlob } from "../pdfPrintFallback";
 
 type ProductLine = "mee" | "bihun";
+
+type EstimatedReportView = "pl" | "unitCost";
 
 interface ReportPeriod {
   year: number;
@@ -893,10 +896,12 @@ const EstimatedUnitCostPDFPage: React.FC<{ line: ProductLineReport }> = ({
 
 interface EstimatedReportPDFDocumentProps {
   data: EstimatedReportResponse;
+  view: EstimatedReportView;
 }
 
 const EstimatedReportPDFDocument: React.FC<EstimatedReportPDFDocumentProps> = ({
   data,
+  view,
 }) => {
   const productLines: ProductLine[] = ["mee", "bihun"];
   return (
@@ -904,20 +909,20 @@ const EstimatedReportPDFDocument: React.FC<EstimatedReportPDFDocumentProps> = ({
       {productLines.flatMap((productLine) => {
         const line = data.reports[productLine];
         if (!line) return [];
-        return [
-          <EstimatedPLPDFPage key={`${productLine}-pl`} line={line} />,
-          <EstimatedUnitCostPDFPage key={`${productLine}-uc`} line={line} />,
-        ];
+        return view === "pl"
+          ? [<EstimatedPLPDFPage key={`${productLine}-pl`} line={line} />]
+          : [<EstimatedUnitCostPDFPage key={`${productLine}-uc`} line={line} />];
       })}
     </Document>
   );
 };
 
 export const generateEstimatedReportPDF = async (
-  data: EstimatedReportResponse
+  data: EstimatedReportResponse,
+  view: EstimatedReportView
 ): Promise<void> => {
   const blob = await pdf(
-    <EstimatedReportPDFDocument data={data} />
+    <EstimatedReportPDFDocument data={data} view={view} />
   ).toBlob();
 
   printPdfBlob(blob, "estimated report PDF");

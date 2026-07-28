@@ -20,11 +20,6 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-28",
-    ms: "Perakaunan: laporan Estimated P&L dan Estimated Unit Cost kini boleh dicetak sebagai PDF — klik butang Print pada mana-mana satu halaman. PDF mengandungi set lengkap empat halaman (P&L dan Kos Unit bagi MEE dan BIHUN) dengan semua angka tepat seperti yang dipaparkan pada skrin untuk bulan yang dipilih, termasuk Add Back yang telah dikunci.",
-    en: "Accounting: the Estimated P&L and Estimated Unit Cost reports can now be printed as a PDF — click the Print button on either page. The PDF contains the full four-page set (P&L and Unit Cost for both MEE and BIHUN) with every figure exactly as shown on screen for the selected month, including the keyed Add Back.",
-  },
-  {
-    date: "2026-07-28",
     ms: "Green Target: perakaunan kini aktif sepenuhnya. Invois, bayaran dan nota kredit/debit/bayaran balik bertarikh 1 Julai 2026 dan selepasnya kini direkodkan secara automatik ke dalam lejar Green Target — setiap invois dan bayaran menghasilkan catatan jurnalnya sendiri, dan pembatalan turut membatalkan catatan itu. Anda juga boleh mengunci masuk jurnal manual baharu dari Accounting → Journal Entries, serta menyunting, membatalkan atau mengembalikan semula catatan sedia ada. Dokumen dan jurnal bertarikh sebelum 1 Julai 2026 dilindungi dan tidak boleh diubah, supaya angka Jan–Jun yang telah dimuktamadkan kekal tepat.",
     en: "Green Target: accounting is now fully live. Invoices, payments and credit/debit/refund notes dated 1 July 2026 onward are now recorded in the Green Target ledger automatically — every invoice and payment produces its own journal entry, and cancelling a document cancels that entry. You can also key in new manual journals from Accounting → Journal Entries, and edit, cancel or restore existing entries. Documents and journals dated before 1 July 2026 are protected and cannot be changed, so the finalised Jan–Jun figures stay exact.",
   },
@@ -47,21 +42,6 @@ const CHANGELOG_ENTRIES: ChangelogEntry[] = [
     date: "2026-07-28",
     ms: "Halaman Material Stock kini menyusun Unit Cost terus selepas Opening Qty, diikuti kumpulan Adjustment dan Closing yang jelas. Nilai Adjustment menunjukkan Qty x Unit Cost, manakala Closing Value diterangkan sebagai Opening + Movements. Lajur Purchases Qty yang tidak digunakan telah dibuang; nilai pembelian hanya dipaparkan dalam ringkasan RM apabila berkenaan, dan jumlah nilai kategori dipaparkan pada baris ringkasan berasingan.",
     en: "The Material Stock page now places Unit Cost directly after Opening Qty, followed by clearly grouped Adjustment and Closing columns. Adjustment Value shows Qty x Unit Cost, while Closing Value is explained as Opening + Movements. The unused Purchases Qty column has been removed; purchase value appears in the RM summaries only when applicable, and category value totals appear in a separate summary row.",
-  },
-  {
-    date: "2026-07-28",
-    ms: "Jurnal: tempoh perakaunan sebelum 1 Jun 2026 kini dilindungi sepenuhnya pada halaman Journal Entries. Sebelum ini catatan jurnal bertarikh sebelum tarikh tersebut masih boleh dibuka, disunting, dibatalkan atau dikunci masuk sebagai catatan baharu, yang boleh mengubah angka laporan yang telah dimuktamadkan. Sekarang sistem menolak percubaan itu dan memaparkan sebab yang jelas. Catatan sedia ada tidak berubah, dan kerja bagi 1 Jun 2026 dan seterusnya berjalan seperti biasa. Invois, resit dan bayaran memang sudah dilindungi sebelum ini.",
-    en: "Journals: the accounting period before 1 June 2026 is now fully protected on the Journal Entries page. Previously a journal dated before that day could still be keyed in as a new entry, edited, or cancelled, which could change figures on reports that were already finalised. The system now refuses and explains why. Existing entries are unchanged, and work dated 1 June 2026 onwards is unaffected. Invoices, receipts and payments were already protected.",
-  },
-  {
-    date: "2026-07-28",
-    ms: "Jurnal: butang \"Restore Entry\" baharu membolehkan catatan jurnal yang dibatalkan tersilap dikembalikan semula ke lejar, tepat seperti keadaan asalnya. Butang ini hanya muncul pada catatan yang dibatalkan. Jika pembatalan itu datang daripada dokumen sumbernya sendiri — contohnya invois, resit atau pembelian yang telah dibatalkan — sistem akan menolak permintaan itu dan menerangkan sebabnya, supaya catatan yang sengaja dibuang tidak kembali ke lejar. Catatan bertarikh sebelum 1 Jun 2026 dan catatan import lama kekal tidak boleh diubah.",
-    en: "Journals: a new \"Restore Entry\" button puts a journal entry that was cancelled by mistake back onto the ledger, exactly as it was before. The button only appears on cancelled entries. If the cancellation came from the entry's own source document — for example a cancelled invoice, receipt or purchase — the system refuses and explains why, so entries that were removed on purpose stay removed. Entries dated before 1 June 2026 and legacy imported entries remain unchangeable.",
-  },
-  {
-    date: "2026-07-28",
-    ms: "Green Target: susunan menu diselaraskan dengan Tien Hock dan Jelly Polly — Accounting, Payroll dan Sales kini berada di atas. Laporan Debtors berpindah ke dalam menu Accounting, manakala Invoices, Payments dan Documents dikumpulkan di bawah menu Sales baharu. Semua halaman kekal di alamat yang sama.",
-    en: "Green Target: the menu layout is now aligned with Tien Hock and Jelly Polly — Accounting, Payroll and Sales sit at the top. The Debtors report has moved into the Accounting menu, while Invoices, Payments and Documents are grouped under a new Sales menu. Every page keeps its existing address.",
   },
   {
     date: "2026-07-28",

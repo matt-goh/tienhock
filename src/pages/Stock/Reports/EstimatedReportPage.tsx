@@ -607,7 +607,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
 
     setExporting(true);
     try {
-      await generateEstimatedReportPDF(report);
+      await generateEstimatedReportPDF(report, view);
     } catch (err) {
       console.error("Error printing PDF:", err);
       toast.error("Failed to generate PDF");
