@@ -30,6 +30,22 @@ requires separate approval).
 
 ---
 
+## Removed 29 Jul 2026 — 1 file (GT salary voucher generator foundation)
+
+Applied and verified on dev, then removed per the project convention. Recover with
+`git show 2f4860b6:dev/migrations/2026-07-28_greentarget_salary_vouchers.sql`.
+
+Confirmed present in the dev database at removal time: `greentarget.journal_entry_types` has `JBSL`
+(Staff Salary Wages) and `JWDR` (Director Remuneration); `greentarget.salary_voucher_branches` has 4
+seeded driver rows (AFRED, JULPAKAL, MASTIN, YONUS), all branch `BW`. Also applied to production by
+the user (2026-07-29).
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-07-28_greentarget_salary_vouchers.sql` | Foundation for the GT Voucher Generator (`src/routes/greentarget/accounting/journal-vouchers.js`, page `GTVoucherGeneratorPage.tsx` under Accounting → Generation): added journal entry types `JBSL` (Staff Salary Wages) and `JWDR` (Director Remuneration), continuing the imported legacy `JBSL/MM/YY` / `JWDR/MM/YY` voucher series; created `greentarget.salary_voucher_branches` (per-driver Lori Habuk branch mapping, BW/SS, used to split DRIVER wages between the BW\_\* and SS\_\* account families), seeded with all 4 current drivers in BW (movable from the Voucher Generator page without a code change). Guarded, idempotent (`ON CONFLICT DO NOTHING` + post-check asserting both types and all 4 seed rows exist). | dev ✓, prod ✓ (applied by the user 2026-07-29) |
+
+---
+
 ## Removed 28 Jul 2026 (third batch) — 8 files (GT G2/G3/G4/G7 + estimated report + unit-cost precision, post-G8)
 
 All eight were applied to **both dev and production** (prod: G2/G3 on 2026-07-27 15:18 by the user;
