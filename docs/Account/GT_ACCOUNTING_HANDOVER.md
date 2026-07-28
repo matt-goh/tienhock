@@ -1696,15 +1696,18 @@ receipt atomically, so it cannot split into partially confirmed/cancelled invoic
 `payment_reference` keeps its separate meaning: cheque number or bank/online transaction reference,
 never the Green Target RV number.
 
-Accounting behaviour is intentionally split at the existing cutover boundary:
+Accounting behaviour (**revised 29 Jul 2026**): GT payments are **operational-only** — saving a
+payment never posts a REC journal, because staff key the consolidated receipt journals by hand
+(one journal grouping many bills, exactly like the legacy `CASH RECEIVED ENTRY` screen). This
+supersedes the brief G7 auto-posting window: `payment-journal.js` is retained only for the
+handful of already-posted payment journals (payment 197's backfilled REC journal and any organic
+payment journals posted during the brief 28 Jul auto-posting window), which still re-sync their
+reference on edit and cancel together with their payment so the existing ledger rows stay
+consistent.
 
-- A receipt received on/after 2026-07-01 keeps G7 intact: every active allocation posts its balanced
-  REC journal (DR `PBB_1` / CR receivable), even when it settles a pre-cutover invoice. A cheque
-  posts every allocation when the receipt is confirmed.
 - A receipt received before 2026-07-01 is accepted only when every selected invoice is also
-  pre-cutover. It updates operational payment history and invoice balances but posts no journal;
-  create/confirm/cancel bypasses R8 only for this non-posting path, while every pre-cutover
-  accounting mutation remains locked. A received date cannot precede any selected invoice date.
+  pre-cutover, so pre-cutover operational history stays consistent with the locked imported
+  ledger. A received date cannot precede any selected invoice date.
 - Amounts must be at least RM0.01 with no more than two decimal places. GT references are trimmed,
   limited to 50 characters, checked case-insensitively and remain reserved after cancellation so two
   receipt histories can never merge.
