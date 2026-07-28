@@ -2310,6 +2310,13 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     });
   };
 
+  const formatUnitCost = (value: number): string => {
+    return value.toLocaleString("en-MY", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 4,
+    });
+  };
+
   const categoryTotals = useMemo(() => {
     const totals: Record<MaterialCategory, { opening: number; purchases: number; adjustments: number; closing: number }> = {
       ingredient: { opening: 0, purchases: 0, adjustments: 0, closing: 0 },
@@ -2457,7 +2464,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
       onChange={(event) => onChange(event.target.value)}
       onClick={onClick}
       className="w-full px-2 py-1 text-right font-mono text-sm border border-default-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
-      step="0.01"
+      step="any"
       min="0"
       placeholder="0.00"
     />
@@ -3334,7 +3341,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                   <td className="px-2 py-1.5 text-right">
                                     {renderAdjustmentValue(
                                       variant.adjustment_value,
-                                      `${formatQty(variant.adjustment_quantity)} × ${formatNumber(variant.unit_cost)} = ${formatNumber(variant.adjustment_value)}`
+                                      `${formatQty(variant.adjustment_quantity)} × ${formatUnitCost(variant.unit_cost)} = ${formatNumber(variant.adjustment_value)}`
                                     )}
                                   </td>
                                   <td className="px-2 py-1.5 text-right font-mono text-sm text-default-700 dark:text-gray-300">
@@ -3400,7 +3407,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                 <td className="px-2 py-1.5 text-right">
                                   {renderAdjustmentValue(
                                     newVariant.adjustment_value,
-                                    `${formatQty(newVariant.adjustment_quantity)} × ${formatNumber(newVariant.unit_cost)} = ${formatNumber(newVariant.adjustment_value)}`
+                                    `${formatQty(newVariant.adjustment_quantity)} × ${formatUnitCost(newVariant.unit_cost)} = ${formatNumber(newVariant.adjustment_value)}`
                                   )}
                                 </td>
                                 <td className="px-2 py-1.5 text-right font-mono text-sm text-default-700 dark:text-gray-300">
@@ -3535,7 +3542,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                             <td className="px-2 py-1.5 text-right">
                               {renderAdjustmentValue(
                                 material.adjustment_value,
-                                `${formatQty(material.adjustment_quantity)} × ${formatNumber(material.unit_cost)} = ${formatNumber(material.adjustment_value)}`
+                                `${formatQty(material.adjustment_quantity)} × ${formatUnitCost(material.unit_cost)} = ${formatNumber(material.adjustment_value)}`
                               )}
                             </td>
                             <td className="px-2 py-1.5 text-right">
@@ -3603,7 +3610,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                               <td className="px-2 py-1.5 text-right">
                                 {renderAdjustmentValue(
                                   newVariant.adjustment_value,
-                                  `${formatQty(newVariant.adjustment_quantity)} × ${formatNumber(newVariant.unit_cost)} = ${formatNumber(newVariant.adjustment_value)}`
+                                  `${formatQty(newVariant.adjustment_quantity)} × ${formatUnitCost(newVariant.unit_cost)} = ${formatNumber(newVariant.adjustment_value)}`
                                 )}
                               </td>
                               <td className="px-2 py-1.5 text-right font-mono text-sm text-default-700 dark:text-gray-300">
