@@ -2998,10 +2998,10 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
               className="sticky z-30 bg-default-50 shadow-sm dark:bg-gray-900"
               style={tableHeaderStyle}
             >
-              <tr className="border-b border-default-200/70 dark:border-gray-700">
+              <tr>
                 <th
                   rowSpan={2}
-                  className="px-3 py-2 text-left align-middle text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wider"
+                  className="border-b border-default-200/70 px-3 py-2 text-left align-middle text-xs font-medium text-default-600 dark:border-gray-700 dark:text-gray-400 uppercase tracking-wider"
                 >
                   <div className="flex items-center gap-2">
                     <span>Material</span>
@@ -3017,24 +3017,21 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                     )}
                   </div>
                 </th>
-                <th className="px-2 pb-1 pt-2 text-center text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider">
+                <th
+                  colSpan={2}
+                  className="border-b border-default-200/70 px-2 pb-1 pt-2 text-center text-xs font-semibold text-default-600 dark:border-gray-700 dark:text-gray-400 uppercase tracking-wider"
+                >
                   Opening
                 </th>
                 <th
-                  rowSpan={2}
-                  className="w-24 px-2 py-2 text-center align-middle text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wider"
-                >
-                  Unit Cost
-                </th>
-                <th
                   colSpan={2}
-                  className="border-l border-sky-200 bg-sky-50 px-2 pb-1 pt-2 text-center text-xs font-semibold text-sky-600 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-400 uppercase tracking-wider"
+                  className="border-b border-l border-sky-200 bg-sky-50 px-2 pb-1 pt-2 text-center text-xs font-semibold text-sky-600 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-400 uppercase tracking-wider"
                 >
                   Adjustment
                 </th>
                 <th
                   colSpan={2}
-                  className="border-l border-default-300 px-2 pb-1 pt-2 text-center text-xs font-semibold text-default-600 dark:border-gray-600 dark:text-gray-400 uppercase tracking-wider"
+                  className="border-b border-l border-default-300 px-2 pb-1 pt-2 text-center text-xs font-semibold text-default-600 dark:border-gray-600 dark:text-gray-400 uppercase tracking-wider"
                 >
                   Closing
                 </th>
@@ -3042,6 +3039,9 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
               <tr>
                 <th className="w-24 px-2 pb-2 pt-1 text-right text-[11px] font-medium text-default-500 dark:text-gray-500 uppercase tracking-wider">
                   Qty
+                </th>
+                <th className="w-24 px-2 pb-2 pt-1 text-right text-[11px] font-medium text-default-500 dark:text-gray-500 uppercase tracking-wider">
+                  Unit Cost
                 </th>
                 <th className="w-28 border-l border-sky-200 bg-sky-50 px-2 pb-2 pt-1 text-center text-[11px] font-medium text-sky-600 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-400 uppercase tracking-wider">
                   Qty
