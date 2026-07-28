@@ -20,8 +20,8 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-28",
-    ms: "Halaman Material Stock kini memaparkan lajur \"Adj. Value\" secara berasingan, dikira terus sebagai Adj. Qty x Unit Cost, supaya nilai pelarasan setiap baris mudah disemak. \"Closing Qty\" dan \"Closing Value\" juga kini dilabel dengan jelas supaya nilai pelarasan tidak lagi dikelirukan dengan nilai stok penutup.",
-    en: "The Material Stock page now shows a separate \"Adj. Value\" column, calculated directly as Adj. Qty x Unit Cost, so each row's adjustment value is easy to check. \"Closing Qty\" and \"Closing Value\" are also labelled clearly so the adjustment value is no longer confused with the closing stock value.",
+    ms: "Halaman Material Stock kini menyusun Unit Cost terus selepas Opening Qty, diikuti kumpulan Adjustment dan Closing yang jelas. Nilai Adjustment menunjukkan Qty x Unit Cost, manakala Closing Value diterangkan sebagai Opening + Movements. Lajur Purchases Qty yang tidak digunakan telah dibuang; nilai pembelian hanya dipaparkan dalam ringkasan RM apabila berkenaan, dan jumlah nilai kategori dipaparkan pada baris ringkasan berasingan.",
+    en: "The Material Stock page now places Unit Cost directly after Opening Qty, followed by clearly grouped Adjustment and Closing columns. Adjustment Value shows Qty x Unit Cost, while Closing Value is explained as Opening + Movements. The unused Purchases Qty column has been removed; purchase value appears in the RM summaries only when applicable, and category value totals appear in a separate summary row.",
   },
   {
     date: "2026-07-28",
