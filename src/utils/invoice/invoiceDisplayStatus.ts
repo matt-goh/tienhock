@@ -45,10 +45,17 @@ const hasActiveUnrefundedCreditNote = (
       doc.type === "credit_note" && doc.paired_status !== "active"
   );
 
+// 'OTH' and 'LESS' lines carry their value in the price with no quantity - the
+// invoice form uses the price directly as the line total.
+const FLAT_LINE_CODES: ReadonlySet<string> = new Set(["OTH", "LESS"]);
+
 /**
  * A "returns only" bill is one a salesman issued purely to record returned
  * products: every line has zero sold and zero free quantity, and at least one
  * line carries a return. Display-only classification - nothing is stored.
+ *
+ * A bill holding an 'OTH'/'LESS' line with a price is a real sale even though
+ * its quantity is zero, so it never counts as returns only.
  *
  * List pages get `is_returns_only` from the API (line items are not fetched
  * there); detail pages fall back to computing it from the loaded line items.
@@ -70,10 +77,14 @@ export const isReturnsOnlyInvoice = (
   );
   if (!hasReturn) return false;
 
-  return lineItems.every(
-    (item: ProductItem) =>
-      Number(item.quantity || 0) === 0 && Number(item.freeProduct || 0) === 0
-  );
+  return lineItems.every((item: ProductItem) => {
+    if (Number(item.quantity || 0) !== 0) return false;
+    if (Number(item.freeProduct || 0) !== 0) return false;
+    if (FLAT_LINE_CODES.has(item.code) && Number(item.price || 0) !== 0) {
+      return false;
+    }
+    return true;
+  });
 };
 
 export const isInvoiceFullyRefunded = (

@@ -30,6 +30,24 @@ function escapeXml(unsafe) {
     .replace(/'/g, "&apos;");
 }
 
+// The invoice form treats 'OTH' and 'LESS' as flat lines: the price IS the line
+// total and the quantity is ignored (see InvoiceFormPage / LineItemsTable). The
+// e-Invoice has to declare that same amount, so a flat line is submitted as a
+// single unit priced at the line total - the real quantity is already carried in
+// the description. Without this the lines would not add up to the header total,
+// which is taken from total_excluding_tax.
+const FLAT_LINE_CODES = new Set(["OTH", "LESS"]);
+
+const isFlatLine = (item) => FLAT_LINE_CODES.has(item?.code);
+
+const getLineQuantity = (item) =>
+  isFlatLine(item) ? 1 : Number(item.quantity) || 0;
+
+const getLineAmount = (item) => {
+  const price = Number(item.price) || 0;
+  return isFlatLine(item) ? price : (Number(item.quantity) || 0) * price;
+};
+
 // Helper function to determine TIN or ID type and format value
 const getIdTypeAndValue = (customerData) => {
   if (!customerData.id_type || customerData.id_type === "N/A") {
@@ -249,13 +267,14 @@ export async function JPEInvoiceTemplate(invoiceData, customerData) {
     for (const item of invoiceData.orderDetails) {
       if (item.issubtotal || item.istotal) continue;
 
-      const itemSubtotal = parseFloat(item.price) * parseFloat(item.quantity);
+      const itemQty = getLineQuantity(item);
+      const itemSubtotal = getLineAmount(item);
       const itemTax = parseFloat(item.tax || 0);
 
       xml += `
   <cac:InvoiceLine>
     <cbc:ID>${lineNumber}</cbc:ID>
-    <cbc:InvoicedQuantity unitCode="NMP">${item.quantity}</cbc:InvoicedQuantity>
+    <cbc:InvoicedQuantity unitCode="NMP">${itemQty}</cbc:InvoicedQuantity>
     <cbc:LineExtensionAmount currencyID="MYR">${itemSubtotal.toFixed(
       2
     )}</cbc:LineExtensionAmount>

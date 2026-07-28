@@ -109,11 +109,28 @@ function escapeXml(unsafe) {
     .replace(/'/g, "&apos;");
 }
 
+// The invoice form treats 'OTH' and 'LESS' as flat lines: the price IS the line
+// total and the quantity is ignored (see InvoiceFormPage / LineItemsTable). The
+// e-Invoice has to declare that same amount, so a flat line is submitted as a
+// single unit priced at the line total - the real quantity is already carried in
+// the description (e.g. "CORN STARCH 25KGS X 80BAGS").
+const FLAT_LINE_CODES = new Set(["OTH", "LESS"]);
+
+const isFlatLine = (detail) => FLAT_LINE_CODES.has(detail?.code);
+
+const getLineQuantity = (detail) =>
+  isFlatLine(detail) ? 1 : Number(detail.qty) || 0;
+
+const getLineAmount = (detail) => {
+  const price = Number(detail.price) || 0;
+  return isFlatLine(detail) ? price : (Number(detail.qty) || 0) * price;
+};
+
 const calculateTaxAndTotals = (invoiceData) => {
   // Calculate tax-exclusive amount (subtotal) from product data
   const subtotal = invoiceData.orderDetails.reduce((sum, detail) => {
     if (!detail.issubtotal) {
-      return sum + (detail.qty || 0) * (Number(detail.price) || 0);
+      return sum + getLineAmount(detail);
     }
     return sum;
   }, 0);
@@ -132,15 +149,18 @@ const calculateTaxAndTotals = (invoiceData) => {
     if (detail.issubtotal) return;
 
     const taxAmount = parseFloat(detail.tax) || 0;
-    const lineAmount = (detail.qty || 0) * (Number(detail.price) || 0);
+    const lineAmount = getLineAmount(detail);
     totalProductTax += taxAmount;
 
     // Determine tax category based on tax amount
     let taxCategory = "06"; // Default to not applicable
     if (taxAmount > 0) {
       taxCategory = "01"; // Default to Sales Tax when tax exists
-    } else if (lineAmount > 0) {
-      taxCategory = "E"; // Exempt if there's an amount but no tax
+    } else if (lineAmount !== 0) {
+      // Exempt if there's an amount but no tax. A negative 'LESS' discount
+      // belongs to the same pool it reduces - otherwise its amount is dropped
+      // and the exempt TaxableAmount no longer matches TaxExclusiveAmount.
+      taxCategory = "E";
     }
 
     taxGroups[taxCategory].amount += taxAmount;
@@ -149,7 +169,7 @@ const calculateTaxAndTotals = (invoiceData) => {
 
   // Filter out empty tax groups
   const taxSubtotals = Object.entries(taxGroups)
-    .filter(([_, group]) => group.taxable > 0)
+    .filter(([_, group]) => group.taxable !== 0)
     .map(([category, group]) => ({
       category,
       taxableAmount: formatAmount(group.taxable),
@@ -217,16 +237,15 @@ const generateInvoiceLines = (orderDetails) => {
   for (let index = 0; index < regularItems.length; index++) {
     const item = regularItems[index];
     const lineNumber = (index + 1).toString().padStart(3, "0");
-    const lineAmount = formatAmount(
-      (item.qty || 0) * (Number(item.price) || 0)
-    );
+    const lineQty = getLineQuantity(item);
+    const lineAmount = formatAmount(getLineAmount(item));
     const productTax = formatAmount(Number(item.tax) || 0);
     const taxCategory = productTax > 0 ? "01" : "06"; // 01 for Sales Tax, 06 for Not Applicable
 
     result += `
   <cac:InvoiceLine>
     <cbc:ID>${lineNumber}</cbc:ID>
-    <cbc:InvoicedQuantity unitCode="NMP">${item.qty}</cbc:InvoicedQuantity>
+    <cbc:InvoicedQuantity unitCode="NMP">${lineQty}</cbc:InvoicedQuantity>
     <cbc:LineExtensionAmount currencyID="MYR">${lineAmount.toFixed(
       2
     )}</cbc:LineExtensionAmount>
@@ -249,9 +268,9 @@ const generateInvoiceLines = (orderDetails) => {
           2
         )}</cbc:TaxableAmount>
         <cbc:TaxAmount currencyID="MYR">${productTax.toFixed(2)}</cbc:TaxAmount>
-        <cbc:BaseUnitMeasure unitCode="NMP">${item.qty}</cbc:BaseUnitMeasure>
-        <cbc:PerUnitAmount currencyID="MYR">${(item.qty > 0
-          ? productTax / item.qty
+        <cbc:BaseUnitMeasure unitCode="NMP">${lineQty}</cbc:BaseUnitMeasure>
+        <cbc:PerUnitAmount currencyID="MYR">${(lineQty > 0
+          ? productTax / lineQty
           : 0
         ).toFixed(2)}</cbc:PerUnitAmount>
         <cac:TaxCategory>
