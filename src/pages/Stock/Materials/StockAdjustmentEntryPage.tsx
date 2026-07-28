@@ -1979,11 +1979,16 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
         await Promise.all(variantNameUpdates);
       }
 
+      // Only modified rows are sent. /stock/batch upserts or deletes each entry by
+      // its own conflict key and ignores rows that are absent, so untouched rows do
+      // not need to travel (unlike the Stock Kilang batch below).
       const entries: MaterialStockEntryInput[] = [];
 
       materials.forEach((material) => {
         if (material.has_variants && material.variants && material.variants.length > 0) {
           material.variants.forEach((variant) => {
+            if (!isVariantRowDirty(material.id, variant)) return;
+
             const originalVariant: StockEntryRow | null = findOriginalVariant(
               material.id,
               variant
@@ -1992,7 +1997,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
               ...makeVariantStockEntries(material.id, variant, originalVariant)
             );
           });
-        } else {
+        } else if (isMaterialRowDirty(material)) {
           entries.push(makeMaterialStockEntry(material));
         }
       });
@@ -2008,7 +2013,8 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
         }
       });
 
-      const response = await saveMaterialStockEntries(entries);
+      const response: MaterialStockBatchResponse =
+        entries.length > 0 ? await saveMaterialStockEntries(entries) : {};
       let stockKilangSaved = false;
 
       if (hasStockKilangUnsavedChanges) {
@@ -3685,8 +3691,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                       </div>
                     </td>
                     <td></td>
-                    <td className="px-2 py-1.5 text-xs text-center text-emerald-600 dark:text-emerald-400">
-                      Manual only
+                    <td>
                     </td>
                     <td></td>
                     <td></td>
