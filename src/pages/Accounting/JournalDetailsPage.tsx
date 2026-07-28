@@ -36,6 +36,7 @@ import {
   IconX,
   IconPrinter,
   IconExternalLink,
+  IconArrowBackUp,
 } from "@tabler/icons-react";
 
 const LEGACY_IMPORT_ENTRY_TYPE: string = "IMP";
@@ -107,9 +108,10 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
   // Dialog states
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showRestoreDialog, setShowRestoreDialog] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showDeleteErrorDialog, setShowDeleteErrorDialog] = useState(false);
-  const [deleteErrorData, setDeleteErrorData] = useState<{
+  const [showActionErrorDialog, setShowActionErrorDialog] = useState(false);
+  const [actionErrorData, setActionErrorData] = useState<{
     message: string;
     detail?: string;
     payment_id?: number;
@@ -222,6 +224,39 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
     }
   };
 
+  // Undo a cancellation. The server refuses when the cancellation was the
+  // source document's doing, and explains why in the shared error dialog.
+  const handleConfirmRestore = async () => {
+    if (!id) return;
+
+    setIsProcessing(true);
+    try {
+      await api.post(`/api/journal-entries/${id}/restore`);
+      toast.success("Journal entry restored successfully");
+      setShowRestoreDialog(false);
+      fetchEntry();
+    } catch (err: unknown) {
+      console.error("Error restoring entry:", err);
+      setShowRestoreDialog(false);
+
+      const errorData = (err as any)?.data;
+      if (errorData?.message) {
+        setActionErrorData({
+          message: errorData.message,
+          detail: errorData.detail,
+          suggestion: errorData.suggestion,
+        });
+        setShowActionErrorDialog(true);
+      } else {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to restore entry";
+        toast.error(errorMessage);
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleConfirmDelete = async () => {
     if (!id) return;
 
@@ -242,14 +277,14 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
 
       if (errorData) {
         // Store error data and show error dialog
-        setDeleteErrorData({
+        setActionErrorData({
           message: errorData.message || "Failed to delete journal entry",
           detail: errorData.detail,
           payment_id: errorData.payment_id,
           invoice_id: errorData.invoice_id,
           suggestion: errorData.suggestion,
         });
-        setShowDeleteErrorDialog(true);
+        setShowActionErrorDialog(true);
       } else {
         // Fallback to simple toast error
         const errorMessage = err instanceof Error ? err.message : "Unknown error";
@@ -262,9 +297,9 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
 
   // Handle navigation to invoice from error dialog
   const handleGoToInvoice = () => {
-    if (deleteErrorData?.invoice_id) {
-      setShowDeleteErrorDialog(false);
-      navigate(`/sales/invoice/${deleteErrorData.invoice_id}`);
+    if (actionErrorData?.invoice_id) {
+      setShowActionErrorDialog(false);
+      navigate(`/sales/invoice/${actionErrorData.invoice_id}`);
     }
   };
 
@@ -378,6 +413,10 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
     entry.status !== "cancelled" && !isLegacyImport && !isGreenTarget;
   const canCancel: boolean =
     entry.status !== "cancelled" && !isLegacyImport && !isGreenTarget;
+  // Offered on every cancelled entry; the server decides whether this
+  // particular cancellation may be undone and explains any refusal.
+  const canRestore: boolean =
+    entry.status === "cancelled" && !isLegacyImport && !isGreenTarget;
   const canDelete: boolean = !isLegacyImport && !isGreenTarget;
   const canPrintVoucher: boolean =
     !isGreenTarget &&
@@ -506,6 +545,18 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
                   disabled={isProcessing}
                 >
                   Cancel Entry
+                </Button>
+              )}
+              {canRestore && (
+                <Button
+                  onClick={() => setShowRestoreDialog(true)}
+                  variant="outline"
+                  color="sky"
+                  icon={IconArrowBackUp}
+                  iconPosition="left"
+                  disabled={isProcessing}
+                >
+                  Restore Entry
                 </Button>
               )}
               {canDelete && (
@@ -700,17 +751,27 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
         variant="danger"
       />
 
+      <ConfirmationDialog
+        isOpen={showRestoreDialog}
+        onClose={() => setShowRestoreDialog(false)}
+        onConfirm={handleConfirmRestore}
+        title="Restore Journal Entry"
+        message={`Restore entry "${visibleReference}"? It will go back onto the ledger exactly as it was before it was cancelled.`}
+        confirmButtonText="Restore Entry"
+        variant="default"
+      />
+
       {/* Delete Error Dialog */}
-      {deleteErrorData && (
+      {actionErrorData && (
         <div
           className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200 ${
-            showDeleteErrorDialog ? "opacity-100" : "opacity-0 pointer-events-none"
+            showActionErrorDialog ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
         >
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => setShowDeleteErrorDialog(false)}
+            onClick={() => setShowActionErrorDialog(false)}
           />
 
           {/* Dialog */}
@@ -718,41 +779,41 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
             {/* Header */}
             <div className="px-6 py-4 border-b border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20">
               <h3 className="text-lg font-semibold text-red-900 dark:text-red-100">
-                {deleteErrorData.message}
+                {actionErrorData.message}
               </h3>
             </div>
 
             {/* Body */}
             <div className="px-6 py-4 space-y-3">
-              {deleteErrorData.detail && (
+              {actionErrorData.detail && (
                 <p className="text-sm text-default-700 dark:text-gray-300">
-                  {deleteErrorData.detail}
+                  {actionErrorData.detail}
                 </p>
               )}
 
-              {deleteErrorData.suggestion && (
+              {actionErrorData.suggestion && (
                 <p className="text-sm text-default-600 dark:text-gray-400 italic">
-                  {deleteErrorData.suggestion}
+                  {actionErrorData.suggestion}
                 </p>
               )}
             </div>
 
             {/* Footer */}
             <div className="px-6 py-4 border-t border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/30 flex justify-end gap-3">
-              {deleteErrorData.invoice_id && (
+              {actionErrorData.invoice_id && (
                 <Button
                   onClick={handleGoToInvoice}
                   color="sky"
                   variant="filled"
                   size="md"
                 >
-                  Go to Invoice #{deleteErrorData.invoice_id}
+                  Go to Invoice #{actionErrorData.invoice_id}
                 </Button>
               )}
               <Button
                 onClick={() => {
-                  setShowDeleteErrorDialog(false);
-                  setDeleteErrorData(null);
+                  setShowActionErrorDialog(false);
+                  setActionErrorData(null);
                 }}
                 color="default"
                 variant="outline"

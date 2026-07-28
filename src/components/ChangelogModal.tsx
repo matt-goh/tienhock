@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-28",
+    ms: "Jurnal: butang \"Restore Entry\" baharu membolehkan catatan jurnal yang dibatalkan tersilap dikembalikan semula ke lejar, tepat seperti keadaan asalnya. Butang ini hanya muncul pada catatan yang dibatalkan. Jika pembatalan itu datang daripada dokumen sumbernya sendiri — contohnya invois, resit atau pembelian yang telah dibatalkan — sistem akan menolak permintaan itu dan menerangkan sebabnya, supaya catatan yang sengaja dibuang tidak kembali ke lejar. Catatan bertarikh sebelum 1 Jun 2026 dan catatan import lama kekal tidak boleh diubah.",
+    en: "Journals: a new \"Restore Entry\" button puts a journal entry that was cancelled by mistake back onto the ledger, exactly as it was before. The button only appears on cancelled entries. If the cancellation came from the entry's own source document — for example a cancelled invoice, receipt or purchase — the system refuses and explains why, so entries that were removed on purpose stay removed. Entries dated before 1 June 2026 and legacy imported entries remain unchangeable.",
+  },
+  {
+    date: "2026-07-28",
     ms: "Green Target: susunan menu diselaraskan dengan Tien Hock dan Jelly Polly — Accounting, Payroll dan Sales kini berada di atas. Laporan Debtors berpindah ke dalam menu Accounting, manakala Invoices, Payments dan Documents dikumpulkan di bawah menu Sales baharu. Semua halaman kekal di alamat yang sama.",
     en: "Green Target: the menu layout is now aligned with Tien Hock and Jelly Polly — Accounting, Payroll and Sales sit at the top. The Debtors report has moved into the Accounting menu, while Invoices, Payments and Documents are grouped under a new Sales menu. Every page keeps its existing address.",
   },

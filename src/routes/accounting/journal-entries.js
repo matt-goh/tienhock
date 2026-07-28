@@ -1,5 +1,9 @@
 // src/routes/accounting/journal-entries.js
 import { Router } from "express";
+import {
+  assertTienHockAccountingDateUnlocked,
+  isAccountingPeriodLockedError,
+} from "./posting-lock.js";
 
 const LEGACY_IMPORT_ENTRY_TYPE = "IMP";
 const LEGACY_IMPORT_SOURCE_TYPE = "legacy_import";
@@ -108,6 +112,50 @@ const ADJUSTMENT_DOC_TYPE_LABELS = {
   debit_note: "Debit Note",
   refund_note: "Refund Note",
 };
+
+// Every document that owns a journal links back through its own
+// journal_entry_id, so one reverse lookup answers both questions a restore
+// asks: is this journal still owned, and does that owner still WANT a live
+// journal? A cancelled owner cancelled this journal as part of its own
+// lifecycle, and a foreign self-billed purchase never posts a GP journal at all
+// (decision 21 Jul 2026) — in both cases the cancellation was deliberate and
+// must not be undone from the Journal page.
+const JOURNAL_OWNER_LOOKUP_SQL = `
+  SELECT 'invoice' AS owner_type, id AS owner_ref,
+         invoice_status IS DISTINCT FROM 'cancelled' AS owner_wants_journal
+    FROM invoices WHERE journal_entry_id = $1
+  UNION ALL
+  SELECT 'receipt', id::text, status IS DISTINCT FROM 'cancelled'
+    FROM receipts WHERE journal_entry_id = $1
+  UNION ALL
+  SELECT 'payment', payment_id::text, status IS DISTINCT FROM 'cancelled'
+    FROM payments WHERE journal_entry_id = $1
+  UNION ALL
+  SELECT 'bank-in', id::text, status IS DISTINCT FROM 'cancelled'
+    FROM bank_ins WHERE journal_entry_id = $1
+  UNION ALL
+  SELECT 'RV', rv_number, status IS DISTINCT FROM 'cancelled'
+    FROM rv_registry WHERE journal_entry_id = $1
+  UNION ALL
+  SELECT 'adjustment document', display_id, status IS DISTINCT FROM 'cancelled'
+    FROM adjustment_documents WHERE journal_entry_id = $1
+  UNION ALL
+  SELECT 'Jelly Polly adjustment document', display_id,
+         status IS DISTINCT FROM 'cancelled'
+    FROM jellypolly.adjustment_documents WHERE journal_entry_id = $1
+  UNION ALL
+  SELECT 'purchase', self_billed_no,
+         invoice_status IS DISTINCT FROM 'cancelled'
+         AND purchase_kind = 'local'
+    FROM self_billed_invoices WHERE journal_entry_id = $1
+  UNION ALL
+  SELECT 'supplier payment', COALESCE(internal_reference, payment_id::text),
+         status IS DISTINCT FROM 'cancelled'
+    FROM supplier_payments WHERE journal_entry_id = $1
+  UNION ALL
+  SELECT 'purchase invoice', invoice_number, TRUE
+    FROM purchase_invoices WHERE journal_entry_id = $1
+`;
 
 /**
  * Resolve the document that auto-created a journal entry into a display label
@@ -1232,6 +1280,139 @@ export default function (pool) {
       console.error("Error cancelling journal entry:", error);
       res.status(500).json({
         message: "Error cancelling journal entry",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  // POST /:id/restore - Undo a cancellation (put a cancelled entry back on the
+  // ledger). Cancelling posts no reversing entry and deletes no lines, so this
+  // is its exact inverse: the entry returns to the state it held before. It is
+  // only offered where the ledger is genuinely missing an entry it should have
+  // — never where the system cancelled the journal on purpose.
+  router.post("/:id/restore", async (req, res) => {
+    const { id } = req.params;
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const checkResult = await client.query(
+        `SELECT id, status, entry_type, entry_date, source_type, source_id,
+                ${VISIBLE_REFERENCE_SQL} AS visible_reference
+           FROM journal_entries je
+          WHERE id = $1
+          FOR UPDATE`,
+        [id]
+      );
+
+      if (checkResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ message: "Journal entry not found" });
+      }
+
+      const entry = checkResult.rows[0];
+
+      if (isLegacyImportEntry(entry)) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: "Legacy import journal entries cannot be restored manually",
+        });
+      }
+
+      if (entry.status !== "cancelled") {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: "Only a cancelled journal entry can be restored",
+        });
+      }
+
+      // Never put an entry back into locked pre-cutover history.
+      assertTienHockAccountingDateUnlocked(
+        entry.entry_date,
+        `Journal entry ${entry.visible_reference}`
+      );
+
+      const ownerResult = await client.query(JOURNAL_OWNER_LOOKUP_SQL, [id]);
+      const blockingOwner = ownerResult.rows.find(
+        (row) => !row.owner_wants_journal
+      );
+
+      if (blockingOwner) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: "This journal was cancelled by its source document",
+          detail:
+            `The ${blockingOwner.owner_type} (${blockingOwner.owner_ref}) that owns ` +
+            "this journal no longer keeps a live journal entry, so restoring it " +
+            "would put an entry back on the ledger that the source document " +
+            "deliberately removed.",
+          suggestion:
+            "Work from the source document instead — its journal follows automatically.",
+        });
+      }
+
+      // A journal that still names a source but that no document points back at
+      // has been detached on purpose (for example a purchase switched from local
+      // to foreign). Restoring it would duplicate an entry the source dropped.
+      if (ownerResult.rows.length === 0 && entry.source_type) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: "This journal has been detached from its source document",
+          detail:
+            `This entry was created from a ${entry.source_type.replace(/_/g, " ")} ` +
+            "that no longer links to it, so it was cancelled deliberately rather " +
+            "than by mistake.",
+          suggestion:
+            "Work from the source document instead, or key a new journal entry.",
+        });
+      }
+
+      // journal_entries_source_posted_uq allows exactly one posted journal per
+      // source. Report a replacement clearly instead of failing on the index.
+      if (entry.source_type && entry.source_id) {
+        const competing = await client.query(
+          `SELECT id, ${VISIBLE_REFERENCE_SQL} AS visible_reference
+             FROM journal_entries je
+            WHERE source_type = $1 AND source_id = $2
+              AND status = 'posted' AND id <> $3`,
+          [entry.source_type, entry.source_id, id]
+        );
+        if (competing.rows.length > 0) {
+          await client.query("ROLLBACK");
+          return res.status(409).json({
+            message: "The source document already has a live journal entry",
+            detail:
+              `Entry ${competing.rows[0].visible_reference} has since replaced this ` +
+              "one, so restoring it would post the same transaction twice.",
+            suggestion: "Review the replacement entry instead.",
+          });
+        }
+      }
+
+      await client.query(
+        `UPDATE journal_entries
+            SET status = 'posted', updated_at = CURRENT_TIMESTAMP, updated_by = $1
+          WHERE id = $2`,
+        [req.staffId || null, id]
+      );
+
+      await client.query("COMMIT");
+
+      res.json({ message: "Journal entry restored successfully" });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      if (isAccountingPeriodLockedError(error)) {
+        return res.status(error.status).json({
+          code: error.code,
+          message: error.message,
+        });
+      }
+      console.error("Error restoring journal entry:", error);
+      res.status(500).json({
+        message: "Error restoring journal entry",
         error: error.message,
       });
     } finally {
