@@ -3019,7 +3019,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                 </th>
                 <th
                   colSpan={2}
-                  className="border-b border-default-200/70 px-2 pb-1 pt-2 text-center text-xs font-semibold text-default-600 dark:border-gray-700 dark:text-gray-400 uppercase tracking-wider"
+                  className="border-b border-l border-default-300 px-2 pb-1 pt-2 text-center text-xs font-semibold text-default-600 dark:border-gray-600 dark:text-gray-400 uppercase tracking-wider"
                 >
                   Opening
                 </th>
@@ -3037,7 +3037,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                 </th>
               </tr>
               <tr>
-                <th className="w-24 px-2 pb-2 pt-1 text-right text-[11px] font-medium text-default-500 dark:text-gray-500 uppercase tracking-wider">
+                <th className="w-24 border-l border-default-300 px-2 pb-2 pt-1 text-right text-[11px] font-medium text-default-500 dark:border-gray-600 dark:text-gray-500 uppercase tracking-wider">
                   Qty
                 </th>
                 <th className="w-24 px-2 pb-2 pt-1 text-right text-[11px] font-medium text-default-500 dark:text-gray-500 uppercase tracking-wider">
