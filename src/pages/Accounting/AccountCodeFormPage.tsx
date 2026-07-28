@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import { AccountCode, LedgerType } from "../../types/types";
 import {
+  type AccountingCacheCompany,
   useAccountCodesCache,
   useLedgerTypesCache,
   refreshAccountCodesCache,
@@ -43,6 +44,22 @@ interface AccountCodeFormData {
   sort_order: number;
   is_active: boolean;
   notes: string;
+}
+
+interface AccountCodeMutationPayload {
+  code: string;
+  description: string;
+  ledger_type: string | null;
+  parent_code: string | null;
+  fs_note: string | null;
+  sort_order: number;
+  is_active: boolean;
+  notes: string | null;
+  expected_updated_at?: string;
+}
+
+export interface AccountCodeFormPageProps {
+  company?: AccountingCacheCompany;
 }
 
 interface FinancialStatementNote {
@@ -122,26 +139,41 @@ const FORM_LISTBOX_SURFACE_CLASSNAME: string =
   "dark:[&>div>button]:!bg-gray-900/50 [&>div>button]:shadow-none";
 const FIELD_SURFACE_CLASSNAME: string =
   "dark:!bg-gray-900/50 !shadow-none";
+const GT_RESERVED_ACCOUNT_CODES: ReadonlySet<string> = new Set([
+  "NEW",
+  "CHILDREN",
+  ".",
+  "..",
+]);
 
-const createEmptyFormData = (): AccountCodeFormData => ({
+const createEmptyFormData = (sortOrder: number = 0): AccountCodeFormData => ({
   code: "",
   description: "",
   ledger_type: "",
   parent_code: "",
   fs_note: "",
-  sort_order: 0,
+  sort_order: sortOrder,
   is_active: true,
   notes: "",
 });
 
-const AccountCodeFormPage: React.FC = () => {
+const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
+  company = "tienhock",
+}: AccountCodeFormPageProps) => {
   const navigate = useNavigate();
   const { code } = useParams<{ code: string }>();
-  const isEditMode = !!code;
+  const isEditMode: boolean = !!code;
+  const isGreenTarget: boolean = company === "greentarget";
+  const apiBase: string = isGreenTarget ? "/greentarget/api" : "/api";
+  const accountCodesPagePath: string = isGreenTarget
+    ? "/greentarget/accounting/account-codes"
+    : "/accounting/account-codes";
 
   // Cached reference data
-  const { ledgerTypes: allLedgerTypes, isLoading: ledgerTypesLoading } = useLedgerTypesCache();
-  const { accountCodes: allAccountCodes, isLoading: accountCodesLoading } = useAccountCodesCache();
+  const { ledgerTypes: allLedgerTypes, isLoading: ledgerTypesLoading } =
+    useLedgerTypesCache(company);
+  const { accountCodes: allAccountCodes, isLoading: accountCodesLoading } =
+    useAccountCodesCache(company);
 
   // Filter to only active items for selection
   const ledgerTypes = useMemo(
@@ -159,6 +191,8 @@ const AccountCodeFormPage: React.FC = () => {
   // Additional state for edit mode
   const [childAccounts, setChildAccounts] = useState<AccountCode[]>([]);
   const [isSystem, setIsSystem] = useState(false);
+  const [isTradeDebtorAccount, setIsTradeDebtorAccount] =
+    useState<boolean>(false);
   const [fsNotes, setFsNotes] = useState<FinancialStatementNote[]>([]);
   const [fsNotesLoading, setFsNotesLoading] = useState<boolean>(true);
   const [overviewYear, setOverviewYear] = useState<number>((): number =>
@@ -173,6 +207,8 @@ const AccountCodeFormPage: React.FC = () => {
   const [overviewRefreshKey, setOverviewRefreshKey] = useState<number>(0);
   const accountRequestIdRef = useRef<number>(0);
   const overviewRequestIdRef = useRef<number>(0);
+  const newFormInitializedRef = useRef<boolean>(false);
+  const accountUpdatedAtRef = useRef<string | null>(null);
 
   // Initial form data reference for change detection
   const initialFormDataRef = useRef<AccountCodeFormData | null>(null);
@@ -197,7 +233,7 @@ const AccountCodeFormPage: React.FC = () => {
     const fetchFinancialStatementNotes = async (): Promise<void> => {
       try {
         const response = await api.get<FinancialStatementNote[]>(
-          "/api/financial-reports/notes"
+          `${apiBase}/financial-reports/notes`
         );
         setFsNotes(response || []);
       } catch (fetchError: unknown) {
@@ -212,7 +248,7 @@ const AccountCodeFormPage: React.FC = () => {
     };
 
     void fetchFinancialStatementNotes();
-  }, []);
+  }, [apiBase]);
 
   // Fetch account data for editing
   const fetchAccountData = useCallback(async (): Promise<void> => {
@@ -227,10 +263,10 @@ const AccountCodeFormPage: React.FC = () => {
       const [accountData, fetchedChildAccounts]: [AccountCode, AccountCode[]] =
         await Promise.all([
           api.get<AccountCode>(
-            `/api/account-codes/${encodeURIComponent(code)}`
+            `${apiBase}/account-codes/${encodeURIComponent(code)}`
           ),
           api.get<AccountCode[]>(
-            `/api/account-codes/children/${encodeURIComponent(code)}`
+            `${apiBase}/account-codes/children/${encodeURIComponent(code)}`
           ),
         ]);
 
@@ -249,8 +285,14 @@ const AccountCodeFormPage: React.FC = () => {
 
       setFormData(fetchedFormData);
       initialFormDataRef.current = { ...fetchedFormData };
+      accountUpdatedAtRef.current = accountData.updated_at || null;
       setChildAccounts(fetchedChildAccounts);
       setIsSystem(accountData.is_system);
+      setIsTradeDebtorAccount(
+        !accountData.is_system &&
+          (accountData.ledger_type === "TD" ||
+            accountData.parent_code === "DEBTOR")
+      );
     } catch (fetchError: unknown) {
       if (accountRequestIdRef.current !== requestId) return;
       console.error("Error fetching account data:", fetchError);
@@ -264,28 +306,54 @@ const AccountCodeFormPage: React.FC = () => {
         setLoading(false);
       }
     }
-  }, [code]);
+  }, [apiBase, code]);
 
   // Initial data loading
   useEffect(() => {
-    if (isEditMode) {
-      void fetchAccountData();
-      return (): void => {
-        accountRequestIdRef.current += 1;
-      };
+    if (!isEditMode) {
+      newFormInitializedRef.current = false;
+      return undefined;
     }
 
+    newFormInitializedRef.current = false;
+    void fetchAccountData();
+    return (): void => {
+      accountRequestIdRef.current += 1;
+    };
+  }, [isEditMode, fetchAccountData]);
+
+  useEffect(() => {
+    if (isEditMode) return;
+    if (isGreenTarget && accountCodesLoading) return undefined;
+    if (newFormInitializedRef.current) return undefined;
+
     accountRequestIdRef.current += 1;
-    const emptyFormData: AccountCodeFormData = createEmptyFormData();
+    const defaultSortOrder: number = isGreenTarget
+      ? allAccountCodes.reduce(
+          (highestSortOrder: number, account: AccountCode): number =>
+            Math.max(highestSortOrder, account.sort_order),
+          0
+        ) + 1
+      : 0;
+    const emptyFormData: AccountCodeFormData =
+      createEmptyFormData(defaultSortOrder);
+    newFormInitializedRef.current = true;
+    accountUpdatedAtRef.current = null;
     setFormData(emptyFormData);
     initialFormDataRef.current = { ...emptyFormData };
     setChildAccounts([]);
     setIsSystem(false);
+    setIsTradeDebtorAccount(false);
     setError(null);
     setIsFormChanged(false);
     setLoading(false);
     return undefined;
-  }, [isEditMode, fetchAccountData]);
+  }, [
+    accountCodesLoading,
+    allAccountCodes,
+    isEditMode,
+    isGreenTarget,
+  ]);
 
   useEffect(() => {
     if (!code || pageLoading) {
@@ -304,7 +372,7 @@ const AccountCodeFormPage: React.FC = () => {
     const fetchOverview = async (): Promise<void> => {
       try {
         const response = await api.get<AccountCodeOverview>(
-          `/api/account-codes/${encodeURIComponent(
+          `${apiBase}/account-codes/${encodeURIComponent(
             code
           )}/overview?year=${overviewYear}&month=${overviewMonth}`
         );
@@ -334,6 +402,7 @@ const AccountCodeFormPage: React.FC = () => {
     };
   }, [
     code,
+    apiBase,
     overviewMonth,
     overviewRefreshKey,
     overviewYear,
@@ -350,6 +419,8 @@ const AccountCodeFormPage: React.FC = () => {
   }, [formData]);
 
   const hasChildAccounts: boolean = childAccounts.length > 0;
+  const hasLockedGtStructure: boolean =
+    isGreenTarget && (isSystem || isTradeDebtorAccount);
 
   // Handlers
   const handleInputChange = (
@@ -386,7 +457,7 @@ const AccountCodeFormPage: React.FC = () => {
       return;
     }
 
-    navigate("/accounting/account-codes");
+    navigate(accountCodesPagePath);
   };
 
   const handleBackClick = (): void => {
@@ -423,12 +494,34 @@ const AccountCodeFormPage: React.FC = () => {
       return false;
     }
 
+    if (isGreenTarget && !formData.ledger_type) {
+      toast.error("Ledger type is required for Green Target accounts");
+      return false;
+    }
+
+    if (isGreenTarget && !formData.fs_note) {
+      toast.error("FS Note / Report Code is required for Green Target accounts");
+      return false;
+    }
+
     // Validate code format (alphanumeric and special chars)
-    const codePattern = /^[A-Za-z0-9\-_.]+$/;
-    if (!codePattern.test(formData.code.trim())) {
+    const codePattern: RegExp = /^[A-Za-z0-9\-_.]+$/;
+    if (
+      !(isGreenTarget && isEditMode) &&
+      !codePattern.test(formData.code.trim())
+    ) {
       toast.error(
         "Account code can only contain letters, numbers, hyphens, underscores, and periods"
       );
+      return false;
+    }
+
+    if (
+      isGreenTarget &&
+      !isEditMode &&
+      GT_RESERVED_ACCOUNT_CODES.has(formData.code.trim().toUpperCase())
+    ) {
+      toast.error("This account code is reserved. Please choose another code.");
       return false;
     }
 
@@ -450,7 +543,7 @@ const AccountCodeFormPage: React.FC = () => {
     setIsSaving(true);
 
     try {
-      const payload = {
+      const payload: AccountCodeMutationPayload = {
         code: formData.code.toUpperCase().trim(),
         description: formData.description.trim(),
         ledger_type: formData.ledger_type || null,
@@ -459,16 +552,21 @@ const AccountCodeFormPage: React.FC = () => {
         sort_order: formData.sort_order,
         is_active: formData.is_active,
         notes: formData.notes.trim() || null,
+        ...(isGreenTarget && isEditMode && accountUpdatedAtRef.current
+          ? { expected_updated_at: accountUpdatedAtRef.current }
+          : {}),
       };
       const submittedAccountCode: string = payload.code;
 
       if (isEditMode) {
         await api.put(
-          `/api/account-codes/${encodeURIComponent(code || submittedAccountCode)}`,
+          `${apiBase}/account-codes/${encodeURIComponent(
+            code || submittedAccountCode
+          )}`,
           payload
         );
       } else {
-        await api.post("/api/account-codes", payload);
+        await api.post(`${apiBase}/account-codes`, payload);
       }
 
       toast.success(
@@ -476,10 +574,12 @@ const AccountCodeFormPage: React.FC = () => {
       );
 
       // Refresh cache to reflect changes
-      await refreshAccountCodesCache().catch((refreshError: unknown): void => {
-        console.error("Error refreshing account codes cache:", refreshError);
-      });
-      navigate("/accounting/account-codes");
+      await refreshAccountCodesCache(company).catch(
+        (refreshError: unknown): void => {
+          console.error("Error refreshing account codes cache:", refreshError);
+        }
+      );
+      navigate(accountCodesPagePath);
     } catch (err: unknown) {
       console.error("Error saving account code:", err);
       const errorMessage = err instanceof Error ? err.message : `Failed to ${isEditMode ? "update" : "create"} account code`;
@@ -491,6 +591,7 @@ const AccountCodeFormPage: React.FC = () => {
 
   // Delete handler
   const handleDeleteClick = (): void => {
+    if (isGreenTarget) return;
     if (isSystem) {
       toast.error("Cannot delete system account code");
       return;
@@ -505,18 +606,20 @@ const AccountCodeFormPage: React.FC = () => {
   };
 
   const handleConfirmDelete = async (): Promise<void> => {
-    if (!code) return;
+    if (!code || isGreenTarget) return;
 
     setIsSaving(true);
     try {
-      await api.delete(`/api/account-codes/${code}`);
+      await api.delete(`${apiBase}/account-codes/${code}`);
       toast.success("Account code deleted successfully");
       setShowDeleteDialog(false);
       // Refresh cache to reflect deletion
-      await refreshAccountCodesCache().catch((refreshError: unknown): void => {
-        console.error("Error refreshing account codes cache:", refreshError);
-      });
-      navigate("/accounting/account-codes");
+      await refreshAccountCodesCache(company).catch(
+        (refreshError: unknown): void => {
+          console.error("Error refreshing account codes cache:", refreshError);
+        }
+      );
+      navigate(accountCodesPagePath);
     } catch (err: unknown) {
       console.error("Error deleting account:", err);
       const errorMessage = err instanceof Error ? err.message : "Failed to delete account code";
@@ -647,8 +750,12 @@ const AccountCodeFormPage: React.FC = () => {
   }, [allAccountCodes, formData.code]);
 
   const canSelectParentAccount = useCallback(
-    (account: AccountCode): boolean => !unavailableParentCodes.has(account.code),
-    [unavailableParentCodes]
+    (account: AccountCode): boolean =>
+      !unavailableParentCodes.has(account.code) &&
+      (!isGreenTarget ||
+        account.code === "DEBTOR" ||
+        account.ledger_type !== "TD"),
+    [isGreenTarget, unavailableParentCodes]
   );
 
   // Render
@@ -663,7 +770,7 @@ const AccountCodeFormPage: React.FC = () => {
   if (error) {
     return (
       <div className="container mx-auto px-4 py-6">
-        <BackButton fallbackPath="/accounting/account-codes" />
+        <BackButton fallbackPath={accountCodesPagePath} />
         <div className="mt-4 p-4 border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded">
           Error: {error}
         </div>
@@ -678,7 +785,7 @@ const AccountCodeFormPage: React.FC = () => {
         <div className="px-6 py-3 border-b border-default-200 dark:border-gray-700">
           <div className="flex items-center gap-4">
             <BackButton
-              fallbackPath="/accounting/account-codes"
+              fallbackPath={accountCodesPagePath}
               onClick={isFormChanged ? handleBackClick : undefined}
             />
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
@@ -779,7 +886,7 @@ const AccountCodeFormPage: React.FC = () => {
                               onClick={(): void => {
                                 if (!isCurrentAccount) {
                                   requestNavigation(
-                                    `/accounting/account-codes/${encodeURIComponent(
+                                    `${accountCodesPagePath}/${encodeURIComponent(
                                       hierarchyAccount.code
                                     )}`
                                   );
@@ -858,7 +965,8 @@ const AccountCodeFormPage: React.FC = () => {
                       handleListboxChange("ledger_type", value)
                     }
                     options={ledgerTypeOptions}
-                    disabled={isSaving}
+                    required={isGreenTarget}
+                    disabled={isSaving || hasLockedGtStructure}
                     placeholder="Select ledger type..."
                     className={FORM_LISTBOX_SURFACE_CLASSNAME}
                   />
@@ -871,7 +979,8 @@ const AccountCodeFormPage: React.FC = () => {
                       handleListboxChange("fs_note", value)
                     }
                     options={fsNoteOptions}
-                    disabled={isSaving}
+                    required={isGreenTarget}
+                    disabled={isSaving || hasLockedGtStructure}
                     placeholder="Select report code..."
                     className={FORM_LISTBOX_SURFACE_CLASSNAME}
                   />
@@ -879,12 +988,13 @@ const AccountCodeFormPage: React.FC = () => {
                   {/* Parent Account */}
                   <div>
                     <AccountCodeCombobox
+                      company={company}
                       label="Immediate Parent Account"
                       value={formData.parent_code}
                       onChange={(value: string): void =>
                         handleListboxChange("parent_code", value)
                       }
-                      disabled={isSaving}
+                      disabled={isSaving || hasLockedGtStructure}
                       placeholder="Search parent account..."
                       filter={canSelectParentAccount}
                       hierarchical
@@ -896,6 +1006,13 @@ const AccountCodeFormPage: React.FC = () => {
                       Akaun peringkat teratas dipaparkan dahulu. Kembangkan folder untuk melihat
                       akaun anak di bawahnya.
                     </p>
+                    {hasLockedGtStructure && (
+                      <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                        {isSystem
+                          ? "Parent, ledger type and report code are fixed for a system account."
+                          : "Trade debtor accounts must remain direct leaf accounts under DEBTOR with ledger type TD and report code 22."}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -945,6 +1062,8 @@ const AccountCodeFormPage: React.FC = () => {
                     <p className="mt-1 pl-7 text-xs text-default-500 dark:text-gray-400">
                       {isSystem
                         ? "Akaun sistem mesti kekal aktif."
+                        : isGreenTarget
+                        ? "Hanya akaun yang belum digunakan boleh dinyahaktifkan. Akaun dengan jurnal atau baki pembukaan mesti kekal aktif."
                         : "Akaun tidak aktif kekal dalam rekod sedia ada tetapi tidak boleh dipilih untuk catatan baharu."}
                     </p>
                   </div>
@@ -1300,7 +1419,7 @@ const AccountCodeFormPage: React.FC = () => {
                               const openChildAccount = (): void => {
                                 if (isSaving) return;
                                 requestNavigation(
-                                  `/accounting/account-codes/${encodeURIComponent(
+                                  `${accountCodesPagePath}/${encodeURIComponent(
                                     childAccount.code
                                   )}`
                                 );
@@ -1415,7 +1534,7 @@ const AccountCodeFormPage: React.FC = () => {
 
             {/* Form Actions */}
             <div className="p-6 flex justify-end items-center space-x-3 border-t border-default-200 dark:border-gray-700">
-              {isEditMode && !isSystem && (
+              {isEditMode && !isGreenTarget && !isSystem && (
                 <Button
                   type="button"
                   color="rose"
@@ -1445,14 +1564,16 @@ const AccountCodeFormPage: React.FC = () => {
       </div>
 
       {/* Dialogs */}
-      <ConfirmationDialog
-        isOpen={showDeleteDialog}
-        onClose={(): void => setShowDeleteDialog(false)}
-        onConfirm={handleConfirmDelete}
-        title="Delete Account Code"
-        message={`Adakah anda pasti mahu memadam akaun "${formData.code}"? Tindakan ini tidak boleh dibatalkan.`}
-        confirmButtonText="Delete"
-      />
+      {!isGreenTarget && (
+        <ConfirmationDialog
+          isOpen={showDeleteDialog}
+          onClose={(): void => setShowDeleteDialog(false)}
+          onConfirm={handleConfirmDelete}
+          title="Delete Account Code"
+          message={`Adakah anda pasti mahu memadam akaun "${formData.code}"? Tindakan ini tidak boleh dibatalkan.`}
+          confirmButtonText="Delete"
+        />
+      )}
 
       <ConfirmationDialog
         isOpen={pendingNavigation !== null}

@@ -70,21 +70,38 @@ const accountCodesInFlight: Partial<
 /**
  * Refresh account codes cache globally
  */
-export const refreshAccountCodesCache = async (): Promise<AccountCode[]> => {
+export const refreshAccountCodesCache = async (
+  company: AccountingCacheCompany = "tienhock"
+): Promise<AccountCode[]> => {
   try {
-    localStorage.removeItem(CACHE_KEYS.ACCOUNT_CODES);
+    const cacheKey: string = getCompanyCacheKey(
+      CACHE_KEYS.ACCOUNT_CODES,
+      company
+    );
+    const updatedEvent: string = getCompanyCacheKey(
+      ACCOUNT_CODES_UPDATED_EVENT,
+      company
+    );
+    const endpoint: string =
+      company === "greentarget"
+        ? "/greentarget/api/account-codes?flat=true"
+        : "/api/account-codes?flat=true";
 
-    const response = await api.get("/api/account-codes?flat=true") as AccountCodesResponse;
-    const data = unwrapAccountCodesResponse(response);
+    localStorage.removeItem(cacheKey);
+
+    const response: AccountCodesResponse = (await api.get(
+      endpoint
+    )) as AccountCodesResponse;
+    const data: AccountCode[] = unwrapAccountCodesResponse(response);
 
     const cacheData: AccountCodesCache = {
       data,
       timestamp: Date.now(),
     };
-    localStorage.setItem(CACHE_KEYS.ACCOUNT_CODES, JSON.stringify(cacheData));
+    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
 
     window.dispatchEvent(
-      new CustomEvent(ACCOUNT_CODES_UPDATED_EVENT, { detail: data })
+      new CustomEvent(updatedEvent, { detail: data })
     );
 
     return data;
@@ -97,16 +114,23 @@ export const refreshAccountCodesCache = async (): Promise<AccountCode[]> => {
 /**
  * Invalidate account codes cache
  */
-export const invalidateAccountCodesCache = (): void => {
-  localStorage.removeItem(CACHE_KEYS.ACCOUNT_CODES);
-  window.dispatchEvent(new CustomEvent(ACCOUNT_CODES_UPDATED_EVENT));
+export const invalidateAccountCodesCache = (
+  company: AccountingCacheCompany = "tienhock"
+): void => {
+  localStorage.removeItem(
+    getCompanyCacheKey(CACHE_KEYS.ACCOUNT_CODES, company)
+  );
+  window.dispatchEvent(
+    new CustomEvent(getCompanyCacheKey(ACCOUNT_CODES_UPDATED_EVENT, company))
+  );
 };
 
 /**
  * Hook for account codes with caching
  */
 export const useAccountCodesCache = (
-  company: AccountingCacheCompany = "tienhock"
+  company: AccountingCacheCompany = "tienhock",
+  enabled: boolean = true
 ) => {
   const [accountCodes, setAccountCodes] = useState<AccountCode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -120,6 +144,12 @@ export const useAccountCodesCache = (
       : "/api/account-codes?flat=true";
 
   const fetchAccountCodes = useCallback(async (forceRefresh = false): Promise<AccountCode[]> => {
+    if (!enabled) {
+      setIsLoading(false);
+      setError(null);
+      return [];
+    }
+
     setIsLoading(true);
     try {
       if (!forceRefresh) {
@@ -167,13 +197,15 @@ export const useAccountCodesCache = (
     } finally {
       setIsLoading(false);
     }
-  }, [company, cacheKey, endpoint]);
+  }, [company, cacheKey, enabled, endpoint]);
 
   useEffect(() => {
-    fetchAccountCodes();
+    void fetchAccountCodes();
   }, [fetchAccountCodes]);
 
   useEffect(() => {
+    if (!enabled) return undefined;
+
     const handleAccountCodesUpdated = (event: CustomEvent) => {
       if (event.detail) {
         setAccountCodes(event.detail);
@@ -193,14 +225,14 @@ export const useAccountCodesCache = (
         handleAccountCodesUpdated as EventListener
       );
     };
-  }, [fetchAccountCodes, updatedEvent]);
+  }, [enabled, fetchAccountCodes, updatedEvent]);
 
   return {
     accountCodes,
     isLoading,
     error,
     refreshAccountCodes: () => fetchAccountCodes(true),
-    invalidateCache: invalidateAccountCodesCache,
+    invalidateCache: (): void => invalidateAccountCodesCache(company),
   };
 };
 

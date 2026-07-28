@@ -27,6 +27,7 @@ import { execFileSync } from "node:child_process";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "..", "..", "..");
 const FIXTURES = path.join(REPO, "dev", "import", "greentarget-report-fixtures");
+const LEGACY = path.join(REPO, "dev", "import", "greentarget-legacy");
 
 const PERIODS = ["01", "02", "03", "04", "05", "06"];
 const MONTH_ENDS = {
@@ -137,6 +138,9 @@ const scalar = (sql) => psql(sql).trim();
 
 // ---------------------------------------------------------------------------
 const manifest = JSON.parse(fs.readFileSync(path.join(FIXTURES, "source-manifest.json"), "utf8"));
+const legacyValidation = JSON.parse(
+  fs.readFileSync(path.join(LEGACY, "generated", "validation-report.json"), "utf8")
+);
 
 const tbByPeriod = {};
 for (const period of PERIODS) {
@@ -228,11 +232,15 @@ for (const period of PERIODS) {
   balances[period] = new Map(rows.map((r) => [r.code, Number(r.cents)]));
 }
 
+// Parent/category fields are live chart metadata and may be intentionally
+// edited after cutover. The immutable historical reconciliation uses the 28
+// GTDB identities from the hash-validated legacy evidence instead.
 const debtorChildren = new Set(
-  query("SELECT code FROM greentarget.account_codes WHERE parent_code = 'DEBTOR' ORDER BY code", ["code"]).map(
-    (r) => r.code
-  )
+  legacyValidation.perSectionChains
+    .filter((section) => section.sourceKind === "GTDB")
+    .map((section) => section.code)
 );
+check(debtorChildren.size === 28, "legacy evidence identifies all 28 GTDB debtor accounts", `found ${debtorChildren.size}`);
 
 // ---------------------------------------------------------------------------
 // 2. THE HEADLINE GATE - per-account, per-month, against the printed scans
@@ -424,15 +432,17 @@ console.log("\n-- 4. June 2026 Balance Sheet tie-outs --------------------------
     );
   }
 
-  // Cash in hand (note 6) prints .00 in June - the derived cash is fully banked.
-  const cashInHand = query(
-    `SELECT COALESCE(SUM(b.cents),0)::bigint FROM (
-       SELECT a.code, (SELECT ROUND(o.amount*100)::bigint FROM greentarget.account_opening_balances o
-                        WHERE o.account_code=a.code) AS cents
-         FROM greentarget.account_codes a WHERE a.fs_note = '6') b`,
-    ["cents"]
-  )[0];
-  check(cashInHand.cents === "0", "June cash in hand (note 6) opens and closes at .00", `found ${money(Number(cashInHand.cents))}`);
+  // Cash in hand (printed APPX 6) closes at .00 in June. Resolve its immutable
+  // legacy membership from the scan rather than mutable live fs_note fields.
+  const cashInHandCodes = tbByPeriod["06"]
+    .filter((row) => row.record_type === "account" && row.appx === "6")
+    .map((row) => normalizePrinted(row.acc_code));
+  const cashInHandCents = cashInHandCodes.reduce((sum, code) => sum + (june.get(code) ?? 0), 0);
+  check(
+    cashInHandCents === 0,
+    "June cash in hand (legacy APPX 6) opens and closes at .00",
+    `found ${money(cashInHandCents)}`
+  );
 }
 
 // ---------------------------------------------------------------------------

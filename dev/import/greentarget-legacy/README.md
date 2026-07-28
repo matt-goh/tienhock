@@ -7,6 +7,16 @@ Plan and phase gates: [`docs/Account/GT_ACCOUNTING_HANDOVER.md`](../../../docs/A
 **Phases G0, G3 and G4 are complete.** G0 is file-only; G3 loads the chart of accounts; G4 imports the
 Jan–Jun 2026 ledger as 1,705 posted journals plus 501 opening anchors.
 
+Since 28 Jul 2026 the live GT chart is maintainable in the application. The 503 G3 codes are an
+immutable-identity **legacy subset**, not a permanent total-row limit: users may add accounts and
+edit account details/status, while codes cannot be renamed or deleted. G3 reruns use
+`ON CONFLICT DO NOTHING`, preserve every existing row/user override, and allow additional
+post-cutover accounts. The generator still derives and validates exactly 503 source rows, and the
+G4 verifiers remain pinned to the Jan–Jun import rather than to the live chart's eventual size.
+The mutation API reserves `NEW`, `CHILDREN`, `.` and `..`, keeps TD accounts as direct leaf children
+of `DEBTOR` on note 22, protects system structure and historical accounts from unsafe deactivation,
+and rejects a stale edit using the row's `updated_at` version rather than overwriting it.
+
 ```
 node dev/import/greentarget-legacy/prepare-staging.mjs              # G0: write staging + report
 node dev/import/greentarget-legacy/prepare-staging.mjs --check-only # G0: verify without writing
@@ -14,12 +24,12 @@ node dev/import/greentarget-legacy/prove-date-rule.mjs              # G0: why th
 
 node dev/import/greentarget-legacy/build-chart.mjs                  # G3: regenerate chart + migration
 node dev/import/greentarget-legacy/build-chart.mjs --check-only     # G3: is the migration still derivable?
-node dev/import/greentarget-legacy/verify-chart.mjs                 # G3: 55 gates against the database
+node dev/import/greentarget-legacy/verify-chart.mjs                 # G3: legacy subset + live structural gates
 
 node dev/import/greentarget-legacy/build-import-staging.mjs             # G4: derive staging + anchors
 node dev/import/greentarget-legacy/build-import-staging.mjs --check-only # G4: still derivable?
 node dev/import/greentarget-legacy/load-staging.mjs                     # G4: hash-validated load
-node dev/import/greentarget-legacy/verify-import.mjs                    # G4: 63 gates vs the printed scans
+node dev/import/greentarget-legacy/verify-import.mjs                    # G4: strict gates vs the printed scans
 ```
 
 ## G4 runbook — the order matters
@@ -116,23 +126,25 @@ ledger by `(DATE_TRUNC('month', entry_date), posting_sequence, journal_entry_lin
 | `read-xlsx.mjs` | yes | Dependency-free ZIP + sheet-XML reader that returns **raw** cell values. |
 | `prepare-staging.mjs` | yes | The intake pipeline and all its gates. |
 | `prove-date-rule.mjs` | yes | Standalone demonstration that the date swap is load-bearing. |
-| `build-chart.mjs` | yes | **G3.** Derives the 503-account chart from the G1 Trial Balance fixtures + the G0 ledger and writes `dev/migrations/2026-07-26_greentarget_chart_of_accounts.sql`. |
-| `verify-chart.mjs` | yes | **G3.** 55 property-based gates read out of the database. Written *before* the loader. |
+| `build-chart.mjs` | yes | **G3.** Derives the exact 503-account legacy payload from the G1 Trial Balance fixtures + the G0 ledger and writes `dev/migrations/2026-07-26_greentarget_chart_of_accounts.sql`. Its runtime-safe migration treats that payload as a required subset and never overwrites existing rows. |
+| `verify-chart.mjs` | yes | **G3.** Property-based gates read source evidence and the database. All 503 codes/provenance remain mandatory; exact field fidelity applies to untouched `G3_CHART_LOAD` rows, intentional UI overrides get structural/FK checks, and extra live accounts are excluded from legacy population arithmetic. |
 | `debtor-map.json` | yes | **G3.** R6 artifact: legacy debtor code → `greentarget.customers`. 28 debtors, 2 candidates, **0 approved** — G7's receivable resolution reads APPROVED mappings only and falls back to `CD_SD` until the user approves. |
 | `build-import-staging.mjs` | yes | **G4.** Derives the 1,434 CD_SD rows from the pinned G0 staging and writes `generated/greentarget_import_staging.csv`, the derivation report, and `dev/migrations/2026-07-27_greentarget_opening_anchors.sql`. |
 | `load-staging.mjs` | yes | **G4.** Hash-validated `\copy` into `greentarget.import_legacy_rows`, in one transaction, with a validation block that refuses to commit an unapproved population. |
 | `post-monthly-journals.sql` | yes | **G4.** One idempotent monthly batch, parameterised by `-v month_start=`. Run six times. |
 | `verify-import.sql` | yes | **G4.** Written *before* the loader. Proves the database is a faithful projection of staging; read-only. Since G7 every population/provenance gate is scoped to `source_type='legacy_import'`, with a mirror gate that no organic journal predates the 2026-07-01 open date. |
-| `verify-import.mjs` | yes | **G4.** 63 gates and 2,850 per-account comparisons against the six printed Trial Balance scans. Never reads staging. (G7 re-pinned the population gates to the legacy subset.) |
+| `verify-import.mjs` | yes | **G4.** Strict gates and 2,850 per-account comparisons against the six printed Trial Balance scans. The balance expectations do not come from database staging; legacy debtor/note membership comes from hash-validated source artifacts, so later live metadata overrides do not rewrite history. (G7 re-pinned the population gates to the legacy subset.) |
 | `backfill-g7-organic.mjs` | yes | **G7.** Posts the pre-G7 post-cutover documents (invoices 325/326, payment 197 → journals 3712–3714) through the shipped G7 services; idempotent. Re-run on production during G8 after the G7 schema migration. |
 
-## ⚠ Do not hand-edit the chart or its migration
+## ⚠ Do not hand-edit the generated legacy payload or its migration
 
-The chart is **generated**. `2026-07-26_greentarget_chart_of_accounts.sql` is written by
+The **503-row legacy seed payload** is generated. `2026-07-26_greentarget_chart_of_accounts.sql` is written by
 `build-chart.mjs`, and `--check-only` fails if the file on disk stops matching what the sources say.
 Editing it by hand breaks the one property that makes 503 accounts trustworthy: that every field came
-from a validated source and can be re-derived from it. If the chart is wrong, fix the source or the
-generator, regenerate, re-apply, and re-run `verify-chart.mjs`.
+from a validated source and can be re-derived from it. This restriction is about the generated files,
+not normal live maintenance: create/edit accounts through the Chart of Accounts page. A migration
+rerun will preserve those live rows and overrides. If the historical payload itself is wrong, fix the
+source or generator, regenerate, re-apply, and re-run `verify-chart.mjs`.
 
 `fs_note` holds the **printed Trial Balance APPX, verbatim** — the legacy system's own per-account
 note field. The Balance Sheet / Income Statement line notes are a separate statement layout and they

@@ -21,7 +21,7 @@
 --
 -- WHAT IT DOES NOT DO
 --   * NO journals, NO journal lines, NO opening anchors - that is G4, and this
---     migration asserts those tables are still empty when it finishes.
+--     migration never writes or rewrites those later-phase tables.
 --   * It touches NO `public` table. GT accounting data is completely isolated
 --     from Tien Hock's, and the tail asserts the TH baseline is unmoved.
 --
@@ -53,11 +53,12 @@
 --   Distribution: BK 5 / GL 440 / TC 29 / TD 29.
 --
 -- IDEMPOTENCY
---   ON CONFLICT DO UPDATE ... WHERE the row actually differs, so an unchanged
---   rerun does not even touch updated_at. A second run is an exact no-op.
---   The load is NON-DESTRUCTIVE (R6): it never deletes or renames an existing
---   account. If it finds a GT account that is not in this payload it ABORTS
---   rather than removing it.
+--   The 503 evidence-derived codes are a REQUIRED LEGACY SUBSET, not the
+--   forever-size of the live chart. ON CONFLICT DO NOTHING preserves every
+--   existing row byte-for-byte, including user-managed descriptions, mapping,
+--   hierarchy, status and notes. A rerun inserts only a missing legacy code;
+--   it never updates, deletes or renames an account and it ignores legitimate
+--   post-cutover accounts outside this payload.
 -- ============================================================================
 
 BEGIN;
@@ -665,13 +666,6 @@ BEGIN
     RAISE EXCEPTION 'G3 payload: account(s) pointing at a parent that is not in the payload: %', v_bad;
   END IF;
 
-  -- R6, non-destructive: never silently drop an account somebody else created.
-  SELECT string_agg(code, ', ') INTO v_bad
-    FROM greentarget.account_codes a
-   WHERE NOT EXISTS (SELECT 1 FROM g3_chart c WHERE c.code = a.code);
-  IF v_bad IS NOT NULL THEN
-    RAISE EXCEPTION 'G3 payload: greentarget.account_codes holds account(s) this migration does not own: % - refusing to delete them (R6). Resolve by hand.', v_bad;
-  END IF;
 END $$;
 
 -- ---------------------------------------------------------------------------
@@ -684,31 +678,7 @@ SELECT code, description, ledger_type, parent_code, level, sort_order,
        TRUE, is_system, notes, fs_note, 'G3_CHART_LOAD', 'G3_CHART_LOAD'
   FROM g3_chart
  ORDER BY level, sort_order
-ON CONFLICT (code) DO UPDATE
-  SET description = EXCLUDED.description,
-      ledger_type = EXCLUDED.ledger_type,
-      parent_code = EXCLUDED.parent_code,
-      level       = EXCLUDED.level,
-      sort_order  = EXCLUDED.sort_order,
-      is_active   = EXCLUDED.is_active,
-      is_system   = EXCLUDED.is_system,
-      notes       = EXCLUDED.notes,
-      fs_note     = EXCLUDED.fs_note,
-      updated_by  = EXCLUDED.updated_by
-  WHERE (greentarget.account_codes.description,
-         greentarget.account_codes.ledger_type,
-         greentarget.account_codes.parent_code,
-         greentarget.account_codes.level,
-         greentarget.account_codes.sort_order,
-         greentarget.account_codes.is_active,
-         greentarget.account_codes.is_system,
-         greentarget.account_codes.notes,
-         greentarget.account_codes.fs_note,
-         greentarget.account_codes.updated_by)
-     IS DISTINCT FROM
-        (EXCLUDED.description, EXCLUDED.ledger_type, EXCLUDED.parent_code,
-         EXCLUDED.level, EXCLUDED.sort_order, EXCLUDED.is_active,
-         EXCLUDED.is_system, EXCLUDED.notes, EXCLUDED.fs_note, EXCLUDED.updated_by);
+ON CONFLICT (code) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
 -- 4. Verify - assert the loaded chart, then assert Tien Hock never moved
@@ -720,19 +690,41 @@ DECLARE
   v_th g3_th_baseline%ROWTYPE;
 BEGIN
   SELECT count(*) INTO v_total FROM greentarget.account_codes;
-  IF v_total <> 503 THEN
-    RAISE EXCEPTION 'G3 verify: expected 503 GT accounts, found %', v_total;
+
+  -- Account codes are immutable. All 503 evidence-derived identities must be
+  -- present, while their user-managed fields and any extra live accounts are
+  -- deliberately outside this rerun's ownership.
+  SELECT string_agg(c.code, ', ' ORDER BY c.code) INTO v_bad
+    FROM g3_chart c
+    LEFT JOIN greentarget.account_codes a ON a.code = c.code
+   WHERE a.code IS NULL;
+  IF v_bad IS NOT NULL THEN
+    RAISE EXCEPTION 'G3 verify: required legacy account code(s) are missing: %', left(v_bad, 400);
   END IF;
 
-  -- Every staged row landed byte-for-byte.
-  SELECT string_agg(c.code, ', ') INTO v_bad
+  SELECT string_agg(c.code, ', ' ORDER BY c.code) INTO v_bad
     FROM g3_chart c
     JOIN greentarget.account_codes a ON a.code = c.code
-   WHERE (a.description, a.ledger_type, a.parent_code, a.level, a.sort_order, a.is_system, a.fs_note, a.is_active)
-      IS DISTINCT FROM
-         (c.description, c.ledger_type, c.parent_code, c.level, c.sort_order, c.is_system, c.fs_note, TRUE);
+   WHERE a.created_by IS DISTINCT FROM 'G3_CHART_LOAD';
   IF v_bad IS NOT NULL THEN
-    RAISE EXCEPTION 'G3 verify: loaded row(s) differ from the payload: %', left(v_bad, 400);
+    RAISE EXCEPTION 'G3 verify: legacy account code(s) lost G3_CHART_LOAD creation provenance: %', left(v_bad, 400);
+  END IF;
+
+  -- Rows that still carry the untouched G3 marker must remain byte-faithful
+  -- to the payload. A real UI/API edit changes updated_by and is deliberately
+  -- preserved by ON CONFLICT DO NOTHING instead of reaching this gate.
+  SELECT string_agg(c.code, ', ' ORDER BY c.code) INTO v_bad
+    FROM g3_chart c
+    JOIN greentarget.account_codes a ON a.code = c.code
+   WHERE a.created_by = 'G3_CHART_LOAD'
+     AND a.updated_by = 'G3_CHART_LOAD'
+     AND (a.description, a.ledger_type, a.parent_code, a.level, a.sort_order,
+          a.is_active, a.is_system, a.notes, a.fs_note)
+         IS DISTINCT FROM
+         (c.description, c.ledger_type, c.parent_code, c.level, c.sort_order,
+          TRUE, c.is_system, c.notes, c.fs_note);
+  IF v_bad IS NOT NULL THEN
+    RAISE EXCEPTION 'G3 verify: untouched legacy account row(s) differ from the evidence payload: %', left(v_bad, 400);
   END IF;
 
   SELECT count(*) FILTER (WHERE ledger_type = 'TD'),
@@ -740,65 +732,54 @@ BEGIN
          count(*) FILTER (WHERE ledger_type = 'TC'),
          count(*) FILTER (WHERE ledger_type = 'GL')
     INTO v_td, v_bk, v_tc, v_gl
-    FROM greentarget.account_codes;
+    FROM g3_chart;
   IF v_td <> 29 OR v_bk <> 5 OR v_tc <> 29 OR v_gl <> 440 THEN
     RAISE EXCEPTION 'G3 verify: ledger_type distribution is TD % / BK % / TC % / GL %, expected 29 / 5 / 29 / 440',
       v_td, v_bk, v_tc, v_gl;
   END IF;
 
-  -- No account may leak out of the statements.
-  IF EXISTS (SELECT 1 FROM greentarget.account_codes WHERE fs_note IS NULL) THEN
-    RAISE EXCEPTION 'G3 verify: at least one account has a NULL fs_note';
-  END IF;
-
   -- Exactly notes 17 and 23 are statement-only. This is the DOCUMENTED
-  -- consequence of storing the APPX; if the set ever changes, say so loudly.
+  -- consequence of the evidence-derived payload. Live accounts may later use
+  -- either note, so this gate is intentionally scoped to g3_chart.
   SELECT count(*) INTO v_unused
     FROM greentarget.financial_statement_notes n
-   WHERE NOT EXISTS (SELECT 1 FROM greentarget.account_codes a WHERE a.fs_note = n.code);
+   WHERE NOT EXISTS (SELECT 1 FROM g3_chart a WHERE a.fs_note = n.code);
   IF v_unused <> 2
-     OR EXISTS (SELECT 1 FROM greentarget.account_codes WHERE fs_note IN ('17','23')) THEN
+     OR EXISTS (SELECT 1 FROM g3_chart WHERE fs_note IN ('17','23')) THEN
     RAISE EXCEPTION 'G3 verify: expected exactly notes 17 and 23 to carry zero accounts, found % noteless note(s)', v_unused;
   END IF;
 
-  -- The DEBTOR control and its 28 children.
-  SELECT count(*) INTO v_children FROM greentarget.account_codes WHERE parent_code = 'DEBTOR';
+  -- The evidence payload contains the DEBTOR control and its 28 children.
+  -- The live hierarchy may also contain manually approved post-cutover rows.
+  SELECT count(*) INTO v_children FROM g3_chart WHERE parent_code = 'DEBTOR';
   IF v_children <> 28 THEN
     RAISE EXCEPTION 'G3 verify: DEBTOR must have exactly 28 children, found %', v_children;
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM greentarget.account_codes
+  IF NOT EXISTS (SELECT 1 FROM g3_chart
                   WHERE code = 'DEBTOR' AND ledger_type = 'TD' AND fs_note = '22'
                     AND is_system = TRUE AND parent_code IS NULL) THEN
     RAISE EXCEPTION 'G3 verify: DEBTOR must be a root is_system TD/22 control account';
   END IF;
   -- ADD carries APPX 22 too but is a GL contra account, never a debtor child.
-  IF NOT EXISTS (SELECT 1 FROM greentarget.account_codes
+  IF NOT EXISTS (SELECT 1 FROM g3_chart
                   WHERE code = 'ADD' AND ledger_type = 'GL' AND parent_code IS NULL) THEN
     RAISE EXCEPTION 'G3 verify: ADD must stay a flat GL account, outside the debtor subledger';
   END IF;
 
   -- The named traps.
-  IF NOT EXISTS (SELECT 1 FROM greentarget.account_codes WHERE code = 'PBB1')
-     OR NOT EXISTS (SELECT 1 FROM greentarget.account_codes WHERE code = 'PBB_1') THEN
+  IF NOT EXISTS (SELECT 1 FROM g3_chart WHERE code = 'PBB1')
+     OR NOT EXISTS (SELECT 1 FROM g3_chart WHERE code = 'PBB_1') THEN
     RAISE EXCEPTION 'G3 verify: PBB1 and PBB_1 are two different accounts with the identical description - both must exist';
   END IF;
-  SELECT string_agg(code, ', ') INTO v_bad FROM greentarget.account_codes WHERE code LIKE '% %';
+  SELECT string_agg(code, ', ' ORDER BY code) INTO v_bad FROM g3_chart WHERE code LIKE '% %';
   IF v_bad IS DISTINCT FROM 'AE ENTERPRISE, LEE DECOR, RUMAH MERAH, SUN TARGET' THEN
     RAISE EXCEPTION 'G3 verify: only the 4 genuine GTDB codes may contain a space, found: %', COALESCE(v_bad, '(none)');
   END IF;
 
-  -- The hierarchy VIEW must surface the whole chart.
+  -- The hierarchy VIEW must surface the whole live chart, including extras.
   SELECT count(*) INTO v_hier FROM greentarget.account_codes_hierarchy;
-  IF v_hier <> 503 THEN
-    RAISE EXCEPTION 'G3 verify: the hierarchy view surfaces % of 503 accounts', v_hier;
-  END IF;
-
-  -- G3 loads the chart and nothing else. G4 posts the ledger.
-  IF (SELECT count(*) FROM greentarget.journal_entries)          <> 0
-  OR (SELECT count(*) FROM greentarget.journal_entry_lines)      <> 0
-  OR (SELECT count(*) FROM greentarget.account_opening_balances) <> 0
-  OR (SELECT count(*) FROM greentarget.import_legacy_rows)       <> 0 THEN
-    RAISE EXCEPTION 'G3 verify: G3 must leave journals and opening anchors empty; G4 populates them';
+  IF v_hier <> v_total THEN
+    RAISE EXCEPTION 'G3 verify: the hierarchy view surfaces % of % live accounts', v_hier, v_total;
   END IF;
 
   -- ZERO IMPACT ON TIEN HOCK.
@@ -811,7 +792,7 @@ BEGIN
     RAISE EXCEPTION 'G3 verify: a public/Tien Hock accounting table changed - aborting';
   END IF;
 
-  RAISE NOTICE 'G3 OK: % GT accounts (TD % / BK % / TC % / GL %), DEBTOR + % children, % surfaced by the hierarchy view; journals and anchors still empty; TH tables unchanged.',
+  RAISE NOTICE 'G3 OK: all 503 legacy identities are present inside % live GT accounts; evidence payload TD % / BK % / TC % / GL %, DEBTOR + % legacy children; % surfaced by the hierarchy view; existing rows preserved; TH tables unchanged.',
     v_total, v_td, v_bk, v_tc, v_gl, v_children, v_hier;
 END $$;
 

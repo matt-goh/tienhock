@@ -655,7 +655,9 @@ BEGIN
     RAISE EXCEPTION 'An opening anchor differs from its staged opening balance';
   END IF;
 
-  -- G3 finding 2, re-asserted: every account under a P&L note opens at zero.
+  -- G3 finding 2, re-asserted for untouched seed metadata: every account
+  -- originally under a P&L note opens at zero. A live chart override is
+  -- intentional and must not rewrite or invalidate the imported balances.
   IF EXISTS (
     SELECT 1
       FROM greentarget.account_opening_balances anchors
@@ -664,6 +666,7 @@ BEGIN
       JOIN greentarget.financial_statement_notes notes
         ON notes.code = accounts.fs_note
      WHERE notes.report_section = 'income_statement'
+       AND accounts.updated_by = 'G3_CHART_LOAD'
        AND anchors.amount <> 0
   ) THEN
     RAISE EXCEPTION 'An income-statement account has a non-zero 1 January opening';
@@ -696,9 +699,12 @@ BEGIN
               FROM actual_monthly_closes m WHERE m.as_of = target.as_of) AS cr,
            (SELECT COALESCE(SUM(m.close_cents), 0)
               FROM actual_monthly_closes m
-              JOIN greentarget.account_codes a ON a.code = m.account_code
              WHERE m.as_of = target.as_of
-               AND a.parent_code = 'DEBTOR') AS debtor_control,
+               AND EXISTS (
+                 SELECT 1 FROM greentarget.import_legacy_rows source
+                  WHERE source.account_code = m.account_code
+                    AND source.source_kind = 'GTDB'
+               )) AS debtor_control,
            (SELECT close_cents FROM actual_monthly_closes m
              WHERE m.as_of = target.as_of AND m.account_code = 'CD_SD') AS cd_sd
       FROM expected_month_ends target
@@ -784,8 +790,12 @@ SELECT closes.as_of,
          WHERE closes.account_code = 'CD_SD') / 100.0 AS cd_sd,
        (SELECT SUM(m.close_cents) / 100.0
           FROM actual_monthly_closes m
-          JOIN greentarget.account_codes a ON a.code = m.account_code
-         WHERE m.as_of = closes.as_of AND a.parent_code = 'DEBTOR')
+         WHERE m.as_of = closes.as_of
+           AND EXISTS (
+             SELECT 1 FROM greentarget.import_legacy_rows source
+              WHERE source.account_code = m.account_code
+                AND source.source_kind = 'GTDB'
+           ))
          AS debtor_control
   FROM actual_monthly_closes closes
  GROUP BY closes.as_of

@@ -516,7 +516,7 @@ const QuickAddAccountCodeModal: React.FC<QuickAddAccountCodeModalProps> = ({
 interface JournalEntryPageProps {
   // Green Target reuses this form over its own journal routes; it fetches GT
   // types/accounts directly (the TH caches are left firing, unused) and has
-  // no quick-add/favourites (GT's chart is fully imported) and no delete.
+  // no inline account quick-add/favourites and no journal delete.
   company?: "tienhock" | "greentarget";
 }
 
@@ -1371,6 +1371,8 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                         <td className="px-1 py-1">
                           <AccountCodeCombobox
                             value={line.account_code}
+                            accounts={allAccountCodes}
+                            company={company}
                             onChange={(value: string) =>
                               handleLineChange(index, "account_code", value)
                             }
@@ -1592,8 +1594,8 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
       </div>
 
       {/* Dialogs */}
-      {/* Quick-add creates Tien Hock account codes only; Green Target's chart
-          is the imported 503-account set and is never extended from here. */}
+      {/* Quick-add creates Tien Hock account codes only. Green Target account
+          codes are maintained from Accounting -> Chart of Accounts. */}
       {!isGreenTarget && (
         <QuickAddAccountCodeModal
           isOpen={quickAddTargetLineIndex !== null}

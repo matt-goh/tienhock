@@ -136,6 +136,9 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
 }: AccountCodeListPageProps) => {
   const navigate = useNavigate();
   const isGreenTarget: boolean = company === "greentarget";
+  const accountCodesPagePath: string = isGreenTarget
+    ? "/greentarget/accounting/account-codes"
+    : "/accounting/account-codes";
 
   // Cached data
   const {
@@ -538,14 +541,14 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
   };
 
   // Handlers
-  const handleAddClick = () => {
-    navigate("/accounting/account-codes/new");
+  const handleAddClick = (): void => {
+    navigate(`${accountCodesPagePath}/new`);
   };
 
-  const handleEditClick = (account: AccountCode) => {
-    // GT chart of accounts is read-only; there is no GT edit page.
-    if (isGreenTarget) return;
-    navigate(`/accounting/account-codes/${account.code}`);
+  const handleEditClick = (account: AccountCode): void => {
+    navigate(
+      `${accountCodesPagePath}/${encodeURIComponent(account.code)}`
+    );
   };
 
   const handleDeleteClick = (account: AccountCode, e: React.MouseEvent) => {
@@ -613,9 +616,7 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
             ? `favourite-shortcut:${node.code}`
             : `hierarchy:${node.code}`
         }
-        className={`${
-          isGreenTarget ? "" : "cursor-pointer "
-        }hover:bg-default-50 dark:hover:bg-gray-700 ${
+        className={`cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700 ${
           isFavouriteShortcut
             ? "bg-amber-50/70 dark:bg-amber-950/20"
             : ""
@@ -722,55 +723,55 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
         <td className="px-4 py-2 text-center text-sm">
           <div className="flex items-center justify-center space-x-2">
             {!isGreenTarget && (
-              <>
-                <button
-                  type="button"
-                  onClick={(event: React.MouseEvent<HTMLButtonElement>): void =>
-                    handleFavouriteToggle(node.code, event)
-                  }
-                  disabled={pendingFavouriteCodes.has(node.code)}
-                  aria-pressed={favouriteCodes.has(node.code)}
-                  aria-label={
-                    favouriteCodes.has(node.code)
-                      ? `Remove ${node.code} from favourites`
-                      : `Add ${node.code} to favourites`
-                  }
-                  className="text-default-300 transition-colors hover:text-amber-500 disabled:cursor-wait disabled:opacity-50 dark:text-gray-500 dark:hover:text-amber-400"
-                  title={
-                    favouriteCodes.has(node.code)
-                      ? "Remove from favourites"
-                      : "Add to favourites"
-                  }
-                >
-                  {favouriteCodes.has(node.code) ? (
-                    <IconStarFilled
-                      size={18}
-                      className="text-amber-500 dark:text-amber-400"
-                    />
-                  ) : (
-                    <IconStar size={18} />
-                  )}
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEditClick(node);
-                  }}
-                  className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
-                  title="Edit"
-                >
-                  <IconPencil size={18} />
-                </button>
-                {!node.is_system && (
-                  <button
-                    onClick={(e) => handleDeleteClick(node, e)}
-                    className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
-                    title="Delete"
-                  >
-                    <IconTrash size={18} />
-                  </button>
+              <button
+                type="button"
+                onClick={(event: React.MouseEvent<HTMLButtonElement>): void =>
+                  handleFavouriteToggle(node.code, event)
+                }
+                disabled={pendingFavouriteCodes.has(node.code)}
+                aria-pressed={favouriteCodes.has(node.code)}
+                aria-label={
+                  favouriteCodes.has(node.code)
+                    ? `Remove ${node.code} from favourites`
+                    : `Add ${node.code} to favourites`
+                }
+                className="text-default-300 transition-colors hover:text-amber-500 disabled:cursor-wait disabled:opacity-50 dark:text-gray-500 dark:hover:text-amber-400"
+                title={
+                  favouriteCodes.has(node.code)
+                    ? "Remove from favourites"
+                    : "Add to favourites"
+                }
+              >
+                {favouriteCodes.has(node.code) ? (
+                  <IconStarFilled
+                    size={18}
+                    className="text-amber-500 dark:text-amber-400"
+                  />
+                ) : (
+                  <IconStar size={18} />
                 )}
-              </>
+              </button>
+            )}
+            <button
+              onClick={(event: React.MouseEvent<HTMLButtonElement>): void => {
+                event.stopPropagation();
+                handleEditClick(node);
+              }}
+              className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
+              title="Edit"
+            >
+              <IconPencil size={18} />
+            </button>
+            {!isGreenTarget && !node.is_system && (
+              <button
+                onClick={(event: React.MouseEvent<HTMLButtonElement>): void =>
+                  handleDeleteClick(node, event)
+                }
+                className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
+                title="Delete"
+              >
+                <IconTrash size={18} />
+              </button>
             )}
           </div>
         </td>
@@ -783,9 +784,9 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
     return (
       <tr
         key={account.code}
-        className={`hover:bg-default-50 dark:hover:bg-gray-700 ${
-          isGreenTarget ? "" : "cursor-pointer "
-        }${!account.is_active ? "opacity-50" : ""}`}
+        className={`cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700 ${
+          !account.is_active ? "opacity-50" : ""
+        }`}
         onClick={() => handleEditClick(account)}
       >
         <td className="px-4 py-2 text-sm">
@@ -838,55 +839,55 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
         <td className="px-4 py-2 text-center text-sm">
           <div className="flex items-center justify-center space-x-2">
             {!isGreenTarget && (
-              <>
-                <button
-                  type="button"
-                  onClick={(event: React.MouseEvent<HTMLButtonElement>): void =>
-                    handleFavouriteToggle(account.code, event)
-                  }
-                  disabled={pendingFavouriteCodes.has(account.code)}
-                  aria-pressed={favouriteCodes.has(account.code)}
-                  aria-label={
-                    favouriteCodes.has(account.code)
-                      ? `Remove ${account.code} from favourites`
-                      : `Add ${account.code} to favourites`
-                  }
-                  className="text-default-300 transition-colors hover:text-amber-500 disabled:cursor-wait disabled:opacity-50 dark:text-gray-500 dark:hover:text-amber-400"
-                  title={
-                    favouriteCodes.has(account.code)
-                      ? "Remove from favourites"
-                      : "Add to favourites"
-                  }
-                >
-                  {favouriteCodes.has(account.code) ? (
-                    <IconStarFilled
-                      size={18}
-                      className="text-amber-500 dark:text-amber-400"
-                    />
-                  ) : (
-                    <IconStar size={18} />
-                  )}
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEditClick(account);
-                  }}
-                  className="text-sky-600 hover:text-sky-800"
-                  title="Edit"
-                >
-                  <IconPencil size={18} />
-                </button>
-                {!account.is_system && (
-                  <button
-                    onClick={(e) => handleDeleteClick(account, e)}
-                    className="text-rose-600 hover:text-rose-800"
-                    title="Delete"
-                  >
-                    <IconTrash size={18} />
-                  </button>
+              <button
+                type="button"
+                onClick={(event: React.MouseEvent<HTMLButtonElement>): void =>
+                  handleFavouriteToggle(account.code, event)
+                }
+                disabled={pendingFavouriteCodes.has(account.code)}
+                aria-pressed={favouriteCodes.has(account.code)}
+                aria-label={
+                  favouriteCodes.has(account.code)
+                    ? `Remove ${account.code} from favourites`
+                    : `Add ${account.code} to favourites`
+                }
+                className="text-default-300 transition-colors hover:text-amber-500 disabled:cursor-wait disabled:opacity-50 dark:text-gray-500 dark:hover:text-amber-400"
+                title={
+                  favouriteCodes.has(account.code)
+                    ? "Remove from favourites"
+                    : "Add to favourites"
+                }
+              >
+                {favouriteCodes.has(account.code) ? (
+                  <IconStarFilled
+                    size={18}
+                    className="text-amber-500 dark:text-amber-400"
+                  />
+                ) : (
+                  <IconStar size={18} />
                 )}
-              </>
+              </button>
+            )}
+            <button
+              onClick={(event: React.MouseEvent<HTMLButtonElement>): void => {
+                event.stopPropagation();
+                handleEditClick(account);
+              }}
+              className="text-sky-600 hover:text-sky-800"
+              title="Edit"
+            >
+              <IconPencil size={18} />
+            </button>
+            {!isGreenTarget && !account.is_system && (
+              <button
+                onClick={(event: React.MouseEvent<HTMLButtonElement>): void =>
+                  handleDeleteClick(account, event)
+                }
+                className="text-rose-600 hover:text-rose-800"
+                title="Delete"
+              >
+                <IconTrash size={18} />
+              </button>
             )}
           </div>
         </td>
@@ -1035,20 +1036,18 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
             )}
           </div>
 
-          {!isGreenTarget && (
-            <Button
-              onClick={handleAddClick}
-              color="sky"
-              variant="filled"
-              icon={IconPlus}
-              iconPosition="left"
-              size="sm"
-              className="whitespace-nowrap"
-            >
-              <span className="2xl:hidden">Add</span>
-              <span className="hidden 2xl:inline">Add Account</span>
-            </Button>
-          )}
+          <Button
+            onClick={handleAddClick}
+            color="sky"
+            variant="filled"
+            icon={IconPlus}
+            iconPosition="left"
+            size="sm"
+            className="whitespace-nowrap"
+          >
+            <span className="2xl:hidden">Add</span>
+            <span className="hidden 2xl:inline">Add Account</span>
+          </Button>
         </div>
       </div>
 

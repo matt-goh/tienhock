@@ -648,6 +648,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
             value={selectedAccount}
             onChange={handleAccountChange}
             accounts={hasCompanyAccounts ? accountCodes : undefined}
+            company={isGreenTarget ? "greentarget" : "tienhock"}
             disabled={accountsLoading}
             placeholder={
               isJellyPolly

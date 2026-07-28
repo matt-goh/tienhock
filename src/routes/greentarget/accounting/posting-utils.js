@@ -10,25 +10,44 @@ import {
 } from "./posting-lock.js";
 
 /**
- * Fail loudly unless every account code exists in GT's own chart. GT never
- * falls back to a control account (no TH-style TR warning): a missing account
- * means the chart and the posting rule disagree, which must abort the
- * transaction, not post somewhere approximate.
+ * Fail loudly unless every account code exists and is active in GT's own
+ * chart. GT reports omit inactive accounts, so allowing a new posting into one
+ * would hide that journal from the statements. GT never falls back to a
+ * control account (no TH-style TR warning): an unavailable account must abort
+ * the transaction, not post somewhere approximate.
  *
  * @param {import("pg").PoolClient} client
  * @param {string[]} accountCodes
+ * @returns {Promise<void>}
  */
 export async function ensureGTAccountsExist(client, accountCodes) {
   const uniqueCodes = [...new Set(accountCodes)];
+  // Keep validated accounts share-locked until the caller's posting
+  // transaction ends, so a concurrent request cannot deactivate one between
+  // this check and the journal-line insert.
   const result = await client.query(
-    "SELECT code FROM greentarget.account_codes WHERE code = ANY($1)",
+    `SELECT code, is_active
+     FROM greentarget.account_codes
+     WHERE code = ANY($1)
+     FOR SHARE`,
     [uniqueCodes]
   );
-  const existing = new Set(result.rows.map((row) => row.code));
-  const missing = uniqueCodes.filter((code) => !existing.has(code));
+  const accountsByCode = new Map(
+    result.rows.map((row) => [row.code, row.is_active])
+  );
+  const missing = uniqueCodes.filter((code) => !accountsByCode.has(code));
   if (missing.length > 0) {
     throw new Error(
       `Green Target account code(s) not found: ${missing.join(", ")}`
+    );
+  }
+
+  const inactive = uniqueCodes.filter(
+    (code) => accountsByCode.get(code) !== true
+  );
+  if (inactive.length > 0) {
+    throw new Error(
+      `Green Target account code(s) inactive: ${inactive.join(", ")}`
     );
   }
 }
