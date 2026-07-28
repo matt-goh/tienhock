@@ -295,9 +295,11 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
       filtered = filtered.filter((a) => a.is_active);
     }
 
-    // Default browsing view shows parents/top-level/favourites only; while
-    // searching, keep every match so leaf children (e.g. RM's children) surface.
-    if (!searchTerm) {
+    // Tien Hock's compact browsing view shows parents/top-level/favourites only;
+    // while searching, keep every match so leaf children surface. Green Target
+    // keeps every active child in the tree because its legacy hierarchy is the
+    // DEBTOR control plus leaf debtor accounts, and hiding leaves makes it look flat.
+    if (!searchTerm && !isGreenTarget) {
       filtered = filtered.filter(
         (account: AccountCode): boolean =>
           parentCodes.has(account.code) ||
@@ -314,6 +316,7 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
     showInactive,
     parentCodes,
     effectiveFavouriteCodes,
+    isGreenTarget,
   ]);
 
   // Filter tree for display
