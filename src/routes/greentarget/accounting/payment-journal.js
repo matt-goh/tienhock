@@ -10,10 +10,10 @@
 // Two deliberate rules:
 //   * Pending cheques post NOTHING until confirmed (TH's pending-cheque
 //     semantics; the journal then dates to payment_date, the keyed RV date).
-//   * A payment on a PRE-CUTOVER invoice (date_issued < 2026-07-01) posts
-//     NOTHING: that invoice's sale and counter-cash collection already live
-//     in the immutable Jan-Jun import, so an organic receipt would double the
-//     money. The operational balance update still proceeds.
+//   * A payment RECEIVED before the cutover posts NOTHING when its invoice is
+//     also pre-cutover: the locked historical ledger remains authoritative and
+//     the operational balance update must not duplicate it. A receipt dated on
+//     or after the cutover posts normally even when it settles an older bill.
 import {
   GREEN_TARGET_ACCOUNTING_OPEN_DATE,
   assertGreenTargetAccountingDateUnlocked,
@@ -32,7 +32,7 @@ export const GT_BANK_ACCOUNT = "PBB_1";
 
 /**
  * Create or re-sync the payment-owned REC journal. Returns null (posts
- * nothing) for pending cheques and for payments on pre-cutover invoices.
+ * nothing) for pending cheques and locked-history receipts.
  *
  * @param {import("pg").PoolClient} client Inside the caller's transaction.
  * @param {object} payment The greentarget.payments row.
@@ -51,12 +51,16 @@ export async function syncGTPaymentJournalEntry(
   }
 
   const invoiceDate = toLocalAccountingDateString(invoice.date_issued);
-  if (invoiceDate < GREEN_TARGET_ACCOUNTING_OPEN_DATE) {
+  const paymentDate = toLocalAccountingDateString(payment.payment_date);
+  if (
+    invoiceDate < GREEN_TARGET_ACCOUNTING_OPEN_DATE &&
+    paymentDate < GREEN_TARGET_ACCOUNTING_OPEN_DATE
+  ) {
     return null;
   }
 
   const entryDate = assertGreenTargetAccountingDateUnlocked(
-    payment.payment_date,
+    paymentDate,
     `Payment ${payment.internal_reference || payment.payment_id}`
   );
 
@@ -72,10 +76,28 @@ export async function syncGTPaymentJournalEntry(
 
   if (journalId) {
     const overrideCheck = await client.query(
-      "SELECT manual_override FROM greentarget.journal_entries WHERE id = $1",
+      `SELECT manual_override, status, entry_type, source_type, source_id
+         FROM greentarget.journal_entries
+        WHERE id = $1
+        FOR UPDATE`,
       [journalId]
     );
-    if (overrideCheck.rows[0]?.manual_override) {
+    const linkedJournal = overrideCheck.rows[0];
+    if (
+      !linkedJournal ||
+      linkedJournal.status !== "posted" ||
+      linkedJournal.entry_type !== "REC" ||
+      linkedJournal.source_type !== "payment" ||
+      String(linkedJournal.source_id) !== String(payment.payment_id)
+    ) {
+      throw Object.assign(
+        new Error(
+          `Payment ${payment.internal_reference || payment.payment_id} is linked to an invalid or cancelled journal`
+        ),
+        { statusCode: 409 }
+      );
+    }
+    if (linkedJournal.manual_override) {
       return journalId;
     }
   }
@@ -140,25 +162,18 @@ export async function syncGTPaymentJournalEntry(
  *
  * @param {import("pg").PoolClient} client
  * @param {object} payment The updated greentarget.payments row.
+ * @param {object} invoice The owning greentarget.invoices row.
+ * @returns {Promise<void>}
  */
-export async function updateGTPaymentJournalReference(client, payment) {
+export async function updateGTPaymentJournalReference(
+  client,
+  payment,
+  invoice
+) {
   if (!payment.journal_entry_id) {
     return;
   }
-  const visibleReference =
-    payment.internal_reference || payment.payment_reference || null;
-  await client.query(
-    `UPDATE greentarget.journal_entries
-        SET display_reference = $2, updated_at = NOW()
-      WHERE id = $1 AND status = 'posted' AND manual_override = false`,
-    [payment.journal_entry_id, visibleReference]
-  );
-  await client.query(
-    `UPDATE greentarget.journal_entry_lines
-        SET cheque_reference = $2
-      WHERE journal_entry_id = $1 AND debit_amount > 0`,
-    [payment.journal_entry_id, payment.payment_reference || null]
-  );
+  await syncGTPaymentJournalEntry(client, payment, invoice, null);
 }
 
 /**

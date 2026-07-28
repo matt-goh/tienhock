@@ -7,6 +7,14 @@ import {
   CACHE_KEYS,
   CACHE_EXPIRY,
 } from "../../utils/greenTarget/cacheUtils";
+import type {
+  CreateGreenTargetPaymentBatchInput,
+  CreateGreenTargetPaymentInput,
+  GreenTargetPayment,
+  GreenTargetPaymentBatchResponse,
+  GreenTargetPaymentMutationResponse,
+  GreenTargetPaymentReferenceAvailability,
+} from "../../types/greenTargetTypes";
 
 export const greenTargetApi = {
   // Generic request method
@@ -210,7 +218,7 @@ export const greenTargetApi = {
       status?: string;
       search?: string;
     } = {}
-  ) => {
+  ): Promise<GreenTargetPayment[]> => {
     const queryParams = new URLSearchParams();
 
     if (options.invoice_id) {
@@ -246,7 +254,7 @@ export const greenTargetApi = {
     }
 
     const queryString = queryParams.toString();
-    return api.get(
+    return api.get<GreenTargetPayment[]>(
       `/greentarget/api/payments${queryString ? `?${queryString}` : ""}`
     );
   },
@@ -256,19 +264,57 @@ export const greenTargetApi = {
         includeCancelled ? "?include_cancelled=true" : ""
       }`
     ),
-  checkInternalPaymentRef: (ref: string, excludePaymentId: number) =>
-    api.get(
+  checkInternalPaymentRef: (
+    ref: string,
+    excludePaymentId?: number
+  ): Promise<GreenTargetPaymentReferenceAvailability> =>
+    api.get<GreenTargetPaymentReferenceAvailability>(
       `/greentarget/api/payments/check-internal-ref/${encodeURIComponent(
         ref
-      )}?exclude_payment_id=${excludePaymentId}`
+      )}${
+        excludePaymentId === undefined
+          ? ""
+          : `?exclude_payment_id=${excludePaymentId}`
+      }`
     ),
-  cancelPayment: (paymentId: number, reason?: string) =>
-    api.put(`/greentarget/api/payments/${paymentId}/cancel`, { reason }),
-  confirmPayment: (paymentId: number, bank_account?: string) =>
-    api.put(`/greentarget/api/payments/${paymentId}/confirm`, { bank_account }),
-  createPayment: (data: any) => api.post("/greentarget/api/payments", data),
-  updatePayment: (id: any, data: any) =>
-    api.put(`/greentarget/api/payments/${id}`, data),
+  cancelPayment: (
+    paymentId: number,
+    reason?: string
+  ): Promise<GreenTargetPaymentMutationResponse> =>
+    api.put<GreenTargetPaymentMutationResponse>(
+      `/greentarget/api/payments/${paymentId}/cancel`,
+      { reason }
+    ),
+  confirmPayment: (
+    paymentId: number
+  ): Promise<GreenTargetPaymentMutationResponse> =>
+    api.put<GreenTargetPaymentMutationResponse>(
+      `/greentarget/api/payments/${paymentId}/confirm`
+    ),
+  createPayment: (
+    data: CreateGreenTargetPaymentInput
+  ): Promise<GreenTargetPaymentMutationResponse> =>
+    api.post<GreenTargetPaymentMutationResponse>(
+      "/greentarget/api/payments",
+      data
+    ),
+  createPaymentBatch: (
+    data: CreateGreenTargetPaymentBatchInput
+  ): Promise<GreenTargetPaymentBatchResponse> =>
+    api.post<GreenTargetPaymentBatchResponse>(
+      "/greentarget/api/payments/batch",
+      data
+    ),
+  updatePayment: (
+    id: number,
+    data: Partial<
+      Pick<GreenTargetPayment, "internal_reference" | "payment_reference">
+    >
+  ): Promise<GreenTargetPaymentMutationResponse> =>
+    api.put<GreenTargetPaymentMutationResponse>(
+      `/greentarget/api/payments/${id}`,
+      data
+    ),
 
   // Location endpoints
   getLocationsByCustomer: (customerId: any) =>
