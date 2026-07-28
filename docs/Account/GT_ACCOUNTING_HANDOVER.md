@@ -1,7 +1,7 @@
 # Green Target Accounting — Build-Out & Legacy Jan–Jun 2026 Import (Handover Plan)
 
-**Created 25 Jul 2026. Status: PHASES G0, G1, G2, G3, G4, G5, G6 and G7 COMPLETE (G4 and G5 on 27 Jul
-2026, G6 and G7 on 28 Jul 2026) —
+**Created 25 Jul 2026. Status: PHASES G0–G8 COMPLETE — LIVE IN PRODUCTION since 28 Jul 2026 (G4 and G5 on 27 Jul
+2026, G6 and G7 on 28 Jul 2026, G8 production rollout 28 Jul night — record in §10f) —
 see the execution records in §9. Source intake and the staging pipeline exist and pass every gate; all
 66 scan pages are transcribed and validated; the `greentarget` accounting tables, the 34-note GT
 catalogue and the 503-account chart of accounts are all loaded; **the Jan–Jun 2026 legacy ledger is
@@ -1561,6 +1561,11 @@ Prerequisite: `greentarget-legacy/generated/` must be populated. It survived the
 is ever empty, `node dev/import/greentarget-legacy/prepare-staging.mjs` regenerates it from the
 workbooks.
 
+**The migration `.sql` files referenced below were removed from `dev/migrations/` after the G8
+production rollout (2026-07-28) — recover any of them with
+`git show 50e63344:dev/migrations/<filename>` (see docs/MIGRATIONS_LOG.md, "Removed 28 Jul 2026
+(third batch)").**
+
 ```bash
 # 1. G2 — schema, lookups, the 34-note catalogue        (baseline-independent, applies as-is)
 docker exec -i tienhock_dev_db psql -U postgres -d tienhock -v ON_ERROR_STOP=1 \
@@ -1594,10 +1599,9 @@ nothing about the GT ledger needs to be taken on trust after the swap.
 - **G6 (frontend) is unaffected** as a code task, but it cannot be tested end-to-end until the rebuild
   is done — the GT routes will return empty or error against a database with no `greentarget`
   accounting tables.
-- **G8 (production cutover) is unchanged and still owns applying these migrations to production.**
-  Note that `.github/workflows/deploy.yml` does **not** run migrations: merging the GT branch to
-  `production` ships the read-only routes only. Nothing calls them until G6, so there is no user
-  impact, but any direct call would error until G8 applies the schema.
+- **G8 (production cutover) is DONE — see §10f.** Every migration reached `tienhock_prod` on
+  2026-07-28 and all four verifiers passed there. `.github/workflows/deploy.yml` still does **not**
+  run migrations: any future GT migration needs the same manual prod apply.
 
 ### 10e. Second refresh + measured re-baseline (28 Jul 2026, G8 rehearsal)
 
@@ -1630,6 +1634,44 @@ frozen June five-ledger fingerprint — all five account aggregates (lines/zeroL
 byte-identical to the frozen V2 expectation and the IMP projection/checkpoints/statements are exact;
 only the content hash moved, consistent with today's legitimate prod metadata changes (the 2991
 restore). Re-pinning that hash is a TH-side decision, not a GT signal.
+
+### 10f. Phase G8 — production rollout — ✅ COMPLETE (28 Jul 2026, ~23:00–24:00 KL)
+
+Everything §10e rehearsed was applied to `tienhock_prod` on the Hetzner server the same night,
+after a BackupModal safety backup and with the office offline. G2/G3 were NOT re-run (they were
+already live since 27 Jul 15:18 and G2's data-tables-empty guard would have aborted by design).
+Apply order and results — every number identical to the rehearsal:
+
+1. `2026-07-27_greentarget_import_date_encoding.sql` → `G4 date_encoding OK` (the TH-baseline guard
+   passing here confirmed prod was still at 2,827 / 8,238 / 33).
+2. `load-staging.mjs` → staging CSV sha256 `6e42b830…` validated, COPY 4,903, same summary table.
+3. `post-monthly-journals.sql` × 6 → 1,705 journals / 4,401 lines.
+4. `2026-07-27_greentarget_opening_anchors.sql` → 501 anchors summing to exactly 0.00.
+5. `2026-07-28_greentarget_g7_organic_posting.sql`.
+6. `backfill-g7-organic.mjs` → journals 1706/1707/1708 (invoice 325 `2026/01012` RM200 S,
+   invoice 326 `2026/01014` RM250 S, payment 197 `RV26/07/01` RM250 REC), balanced, back-linked,
+   `posting_sequence` 1–3 — the same three pre-G7 documents as dev.
+7. All four verifiers green: `verify-import.sql` **G4 VERIFY OK** (six month-ends exact),
+   `verify-chart.mjs` **59 gates**, `verify-import.mjs` **64 gates + 2,850 comparisons**,
+   `verify-legacy-reports.mjs` **ALL STAGES GREEN (123 gates)** — including the Tien Hock
+   isolation gates (2,827 / 8,238 / 33 unmoved).
+
+**Three server-environment gotchas, now documented so the next rollout doesn't rediscover them:**
+(a) `verify-chart.mjs` and `verify-import.mjs` were docker-only; they were patched with the same
+`GT_IMPORT_DB_MODE=direct` support `load-staging.mjs` already had (default unchanged = dev docker,
+re-verified locally after the patch). (b) The gitignored inputs the verifiers read —
+`generated/validation-report.json` and `greentarget-report-fixtures/data/*.csv` — are not in the
+repo and had to be scp'd to the server. (c) The `postgres` user could not traverse
+`/home/tienhock` until `chmod o+x ~` and `chmod -R a+rX ~/tienhock-app` were applied (scp-created
+directories come down `750`).
+
+**Live spot-check passed:** GT Trial Balance 06/2026 (2,896,808.53 balanced, DEBTOR 156,782.22),
+CD_SD ledger June close 65,705.40, GT Debtors report 156,782.22 with ledger deep-links, and the TH
+Estimated P&L June values (PU_BBER 130,631.40 / CS_BBER 194,663.40, the verifier-pinned figures —
+the estimated parity fixes were applied to prod in the same window, see
+ESTIMATED_REPORT_HANDOVER.md §5). The GT ledger in production is now live and authoritative;
+the only outstanding GT input remains the unapproved `debtor-map.json` (receivables fall back to
+`CD_SD` until the user approves mappings).
 
 ---
 
