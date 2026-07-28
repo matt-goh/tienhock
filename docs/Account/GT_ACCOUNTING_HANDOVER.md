@@ -21,8 +21,9 @@ at the imported ledger (June 2026 total RM156,782.22). G7 enabled journal mainte
 and providing no delete workflow. **G7 shipped organic posting: GT
 invoices, payments and adjustments dated on/after 2026-07-01 now own balanced journals in the
 `greentarget` schema, manual journals are keyed from the shared Journal pages, and the R8 posting
-lock rejects every pre-July GT mutation with 409. The bridge §5 process decision was made: enter
-everything in the ERP.** The one outstanding input across the whole project is still the user
+lock protects every pre-July accounting mutation. The 29 Jul payment-entry follow-up deliberately
+allows non-posting payment-history rows against pre-cutover invoices; it never changes the imported
+ledger. The bridge §5 process decision was made: enter everything in the ERP.** The one outstanding input across the whole project is still the user
 approval of `debtor-map.json` (both mappings stay unapproved; every organic receivable falls back to
 `CD_SD` until then). ⚠ **The dev database was then replaced with production data,
 which removed every GT accounting row G2/G3/G4 created — see §10 for what survives and how to rebuild
@@ -1318,9 +1319,10 @@ the GT IS/BS PDF print output against the scans (data path verified; visual chec
 **Green Target now posts its own journals.** Every GT invoice, payment and adjustment dated on/after
 **2026-07-01** owns a balanced journal in the `greentarget` schema, synced from the operational
 lifecycle; manual journals are created/edited/cancelled/restored from the shared Journal pages; and a
-hard posting lock (R8) rejects **every** GT mutation dated before 2026-07-01 with HTTP 409
-(`ACCOUNTING_PERIOD_LOCKED`). The Jan–Jun import stays immutable — proven by all three harnesses,
-re-pinned to the legacy subset and green. Changelog entry shipped (rule 16).
+hard posting lock (R8) rejects every GT **accounting** mutation dated before 2026-07-01 with HTTP
+409 (`ACCOUNTING_PERIOD_LOCKED`). The narrow exception is a non-posting historical payment-history
+entry described below; it cannot alter the ledger. The Jan–Jun import stays immutable — proven by
+all three harnesses, re-pinned to the legacy subset and green. Changelog entry shipped (rule 16).
 
 #### The two pre-G7 decisions, settled
 
@@ -1353,12 +1355,15 @@ backfill itself:** invoice `2026/01012`'s rental is tong `B17` → `TGB`; `2026/
 the imported one), falling back to the rule above.
 
 **Cutover / straddle rules.** Invoice create/update/cancel/delete dated before the open date → 409.
-A payment posts a journal **only when its owning invoice is dated on/after the open date** — a
-pre-cutover invoice's money already lives in the immutable import, so an organic receipt would
-double it (the operational balance update still proceeds). Pending cheques post nothing until
-confirmed; the journal then dates to `payment_date`. **The lock is stricter than Tien Hock's**: it
-guards ALL GT mutations including hand-keyed journals, per the G7 gate "pre-1-Jul mutations return
-409". `posting_sequence` for organic journals is MAX+1 within the entry month, keeping the dense
+A payment posts a journal whenever its **Date Received is on/after 2026-07-01**, including when it
+settles an older invoice. A Date Received before the cutover is accepted only when every allocated
+invoice is also pre-cutover; that row is operational history only and posts no journal, so it cannot
+alter the locked ledger. Pending cheques post nothing until the full receipt is confirmed; each
+allocation journal then dates to `payment_date`. **The lock is stricter than Tien Hock's**: it guards
+all GT **accounting** mutations including hand-keyed journals. The historical exception exists only
+for the non-posting path; the imported books and opening activity remain authoritative without
+claiming that every operational payment has a one-to-one imported receipt.
+`posting_sequence` for organic journals is MAX+1 within the entry month, keeping the dense
 1..N invariant the ledger's (month, sequence, display_order) ordering relies on.
 
 **System journals detach exactly like TH**: hand-editing an S/REC/CN/DN/RN journal (or any journal
@@ -1672,6 +1677,47 @@ the estimated parity fixes were applied to prod in the same window, see
 ESTIMATED_REPORT_HANDOVER.md §5). The GT ledger in production is now live and authoritative;
 the only outstanding GT input remains the unapproved `debtor-map.json` (receivables fall back to
 `CD_SD` until the user approves mappings).
+
+### 10g. Payment received entry follow-up — COMPLETE (29 Jul 2026)
+
+The Green Target Payments page now follows the supplied legacy `CASH RECEIVED ENTRY` workflow:
+the user keys one **Date Received**, one **Green Target Reference No.** (for example
+`RV26/06/62`), one method and an optional cheque/transaction reference, then allocates that receipt
+to one or more selected invoices. The whole submission is one database transaction — either every
+invoice payment and balance update succeeds, or none does. All allocation rows share the keyed GT
+reference, so the list renders one receipt header with the invoice lines underneath. The invoice
+details page uses the same manual-reference rule; the old invoice-month RV auto-generator is gone.
+
+This follow-up deliberately adds **no table or column**. `greentarget.payments` remains one row per
+invoice allocation; the shared `internal_reference`, received date and method identify the visible
+receipt, while hidden `REC-{payment_id}` values remain unique per organic journal. Editing the GT
+reference, confirming a pending cheque, or cancelling from any allocation now updates the full
+receipt atomically, so it cannot split into partially confirmed/cancelled invoice lines.
+`payment_reference` keeps its separate meaning: cheque number or bank/online transaction reference,
+never the Green Target RV number.
+
+Accounting behaviour is intentionally split at the existing cutover boundary:
+
+- A receipt received on/after 2026-07-01 keeps G7 intact: every active allocation posts its balanced
+  REC journal (DR `PBB_1` / CR receivable), even when it settles a pre-cutover invoice. A cheque
+  posts every allocation when the receipt is confirmed.
+- A receipt received before 2026-07-01 is accepted only when every selected invoice is also
+  pre-cutover. It updates operational payment history and invoice balances but posts no journal;
+  create/confirm/cancel bypasses R8 only for this non-posting path, while every pre-cutover
+  accounting mutation remains locked. A received date cannot precede any selected invoice date.
+- Amounts must be at least RM0.01 with no more than two decimal places. GT references are trimmed,
+  limited to 50 characters, checked case-insensitively and remain reserved after cancellation so two
+  receipt histories can never merge.
+
+**Files:** `src/routes/greentarget/payments.js`,
+`src/routes/greentarget/accounting/payment-journal.js`, `src/routes/greentarget/api.ts`,
+`src/types/greenTargetTypes.ts`, `src/components/GreenTarget/GreenTargetPaymentForm.tsx`,
+`src/components/GreenTarget/GreenTargetPaymentTable.tsx`,
+`src/pages/GreenTarget/Payments/GreenTargetPaymentPage.tsx`,
+`src/pages/GreenTarget/Invoices/InvoiceDetailsPage.tsx`,
+`src/pages/GreenTarget/Invoices/InvoiceFormPage.tsx`,
+`dev/import/greentarget-report-fixtures/verify-legacy-reports.mjs`, AGENTS/CLAUDE guidance, and the
+29 Jul changelog entry.
 
 ---
 

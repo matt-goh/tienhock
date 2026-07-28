@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
 import {
   IconBan,
   IconCircleCheck,
@@ -46,6 +47,9 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
   const [showCancelDialog, setShowCancelDialog] = useState<boolean>(false);
   const [selectedPayment, setSelectedPayment] =
     useState<GreenTargetPayment | null>(null);
+  const [selectedPaymentGroup, setSelectedPaymentGroup] = useState<
+    GreenTargetPayment[]
+  >([]);
 
   const formatCurrency = (amount: number | string): string => {
     const numericAmount: number = Number(amount);
@@ -58,11 +62,7 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
   };
 
   const formatDate = (dateString: string): string =>
-    new Date(dateString).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    format(new Date(dateString), "dd/MM/yyyy");
 
   const handleConfirmPayment = async (): Promise<void> => {
     if (!selectedPayment || confirmingPaymentId !== null) {
@@ -75,7 +75,12 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
 
     try {
       await greenTargetApi.confirmPayment(selectedPayment.payment_id);
-      toast.success("Payment confirmed successfully", { id: toastId });
+      toast.success(
+        selectedPaymentGroup.length > 1
+          ? "Receipt confirmed successfully"
+          : "Payment confirmed successfully",
+        { id: toastId }
+      );
       onRefresh();
     } catch (error: unknown) {
       console.error("Error confirming payment:", error);
@@ -85,6 +90,7 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
     } finally {
       setConfirmingPaymentId(null);
       setSelectedPayment(null);
+      setSelectedPaymentGroup([]);
     }
   };
 
@@ -98,7 +104,11 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
 
     try {
       await greenTargetApi.cancelPayment(selectedPayment.payment_id);
-      toast.success("Payment cancelled successfully");
+      toast.success(
+        selectedPaymentGroup.length > 1
+          ? "Receipt cancelled successfully"
+          : "Payment cancelled successfully"
+      );
       onRefresh();
     } catch (error: unknown) {
       console.error("Error cancelling payment:", error);
@@ -106,16 +116,25 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
     } finally {
       setCancellingPaymentId(null);
       setSelectedPayment(null);
+      setSelectedPaymentGroup([]);
     }
   };
 
-  const openConfirmDialog = (payment: GreenTargetPayment): void => {
+  const openConfirmDialog = (
+    payment: GreenTargetPayment,
+    paymentGroup: GreenTargetPayment[] = [payment]
+  ): void => {
     setSelectedPayment(payment);
+    setSelectedPaymentGroup(paymentGroup);
     setShowConfirmDialog(true);
   };
 
-  const openCancelDialog = (payment: GreenTargetPayment): void => {
+  const openCancelDialog = (
+    payment: GreenTargetPayment,
+    paymentGroup: GreenTargetPayment[] = [payment]
+  ): void => {
     setSelectedPayment(payment);
+    setSelectedPaymentGroup(paymentGroup);
     setShowCancelDialog(true);
   };
 
@@ -149,16 +168,19 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
       groups: Record<string, GreenTargetPayment[]>,
       payment: GreenTargetPayment
     ): Record<string, GreenTargetPayment[]> => {
-      const paymentDate: string = String(payment.payment_date).slice(0, 10);
+      const paymentDate: string = format(
+        new Date(payment.payment_date),
+        "yyyy-MM-dd"
+      );
       const statusGroup: "active" | "pending" | "cancelled" =
         payment.status === "pending"
           ? "pending"
           : payment.status === "cancelled"
           ? "cancelled"
           : "active";
-      const groupKey: string = payment.payment_reference
+      const groupKey: string = payment.internal_reference
         ? [
-            payment.payment_reference,
+            payment.internal_reference,
             paymentDate,
             payment.payment_method,
             statusGroup,
@@ -195,17 +217,26 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
         return 1;
       }
 
-      const firstDate: string = String(firstGroup[0].payment_date).slice(0, 10);
-      const secondDate: string = String(secondGroup[0].payment_date).slice(
-        0,
-        10
+      const firstDate: string = format(
+        new Date(firstGroup[0].payment_date),
+        "yyyy-MM-dd"
+      );
+      const secondDate: string = format(
+        new Date(secondGroup[0].payment_date),
+        "yyyy-MM-dd"
       );
       return secondDate.localeCompare(firstDate);
     }
   );
+  const selectedPaymentTotal: number = selectedPaymentGroup.reduce(
+    (sum: number, payment: GreenTargetPayment): number =>
+      sum + Number(payment.amount_paid || 0),
+    0
+  );
 
   const renderPaymentActions = (
-    payment: GreenTargetPayment
+    payment: GreenTargetPayment,
+    paymentGroup: GreenTargetPayment[] = [payment]
   ): React.ReactNode => (
     <div className="flex justify-center gap-1">
       {payment.status === "pending" && (
@@ -214,7 +245,7 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
           size="sm"
           variant="outline"
           color="sky"
-          onClick={(): void => openConfirmDialog(payment)}
+          onClick={(): void => openConfirmDialog(payment, paymentGroup)}
           disabled={
             confirmingPaymentId === payment.payment_id ||
             cancellingPaymentId === payment.payment_id
@@ -230,7 +261,7 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
           size="sm"
           variant="outline"
           color="rose"
-          onClick={(): void => openCancelDialog(payment)}
+          onClick={(): void => openCancelDialog(payment, paymentGroup)}
           disabled={
             cancellingPaymentId === payment.payment_id ||
             confirmingPaymentId === payment.payment_id
@@ -286,12 +317,14 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
           <table className="w-full min-w-[1100px] divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-900/50">
               <tr>
-                <th className={`${tableHeaderClassName} text-left`}>Date</th>
                 <th className={`${tableHeaderClassName} text-left`}>
-                  Reference
+                  Date Received
                 </th>
                 <th className={`${tableHeaderClassName} text-left`}>
-                  Internal Ref
+                  GT Reference No.
+                </th>
+                <th className={`${tableHeaderClassName} text-left`}>
+                  Cheque / Transaction Ref
                 </th>
                 <th className={`${tableHeaderClassName} text-left`}>
                   Invoice(s)
@@ -348,17 +381,25 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
                           <td className="max-w-[170px] px-3 py-3">
                             <div
                               className="truncate font-mono font-semibold text-gray-900 dark:text-gray-100"
-                              title={firstPayment.payment_reference || ""}
+                              title={firstPayment.internal_reference || ""}
                             >
-                              {firstPayment.payment_reference}
+                              {firstPayment.internal_reference}
                             </div>
                             <span className="mt-1 inline-flex rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700 dark:bg-sky-900/50 dark:text-sky-300">
                               {paymentGroup.length} invoices
                             </span>
                           </td>
+                          <td className="max-w-[180px] px-3 py-3 font-mono text-sm text-gray-600 dark:text-gray-400">
+                            <span
+                              className="block truncate"
+                              title={firstPayment.payment_reference || ""}
+                            >
+                              {firstPayment.payment_reference || "-"}
+                            </span>
+                          </td>
                           <td
                             className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400"
-                            colSpan={3}
+                            colSpan={2}
                           >
                             Multiple invoices
                           </td>
@@ -376,8 +417,11 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
                           <td className="px-3 py-3 text-right font-medium text-green-600 dark:text-green-400">
                             {formatCurrency(totalAmount)}
                           </td>
-                          <td className="px-3 py-3 text-center text-sm text-gray-400 dark:text-gray-500">
-                            -
+                          <td className="px-3 py-3 text-center">
+                            {renderPaymentActions(
+                              firstPayment,
+                              paymentGroup
+                            )}
                           </td>
                         </tr>
 
@@ -412,9 +456,7 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
                                   </span>
                                 </td>
                                 <td className="px-3 py-3" />
-                                <td className="whitespace-nowrap px-3 py-3 font-mono text-sm text-gray-500 dark:text-gray-400">
-                                  {payment.internal_reference || "-"}
-                                </td>
+                                <td className="px-3 py-3" />
                                 <td className="px-3 py-3">
                                   <button
                                     type="button"
@@ -423,7 +465,7 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
                                     }
                                     className="inline-flex rounded-md bg-sky-50 px-2 py-1 font-mono text-sm font-medium text-sky-700 hover:bg-sky-100 hover:text-sky-800 dark:bg-sky-900/30 dark:text-sky-300 dark:hover:bg-sky-900/50 dark:hover:text-sky-200"
                                   >
-                                    {payment.invoice_id}
+                                    {payment.invoice_number || payment.invoice_id}
                                   </button>
                                 </td>
                                 <td
@@ -450,8 +492,8 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
                                 <td className="px-3 py-3 text-right font-medium text-green-600 dark:text-green-400">
                                   {formatCurrency(payment.amount_paid)}
                                 </td>
-                                <td className="px-3 py-3 text-center">
-                                  {renderPaymentActions(payment)}
+                                <td className="px-3 py-3 text-center text-sm text-gray-400 dark:text-gray-500">
+                                  -
                                 </td>
                               </tr>
                             );
@@ -472,13 +514,13 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
                       <td className="max-w-[170px] px-3 py-3">
                         <span
                           className="block truncate font-mono text-sm text-gray-600 dark:text-gray-400"
-                          title={firstPayment.payment_reference || ""}
+                          title={firstPayment.internal_reference || ""}
                         >
-                          {firstPayment.payment_reference || "-"}
+                          {firstPayment.internal_reference || "-"}
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-3 py-3 font-mono text-sm text-gray-500 dark:text-gray-400">
-                        {firstPayment.internal_reference || "-"}
+                        {firstPayment.payment_reference || "-"}
                       </td>
                       <td className="px-3 py-3">
                         <button
@@ -486,7 +528,7 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
                           onClick={(): void => onViewPayment(firstPayment)}
                           className="inline-flex rounded-md bg-sky-50 px-2 py-1 font-mono text-sm font-medium text-sky-700 hover:bg-sky-100 hover:text-sky-800 dark:bg-sky-900/30 dark:text-sky-300 dark:hover:bg-sky-900/50 dark:hover:text-sky-200"
                         >
-                          {firstPayment.invoice_id}
+                          {firstPayment.invoice_number || firstPayment.invoice_id}
                         </button>
                       </td>
                       <td
@@ -535,27 +577,38 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
           onClose={(): void => {
             setShowConfirmDialog(false);
             setSelectedPayment(null);
+            setSelectedPaymentGroup([]);
           }}
           onConfirm={(): void => {
             void handleConfirmPayment();
           }}
-          title="Confirm pending payment?"
+          title={
+            selectedPaymentGroup.length > 1
+              ? "Confirm pending receipt?"
+              : "Confirm pending payment?"
+          }
           message={
             <div className="space-y-3">
               <p>
                 Confirm the pending{" "}
                 {selectedPayment.payment_method.replace("_", " ")} payment of{" "}
                 <span className="font-semibold text-default-800 dark:text-gray-100">
-                  {formatCurrency(selectedPayment.amount_paid)}
+                  {formatCurrency(selectedPaymentTotal)}
                 </span>
-                ?
+                {selectedPaymentGroup.length > 1
+                  ? ` across ${selectedPaymentGroup.length} invoices?`
+                  : "?"}
               </p>
               <p className="text-xs text-default-500 dark:text-gray-400">
-                Confirming updates the related invoice balance.
+                Confirming updates all related invoice balances together.
               </p>
             </div>
           }
-          confirmButtonText="Confirm Payment"
+          confirmButtonText={
+            selectedPaymentGroup.length > 1
+              ? "Confirm Receipt"
+              : "Confirm Payment"
+          }
           variant="success"
         />
       )}
@@ -565,14 +618,22 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
         onClose={(): void => {
           setShowCancelDialog(false);
           setSelectedPayment(null);
+          setSelectedPaymentGroup([]);
         }}
         onConfirm={handleCancelPayment}
-        title="Cancel Payment"
+        title={
+          selectedPaymentGroup.length > 1
+            ? "Cancel Receipt"
+            : "Cancel Payment"
+        }
         message={
           <div className="space-y-2">
             <p>
               Are you sure you want to cancel this payment of{" "}
-              {formatCurrency(selectedPayment?.amount_paid || 0)}?
+              {formatCurrency(selectedPaymentTotal)}
+              {selectedPaymentGroup.length > 1
+                ? ` across ${selectedPaymentGroup.length} invoices?`
+                : "?"}
             </p>
             {selectedPayment?.status === "pending" && (
               <p className="text-xs text-default-500 dark:text-gray-400">
@@ -582,7 +643,11 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
             )}
           </div>
         }
-        confirmButtonText="Cancel Payment"
+        confirmButtonText={
+          selectedPaymentGroup.length > 1
+            ? "Cancel Receipt"
+            : "Cancel Payment"
+        }
         variant="danger"
       />
     </>

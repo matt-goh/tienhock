@@ -22,6 +22,28 @@ interface PaymentFilters {
   searchTerm: string;
 }
 
+const getReceiptGroupKey = (payment: GreenTargetPayment): string => {
+  if (!payment.internal_reference) {
+    return `single_${payment.payment_id}`;
+  }
+  const paymentDate: string = format(
+    new Date(payment.payment_date),
+    "yyyy-MM-dd"
+  );
+  const statusGroup: "active" | "pending" | "cancelled" =
+    payment.status === "pending"
+      ? "pending"
+      : payment.status === "cancelled"
+      ? "cancelled"
+      : "active";
+  return [
+    payment.internal_reference,
+    paymentDate,
+    payment.payment_method,
+    statusGroup,
+  ].join("::");
+};
+
 const GreenTargetPaymentPage: React.FC = () => {
   const navigate = useNavigate();
   const [payments, setPayments] = useState<GreenTargetPayment[]>([]);
@@ -105,20 +127,34 @@ const GreenTargetPaymentPage: React.FC = () => {
 
     const normalizedSearchTerm: string = filters.searchTerm.trim().toLowerCase();
     if (normalizedSearchTerm) {
-      filtered = filtered.filter(
-        (payment: GreenTargetPayment): boolean =>
-          String(payment.invoice_id)
-            .toLowerCase()
-            .includes(normalizedSearchTerm) ||
-          payment.payment_reference
-            ?.toLowerCase()
-            .includes(normalizedSearchTerm) ||
-          payment.internal_reference
-            ?.toLowerCase()
-            .includes(normalizedSearchTerm) ||
-          String(payment.amount_paid).includes(normalizedSearchTerm) ||
-          payment.customer_name?.toLowerCase().includes(normalizedSearchTerm) ||
-          false
+      const matchingReceiptKeys: Set<string> = new Set(
+        filtered
+          .filter(
+            (payment: GreenTargetPayment): boolean =>
+              String(payment.invoice_id)
+                .toLowerCase()
+                .includes(normalizedSearchTerm) ||
+              payment.invoice_number
+                ?.toLowerCase()
+                .includes(normalizedSearchTerm) ||
+              payment.payment_reference
+                ?.toLowerCase()
+                .includes(normalizedSearchTerm) ||
+              payment.internal_reference
+                ?.toLowerCase()
+                .includes(normalizedSearchTerm) ||
+              String(payment.amount_paid).includes(normalizedSearchTerm) ||
+              payment.customer_name
+                ?.toLowerCase()
+                .includes(normalizedSearchTerm) ||
+              false
+          )
+          .map((payment: GreenTargetPayment): string =>
+            getReceiptGroupKey(payment)
+          )
+      );
+      filtered = filtered.filter((payment: GreenTargetPayment): boolean =>
+        matchingReceiptKeys.has(getReceiptGroupKey(payment))
       );
     }
 
@@ -169,8 +205,22 @@ const GreenTargetPaymentPage: React.FC = () => {
     setShowPaymentForm(true);
   };
 
-  const handlePaymentCreated = (): void => {
+  const handlePaymentCreated = (paymentDate: string): void => {
     setShowPaymentForm(false);
+    const paymentDateMatch: RegExpMatchArray | null = paymentDate.match(
+      /^(\d{4})-(\d{2})-(\d{2})$/
+    );
+    if (paymentDateMatch) {
+      const paymentYear: number = Number(paymentDateMatch[1]);
+      const paymentMonthIndex: number = Number(paymentDateMatch[2]) - 1;
+      const monthStart: Date = new Date(paymentYear, paymentMonthIndex, 1);
+      const monthEnd: Date = new Date(paymentYear, paymentMonthIndex + 1, 0);
+      monthEnd.setHours(23, 59, 59, 999);
+      setFilters((previousFilters: PaymentFilters): PaymentFilters => ({
+        ...previousFilters,
+        dateRange: { start: monthStart, end: monthEnd },
+      }));
+    }
     void fetchPayments();
   };
 
@@ -193,7 +243,7 @@ const GreenTargetPaymentPage: React.FC = () => {
               <input
                 type="text"
                 placeholder="Search"
-                title="Search payments by invoice, reference, customer, or amount"
+                title="Search payments by invoice, GT reference, cheque or transaction reference, customer, or amount"
                 className="h-[40px] w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 text-default-900 placeholder:text-default-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder:text-gray-400"
                 value={filters.searchTerm}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
