@@ -6,7 +6,8 @@ Nothing blocks Phase 3. The report now computes end to end from live data (§8),
 **both product lines reproduce the printed June SALES total to the cent** — the old
 "sales deltas" turned out to be a UTC month-window artefact, not a data difference
 (§8.3). Every remaining difference against the print is one of the already-documented
-items in §6.2/§7. Outstanding: Q14/Q15 to send, the §5 data fixes to apply, and the
+items in §6.2/§7. Outstanding: Q14/Q15 to send (answers may arrive during any
+phase — see the §7.2 deferred-fix protocol), the §5 data fixes to apply, and the
 Phase 3 parity pass.
 
 This doc tracks the implementation of the boss-only "Estimated P&L & Unit Cost" report
@@ -633,6 +634,25 @@ decide, and every mapping is seeded and verified.
   no June `OIL*` posting explains it.
 
 Both have ready-to-send Bahasa Melayu messages in §2.1.
+
+**Deferred-fix protocol (user decision, 2026-07-28):** the answers to Q14/Q15 are NOT
+required before Phase 3 and may arrive at any time — during any phase or after
+Phase 6 wrap-up. Both are pure source-data corrections with no engine, mapping,
+frontend or PDF impact: the report derives every value live, so fixing the source
+data automatically corrects the report on the next run. When the user @-references
+this handover with the co-worker's answers, the workflow is:
+
+- **Q14** — identify the mis-keyed June MEE small-packing row(s) from the answer and
+  correct `material_stock_entries` for year 2026 / month 6 (target delta:
+  −RM883.60 on the `CS_MPMS` bucket). Key the correction into June 2026 itself,
+  NOT the current month, and note that it shifts June closing stock and therefore
+  every later month's derived opening stock by the same amount.
+- **Q15** — key the missing RM40.00 June diesel posting (or reclassify the
+  mis-posted one) onto the correct salesman-lorry `OIL*` account(s) with a June
+  2026 date, per the co-worker's evidence; target delta: +RM20.00 per product line
+  after the 50% split.
+- After either fix, re-run the Phase 3 verifier / §8.2 baseline and update the
+  delta tables (§6.2, §8.2) and this section to close the item.
 
 ### 7.3 Deferred to Phase 3 parity (no question needed yet)
 
