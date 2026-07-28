@@ -17,6 +17,9 @@ from period **06/2026**.
   `verified_db` flags showing which values the dev DB already reproduces, plus
   handwritten boss corrections (`*_handwritten`). Transcription is complete: no
   value is left `ocr_uncertain`.
+- `verify-estimated-report.mjs` — imports and runs the shipped report engine against
+  the dev DB, verifies the approved data fixes and every machine-comparable June
+  value, and fails on any difference outside the documented parity delta list.
 
 The rendered page PNGs (`pages/cs-p01..p10.png`) were deleted on 2026-07-25 once the
 transcription was complete. Regenerate them from the PDF whenever a page needs
@@ -26,7 +29,11 @@ re-reading:
 ## Parity target
 
 1:1 content parity with the June 2026 printed values, derived from system data
-(sales, material stock, posted journals, processed payroll) via the seeded formula
-and mapping tables — never hardcoded. Known documented deltas are listed in
-`expected-june-2026.json` → `data_issues_confirmed` and tracked in
-`docs/Account/ESTIMATED_REPORT_HANDOVER.md`.
+(sales, material stock and posted journals, including the JVSL salary voucher) via the
+seeded formula and mapping tables — never hardcoded. Known documented deltas are listed in
+the verifier's atomic delta map and the canonical table in
+`docs/Account/ESTIMATED_REPORT_HANDOVER.md` §9.2. The fixture's
+`data_issues_confirmed` array retains selected source-history notes.
+
+Run the Phase 3 gate from the repository root:
+`node dev/import/closing-stock-report/verify-estimated-report.mjs`

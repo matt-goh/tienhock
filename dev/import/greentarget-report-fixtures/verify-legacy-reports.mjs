@@ -962,6 +962,9 @@ function scanSqlReferences(source) {
   const problems = [];
   for (const literal of literals) {
     for (const match of literal.matchAll(/\b(?:FROM|JOIN)\s+([A-Za-z_][\w.]*)/gi)) {
+      // EXTRACT(field FROM source) is not a table reference.
+      const before = literal.slice(Math.max(0, match.index - 30), match.index);
+      if (/EXTRACT\(\s*\w+\s*$/i.test(before)) continue;
       const reference = match[1];
       const lower = reference.toLowerCase();
       if (lower === "lateral") continue;
