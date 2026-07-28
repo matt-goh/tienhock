@@ -12,6 +12,8 @@ import { api } from "../../routes/utils/api";
 import {
   JournalEntry,
   JournalEntryLine,
+  JournalEntryTypeInfo,
+  AccountCode,
   CashReceiptVoucherData,
 } from "../../types/types";
 import {
@@ -25,6 +27,8 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import ChequeReuseWarning from "../../components/Accounting/ChequeReuseWarning";
 import { printCashReceiptVoucherPDF } from "../../utils/accounting/CashReceiptVoucherPDF";
 import { generateJournalVoucherPDF } from "../../utils/accounting/JournalVoucherPDFMake";
+import { GREENTARGET_INFO } from "../../utils/invoice/einvoice/companyInfo";
+import GreenTargetLogo from "../../utils/GreenTargetLogo.png";
 import {
   IconFileText,
   IconPencil,
@@ -59,13 +63,27 @@ const getVisibleLineReference = (
   return line.display_reference?.trim() || getVisibleReference(entry);
 };
 
-const JournalDetailsPage: React.FC = () => {
+interface JournalDetailsContentProps {
+  // Cached Tien Hock reference data; Green Target has no types endpoint and its
+  // account codes live in the GT schema, so it passes empty lists and skips
+  // the TH fetches entirely (line-level account_description covers display).
+  entryTypes: JournalEntryTypeInfo[];
+  accountCodes: AccountCode[];
+  isGreenTarget: boolean;
+}
+
+const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
+  entryTypes,
+  accountCodes,
+  isGreenTarget,
+}) => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
 
-  // Cached reference data
-  const { entryTypes } = useJournalEntryTypesCache();
-  const { accountCodes } = useAccountCodesCache();
+  const apiBase: string = isGreenTarget ? "/greentarget/api" : "/api";
+  const journalEntriesPath: string = isGreenTarget
+    ? "/greentarget/accounting/journal-entries"
+    : "/accounting/journal-entries";
 
   // Data state
   const [entry, setEntry] = useState<JournalEntry | null>(null);
@@ -113,7 +131,7 @@ const JournalDetailsPage: React.FC = () => {
     setError(null);
 
     try {
-      const response = await api.get(`/api/journal-entries/${id}`);
+      const response = await api.get(`${apiBase}/journal-entries/${id}`);
       setEntry(response as JournalEntry);
     } catch (err: unknown) {
       console.error("Error fetching journal entry:", err);
@@ -122,7 +140,7 @@ const JournalDetailsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, apiBase]);
 
   useEffect(() => {
     fetchEntry();
@@ -134,10 +152,16 @@ const JournalDetailsPage: React.FC = () => {
     return type ? `${code} - ${type.name}` : code;
   };
 
-  // Get account description
-  const getAccountDescription = (code: string): string => {
+  // Get account description. The cached chart wins; otherwise fall back to the
+  // per-line description the detail endpoint returns (Green Target's chart is
+  // not cached here, so this is what labels GT lines).
+  const getAccountDescription = (
+    code: string,
+    lineDescription?: string
+  ): string => {
     const account = accountCodes.find((a) => a.code === code);
-    return account ? `${code} - ${account.description}` : code;
+    if (account) return `${code} - ${account.description}`;
+    return lineDescription ? `${code} - ${lineDescription}` : code;
   };
 
   // Format date
@@ -172,11 +196,11 @@ const JournalDetailsPage: React.FC = () => {
 
   // Handlers
   const handleBack = () => {
-    navigate("/accounting/journal-entries");
+    navigate(journalEntriesPath);
   };
 
   const handleEdit = () => {
-    navigate(`/accounting/journal-entries/${id}/edit`);
+    navigate(`${journalEntriesPath}/${id}/edit`);
   };
 
   const handleConfirmCancel = async () => {
@@ -206,7 +230,7 @@ const JournalDetailsPage: React.FC = () => {
       await api.delete(`/api/journal-entries/${id}`);
       toast.success("Journal entry deleted successfully");
       setShowDeleteDialog(false);
-      navigate("/accounting/journal-entries");
+      navigate(journalEntriesPath);
     } catch (err: unknown) {
       console.error("Error deleting entry:", err);
 
@@ -270,7 +294,8 @@ const JournalDetailsPage: React.FC = () => {
       const accountDescriptions: Record<string, string> = {};
       (entry.lines || []).forEach((line) => {
         const account = accountCodes.find((a) => a.code === line.account_code);
-        if (account) accountDescriptions[line.account_code] = account.description;
+        const description = account?.description ?? line.account_description;
+        if (description) accountDescriptions[line.account_code] = description;
       });
       const visibleReference: string = getVisibleReference(entry);
       const displayEntryType: string = getDisplayEntryType(entry);
@@ -292,6 +317,10 @@ const JournalDetailsPage: React.FC = () => {
         total_debit: entry.total_debit,
         total_credit: entry.total_credit,
         accountDescriptions,
+        // Green Target prints the same voucher on its own letterhead/logo
+        ...(isGreenTarget
+          ? { companyInfo: GREENTARGET_INFO, logoUrl: GreenTargetLogo }
+          : {}),
       });
     } catch (err: unknown) {
       console.error("Error printing journal voucher:", err);
@@ -346,10 +375,12 @@ const JournalDetailsPage: React.FC = () => {
   const visibleReference: string = getVisibleReference(entry);
   const displayEntryType: string = getDisplayEntryType(entry);
   const canEdit: boolean =
-    entry.status !== "cancelled" && !isLegacyImport;
-  const canCancel: boolean = entry.status !== "cancelled" && !isLegacyImport;
-  const canDelete: boolean = !isLegacyImport;
+    entry.status !== "cancelled" && !isLegacyImport && !isGreenTarget;
+  const canCancel: boolean =
+    entry.status !== "cancelled" && !isLegacyImport && !isGreenTarget;
+  const canDelete: boolean = !isLegacyImport && !isGreenTarget;
   const canPrintVoucher: boolean =
+    !isGreenTarget &&
     !isLegacyImport &&
     (entry.entry_type as string) === "REC" &&
     entry.status !== "cancelled";
@@ -556,7 +587,10 @@ const JournalDetailsPage: React.FC = () => {
                       </td>
                       <td className="px-4 py-2.5">
                         <div className="text-sm font-medium text-default-900 dark:text-gray-100">
-                          {getAccountDescription(line.account_code)}
+                          {getAccountDescription(
+                            line.account_code,
+                            line.account_description
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-2.5 text-sm text-default-600 dark:text-gray-300">
@@ -733,6 +767,40 @@ const JournalDetailsPage: React.FC = () => {
 
     </div>
   );
+};
+
+// Tien Hock fetches its cached entry types and chart of accounts; Green Target
+// has no types endpoint and its chart lives in the GT schema, so it skips both
+// TH fetches (the GT detail payload carries per-line account descriptions).
+const TienHockJournalDetails: React.FC = () => {
+  const { entryTypes } = useJournalEntryTypesCache();
+  const { accountCodes } = useAccountCodesCache();
+  return (
+    <JournalDetailsContent
+      entryTypes={entryTypes}
+      accountCodes={accountCodes}
+      isGreenTarget={false}
+    />
+  );
+};
+
+interface JournalDetailsPageProps {
+  company?: "tienhock" | "greentarget";
+}
+
+const JournalDetailsPage: React.FC<JournalDetailsPageProps> = ({
+  company = "tienhock",
+}) => {
+  if (company === "greentarget") {
+    return (
+      <JournalDetailsContent
+        entryTypes={[]}
+        accountCodes={[]}
+        isGreenTarget
+      />
+    );
+  }
+  return <TienHockJournalDetails />;
 };
 
 export default JournalDetailsPage;

@@ -19,6 +19,16 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-07-28",
+    ms: "Green Target: susunan menu diselaraskan dengan Tien Hock dan Jelly Polly — Accounting, Payroll dan Sales kini berada di atas. Laporan Debtors berpindah ke dalam menu Accounting, manakala Invoices, Payments dan Documents dikumpulkan di bawah menu Sales baharu. Semua halaman kekal di alamat yang sama.",
+    en: "Green Target: the menu layout is now aligned with Tien Hock and Jelly Polly — Accounting, Payroll and Sales sit at the top. The Debtors report has moved into the Accounting menu, while Invoices, Payments and Documents are grouped under a new Sales menu. Every page keeps its existing address.",
+  },
+  {
+    date: "2026-07-28",
+    ms: "Green Target: bahagian Accounting baharu kini tersedia — Journal Entries, Account Ledger, Trial Balance, Income Statement, Balance Sheet dan Chart of Accounts — memaparkan lejar akaun sebenar Jan–Jun 2026 yang diimport daripada sistem lama. Laporan Debtors kini juga membaca baki penghutang sebenar daripada lejar tersebut (jumlah Jun 2026: RM156,782.22), bukan lagi invois operasi, dan setiap penghutang boleh diklik untuk melihat penyata akaunnya. Semua halaman ini baca sahaja buat masa ini.",
+    en: "Green Target: a new Accounting section is now available — Journal Entries, Account Ledger, Trial Balance, Income Statement, Balance Sheet and Chart of Accounts — showing the real Jan–Jun 2026 account ledger imported from the legacy system. The Debtors report now also reads the true debtor balances from that ledger (June 2026 total: RM156,782.22) instead of operational invoices, and each debtor can be clicked to view its account statement. All of these pages are read-only for now.",
+  },
+  {
     date: "2026-07-27",
     ms: "Jurnal: Bayaran Tunai (C) kini mengisi nombor cek fizikal yang betul semula, jadi tidak perlu lagi menaip ganti nombor tersebut. Sebelum ini ruangan cek terisi dengan nombor rujukan bank yang panjang (contohnya PBE2607240364268554) kerana sistem turut mengambil kira nombor transaksi bank daripada Bayaran Bank (B). Kini hanya buku cek Bayaran Tunai dikira, jadi nombor seterusnya terisi dengan betul (contohnya PBB350787). Tiada rekod sedia ada yang terjejas.",
     en: "Journals: Cash Payment (C) entries now prefill the correct physical cheque number again, so you no longer have to type over it. Previously the cheque field filled in with a long bank reference (e.g. PBE2607240364268554) because the system was also counting the bank transaction ids keyed on Bank Payment (B) entries. It now looks only at the Cash Payment cheque book, so the next number fills in correctly (e.g. PBB350787). No existing records are affected.",

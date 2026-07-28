@@ -24,6 +24,16 @@ interface CacheItem<T> {
   timestamp: number;
 }
 
+// Companies with their own accounting backend. Tien Hock is the default and
+// keeps the original un-suffixed cache keys/events so existing caches and
+// listeners keep working unchanged.
+export type AccountingCacheCompany = "tienhock" | "greentarget";
+
+const getCompanyCacheKey = (
+  baseKey: string,
+  company: AccountingCacheCompany
+): string => (company === "tienhock" ? baseKey : `${baseKey}:${company}`);
+
 // ==================== Account Codes Cache ====================
 
 interface AccountCodesCache {
@@ -52,8 +62,10 @@ const unwrapAccountCodesResponse = (
 // Shared across every mounted instance of useAccountCodesCache, so a page and
 // a child component (e.g. AccountCodeCombobox) that both mount at once and
 // both find a cold cache await the SAME network request instead of each
-// firing their own /api/account-codes call.
-let accountCodesInFlight: Promise<AccountCode[]> | null = null;
+// firing their own /api/account-codes call. Keyed per company.
+const accountCodesInFlight: Partial<
+  Record<AccountingCacheCompany, Promise<AccountCode[]> | null>
+> = {};
 
 /**
  * Refresh account codes cache globally
@@ -93,16 +105,25 @@ export const invalidateAccountCodesCache = (): void => {
 /**
  * Hook for account codes with caching
  */
-export const useAccountCodesCache = () => {
+export const useAccountCodesCache = (
+  company: AccountingCacheCompany = "tienhock"
+) => {
   const [accountCodes, setAccountCodes] = useState<AccountCode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+
+  const cacheKey = getCompanyCacheKey(CACHE_KEYS.ACCOUNT_CODES, company);
+  const updatedEvent = getCompanyCacheKey(ACCOUNT_CODES_UPDATED_EVENT, company);
+  const endpoint =
+    company === "greentarget"
+      ? "/greentarget/api/account-codes?flat=true"
+      : "/api/account-codes?flat=true";
 
   const fetchAccountCodes = useCallback(async (forceRefresh = false): Promise<AccountCode[]> => {
     setIsLoading(true);
     try {
       if (!forceRefresh) {
-        const cachedData = localStorage.getItem(CACHE_KEYS.ACCOUNT_CODES);
+        const cachedData = localStorage.getItem(cacheKey);
         if (cachedData) {
           const { data, timestamp }: AccountCodesCache = JSON.parse(cachedData);
           const isExpired = Date.now() - timestamp > CACHE_DURATION;
@@ -116,24 +137,21 @@ export const useAccountCodesCache = () => {
         }
       }
 
-      if (!accountCodesInFlight) {
-        accountCodesInFlight = (
-          api.get("/api/account-codes?flat=true") as Promise<AccountCodesResponse>
+      if (!accountCodesInFlight[company]) {
+        accountCodesInFlight[company] = (
+          api.get(endpoint) as Promise<AccountCodesResponse>
         )
           .then((response) => {
             const data = unwrapAccountCodesResponse(response);
             const cacheData: AccountCodesCache = { data, timestamp: Date.now() };
-            localStorage.setItem(
-              CACHE_KEYS.ACCOUNT_CODES,
-              JSON.stringify(cacheData)
-            );
+            localStorage.setItem(cacheKey, JSON.stringify(cacheData));
             return data;
           })
           .finally(() => {
-            accountCodesInFlight = null;
+            accountCodesInFlight[company] = null;
           });
       }
-      const data = await accountCodesInFlight;
+      const data = await accountCodesInFlight[company]!;
 
       setAccountCodes(data);
       setError(null);
@@ -149,7 +167,7 @@ export const useAccountCodesCache = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [company, cacheKey, endpoint]);
 
   useEffect(() => {
     fetchAccountCodes();
@@ -165,17 +183,17 @@ export const useAccountCodesCache = () => {
     };
 
     window.addEventListener(
-      ACCOUNT_CODES_UPDATED_EVENT,
+      updatedEvent,
       handleAccountCodesUpdated as EventListener
     );
 
     return () => {
       window.removeEventListener(
-        ACCOUNT_CODES_UPDATED_EVENT,
+        updatedEvent,
         handleAccountCodesUpdated as EventListener
       );
     };
-  }, [fetchAccountCodes]);
+  }, [fetchAccountCodes, updatedEvent]);
 
   return {
     accountCodes,
@@ -194,7 +212,9 @@ interface LedgerTypesCache {
 }
 
 // See accountCodesInFlight above — same de-dup for simultaneous hook mounts.
-let ledgerTypesInFlight: Promise<LedgerType[]> | null = null;
+const ledgerTypesInFlight: Partial<
+  Record<AccountingCacheCompany, Promise<LedgerType[]> | null>
+> = {};
 
 /**
  * Refresh ledger types cache globally
@@ -233,16 +253,25 @@ export const invalidateLedgerTypesCache = (): void => {
 /**
  * Hook for ledger types with caching
  */
-export const useLedgerTypesCache = () => {
+export const useLedgerTypesCache = (
+  company: AccountingCacheCompany = "tienhock"
+) => {
   const [ledgerTypes, setLedgerTypes] = useState<LedgerType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+
+  const cacheKey = getCompanyCacheKey(CACHE_KEYS.LEDGER_TYPES, company);
+  const updatedEvent = getCompanyCacheKey(LEDGER_TYPES_UPDATED_EVENT, company);
+  const endpoint =
+    company === "greentarget"
+      ? "/greentarget/api/ledger-types"
+      : "/api/ledger-types";
 
   const fetchLedgerTypes = useCallback(async (forceRefresh = false): Promise<LedgerType[]> => {
     setIsLoading(true);
     try {
       if (!forceRefresh) {
-        const cachedData = localStorage.getItem(CACHE_KEYS.LEDGER_TYPES);
+        const cachedData = localStorage.getItem(cacheKey);
         if (cachedData) {
           const { data, timestamp }: LedgerTypesCache = JSON.parse(cachedData);
           const isExpired = Date.now() - timestamp > CACHE_DURATION;
@@ -256,23 +285,20 @@ export const useLedgerTypesCache = () => {
         }
       }
 
-      if (!ledgerTypesInFlight) {
-        ledgerTypesInFlight = (
-          api.get("/api/ledger-types") as Promise<LedgerType[]>
+      if (!ledgerTypesInFlight[company]) {
+        ledgerTypesInFlight[company] = (
+          api.get(endpoint) as Promise<LedgerType[]>
         )
           .then((data) => {
             const cacheData: LedgerTypesCache = { data, timestamp: Date.now() };
-            localStorage.setItem(
-              CACHE_KEYS.LEDGER_TYPES,
-              JSON.stringify(cacheData)
-            );
+            localStorage.setItem(cacheKey, JSON.stringify(cacheData));
             return data;
           })
           .finally(() => {
-            ledgerTypesInFlight = null;
+            ledgerTypesInFlight[company] = null;
           });
       }
-      const data = await ledgerTypesInFlight;
+      const data = await ledgerTypesInFlight[company]!;
 
       setLedgerTypes(data);
       setError(null);
@@ -288,7 +314,7 @@ export const useLedgerTypesCache = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [company, cacheKey, endpoint]);
 
   useEffect(() => {
     fetchLedgerTypes();
@@ -304,17 +330,17 @@ export const useLedgerTypesCache = () => {
     };
 
     window.addEventListener(
-      LEDGER_TYPES_UPDATED_EVENT,
+      updatedEvent,
       handleLedgerTypesUpdated as EventListener
     );
 
     return () => {
       window.removeEventListener(
-        LEDGER_TYPES_UPDATED_EVENT,
+        updatedEvent,
         handleLedgerTypesUpdated as EventListener
       );
     };
-  }, [fetchLedgerTypes]);
+  }, [fetchLedgerTypes, updatedEvent]);
 
   return {
     ledgerTypes,

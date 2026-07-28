@@ -16,6 +16,7 @@ import ReportSourceGuide from "../../../components/Accounting/ReportSourceGuide"
 import Pagination from "../../../components/Invoice/Pagination";
 import { api } from "../../../routes/utils/api";
 import { generateTrialBalancePDF } from "../../../utils/accounting/TrialBalancePDF";
+import { GREENTARGET_INFO } from "../../../utils/invoice/einvoice/companyInfo";
 import toast from "react-hot-toast";
 
 interface TrialBalanceAccount {
@@ -69,7 +70,17 @@ const LEDGER_TYPE_LABELS: Record<string, string> = {
   TD: "Trade Debtor",
 };
 
-const TrialBalancePage: React.FC = () => {
+export interface TrialBalancePageProps {
+  company?: "tienhock" | "greentarget";
+}
+
+const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
+  company = "tienhock",
+}: TrialBalancePageProps) => {
+  const isGreenTarget: boolean = company === "greentarget";
+  const reportsBasePath: string = isGreenTarget
+    ? "/greentarget/api/financial-reports"
+    : "/api/financial-reports";
   const [trialBalance, setTrialBalance] = useState<TrialBalanceData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -117,7 +128,7 @@ const TrialBalancePage: React.FC = () => {
       setError(null);
 
       const response = await api.get(
-        `/api/financial-reports/trial-balance/${year}/${month}?${params.toString()}`
+        `${reportsBasePath}/trial-balance/${year}/${month}?${params.toString()}`
       );
       setTrialBalance(response);
     } catch (err) {
@@ -126,7 +137,7 @@ const TrialBalancePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth, buildFilterParams, currentPage]);
+  }, [selectedMonth, buildFilterParams, currentPage, reportsBasePath]);
 
   useEffect(() => {
     fetchTrialBalance();
@@ -156,9 +167,18 @@ const TrialBalancePage: React.FC = () => {
       const year = selectedMonth.getFullYear();
       const month = selectedMonth.getMonth() + 1;
       const fullData: TrialBalanceData = await api.get(
-        `/api/financial-reports/trial-balance/${year}/${month}?${buildFilterParams().toString()}`
+        `${reportsBasePath}/trial-balance/${year}/${month}?${buildFilterParams().toString()}`
       );
-      await generateTrialBalancePDF(fullData, fullData.accounts);
+      await generateTrialBalancePDF(
+        fullData,
+        fullData.accounts,
+        isGreenTarget
+          ? {
+              companyName: GREENTARGET_INFO.name,
+              logoSrc: "/greentarget-logo.png",
+            }
+          : undefined
+      );
     } catch (err) {
       console.error("Error printing PDF:", err);
       toast.error("Failed to generate PDF");
@@ -252,8 +272,8 @@ const TrialBalancePage: React.FC = () => {
               className="flex-shrink-0"
             />
 
-            {/* Source Guide */}
-            <ReportSourceGuide report="trial_balance" />
+            {/* Source Guide (TH-specific) */}
+            {!isGreenTarget && <ReportSourceGuide report="trial_balance" />}
 
             {/* Refresh Button */}
             <Button

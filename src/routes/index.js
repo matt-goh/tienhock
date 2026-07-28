@@ -111,6 +111,11 @@ import greenTargetECarumanRouter from "./greentarget/e-caruman.js";
 import greenTargetCustomerSignupsRouter from "./greentarget/customer-signups.js";
 import greenTargetFinancialReportsRouter from "./greentarget/accounting/financial-reports.js";
 import greenTargetAccountLedgerRouter from "./greentarget/accounting/account-ledger.js";
+import greenTargetJournalEntriesRouter from "./greentarget/accounting/journal-entries.js";
+import createGreenTargetAccountCodesRouter, {
+  createGreenTargetLedgerTypesRouter,
+} from "./greentarget/accounting/account-codes.js";
+import createGreenTargetDebtorsRouter from "./greentarget/accounting/debtors.js";
 
 // Jellypolly routes
 import jellypollyInvoiceRouter from "./jellypolly/invoices.js";
@@ -349,6 +354,24 @@ export default function setupRoutes(app, pool) {
   app.use(
     "/greentarget/api/bank-statement",
     greenTargetAccountLedgerRouter(pool)
+  );
+  // Green Target accounting lookups (G6). Same read-only `greentarget` schema
+  // isolation; paths mirror Tien Hock's so the shared pages swap base path only.
+  app.use(
+    "/greentarget/api/journal-entries",
+    greenTargetJournalEntriesRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/account-codes",
+    createGreenTargetAccountCodesRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/ledger-types",
+    createGreenTargetLedgerTypesRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/debtors",
+    createGreenTargetDebtorsRouter(pool)
   );
 
   // Jellypolly routes
