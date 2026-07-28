@@ -107,6 +107,20 @@ function isLegacyImportEntry(entry) {
   );
 }
 
+/**
+ * Translate an accounting-period-lock failure into its API response so every
+ * mutation reports the locked period identically.
+ *
+ * @param {unknown} error
+ * @param {import("express").Response} res
+ * @returns {boolean} true when the error was handled
+ */
+function handleAccountingPeriodLock(error, res) {
+  if (!isAccountingPeriodLockedError(error)) return false;
+  res.status(error.status).json({ code: error.code, message: error.message });
+  return true;
+}
+
 const ADJUSTMENT_DOC_TYPE_LABELS = {
   credit_note: "Credit Note",
   debit_note: "Debit Note",
@@ -885,6 +899,13 @@ export default function (pool) {
     try {
       await client.query("BEGIN");
 
+      // Manual entries post immediately, so a backdated one would write
+      // straight into the imported history the lock protects.
+      assertTienHockAccountingDateUnlocked(
+        entry_date,
+        `Journal entry ${reference_no}`
+      );
+
       // Check if reference already exists
       const checkQuery =
         "SELECT 1 FROM journal_entries WHERE reference_no = $1";
@@ -960,6 +981,7 @@ export default function (pool) {
       });
     } catch (error) {
       await client.query("ROLLBACK");
+      if (handleAccountingPeriodLock(error, res)) return;
       console.error("Error creating journal entry:", error);
       res.status(500).json({
         message: "Error creating journal entry",
@@ -1023,7 +1045,7 @@ export default function (pool) {
 
       // Check if entry exists and is editable
       const checkQuery = `
-        SELECT status, entry_type, source_type, description
+        SELECT status, entry_type, source_type, description, entry_date
         FROM journal_entries
         WHERE id = $1
         FOR UPDATE`;
@@ -1048,6 +1070,17 @@ export default function (pool) {
           message: "Cannot edit a cancelled journal entry",
         });
       }
+
+      // Both dates are checked: the entry may be neither rewritten where it
+      // already sits in locked history nor moved into it from the open period.
+      assertTienHockAccountingDateUnlocked(
+        existing.entry_date,
+        `Journal entry ${reference_no}`
+      );
+      assertTienHockAccountingDateUnlocked(
+        entry_date,
+        `Journal entry ${reference_no}`
+      );
 
       // Editing a system-owned journal DETACHES it rather than being blocked:
       // manual_override stops its source from rebuilding it (the sales, GP and
@@ -1158,6 +1191,7 @@ export default function (pool) {
       });
     } catch (error) {
       await client.query("ROLLBACK");
+      if (handleAccountingPeriodLock(error, res)) return;
       console.error("Error updating journal entry:", error);
       res.status(500).json({
         message: "Error updating journal entry",
@@ -1178,7 +1212,7 @@ export default function (pool) {
 
       // Check if entry exists and is draft
       const checkQuery =
-        "SELECT status, entry_type, source_type, total_debit, total_credit FROM journal_entries WHERE id = $1";
+        "SELECT status, entry_type, source_type, total_debit, total_credit, entry_date, reference_no FROM journal_entries WHERE id = $1";
       const checkResult = await client.query(checkQuery, [id]);
 
       if (checkResult.rows.length === 0) {
@@ -1199,6 +1233,13 @@ export default function (pool) {
           message: `Cannot post entry with status '${checkResult.rows[0].status}'`,
         });
       }
+
+      // Posting is what puts the entry on the ledger, so it must land in the
+      // open period.
+      assertTienHockAccountingDateUnlocked(
+        checkResult.rows[0].entry_date,
+        `Journal entry ${checkResult.rows[0].reference_no}`
+      );
 
       // Verify debits equal credits
       const { total_debit, total_credit } = checkResult.rows[0];
@@ -1223,6 +1264,7 @@ export default function (pool) {
       res.json({ message: "Journal entry posted successfully" });
     } catch (error) {
       await client.query("ROLLBACK");
+      if (handleAccountingPeriodLock(error, res)) return;
       console.error("Error posting journal entry:", error);
       res.status(500).json({
         message: "Error posting journal entry",
@@ -1242,7 +1284,7 @@ export default function (pool) {
       await client.query("BEGIN");
 
       const checkQuery =
-        "SELECT status, entry_type, source_type FROM journal_entries WHERE id = $1";
+        "SELECT status, entry_type, source_type, entry_date, reference_no FROM journal_entries WHERE id = $1";
       const checkResult = await client.query(checkQuery, [id]);
 
       if (checkResult.rows.length === 0) {
@@ -1264,6 +1306,13 @@ export default function (pool) {
         });
       }
 
+      // Cancelling takes the entry off the ledger, which rewrites reported
+      // history just as surely as editing it would.
+      assertTienHockAccountingDateUnlocked(
+        checkResult.rows[0].entry_date,
+        `Journal entry ${checkResult.rows[0].reference_no}`
+      );
+
       const updateQuery = `
         UPDATE journal_entries
         SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP, updated_by = $1
@@ -1277,6 +1326,7 @@ export default function (pool) {
       res.json({ message: "Journal entry cancelled successfully" });
     } catch (error) {
       await client.query("ROLLBACK");
+      if (handleAccountingPeriodLock(error, res)) return;
       console.error("Error cancelling journal entry:", error);
       res.status(500).json({
         message: "Error cancelling journal entry",
@@ -1404,12 +1454,7 @@ export default function (pool) {
       res.json({ message: "Journal entry restored successfully" });
     } catch (error) {
       await client.query("ROLLBACK");
-      if (isAccountingPeriodLockedError(error)) {
-        return res.status(error.status).json({
-          code: error.code,
-          message: error.message,
-        });
-      }
+      if (handleAccountingPeriodLock(error, res)) return;
       console.error("Error restoring journal entry:", error);
       res.status(500).json({
         message: "Error restoring journal entry",

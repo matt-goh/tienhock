@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-28",
+    ms: "Jurnal: tempoh perakaunan sebelum 1 Jun 2026 kini dilindungi sepenuhnya pada halaman Journal Entries. Sebelum ini catatan jurnal bertarikh sebelum tarikh tersebut masih boleh dibuka, disunting, dibatalkan atau dikunci masuk sebagai catatan baharu, yang boleh mengubah angka laporan yang telah dimuktamadkan. Sekarang sistem menolak percubaan itu dan memaparkan sebab yang jelas. Catatan sedia ada tidak berubah, dan kerja bagi 1 Jun 2026 dan seterusnya berjalan seperti biasa. Invois, resit dan bayaran memang sudah dilindungi sebelum ini.",
+    en: "Journals: the accounting period before 1 June 2026 is now fully protected on the Journal Entries page. Previously a journal dated before that day could still be keyed in as a new entry, edited, or cancelled, which could change figures on reports that were already finalised. The system now refuses and explains why. Existing entries are unchanged, and work dated 1 June 2026 onwards is unaffected. Invoices, receipts and payments were already protected.",
+  },
+  {
+    date: "2026-07-28",
     ms: "Jurnal: butang \"Restore Entry\" baharu membolehkan catatan jurnal yang dibatalkan tersilap dikembalikan semula ke lejar, tepat seperti keadaan asalnya. Butang ini hanya muncul pada catatan yang dibatalkan. Jika pembatalan itu datang daripada dokumen sumbernya sendiri — contohnya invois, resit atau pembelian yang telah dibatalkan — sistem akan menolak permintaan itu dan menerangkan sebabnya, supaya catatan yang sengaja dibuang tidak kembali ke lejar. Catatan bertarikh sebelum 1 Jun 2026 dan catatan import lama kekal tidak boleh diubah.",
     en: "Journals: a new \"Restore Entry\" button puts a journal entry that was cancelled by mistake back onto the ledger, exactly as it was before. The button only appears on cancelled entries. If the cancellation came from the entry's own source document — for example a cancelled invoice, receipt or purchase — the system refuses and explains why, so entries that were removed on purpose stay removed. Entries dated before 1 June 2026 and legacy imported entries remain unchangeable.",
   },
