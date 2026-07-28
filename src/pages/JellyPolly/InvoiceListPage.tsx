@@ -52,6 +52,7 @@ import Pagination from "../../components/Invoice/Pagination";
 import JPConsolidatedInvoiceModal from "../../components/JellyPolly/JPConsolidatedInvoiceModal";
 import InvoiceDailyPrintMenu from "../../components/JellyPolly/InvoiceDailyPrintMenu";
 import StyledListbox from "../../components/StyledListbox";
+import { isZeroValueBill } from "../../utils/invoice/invoiceDisplayStatus";
 
 // --- Constants ---
 const STORAGE_KEY = "invoiceListFiltersJP_v2"; // Use a unique key
@@ -1130,10 +1131,10 @@ const InvoiceListPage: React.FC = () => {
   const handleBulkSubmitEInvoice = () => {
     if (selectedInvoiceIds.size === 0) return;
 
-    // Returns-only bills have no sales value and are covered by the monthly
+    // RM0.00 bills have no sales value and are covered by the monthly
     // consolidated e-Invoice, so they are never submitted individually.
-    const returnsOnlyCount = invoices.filter(
-      (inv) => selectedInvoiceIds.has(inv.id) && inv.is_returns_only
+    const zeroValueCount = invoices.filter(
+      (inv) => selectedInvoiceIds.has(inv.id) && isZeroValueBill(inv)
     ).length;
 
     // Filter for eligible invoices based on current data
@@ -1141,7 +1142,7 @@ const InvoiceListPage: React.FC = () => {
       (inv) =>
         selectedInvoiceIds.has(inv.id) &&
         inv.invoice_status !== "cancelled" && // Cannot submit cancelled
-        !inv.is_returns_only && // Returns-only bills have no sales value
+        !isZeroValueBill(inv) && // RM0.00 bills have no sales value
         (inv.einvoice_status === null ||
           inv.einvoice_status === "invalid" ||
           inv.einvoice_status === "pending") && // Not already valid/cancelled
@@ -1153,22 +1154,22 @@ const InvoiceListPage: React.FC = () => {
 
     if (eligibleInvoices.length === 0) {
       toast.error(
-        returnsOnlyCount === selectedInvoiceIds.size
-          ? "Returns-only bills record returned products with no sales value, so they cannot be submitted as individual e-Invoices. They are covered by the monthly consolidated e-Invoice."
+        zeroValueCount === selectedInvoiceIds.size
+          ? "These bills total RM0.00 and have no sales value, so they cannot be submitted as individual e-Invoices. They are covered by the monthly consolidated e-Invoice."
           : "No selected invoices are eligible for e-invoice submission (Must be within last 3 days, Unpaid/Paid/Overdue, Customer must have TIN/ID, and not already Valid/Cancelled).",
         { duration: 8000 }
       );
       return;
     }
-    if (returnsOnlyCount > 0) {
+    if (zeroValueCount > 0) {
       toast(
-        `${returnsOnlyCount} returns-only bill(s) were skipped - they have no sales value and are covered by the monthly consolidated e-Invoice.`,
+        `${zeroValueCount} bill(s) totalling RM0.00 were skipped - they have no sales value and are covered by the monthly consolidated e-Invoice.`,
         { duration: 6000 }
       );
     }
-    if (eligibleInvoices.length < selectedInvoiceIds.size - returnsOnlyCount) {
+    if (eligibleInvoices.length < selectedInvoiceIds.size - zeroValueCount) {
       const ineligibleCount =
-        selectedInvoiceIds.size - returnsOnlyCount - eligibleInvoices.length;
+        selectedInvoiceIds.size - zeroValueCount - eligibleInvoices.length;
       toast.error(
         `${ineligibleCount} selected invoice(s) are ineligible (check date, status, customer info). Proceeding with ${eligibleInvoices.length} eligible invoice(s).`,
         { duration: 6000 }
@@ -1187,7 +1188,7 @@ const InvoiceListPage: React.FC = () => {
         (inv) =>
           selectedInvoiceIds.has(inv.id) &&
           inv.invoice_status !== "cancelled" &&
-          !inv.is_returns_only &&
+          !isZeroValueBill(inv) &&
           (inv.einvoice_status === null || inv.einvoice_status === "invalid") &&
           inv.customerTin &&
           inv.customerIdNumber && // Ensure both TIN and ID number are present
@@ -1967,7 +1968,7 @@ const InvoiceListPage: React.FC = () => {
             (inv) =>
               selectedInvoiceIds.has(inv.id) &&
               inv.invoice_status !== "cancelled" &&
-              !inv.is_returns_only &&
+              !isZeroValueBill(inv) &&
               (inv.einvoice_status === null ||
                 inv.einvoice_status === "invalid" ||
                 inv.einvoice_status === "pending") &&
