@@ -1438,6 +1438,10 @@ routes and cache. The backend exposes authenticated `POST /greentarget/api/accou
 `PUT /greentarget/api/account-codes/:code` endpoints plus the detail/children/overview reads needed
 by the form.
 
+The GT Tree view keeps terminal child accounts when it builds the hierarchy, so `DEBTOR` exposes its
+28 imported debtor children with expand/collapse controls and any future parent assignment appears
+the same way. The other legacy accounts remain roots because that is the structure in the source data.
+
 **Live maintenance policy**
 
 - Create requires a unique code, non-empty description, an active GT ledger type and an active GT
