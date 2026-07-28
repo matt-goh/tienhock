@@ -40,6 +40,7 @@ import {
   IconCircleCheck,
   IconClockHour4,
   IconAlertTriangle,
+  IconMinus,
   IconSend,
   IconRefresh,
   IconFiles,
@@ -1587,6 +1588,8 @@ const InvoiceDetailsPage: React.FC = () => {
       case "credit_balance":
       case "credited":
         return "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300";
+      case "returns_only":
+        return "bg-slate-100 dark:bg-slate-700/40 text-slate-700 dark:text-slate-300";
       case "cancelled":
         return "bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300";
       case "overdue":
@@ -1599,8 +1602,19 @@ const InvoiceDetailsPage: React.FC = () => {
   };
 
   const getEInvoiceStatusInfo = (
-    status: ExtendedInvoiceData["einvoice_status"]
+    status: ExtendedInvoiceData["einvoice_status"],
+    isReturnsOnly: boolean
   ) => {
+    // Returns-only bills carry no sales value, so a rejected/pending
+    // submission is expected rather than something the user must act on.
+    if (isReturnsOnly && (status === "invalid" || status === "pending")) {
+      return {
+        text: "Not Applicable",
+        color: "text-default-500 dark:text-gray-400",
+        icon: IconMinus,
+      };
+    }
+
     switch (status) {
       case "valid":
         return {
@@ -1702,7 +1716,11 @@ const InvoiceDetailsPage: React.FC = () => {
     adjustmentDocs
   );
   const invoiceStatusStyle = getStatusBadgeClass(invoiceDisplayStatus);
-  const eInvoiceStatusInfo = getEInvoiceStatusInfo(invoiceData.einvoice_status);
+  const isReturnsOnly: boolean = invoiceDisplayStatus === "returns_only";
+  const eInvoiceStatusInfo = getEInvoiceStatusInfo(
+    invoiceData.einvoice_status,
+    isReturnsOnly
+  );
   const EInvoiceIcon = eInvoiceStatusInfo?.icon;
   const consolidatedStatusInfo = getConsolidatedStatusInfo(
     invoiceData.consolidated_part_of
@@ -1837,6 +1855,7 @@ const InvoiceDetailsPage: React.FC = () => {
             </Button>
           )}
           {!isCancelled &&
+            !isReturnsOnly &&
             (invoiceData.einvoice_status === null ||
               invoiceData.einvoice_status === "invalid" ||
               invoiceData.einvoice_status === "pending") &&
@@ -2400,6 +2419,12 @@ const InvoiceDetailsPage: React.FC = () => {
                   </>
                 )}
               </div>
+              {isReturnsOnly && (
+                <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                  This bill only records returned products and carries no sales
+                  value, so it does not need its own e-Invoice.
+                </p>
+              )}
               {/* Manual UUID Edit - only when einvoice_status is null */}
               {invoiceData.einvoice_status === null && (
                 <div className="mt-3 pt-3 border-t border-default-100 dark:border-gray-700 group flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity">
