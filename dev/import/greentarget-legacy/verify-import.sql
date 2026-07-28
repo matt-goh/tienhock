@@ -743,9 +743,9 @@ BEGIN
     INTO v_th_accounts, v_th_journals, v_th_lines, v_th_anchors, v_th_notes;
 
   IF (v_th_accounts, v_th_journals, v_th_notes)
-     IS DISTINCT FROM (2825::bigint, 8188::bigint, 33::bigint) THEN
+     IS DISTINCT FROM (2827::bigint, 8238::bigint, 33::bigint) THEN
     RAISE EXCEPTION
-      'Tien Hock moved: account_codes %, journal_entries %, notes % (expected 2825 / 8188 / 33)',
+      'Tien Hock moved: account_codes %, journal_entries %, notes % (expected 2827 / 8238 / 33)',
       v_th_accounts, v_th_journals, v_th_notes;
   END IF;
 

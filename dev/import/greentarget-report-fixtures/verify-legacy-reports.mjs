@@ -1098,7 +1098,7 @@ async function stageBridge() {
 /**
  * Every table an engine touches must be `greentarget.`-qualified. This is the
  * one bug a schema clone is most likely to have, and it would be silent: an
- * unqualified `account_codes` reads Tien Hock's 2,825-row chart and the GT
+ * unqualified `account_codes` reads Tien Hock's 2,827-row chart and the GT
  * report would still look plausible. Scans only SQL template literals.
  *
  * CTE names are collected across the WHOLE file, not per literal, because the
@@ -1198,8 +1198,8 @@ async function stageRegressions() {
     ["greentarget.account_opening_balances", "501"],
     ["greentarget.import_legacy_rows", "4903"],
     ["greentarget.financial_statement_notes", "34"],
-    ["public.account_codes", "2825"],
-    ["public.journal_entries", "8188"],
+    ["public.account_codes", "2827"],
+    ["public.journal_entries", "8238"],
     ["public.financial_statement_notes", "33"],
   ];
   for (const [table, expected] of expectations) {

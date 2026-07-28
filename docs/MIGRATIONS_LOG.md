@@ -18,6 +18,36 @@ requires separate approval).
 
 ---
 
+## Removed 28 Jul 2026 (second batch) — 2 files (JP cancelled-invoice zeroing + journal 015375 restore)
+
+Both files below were removed from `dev/migrations/` on 2026-07-28, after the batch immediately
+below. **Nothing new was executed — documentation + file removal only.** **Recover either with
+`git show a88079b2:dev/migrations/<filename>`** (`a88079b2` is the HEAD immediately before this
+removal).
+
+Dev state verified at removal time: 1 cancelled `jellypolly.invoices` row, 0 cancelled JP invoices or
+order-detail lines carrying a non-zero amount; journal `2991` `posted`, 2 lines, 34.00 DR = 34.00 CR.
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-07-28_jellypolly_zero_cancelled_invoices.sql` | Backfill for invoices cancelled **before** the JP cancel handler was brought in line with Tien Hock's: zeroed `jellypolly.order_details` (quantity, price, total, freeproduct, returnproduct, tax) and `jellypolly.invoices` (total_excluding_tax, tax_amount, rounding, totalamountpayable, balance_due) for every `invoice_status = 'cancelled'` row, **preserving each line's product code and description** (TH behaviour). TH's handler always zeroed both; the JP clone only ever set `balance_due = 0`, so a cancelled JP invoice kept its full Total Payable and line amounts. Beyond display this corrected a real number — the JP customer-statement previous-balance query (`src/routes/jellypolly/debtors.js`) sums `totalamountpayable` with no `invoice_status` filter, so cancelled invoices were inflating brought-forward balances. `customers.credit_used` deliberately **not** touched (JP maintains it incrementally and the cancel handler already reversed it). Guards: aborts if any cancelled invoice still has an ACTIVE payment or an active non-consolidated adjustment document; SERIALIZABLE + `lock_timeout 5s`; post-check that no cancelled invoice retains a non-zero amount. **Destructive and irreversible by design** (billed quantities/prices of cancelled invoices are discarded). Idempotent, fail-closed. Companion code change: the JP cancel handler in `src/routes/jellypolly/invoices.js`. Changelog entry shipped 2026-07-28. | dev ✓, prod PENDING |
+| `2026-07-28_restore_journal_015375.sql` | Restored sales journal `2991` — invoice `015375`, VIVIANA, RM34.00, `entry_date` 2026-06-29, DR `VIVIANA` / CR `CR_SALES` — cancelled by mistake. It is `source_type='invoice'` AND `manual_override=true`, so `syncSalesJournalEntry` returns early and would never rebuild it, leaving an active **paid** invoice with no GL presence and no workflow able to restore it. Cancellation is a pure status flag (no reversing entry posted, no lines deleted), so flipping `status` back to `posted` restores the exact pre-cancel state. Guards: full header + line identity fingerprint (refs, type, date, source, amounts, description, both accounts, exactly 2 lines), never restores into the locked pre-2026-06-01 period, invoice still active and still pointing at journal 2991, and no competing posted journal on the same source (`journal_entries_source_posted_uq`). Idempotent — the ALREADY-FINAL branch no-ops when the entry is already posted. | dev ✓ (see note), prod PENDING |
+
+> **Note on the dev state of journal 2991:** it is posted and balanced, but `updated_by` is NULL
+> rather than the migration's `restore_journal_015375` stamp (`updated_at` 2026-07-28 02:29:41), so
+> the dev restore most likely went through the new **Restore Entry** button
+> (`POST /api/journal-entries/:id/restore`), which implements the same guards generally — leaving the
+> migration's ALREADY-FINAL no-op branch as the path taken on dev. The end state is what the
+> migration asserts either way. **Production is still pending** and journal 2991 there is presumably
+> still cancelled; the migration is the safe way to apply it, or use the button.
+>
+> **Known remaining instance of the same defect** (not covered by this migration, restorable through
+> the button): journal `2786` / `JCN-202607-0001`, cancelled while its credit note `TH-CN-26-1`
+> (RM21.55) is still active. See the `CLAUDE.md` / `AGENTS.md` "Journal restore + journal 015375
+> correction (2026-07-28)" schema note.
+
+---
+
 ## Removed 28 Jul 2026 — 3 files (Estimated report Phase 1 + Green Target G2/G3)
 
 All three files below were removed from `dev/migrations/` on 2026-07-28 after being applied and

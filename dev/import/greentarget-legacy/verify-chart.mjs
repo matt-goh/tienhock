@@ -634,8 +634,8 @@ console.log("\n-- 6. phase boundaries ------------------------------------------
   const thAc = scalar("SELECT count(*) FROM public.account_codes");
   const thJe = scalar("SELECT count(*) FROM public.journal_entries");
   const thNotes = scalar("SELECT count(*) FROM public.financial_statement_notes");
-  check(thAc === "2825", "public.account_codes unmoved at 2,825", `found ${thAc}`);
-  check(thJe === "8188", "public.journal_entries unmoved at 8,188", `found ${thJe}`);
+  check(thAc === "2827", "public.account_codes unmoved at 2,827", `found ${thAc}`);
+  check(thJe === "8238", "public.journal_entries unmoved at 8,238", `found ${thJe}`);
   check(thNotes === "33", "public.financial_statement_notes unmoved at 33", `found ${thNotes}`);
 
   // BTFS: carried as a chart entry with NO ledger movement. G4 must give it no

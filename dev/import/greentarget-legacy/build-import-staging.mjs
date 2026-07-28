@@ -785,7 +785,7 @@ BEGIN
   SELECT (SELECT COUNT(*) FROM public.account_codes),
          (SELECT COUNT(*) FROM public.journal_entries)
     INTO v_th_accounts, v_th_journals;
-  IF (v_th_accounts, v_th_journals) IS DISTINCT FROM (2825::bigint, 8188::bigint) THEN
+  IF (v_th_accounts, v_th_journals) IS DISTINCT FROM (2827::bigint, 8238::bigint) THEN
     RAISE EXCEPTION 'Tien Hock moved: account_codes %, journal_entries %', v_th_accounts, v_th_journals;
   END IF;
 

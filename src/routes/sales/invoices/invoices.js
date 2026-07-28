@@ -500,7 +500,24 @@ export default function (pool, config) {
             FROM adjustment_documents a
             LEFT JOIN adjustment_documents p ON a.paired_with_id = p.id
             WHERE a.original_invoice_id = i.id
-          ) as adjustment_docs
+          ) as adjustment_docs,
+          -- Why a RM0.00 bill has no value, for display only. A zero total is a
+          -- safe test: it never disagrees with the amount the e-Invoice would
+          -- declare about being zero.
+          CASE
+            WHEN COALESCE(i.totalamountpayable, 0) <> 0 THEN NULL
+            WHEN EXISTS (
+              SELECT 1 FROM order_details ro
+              WHERE ro.invoiceid = i.id AND ro.issubtotal = false
+                AND (COALESCE(ro.quantity, 0) > 0 OR COALESCE(ro.freeproduct, 0) > 0)
+            ) THEN 'free_goods'
+            WHEN EXISTS (
+              SELECT 1 FROM order_details ro
+              WHERE ro.invoiceid = i.id AND ro.issubtotal = false
+                AND COALESCE(ro.returnproduct, 0) > 0
+            ) THEN 'returns_only'
+            ELSE 'zero_value'
+          END as zero_value_kind
       `;
       let fromClause = `
         FROM invoices i
@@ -662,6 +679,7 @@ export default function (pool, config) {
         is_consolidated: row.is_consolidated || false,
         consolidated_invoices: row.consolidated_invoices,
         consolidated_part_of: row.consolidated_part_of,
+        zero_value_kind: row.zero_value_kind || null,
         adjustmentDocs: (Array.isArray(row.adjustment_docs)
           ? row.adjustment_docs
           : []

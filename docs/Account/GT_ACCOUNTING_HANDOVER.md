@@ -1599,6 +1599,38 @@ nothing about the GT ledger needs to be taken on trust after the swap.
   `production` ships the read-only routes only. Nothing calls them until G6, so there is no user
   impact, but any direct call would error until G8 applies the schema.
 
+### 10e. Second refresh + measured re-baseline (28 Jul 2026, G8 rehearsal)
+
+The dev database was replaced with a fresh production copy again on 28 Jul 2026 (~21:40 KL) for the
+G8 rehearsal. **New measured TH baseline: `public.account_codes` = 2,827, `public.journal_entries`
+= 8,238, `public.financial_statement_notes` = 33** (was 2,825 / 8,188 / 33). The new literals are
+written into the three §10b locations (`2026-07-27_greentarget_import_date_encoding.sql`,
+`2026-07-27_greentarget_opening_anchors.sql` — regenerated via `build-import-staging.mjs`, never
+hand-edited — and `build-import-staging.mjs:788`) and all ten verifier gates (`verify-chart.mjs`,
+`verify-import.mjs`, `verify-legacy-reports.mjs`, `verify-import.sql`). The guards stay exact-match;
+re-measure at the moment of the real production apply, since any office work before then moves them.
+
+**The 28 Jul refresh also settled the stale "prod PENDING" labels.** Tonight's production dump
+contains: the TH V2 anchors (62 `legacy-report-v2` rows, 21 Jul) + fs_note remap + V3
+`closing_stock_values`, the foreign-GP unlink (OP/LGP `fs_note` NULL), the JP cancelled-invoice
+zeroing, the estimated report foundation (135 lines), **GT G2 + G3 (34 notes + 503 accounts,
+applied by the user on 27 Jul 15:18)**, and journal 2991 restored via the migration (28 Jul 16:44).
+Rosa's Q15 diesel fix (keyed in production 28 Jul) is present, proving the dump is current
+production and not a dev copy. **Consequence for G8: G2/G3 are already in production and must NOT
+be re-applied there (G2's data-tables-empty guard aborts by design once populated); G8's apply list
+is G4 (×2) + G7 + `backfill-g7-organic.mjs` only, with the verifiers proving G2/G3 content.**
+
+**Rehearsal result on the refreshed copy (all green):** G4 date-encoding OK → staging load OK →
+six monthly batches (1,705 journals / 4,401 lines) → anchors OK (501, summing 0.00) → G7 migration +
+backfill (3 organic journals, ids 1706–1708, invoices 325/326 + payment 197 — the same three pre-G7
+documents exist in production) → `verify-import.sql` G4 VERIFY OK, `verify-chart.mjs` 59 gates,
+`verify-import.mjs` 64 gates + 2,850 comparisons, `verify-legacy-reports.mjs` 123 gates. The TH
+harness (`legacy-report-fixtures/verify-legacy-reports.mjs`) now passes everything **except** the
+frozen June five-ledger fingerprint — all five account aggregates (lines/zeroLines/DR/CR cents) are
+byte-identical to the frozen V2 expectation and the IMP projection/checkpoints/statements are exact;
+only the content hash moved, consistent with today's legitimate prod metadata changes (the 2991
+restore). Re-pinning that hash is a TH-side decision, not a GT signal.
+
 ---
 
 *Update this file with a per-phase execution record as phases complete. Entry point for all
