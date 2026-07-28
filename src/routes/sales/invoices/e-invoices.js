@@ -249,7 +249,13 @@ export default function (pool, config) {
             AND NOT EXISTS (
               SELECT 1 FROM order_details ro
                WHERE ro.invoiceid = i.id AND ro.issubtotal = false
-                 AND (COALESCE(ro.quantity, 0) > 0 OR COALESCE(ro.freeproduct, 0) > 0)
+                 AND (
+                   COALESCE(ro.quantity, 0) > 0
+                   OR COALESCE(ro.freeproduct, 0) > 0
+                   -- 'OTH'/'LESS' lines carry their value in the price with no
+                   -- quantity, so a bill holding one is a real sale
+                   OR (ro.code IN ('OTH', 'LESS') AND COALESCE(ro.price, 0) <> 0)
+                 )
             )
           ORDER BY i.id`,
         [lockInvoiceIds]
