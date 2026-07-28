@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-28",
+    ms: "Halaman Material Stock kini memaparkan lajur \"Adj. Value\" secara berasingan, dikira terus sebagai Adj. Qty x Unit Cost, supaya nilai pelarasan setiap baris mudah disemak. \"Closing Qty\" dan \"Closing Value\" juga kini dilabel dengan jelas supaya nilai pelarasan tidak lagi dikelirukan dengan nilai stok penutup.",
+    en: "The Material Stock page now shows a separate \"Adj. Value\" column, calculated directly as Adj. Qty x Unit Cost, so each row's adjustment value is easy to check. \"Closing Qty\" and \"Closing Value\" are also labelled clearly so the adjustment value is no longer confused with the closing stock value.",
+  },
+  {
+    date: "2026-07-28",
     ms: "Jurnal: tempoh perakaunan sebelum 1 Jun 2026 kini dilindungi sepenuhnya pada halaman Journal Entries. Sebelum ini catatan jurnal bertarikh sebelum tarikh tersebut masih boleh dibuka, disunting, dibatalkan atau dikunci masuk sebagai catatan baharu, yang boleh mengubah angka laporan yang telah dimuktamadkan. Sekarang sistem menolak percubaan itu dan memaparkan sebab yang jelas. Catatan sedia ada tidak berubah, dan kerja bagi 1 Jun 2026 dan seterusnya berjalan seperti biasa. Invois, resit dan bayaran memang sudah dilindungi sebelum ini.",
     en: "Journals: the accounting period before 1 June 2026 is now fully protected on the Journal Entries page. Previously a journal dated before that day could still be keyed in as a new entry, edited, or cancelled, which could change figures on reports that were already finalised. The system now refuses and explains why. Existing entries are unchanged, and work dated 1 June 2026 onwards is unaffected. Invoices, receipts and payments were already protected.",
   },

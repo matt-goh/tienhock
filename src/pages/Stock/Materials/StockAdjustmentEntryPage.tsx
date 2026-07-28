@@ -2463,6 +2463,27 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     />
   );
 
+  const renderAdjustmentValue = (
+    value: number,
+    title: string,
+    emphasized: boolean = false
+  ): React.ReactNode => (
+    <span
+      className={clsx(
+        "font-mono text-sm",
+        emphasized ? "font-bold" : "font-medium",
+        value < 0
+          ? "text-red-600 dark:text-red-400"
+          : value > 0
+            ? "text-sky-600 dark:text-sky-400"
+            : "text-default-400 dark:text-gray-500"
+      )}
+      title={title}
+    >
+      {formatNumber(value)}
+    </span>
+  );
+
   const deleteTargetName: string =
     deleteTarget?.type === "variant"
       ? getVariantDisplayName(deleteTarget.variant)
@@ -2512,6 +2533,10 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                   <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
                   <span className="whitespace-nowrap text-default-500 dark:text-gray-400">
                     Purchases: <span className="font-medium text-blue-600 dark:text-blue-400">RM {formatNumber(grandTotal.purchases)}</span>
+                  </span>
+                  <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
+                  <span className="whitespace-nowrap text-default-500 dark:text-gray-400">
+                    Adjustments: <span className="font-medium text-sky-600 dark:text-sky-400">RM {formatNumber(grandTotal.adjustments)}</span>
                   </span>
                   <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
                   <span className="whitespace-nowrap text-default-500 dark:text-gray-400">
@@ -2992,16 +3017,28 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                   Purchases
                 </th>
                 <th className="px-2 py-2 text-center text-xs font-medium text-sky-600 dark:text-sky-400 uppercase tracking-wider w-28 bg-sky-50 dark:bg-sky-900/20">
-                  Adjustment
+                  Adj. Qty
                 </th>
                 <th className="px-2 py-2 text-center text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wider w-24">
                   Unit Cost
                 </th>
-                <th className="px-2 py-2 text-right text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wider w-24">
-                  Closing
+                <th
+                  className="w-28 px-2 py-2 text-right text-xs font-medium text-sky-600 dark:text-sky-400 uppercase tracking-wider"
+                  title="Adjustment Value = Adjustment Qty × Unit Cost"
+                >
+                  <span className="block">Adj. Value</span>
+                  <span className="block text-[10px] font-normal normal-case tracking-normal">
+                    Qty × Unit Cost
+                  </span>
                 </th>
-                <th className="px-2 py-2 text-right text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wider w-28">
-                  Value
+                <th className="w-28 whitespace-nowrap px-2 py-2 text-right text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wider">
+                  Closing Qty
+                </th>
+                <th
+                  className="px-2 py-2 text-right text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wider w-32"
+                  title="Closing Value = Opening Value + Purchases Value + Adjustment Value"
+                >
+                  Closing Value
                 </th>
               </tr>
             </thead>
@@ -3018,6 +3055,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                           <IconPackage size={14} className="text-default-500" />
                           {categoryLabels[category]}
                           <span className="text-default-400 font-normal">({items.length})</span>
+                          <span className="text-default-400 font-normal">Value totals</span>
                         </div>
                       </td>
                       <td className="px-2 py-1.5 text-xs text-right text-default-500 dark:text-gray-400">
@@ -3026,10 +3064,11 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                       <td className="px-2 py-1.5 text-xs text-right text-blue-600 dark:text-blue-400">
                         {formatNumber(categoryTotals[category].purchases)}
                       </td>
+                      <td></td>
+                      <td></td>
                       <td className="px-2 py-1.5 text-xs text-right text-sky-600 dark:text-sky-400">
                         {formatNumber(categoryTotals[category].adjustments)}
                       </td>
-                      <td></td>
                       <td></td>
                       <td className="px-2 py-1.5 text-xs text-right">
                         <span className="text-green-600 dark:text-green-400 font-medium">
@@ -3128,6 +3167,13 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                 {formatQty(material.adjustment_quantity)}
                               </td>
                               <td className="px-2 py-1.5 text-center text-xs text-default-400 dark:text-gray-500">-</td>
+                              <td className="px-2 py-1.5 text-right">
+                                {renderAdjustmentValue(
+                                  material.adjustment_value,
+                                  "Total adjustment value for all variants",
+                                  true
+                                )}
+                              </td>
                               <td className="px-2 py-1.5 text-right font-mono text-sm font-semibold text-default-700 dark:text-gray-200">
                                 {formatQty(material.closing_quantity)}
                               </td>
@@ -3261,6 +3307,12 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                       (event) => event.stopPropagation()
                                     )}
                                   </td>
+                                  <td className="px-2 py-1.5 text-right">
+                                    {renderAdjustmentValue(
+                                      variant.adjustment_value,
+                                      `${formatQty(variant.adjustment_quantity)} × ${formatNumber(variant.unit_cost)} = ${formatNumber(variant.adjustment_value)}`
+                                    )}
+                                  </td>
                                   <td className="px-2 py-1.5 text-right font-mono text-sm text-default-700 dark:text-gray-300">
                                     {formatQty(variant.closing_quantity)}
                                   </td>
@@ -3322,6 +3374,12 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                     (value) => handleNewVariantChange(material.id, "unit_cost", value)
                                   )}
                                 </td>
+                                <td className="px-2 py-1.5 text-right">
+                                  {renderAdjustmentValue(
+                                    newVariant.adjustment_value,
+                                    `${formatQty(newVariant.adjustment_quantity)} × ${formatNumber(newVariant.unit_cost)} = ${formatNumber(newVariant.adjustment_value)}`
+                                  )}
+                                </td>
                                 <td className="px-2 py-1.5 text-right font-mono text-sm text-default-700 dark:text-gray-300">
                                   {formatQty(newVariant.closing_quantity)}
                                 </td>
@@ -3333,7 +3391,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
 
                             {isExpanded && !newVariant && (
                               <tr className="bg-white dark:bg-gray-800 border-l-2 border-purple-100 dark:border-gray-700 hover:border-purple-300 dark:hover:border-gray-500 transition-colors">
-                                <td colSpan={7} className="px-3 py-1.5 pl-12">
+                                <td colSpan={8} className="px-3 py-1.5 pl-12">
                                   <button
                                     onClick={(event) => {
                                       event.stopPropagation();
@@ -3457,6 +3515,12 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                               )}
                             </td>
                             <td className="px-2 py-1.5 text-right">
+                              {renderAdjustmentValue(
+                                material.adjustment_value,
+                                `${formatQty(material.adjustment_quantity)} × ${formatNumber(material.unit_cost)} = ${formatNumber(material.adjustment_value)}`
+                              )}
+                            </td>
+                            <td className="px-2 py-1.5 text-right">
                               <span className="font-mono text-sm text-default-700 dark:text-gray-300">
                                 {formatQty(material.closing_quantity)}
                               </span>
@@ -3519,6 +3583,12 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                   (value) => handleNewVariantChange(material.id, "unit_cost", value)
                                 )}
                               </td>
+                              <td className="px-2 py-1.5 text-right">
+                                {renderAdjustmentValue(
+                                  newVariant.adjustment_value,
+                                  `${formatQty(newVariant.adjustment_quantity)} × ${formatNumber(newVariant.unit_cost)} = ${formatNumber(newVariant.adjustment_value)}`
+                                )}
+                              </td>
                               <td className="px-2 py-1.5 text-right font-mono text-sm text-default-700 dark:text-gray-300">
                                 {formatQty(newVariant.closing_quantity)}
                               </td>
@@ -3549,6 +3619,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                     <td className="px-2 py-1.5 text-xs text-center text-emerald-600 dark:text-emerald-400">
                       Manual only
                     </td>
+                    <td></td>
                     <td></td>
                     <td></td>
                     <td className="px-2 py-1.5 text-xs text-right">
@@ -3589,6 +3660,9 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                           (value) => handleStockKilangUnitCostChange(item.product_id, value)
                         )}
                       </td>
+                      <td className="px-2 py-1.5 text-center font-mono text-sm text-default-400 dark:text-gray-500">
+                        -
+                      </td>
                       <td className="px-2 py-1.5 text-right">
                         <span className="font-mono text-sm font-medium text-emerald-600 dark:text-emerald-400">
                           {formatQty(item.quantity)}
@@ -3606,7 +3680,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
 
               {isLoadingStockKilang && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-4 text-center text-default-400 dark:text-gray-500 text-sm">
+                  <td colSpan={8} className="px-4 py-4 text-center text-default-400 dark:text-gray-500 text-sm">
                     Loading finished goods stock...
                   </td>
                 </tr>
@@ -3614,7 +3688,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
 
               {materials.length === 0 && stockKilang.length === 0 && !isLoadingStockKilang && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-default-500 dark:text-gray-400">
+                  <td colSpan={8} className="px-4 py-12 text-center text-default-500 dark:text-gray-400">
                     <IconPackage size={32} className="mx-auto mb-2 text-default-300 dark:text-gray-600" />
                     <p>No materials found for {activeTab.toUpperCase()}</p>
                   </td>
@@ -3627,7 +3701,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                 {materials.length > 0 && (
                   <tr>
                     <td className="px-3 py-1.5 text-right text-sm text-default-600 dark:text-gray-400">
-                      Materials:
+                      Material value totals:
                     </td>
                     <td className="px-2 py-1.5 text-right font-mono text-sm text-default-600 dark:text-gray-400">
                       {formatNumber(grandTotal.opening)}
@@ -3635,10 +3709,11 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                     <td className="px-2 py-1.5 text-right font-mono text-sm text-blue-600 dark:text-blue-400">
                       {formatNumber(grandTotal.purchases)}
                     </td>
+                    <td></td>
+                    <td></td>
                     <td className="px-2 py-1.5 text-right font-mono text-sm text-sky-600 dark:text-sky-400">
                       {formatNumber(grandTotal.adjustments)}
                     </td>
-                    <td></td>
                     <td></td>
                     <td className="px-2 py-1.5 text-right font-mono text-sm text-green-600 dark:text-green-400">
                       {formatNumber(grandTotal.closing)}
@@ -3647,7 +3722,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                 )}
                 {stockKilang.length > 0 && (
                   <tr>
-                    <td colSpan={6} className="px-3 py-1.5 text-right text-sm text-default-600 dark:text-gray-400">
+                    <td colSpan={7} className="px-3 py-1.5 text-right text-sm text-default-600 dark:text-gray-400">
                       Stock Kilang:
                     </td>
                     <td className="px-2 py-1.5 text-right font-mono text-sm text-emerald-600 dark:text-emerald-400">
@@ -3656,7 +3731,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                   </tr>
                 )}
                 <tr className="font-semibold border-t border-default-200 dark:border-gray-600">
-                  <td colSpan={6} className="px-3 py-2 text-right text-sm text-default-700 dark:text-gray-300">
+                  <td colSpan={7} className="px-3 py-2 text-right text-sm text-default-700 dark:text-gray-300">
                     Grand Total:
                   </td>
                   <td className="px-2 py-2 text-right font-mono text-sm text-sky-600 dark:text-sky-400">
