@@ -40,6 +40,7 @@ import GTAdjustmentDocsFormPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentD
 import GTAdjustmentDocsDetailsPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsDetailsPage";
 import GTJournalEntryListPage from "./GreenTarget/Accounting/GTJournalEntryListPage";
 import GTJournalDetailsPage from "./GreenTarget/Accounting/GTJournalDetailsPage";
+import GTJournalEntryPage from "./GreenTarget/Accounting/GTJournalEntryPage";
 import GTAccountLedgerPage from "./GreenTarget/Accounting/GTAccountLedgerPage";
 import GTTrialBalancePage from "./GreenTarget/Accounting/GTTrialBalancePage";
 import GTIncomeStatementPage from "./GreenTarget/Accounting/GTIncomeStatementPage";
@@ -66,9 +67,20 @@ export const GreenTargetNavData: SidebarItem[] = [
         group: "Generation",
         subItems: [
           {
+            name: "New Entry",
+            path: "/accounting/journal-entries/new",
+            component: GTJournalEntryPage,
+            showInPopover: true,
+          },
+          {
             name: "Journal Details",
             path: "/accounting/journal-entries/:id",
             component: GTJournalDetailsPage,
+          },
+          {
+            name: "Edit Entry",
+            path: "/accounting/journal-entries/:id/edit",
+            component: GTJournalEntryPage,
           },
         ],
       },

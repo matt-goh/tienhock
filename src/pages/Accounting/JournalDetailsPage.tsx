@@ -210,7 +210,7 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
 
     setIsProcessing(true);
     try {
-      await api.post(`/api/journal-entries/${id}/cancel`);
+      await api.post(`${apiBase}/journal-entries/${id}/cancel`);
       toast.success("Journal entry cancelled successfully");
       setShowCancelDialog(false);
       fetchEntry();
@@ -231,7 +231,7 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
 
     setIsProcessing(true);
     try {
-      await api.post(`/api/journal-entries/${id}/restore`);
+      await api.post(`${apiBase}/journal-entries/${id}/restore`);
       toast.success("Journal entry restored successfully");
       setShowRestoreDialog(false);
       fetchEntry();
@@ -409,14 +409,12 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
   const isLegacyImport: boolean = isLegacyImportEntry(entry);
   const visibleReference: string = getVisibleReference(entry);
   const displayEntryType: string = getDisplayEntryType(entry);
-  const canEdit: boolean =
-    entry.status !== "cancelled" && !isLegacyImport && !isGreenTarget;
-  const canCancel: boolean =
-    entry.status !== "cancelled" && !isLegacyImport && !isGreenTarget;
+  const canEdit: boolean = entry.status !== "cancelled" && !isLegacyImport;
+  const canCancel: boolean = entry.status !== "cancelled" && !isLegacyImport;
   // Offered on every cancelled entry; the server decides whether this
   // particular cancellation may be undone and explains any refusal.
-  const canRestore: boolean =
-    entry.status === "cancelled" && !isLegacyImport && !isGreenTarget;
+  const canRestore: boolean = entry.status === "cancelled" && !isLegacyImport;
+  // Green Target has no DELETE journal route — its journals are cancelled only.
   const canDelete: boolean = !isLegacyImport && !isGreenTarget;
   const canPrintVoucher: boolean =
     !isGreenTarget &&
@@ -831,8 +829,8 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
 };
 
 // Tien Hock fetches its cached entry types and chart of accounts; Green Target
-// has no types endpoint and its chart lives in the GT schema, so it skips both
-// TH fetches (the GT detail payload carries per-line account descriptions).
+// fetches its own entry types (G7 added the endpoint) and skips the chart —
+// the GT detail payload carries per-line account descriptions.
 const TienHockJournalDetails: React.FC = () => {
   const { entryTypes } = useJournalEntryTypesCache();
   const { accountCodes } = useAccountCodesCache();
@@ -845,6 +843,34 @@ const TienHockJournalDetails: React.FC = () => {
   );
 };
 
+const GreenTargetJournalDetails: React.FC = () => {
+  const [entryTypes, setEntryTypes] = useState<JournalEntryTypeInfo[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadTypes = async () => {
+      try {
+        const response = await api.get("/greentarget/api/journal-entries/types");
+        if (!cancelled) setEntryTypes(response as JournalEntryTypeInfo[]);
+      } catch (err: unknown) {
+        console.error("Error fetching Green Target journal entry types:", err);
+      }
+    };
+    loadTypes();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <JournalDetailsContent
+      entryTypes={entryTypes}
+      accountCodes={[]}
+      isGreenTarget
+    />
+  );
+};
+
 interface JournalDetailsPageProps {
   company?: "tienhock" | "greentarget";
 }
@@ -853,13 +879,7 @@ const JournalDetailsPage: React.FC<JournalDetailsPageProps> = ({
   company = "tienhock",
 }) => {
   if (company === "greentarget") {
-    return (
-      <JournalDetailsContent
-        entryTypes={[]}
-        accountCodes={[]}
-        isGreenTarget
-      />
-    );
+    return <GreenTargetJournalDetails />;
   }
   return <TienHockJournalDetails />;
 };

@@ -19,7 +19,7 @@ node dev/import/greentarget-legacy/verify-chart.mjs                 # G3: 55 gat
 node dev/import/greentarget-legacy/build-import-staging.mjs             # G4: derive staging + anchors
 node dev/import/greentarget-legacy/build-import-staging.mjs --check-only # G4: still derivable?
 node dev/import/greentarget-legacy/load-staging.mjs                     # G4: hash-validated load
-node dev/import/greentarget-legacy/verify-import.mjs                    # G4: 62 gates vs the printed scans
+node dev/import/greentarget-legacy/verify-import.mjs                    # G4: 63 gates vs the printed scans
 ```
 
 ## G4 runbook — the order matters
@@ -118,12 +118,13 @@ ledger by `(DATE_TRUNC('month', entry_date), posting_sequence, journal_entry_lin
 | `prove-date-rule.mjs` | yes | Standalone demonstration that the date swap is load-bearing. |
 | `build-chart.mjs` | yes | **G3.** Derives the 503-account chart from the G1 Trial Balance fixtures + the G0 ledger and writes `dev/migrations/2026-07-26_greentarget_chart_of_accounts.sql`. |
 | `verify-chart.mjs` | yes | **G3.** 55 property-based gates read out of the database. Written *before* the loader. |
-| `debtor-map.json` | yes | **G3.** R6 artifact: legacy debtor code → `greentarget.customers`. 28 debtors, 2 candidates, **0 approved** — needs the user before G7 consumes it. |
+| `debtor-map.json` | yes | **G3.** R6 artifact: legacy debtor code → `greentarget.customers`. 28 debtors, 2 candidates, **0 approved** — G7's receivable resolution reads APPROVED mappings only and falls back to `CD_SD` until the user approves. |
 | `build-import-staging.mjs` | yes | **G4.** Derives the 1,434 CD_SD rows from the pinned G0 staging and writes `generated/greentarget_import_staging.csv`, the derivation report, and `dev/migrations/2026-07-27_greentarget_opening_anchors.sql`. |
 | `load-staging.mjs` | yes | **G4.** Hash-validated `\copy` into `greentarget.import_legacy_rows`, in one transaction, with a validation block that refuses to commit an unapproved population. |
 | `post-monthly-journals.sql` | yes | **G4.** One idempotent monthly batch, parameterised by `-v month_start=`. Run six times. |
-| `verify-import.sql` | yes | **G4.** Written *before* the loader. Proves the database is a faithful projection of staging; read-only. |
-| `verify-import.mjs` | yes | **G4.** 62 gates and 2,850 per-account comparisons against the six printed Trial Balance scans. Never reads staging. |
+| `verify-import.sql` | yes | **G4.** Written *before* the loader. Proves the database is a faithful projection of staging; read-only. Since G7 every population/provenance gate is scoped to `source_type='legacy_import'`, with a mirror gate that no organic journal predates the 2026-07-01 open date. |
+| `verify-import.mjs` | yes | **G4.** 63 gates and 2,850 per-account comparisons against the six printed Trial Balance scans. Never reads staging. (G7 re-pinned the population gates to the legacy subset.) |
+| `backfill-g7-organic.mjs` | yes | **G7.** Posts the pre-G7 post-cutover documents (invoices 325/326, payment 197 → journals 3712–3714) through the shipped G7 services; idempotent. Re-run on production during G8 after the G7 schema migration. |
 
 ## ⚠ Do not hand-edit the chart or its migration
 

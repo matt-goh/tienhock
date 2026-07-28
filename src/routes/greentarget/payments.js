@@ -1,5 +1,11 @@
 // src/routes/greentarget/payments.js
 import { Router } from "express";
+import {
+  syncGTPaymentJournalEntry,
+  cancelGTPaymentJournalEntry,
+  updateGTPaymentJournalReference,
+} from "./accounting/payment-journal.js";
+import { assertGreenTargetAccountingDateUnlocked } from "./accounting/posting-lock.js";
 
 const fetchActiveAdjustmentForInvoice = async (client, invoiceId) => {
   const result = await client.query(
@@ -15,40 +21,6 @@ const fetchActiveAdjustmentForInvoice = async (client, invoiceId) => {
   return result.rows[0] || null;
 };
 
-const pad2 = (value) => String(value).padStart(2, "0");
-
-const getMonthRange = (monthInt, yearInt) => {
-  const nextMonth = monthInt === 12 ? 1 : monthInt + 1;
-  const nextYear = monthInt === 12 ? yearInt + 1 : yearInt;
-  return {
-    startDate: `${yearInt}-${pad2(monthInt)}-01`,
-    nextDate: `${nextYear}-${pad2(nextMonth)}-01`,
-    endDate: `${yearInt}-${pad2(monthInt)}-${pad2(
-      new Date(yearInt, monthInt, 0).getDate()
-    )}`,
-    statementDate: `${pad2(new Date(yearInt, monthInt, 0).getDate())}/${pad2(
-      monthInt
-    )}/${yearInt}`,
-  };
-};
-
-const formatDisplayDate = (value) => {
-  if (!value) return "";
-  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
-    const [year, month, day] = value.substring(0, 10).split("-");
-    return `${day}/${month}/${year}`;
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return `${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}/${date.getFullYear()}`;
-};
-
-const getDateSortTime = (value) => {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
-};
-
-const parseAmount = (value) => parseFloat(value || 0);
 const PAYMENT_METHODS = new Set([
   "cash",
   "cheque",
@@ -310,6 +282,19 @@ export default function (pool) {
         );
       }
 
+      // G7: the posting lock guards the payment's accounting date; the
+      // payment-owned REC journal posts only for active payments on organic
+      // (post-cutover) invoices — pending cheques post at confirmation.
+      assertGreenTargetAccountingDateUnlocked(payment_date, "Payment");
+      if (initialStatus === "active") {
+        await syncGTPaymentJournalEntry(
+          client,
+          paymentResult.rows[0],
+          invoice,
+          null
+        );
+      }
+
       await client.query("COMMIT");
 
       res.status(201).json({
@@ -330,552 +315,6 @@ export default function (pool) {
       });
     } finally {
       client.release();
-    }
-  });
-
-  // Get debtors report
-  router.get("/debtors", async (req, res) => {
-    const { month, year } = req.query;
-
-    try {
-      const queryParams = [];
-      let monthFilterClause = "";
-
-      if (month && year) {
-        const monthInt = parseInt(month, 10);
-        const yearInt = parseInt(year, 10);
-
-        if (!isNaN(monthInt) && !isNaN(yearInt) && monthInt >= 1 && monthInt <= 12) {
-          const { startDate, nextDate } = getMonthRange(monthInt, yearInt);
-          queryParams.push(startDate, nextDate);
-          monthFilterClause = "AND i.date_issued >= $1::date AND i.date_issued < $2::date";
-        }
-      }
-
-      const query = `
-        WITH invoice_payments AS (
-          SELECT
-            p.invoice_id,
-            json_agg(
-              json_build_object(
-                'payment_id', p.payment_id,
-                'payment_method', p.payment_method,
-                'payment_reference', p.payment_reference,
-                'date', p.payment_date,
-                'amount', p.amount_paid,
-                'status', p.status
-              ) ORDER BY p.payment_date, p.payment_id
-            ) AS payments
-          FROM greentarget.payments p
-          WHERE p.status IS NULL OR p.status = 'active'
-          GROUP BY p.invoice_id
-        ),
-        outstanding_invoices AS (
-          SELECT
-            i.invoice_id,
-            i.invoice_number,
-            i.customer_id,
-            i.date_issued,
-            i.total_amount,
-            i.balance_due,
-            GREATEST(i.total_amount - i.balance_due, 0) AS total_paid,
-            COALESCE(ip.payments, '[]'::json) AS payments
-          FROM greentarget.invoices i
-          LEFT JOIN invoice_payments ip ON i.invoice_id = ip.invoice_id
-          WHERE i.status IN ('active', 'overdue')
-            AND i.balance_due > 0.01
-            AND COALESCE(i.is_consolidated, false) = false
-            AND i.type != 'consolidated'
-            ${monthFilterClause}
-        ),
-        customer_aggregates AS (
-          SELECT
-            oi.customer_id,
-            c.name AS customer_name,
-            c.phone_number,
-            c.state,
-            c.additional_info,
-            MAX(oi.date_issued) AS latest_invoice_date,
-            json_agg(
-              json_build_object(
-                'invoice_id', oi.invoice_id,
-                'invoice_number', oi.invoice_number,
-                'date', oi.date_issued,
-                'amount', oi.total_amount,
-                'payments', oi.payments,
-                'balance', oi.balance_due
-              ) ORDER BY oi.date_issued, oi.invoice_id
-            ) AS invoices,
-            SUM(oi.total_amount) AS total_amount,
-            SUM(oi.total_paid) AS total_paid,
-            SUM(oi.balance_due) AS total_balance
-          FROM outstanding_invoices oi
-          JOIN greentarget.customers c ON oi.customer_id = c.customer_id
-          GROUP BY oi.customer_id, c.name, c.phone_number, c.state, c.additional_info
-        )
-        SELECT *
-        FROM customer_aggregates
-        ORDER BY total_balance DESC, latest_invoice_date DESC
-      `;
-
-      const result = await pool.query(query, queryParams);
-
-      let grand_total_amount = 0;
-      let grand_total_paid = 0;
-      let grand_total_balance = 0;
-
-      const customers = result.rows.map((row) => {
-        const totalAmount = parseAmount(row.total_amount);
-        const totalPaid = parseAmount(row.total_paid);
-        const totalBalance = parseAmount(row.total_balance);
-
-        grand_total_amount += totalAmount;
-        grand_total_paid += totalPaid;
-        grand_total_balance += totalBalance;
-
-        return {
-          customer_id: String(row.customer_id),
-          customer_name: row.customer_name,
-          phone_number: row.phone_number,
-          address: row.additional_info,
-          city: null,
-          state: row.state,
-          invoices: row.invoices || [],
-          total_amount: totalAmount,
-          total_paid: totalPaid,
-          total_balance: totalBalance,
-          credit_limit: 0,
-          credit_balance: -totalBalance,
-        };
-      });
-
-      const salesmen = customers.length
-        ? [
-            {
-              salesman_id: "GT",
-              salesman_name: "Green Target",
-              customers,
-              total_balance: grand_total_balance,
-            },
-          ]
-        : [];
-
-      res.json({
-        salesmen,
-        grand_total_amount,
-        grand_total_paid,
-        grand_total_balance,
-        report_date: new Date().toISOString(),
-      });
-    } catch (error) {
-      console.error("Error fetching debtors report:", error);
-      res.status(500).json({
-        message: "Error fetching debtors report",
-        error: error.message,
-      });
-    }
-  });
-
-  router.get("/debtors/statement/:customerId", async (req, res) => {
-    const { customerId } = req.params;
-    const { month, year } = req.query;
-
-    if (!month || !year) {
-      return res.status(400).json({
-        message: "Month and year are required query parameters",
-      });
-    }
-
-    const monthInt = parseInt(month, 10);
-    const yearInt = parseInt(year, 10);
-
-    if (isNaN(monthInt) || isNaN(yearInt) || monthInt < 1 || monthInt > 12) {
-      return res.status(400).json({ message: "Invalid month or year" });
-    }
-
-    const { startDate, nextDate, statementDate } = getMonthRange(
-      monthInt,
-      yearInt
-    );
-
-    try {
-      const customerResult = await pool.query(
-        `SELECT customer_id, name, phone_number, email, state, additional_info
-           FROM greentarget.customers
-          WHERE customer_id = $1`,
-        [customerId]
-      );
-
-      if (customerResult.rows.length === 0) {
-        return res.status(404).json({ message: "Customer not found" });
-      }
-
-      const customer = customerResult.rows[0];
-
-      const previousBalanceResult = await pool.query(
-        `SELECT
-           (SELECT COALESCE(SUM(total_amount), 0)
-              FROM greentarget.invoices
-             WHERE customer_id = $1
-               AND status != 'cancelled'
-               AND COALESCE(is_consolidated, false) = false
-               AND type != 'consolidated'
-               AND date_issued < $2::date)
-           -
-           (SELECT COALESCE(SUM(p.amount_paid), 0)
-              FROM greentarget.payments p
-              JOIN greentarget.invoices i ON p.invoice_id = i.invoice_id
-             WHERE i.customer_id = $1
-               AND i.status != 'cancelled'
-               AND (p.status IS NULL OR p.status = 'active')
-               AND p.payment_date < $2::date)
-           AS previous_balance`,
-        [customerId, startDate]
-      );
-
-      const previousBalance = parseAmount(
-        previousBalanceResult.rows[0]?.previous_balance
-      );
-
-      const invoicesResult = await pool.query(
-        `SELECT invoice_id, invoice_number, date_issued, total_amount, balance_due
-           FROM greentarget.invoices
-          WHERE customer_id = $1
-            AND status != 'cancelled'
-            AND COALESCE(is_consolidated, false) = false
-            AND type != 'consolidated'
-            AND date_issued >= $2::date
-            AND date_issued < $3::date
-          ORDER BY date_issued, invoice_id`,
-        [customerId, startDate, nextDate]
-      );
-
-      const paymentsResult = await pool.query(
-        `SELECT p.payment_id, p.invoice_id, i.invoice_number, p.payment_date,
-                p.amount_paid, p.payment_reference
-           FROM greentarget.payments p
-           JOIN greentarget.invoices i ON p.invoice_id = i.invoice_id
-          WHERE i.customer_id = $1
-            AND i.status != 'cancelled'
-            AND (p.status IS NULL OR p.status = 'active')
-            AND p.payment_date >= $2::date
-            AND p.payment_date < $3::date
-          ORDER BY p.payment_date, p.payment_id`,
-        [customerId, startDate, nextDate]
-      );
-
-      const allTransactions = [];
-
-      invoicesResult.rows.forEach((invoice) => {
-        allTransactions.push({
-          dateStr: formatDisplayDate(invoice.date_issued),
-          particulars: `INV/${invoice.invoice_number || invoice.invoice_id}`,
-          type: "debit",
-          amount: parseAmount(invoice.total_amount),
-          sortKey: getDateSortTime(invoice.date_issued) * 2,
-        });
-      });
-
-      paymentsResult.rows.forEach((payment) => {
-        allTransactions.push({
-          dateStr: formatDisplayDate(payment.payment_date),
-          particulars: `INV/NO : ${
-            payment.invoice_number || payment.invoice_id
-          }/${customerId}`,
-          type: "credit",
-          amount: parseAmount(payment.amount_paid),
-          sortKey: getDateSortTime(payment.payment_date) * 2 + 1,
-        });
-      });
-
-      allTransactions.sort((a, b) => a.sortKey - b.sortKey);
-
-      let runningBalance = previousBalance;
-      const transactions = allTransactions.map((transaction) => {
-        runningBalance +=
-          transaction.type === "debit" ? transaction.amount : -transaction.amount;
-        return {
-          date: transaction.dateStr,
-          particulars: transaction.particulars,
-          type: transaction.type,
-          amount: transaction.amount,
-          running_balance: runningBalance,
-        };
-      });
-
-      const agingResult = await pool.query(
-        `SELECT
-           COALESCE(SUM(CASE
-             WHEN date_issued >= $2::date AND date_issued < $3::date
-             THEN balance_due ELSE 0 END), 0) AS current_month,
-           COALESCE(SUM(CASE
-             WHEN date_issued >= ($2::date - INTERVAL '1 month')
-              AND date_issued < $2::date
-             THEN balance_due ELSE 0 END), 0) AS one_month,
-           COALESCE(SUM(CASE
-             WHEN date_issued >= ($2::date - INTERVAL '2 months')
-              AND date_issued < ($2::date - INTERVAL '1 month')
-             THEN balance_due ELSE 0 END), 0) AS two_months,
-           COALESCE(SUM(CASE
-             WHEN date_issued < ($2::date - INTERVAL '2 months')
-             THEN balance_due ELSE 0 END), 0) AS three_months_plus
-         FROM greentarget.invoices
-         WHERE customer_id = $1
-           AND status IN ('active', 'overdue')
-           AND balance_due > 0.01
-           AND COALESCE(is_consolidated, false) = false
-           AND type != 'consolidated'
-           AND date_issued < $3::date`,
-        [customerId, startDate, nextDate]
-      );
-
-      res.json({
-        customer: {
-          id: String(customer.customer_id),
-          name: customer.name,
-          address: customer.additional_info,
-          city: null,
-          state: customer.state,
-          phone_number: customer.phone_number,
-          email: customer.email,
-        },
-        statement_date: statementDate,
-        statement_month: monthInt,
-        statement_year: yearInt,
-        previous_balance: previousBalance,
-        transactions,
-        total_amount_due: runningBalance,
-        aging: {
-          current_month: parseAmount(agingResult.rows[0]?.current_month),
-          one_month: parseAmount(agingResult.rows[0]?.one_month),
-          two_months: parseAmount(agingResult.rows[0]?.two_months),
-          three_months_plus: parseAmount(
-            agingResult.rows[0]?.three_months_plus
-          ),
-        },
-      });
-    } catch (error) {
-      console.error("Error fetching Green Target customer statement:", error);
-      res.status(500).json({
-        message: "Error fetching customer statement",
-        error: error.message,
-      });
-    }
-  });
-
-  router.get("/debtors/general-statement", async (req, res) => {
-    const includeZero = req.query.includeZero;
-    const now = new Date();
-    const monthInt = req.query.month
-      ? parseInt(req.query.month, 10)
-      : now.getMonth() + 1;
-    const yearInt = req.query.year
-      ? parseInt(req.query.year, 10)
-      : now.getFullYear();
-
-    if (isNaN(monthInt) || isNaN(yearInt) || monthInt < 1 || monthInt > 12) {
-      return res.status(400).json({ message: "Invalid month or year" });
-    }
-
-    const { startDate, nextDate, statementDate } = getMonthRange(
-      monthInt,
-      yearInt
-    );
-    const reportDateTime = new Date().toLocaleString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    });
-
-    try {
-      const result = await pool.query(
-        `WITH customer_invoices AS (
-           SELECT
-             c.customer_id,
-             c.name AS customer_name,
-             i.invoice_id,
-             i.date_issued,
-             i.balance_due,
-             i.total_amount
-           FROM greentarget.customers c
-           JOIN greentarget.invoices i ON c.customer_id = i.customer_id
-           WHERE i.status IN ('active', 'overdue')
-             AND i.balance_due > 0.01
-             AND COALESCE(i.is_consolidated, false) = false
-             AND i.type != 'consolidated'
-             AND i.date_issued < $2::date
-         ),
-         customer_payments AS (
-           SELECT
-             i.customer_id,
-             COALESCE(SUM(p.amount_paid), 0) AS monthly_payment
-           FROM greentarget.invoices i
-           JOIN greentarget.payments p ON i.invoice_id = p.invoice_id
-           WHERE (p.status IS NULL OR p.status = 'active')
-             AND i.status != 'cancelled'
-             AND COALESCE(i.is_consolidated, false) = false
-             AND i.type != 'consolidated'
-             AND p.payment_date >= $1::date
-             AND p.payment_date < $2::date
-           GROUP BY i.customer_id
-         ),
-         customer_summary AS (
-           SELECT
-             ci.customer_id,
-             ci.customer_name,
-             COALESCE(SUM(CASE
-               WHEN ci.date_issued < $1::date
-               THEN ci.balance_due ELSE 0 END), 0) AS bal_bf,
-             COALESCE(SUM(CASE
-               WHEN ci.date_issued >= $1::date AND ci.date_issued < $2::date
-               THEN ci.total_amount ELSE 0 END), 0) AS current_invoices,
-             COALESCE(SUM(ci.balance_due), 0) AS total_due,
-             COALESCE(SUM(CASE
-               WHEN ci.date_issued >= $1::date AND ci.date_issued < $2::date
-               THEN ci.balance_due ELSE 0 END), 0) AS aging_current,
-             COALESCE(SUM(CASE
-               WHEN ci.date_issued >= ($1::date - INTERVAL '1 month')
-                AND ci.date_issued < $1::date
-               THEN ci.balance_due ELSE 0 END), 0) AS aging_1_month,
-             COALESCE(SUM(CASE
-               WHEN ci.date_issued >= ($1::date - INTERVAL '2 months')
-                AND ci.date_issued < ($1::date - INTERVAL '1 month')
-               THEN ci.balance_due ELSE 0 END), 0) AS aging_2_months,
-             COALESCE(SUM(CASE
-               WHEN ci.date_issued < ($1::date - INTERVAL '2 months')
-               THEN ci.balance_due ELSE 0 END), 0) AS aging_3_plus
-           FROM customer_invoices ci
-           GROUP BY ci.customer_id, ci.customer_name
-         )
-         SELECT
-           cs.customer_id,
-           cs.customer_name,
-           cs.bal_bf,
-           cs.current_invoices,
-           COALESCE(cp.monthly_payment, 0) AS payment,
-           cs.total_due,
-           cs.aging_current,
-           cs.aging_1_month,
-           cs.aging_2_months,
-           cs.aging_3_plus
-         FROM customer_summary cs
-         LEFT JOIN customer_payments cp ON cs.customer_id = cp.customer_id
-         ORDER BY cs.customer_id ASC`,
-        [startDate, nextDate]
-      );
-
-      const totals = {
-        bal_bf: 0,
-        current_invoices: 0,
-        payment: 0,
-        total_due: 0,
-        aging_current: 0,
-        aging_1_month: 0,
-        aging_2_months: 0,
-        aging_3_plus: 0,
-      };
-
-      let customers = result.rows.map((row) => {
-        const customer = {
-          account_no: String(row.customer_id),
-          particular: row.customer_name || "UNNAMED",
-          bal_bf: parseAmount(row.bal_bf),
-          current_invoices: parseAmount(row.current_invoices),
-          payment: parseAmount(row.payment),
-          total_due: parseAmount(row.total_due),
-          aging_current: parseAmount(row.aging_current),
-          aging_1_month: parseAmount(row.aging_1_month),
-          aging_2_months: parseAmount(row.aging_2_months),
-          aging_3_plus: parseAmount(row.aging_3_plus),
-        };
-
-        totals.bal_bf += customer.bal_bf;
-        totals.current_invoices += customer.current_invoices;
-        totals.payment += customer.payment;
-        totals.total_due += customer.total_due;
-        totals.aging_current += customer.aging_current;
-        totals.aging_1_month += customer.aging_1_month;
-        totals.aging_2_months += customer.aging_2_months;
-        totals.aging_3_plus += customer.aging_3_plus;
-
-        return customer;
-      });
-
-      // includeZero=1 (the interactive By Customer view): the SQL above only
-      // returns customers with open GT invoices, so merge in every other
-      // Green Target customer as a zero row.
-      if (includeZero === "1") {
-        const present = new Set(customers.map((c) => c.account_no));
-        const allResult = await pool.query(
-          `SELECT customer_id, name FROM greentarget.customers ORDER BY customer_id ASC`
-        );
-        for (const row of allResult.rows) {
-          const accountNo = String(row.customer_id);
-          if (present.has(accountNo)) continue;
-          customers.push({
-            account_no: accountNo,
-            particular: row.name || "UNNAMED",
-            bal_bf: 0,
-            current_invoices: 0,
-            payment: 0,
-            total_due: 0,
-            aging_current: 0,
-            aging_1_month: 0,
-            aging_2_months: 0,
-            aging_3_plus: 0,
-          });
-        }
-        customers.sort((a, b) => a.account_no.localeCompare(b.account_no));
-      }
-
-      // Server-side search, zero-balance filter and pagination for the
-      // interactive By Customer view. Totals above always aggregate the
-      // customers with open invoices.
-      let totalCustomers = customers.length;
-      let page = 1;
-      if (includeZero === "1") {
-        const search = String(req.query.search || "")
-          .trim()
-          .toLowerCase();
-        if (search) {
-          customers = customers.filter(
-            (c) =>
-              c.account_no.toLowerCase().includes(search) ||
-              c.particular.toLowerCase().includes(search)
-          );
-        }
-        if (req.query.hideZero === "1") {
-          customers = customers.filter((c) => Math.abs(c.total_due) > 0.005);
-        }
-        totalCustomers = customers.length;
-        if (req.query.page || req.query.limit) {
-          const limit = Math.max(1, parseInt(req.query.limit, 10) || 200);
-          const maxPage = Math.max(1, Math.ceil(totalCustomers / limit));
-          page = Math.min(Math.max(1, parseInt(req.query.page, 10) || 1), maxPage);
-          customers = customers.slice((page - 1) * limit, page * limit);
-        }
-      }
-
-      res.json({
-        statement_date: statementDate,
-        report_datetime: reportDateTime,
-        statement_month: monthInt,
-        statement_year: yearInt,
-        customers,
-        totals,
-        total_customers: totalCustomers,
-        page,
-      });
-    } catch (error) {
-      console.error("Error fetching Green Target general statement:", error);
-      res.status(500).json({
-        message: "Error fetching general statement",
-        error: error.message,
-      });
     }
   });
 
@@ -977,6 +416,10 @@ export default function (pool) {
         return res.status(404).json({ message: "Payment not found" });
       }
 
+      // G7: keep the payment-owned journal's visible reference in step
+      // (amounts and dates are not editable on GT payments).
+      await updateGTPaymentJournalReference(pool, result.rows[0]);
+
       res.json({
         message: "Payment updated successfully",
         payment: result.rows[0],
@@ -1000,7 +443,8 @@ export default function (pool) {
 
       // Get the payment details and lock the payment row
       const paymentQuery = `
-        SELECT p.*, i.customer_id, i.balance_due, i.status as invoice_status
+        SELECT p.*, i.customer_id, i.balance_due, i.status as invoice_status,
+               i.date_issued as invoice_date_issued, i.invoice_number
         FROM greentarget.payments p
         JOIN greentarget.invoices i ON p.invoice_id = i.invoice_id
         WHERE p.payment_id = $1 AND p.status = 'pending'
@@ -1075,6 +519,23 @@ export default function (pool) {
       await client.query(
         `UPDATE greentarget.customers SET last_activity_date = CURRENT_DATE WHERE customer_id = $1`,
         [customer_id]
+      );
+
+      // G7: a confirmed cheque posts its REC journal now (pending cheques
+      // post nothing at creation).
+      assertGreenTargetAccountingDateUnlocked(
+        payment.payment_date,
+        "Payment confirmation"
+      );
+      await syncGTPaymentJournalEntry(
+        client,
+        updatedPayment.rows[0],
+        {
+          customer_id: payment.customer_id,
+          invoice_number: payment.invoice_number,
+          date_issued: payment.invoice_date_issued,
+        },
+        null
       );
 
       await client.query("COMMIT");
@@ -1162,6 +623,17 @@ export default function (pool) {
         payment_id,
       ]);
 
+      // G7: cancelling a payment is a locked-period mutation when dated
+      // pre-cutover, and its REC journal is cancelled with it (pending
+      // cheques never posted one).
+      assertGreenTargetAccountingDateUnlocked(
+        payment.payment_date,
+        "Payment cancellation"
+      );
+      if (payment.journal_entry_id) {
+        await cancelGTPaymentJournalEntry(client, payment.journal_entry_id);
+      }
+
       // Pending cheques have not reduced the invoice balance or updated the
       // customer's paid activity, so cancelling one must only cancel the
       // payment row. Active payments still restore the invoice balance.
@@ -1196,8 +668,8 @@ export default function (pool) {
         typeof error.message === "string" &&
         (error.message.startsWith("Cannot cancel payment") ||
           error.message.includes("active adjustment document"));
-      res.status(isUserError ? 400 : 500).json({
-        message: isUserError ? error.message : "Error cancelling payment",
+      res.status(error.statusCode || (isUserError ? 400 : 500)).json({
+        message: isUserError || error.statusCode ? error.message : "Error cancelling payment",
         error: error.message,
       });
     } finally {

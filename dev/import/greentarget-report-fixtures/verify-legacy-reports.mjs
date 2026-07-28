@@ -817,9 +817,22 @@ async function stageLedger() {
     accounts[0].sort_order <= accounts[accounts.length - 1].sort_order,
     "the account list is in printed Trial Balance order"
   );
+  // G7: organic journals add posted lines on top of the pinned 4,401 legacy
+  // ones, so the expected total is the import PLUS whatever organic posting
+  // has accrued (measured independently of the picker).
+  const organicLineCount = Number(
+    (await pool.query(
+      `SELECT COUNT(*)::text AS value
+         FROM greentarget.journal_entry_lines jel
+         JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
+        WHERE je.status = 'posted'
+          AND je.source_type IS DISTINCT FROM 'legacy_import'`
+    )).rows[0].value
+  );
   check(
-    accounts.reduce((total, account) => total + account.transaction_count, 0) === 4401,
-    "the account list's transaction counts sum to the 4,401 posted lines"
+    accounts.reduce((total, account) => total + account.transaction_count, 0) ===
+      4401 + organicLineCount,
+    `the account list's transaction counts sum to the 4,401 legacy lines plus the ${organicLineCount} organic ones`
   );
 }
 
@@ -991,6 +1004,13 @@ async function stageRegressions() {
     "journal-entries.js",
     "account-codes.js",
     "debtors.js",
+    // G7 organic posting services + lock (same isolation rule).
+    "posting-lock.js",
+    "posting-utils.js",
+    "sales-journal.js",
+    "payment-journal.js",
+    "adjustment-journal.js",
+    "debtor-map.js",
   ]) {
     const filePath = path.join(ENGINE_DIR, file);
     if (!fs.existsSync(filePath)) {
@@ -1022,9 +1042,17 @@ async function stageRegressions() {
   );
 
   const scalar = async (sql) => (await pool.query(sql)).rows[0].value;
+  // G7 pins the LEGACY population, not the whole table: organic posting
+  // (invoices, payments, adjustments, manual journals) grows both journal
+  // tables from 2026-07-01 onward, and that growth is the point of G7.
   const expectations = [
-    ["greentarget.journal_entries", "1705"],
-    ["greentarget.journal_entry_lines", "4401"],
+    ["greentarget.journal_entries WHERE source_type = 'legacy_import'", "1705"],
+    [
+      `greentarget.journal_entry_lines jel
+        JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
+       WHERE je.source_type = 'legacy_import'`,
+      "4401",
+    ],
     ["greentarget.account_opening_balances", "501"],
     ["greentarget.import_legacy_rows", "4903"],
     ["greentarget.account_codes", "503"],
@@ -1038,12 +1066,21 @@ async function stageRegressions() {
     check(actual === expected, `${table} holds ${expected} rows`, `found ${actual}`);
   }
 
-  // G5 is read-only: it must not have posted, cancelled or anchored anything.
+  // The import stays immutable: no legacy journal may be cancelled or lose
+  // its provenance, however many organic journals arrive beside it.
   const mutated = await scalar(
     `SELECT count(*)::text AS value FROM greentarget.journal_entries
-      WHERE status <> 'posted' OR source_type IS DISTINCT FROM 'legacy_import'`
+      WHERE source_type = 'legacy_import' AND status <> 'posted'`
   );
-  check(mutated === "0", "G5 posted nothing: every GT journal is still an untouched legacy import", `found ${mutated}`);
+  check(mutated === "0", "every legacy import journal is still an untouched posted import", `found ${mutated}`);
+
+  // G7's R8 posting lock: nothing organic may be dated before the open date.
+  const preCutover = await scalar(
+    `SELECT count(*)::text AS value FROM greentarget.journal_entries
+      WHERE source_type IS DISTINCT FROM 'legacy_import'
+        AND entry_date < DATE '2026-07-01'`
+  );
+  check(preCutover === "0", "no organic journal is dated before the 2026-07-01 open date", `found ${preCutover}`);
 }
 
 // ===========================================================================
