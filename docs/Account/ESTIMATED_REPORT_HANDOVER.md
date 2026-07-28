@@ -1,6 +1,6 @@
 # ESTIMATED REPORT HANDOVER — Closing Stock P&L / Estimated Unit Cost (MEE & BIHUN)
 
-Status: **Phase 4 COMPLETE — frontend shipped (2026-07-28); Phase 5 PDF next (handoff ready in §11 — start there in a fresh session)** | Started: 2026-07-23 | Owner: Kimi (planning/Q&A) → Claude (Phase 1) → Claude (Phase 2) → GPT-5.6 Sol (Phase 3) → Kimi (Phase 4)
+Status: **Phase 5 COMPLETE — PDF printing shipped (2026-07-28); Phase 6 wrap-up next (production rollout, §9.4 checklist)** | Started: 2026-07-23 | Owner: Kimi (planning/Q&A) → Claude (Phase 1) → Claude (Phase 2) → GPT-5.6 Sol (Phase 3) → Kimi (Phase 4) → Kimi (Phase 5)
 
 Phase 3 runs the shipped engine against the complete June fixture with **392 exact
 checks, 70 explicitly derived/documented deltas and 0 failures** (§9). Both approved
@@ -365,14 +365,26 @@ RM53 on OIL6389, the missing RM40 parked on CA_WA; Rosa re-pointed it in product
       (user, 2026-07-28): the report is for ALL logged-in staff** — no boss-only rule,
       so the existing global `authMiddleware` is the whole policy and the nav item is
       visible to everyone. Changelog entry shipped with the page. See §10.
-- [ ] **Phase 5 — PDF printing**: `src/utils/stock/EstimatedReportPDF.tsx` via
-      `printPdfBlob` (P&L + unit cost pages per product line). Full handoff in §11.
+- [x] **Phase 5 — PDF printing** (2026-07-28): `src/utils/stock/EstimatedReportPDF.tsx`
+      via `printPdfBlob`; Print button on the shared report page prints the full
+      four-page set (MEE P&L, MEE Unit Cost, BIHUN P&L, BIHUN Unit Cost) from the
+      already-fetched report response — user-confirmed scope. Changelog entry
+      shipped. See §12.
 - [ ] **Phase 6 — Wrap-up**: apply any evidence-backed Q14/Q15 corrections received,
       production migration rollout, changelog entry,
       AGENTS.md/CLAUDE.md updates, bug-scan offer.
 
 ## 4. Progress log
 
+- 2026-07-28 — **Phase 5 done.** PDF printing shipped:
+  `src/utils/stock/EstimatedReportPDF.tsx` (new) renders the full four-page set —
+  MEE P&L, MEE Unit Cost, BIHUN P&L, BIHUN Unit Cost — straight from the
+  already-fetched `EstimatedReportResponse` (no refetch, nothing hardcoded), and a
+  Print button (`exporting` state, "Preparing..." label, `toast.error` on failure)
+  sits in the shared page's header actions on both the P&L and unit-cost pages.
+  Print scope was confirmed with the user (full set from either page, over the
+  other §11.1 options). Prints through `printPdfBlob` per AGENTS.md rule 19.
+  Changelog entry prepended. See §12.
 - 2026-07-28 — **Post-Phase-4 UI fixes (user feedback).** (1) The mappings modal's
   `SearchableCombobox` rendered every matching option with no cap, so the account
   picker mounted ~600 options at once and stalled the page; it now renders at most
@@ -1191,3 +1203,58 @@ modern clean design.
   (`2026-07-25_estimated_report_foundation.sql`,
   `2026-07-28_estimated_report_parity_data_fixes.sql`) must reach production before
   the report is exposed there.
+
+---
+
+## 12. Phase 5 — delivered PDF printing (2026-07-28)
+
+One new file, one edited file, one changelog entry. **No backend change.**
+
+- `src/utils/stock/EstimatedReportPDF.tsx` (new, ~700 lines) — exports
+  `generateEstimatedReportPDF(data)`. Built with `@react-pdf/renderer` following
+  the `src/utils/accounting/IncomeStatementPDF.tsx` pattern (Tien Hock logo +
+  `TIENHOCK_INFO` header, A4, Courier amounts, generated-on timestamp, "Page X of
+  Y" footer). Produces a Blob and prints through `printPdfBlob` from
+  `src/utils/pdfPrintFallback.ts` (AGENTS.md rule 19).
+- `src/pages/Stock/Reports/EstimatedReportPage.tsx` — `IconPrinter` Print button
+  in the header actions (backs BOTH the P&L and unit-cost pages via the `view`
+  prop), `exporting` state, "Preparing..." label, `toast.error` on failure,
+  disabled while `exporting || !report`. Passes the already-fetched
+  `EstimatedReportResponse` straight to the generator — **no refetch, nothing
+  hardcoded**, so the PDF always matches the screen for the selected month,
+  including whatever Add Back is keyed.
+- `src/components/ChangelogModal.tsx` — prepended the 2026-07-28 ms/en entry.
+
+Decisions and details worth knowing:
+
+- **Print scope (user-confirmed 2026-07-28): the full four-page set from either
+  page** — MEE P&L, MEE Unit Cost, BIHUN P&L, BIHUN Unit Cost — matching the
+  legacy printout set (the §11.2 default), chosen over printing only the current
+  view/line. The MEE/BIHUN switcher and the P&L/unit-cost page split remain
+  screen-only view filters. A product line absent from the response is simply
+  skipped (`reports` is a `Partial<Record<...>>`).
+- Content is 1:1 with the live response as rendered on screen (§11.2): P&L page =
+  product table (bags) + Total Sales, closing/opening stock tables + totals +
+  the Closing+Sales info row, purchase + returns tables + totals + the
+  Opening+Purchase+Returns info row, USAGE band, GROSS, the five-row expense
+  breakdown + Total Expenses in parentheses, P/L band, the keyed ADD BACK
+  (highlighted sky row, read-only), FINAL P/L, ACCUMULATIVE band + anchor
+  caption. Unit-cost page = production/bags-sold/sales summary, the six cost
+  groups (amount + 6-dp unit per row, subtotals), TOTAL before repair, machine
+  repair + its total, TOTAL incl. repair, ADD BACK (amount + unit), FINAL
+  ESTIMATED UNIT COST. Money en-MY 2dp with parentheses for negatives, unit
+  costs 6dp, P/L figures keep the green/red convention. Group/expense labels
+  reuse the same `UNIT_COST_GROUP_LABELS` / `EXPENSE_BREAKDOWN_LABELS` maps as
+  the page.
+- Drilldowns/mapping members are screen-only, as §11.2 specified; engine
+  `warnings` print as a small footnote on that line's P&L page only.
+- No fixture/printed target numbers appear anywhere in the generator — those
+  remain verifier-only (§9).
+- The PDF defines its own response interfaces (same pattern as
+  `IncomeStatementPDF`); they were kept field-identical to the page's local
+  types, which pass structurally. No build or typecheck was run (project rule —
+  the user tests manually).
+- The §11.4 open items were left untouched as instructed: Q14, the dev-only Q15
+  delta, the mapping-notes clearing limitation, the unkeyed June Add Back values
+  (the PDF prints whatever is keyed — 0.00 if nothing is), and variant 118's
+  `default_unit_cost`.

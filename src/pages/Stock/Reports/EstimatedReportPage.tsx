@@ -10,6 +10,7 @@ import {
   IconAdjustments,
   IconChevronDown,
   IconChevronRight,
+  IconPrinter,
   IconRefresh,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
@@ -22,6 +23,7 @@ import EstimatedReportMappingModal, {
   MappingLine,
   MappingSourceRow,
 } from "../../../components/Stock/EstimatedReportMappingModal";
+import { generateEstimatedReportPDF } from "../../../utils/stock/EstimatedReportPDF";
 import { api } from "../../../routes/utils/api";
 
 type ProductLine = "mee" | "bihun";
@@ -498,6 +500,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
   const [isMappingModalOpen, setIsMappingModalOpen] = useState<boolean>(false);
   const [addBackInput, setAddBackInput] = useState<string>("0");
   const [savingAddBack, setSavingAddBack] = useState<boolean>(false);
+  const [exporting, setExporting] = useState<boolean>(false);
 
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
     const now = new Date();
@@ -599,6 +602,20 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
     fetchMappings();
   };
 
+  const handlePrintPDF = async (): Promise<void> => {
+    if (!report) return;
+
+    setExporting(true);
+    try {
+      await generateEstimatedReportPDF(report);
+    } catch (err) {
+      console.error("Error printing PDF:", err);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading && !report) {
     return (
       <div className="flex h-96 items-center justify-center">
@@ -665,6 +682,17 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
             onClick={() => setIsMappingModalOpen(true)}
           >
             Mappings
+          </Button>
+          <Button
+            size="sm"
+            variant="filled"
+            color="sky"
+            icon={IconPrinter}
+            iconSize={16}
+            onClick={handlePrintPDF}
+            disabled={exporting || !report}
+          >
+            {exporting ? "Preparing..." : "Print"}
           </Button>
         </div>
       </div>

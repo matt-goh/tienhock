@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-28",
+    ms: "Perakaunan: laporan Estimated P&L dan Estimated Unit Cost kini boleh dicetak sebagai PDF — klik butang Print pada mana-mana satu halaman. PDF mengandungi set lengkap empat halaman (P&L dan Kos Unit bagi MEE dan BIHUN) dengan semua angka tepat seperti yang dipaparkan pada skrin untuk bulan yang dipilih, termasuk Add Back yang telah dikunci.",
+    en: "Accounting: the Estimated P&L and Estimated Unit Cost reports can now be printed as a PDF — click the Print button on either page. The PDF contains the full four-page set (P&L and Unit Cost for both MEE and BIHUN) with every figure exactly as shown on screen for the selected month, including the keyed Add Back.",
+  },
+  {
+    date: "2026-07-28",
     ms: "Green Target: perakaunan kini aktif sepenuhnya. Invois, bayaran dan nota kredit/debit/bayaran balik bertarikh 1 Julai 2026 dan selepasnya kini direkodkan secara automatik ke dalam lejar Green Target — setiap invois dan bayaran menghasilkan catatan jurnalnya sendiri, dan pembatalan turut membatalkan catatan itu. Anda juga boleh mengunci masuk jurnal manual baharu dari Accounting → Journal Entries, serta menyunting, membatalkan atau mengembalikan semula catatan sedia ada. Dokumen dan jurnal bertarikh sebelum 1 Julai 2026 dilindungi dan tidak boleh diubah, supaya angka Jan–Jun yang telah dimuktamadkan kekal tepat.",
     en: "Green Target: accounting is now fully live. Invoices, payments and credit/debit/refund notes dated 1 July 2026 onward are now recorded in the Green Target ledger automatically — every invoice and payment produces its own journal entry, and cancelling a document cancels that entry. You can also key in new manual journals from Accounting → Journal Entries, and edit, cancel or restore existing entries. Documents and journals dated before 1 July 2026 are protected and cannot be changed, so the finalised Jan–Jun figures stay exact.",
   },
