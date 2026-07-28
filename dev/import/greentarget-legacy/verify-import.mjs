@@ -118,7 +118,25 @@ const normalizePrinted = (code) => code.replace(/ /g, "_");
 
 // ---------------------------------------------------------------------------
 const SEP = "";
+// GT_IMPORT_DB_MODE=direct runs psql against a real server (production
+// verification, same convention as load-staging.mjs); default = dev docker.
+const DB_MODE = process.env.GT_IMPORT_DB_MODE || "docker";
+
 function psql(sql) {
+  if (DB_MODE === "direct") {
+    const required = ["DB_HOST", "DB_PORT", "DB_USER", "DB_NAME"];
+    const missing = required.filter((name) => !process.env[name]);
+    if (missing.length > 0) {
+      throw new Error(`Direct PostgreSQL mode requires explicit ${missing.join(", ")}`);
+    }
+    const env = { ...process.env };
+    if (process.env.DB_PASSWORD) env.PGPASSWORD = process.env.DB_PASSWORD;
+    return execFileSync(
+      process.env.PSQL_BIN || "psql",
+      ["--no-psqlrc", "-h", process.env.DB_HOST, "-p", process.env.DB_PORT, "-U", process.env.DB_USER, "-d", process.env.DB_NAME, "-At", "-F", SEP, "-c", sql],
+      { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, env }
+    );
+  }
   return execFileSync(
     "docker",
     ["exec", "-i", "tienhock_dev_db", "psql", "-U", "postgres", "-d", "tienhock", "-At", "-F", SEP, "-c", sql],
