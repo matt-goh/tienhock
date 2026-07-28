@@ -160,9 +160,42 @@ export default function (pool, config) {
         });
       }
 
+      // Returns-only bills (every line has zero sold/free quantity and at least
+      // one return) carry no sales value. MyInvois rejects them because each
+      // line goes out with quantity 0 and amount 0.00, so they are never
+      // submitted individually - the monthly consolidated e-Invoice covers them.
+      const returnsOnlyResult = await pool.query(
+        `SELECT i.id
+           FROM jellypolly.invoices i
+          WHERE i.id = ANY($1)
+            AND EXISTS (
+              SELECT 1 FROM jellypolly.order_details ro
+               WHERE ro.invoiceid = i.id AND ro.issubtotal = false
+                 AND COALESCE(ro.returnproduct, 0) > 0
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM jellypolly.order_details ro
+               WHERE ro.invoiceid = i.id AND ro.issubtotal = false
+                 AND (COALESCE(ro.quantity, 0) > 0 OR COALESCE(ro.freeproduct, 0) > 0)
+            )
+          ORDER BY i.id`,
+        [invoiceIds]
+      );
+
+      if (returnsOnlyResult.rows.length > 0) {
+        return res.status(409).json({
+          success: false,
+          code: "RETURNS_ONLY_INVOICES",
+          message:
+            "One or more invoices only record returned products and have no sales value, so they cannot be submitted as individual e-Invoices. They are covered by the monthly consolidated e-Invoice instead.",
+          invoices: returnsOnlyResult.rows.map((row) => ({ id: row.id })),
+          overallStatus: "Invalid",
+        });
+      }
+
       // STEP 1: Check for invoices that already have a long_id (already processed successfully)
       const validatedQuery = `
-      SELECT id, uuid, long_id, einvoice_status 
+      SELECT id, uuid, long_id, einvoice_status
       FROM jellypolly.invoices
       WHERE id = ANY($1) AND long_id IS NOT NULL AND long_id != ''
       `;

@@ -335,6 +335,9 @@ export interface ExtendedInvoiceData extends InvoiceData {
   payment_notes?: string;
   consolidated_part_of?: ConsolidatedInfo | null;
   adjustmentDocs?: AdjustmentDocument[];
+  // Display-only flag from the invoice list API: every line has zero sold/free
+  // quantity and at least one line has a return (a returns-recording bill).
+  is_returns_only?: boolean;
 }
 
 export interface ProductItem {

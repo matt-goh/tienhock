@@ -30,6 +30,7 @@ import {
   createInvoice,
   createPayment,
 } from "../../utils/invoice/InvoiceUtils";
+import { isReturnsOnlyInvoice } from "../../utils/invoice/invoiceDisplayStatus";
 import toast from "react-hot-toast";
 import { IconSquare, IconSquareCheckFilled } from "@tabler/icons-react";
 import { FormInput, FormListbox } from "../../components/FormComponents";
@@ -628,6 +629,7 @@ const InvoiceFormPage: React.FC = () => {
         submitAsEinvoice &&
         customerTinNumber &&
         customerIdNumber &&
+        !isReturnsOnlyInvoice(invoiceData) &&
         isInvoiceDateEligibleForEinvoice(invoiceData.createddate);
 
       if (shouldSubmitEinvoice) {
@@ -739,10 +741,16 @@ const InvoiceFormPage: React.FC = () => {
     return !isNaN(invoiceTimestamp) && invoiceTimestamp >= cutoffTimestamp;
   };
 
+  // Returns-only bills record returned products with no sales value. MyInvois
+  // rejects them (every line goes out with quantity 0 / amount 0.00), so they
+  // are covered by the monthly consolidated e-Invoice instead.
+  const isReturnsOnlyBill: boolean = isReturnsOnlyInvoice(invoiceData);
+
   // Determine if e-invoice checkbox should be enabled
   const canSubmitEinvoice =
     !!customerTinNumber &&
     !!customerIdNumber &&
+    !isReturnsOnlyBill &&
     isInvoiceDateEligibleForEinvoice(invoiceData.createddate);
 
   // --- JSX Output ---
@@ -922,7 +930,9 @@ const InvoiceFormPage: React.FC = () => {
                 }`}
                 disabled={!canSubmitEinvoice || isSaving}
                 title={
-                  !canSubmitEinvoice
+                  isReturnsOnlyBill
+                    ? "This bill only records returned products and has no sales value, so it does not need its own e-Invoice"
+                    : !canSubmitEinvoice
                     ? "Customer must have TIN and ID number for e-invoicing"
                     : ""
                 }

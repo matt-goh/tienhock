@@ -13,6 +13,7 @@ import {
   IconAlertTriangle,
   IconCircleCheck,
   IconFiles,
+  IconMinus,
 } from "@tabler/icons-react";
 import {
   formatDisplayDate,
@@ -39,6 +40,13 @@ interface InvoiceStatusStyle {
   text: string;
   border: string;
   label: string;
+}
+
+interface EInvoiceStatusStyle {
+  text: string;
+  label: string;
+  color: string;
+  icon: React.ElementType;
 }
 
 interface InvoiceAmountAdjustmentSummary {
@@ -149,6 +157,13 @@ const getInvoiceStatusStyles = (
         border: "border-teal-200 dark:border-teal-700",
         label: getInvoiceDisplayStatusLabel(status as InvoiceDisplayStatus),
       };
+    case "returns_only":
+      return {
+        bg: "bg-slate-100 dark:bg-slate-700/40",
+        text: "text-slate-700 dark:text-slate-300",
+        border: "border-slate-200 dark:border-slate-600",
+        label: getInvoiceDisplayStatusLabel(status as InvoiceDisplayStatus),
+      };
     case "credit_balance":
     case "credited":
       return {
@@ -182,24 +197,50 @@ const getInvoiceStatusStyles = (
 };
 
 // Helper to get e-invoice status styles and icon
-const getEInvoiceStatusInfo = (status: EInvoiceStatus) => {
+const getEInvoiceStatusInfo = (
+  status: EInvoiceStatus,
+  isReturnsOnly: boolean
+): EInvoiceStatusStyle | null => {
+  // Returns-only bills carry no sales value, so a rejected/pending submission
+  // is expected noise rather than something the user must act on.
+  if (isReturnsOnly && (status === "invalid" || status === "pending")) {
+    return {
+      text: "Not Applicable (returns only)",
+      label: "e-Invoice: N/A",
+      color: "text-default-500 dark:text-gray-400",
+      icon: IconMinus,
+    };
+  }
+
   switch (status) {
     case "valid":
-      return { text: "Valid", color: "text-green-600 dark:text-green-400", icon: IconCircleCheck };
+      return {
+        text: "Valid",
+        label: "e-Invoice",
+        color: "text-green-600 dark:text-green-400",
+        icon: IconCircleCheck,
+      };
     case "pending":
       return {
         text: "Pending",
+        label: "e-Invoice",
         color: "text-yellow-600 dark:text-yellow-400",
         icon: IconClockHour4,
       };
     case "invalid":
       return {
         text: "Invalid",
+        label: "e-Invoice",
         color: "text-red-600 dark:text-red-400",
         icon: IconAlertTriangle,
       };
     case "cancelled":
-      return { text: "Cancelled", color: "text-rose-600 dark:text-rose-400", icon: IconBan };
+      return {
+        text: "Cancelled",
+        label: "e-Invoice",
+        color: "text-rose-600 dark:text-rose-400",
+        icon: IconBan,
+      };
     default:
       return null; // No status or 'null'
   }
@@ -233,7 +274,11 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
   );
   const invoiceStatusStyle: InvoiceStatusStyle =
     getInvoiceStatusStyles(invoiceDisplayStatus);
-  const eInvoiceStatusInfo = getEInvoiceStatusInfo(invoice.einvoice_status);
+  const isReturnsOnly: boolean = invoiceDisplayStatus === "returns_only";
+  const eInvoiceStatusInfo = getEInvoiceStatusInfo(
+    invoice.einvoice_status,
+    isReturnsOnly
+  );
   const EInvoiceIcon = eInvoiceStatusInfo?.icon;
   const consolidatedStatusInfo = getConsolidatedStatusInfo(
     invoice.consolidated_part_of
@@ -410,7 +455,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
               title={`e-Invoice: ${eInvoiceStatusInfo.text}`}
             >
               <EInvoiceIcon size={14} className="mr-1" />
-              e-Invoice
+              {eInvoiceStatusInfo.label}
             </a>
           ) : (
             <span
@@ -418,7 +463,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
               title={`e-Invoice: ${eInvoiceStatusInfo.text}`}
             >
               <EInvoiceIcon size={14} className="mr-1" />
-              e-Invoice
+              {eInvoiceStatusInfo.label}
             </span>
           ))}
         {/* Consolidated Status - add this */}
