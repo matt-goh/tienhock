@@ -30,12 +30,13 @@ requires separate approval).
 
 ---
 
-## Removed 28 Jul 2026 (third batch) — 7 files (GT G2/G3/G4/G7 + estimated report, post-G8)
+## Removed 28 Jul 2026 (third batch) — 8 files (GT G2/G3/G4/G7 + estimated report + unit-cost precision, post-G8)
 
-All seven were applied to **both dev and production** (prod: G2/G3 on 2026-07-27 15:18 by the user;
-the rest during the 28 Jul G8 window — see the prod-rollout section at the bottom of this file), so
+All eight were applied to **both dev and production** (prod: G2/G3 on 2026-07-27 15:18 by the user;
+the rest during the 28 Jul G8 window — see the prod-rollout section at the bottom of this file;
+the unit-cost precision widening was applied to prod later the same night), so
 per the project convention the `.sql` files are deleted and recovered from git history when needed:
-all seven are tracked at commit **`50e63344`** — `git show 50e63344:dev/migrations/<filename>`.
+all eight are tracked at commit **`50e63344`** — `git show 50e63344:dev/migrations/<filename>`.
 The three foundation files (estimated + GT G2/G3) had already been removed once (the "3 files"
 section below) and were restored to the working tree for the G8 rehearsal/rollout; this is their
 second, final removal.
@@ -49,15 +50,7 @@ second, final removal.
 | `2026-07-27_greentarget_opening_anchors.sql` | GT §10b/§10f; GENERATED — regenerate via `build-import-staging.mjs`, never hand-edit |
 | `2026-07-28_greentarget_g7_organic_posting.sql` | GT §9 (G7)/§10f |
 | `2026-07-28_estimated_report_parity_data_fixes.sql` | ESTIMATED_REPORT_HANDOVER.md §5 |
-
-**Still in `dev/migrations/`:** `2026-07-28_material_unit_cost_precision.sql` — dev ✓ but **prod
-PENDING**: prod psql displays `material_stock_entries.unit_cost` with 2 decimals (`282.20`) where
-the widened `numeric(10,4)` would display 4 (`282.2000`), so the widening never reached production.
-Apply it to prod (safe, metadata-compatible) before removing the file:
-
-```bash
-sudo -u postgres psql -d tienhock_prod -v ON_ERROR_STOP=1 -f dev/migrations/2026-07-28_material_unit_cost_precision.sql
-```
+| `2026-07-28_material_unit_cost_precision.sql` | Widened the four material unit-cost columns from `numeric(10,2)` to `numeric(10,4)` (`materials.default_unit_cost`, `material_variants.default_unit_cost`, `material_stock_entries.unit_cost`, `material_stock_kilang_entries.unit_cost`) so rates like 0.035 store exactly; RM value columns stay at 2 decimals. Metadata-compatible widening — existing values untouched. **Prod application was verified by evidence before it ran:** the 2026-07-28 prod dump showed 2-decimal display (`282.50`) vs dev's 4-decimal (`282.5000`). |
 
 ---
 
