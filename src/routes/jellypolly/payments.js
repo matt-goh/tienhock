@@ -1,6 +1,7 @@
 // src/routes/sales/invoices/payments.js
 import { Router } from "express";
 import { requireChequeClearanceDate } from "../utils/cheque-clearance-date.js";
+import { toLocalAccountingDateString } from "../accounting/posting-lock.js";
 
 // Helper function (can be moved to a shared util if used elsewhere)
 const updateCustomerCredit = async (client, customerId, amount) => {
@@ -20,6 +21,29 @@ const updateCustomerCredit = async (client, customerId, amount) => {
   } catch (error) {
     console.error(`Error updating credit for customer ${customerId}:`, error);
     throw error; // Re-throw to be caught by transaction handler
+  }
+};
+
+// Accepts only an explicit yyyy-MM-dd from the client so an edited date can
+// never be reinterpreted through UTC on its way into the payment row.
+const normalizeEditableDate = (value, label) => {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (!raw) {
+    const error = new Error(`${label} is required.`);
+    error.status = 400;
+    throw error;
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const error = new Error(`${label} must be a valid date in yyyy-MM-dd format.`);
+    error.status = 400;
+    throw error;
+  }
+  try {
+    return toLocalAccountingDateString(raw);
+  } catch (_error) {
+    const error = new Error(`${label} must be a valid date in yyyy-MM-dd format.`);
+    error.status = 400;
+    throw error;
   }
 };
 
@@ -462,6 +486,196 @@ export default function (pool) {
           message: error.message || "Error confirming payment",
           code: error.code,
         });
+    } finally {
+      client.release();
+    }
+  });
+
+  // --- PUT /api/payments/:payment_id/date - Correct a mis-keyed payment date ---
+  // Jelly Polly posts no journal entries, so a date correction only rewrites the
+  // payment rows; the debtors report and account ledger read
+  // COALESCE(posting_date, payment_date) at query time and follow automatically.
+  // Payment Management groups a cheque by reference + date + method, so the whole
+  // group moves together or a multi-invoice cheque would split into two rows.
+  router.put("/:payment_id/date", async (req, res) => {
+    const { payment_id } = req.params;
+    const { payment_date, posting_date, expected_payment_date } = req.body;
+    const paymentIdNum = parseInt(payment_id, 10);
+
+    if (isNaN(paymentIdNum)) {
+      return res.status(400).json({ message: "Invalid payment ID." });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const anchorResult = await client.query(
+        `SELECT p.*, i.paymenttype
+           FROM jellypolly.payments p
+           JOIN jellypolly.invoices i ON i.id = p.invoice_id
+          WHERE p.payment_id = $1
+          FOR UPDATE OF p`,
+        [paymentIdNum]
+      );
+      if (anchorResult.rows.length === 0) {
+        const error = new Error("Payment not found.");
+        error.status = 404;
+        throw error;
+      }
+
+      const anchor = anchorResult.rows[0];
+      if (anchor.status === "cancelled") {
+        const error = new Error(
+          "This payment is cancelled and its date cannot be changed."
+        );
+        error.status = 400;
+        throw error;
+      }
+      // A cash bill's collection belongs to the invoice: changing the invoice
+      // date already rewrites it, so editing it here would silently revert.
+      if (anchor.paymenttype === "CASH") {
+        const error = new Error(
+          "This payment belongs to a cash bill and always follows the bill date. Change the invoice date instead."
+        );
+        error.status = 400;
+        throw error;
+      }
+
+      const currentDate = toLocalAccountingDateString(anchor.payment_date);
+      const normalizedExpectedDate =
+        expected_payment_date === null || expected_payment_date === undefined
+          ? null
+          : toLocalAccountingDateString(expected_payment_date);
+      if (normalizedExpectedDate && normalizedExpectedDate !== currentDate) {
+        const error = new Error(
+          "This payment date changed after you opened it. Reload and try again."
+        );
+        error.status = 409;
+        error.code = "PAYMENT_DATE_CHANGED";
+        throw error;
+      }
+
+      // No future-date guard: a post-dated cheque is legitimately received now
+      // and dated later. Only the clearance date below is constrained — money
+      // cannot have cleared the bank in the future.
+      const nextDate = normalizeEditableDate(payment_date, "Payment date");
+      const today = toLocalAccountingDateString(new Date());
+
+      // The visible payment group: same cheque/transfer reference keyed on the
+      // same day with the same method. A payment with no reference is its own
+      // group, exactly as Payment Management renders it.
+      const groupResult = anchor.payment_reference
+        ? await client.query(
+            `SELECT payment_id, posting_date
+               FROM jellypolly.payments
+              WHERE payment_reference = $1
+                AND payment_date::date = $2::date
+                AND payment_method = $3
+                AND (status IS NULL OR status != 'cancelled')
+              ORDER BY payment_id
+              FOR UPDATE`,
+            [anchor.payment_reference, currentDate, anchor.payment_method]
+          )
+        : { rows: [{ payment_id: anchor.payment_id, posting_date: anchor.posting_date }] };
+
+      const groupIds = groupResult.rows.map((row) => row.payment_id);
+      if (!groupIds.includes(paymentIdNum)) {
+        const error = new Error(
+          "This payment group changed after you opened it. Reload and try again."
+        );
+        error.status = 409;
+        error.code = "PAYMENT_DATE_CHANGED";
+        throw error;
+      }
+
+      // Confirmed payments carry an accounting date of their own; members still
+      // pending have none and must keep it until they are confirmed. An omitted
+      // clearance date leaves every posting date untouched rather than
+      // flattening a group that was confirmed in more than one batch.
+      const postedRows = groupResult.rows.filter(
+        (row) => row.posting_date !== null
+      );
+      const postedIds = postedRows.map((row) => row.payment_id);
+      let nextPostingDate = null;
+      if (posting_date !== null && posting_date !== undefined) {
+        if (postedIds.length === 0) {
+          const error = new Error(
+            "This payment has not been confirmed yet, so it has no clearance date to change."
+          );
+          error.status = 400;
+          throw error;
+        }
+        nextPostingDate = normalizeEditableDate(posting_date, "Clearance date");
+        if (nextPostingDate < nextDate) {
+          const error = new Error(
+            `Clearance date cannot be before the payment date (${nextDate}).`
+          );
+          error.status = 400;
+          throw error;
+        }
+        if (nextPostingDate > today) {
+          const error = new Error("Clearance date cannot be in the future.");
+          error.status = 400;
+          throw error;
+        }
+      } else {
+        for (const row of postedRows) {
+          const existingPostingDate = toLocalAccountingDateString(
+            row.posting_date
+          );
+          if (existingPostingDate < nextDate) {
+            const error = new Error(
+              `Payment ${row.payment_id} cleared on ${existingPostingDate}, before the new payment date (${nextDate}). Set the clearance date as well.`
+            );
+            error.status = 400;
+            throw error;
+          }
+        }
+      }
+
+      await client.query(
+        `UPDATE jellypolly.payments SET payment_date = $2::date WHERE payment_id = ANY($1::int[])`,
+        [groupIds, nextDate]
+      );
+      if (nextPostingDate) {
+        await client.query(
+          `UPDATE jellypolly.payments SET posting_date = $2::date WHERE payment_id = ANY($1::int[])`,
+          [postedIds, nextPostingDate]
+        );
+      }
+
+      const updated = await client.query(
+        `SELECT payment_id, invoice_id, payment_date, posting_date, amount_paid,
+                payment_method, payment_reference, status
+           FROM jellypolly.payments
+          WHERE payment_id = ANY($1::int[])
+          ORDER BY payment_id`,
+        [groupIds]
+      );
+
+      await client.query("COMMIT");
+
+      res.json({
+        message:
+          groupIds.length > 1
+            ? `Date updated for ${groupIds.length} payments under reference ${anchor.payment_reference}.`
+            : "Payment date updated.",
+        payment_date: nextDate,
+        posting_date: nextPostingDate,
+        updated_payment_count: groupIds.length,
+        payments: updated.rows.map((p) => ({
+          ...p,
+          amount_paid: parseFloat(p.amount_paid || 0),
+        })),
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error updating payment date:", error);
+      res.status(error.status || 500).json({
+        code: error.code,
+        message: error.message || "Error updating payment date",
+      });
     } finally {
       client.release();
     }

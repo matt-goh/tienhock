@@ -26,7 +26,10 @@
 import { generateReceiptReference } from "./payment-journal.js";
 import { determineBankAccount } from "../../utils/payment-helpers.js";
 import { getCustomerDebtorAccountCode } from "./debtorSync.js";
-import { assertTienHockAccountingDateUnlocked } from "./posting-lock.js";
+import {
+  assertTienHockAccountingDateUnlocked,
+  toLocalAccountingDateString,
+} from "./posting-lock.js";
 import {
   IMPORTED_PAYMENT_EVIDENCE_NOT_FOUND_CODE,
   IMPORTED_PAYMENT_RECONCILIATION_MATCH_CODE,
@@ -658,6 +661,174 @@ export async function updateReceiptReference(
   return {
     receipt: fresh.rows[0],
     receipt_ids: receiptIds,
+    updated_receipt_count: receiptIds.length,
+    updated_payment_count: paymentUpdate.rowCount,
+  };
+}
+
+/**
+ * Corrects a mis-keyed receipt date without touching the ledger. Only cheque
+ * receipts qualify: their accounting date is the separately captured clearance
+ * date (posting_date), so received_date is pure payment history. Every other
+ * method posts with posting_date defaulted to received_date, where moving one
+ * date alone would silently desync the receipt from its own journal — those
+ * corrections stay on cancel + re-key.
+ *
+ * Receipts sharing the current reference/date/method/account move together so a
+ * visible Payment Management group never splits, and their payment-history
+ * projections follow in the same transaction.
+ *
+ * @param {import('pg').PoolClient} client
+ * @param {number} receiptId
+ * @param {string|null|undefined} expectedReceivedDate
+ * @param {string} receivedDate
+ * @param {string|null} userId
+ * @returns {Promise<{receipt: object, receipt_ids: number[], received_date: string, updated_receipt_count: number, updated_payment_count: number}>}
+ */
+export async function updateReceiptDate(
+  client,
+  receiptId,
+  expectedReceivedDate,
+  receivedDate,
+  userId
+) {
+  const rawNextDate = typeof receivedDate === "string" ? receivedDate.trim() : "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(rawNextDate)) {
+    const error = new Error(
+      "Payment date must be a valid date in yyyy-MM-dd format."
+    );
+    error.status = 400;
+    throw error;
+  }
+  const nextDate = toLocalAccountingDateString(rawNextDate);
+
+  const receiptResult = await client.query(
+    `SELECT * FROM receipts WHERE id = $1 FOR UPDATE`,
+    [receiptId]
+  );
+  if (receiptResult.rows.length === 0) {
+    const error = new Error("Payment group not found");
+    error.status = 404;
+    throw error;
+  }
+
+  const receipt = receiptResult.rows[0];
+  if (receipt.status === "cancelled") {
+    throw new Error("This payment group is cancelled and cannot be changed");
+  }
+  if (receipt.origin !== "erp") {
+    throw new Error("Imported opening payment groups cannot be changed");
+  }
+  if (receipt.payment_method !== "cheque") {
+    throw new Error(
+      "Only cheque payment dates can be corrected here. For cash, bank transfer and online payments the payment date is also the accounting date — cancel this payment and record it again on the correct date."
+    );
+  }
+
+  // Guard the stored dates and the new one, so a receipt can be moved neither
+  // into nor out of the locked pre-cutover period.
+  assertReceiptDatesUnlocked(receipt, `Payment group ${receiptId}`);
+  assertTienHockAccountingDateUnlocked(
+    nextDate,
+    `Payment group ${receiptId} (new payment date)`
+  );
+
+  // No future-date guard: a post-dated cheque is legitimately received now and
+  // dated later. Only the clearance date, checked per group member below, is
+  // constrained — money cannot have cleared the bank in the future.
+  const currentDate = toLocalDateString(receipt.received_date);
+  const normalizedExpectedDate =
+    expectedReceivedDate === null || expectedReceivedDate === undefined
+      ? null
+      : toLocalAccountingDateString(expectedReceivedDate);
+  if (normalizedExpectedDate && normalizedExpectedDate !== currentDate) {
+    const error = new Error(
+      "This payment group changed after you opened it. Reload and try again."
+    );
+    error.status = 409;
+    error.code = "RECEIPT_DATE_CHANGED";
+    throw error;
+  }
+
+  const groupResult = await client.query(
+    `SELECT id, journal_entry_id, received_date, posting_date
+       FROM receipts
+      WHERE display_reference IS NOT DISTINCT FROM $1
+        AND received_date = $2
+        AND payment_method = $3
+        AND debit_account = $4
+        AND origin = 'erp'
+        AND status IN ('pending', 'posted')
+      ORDER BY id
+      FOR UPDATE`,
+    [
+      receipt.display_reference,
+      receipt.received_date,
+      receipt.payment_method,
+      receipt.debit_account,
+    ]
+  );
+  const receiptIds = groupResult.rows.map((row) => row.id);
+  if (!receiptIds.includes(receiptId)) {
+    const error = new Error(
+      "This payment group changed after you opened it. Reload and try again."
+    );
+    error.status = 409;
+    error.code = "RECEIPT_DATE_CHANGED";
+    throw error;
+  }
+  for (const groupReceipt of groupResult.rows) {
+    assertReceiptDatesUnlocked(
+      groupReceipt,
+      `Payment group ${receipt.display_reference || receiptId}`
+    );
+    // A cheque cannot clear the bank before it was received.
+    if (groupReceipt.posting_date) {
+      const clearanceDate = toLocalDateString(groupReceipt.posting_date);
+      if (clearanceDate < nextDate) {
+        const error = new Error(
+          `This cheque cleared on ${clearanceDate}, before the new payment date (${nextDate}). Choose a payment date on or before the clearance date.`
+        );
+        error.status = 400;
+        throw error;
+      }
+    }
+  }
+
+  if (currentDate === nextDate) {
+    return {
+      receipt,
+      receipt_ids: receiptIds,
+      received_date: nextDate,
+      updated_receipt_count: 0,
+      updated_payment_count: 0,
+    };
+  }
+
+  await client.query(
+    `UPDATE receipts
+        SET received_date = $2::date, updated_at = NOW(), updated_by = $3
+      WHERE id = ANY($1::int[])`,
+    [receiptIds, nextDate, userId || null]
+  );
+
+  const paymentUpdate = await client.query(
+    `UPDATE payments p
+        SET payment_date = $2::date
+       FROM receipt_allocations ra
+      WHERE p.receipt_allocation_id = ra.id
+        AND ra.receipt_id = ANY($1::int[])
+        AND COALESCE(p.status, 'active') != 'cancelled'`,
+    [receiptIds, nextDate]
+  );
+
+  const fresh = await client.query(`SELECT * FROM receipts WHERE id = $1`, [
+    receiptId,
+  ]);
+  return {
+    receipt: fresh.rows[0],
+    receipt_ids: receiptIds,
+    received_date: nextDate,
     updated_receipt_count: receiptIds.length,
     updated_payment_count: paymentUpdate.rowCount,
   };

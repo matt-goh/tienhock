@@ -11,6 +11,7 @@ import {
   cancelReceiptGroup,
   getReceiptGroup,
   updateReceiptReference,
+  updateReceiptDate,
 } from "../accounting/receipt-service.js";
 import { applyOverpayment } from "../accounting/overpayment-apply.js";
 
@@ -237,6 +238,39 @@ export default function (pool) {
       res.status(error.status || 400).json({
         code: error.code,
         message: error.message || "Error updating receipt reference",
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  // --- PATCH /api/receipts/:id/date ---
+  // Cheque receipts only: corrects the mis-keyed payment date. The ledger is
+  // untouched — a cheque posts on its clearance date, not its received date.
+  router.patch("/:id/date", async (req, res) => {
+    const receiptId = parseInt(req.params.id, 10);
+    if (!Number.isInteger(receiptId) || receiptId <= 0) {
+      return res.status(400).json({ message: "Invalid payment group" });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await updateReceiptDate(
+        client,
+        receiptId,
+        req.body?.expected_received_date,
+        req.body?.received_date,
+        req.user?.id || null
+      );
+      await client.query("COMMIT");
+      res.json({ message: "Payment date updated", ...result });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error updating receipt date:", error);
+      res.status(error.status || 400).json({
+        code: error.code,
+        message: error.message || "Error updating receipt date",
       });
     } finally {
       client.release();
