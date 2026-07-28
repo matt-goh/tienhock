@@ -1169,13 +1169,41 @@ export default function (pool, config) {
         }
       }
 
-      // 5. Update Invoice Status in DB
+      // 5. Zero out all financial data for cancelled invoice
+      // Update all order details to zero
+      const zeroOrderDetailsQuery = `
+        UPDATE jellypolly.order_details
+        SET quantity = 0,
+            price = 0,
+            total = '0.00',
+            freeproduct = 0,
+            returnproduct = 0,
+            tax = 0
+        WHERE invoiceid = $1
+      `;
+      await client.query(zeroOrderDetailsQuery, [id]);
+
+      // Update invoice financial totals to zero
+      const zeroInvoiceTotalsQuery = `
+        UPDATE jellypolly.invoices
+        SET total_excluding_tax = 0,
+            tax_amount = 0,
+            rounding = 0,
+            totalamountpayable = 0,
+            balance_due = 0
+        WHERE id = $1
+      `;
+      await client.query(zeroInvoiceTotalsQuery, [id]);
+
+      console.log(`Zeroed out financial data for cancelled invoice ${id}`);
+
+      // 6. Update Invoice Status in DB
       const newEInvoiceStatus = einvoiceCancelledApi
         ? "cancelled"
         : invoice.einvoice_status;
       const updateInvoiceQuery = `
-        UPDATE jellypolly.invoices 
-        SET invoice_status = 'cancelled', 
+        UPDATE jellypolly.invoices
+        SET invoice_status = 'cancelled',
             einvoice_status = $1,
             balance_due = 0 -- Set balance to 0 when cancelling
             -- Optionally add a cancellation_timestamp column

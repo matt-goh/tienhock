@@ -146,9 +146,13 @@ export interface DebtorsReportPageConfig {
     year: number
   ) => string;
   generalStatementEndpoint: (month: number, year: number) => string;
-  customerDetailsPath: (customerId: string) => string;
-  customerInvoicesPath: (customerId: string) => string;
-  invoiceDetailsPath: (invoiceId: string) => string;
+  // Drill paths are optional: a ledger-backed debtors source (e.g. Green
+  // Target's imported legacy ledger) has no operational customer/invoice
+  // pages to drill into, so it omits them and the corresponding clicks
+  // become inert.
+  customerDetailsPath?: (customerId: string) => string;
+  customerInvoicesPath?: (customerId: string) => string;
+  invoiceDetailsPath?: (invoiceId: string) => string;
   adjustmentDocDetailsPath?: (adjustmentDocId: string) => string;
   companyName: string;
   statementCompanyInfo?: CompanyInfo;
@@ -904,6 +908,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
   };
 
   const handleCustomerClick = (customerId: string): void => {
+    if (!config.customerInvoicesPath) return;
     navigate(config.customerInvoicesPath(customerId));
   };
 
@@ -1383,11 +1388,12 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                                   : ""
                               }`}
                               title={row.particular}
-                              onClick={() =>
+                              onClick={() => {
+                                if (!config.customerDetailsPath) return;
                                 navigate(
                                   config.customerDetailsPath(row.account_no)
-                                )
-                              }
+                                );
+                              }}
                             >
                               {row.particular}
                             </span>
@@ -1634,6 +1640,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                                   }
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    if (!config.customerDetailsPath) return;
                                     navigate(config.customerDetailsPath(customer.customer_id));
                                   }}
                                 >
@@ -1792,6 +1799,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                                         <tr
                                           className="hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer text-default-800 dark:text-gray-100"
                                           onClick={() => {
+                                            if (!config.invoiceDetailsPath) return;
                                             navigate(
                                               config.invoiceDetailsPath(
                                                 invoice.invoice_id
@@ -1843,7 +1851,10 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                                                   : ""
                                               }`}
                                               onClick={() => {
-                                                if (invoice.balance !== 0) {
+                                                if (
+                                                  invoice.balance !== 0 &&
+                                                  config.invoiceDetailsPath
+                                                ) {
                                                   navigate(
                                                     config.invoiceDetailsPath(
                                                       invoice.invoice_id

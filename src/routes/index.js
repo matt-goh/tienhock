@@ -111,6 +111,11 @@ import greenTargetECarumanRouter from "./greentarget/e-caruman.js";
 import greenTargetCustomerSignupsRouter from "./greentarget/customer-signups.js";
 import greenTargetFinancialReportsRouter from "./greentarget/accounting/financial-reports.js";
 import greenTargetAccountLedgerRouter from "./greentarget/accounting/account-ledger.js";
+import greenTargetJournalEntriesRouter from "./greentarget/accounting/journal-entries.js";
+import createGreenTargetAccountCodesRouter, {
+  createGreenTargetLedgerTypesRouter,
+} from "./greentarget/accounting/account-codes.js";
+import createGreenTargetDebtorsRouter from "./greentarget/accounting/debtors.js";
 
 // Jellypolly routes
 import jellypollyInvoiceRouter from "./jellypolly/invoices.js";
@@ -349,6 +354,32 @@ export default function setupRoutes(app, pool) {
   app.use(
     "/greentarget/api/bank-statement",
     greenTargetAccountLedgerRouter(pool)
+  );
+  // Green Target accounting lookups (G6) and mutations (G7+). Same
+  // `greentarget` schema isolation; paths mirror Tien Hock's so the shared
+  // pages swap base path only. Since G7 this router also MUTATES the GT
+  // books, so it sits behind the same session auth + restore guard TH gets
+  // (the JP account-ledger mount is the per-route precedent). The shared
+  // frontend api helper already sends x-session-id on every request.
+  app.use(
+    "/greentarget/api/journal-entries",
+    authMiddleware(pool),
+    checkRestoreState,
+    greenTargetJournalEntriesRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/account-codes",
+    authMiddleware(pool),
+    checkRestoreState,
+    createGreenTargetAccountCodesRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/ledger-types",
+    createGreenTargetLedgerTypesRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/debtors",
+    createGreenTargetDebtorsRouter(pool)
   );
 
   // Jellypolly routes

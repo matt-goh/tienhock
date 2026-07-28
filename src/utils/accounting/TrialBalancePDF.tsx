@@ -208,11 +208,18 @@ const getMonthName = (year: number, month: number): string => {
 interface TrialBalancePDFDocumentProps {
   data: TrialBalanceData;
   accounts: TrialBalanceAccount[];
+  branding?: TrialBalancePDFBranding;
+}
+
+export interface TrialBalancePDFBranding {
+  companyName?: string;
+  logoSrc?: string;
 }
 
 const TrialBalancePDFDocument: React.FC<TrialBalancePDFDocumentProps> = ({
   data,
   accounts,
+  branding,
 }) => {
   // Calculate totals from filtered accounts
   const filteredTotals = accounts.reduce(
@@ -228,9 +235,11 @@ const TrialBalancePDFDocument: React.FC<TrialBalancePDFDocumentProps> = ({
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
-          <Image src={TienHockLogo} style={styles.logo} />
+          <Image src={branding?.logoSrc ?? TienHockLogo} style={styles.logo} />
           <View style={styles.headerTextContainer}>
-            <Text style={styles.companyName}>{TIENHOCK_INFO.name}</Text>
+            <Text style={styles.companyName}>
+              {branding?.companyName ?? TIENHOCK_INFO.name}
+            </Text>
             <Text style={styles.reportTitle}>TRIAL BALANCE</Text>
             <Text style={styles.periodText}>
               As at {data.period.end_date} | Period: {getMonthName(data.period.year, data.period.month)}
@@ -308,10 +317,15 @@ const TrialBalancePDFDocument: React.FC<TrialBalancePDFDocumentProps> = ({
 
 export const generateTrialBalancePDF = async (
   data: TrialBalanceData,
-  accounts: TrialBalanceAccount[]
+  accounts: TrialBalanceAccount[],
+  branding?: TrialBalancePDFBranding
 ): Promise<void> => {
   const blob = await pdf(
-    <TrialBalancePDFDocument data={data} accounts={accounts} />
+    <TrialBalancePDFDocument
+      data={data}
+      accounts={accounts}
+      branding={branding}
+    />
   ).toBlob();
 
   printPdfBlob(blob, "trial balance PDF");

@@ -1,13 +1,11 @@
 import {
   IconDeviceDesktopAnalytics,
   IconFileInvoice,
-  IconReportAnalytics,
+  IconReportMoney,
   IconTrash,
   IconTruck,
   IconUsers,
-  IconCash,
   IconReceipt,
-  IconFileText,
 } from "@tabler/icons-react";
 import { SidebarItem } from "./pagesRoute";
 
@@ -40,7 +38,18 @@ import GTECarumanPage from "./GreenTarget/Payroll/GTECarumanPage";
 import GTAdjustmentDocsListPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsListPage";
 import GTAdjustmentDocsFormPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsFormPage";
 import GTAdjustmentDocsDetailsPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsDetailsPage";
+import GTJournalEntryListPage from "./GreenTarget/Accounting/GTJournalEntryListPage";
+import GTJournalDetailsPage from "./GreenTarget/Accounting/GTJournalDetailsPage";
+import GTJournalEntryPage from "./GreenTarget/Accounting/GTJournalEntryPage";
+import GTAccountLedgerPage from "./GreenTarget/Accounting/GTAccountLedgerPage";
+import GTTrialBalancePage from "./GreenTarget/Accounting/GTTrialBalancePage";
+import GTIncomeStatementPage from "./GreenTarget/Accounting/GTIncomeStatementPage";
+import GTBalanceSheetPage from "./GreenTarget/Accounting/GTBalanceSheetPage";
+import GTAccountCodeListPage from "./GreenTarget/Accounting/GTAccountCodeListPage";
+import GTAccountCodeFormPage from "./GreenTarget/Accounting/GTAccountCodeFormPage";
 
+// Top-level order mirrors the other two companies (Tien Hock / Jelly Polly):
+// Accounting -> Payroll -> Sales -> operational/catalogue menus.
 export const GreenTargetNavData: SidebarItem[] = [
   {
     name: "Dashboard",
@@ -49,97 +58,83 @@ export const GreenTargetNavData: SidebarItem[] = [
     component: GreenTargetDashboardPage,
   },
   {
-    name: "Rentals",
-    icon: IconTruck,
-    path: "/rentals",
-    component: GreenTargetRentalListPage,
+    name: "Accounting",
+    icon: IconReportMoney,
     subItems: [
       {
-        name: "Create Rental",
-        path: "/rentals/new",
-        component: GreenTargetRentalFormPage,
-        showInPopover: true,
-      },
-      {
-        name: "Edit Rental",
-        path: "/rentals/:id",
-        component: GreenTargetRentalFormPage,
-      },
-      {
-        name: "Delivery Order",
-        path: "/rentals/:id/delivery-order",
-        component: GreenTargetDeliveryOrderPage,
-      },
-    ],
-  },
-  {
-    name: "Invoices",
-    icon: IconFileInvoice,
-    path: "/invoices",
-    component: GreenTargetInvoiceListPage,
-    subItems: [
-      {
-        name: "Create Invoice",
-        path: "/invoices/new",
-        component: GreenTargetInvoiceFormPage,
-        showInPopover: true,
-      },
-      {
-        name: "Edit Invoice",
-        path: "/invoices/:id/edit",
-        component: GreenTargetInvoiceFormPage,
-      },
-      {
-        name: "Invoice Details",
-        path: "/invoices/:id",
-        component: GreenTargetInvoiceDetailsPage,
-      },
-    ],
-  },
-  {
-    name: "Documents",
-    icon: IconFileText,
-    path: "/adjustment-docs",
-    component: GTAdjustmentDocsListPage,
-    subItems: [
-      {
-        name: "Adjustment Docs",
-        path: "/adjustment-docs",
+        name: "Journal Entries",
+        path: "/accounting/journal-entries",
+        component: GTJournalEntryListPage,
+        group: "Generation",
         subItems: [
           {
-            name: "Create Adjustment Document",
-            path: "/adjustment-docs/new",
-            component: GTAdjustmentDocsFormPage,
-          },
-          {
-            name: "New Credit Note",
-            path: "/adjustment-docs/new?type=credit",
+            name: "New Entry",
+            path: "/accounting/journal-entries/new",
+            component: GTJournalEntryPage,
             showInPopover: true,
           },
           {
-            name: "New Debit Note",
-            path: "/adjustment-docs/new?type=debit",
+            name: "Journal Details",
+            path: "/accounting/journal-entries/:id",
+            component: GTJournalDetailsPage,
+          },
+          {
+            name: "Edit Entry",
+            path: "/accounting/journal-entries/:id/edit",
+            component: GTJournalEntryPage,
+          },
+        ],
+      },
+      {
+        name: "Account Ledger",
+        path: "/accounting/reports/account-ledger",
+        component: GTAccountLedgerPage,
+        group: "Reports",
+      },
+      {
+        name: "Debtors",
+        path: "/debtors",
+        component: GreenTargetDebtorsReportPage,
+        group: "Reports",
+      },
+      {
+        name: "Trial Balance",
+        path: "/accounting/reports/trial-balance",
+        component: GTTrialBalancePage,
+        group: "Reports",
+      },
+      {
+        name: "Income Statement",
+        path: "/accounting/reports/income-statement",
+        component: GTIncomeStatementPage,
+        group: "Reports",
+      },
+      {
+        name: "Balance Sheet",
+        path: "/accounting/reports/balance-sheet",
+        component: GTBalanceSheetPage,
+        group: "Reports",
+      },
+      {
+        name: "Chart of Accounts",
+        path: "/accounting/account-codes",
+        component: GTAccountCodeListPage,
+        group: "Setup",
+        subItems: [
+          {
+            name: "New Account",
+            path: "/accounting/account-codes/new",
+            component: GTAccountCodeFormPage,
             showInPopover: true,
           },
           {
-            name: "New Refund Note",
-            path: "/adjustment-docs/new?type=refund",
-            showInPopover: true,
-          },
-          {
-            name: "Adjustment Document Details",
-            path: "/adjustment-docs/:id",
-            component: GTAdjustmentDocsDetailsPage,
+            name: "Edit Account",
+            path: "/accounting/account-codes/:code",
+            component: GTAccountCodeFormPage,
           },
         ],
       },
     ],
-  },
-  {
-    name: "Payments",
-    icon: IconCash,
-    path: "/payments",
-    component: GreenTargetPaymentPage,
   },
   {
     name: "Payroll",
@@ -227,10 +222,94 @@ export const GreenTargetNavData: SidebarItem[] = [
     ],
   },
   {
-    name: "Debtors",
-    icon: IconReportAnalytics,
-    path: "/debtors",
-    component: GreenTargetDebtorsReportPage,
+    name: "Sales",
+    icon: IconFileInvoice,
+    subItems: [
+      {
+        name: "Invoices",
+        path: "/invoices",
+        component: GreenTargetInvoiceListPage,
+        subItems: [
+          {
+            name: "Create Invoice",
+            path: "/invoices/new",
+            component: GreenTargetInvoiceFormPage,
+            showInPopover: true,
+          },
+          {
+            name: "Edit Invoice",
+            path: "/invoices/:id/edit",
+            component: GreenTargetInvoiceFormPage,
+          },
+          {
+            name: "Invoice Details",
+            path: "/invoices/:id",
+            component: GreenTargetInvoiceDetailsPage,
+          },
+        ],
+      },
+      {
+        name: "Payments",
+        path: "/payments",
+        component: GreenTargetPaymentPage,
+      },
+      {
+        name: "Documents",
+        path: "/adjustment-docs",
+        component: GTAdjustmentDocsListPage,
+        subItems: [
+          {
+            name: "Create Adjustment Document",
+            path: "/adjustment-docs/new",
+            component: GTAdjustmentDocsFormPage,
+          },
+          {
+            name: "New Credit Note",
+            path: "/adjustment-docs/new?type=credit",
+            showInPopover: true,
+          },
+          {
+            name: "New Debit Note",
+            path: "/adjustment-docs/new?type=debit",
+            showInPopover: true,
+          },
+          {
+            name: "New Refund Note",
+            path: "/adjustment-docs/new?type=refund",
+            showInPopover: true,
+          },
+          {
+            name: "Adjustment Document Details",
+            path: "/adjustment-docs/:id",
+            component: GTAdjustmentDocsDetailsPage,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    name: "Rentals",
+    icon: IconTruck,
+    path: "/rentals",
+    component: GreenTargetRentalListPage,
+    subItems: [
+      {
+        name: "Create Rental",
+        path: "/rentals/new",
+        component: GreenTargetRentalFormPage,
+        showInPopover: true,
+      },
+      {
+        name: "Edit Rental",
+        path: "/rentals/:id",
+        component: GreenTargetRentalFormPage,
+      },
+      {
+        name: "Delivery Order",
+        path: "/rentals/:id/delivery-order",
+        component: GreenTargetDeliveryOrderPage,
+      },
+    ],
   },
   {
     name: "Customers",

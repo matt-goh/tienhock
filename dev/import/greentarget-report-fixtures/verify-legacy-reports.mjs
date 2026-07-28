@@ -165,6 +165,65 @@ const tbByPeriod = Object.fromEntries(
 );
 const isFixture = readFixture(`gt-is-${YEAR}-06.csv`);
 const bsFixture = readFixture(`gt-bs-${YEAR}-06.csv`);
+const legacyValidation = JSON.parse(
+  fs.readFileSync(
+    path.join(REPO, "dev", "import", "greentarget-legacy", "generated", "validation-report.json"),
+    "utf8"
+  )
+);
+const LEGACY_CHART_CODES = new Set([
+  ...tbByPeriod["06"]
+    .filter((row) => row.record_type === "account")
+    .map((row) => normalizePrinted(row.acc_code)),
+  ...legacyValidation.perSectionChains
+    .filter((section) => section.sourceKind === "GTDB")
+    .map((section) => section.code),
+]);
+if (LEGACY_CHART_CODES.size !== 503) {
+  throw new Error(`Expected 503 evidence-derived chart codes, found ${LEGACY_CHART_CODES.size}`);
+}
+const LEGACY_BANK_CODES = tbByPeriod["06"]
+  .filter((row) => row.record_type === "account" && row.appx === "19")
+  .map((row) => normalizePrinted(row.acc_code));
+if (LEGACY_BANK_CODES.length !== 5) {
+  throw new Error(`Expected 5 evidence-derived bank codes, found ${LEGACY_BANK_CODES.length}`);
+}
+
+/**
+ * Immutable G3 field expectations, derived independently from the pinned
+ * evidence. The live chart may intentionally diverge after a user edits a
+ * seed, but the verifier still needs to know whether an exact historical
+ * report comparison remains applicable.
+ */
+const LEGACY_CHART_EXPECTED = new Map();
+tbByPeriod["06"]
+  .filter((row) => row.record_type === "account")
+  .forEach((row, index) => {
+    const code = normalizePrinted(row.acc_code);
+    LEGACY_CHART_EXPECTED.set(code, {
+      description: row.particular,
+      ledgerType: code === CONTROL_LINE ? "TD" : row.appx === "19" ? "BK" : row.appx === "13" ? "TC" : "GL",
+      parentCode: null,
+      sortOrder: index + 1,
+      isActive: true,
+      fsNote: row.appx,
+    });
+  });
+legacyValidation.perSectionChains
+  .filter((section) => section.sourceKind === "GTDB")
+  .forEach((section, index) => {
+    LEGACY_CHART_EXPECTED.set(section.code, {
+      description: section.description,
+      ledgerType: "TD",
+      parentCode: CONTROL_LINE,
+      sortOrder: 1000 + index + 1,
+      isActive: true,
+      fsNote: "22",
+    });
+  });
+if (LEGACY_CHART_EXPECTED.size !== 503) {
+  throw new Error(`Expected 503 evidence-derived chart expectations, found ${LEGACY_CHART_EXPECTED.size}`);
+}
 
 const pool = new Pool({
   user: process.env.DB_USER,
@@ -175,11 +234,63 @@ const pool = new Pool({
   max: 4,
 });
 
+let legacyReportOverridesPromise;
+
+/**
+ * Return intentional G3 seed edits that can change an engine's historical
+ * presentation or account selection. Notes-only edits and an edit that was
+ * later restored byte-for-byte do not make the historical comparison stale.
+ */
+async function findLegacyReportOverrides() {
+  if (!legacyReportOverridesPromise) {
+    legacyReportOverridesPromise = pool
+      .query(
+        `SELECT code, description, ledger_type, parent_code, sort_order, is_active, fs_note
+           FROM greentarget.account_codes
+          WHERE code = ANY($1::varchar[])
+            AND created_by = 'G3_CHART_LOAD'
+            AND updated_by IS DISTINCT FROM 'G3_CHART_LOAD'`,
+        [[...LEGACY_CHART_EXPECTED.keys()]]
+      )
+      .then((result) =>
+        result.rows.filter((row) => {
+          const expected = LEGACY_CHART_EXPECTED.get(row.code);
+          return (
+            expected !== undefined &&
+            (row.description !== expected.description ||
+              row.ledger_type !== expected.ledgerType ||
+              (row.parent_code ?? null) !== expected.parentCode ||
+              Number(row.sort_order) !== expected.sortOrder ||
+              row.is_active !== expected.isActive ||
+              row.fs_note !== expected.fsNote)
+          );
+        })
+      );
+  }
+  return legacyReportOverridesPromise;
+}
+
+const describeLegacyReportOverrides = (rows) =>
+  rows
+    .slice(0, 8)
+    .map((row) => row.code)
+    .join(", ") + (rows.length > 8 ? ` (+${rows.length - 8} more)` : "");
+
 // ===========================================================================
 // STAGE: tb
 // ===========================================================================
 async function stageTb() {
   console.log("\n== stage tb — buildTrialBalance vs the six printed Trial Balances ==");
+
+  const reportOverrides = await findLegacyReportOverrides();
+  if (reportOverrides.length > 0) {
+    pass(
+      `exact historical Trial Balance comparison is not applicable after ${reportOverrides.length} intentional G3 seed override(s)`
+    );
+    note(`report-shaping override(s): ${describeLegacyReportOverrides(reportOverrides)}`);
+    note("the immutable 503-code source payload and imported ledger remain covered by verify-chart.mjs and verify-import.mjs");
+    return;
+  }
 
   let comparisons = 0;
 
@@ -453,6 +564,16 @@ function compareStatement(label, fixture, report, subtotalRefs, subtotalLabels, 
 async function stageStatements() {
   console.log("\n== stage statements — buildIncomeStatement / buildBalanceSheet vs the scans ==");
 
+  const reportOverrides = await findLegacyReportOverrides();
+  if (reportOverrides.length > 0) {
+    pass(
+      `exact historical statement comparison is not applicable after ${reportOverrides.length} intentional G3 seed override(s)`
+    );
+    note(`report-shaping override(s): ${describeLegacyReportOverrides(reportOverrides)}`);
+    note("the immutable statement fixtures remain independently pinned; current reports now follow the approved live chart metadata");
+    return;
+  }
+
   const income = await buildIncomeStatement(pool, { year: YEAR, month: 6 });
   const balance = await buildBalanceSheet(pool, { year: YEAR, month: 6 });
 
@@ -536,6 +657,7 @@ async function stageStatements() {
   {
     const dbRows = await pool.query(
       `SELECT ac.code, ac.fs_note, COALESCE(ac.notes,'') AS notes,
+              COALESCE(ac.updated_by,'') AS updated_by,
               COALESCE((SELECT ROUND(o.amount*100) FROM greentarget.account_opening_balances o
                          WHERE o.account_code = ac.code), 0)::bigint AS anchor_cents,
               (SELECT count(*) FROM greentarget.journal_entry_lines l
@@ -553,10 +675,11 @@ async function stageStatements() {
         problems.push(`${code} is not in the chart`);
         continue;
       }
-      if (row.fs_note !== override.appx_note) {
+      const untouchedSeed = row.updated_by === "G3_CHART_LOAD";
+      if (untouchedSeed && row.fs_note !== override.appx_note) {
         problems.push(`${code}: chart fs_note ${row.fs_note} but the engine's override says APPX ${override.appx_note}`);
       }
-      if (!/statement/i.test(row.notes)) {
+      if (untouchedSeed && !/statement/i.test(row.notes)) {
         problems.push(`${code}: account_codes.notes no longer records its statement placement`);
       }
       if (Number(row.anchor_cents) !== 0 || Number(row.line_count) !== 0) {
@@ -566,7 +689,11 @@ async function stageStatements() {
         );
       }
     }
-    check(problems.length === 0, "the 3 APPX-vs-statement overrides agree with the chart and are still dormant", problems.join("; "));
+    check(
+      problems.length === 0,
+      "the 3 untouched APPX-vs-statement seeds retain their evidence and all three accounts remain dormant",
+      problems.join("; ")
+    );
   }
 
   // --- ...and that they are actually APPLIED, which dormancy alone cannot show
@@ -765,7 +892,8 @@ async function stageLedger() {
   // --- Bank Statement: the same engine pointed at the five APPX-19 accounts
   const bankAccounts = await pool.query(
     `SELECT code, description FROM greentarget.account_codes
-      WHERE ledger_type = 'BK' ORDER BY sort_order`
+      WHERE code = ANY($1::text[]) ORDER BY sort_order`,
+    [LEGACY_BANK_CODES]
   );
   check(bankAccounts.rowCount === 5, "GT has 5 bank (BK / APPX 19) accounts", `found ${bankAccounts.rowCount}`);
 
@@ -812,14 +940,41 @@ async function stageLedger() {
 
   // --- The picker
   const accounts = await listLedgerAccounts(pool);
-  check(accounts.length === 503, "the ledger account list surfaces all 503 GT accounts", `found ${accounts.length}`);
+  const listedCodes = new Set(accounts.map((account) => account.code));
+  const activeLegacyRows = await pool.query(
+    `SELECT code
+       FROM greentarget.account_codes
+      WHERE code = ANY($1::text[]) AND is_active = true`,
+    [[...LEGACY_CHART_CODES]]
+  );
+  const missingLegacyCodes = activeLegacyRows.rows
+    .map((row) => row.code)
+    .filter((code) => !listedCodes.has(code));
+  check(
+    missingLegacyCodes.length === 0,
+    `the ledger account list surfaces all ${activeLegacyRows.rowCount} active legacy accounts; inactive identities remain stored and post-cutover accounts may coexist`,
+    missingLegacyCodes.slice(0, 10).join(", ")
+  );
   check(
     accounts[0].sort_order <= accounts[accounts.length - 1].sort_order,
     "the account list is in printed Trial Balance order"
   );
+  // G7: organic journals add posted lines on top of the pinned 4,401 legacy
+  // ones, so the expected total is the import PLUS whatever organic posting
+  // has accrued (measured independently of the picker).
+  const organicLineCount = Number(
+    (await pool.query(
+      `SELECT COUNT(*)::text AS value
+         FROM greentarget.journal_entry_lines jel
+         JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
+        WHERE je.status = 'posted'
+          AND je.source_type IS DISTINCT FROM 'legacy_import'`
+    )).rows[0].value
+  );
   check(
-    accounts.reduce((total, account) => total + account.transaction_count, 0) === 4401,
-    "the account list's transaction counts sum to the 4,401 posted lines"
+    accounts.reduce((total, account) => total + account.transaction_count, 0) ===
+      4401 + organicLineCount,
+    `the account list's transaction counts sum to the 4,401 legacy lines plus the ${organicLineCount} organic ones`
   );
 }
 
@@ -962,6 +1117,9 @@ function scanSqlReferences(source) {
   const problems = [];
   for (const literal of literals) {
     for (const match of literal.matchAll(/\b(?:FROM|JOIN)\s+([A-Za-z_][\w.]*)/gi)) {
+      // EXTRACT(field FROM source) is not a table reference.
+      const before = literal.slice(Math.max(0, match.index - 30), match.index);
+      if (/EXTRACT\(\s*\w+\s*$/i.test(before)) continue;
       const reference = match[1];
       const lower = reference.toLowerCase();
       if (lower === "lateral") continue;
@@ -979,8 +1137,29 @@ async function stageRegressions() {
   console.log("\n== stage regressions — isolation, population, Tien Hock ==");
 
   const allCtes = new Set();
-  for (const file of ["report-engine.js", "financial-reports.js", "account-ledger.js"]) {
-    const source = fs.readFileSync(path.join(ENGINE_DIR, file), "utf8");
+  for (const file of [
+    "report-engine.js",
+    "financial-reports.js",
+    "account-ledger.js",
+    // G6 read-only routers. debtors.js is written by a parallel workstream —
+    // skip whatever has not landed yet instead of failing the stage.
+    "journal-entries.js",
+    "account-codes.js",
+    "debtors.js",
+    // G7 organic posting services + lock (same isolation rule).
+    "posting-lock.js",
+    "posting-utils.js",
+    "sales-journal.js",
+    "payment-journal.js",
+    "adjustment-journal.js",
+    "debtor-map.js",
+  ]) {
+    const filePath = path.join(ENGINE_DIR, file);
+    if (!fs.existsSync(filePath)) {
+      note(`${file}: not present yet, isolation scan skipped`);
+      continue;
+    }
+    const source = fs.readFileSync(filePath, "utf8");
     const { problems, ctes } = scanSqlReferences(source);
     ctes.forEach((cte) => allCtes.add(cte));
     check(
@@ -1005,12 +1184,19 @@ async function stageRegressions() {
   );
 
   const scalar = async (sql) => (await pool.query(sql)).rows[0].value;
+  // G7 pins the LEGACY population, not the whole table: organic posting
+  // (invoices, payments, adjustments, manual journals) grows both journal
+  // tables from 2026-07-01 onward, and that growth is the point of G7.
   const expectations = [
-    ["greentarget.journal_entries", "1705"],
-    ["greentarget.journal_entry_lines", "4401"],
+    ["greentarget.journal_entries WHERE source_type = 'legacy_import'", "1705"],
+    [
+      `greentarget.journal_entry_lines jel
+        JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
+       WHERE je.source_type = 'legacy_import'`,
+      "4401",
+    ],
     ["greentarget.account_opening_balances", "501"],
     ["greentarget.import_legacy_rows", "4903"],
-    ["greentarget.account_codes", "503"],
     ["greentarget.financial_statement_notes", "34"],
     ["public.account_codes", "2825"],
     ["public.journal_entries", "8188"],
@@ -1021,12 +1207,37 @@ async function stageRegressions() {
     check(actual === expected, `${table} holds ${expected} rows`, `found ${actual}`);
   }
 
-  // G5 is read-only: it must not have posted, cancelled or anchored anything.
+  const legacyAccountCount = String(
+    (
+      await pool.query(
+        `SELECT count(*)::text AS value
+           FROM greentarget.account_codes
+          WHERE code = ANY($1::text[])`,
+        [[...LEGACY_CHART_CODES]]
+      )
+    ).rows[0].value
+  );
+  check(
+    legacyAccountCount === "503",
+    "greentarget.account_codes retains all 503 evidence-derived identities; post-cutover accounts are allowed beside them",
+    `found ${legacyAccountCount}`
+  );
+
+  // The import stays immutable: no legacy journal may be cancelled or lose
+  // its provenance, however many organic journals arrive beside it.
   const mutated = await scalar(
     `SELECT count(*)::text AS value FROM greentarget.journal_entries
-      WHERE status <> 'posted' OR source_type IS DISTINCT FROM 'legacy_import'`
+      WHERE source_type = 'legacy_import' AND status <> 'posted'`
   );
-  check(mutated === "0", "G5 posted nothing: every GT journal is still an untouched legacy import", `found ${mutated}`);
+  check(mutated === "0", "every legacy import journal is still an untouched posted import", `found ${mutated}`);
+
+  // G7's R8 posting lock: nothing organic may be dated before the open date.
+  const preCutover = await scalar(
+    `SELECT count(*)::text AS value FROM greentarget.journal_entries
+      WHERE source_type IS DISTINCT FROM 'legacy_import'
+        AND entry_date < DATE '2026-07-01'`
+  );
+  check(preCutover === "0", "no organic journal is dated before the 2026-07-01 open date", `found ${preCutover}`);
 }
 
 // ===========================================================================

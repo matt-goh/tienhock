@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
-import { JournalEntry } from "../../types/types";
+import { JournalEntry, JournalEntryTypeInfo } from "../../types/types";
 import { useJournalEntryTypesCache } from "../../utils/accounting/useAccountingCache";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
@@ -26,6 +26,11 @@ const LEGACY_IMPORT_ENTRY_TYPE: string = "IMP";
 const LEGACY_STORAGE_KEY = "journalEntryListDateRange";
 const FILTERS_STORAGE_KEY = "journalEntryListFilters";
 const SCROLL_RESTORATION_KEY: string = "journal-entry-list";
+// Green Target keeps its own filter/scroll cache so browsing the GT ledger
+// never overwrites the Tien Hock list's saved filters (and vice versa).
+const GT_LEGACY_STORAGE_KEY = "gtJournalEntryListDateRange";
+const GT_FILTERS_STORAGE_KEY = "gtJournalEntryListFilters";
+const GT_SCROLL_RESTORATION_KEY: string = "gt-journal-entry-list";
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "active", label: "Active" },
@@ -60,7 +65,10 @@ const getChequeDuplicateCount = (entry: JournalEntry): number =>
   entry.cheque_duplicate_count ?? 0;
 
 // Load cached filters (search, date range, and type/status pill selections) from localStorage
-const loadCachedFilters = (): CachedListFilters => {
+const loadCachedFilters = (
+  filtersKey: string = FILTERS_STORAGE_KEY,
+  legacyKey: string = LEGACY_STORAGE_KEY
+): CachedListFilters => {
   const fallback: CachedListFilters = {
     search: "",
     dateRange: { start: new Date(), end: new Date() },
@@ -69,7 +77,7 @@ const loadCachedFilters = (): CachedListFilters => {
     page: 1,
   };
   try {
-    const cached = localStorage.getItem(FILTERS_STORAGE_KEY);
+    const cached = localStorage.getItem(filtersKey);
     if (cached) {
       const parsed = JSON.parse(cached);
       return {
@@ -92,7 +100,7 @@ const loadCachedFilters = (): CachedListFilters => {
       };
     }
     // Migrate from the old date-range-only cache
-    const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+    const legacy = localStorage.getItem(legacyKey);
     if (legacy) {
       const parsed = JSON.parse(legacy);
       return {
@@ -110,7 +118,11 @@ const loadCachedFilters = (): CachedListFilters => {
 };
 
 // Helper to parse URL params and return initial state
-const getInitialStateFromParams = (params: URLSearchParams): {
+const getInitialStateFromParams = (
+  params: URLSearchParams,
+  filtersKey: string = FILTERS_STORAGE_KEY,
+  legacyKey: string = LEGACY_STORAGE_KEY
+): {
   search: string;
   types: string[];
   statuses: string[];
@@ -155,7 +167,7 @@ const getInitialStateFromParams = (params: URLSearchParams): {
   }
 
   // Fall back to cached filters
-  const cached = loadCachedFilters();
+  const cached = loadCachedFilters(filtersKey, legacyKey);
   return {
     search: urlSearch || cached.search,
     types: urlType ? urlTypes : cached.types,
@@ -164,12 +176,33 @@ const getInitialStateFromParams = (params: URLSearchParams): {
   };
 };
 
-const JournalEntryListPage: React.FC = () => {
+interface JournalEntryListContentProps {
+  // Cached Tien Hock entry types; Green Target has only IMP and no types
+  // endpoint, so it passes an empty list and skips the TH fetch entirely.
+  entryTypes: JournalEntryTypeInfo[];
+  isGreenTarget: boolean;
+}
+
+const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
+  entryTypes,
+  isGreenTarget,
+}) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Cached entry types
-  const { entryTypes } = useJournalEntryTypesCache();
+  const apiBase: string = isGreenTarget ? "/greentarget/api" : "/api";
+  const journalEntriesPath: string = isGreenTarget
+    ? "/greentarget/accounting/journal-entries"
+    : "/accounting/journal-entries";
+  const filtersStorageKey: string = isGreenTarget
+    ? GT_FILTERS_STORAGE_KEY
+    : FILTERS_STORAGE_KEY;
+  const legacyStorageKey: string = isGreenTarget
+    ? GT_LEGACY_STORAGE_KEY
+    : LEGACY_STORAGE_KEY;
+  const scrollRestorationKey: string = isGreenTarget
+    ? GT_SCROLL_RESTORATION_KEY
+    : SCROLL_RESTORATION_KEY;
 
   // Data state
   const [entries, setEntries] = useState<JournalEntryListItem[]>([]);
@@ -182,23 +215,29 @@ const JournalEntryListPage: React.FC = () => {
   // actually triggers the fetch (committed on blur / Enter to avoid firing an
   // API call on every keystroke).
   const [searchTerm, setSearchTerm] = useState<string>(
-    () => loadCachedFilters().search
+    () => loadCachedFilters(filtersStorageKey, legacyStorageKey).search
   );
   const [searchInput, setSearchInput] = useState<string>(
-    () => loadCachedFilters().search
+    () => loadCachedFilters(filtersStorageKey, legacyStorageKey).search
   );
   const [selectedTypes, setSelectedTypes] = useState<string[]>(
-    () => loadCachedFilters().types
+    () => loadCachedFilters(filtersStorageKey, legacyStorageKey).types
   );
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(
-    () => loadCachedFilters().statuses
+    () => loadCachedFilters(filtersStorageKey, legacyStorageKey).statuses
   );
-  const [dateRange, setDateRange] = useState(() => loadCachedFilters().dateRange);
+  const [dateRange, setDateRange] = useState(
+    () => loadCachedFilters(filtersStorageKey, legacyStorageKey).dateRange
+  );
 
   // Apply URL params on mount
   useEffect(() => {
     if (!initialized) {
-      const initialState = getInitialStateFromParams(searchParams);
+      const initialState = getInitialStateFromParams(
+        searchParams,
+        filtersStorageKey,
+        legacyStorageKey
+      );
       setSearchTerm(initialState.search);
       setSearchInput(initialState.search);
       setSelectedTypes(initialState.types);
@@ -209,7 +248,9 @@ const JournalEntryListPage: React.FC = () => {
   }, [searchParams, initialized]);
 
   // Pagination - restore last viewed page from cache
-  const [page, setPage] = useState<number>(() => loadCachedFilters().page);
+  const [page, setPage] = useState<number>(
+    () => loadCachedFilters(filtersStorageKey, legacyStorageKey).page
+  );
   const [limit] = useState(50);
 
   // Delete dialog
@@ -249,7 +290,8 @@ const JournalEntryListPage: React.FC = () => {
       params.append("offset", ((page - 1) * limit).toString());
 
       if (searchTerm) params.append("search", searchTerm);
-      if (selectedTypes.length > 0)
+      // Green Target has only IMP entries; never send a TH type filter
+      if (!isGreenTarget && selectedTypes.length > 0)
         params.append("entry_type", selectedTypes.join(","));
       if (selectedStatuses.length > 0) {
         // The UI's "Active" means "not cancelled"; the DB stores posted plus
@@ -265,7 +307,7 @@ const JournalEntryListPage: React.FC = () => {
         params.append("end_date", formatDateForAPI(dateRange.end));
 
       const response = await api.get(
-        `/api/journal-entries?${params.toString()}`
+        `${apiBase}/journal-entries?${params.toString()}`
       );
       const data = response as {
         entries: JournalEntryListItem[];
@@ -280,13 +322,13 @@ const JournalEntryListPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, searchTerm, selectedTypes, selectedStatuses, dateRange]);
+  }, [page, limit, searchTerm, selectedTypes, selectedStatuses, dateRange, apiBase, isGreenTarget]);
 
   useEffect(() => {
     fetchEntries();
   }, [fetchEntries]);
 
-  useScrollRestoration(SCROLL_RESTORATION_KEY, initialized && !loading);
+  useScrollRestoration(scrollRestorationKey, initialized && !loading);
 
   // Cache search, date range, pill selections, and current page to localStorage.
   // Page is reset to 1 explicitly by the filter handlers (not on restore), so the
@@ -294,7 +336,7 @@ const JournalEntryListPage: React.FC = () => {
   useEffect(() => {
     try {
       localStorage.setItem(
-        FILTERS_STORAGE_KEY,
+        filtersStorageKey,
         JSON.stringify({
           search: searchTerm,
           start: dateRange.start.toISOString(),
@@ -307,25 +349,27 @@ const JournalEntryListPage: React.FC = () => {
     } catch (e) {
       console.error("Error caching filters:", e);
     }
-  }, [searchTerm, dateRange, selectedTypes, selectedStatuses, page]);
+  }, [searchTerm, dateRange, selectedTypes, selectedStatuses, page, filtersStorageKey]);
 
   // Handlers
   const handleCreateNew = () => {
-    navigate("/accounting/journal-entries/new");
+    navigate(`${journalEntriesPath}/new`);
   };
 
   const handleView = (entry: JournalEntryListItem) => {
-    navigate(`/accounting/journal-entries/${entry.id}`);
+    navigate(`${journalEntriesPath}/${entry.id}`);
   };
 
   const handleEdit = (entry: JournalEntryListItem) => {
-    navigate(`/accounting/journal-entries/${entry.id}/edit`);
+    navigate(`${journalEntriesPath}/${entry.id}/edit`);
   };
 
   const handleDeleteClick = (
     entry: JournalEntryListItem,
     e: React.MouseEvent
   ) => {
+    // Green Target's ledger is immutable legacy data — delete stays unreachable
+    if (isGreenTarget) return;
     e.stopPropagation();
     setEntryToDelete(entry);
     setShowDeleteDialog(true);
@@ -518,39 +562,44 @@ const JournalEntryListPage: React.FC = () => {
 
         {/* Filters - own row below the title/date controls; all pills flow in one wrapping line */}
         <div className="order-4 w-full flex flex-wrap items-center gap-1.5 min-w-0">
-          {/* Type pills - toggle each journal type on/off (none selected = show all) */}
-          {entryTypes
-            .filter((type) => type.code !== LEGACY_IMPORT_ENTRY_TYPE)
-            .map((type) => {
-              const active = selectedTypes.includes(type.code);
-              return (
-                <button
-                  key={type.code}
-                  type="button"
-                  onClick={() => toggleType(type.code)}
-                  aria-pressed={active}
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border transition-colors select-none whitespace-nowrap ${
-                    active
-                      ? "border-sky-500 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300"
-                      : "border-default-300 dark:border-gray-600 text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700"
-                  }`}
-                >
-                  <span className="font-semibold">{type.code}</span>
-                  <span
-                    className={
+          {/* Type pills - toggle each journal type on/off (none selected = show all).
+              Hidden for Green Target: these pills come from the Tien Hock type
+              cache; GT users filter by search instead. */}
+          {!isGreenTarget &&
+            entryTypes
+              .filter((type) => type.code !== LEGACY_IMPORT_ENTRY_TYPE)
+              .map((type) => {
+                const active = selectedTypes.includes(type.code);
+                return (
+                  <button
+                    key={type.code}
+                    type="button"
+                    onClick={() => toggleType(type.code)}
+                    aria-pressed={active}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border transition-colors select-none whitespace-nowrap ${
                       active
-                        ? "text-sky-600/80 dark:text-sky-300/80"
-                        : "text-default-500 dark:text-gray-400"
-                    }
+                        ? "border-sky-500 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300"
+                        : "border-default-300 dark:border-gray-600 text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700"
+                    }`}
                   >
-                    {type.name}
-                  </span>
-                </button>
-              );
-            })}
+                    <span className="font-semibold">{type.code}</span>
+                    <span
+                      className={
+                        active
+                          ? "text-sky-600/80 dark:text-sky-300/80"
+                          : "text-default-500 dark:text-gray-400"
+                      }
+                    >
+                      {type.name}
+                    </span>
+                  </button>
+                );
+              })}
 
           {/* Divider */}
-          <span className="h-5 w-px bg-default-300 dark:bg-gray-600 mx-1" />
+          {!isGreenTarget && (
+            <span className="h-5 w-px bg-default-300 dark:bg-gray-600 mx-1" />
+          )}
 
           {/* Status pills */}
           {STATUS_OPTIONS.map((status) => {
@@ -713,13 +762,17 @@ const JournalEntryListPage: React.FC = () => {
                             >
                               <IconPencil size={18} />
                             </button>
-                            <button
-                              onClick={(e) => handleDeleteClick(entry, e)}
-                              className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
-                              title="Delete"
-                            >
-                              <IconTrash size={18} />
-                            </button>
+                            {/* GT journals are posted-on-create with no draft
+                                state, so delete stays a Tien Hock action */}
+                            {!isGreenTarget && (
+                              <button
+                                onClick={(e) => handleDeleteClick(entry, e)}
+                                className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
+                                title="Delete"
+                              >
+                                <IconTrash size={18} />
+                              </button>
+                            )}
                           </>
                         )}
                       </div>
@@ -876,6 +929,28 @@ const JournalEntryListPage: React.FC = () => {
       )}
     </div>
   );
+};
+
+// Tien Hock fetches its cached entry types for the filter pills; Green Target
+// has only IMP entries and no types endpoint, so it skips that fetch entirely.
+const TienHockJournalEntryList: React.FC = () => {
+  const { entryTypes } = useJournalEntryTypesCache();
+  return (
+    <JournalEntryListContent entryTypes={entryTypes} isGreenTarget={false} />
+  );
+};
+
+interface JournalEntryListPageProps {
+  company?: "tienhock" | "greentarget";
+}
+
+const JournalEntryListPage: React.FC<JournalEntryListPageProps> = ({
+  company = "tienhock",
+}) => {
+  if (company === "greentarget") {
+    return <JournalEntryListContent entryTypes={[]} isGreenTarget />;
+  }
+  return <TienHockJournalEntryList />;
 };
 
 export default JournalEntryListPage;

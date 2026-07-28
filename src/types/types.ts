@@ -1125,6 +1125,7 @@ export type JournalEntryType =
   | "I"
   | "IMP"
   | "J"
+  | "JV"
   | "JVDR"
   | "JVSL"
   | "O"

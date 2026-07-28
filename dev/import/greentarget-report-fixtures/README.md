@@ -36,13 +36,21 @@ these fixtures. Tien Hock's harness re-implements its engines' SQL query-for-que
 not, so the verified logic and the served logic cannot diverge. It connects with `pg` using the
 `DB_*` values in the repo-root `.env`, and is strictly read-only.
 
+The exact `tb` and `statements` comparisons apply while the live G3 seed fields still match the
+pinned evidence. If a user intentionally changes a seeded description, ledger type, parent, report
+note, sort order or active status, those two stages report the affected codes and pass as explicitly
+not applicable: current reports are then expected to follow the approved live chart. Notes-only edits
+or a field restored to its evidence value do not disable the comparisons. `verify-chart.mjs` and
+`verify-import.mjs` continue to prove the immutable 503-code payload, imported ledger and historical
+closes independently, while the `ledger`, `bridge` and `regressions` stages still run normally.
+
 | Stage | What it proves | Gates |
 |---|---|---:|
 | `tb` | `buildTrialBalance` vs all six printed Trial Balances — every printed line, **in printed order**, the netted DEBTOR control, and grand totals | 54 |
 | `statements` | `buildIncomeStatement` + `buildBalanceSheet` vs the printed June statements, line by line, incl. the three APPX overrides and each line's account composition | 17 |
 | `ledger` | `buildAccountLedger` for **all 501 accounts**: printed row order, month-end running balances, derived-row flagging, the five bank statements | 17 |
 | `bridge` | the §3d operational-bridge counts, so [`GT_OPERATIONAL_BRIDGE.md`](../../../docs/Account/GT_OPERATIONAL_BRIDGE.md) cannot rot | 12 |
-| `regressions` | the engines are schema-isolated (static scan), GT's population is unmoved, Tien Hock is untouched | 13 |
+| `regressions` | the engines + the G7 posting services are schema-isolated (static scan), the LEGACY population is unmoved (organic journals may accrue beside it), no organic journal predates the 2026-07-01 open date, Tien Hock is untouched | 24 |
 
 Two gates are worth knowing about because they look surprising:
 

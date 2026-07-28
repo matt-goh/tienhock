@@ -470,19 +470,24 @@ BEGIN
     RAISE EXCEPTION 'One or more imported journal headers differ from staging';
   END IF;
 
+  -- Only IMPORTED journals must come from staging; organic G7 journals
+  -- (source_type invoice/payment/adjustment, or NULL for manual ones) live
+  -- beside the import from 2026-07-01 onward by design.
   IF EXISTS (
     SELECT 1
       FROM greentarget.journal_entries actual
       LEFT JOIN desired_import_headers desired
         ON desired.reference_no = actual.reference_no
-     WHERE desired.reference_no IS NULL
+     WHERE actual.source_type = 'legacy_import'
+       AND desired.reference_no IS NULL
   ) THEN
     RAISE EXCEPTION 'An unexpected journal exists in greentarget.journal_entries';
   END IF;
 
   -- Every family decoded in G0 must have resolved; a NULL means a new one.
   IF EXISTS (
-    SELECT 1 FROM greentarget.journal_entries WHERE legacy_entry_type IS NULL
+    SELECT 1 FROM greentarget.journal_entries
+     WHERE source_type = 'legacy_import' AND legacy_entry_type IS NULL
   ) THEN
     RAISE EXCEPTION 'An imported journal has no decoded legacy family';
   END IF;
@@ -517,15 +522,20 @@ BEGIN
       LEFT JOIN desired_import_lines desired
         ON desired.reference_no = header.reference_no
        AND desired.line_number = actual.line_number
-     WHERE desired.reference_no IS NULL
+     WHERE header.source_type = 'legacy_import'
+       AND desired.reference_no IS NULL
   ) THEN
     RAISE EXCEPTION 'An imported journal contains an extra line';
   END IF;
 
   -- The 789 PB cheque numbers and 225 PBEB/PBE bank transaction ids are
-  -- per-LINE evidence G5 has to reprint (named trap 5).
-  IF (SELECT COUNT(*) FROM greentarget.journal_entry_lines
-       WHERE cheque_reference IS NOT NULL) <> 1014 THEN
+  -- per-LINE evidence G5 has to reprint (named trap 5). Organic G7 receipts
+  -- carry their own payment references, so the count is scoped to the import.
+  IF (SELECT COUNT(*) FROM greentarget.journal_entry_lines lines
+       JOIN greentarget.journal_entries header
+         ON header.id = lines.journal_entry_id
+       WHERE header.source_type = 'legacy_import'
+         AND lines.cheque_reference IS NOT NULL) <> 1014 THEN
     RAISE EXCEPTION 'The 1,014 per-line cheque/bank references did not all survive the import';
   END IF;
 
@@ -547,30 +557,43 @@ BEGIN
     INTO v_journals, v_lines
     FROM greentarget.journal_entries header
     JOIN greentarget.journal_entry_lines lines
-      ON lines.journal_entry_id = header.id;
+      ON lines.journal_entry_id = header.id
+   WHERE header.source_type = 'legacy_import';
 
   IF (v_journals, v_lines) IS DISTINCT FROM (1705::bigint, 4401::bigint) THEN
-    RAISE EXCEPTION 'Final posted population is % journals / % lines, expected 1705 / 4401',
+    RAISE EXCEPTION 'Final imported population is % journals / % lines, expected 1705 / 4401',
       v_journals, v_lines;
   END IF;
 
-  SELECT SUM(ROUND(debit_amount * 100))::bigint,
-         SUM(ROUND(credit_amount * 100))::bigint
+  SELECT SUM(ROUND(lines.debit_amount * 100))::bigint,
+         SUM(ROUND(lines.credit_amount * 100))::bigint
     INTO v_debit_cents, v_credit_cents
-    FROM greentarget.journal_entry_lines;
+    FROM greentarget.journal_entry_lines lines
+    JOIN greentarget.journal_entries header
+      ON header.id = lines.journal_entry_id
+   WHERE header.source_type = 'legacy_import';
 
   IF v_debit_cents IS DISTINCT FROM v_credit_cents
      OR v_debit_cents IS DISTINCT FROM 94766514::numeric THEN
-    RAISE EXCEPTION 'Global posted DR % <> CR % (expected 94,766,514 cents each)',
+    RAISE EXCEPTION 'Global imported DR % <> CR % (expected 94,766,514 cents each)',
       v_debit_cents, v_credit_cents;
   END IF;
 
-  -- Everything is inside the import period and nothing posts after cutover.
+  -- The import stays inside its window; organic G7 journals own 2026-07-01+.
   IF EXISTS (
     SELECT 1 FROM greentarget.journal_entries
-     WHERE entry_date < DATE '2026-01-01' OR entry_date >= DATE '2026-07-01'
+     WHERE source_type = 'legacy_import'
+       AND (entry_date < DATE '2026-01-01' OR entry_date >= DATE '2026-07-01')
   ) THEN
-    RAISE EXCEPTION 'A journal falls outside the 2026-01-01..2026-06-30 import window';
+    RAISE EXCEPTION 'An imported journal falls outside the 2026-01-01..2026-06-30 import window';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM greentarget.journal_entries
+     WHERE source_type IS DISTINCT FROM 'legacy_import'
+       AND entry_date < DATE '2026-07-01'
+  ) THEN
+    RAISE EXCEPTION 'An organic journal predates the 2026-07-01 open date (R8)';
   END IF;
 
   -- 9. Opening anchors ------------------------------------------------------
@@ -632,7 +655,9 @@ BEGIN
     RAISE EXCEPTION 'An opening anchor differs from its staged opening balance';
   END IF;
 
-  -- G3 finding 2, re-asserted: every account under a P&L note opens at zero.
+  -- G3 finding 2, re-asserted for untouched seed metadata: every account
+  -- originally under a P&L note opens at zero. A live chart override is
+  -- intentional and must not rewrite or invalidate the imported balances.
   IF EXISTS (
     SELECT 1
       FROM greentarget.account_opening_balances anchors
@@ -641,6 +666,7 @@ BEGIN
       JOIN greentarget.financial_statement_notes notes
         ON notes.code = accounts.fs_note
      WHERE notes.report_section = 'income_statement'
+       AND accounts.updated_by = 'G3_CHART_LOAD'
        AND anchors.amount <> 0
   ) THEN
     RAISE EXCEPTION 'An income-statement account has a non-zero 1 January opening';
@@ -673,9 +699,12 @@ BEGIN
               FROM actual_monthly_closes m WHERE m.as_of = target.as_of) AS cr,
            (SELECT COALESCE(SUM(m.close_cents), 0)
               FROM actual_monthly_closes m
-              JOIN greentarget.account_codes a ON a.code = m.account_code
              WHERE m.as_of = target.as_of
-               AND a.parent_code = 'DEBTOR') AS debtor_control,
+               AND EXISTS (
+                 SELECT 1 FROM greentarget.import_legacy_rows source
+                  WHERE source.account_code = m.account_code
+                    AND source.source_kind = 'GTDB'
+               )) AS debtor_control,
            (SELECT close_cents FROM actual_monthly_closes m
              WHERE m.as_of = target.as_of AND m.account_code = 'CD_SD') AS cd_sd
       FROM expected_month_ends target
@@ -761,8 +790,12 @@ SELECT closes.as_of,
          WHERE closes.account_code = 'CD_SD') / 100.0 AS cd_sd,
        (SELECT SUM(m.close_cents) / 100.0
           FROM actual_monthly_closes m
-          JOIN greentarget.account_codes a ON a.code = m.account_code
-         WHERE m.as_of = closes.as_of AND a.parent_code = 'DEBTOR')
+         WHERE m.as_of = closes.as_of
+           AND EXISTS (
+             SELECT 1 FROM greentarget.import_legacy_rows source
+              WHERE source.account_code = m.account_code
+                AND source.source_kind = 'GTDB'
+           ))
          AS debtor_control
   FROM actual_monthly_closes closes
  GROUP BY closes.as_of
