@@ -1,7 +1,6 @@
 // src/routes/greentarget/payments.js
 import { Router } from "express";
 import {
-  syncGTPaymentJournalEntry,
   cancelGTPaymentJournalEntry,
   updateGTPaymentJournalReference,
 } from "./accounting/payment-journal.js";
@@ -153,10 +152,11 @@ const normalizePaymentAllocations = (body) => {
 };
 
 /**
- * A received date before the accounting cutover is allowed only when every
- * selected invoice is also historical. That payment stays operational-only
- * and cannot mutate the locked ledger. A later receipt against an older
- * invoice is a genuine organic collection and keeps the normal journal path.
+ * GT payments are operational-only (decision 29 Jul 2026): staff key the
+ * consolidated receipt journals by hand, so no payment ever posts a REC
+ * journal. A received date before the accounting cutover is still allowed
+ * only when every selected invoice is also historical, keeping pre-cutover
+ * operational history consistent with the locked imported ledger.
  *
  * @param {Array<Record<string, unknown>>} invoices
  * @param {string} paymentDate
@@ -536,15 +536,6 @@ export default function (pool) {
             [newBalanceDue, newStatus, allocation.invoiceId]
           );
           activeCustomerIds.add(Number(invoice.customer_id));
-
-          // A genuinely historical received date returns without posting;
-          // receipts from the cutover onward create their balanced REC journal.
-          await syncGTPaymentJournalEntry(
-            client,
-            paymentResult.rows[0],
-            invoice,
-            null
-          );
         }
 
         const refreshedPaymentResult = await client.query(
@@ -798,16 +789,8 @@ export default function (pool) {
         );
       }
 
-      // A genuinely historical received date returns without posting;
-      // receipts from the cutover onward create their balanced REC journal.
-      if (initialStatus === "active") {
-        await syncGTPaymentJournalEntry(
-          client,
-          paymentResult.rows[0],
-          invoice,
-          null
-        );
-      }
+      // GT payments are operational-only: staff key the consolidated receipt
+      // journals by hand, so no REC journal is created here.
 
       const refreshedPaymentResult = await client.query(
         "SELECT * FROM greentarget.payments WHERE payment_id = $1",
@@ -1136,11 +1119,10 @@ export default function (pool) {
       const paymentIds = paymentGroup.payments.map((payment) =>
         Number(payment.payment_id)
       );
-      const updatedPaymentResult = await client.query(
+      await client.query(
         `UPDATE greentarget.payments
             SET status = 'active'
-          WHERE payment_id = ANY($1::int[])
-          RETURNING *`,
+          WHERE payment_id = ANY($1::int[])`,
         [paymentIds]
       );
 
@@ -1156,35 +1138,6 @@ export default function (pool) {
               SET balance_due = $1, status = $2
             WHERE invoice_id = $3`,
           [invoiceBalance.balanceCents / 100, newStatus, invoiceId]
-        );
-      }
-
-      const updatedPaymentById = new Map(
-        updatedPaymentResult.rows.map((payment) => [
-          Number(payment.payment_id),
-          payment,
-        ])
-      );
-      const paymentsInCreationOrder = [...paymentGroup.payments].sort(
-        (firstPayment, secondPayment) =>
-          Number(firstPayment.payment_id) - Number(secondPayment.payment_id)
-      );
-      for (const originalPayment of paymentsInCreationOrder) {
-        const updatedPayment = updatedPaymentById.get(
-          Number(originalPayment.payment_id)
-        );
-        if (!updatedPayment) {
-          throw new Error("Receipt confirmation missed a payment allocation");
-        }
-        await syncGTPaymentJournalEntry(
-          client,
-          updatedPayment,
-          {
-            customer_id: originalPayment.customer_id,
-            invoice_number: originalPayment.invoice_number,
-            date_issued: originalPayment.invoice_date_issued,
-          },
-          null
         );
       }
 
