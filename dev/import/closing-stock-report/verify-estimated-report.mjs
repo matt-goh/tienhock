@@ -96,14 +96,9 @@ const ROOT_MONEY_DELTAS = new Map([
     "mee.unit.packing.PLASTIC (SMALL).amount",
     { delta: -88368, reason: "derived from Q14 closing stock and the RM0.08 opening noise" },
   ],
-  [
-    "mee.unit.salesman.VRE-DIESEL (LORI SALESMAN SAHAJA).amount",
-    { delta: -2000, reason: "Q15: RM40.00 shared diesel pool source entry is unresolved" },
-  ],
-  [
-    "bihun.unit.salesman.VRE-DIESEL (LORI SALESMAN SAHAJA).amount",
-    { delta: -2000, reason: "Q15: RM40.00 shared diesel pool source entry is unresolved" },
-  ],
+  // Q15 RESOLVED 2026-07-28 in production (Rosa re-pointed the parked RM40 from
+  // CA_WA to OIL6389 on PCE003/06; +RM20.00 per product line after the 50% split).
+  // Both VRE-DIESEL rows now land exact and intentionally carry no expected delta.
   [
     "mee.unit.expenses.subtotal.amount",
     { delta: 2094, reason: "documented JVSL snapshot and visible-row rounding residual" },

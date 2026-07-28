@@ -56,6 +56,7 @@ import ConsolidatedInvoiceModal from "../../components/Invoice/ConsolidatedInvoi
 import InvoiceDailyPrintMenu from "../../components/Invoice/InvoiceDailyPrintMenu";
 import StyledListbox from "../../components/StyledListbox";
 import { useScrollRestoration } from "../../hooks/useScrollRestoration";
+import { isZeroValueBill } from "../../utils/invoice/invoiceDisplayStatus";
 
 // --- Constants ---
 const STORAGE_KEY = "invoiceListFilters_v2"; // Use a unique key
@@ -1103,11 +1104,18 @@ const InvoiceListPage: React.FC = () => {
   const handleBulkSubmitEInvoice = () => {
     if (selectedInvoiceIds.size === 0) return;
 
+    // RM0.00 bills have no sales value and are covered by the monthly
+    // consolidated e-Invoice, so they are never submitted individually.
+    const zeroValueCount = invoices.filter(
+      (inv) => selectedInvoiceIds.has(inv.id) && isZeroValueBill(inv)
+    ).length;
+
     // Filter for eligible invoices based on current data
     const eligibleInvoices = invoices.filter(
       (inv) =>
         selectedInvoiceIds.has(inv.id) &&
         inv.invoice_status !== "cancelled" && // Cannot submit cancelled
+        !isZeroValueBill(inv) && // RM0.00 bills have no sales value
         (inv.einvoice_status === null ||
           inv.einvoice_status === "invalid" ||
           inv.einvoice_status === "pending") && // Not already valid/cancelled
@@ -1121,13 +1129,22 @@ const InvoiceListPage: React.FC = () => {
 
     if (eligibleInvoices.length === 0) {
       toast.error(
-        "No selected invoices are eligible for e-invoice submission (Must be within last 3 days, Unpaid/Paid/Overdue, Customer must have TIN/ID and phone number, and not already Valid/Cancelled).",
+        zeroValueCount === selectedInvoiceIds.size
+          ? "These bills total RM0.00 and have no sales value, so they cannot be submitted as individual e-Invoices. They are covered by the monthly consolidated e-Invoice."
+          : "No selected invoices are eligible for e-invoice submission (Must be within last 3 days, Unpaid/Paid/Overdue, Customer must have TIN/ID and phone number, and not already Valid/Cancelled).",
         { duration: 12000 }
       );
       return;
     }
-    if (eligibleInvoices.length < selectedInvoiceIds.size) {
-      const ineligibleCount = selectedInvoiceIds.size - eligibleInvoices.length;
+    if (zeroValueCount > 0) {
+      toast(
+        `${zeroValueCount} bill(s) totalling RM0.00 were skipped - they have no sales value and are covered by the monthly consolidated e-Invoice.`,
+        { duration: 8000 }
+      );
+    }
+    if (eligibleInvoices.length < selectedInvoiceIds.size - zeroValueCount) {
+      const ineligibleCount =
+        selectedInvoiceIds.size - zeroValueCount - eligibleInvoices.length;
       toast.error(
         `${ineligibleCount} selected invoice(s) are ineligible (check date, status, customer info). Proceeding with ${eligibleInvoices.length} eligible invoice(s).`,
         { duration: 8000 }
@@ -1146,6 +1163,7 @@ const InvoiceListPage: React.FC = () => {
         (inv) =>
           selectedInvoiceIds.has(inv.id) &&
           inv.invoice_status !== "cancelled" &&
+          !isZeroValueBill(inv) &&
           (inv.einvoice_status === null || inv.einvoice_status === "invalid") &&
           inv.customerTin &&
           inv.customerIdNumber && // Ensure both TIN and ID number are present
@@ -1948,6 +1966,7 @@ const InvoiceListPage: React.FC = () => {
             (inv) =>
               selectedInvoiceIds.has(inv.id) &&
               inv.invoice_status !== "cancelled" &&
+              !isZeroValueBill(inv) &&
               (inv.einvoice_status === null ||
                 inv.einvoice_status === "invalid" ||
                 inv.einvoice_status === "pending") &&

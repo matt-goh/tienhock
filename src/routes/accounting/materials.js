@@ -1188,7 +1188,11 @@ export default function (pool) {
         }
 
         const conflictKey = finalVariantId ? String(finalVariantId) : (finalCustomDescription || "default");
-        const shouldDelete = adjustmentQty === 0 && !custom_name && !notes?.trim();
+        // A keyed unit cost is worth keeping on its own: without it, editing only
+        // the unit cost on a row with no adjustment quantity silently dropped the
+        // row and the cost reverted to the material/variant default on reload.
+        const shouldDelete =
+          adjustmentQty === 0 && cost === 0 && !custom_name && !notes?.trim();
 
         if (shouldDelete) {
           const deleteResult = await client.query(

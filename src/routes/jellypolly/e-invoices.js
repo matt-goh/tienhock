@@ -160,9 +160,33 @@ export default function (pool, config) {
         });
       }
 
+      // A bill totalling RM0.00 carries no sales value - whether it records
+      // returns, gives goods away free, or has no quantities at all. MyInvois
+      // rejects every one of them, so they are never submitted individually;
+      // the monthly consolidated e-Invoice covers them instead.
+      const zeroValueResult = await pool.query(
+        `SELECT i.id
+           FROM jellypolly.invoices i
+          WHERE i.id = ANY($1)
+            AND COALESCE(i.totalamountpayable, 0) = 0
+          ORDER BY i.id`,
+        [invoiceIds]
+      );
+
+      if (zeroValueResult.rows.length > 0) {
+        return res.status(409).json({
+          success: false,
+          code: "ZERO_VALUE_INVOICES",
+          message:
+            "One or more bills total RM0.00 and have no sales value, so they cannot be submitted as individual e-Invoices. They are covered by the monthly consolidated e-Invoice instead.",
+          invoices: zeroValueResult.rows.map((row) => ({ id: row.id })),
+          overallStatus: "Invalid",
+        });
+      }
+
       // STEP 1: Check for invoices that already have a long_id (already processed successfully)
       const validatedQuery = `
-      SELECT id, uuid, long_id, einvoice_status 
+      SELECT id, uuid, long_id, einvoice_status
       FROM jellypolly.invoices
       WHERE id = ANY($1) AND long_id IS NOT NULL AND long_id != ''
       `;

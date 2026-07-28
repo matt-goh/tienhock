@@ -40,6 +40,7 @@ import {
   IconCircleCheck,
   IconClockHour4,
   IconAlertTriangle,
+  IconMinus,
   IconSend,
   IconRefresh,
   IconFiles,
@@ -75,6 +76,9 @@ import {
 import {
   getInvoiceDisplayStatus,
   getInvoiceDisplayStatusLabel,
+  getZeroValueKind,
+  getZeroValueNote,
+  isZeroValueBill,
 } from "../../utils/invoice/invoiceDisplayStatus";
 import type { InvoiceDisplayStatus } from "../../utils/invoice/invoiceDisplayStatus";
 
@@ -1587,6 +1591,10 @@ const InvoiceDetailsPage: React.FC = () => {
       case "credit_balance":
       case "credited":
         return "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300";
+      case "returns_only":
+      case "free_goods":
+      case "zero_value":
+        return "bg-slate-100 dark:bg-slate-700/40 text-slate-700 dark:text-slate-300";
       case "cancelled":
         return "bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300";
       case "overdue":
@@ -1599,8 +1607,19 @@ const InvoiceDetailsPage: React.FC = () => {
   };
 
   const getEInvoiceStatusInfo = (
-    status: ExtendedInvoiceData["einvoice_status"]
+    status: ExtendedInvoiceData["einvoice_status"],
+    isZeroValue: boolean
   ) => {
+    // RM0.00 bills carry no sales value, so a rejected/pending submission is
+    // expected rather than something the user must act on.
+    if (isZeroValue && (status === "invalid" || status === "pending")) {
+      return {
+        text: "Not Applicable",
+        color: "text-default-500 dark:text-gray-400",
+        icon: IconMinus,
+      };
+    }
+
     switch (status) {
       case "valid":
         return {
@@ -1702,7 +1721,14 @@ const InvoiceDetailsPage: React.FC = () => {
     adjustmentDocs
   );
   const invoiceStatusStyle = getStatusBadgeClass(invoiceDisplayStatus);
-  const eInvoiceStatusInfo = getEInvoiceStatusInfo(invoiceData.einvoice_status);
+  const isZeroValue: boolean = isZeroValueBill(invoiceData);
+  const zeroValueNote: string | null = getZeroValueNote(
+    getZeroValueKind(invoiceData)
+  );
+  const eInvoiceStatusInfo = getEInvoiceStatusInfo(
+    invoiceData.einvoice_status,
+    isZeroValue
+  );
   const EInvoiceIcon = eInvoiceStatusInfo?.icon;
   const consolidatedStatusInfo = getConsolidatedStatusInfo(
     invoiceData.consolidated_part_of
@@ -1837,6 +1863,7 @@ const InvoiceDetailsPage: React.FC = () => {
             </Button>
           )}
           {!isCancelled &&
+            !isZeroValue &&
             (invoiceData.einvoice_status === null ||
               invoiceData.einvoice_status === "invalid" ||
               invoiceData.einvoice_status === "pending") &&
@@ -2400,6 +2427,11 @@ const InvoiceDetailsPage: React.FC = () => {
                   </>
                 )}
               </div>
+              {zeroValueNote && (
+                <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                  {zeroValueNote}
+                </p>
+              )}
               {/* Manual UUID Edit - only when einvoice_status is null */}
               {invoiceData.einvoice_status === null && (
                 <div className="mt-3 pt-3 border-t border-default-100 dark:border-gray-700 group flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity">

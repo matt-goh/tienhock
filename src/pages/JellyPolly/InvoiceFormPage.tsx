@@ -24,6 +24,7 @@ import {
   createInvoice,
   createPayment,
 } from "../../utils/JellyPolly/InvoiceUtils";
+import { isZeroValueBill } from "../../utils/invoice/invoiceDisplayStatus";
 import toast from "react-hot-toast";
 import { IconSquare, IconSquareCheckFilled } from "@tabler/icons-react";
 import { FormInput, FormListbox } from "../../components/FormComponents";
@@ -613,6 +614,7 @@ const InvoiceFormPage: React.FC = () => {
         submitAsEinvoice &&
         customerTinNumber &&
         customerIdNumber &&
+        !isZeroValueBill(invoiceData) &&
         isInvoiceDateEligibleForEinvoice(invoiceData.createddate);
 
       if (shouldSubmitEinvoice) {
@@ -727,10 +729,16 @@ const InvoiceFormPage: React.FC = () => {
     return !isNaN(invoiceTimestamp) && invoiceTimestamp >= cutoffTimestamp;
   };
 
+  // A bill totalling RM0.00 - returns being recorded, goods given away free, or
+  // no quantities at all - has no sales value. MyInvois rejects every one, so
+  // they are covered by the monthly consolidated e-Invoice instead.
+  const isNoValueBill: boolean = isZeroValueBill(invoiceData);
+
   // Determine if e-invoice checkbox should be enabled
   const canSubmitEinvoice =
     !!customerTinNumber &&
     !!customerIdNumber &&
+    !isNoValueBill &&
     isInvoiceDateEligibleForEinvoice(invoiceData.createddate);
 
   // --- JSX Output ---
@@ -910,7 +918,9 @@ const InvoiceFormPage: React.FC = () => {
                 }`}
                 disabled={!canSubmitEinvoice || isSaving}
                 title={
-                  !canSubmitEinvoice
+                  isNoValueBill
+                    ? "This bill totals RM0.00 and has no sales value, so it does not need its own e-Invoice"
+                    : !canSubmitEinvoice
                     ? "Customer must have TIN and ID number for e-invoicing"
                     : ""
                 }

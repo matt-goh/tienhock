@@ -335,7 +335,21 @@ export interface ExtendedInvoiceData extends InvoiceData {
   payment_notes?: string;
   consolidated_part_of?: ConsolidatedInfo | null;
   adjustmentDocs?: AdjustmentDocument[];
+  // Display-only classification from the invoice list API explaining why a bill
+  // totals RM0.00 (line items are not fetched on list pages). Null/absent when
+  // the bill carries value.
+  zero_value_kind?: ZeroValueKind | null;
 }
+
+/**
+ * Why a bill totals RM0.00. Display-only classification - nothing is stored.
+ *
+ * - `returns_only`  a bill issued purely to record returned products
+ * - `free_goods`    goods given away, keyed either as free products or as a
+ *                   quantity at price 0.00
+ * - `zero_value`    anything else with no value (e.g. a bill with no quantities)
+ */
+export type ZeroValueKind = "returns_only" | "free_goods" | "zero_value";
 
 export interface ProductItem {
   uid?: string; // Unique ID for front-end list rendering (not in DB)

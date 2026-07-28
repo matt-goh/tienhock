@@ -505,8 +505,8 @@ console.log("\n-- 6. Tien Hock isolation ---------------------------------------
   const thJournals = scalar("SELECT count(*) FROM public.journal_entries");
   const thLines = scalar("SELECT count(*) FROM public.journal_entry_lines");
   const thNotes = scalar("SELECT count(*) FROM public.financial_statement_notes");
-  check(thAccounts === "2825", "public.account_codes unmoved at 2,825", `found ${thAccounts}`);
-  check(thJournals === "8188", "public.journal_entries unmoved at 8,188", `found ${thJournals}`);
+  check(thAccounts === "2827", "public.account_codes unmoved at 2,827", `found ${thAccounts}`);
+  check(thJournals === "8238", "public.journal_entries unmoved at 8,238", `found ${thJournals}`);
   check(thNotes === "33", "public.financial_statement_notes unmoved at 33", `found ${thNotes}`);
   check(Number(thLines) > 0, "public.journal_entry_lines still populated", `found ${thLines}`);
 }

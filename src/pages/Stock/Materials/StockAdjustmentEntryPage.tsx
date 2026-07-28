@@ -651,6 +651,53 @@ const orderVariantsWithinMaterial = (
   });
 };
 
+interface NumericCellInputProps {
+  value: number;
+  onChange: (value: string) => void;
+  onClick?: (event: React.MouseEvent<HTMLInputElement>) => void;
+  className: string;
+  placeholder: string;
+  allowNegative: boolean;
+}
+
+// The stock rows hold numbers, so a plain controlled input wipes half-typed
+// values: "0.005" round-trips through parseFloat as 0 on the first keystroke and
+// re-renders as empty. Keep the raw text locally while the field is focused and
+// mirror the row value again on blur.
+const NumericCellInput: React.FC<NumericCellInputProps> = ({
+  value,
+  onChange,
+  onClick,
+  className,
+  placeholder,
+  allowNegative,
+}) => {
+  const [draft, setDraft] = useState<string | null>(null);
+  const pattern: RegExp = allowNegative ? /^-?\d*\.?\d*$/ : /^\d*\.?\d*$/;
+  const text: string = draft ?? (value ? String(value) : "");
+
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
+    const raw: string = event.target.value;
+    if (raw !== "" && !pattern.test(raw)) return;
+
+    setDraft(raw);
+    onChange(raw);
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={text}
+      onChange={handleChange}
+      onBlur={() => setDraft(null)}
+      onClick={onClick}
+      className={className}
+      placeholder={placeholder}
+    />
+  );
+};
+
 const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
   mode,
   generalHeaderActions,
@@ -1932,11 +1979,16 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
         await Promise.all(variantNameUpdates);
       }
 
+      // Only modified rows are sent. /stock/batch upserts or deletes each entry by
+      // its own conflict key and ignores rows that are absent, so untouched rows do
+      // not need to travel (unlike the Stock Kilang batch below).
       const entries: MaterialStockEntryInput[] = [];
 
       materials.forEach((material) => {
         if (material.has_variants && material.variants && material.variants.length > 0) {
           material.variants.forEach((variant) => {
+            if (!isVariantRowDirty(material.id, variant)) return;
+
             const originalVariant: StockEntryRow | null = findOriginalVariant(
               material.id,
               variant
@@ -1945,7 +1997,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
               ...makeVariantStockEntries(material.id, variant, originalVariant)
             );
           });
-        } else {
+        } else if (isMaterialRowDirty(material)) {
           entries.push(makeMaterialStockEntry(material));
         }
       });
@@ -1961,7 +2013,8 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
         }
       });
 
-      const response = await saveMaterialStockEntries(entries);
+      const response: MaterialStockBatchResponse =
+        entries.length > 0 ? await saveMaterialStockEntries(entries) : {};
       let stockKilangSaved = false;
 
       if (hasStockKilangUnsavedChanges) {
@@ -2310,6 +2363,13 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     });
   };
 
+  const formatUnitCost = (value: number): string => {
+    return value.toLocaleString("en-MY", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 4,
+    });
+  };
+
   const categoryTotals = useMemo(() => {
     const totals: Record<MaterialCategory, { opening: number; purchases: number; adjustments: number; closing: number }> = {
       ingredient: { opening: 0, purchases: 0, adjustments: 0, closing: 0 },
@@ -2435,14 +2495,13 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     onChange: (value: string) => void,
     onClick?: (event: React.MouseEvent<HTMLInputElement>) => void
   ): React.ReactNode => (
-    <input
-      type="number"
-      value={value || ""}
-      onChange={(event) => onChange(event.target.value)}
+    <NumericCellInput
+      value={value}
+      onChange={onChange}
       onClick={onClick}
       className="w-full px-2 py-1 text-right font-mono text-sm border border-sky-200 dark:border-sky-800 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
-      step="1"
       placeholder="0"
+      allowNegative={true}
     />
   );
 
@@ -2451,15 +2510,13 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     onChange: (value: string) => void,
     onClick?: (event: React.MouseEvent<HTMLInputElement>) => void
   ): React.ReactNode => (
-    <input
-      type="number"
-      value={value || ""}
-      onChange={(event) => onChange(event.target.value)}
+    <NumericCellInput
+      value={value}
+      onChange={onChange}
       onClick={onClick}
       className="w-full px-2 py-1 text-right font-mono text-sm border border-default-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
-      step="0.01"
-      min="0"
       placeholder="0.00"
+      allowNegative={false}
     />
   );
 
@@ -3334,7 +3391,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                   <td className="px-2 py-1.5 text-right">
                                     {renderAdjustmentValue(
                                       variant.adjustment_value,
-                                      `${formatQty(variant.adjustment_quantity)} × ${formatNumber(variant.unit_cost)} = ${formatNumber(variant.adjustment_value)}`
+                                      `${formatQty(variant.adjustment_quantity)} × ${formatUnitCost(variant.unit_cost)} = ${formatNumber(variant.adjustment_value)}`
                                     )}
                                   </td>
                                   <td className="px-2 py-1.5 text-right font-mono text-sm text-default-700 dark:text-gray-300">
@@ -3400,7 +3457,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                 <td className="px-2 py-1.5 text-right">
                                   {renderAdjustmentValue(
                                     newVariant.adjustment_value,
-                                    `${formatQty(newVariant.adjustment_quantity)} × ${formatNumber(newVariant.unit_cost)} = ${formatNumber(newVariant.adjustment_value)}`
+                                    `${formatQty(newVariant.adjustment_quantity)} × ${formatUnitCost(newVariant.unit_cost)} = ${formatNumber(newVariant.adjustment_value)}`
                                   )}
                                 </td>
                                 <td className="px-2 py-1.5 text-right font-mono text-sm text-default-700 dark:text-gray-300">
@@ -3535,7 +3592,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                             <td className="px-2 py-1.5 text-right">
                               {renderAdjustmentValue(
                                 material.adjustment_value,
-                                `${formatQty(material.adjustment_quantity)} × ${formatNumber(material.unit_cost)} = ${formatNumber(material.adjustment_value)}`
+                                `${formatQty(material.adjustment_quantity)} × ${formatUnitCost(material.unit_cost)} = ${formatNumber(material.adjustment_value)}`
                               )}
                             </td>
                             <td className="px-2 py-1.5 text-right">
@@ -3603,7 +3660,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                               <td className="px-2 py-1.5 text-right">
                                 {renderAdjustmentValue(
                                   newVariant.adjustment_value,
-                                  `${formatQty(newVariant.adjustment_quantity)} × ${formatNumber(newVariant.unit_cost)} = ${formatNumber(newVariant.adjustment_value)}`
+                                  `${formatQty(newVariant.adjustment_quantity)} × ${formatUnitCost(newVariant.unit_cost)} = ${formatNumber(newVariant.adjustment_value)}`
                                 )}
                               </td>
                               <td className="px-2 py-1.5 text-right font-mono text-sm text-default-700 dark:text-gray-300">
@@ -3634,8 +3691,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                       </div>
                     </td>
                     <td></td>
-                    <td className="px-2 py-1.5 text-xs text-center text-emerald-600 dark:text-emerald-400">
-                      Manual only
+                    <td>
                     </td>
                     <td></td>
                     <td></td>
