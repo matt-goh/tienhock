@@ -20,6 +20,7 @@ import {
   IconPrinter,
   IconPlus,
   IconSettings,
+  IconCalendarEvent,
 } from "@tabler/icons-react";
 import {
   confirmPayment,
@@ -47,6 +48,16 @@ const createTodayClearanceRange = (): TimeRange => {
   const today: Date = new Date();
   return { start: today, end: today };
 };
+
+// API date values arrive as timestamps or UTC-midnight `date` columns; go
+// through a Date so the local calendar day is preserved either way.
+const toDayRange = (value: string): TimeRange => {
+  const day: Date = new Date(value);
+  return { start: day, end: day };
+};
+
+const toDayString = (value: string): string =>
+  format(new Date(value), "yyyy-MM-dd");
 
 const formatPaymentMethodLabel = (
   paymentMethod: Payment["payment_method"]
@@ -80,6 +91,16 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
     createTodayClearanceRange
   );
   const [loadingVoucherId, setLoadingVoucherId] = useState<number | null>(null);
+  const [showDateDialog, setShowDateDialog] = useState<boolean>(false);
+  const [dateEditPayment, setDateEditPayment] = useState<Payment | null>(null);
+  const [paymentDateRange, setPaymentDateRange] = useState<TimeRange>(
+    createTodayClearanceRange
+  );
+  const [accountingDateRange, setAccountingDateRange] =
+    useState<TimeRange | null>(null);
+  const [dateEditGroupSize, setDateEditGroupSize] = useState<number>(1);
+  const [savingPaymentDate, setSavingPaymentDate] = useState<boolean>(false);
+  const [paymentDateError, setPaymentDateError] = useState<string | null>(null);
   const { customers } = useCustomersCache();
   const usesTienHockReceiptAccounting: boolean =
     paymentApiEndpoint === "/api/payments";
@@ -137,6 +158,112 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
       setSelectedPayment(null);
       setSelectedBankAccount("BANK_PBB"); // Reset to default
       setClearanceDateRange(createTodayClearanceRange());
+    }
+  };
+
+  // Tien Hock: only a cheque's date is pure payment history — every other
+  // method posts its journal on the date it was received, so correcting it
+  // means cancelling and re-keying. Jelly Polly posts no journals at all.
+  const canEditPaymentDate = (payment: Payment): boolean => {
+    if (payment.status === "cancelled") return false;
+    if (payment.is_auto_collection) return false;
+    if (
+      payment.payment_method === "contra" ||
+      payment.payment_method === "overpayment"
+    ) {
+      return false;
+    }
+    if (!usesTienHockReceiptAccounting) return true;
+    return payment.payment_method === "cheque" && Boolean(payment.receipt_id);
+  };
+
+  const handleEditDateClick = (payment: Payment, groupSize: number): void => {
+    setDateEditGroupSize(groupSize);
+    setDateEditPayment(payment);
+    setPaymentDateRange(toDayRange(payment.payment_date));
+    setAccountingDateRange(
+      !usesTienHockReceiptAccounting && payment.posting_date
+        ? toDayRange(payment.posting_date)
+        : null
+    );
+    setPaymentDateError(null);
+    setShowDateDialog(true);
+  };
+
+  const closeDateDialog = (): void => {
+    setShowDateDialog(false);
+    setDateEditPayment(null);
+    setAccountingDateRange(null);
+    setPaymentDateError(null);
+  };
+
+  // Keep an accounting date that merely mirrors the payment date (cash, online
+  // and bank transfers post on the day they are received) moving with it, while
+  // leaving a genuine cheque clearance date alone.
+  const handlePaymentDateChange = (range: TimeRange): void => {
+    const previousDate: string = format(paymentDateRange.start, "yyyy-MM-dd");
+    setPaymentDateRange(range);
+    if (
+      accountingDateRange &&
+      format(accountingDateRange.start, "yyyy-MM-dd") === previousDate
+    ) {
+      setAccountingDateRange(range);
+    }
+  };
+
+  const handleSavePaymentDate = async (): Promise<void> => {
+    if (!dateEditPayment || savingPaymentDate) return;
+
+    const currentDate: string = toDayString(dateEditPayment.payment_date);
+    const nextDate: string = format(paymentDateRange.start, "yyyy-MM-dd");
+    const currentAccountingDate: string | null = dateEditPayment.posting_date
+      ? toDayString(dateEditPayment.posting_date)
+      : null;
+    const nextAccountingDate: string | null = accountingDateRange
+      ? format(accountingDateRange.start, "yyyy-MM-dd")
+      : null;
+
+    if (
+      nextDate === currentDate &&
+      nextAccountingDate === currentAccountingDate
+    ) {
+      closeDateDialog();
+      return;
+    }
+
+    setSavingPaymentDate(true);
+    setPaymentDateError(null);
+    try {
+      if (usesTienHockReceiptAccounting) {
+        await api.patch(`/api/receipts/${dateEditPayment.receipt_id}/date`, {
+          expected_received_date: currentDate,
+          received_date: nextDate,
+        });
+      } else {
+        await api.put(
+          `${paymentApiEndpoint}/${dateEditPayment.payment_id}/date`,
+          {
+            expected_payment_date: currentDate,
+            payment_date: nextDate,
+            ...(nextAccountingDate &&
+            nextAccountingDate !== currentAccountingDate
+              ? { posting_date: nextAccountingDate }
+              : {}),
+          }
+        );
+      }
+      toast.success("Payment date updated.");
+      closeDateDialog();
+      onRefresh();
+    } catch (error: unknown) {
+      console.error("Error updating payment date:", error);
+      setPaymentDateError(
+        error instanceof Error && error.message
+          ? error.message
+          : "We couldn't update this payment date. Nothing was changed."
+      );
+    } finally {
+      setSavingPaymentDate(false);
     }
   };
 
@@ -392,7 +519,25 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                     <React.Fragment key={reference}>
                       <tr className="bg-sky-50/80 dark:bg-sky-950/30">
                         <td className="border-l-4 border-sky-400 px-3 py-3 text-sm font-medium text-gray-800 dark:border-sky-600 dark:text-gray-100">
-                          {formatDate(firstPayment.payment_date)}
+                          <div className="flex items-center gap-1.5">
+                            <span>{formatDate(firstPayment.payment_date)}</span>
+                            {canEditPaymentDate(groupTemplate) && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleEditDateClick(
+                                    groupTemplate,
+                                    paymentGroup.length
+                                  )
+                                }
+                                className="rounded p-0.5 text-gray-400 transition-colors hover:bg-sky-100 hover:text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:hover:bg-sky-900/50 dark:hover:text-sky-300"
+                                title={`Correct the date for all ${paymentGroup.length} payments under ${groupTemplate.payment_reference}`}
+                                aria-label="Correct payment date"
+                              >
+                                <IconCalendarEvent size={15} stroke={1.75} />
+                              </button>
+                            )}
+                          </div>
                         </td>
                         <td className="px-3 py-3 max-w-[150px]">
                           <div className="truncate font-mono font-semibold text-gray-900 dark:text-gray-100" title={firstPayment.payment_reference || ''}>
@@ -575,7 +720,25 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                   return (
                     <tr key={payment.payment_id}>
                       <td className="px-3 py-3 text-sm">
-                        {formatDate(payment.payment_date)}
+                        <div className="flex items-center gap-1.5">
+                          <span>{formatDate(payment.payment_date)}</span>
+                          {canEditPaymentDate(payment) && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleEditDateClick(
+                                  payment,
+                                  Number(payment.allocation_count) || 1
+                                )
+                              }
+                              className="rounded p-0.5 text-gray-400 transition-colors hover:bg-sky-100 hover:text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:hover:bg-sky-900/50 dark:hover:text-sky-300"
+                              title="Correct payment date"
+                              aria-label="Correct payment date"
+                            >
+                              <IconCalendarEvent size={15} stroke={1.75} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-3 max-w-[150px]">
                         {onViewPaymentGroup &&
@@ -801,6 +964,96 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
           }
           variant="success"
           allowContentOverflow={requiresClearanceDate}
+        />
+      )}
+
+      {dateEditPayment && (
+        <ConfirmationDialog
+          isOpen={showDateDialog}
+          onClose={closeDateDialog}
+          onConfirm={() => void handleSavePaymentDate()}
+          title="Correct payment date"
+          message={
+            <div className="space-y-3">
+              <p>
+                Change the date recorded for this{" "}
+                {formatPaymentMethodLabel(dateEditPayment.payment_method)}{" "}
+                payment of{" "}
+                <span className="font-semibold text-default-800 dark:text-gray-100">
+                  {formatCurrency(dateEditPayment.amount_paid)}
+                </span>
+                .
+              </p>
+
+              {dateEditGroupSize > 1 && (
+                <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sky-800 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-200">
+                  Reference {dateEditPayment.payment_reference} covers more than
+                  one invoice. Every payment under it moves to the new date
+                  together, so the group stays on one row.
+                </div>
+              )}
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300">
+                  Payment Date
+                </label>
+                <TimeNavigator
+                  range={paymentDateRange}
+                  onChange={handlePaymentDateChange}
+                  modes={["day"]}
+                  presets={false}
+                  showArrows={false}
+                  size="sm"
+                  disabled={savingPaymentDate}
+                  className="w-full"
+                  triggerClassName="w-full justify-between"
+                />
+              </div>
+
+              {accountingDateRange && (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300">
+                    {dateEditPayment.payment_method === "cheque"
+                      ? "Cheque Clearance Date"
+                      : "Accounting Date"}
+                  </label>
+                  <TimeNavigator
+                    range={accountingDateRange}
+                    onChange={(range: TimeRange): void =>
+                      setAccountingDateRange(range)
+                    }
+                    modes={["day"]}
+                    presets={false}
+                    showArrows={false}
+                    size="sm"
+                    disabled={savingPaymentDate}
+                    className="w-full"
+                    triggerClassName="w-full justify-between"
+                  />
+                  <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
+                    This date controls Jelly Polly debtor statements and the
+                    account ledger. It cannot be before the payment date.
+                  </p>
+                </div>
+              )}
+
+              {paymentDateError && (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-900/30 dark:text-rose-300">
+                  {paymentDateError}
+                </div>
+              )}
+
+              <p className="text-xs text-default-500 dark:text-gray-400">
+                {usesTienHockReceiptAccounting
+                  ? "Amounts, invoice balances and the posted journal entry are not changed — a cheque is always posted on its clearance date."
+                  : "Amounts and invoice balances are not changed."}
+              </p>
+            </div>
+          }
+          confirmButtonText={savingPaymentDate ? "Saving..." : "Save Date"}
+          variant="success"
+          allowContentOverflow
+          isConfirming={savingPaymentDate}
         />
       )}
 
