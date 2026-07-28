@@ -47,6 +47,7 @@ import GTIncomeStatementPage from "./GreenTarget/Accounting/GTIncomeStatementPag
 import GTBalanceSheetPage from "./GreenTarget/Accounting/GTBalanceSheetPage";
 import GTAccountCodeListPage from "./GreenTarget/Accounting/GTAccountCodeListPage";
 import GTAccountCodeFormPage from "./GreenTarget/Accounting/GTAccountCodeFormPage";
+import GTVoucherGeneratorPage from "./GreenTarget/Accounting/GTVoucherGeneratorPage";
 
 // Top-level order mirrors the other two companies (Tien Hock / Jelly Polly):
 // Accounting -> Payroll -> Sales -> operational/catalogue menus.
@@ -84,6 +85,12 @@ export const GreenTargetNavData: SidebarItem[] = [
             component: GTJournalEntryPage,
           },
         ],
+      },
+      {
+        name: "Voucher Generator",
+        path: "/accounting/voucher-generator",
+        component: GTVoucherGeneratorPage,
+        group: "Generation",
       },
       {
         name: "Account Ledger",
