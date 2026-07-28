@@ -66,6 +66,10 @@ type PaginationPageItem = number | "ellipsis";
 
 const ACCOUNT_CODES_PAGE_SIZE = 100;
 
+export interface AccountCodeListPageProps {
+  company?: "tienhock" | "greentarget";
+}
+
 interface FsNoteListboxProps {
   value: string;
   onChange: (value: string) => void;
@@ -127,22 +131,32 @@ const FsNoteListbox: React.FC<FsNoteListboxProps> = ({
   );
 };
 
-const AccountCodeListPage: React.FC = () => {
+const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
+  company = "tienhock",
+}: AccountCodeListPageProps) => {
   const navigate = useNavigate();
+  const isGreenTarget: boolean = company === "greentarget";
 
   // Cached data
   const {
     accountCodes: flatAccounts,
     isLoading: accountCodesLoading,
     refreshAccountCodes,
-  } = useAccountCodesCache();
-  const { ledgerTypes, isLoading: ledgerTypesLoading } = useLedgerTypesCache();
+  } = useAccountCodesCache(company);
+  const { ledgerTypes, isLoading: ledgerTypesLoading } =
+    useLedgerTypesCache(company);
   const {
     favouriteCodes,
     pendingCodes: pendingFavouriteCodes,
     isLoading: favouritesLoading,
     toggleFavourite,
   } = useAccountCodeFavourites();
+
+  // Favourites are TH-staff-keyed; GT has none, so they never affect GT views.
+  const effectiveFavouriteCodes = useMemo(
+    (): Set<string> => (isGreenTarget ? new Set<string>() : favouriteCodes),
+    [isGreenTarget, favouriteCodes]
+  );
 
   // Financial statement notes state
   const [fsNotes, setFsNotes] = useState<FinancialStatementNote[]>([]);
@@ -152,7 +166,11 @@ const AccountCodeListPage: React.FC = () => {
   useEffect(() => {
     const fetchNotes = async () => {
       try {
-        const response = await api.get("/api/financial-reports/notes");
+        const response = await api.get(
+          isGreenTarget
+            ? "/greentarget/api/financial-reports/notes"
+            : "/api/financial-reports/notes"
+        );
         setFsNotes(response || []);
       } catch (error) {
         console.error("Error fetching financial statement notes:", error);
@@ -161,14 +179,14 @@ const AccountCodeListPage: React.FC = () => {
       }
     };
     fetchNotes();
-  }, []);
+  }, [isGreenTarget]);
 
   // Derived loading state
   const loading =
     accountCodesLoading ||
     ledgerTypesLoading ||
     fsNotesLoading ||
-    favouritesLoading;
+    (!isGreenTarget && favouritesLoading);
 
   // Local state
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
@@ -281,7 +299,7 @@ const AccountCodeListPage: React.FC = () => {
         (account: AccountCode): boolean =>
           parentCodes.has(account.code) ||
           !account.parent_code ||
-          favouriteCodes.has(account.code)
+          effectiveFavouriteCodes.has(account.code)
       );
     }
 
@@ -292,7 +310,7 @@ const AccountCodeListPage: React.FC = () => {
     selectedLedgerType,
     showInactive,
     parentCodes,
-    favouriteCodes,
+    effectiveFavouriteCodes,
   ]);
 
   // Filter tree for display
@@ -328,12 +346,12 @@ const AccountCodeListPage: React.FC = () => {
     const remainingAccounts: AccountCode[] = [];
 
     filteredAccounts.forEach((account: AccountCode): void => {
-      if (favouriteCodes.has(account.code)) favourites.push(account);
+      if (effectiveFavouriteCodes.has(account.code)) favourites.push(account);
       else remainingAccounts.push(account);
     });
 
     return [...favourites, ...remainingAccounts];
-  }, [filteredAccounts, favouriteCodes]);
+  }, [filteredAccounts, effectiveFavouriteCodes]);
 
   // Open the permanent parent-account view by default, while still allowing the
   // user to collapse individual branches afterwards.
@@ -386,7 +404,7 @@ const AccountCodeListPage: React.FC = () => {
   const treeDisplayRows = useMemo((): TreeDisplayRow[] => {
     const favouriteRows: TreeDisplayRow[] = orderedFilteredAccounts
       .filter((account: AccountCode): boolean =>
-        favouriteCodes.has(account.code)
+        effectiveFavouriteCodes.has(account.code)
       )
       .map(
         (account: AccountCode): TreeDisplayRow => ({
@@ -402,7 +420,7 @@ const AccountCodeListPage: React.FC = () => {
       })
     );
     return [...favouriteRows, ...hierarchyRows];
-  }, [orderedFilteredAccounts, visibleTreeRows, favouriteCodes]);
+  }, [orderedFilteredAccounts, visibleTreeRows, effectiveFavouriteCodes]);
 
   const totalDisplayItems: number =
     viewMode === "tree"
@@ -525,6 +543,8 @@ const AccountCodeListPage: React.FC = () => {
   };
 
   const handleEditClick = (account: AccountCode) => {
+    // GT chart of accounts is read-only; there is no GT edit page.
+    if (isGreenTarget) return;
     navigate(`/accounting/account-codes/${account.code}`);
   };
 
@@ -593,7 +613,9 @@ const AccountCodeListPage: React.FC = () => {
             ? `favourite-shortcut:${node.code}`
             : `hierarchy:${node.code}`
         }
-        className={`cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700 ${
+        className={`${
+          isGreenTarget ? "" : "cursor-pointer "
+        }hover:bg-default-50 dark:hover:bg-gray-700 ${
           isFavouriteShortcut
             ? "bg-amber-50/70 dark:bg-amber-950/20"
             : ""
@@ -671,14 +693,20 @@ const AccountCodeListPage: React.FC = () => {
           )}
         </td>
         <td className="px-4 py-2 text-sm" onClick={(e) => e.stopPropagation()}>
-          <FsNoteListbox
-            value={node.fs_note || ""}
-            onChange={(value: string): void => {
-              void handleFsNoteChange(node.code, value || null);
-            }}
-            options={fsNoteOptions}
-            ariaLabel={`FS Note for ${node.code}`}
-          />
+          {isGreenTarget ? (
+            <span className="text-default-600 dark:text-gray-300">
+              {node.fs_note || "-"}
+            </span>
+          ) : (
+            <FsNoteListbox
+              value={node.fs_note || ""}
+              onChange={(value: string): void => {
+                void handleFsNoteChange(node.code, value || null);
+              }}
+              options={fsNoteOptions}
+              ariaLabel={`FS Note for ${node.code}`}
+            />
+          )}
         </td>
         <td className="px-4 py-2 text-center text-sm">
           <span
@@ -693,52 +721,56 @@ const AccountCodeListPage: React.FC = () => {
         </td>
         <td className="px-4 py-2 text-center text-sm">
           <div className="flex items-center justify-center space-x-2">
-            <button
-              type="button"
-              onClick={(event: React.MouseEvent<HTMLButtonElement>): void =>
-                handleFavouriteToggle(node.code, event)
-              }
-              disabled={pendingFavouriteCodes.has(node.code)}
-              aria-pressed={favouriteCodes.has(node.code)}
-              aria-label={
-                favouriteCodes.has(node.code)
-                  ? `Remove ${node.code} from favourites`
-                  : `Add ${node.code} to favourites`
-              }
-              className="text-default-300 transition-colors hover:text-amber-500 disabled:cursor-wait disabled:opacity-50 dark:text-gray-500 dark:hover:text-amber-400"
-              title={
-                favouriteCodes.has(node.code)
-                  ? "Remove from favourites"
-                  : "Add to favourites"
-              }
-            >
-              {favouriteCodes.has(node.code) ? (
-                <IconStarFilled
-                  size={18}
-                  className="text-amber-500 dark:text-amber-400"
-                />
-              ) : (
-                <IconStar size={18} />
-              )}
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleEditClick(node);
-              }}
-              className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
-              title="Edit"
-            >
-              <IconPencil size={18} />
-            </button>
-            {!node.is_system && (
-              <button
-                onClick={(e) => handleDeleteClick(node, e)}
-                className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
-                title="Delete"
-              >
-                <IconTrash size={18} />
-              </button>
+            {!isGreenTarget && (
+              <>
+                <button
+                  type="button"
+                  onClick={(event: React.MouseEvent<HTMLButtonElement>): void =>
+                    handleFavouriteToggle(node.code, event)
+                  }
+                  disabled={pendingFavouriteCodes.has(node.code)}
+                  aria-pressed={favouriteCodes.has(node.code)}
+                  aria-label={
+                    favouriteCodes.has(node.code)
+                      ? `Remove ${node.code} from favourites`
+                      : `Add ${node.code} to favourites`
+                  }
+                  className="text-default-300 transition-colors hover:text-amber-500 disabled:cursor-wait disabled:opacity-50 dark:text-gray-500 dark:hover:text-amber-400"
+                  title={
+                    favouriteCodes.has(node.code)
+                      ? "Remove from favourites"
+                      : "Add to favourites"
+                  }
+                >
+                  {favouriteCodes.has(node.code) ? (
+                    <IconStarFilled
+                      size={18}
+                      className="text-amber-500 dark:text-amber-400"
+                    />
+                  ) : (
+                    <IconStar size={18} />
+                  )}
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEditClick(node);
+                  }}
+                  className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
+                  title="Edit"
+                >
+                  <IconPencil size={18} />
+                </button>
+                {!node.is_system && (
+                  <button
+                    onClick={(e) => handleDeleteClick(node, e)}
+                    className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
+                    title="Delete"
+                  >
+                    <IconTrash size={18} />
+                  </button>
+                )}
+              </>
             )}
           </div>
         </td>
@@ -751,9 +783,9 @@ const AccountCodeListPage: React.FC = () => {
     return (
       <tr
         key={account.code}
-        className={`hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer ${
-          !account.is_active ? "opacity-50" : ""
-        }`}
+        className={`hover:bg-default-50 dark:hover:bg-gray-700 ${
+          isGreenTarget ? "" : "cursor-pointer "
+        }${!account.is_active ? "opacity-50" : ""}`}
         onClick={() => handleEditClick(account)}
       >
         <td className="px-4 py-2 text-sm">
@@ -777,14 +809,20 @@ const AccountCodeListPage: React.FC = () => {
           {account.parent_code || "-"}
         </td>
         <td className="px-4 py-2 text-sm" onClick={(e) => e.stopPropagation()}>
-          <FsNoteListbox
-            value={account.fs_note || ""}
-            onChange={(value: string): void => {
-              void handleFsNoteChange(account.code, value || null);
-            }}
-            options={fsNoteOptions}
-            ariaLabel={`FS Note for ${account.code}`}
-          />
+          {isGreenTarget ? (
+            <span className="text-default-600 dark:text-gray-300">
+              {account.fs_note || "-"}
+            </span>
+          ) : (
+            <FsNoteListbox
+              value={account.fs_note || ""}
+              onChange={(value: string): void => {
+                void handleFsNoteChange(account.code, value || null);
+              }}
+              options={fsNoteOptions}
+              ariaLabel={`FS Note for ${account.code}`}
+            />
+          )}
         </td>
         <td className="px-4 py-2 text-center text-sm">
           <span
@@ -799,52 +837,56 @@ const AccountCodeListPage: React.FC = () => {
         </td>
         <td className="px-4 py-2 text-center text-sm">
           <div className="flex items-center justify-center space-x-2">
-            <button
-              type="button"
-              onClick={(event: React.MouseEvent<HTMLButtonElement>): void =>
-                handleFavouriteToggle(account.code, event)
-              }
-              disabled={pendingFavouriteCodes.has(account.code)}
-              aria-pressed={favouriteCodes.has(account.code)}
-              aria-label={
-                favouriteCodes.has(account.code)
-                  ? `Remove ${account.code} from favourites`
-                  : `Add ${account.code} to favourites`
-              }
-              className="text-default-300 transition-colors hover:text-amber-500 disabled:cursor-wait disabled:opacity-50 dark:text-gray-500 dark:hover:text-amber-400"
-              title={
-                favouriteCodes.has(account.code)
-                  ? "Remove from favourites"
-                  : "Add to favourites"
-              }
-            >
-              {favouriteCodes.has(account.code) ? (
-                <IconStarFilled
-                  size={18}
-                  className="text-amber-500 dark:text-amber-400"
-                />
-              ) : (
-                <IconStar size={18} />
-              )}
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleEditClick(account);
-              }}
-              className="text-sky-600 hover:text-sky-800"
-              title="Edit"
-            >
-              <IconPencil size={18} />
-            </button>
-            {!account.is_system && (
-              <button
-                onClick={(e) => handleDeleteClick(account, e)}
-                className="text-rose-600 hover:text-rose-800"
-                title="Delete"
-              >
-                <IconTrash size={18} />
-              </button>
+            {!isGreenTarget && (
+              <>
+                <button
+                  type="button"
+                  onClick={(event: React.MouseEvent<HTMLButtonElement>): void =>
+                    handleFavouriteToggle(account.code, event)
+                  }
+                  disabled={pendingFavouriteCodes.has(account.code)}
+                  aria-pressed={favouriteCodes.has(account.code)}
+                  aria-label={
+                    favouriteCodes.has(account.code)
+                      ? `Remove ${account.code} from favourites`
+                      : `Add ${account.code} to favourites`
+                  }
+                  className="text-default-300 transition-colors hover:text-amber-500 disabled:cursor-wait disabled:opacity-50 dark:text-gray-500 dark:hover:text-amber-400"
+                  title={
+                    favouriteCodes.has(account.code)
+                      ? "Remove from favourites"
+                      : "Add to favourites"
+                  }
+                >
+                  {favouriteCodes.has(account.code) ? (
+                    <IconStarFilled
+                      size={18}
+                      className="text-amber-500 dark:text-amber-400"
+                    />
+                  ) : (
+                    <IconStar size={18} />
+                  )}
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEditClick(account);
+                  }}
+                  className="text-sky-600 hover:text-sky-800"
+                  title="Edit"
+                >
+                  <IconPencil size={18} />
+                </button>
+                {!account.is_system && (
+                  <button
+                    onClick={(e) => handleDeleteClick(account, e)}
+                    className="text-rose-600 hover:text-rose-800"
+                    title="Delete"
+                  >
+                    <IconTrash size={18} />
+                  </button>
+                )}
+              </>
             )}
           </div>
         </td>
@@ -993,18 +1035,20 @@ const AccountCodeListPage: React.FC = () => {
             )}
           </div>
 
-          <Button
-            onClick={handleAddClick}
-            color="sky"
-            variant="filled"
-            icon={IconPlus}
-            iconPosition="left"
-            size="sm"
-            className="whitespace-nowrap"
-          >
-            <span className="2xl:hidden">Add</span>
-            <span className="hidden 2xl:inline">Add Account</span>
-          </Button>
+          {!isGreenTarget && (
+            <Button
+              onClick={handleAddClick}
+              color="sky"
+              variant="filled"
+              icon={IconPlus}
+              iconPosition="left"
+              size="sm"
+              className="whitespace-nowrap"
+            >
+              <span className="2xl:hidden">Add</span>
+              <span className="hidden 2xl:inline">Add Account</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1163,14 +1207,16 @@ const AccountCodeListPage: React.FC = () => {
       )}
 
       {/* Delete Confirmation Dialog */}
-      <ConfirmationDialog
-        isOpen={showDeleteDialog}
-        onClose={() => setShowDeleteDialog(false)}
-        onConfirm={handleConfirmDelete}
-        title="Delete Account Code"
-        message={`Are you sure you want to delete account "${accountToDelete?.code}"? This action cannot be undone.`}
-        variant="danger"
-      />
+      {!isGreenTarget && (
+        <ConfirmationDialog
+          isOpen={showDeleteDialog}
+          onClose={() => setShowDeleteDialog(false)}
+          onConfirm={handleConfirmDelete}
+          title="Delete Account Code"
+          message={`Are you sure you want to delete account "${accountToDelete?.code}"? This action cannot be undone.`}
+          variant="danger"
+        />
+      )}
     </div>
   );
 };

@@ -1,6 +1,7 @@
 # Green Target Accounting — Build-Out & Legacy Jan–Jun 2026 Import (Handover Plan)
 
-**Created 25 Jul 2026. Status: PHASES G0, G1, G2, G3, G4 and G5 COMPLETE (G4 and G5 on 27 Jul 2026) —
+**Created 25 Jul 2026. Status: PHASES G0, G1, G2, G3, G4, G5 and G6 COMPLETE (G4 and G5 on 27 Jul
+2026, G6 on 28 Jul 2026) —
 see the execution records in §9. Source intake and the staging pipeline exist and pass every gate; all
 66 scan pages are transcribed and validated; the `greentarget` accounting tables, the 34-note GT
 catalogue and the 503-account chart of accounts are all loaded; **the Jan–Jun 2026 legacy ledger is
@@ -12,13 +13,16 @@ resolved by evidence during G1. G3 settled the `BTFS` disposition and the APPX-v
 mapping (`fs_note` holds the printed APPX verbatim — see §9, G3). G4 settled the derived CD_SD cash
 leg (user-approved), the four `(ref, date)` collisions, and `posting_sequence`. G5 settled the
 backend-clone question and produced the §3d operational bridge
-([GT_OPERATIONAL_BRIDGE.md](GT_OPERATIONAL_BRIDGE.md)). **G6 (frontend) is unblocked and is now the
-critical path**; the one outstanding input across the whole project is the user approval of
+([GT_OPERATIONAL_BRIDGE.md](GT_OPERATIONAL_BRIDGE.md)). **G6 shipped the frontend: the GT Accounting
+nav section (Journal Entries, Account Ledger, Trial Balance, Income Statement, Balance Sheet, Chart
+of Accounts) runs the shared TH pages read-only over GT route clones, and the GT Debtors report is
+re-pointed at the imported ledger (June 2026 total RM156,782.22).** G7 (organic posting) is now the
+critical path; the one outstanding input across the whole project is the user approval of
 `debtor-map.json`, which G7 needs. **A decision the user must make before G7 ships is named in the
 bridge §5 and in §7 here: whether GT will enter *every* invoice and payment from 1 July, or keep
 posting from manually keyed journals.** ⚠ **The dev database was then replaced with production data,
 which removed every GT accounting row G2/G3/G4 created — see §10 for what survives and how to rebuild
-it.** This
+it** (the rebuild has since been done; all 230 gates are green). This
 document is the entry point for the Green Target (GT) accounting project. It is
 written for a fresh session that has not seen the Tien Hock (TH) work, and it front-loads the
 findings that were already measured on 25 Jul 2026 so nobody re-derives them.
@@ -1205,6 +1209,92 @@ actually injected.**
    ledger, which is authoritative; it is recorded so a future session does not "discover" it.
 4. **⚠ The process decision in the bridge §5 must be made before G7 ships.** From 1 July the GL is
    fed by the operational screens, which today carry 2.9% of revenue and 0% of receivables.
+
+---
+
+### Phase G6 — frontend pages + debtors re-point — ✅ COMPLETE (28 Jul 2026)
+
+**The GT Accounting section is live: six shared TH pages now serve Green Target through an optional
+`company="greentarget"` prop (R7), backed by new read-only GT route clones, and the GT Debtors
+report is re-pointed at the imported ledger.** TH behaviour is unchanged — every prop defaults to
+Tien Hock and every TH config/endpoint/localStorage key keeps its original value. Changelog entry
+shipped (rule 16).
+
+**Files changed**
+
+| Path | Tracked | What |
+|---|---|---|
+| `src/routes/greentarget/accounting/journal-entries.js` | yes | New read-only clone: `GET /` (TH's `{ entries, total, limit, offset }` envelope, same filters) and `GET /:id` (lines with per-line display refs + joined account descriptions, `source: null`). |
+| `src/routes/greentarget/accounting/account-codes.js` | yes | New read-only clone: `GET /?flat=true` (503 accounts, `fs_note_name` joined) and the `/ledger-types` router (6 rows). |
+| `src/routes/greentarget/accounting/debtors.js` | yes | New ledger-backed debtors: `GET /`, `GET /statement/:code`, `GET /general-statement` emitting the shared page's exact shapes from the 28 TD children; aging as a monthly FIFO roll-forward from the 2026-01-01 anchors. |
+| `src/routes/index.js` | yes | Mounts `/greentarget/api/journal-entries`, `/account-codes`, `/ledger-types`, `/debtors`. |
+| `src/pages/Accounting/{JournalEntryListPage,JournalDetailsPage,AccountCodeListPage,DebtorsReportPage}.tsx`, `src/pages/Accounting/Reports/{TrialBalancePage,AccountLedgerPage,IncomeStatementPage,BalanceSheetPage}.tsx` | yes | Optional `company` prop (or, for Debtors, the existing config) with TH defaults; GT branches swap base paths, hide mutating/TH-only UI, and keep TH byte-identical when the prop is absent. |
+| `src/utils/accounting/useAccountingCache.ts` | yes | `useAccountCodesCache` / `useLedgerTypesCache` take an optional company (TH default; GT keys/endpoints suffixed). |
+| `src/utils/accounting/{TrialBalancePDF,JournalVoucherPDFMake}.ts(x)` | yes | Optional branding params with TH defaults. |
+| `src/utils/accounting/{GTIncomeStatementPDF,GTBalanceSheetPDF}.tsx` | yes | New GT PDF variants driven by the block-keyed payload (sibling files; TH PDFs untouched). |
+| `src/pages/GreenTarget/Accounting/GT*.tsx` (7 wrappers) | yes | 30-line config wrappers in the established `DebtorsReportPage` pattern. |
+| `src/pages/GreenTarget/DebtorsReportPage.tsx` | yes | Re-pointed at `/greentarget/api/debtors*`; customer drill deep-links `account-ledger?account=CODE`; `invoiceDetailsPath` omitted (bill rows are legacy journal refs). Shared page's three drill paths became optional config fields with guarded call sites. |
+| `src/pages/GreenTargetNavData.tsx` | yes | New Accounting section (Journal Entries + details, Account Ledger, Trial Balance, Income Statement, Balance Sheet, Chart of Accounts) with Debtors under Reports, and a new Sales section grouping Invoices / Payments / Documents; top-level order aligned with TH/JP (Accounting → Payroll → Sales → operational). All routes keep their existing paths. |
+| `dev/import/greentarget-report-fixtures/verify-legacy-reports.mjs` | yes | Regressions scan covers the three new routers; `EXTRACT(field FROM x)` no longer false-positives the FROM/JOIN table-reference regex. |
+| `src/components/ChangelogModal.tsx`, `AGENTS.md`, `CLAUDE.md` | yes | Changelog entry + GT status sentence (byte-identical in both, rule 13). |
+
+**Decisions**
+
+- **Everything is read-only.** All 1,705 GT journals are `IMP`, which TH already renders read-only;
+  GT adds belt-and-braces gates. No create/edit forms (JournalEntryPage, AccountCodeFormPage stay
+  TH-only); the R8 posting lock and mutations are G7's. "Bank Statement" and "Opening Balances" need
+  no GT pages — a bank statement is the Account Ledger pointed at a BK account, and anchors surface
+  read-only in the ledger payload (`opening_balance`/`opening_source`).
+- **Debtors re-point (user-approved approach):** the shared page is kept and fed by ledger-backed
+  endpoints. Each TD child is a "customer" (id = account code); per month: a `BALANCE B/F` row when
+  opening ≠ 0, one bill row per debit line (`invoice_number` = legacy display ref), and a
+  `RECEIPTS` row holding the month's credit lines as payments. Customer totals are exact:
+  `amount = opening + Σdebits`, `paid = Σcredits`, `balance = closing` (signed; KBOX −0.01 and
+  RUMAH MERAH −1.00 preserved). The general statement is a natural fit (`bal_bf / current_invoices
+  / payment / total_due`); the per-debtor statement is the running account ledger.
+- **IS/BS render GT's printed layout**, not TH's: block loop with `subtotal_ref`-driven bands
+  (GROSS PROFIT / OPERATING PROFIT / PROFIT BEFORE TAXATION / PROFIT FOR THE FINANCIAL YEAR; NET
+  ASSETS / TOTAL FINANCED BY), YTD basis label on the IS, and GT PDF variants reproducing the legacy
+  scan look. `ReportSourceGuide` (TH-specific copy) is hidden on all GT report paths.
+- **GT localStorage keys are namespaced** (`:greentarget` / `gtJournalEntryList*`), so the GT pages
+  never restore or overwrite TH filter/scroll caches — important because 69 account codes collide.
+
+**Findings**
+
+1. **TH's journal list envelope is `{ entries, total, limit, offset }`** (not `{ data/rows, ... }`) —
+   the clone copies the real envelope, so the shared list page works unmodified.
+2. **The isolation scanner false-positived `EXTRACT(YEAR FROM je.entry_date)`** as an unqualified
+   table reference. Fixed in the scanner (the SQL was already fully `greentarget.`-qualified); the
+   gate still fires on real leaks — verified because it caught `debtors.js` by name before the fix.
+3. **The GT debtors statement 404s on the `DEBTOR` control and unknown codes** — only the 28
+   children are debtors.
+4. TH favourites still fetch in the background on GT CoA/ledger pages (hooks can't be conditional;
+   results never applied to GT views) — same as the JP precedent.
+
+**Gate results — all green**
+
+| Gate | Result |
+|---|---|
+| `verify-legacy-reports.mjs` | ✅ `ALL STAGES GREEN (116 gates)` — regressions scan now covers all six GT routers |
+| `verify-chart.mjs` / `verify-import.mjs` | ✅ 55 gates / 62 gates, 2,850 comparisons |
+| Debtors grand total 06/2026 | ✅ **156,782.22** exactly (= printed note 22), over HTTP and in-process; general-statement `total_due` ties; bare `GET /` defaults to 6/2026 |
+| IS / BS over HTTP | ✅ profit 16,369.61 YTD; BS balanced, net assets = financed by = 280,386.14 |
+| Journal list / detail | ✅ 1,705 total; legacy refs (`RV26/06/76`), `source: null`, per-line account descriptions |
+| CoA / ledger-types | ✅ 503 / 6 rows over HTTP |
+| Frontend modules | ✅ all 14 touched/created modules transform through Vite without error |
+| TH pages unchanged | ✅ by construction: props/configs/localStorage keys default to TH; no TH endpoint touched |
+
+**Not verified:** click-through of the GT pages in a browser (per rule 10 the user tests manually);
+the GT IS/BS PDF print output against the scans (data path verified; visual check is the user's).
+
+#### Open items for later phases
+
+1. **`debtor-map.json` still has 0 approved mappings** — needed before G7's non-destructive sync.
+2. **⚠ The bridge §5 process decision** (enter every invoice/payment from 1 July, or keep manual
+   journals) must be made before G7 ships.
+3. The RM50.00 `2026/00099` disagreement remains named, not resolved.
+4. The old operational `/greentarget/api/payments/debtors*` endpoints are now unused by any page;
+   removal is a G7 cleanup, not G6 scope.
 
 ---
 

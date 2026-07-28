@@ -979,8 +979,22 @@ async function stageRegressions() {
   console.log("\n== stage regressions — isolation, population, Tien Hock ==");
 
   const allCtes = new Set();
-  for (const file of ["report-engine.js", "financial-reports.js", "account-ledger.js"]) {
-    const source = fs.readFileSync(path.join(ENGINE_DIR, file), "utf8");
+  for (const file of [
+    "report-engine.js",
+    "financial-reports.js",
+    "account-ledger.js",
+    // G6 read-only routers. debtors.js is written by a parallel workstream —
+    // skip whatever has not landed yet instead of failing the stage.
+    "journal-entries.js",
+    "account-codes.js",
+    "debtors.js",
+  ]) {
+    const filePath = path.join(ENGINE_DIR, file);
+    if (!fs.existsSync(filePath)) {
+      note(`${file}: not present yet, isolation scan skipped`);
+      continue;
+    }
+    const source = fs.readFileSync(filePath, "utf8");
     const { problems, ctes } = scanSqlReferences(source);
     ctes.forEach((cte) => allCtes.add(cte));
     check(
