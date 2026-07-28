@@ -18,6 +18,35 @@ requires separate approval).
 
 ---
 
+## Removed 28 Jul 2026 — 3 files (Estimated report Phase 1 + Green Target G2/G3)
+
+All three files below were removed from `dev/migrations/` on 2026-07-28 after being applied and
+verified on dev. **Nothing new was executed — documentation + file removal only.** They were created
+after `5cfd925b`, so **recover them with `git show 26afc11b:dev/migrations/<filename>`** (`26afc11b`
+is the HEAD immediately before this removal).
+
+Confirmed present in the dev database at removal time: 135 `estimated_report_lines` + 447
+`estimated_report_line_sources`; 503 `greentarget.account_codes` + 34
+`greentarget.financial_statement_notes`.
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-07-25_estimated_report_foundation.sql` | Estimated P&L / Unit Cost report (MEE & BIHUN) **Phase 1**: created `estimated_report_lines`, `estimated_report_line_sources`, `estimated_report_inputs`, `estimated_report_anchors` and seeded 135 lines / 447 source members from the legacy formula pages (ClosingStockReport.pdf p3–p8) + the June 2026 printed report; seeded the 2026-06-01 accumulative anchors (MEE −166,900.31, BIHUN 404,935.44). Schema + mappings only — posts no journal, changes no stock/sales data, computes no report value. Idempotent (rebuilds seeded lines/members; never touches user-keyed `estimated_report_inputs`; anchors inserted only when absent). **Must also be re-applied after any production→dev DB import that drops the `estimated_report_*` tables** — see ESTIMATED_REPORT_HANDOVER.md §9.4 "Deployment / DB-refresh note". | dev ✓, prod PENDING |
+| `2026-07-26_greentarget_accounting_foundation.sql` | Green Target **Phase G2**: cloned the accounting layer into the `greentarget` schema — 8 tables (`ledger_types`, `journal_entry_types`, `financial_statement_notes`, `account_codes`, `journal_entries`, `journal_entry_lines`, `account_opening_balances`, `import_legacy_rows`) + the `account_codes_hierarchy` **VIEW** — and seeded the 6 ledger types, the `IMP` journal type and the **34-note** GT financial-statement catalogue (incl. the GT-only `statement_block` column and the three GT/TH semantic collisions: note `9`, `18-2`, `23`). Creates no account code, journal or anchor; touches no `public` table. **Baseline-independent** (snapshots the TH counts into a temp table inside its own transaction and asserts them unmoved), so it applies cleanly to any database — unlike the G4 migrations. Idempotent; an unchanged rerun is an exact no-op. | dev ✓, prod PENDING (G8) |
+| `2026-07-26_greentarget_chart_of_accounts.sql` | Green Target **Phase G3**: loaded the **503-account** legacy seed chart into `greentarget.account_codes` (473 GTLD ledger accounts + `BTFS` + the `DEBTOR` control + 28 GTDB debtor children), with `fs_note` = the printed Trial Balance APPX verbatim and `ledger_type` derived from printed evidence (BK 5 / GL 440 / TC 29 / TD 29). **GENERATED FILE — never hand-edited**: regenerate with `node dev/import/greentarget-legacy/build-chart.mjs`, verify with `verify-chart.mjs` (55 gates); sha256 at removal `abe56e5f…`. Creates no journal/line/anchor and touches no `public` table (tail asserts the TH baseline unmoved). **Baseline-independent.** Rerun is `ON CONFLICT DO NOTHING` — preserves user overrides and tolerates extra live rows. | dev ✓, prod PENDING (G8) |
+
+**Rebuild order after a dev DB refresh (GT_ACCOUNTING_HANDOVER.md §10c):** G2 → G3 → G4
+(`2026-07-27_greentarget_import_date_encoding.sql` + staging load + `…_opening_anchors.sql`, which
+are **still in `dev/migrations/`** and require the §10b TH-baseline re-pin) → G7
+(`2026-07-28_greentarget_g7_organic_posting.sql`). G2 and G3 apply as-is at any baseline.
+
+**Prod:** GT — all GT migrations reach production only through **Phase G8** (production has never had
+any GT accounting migration applied; `deploy.yml` does not run migrations). Estimated report — the
+foundation migration plus `2026-07-28_estimated_report_parity_data_fixes.sql` must both reach
+production before the report is exposed there (ESTIMATED_REPORT_HANDOVER.md §9.4).
+
+---
+
 ## Ran 24 Jul 2026 — REC journals display_reference backfill (no migration file kept)
 
 One-time data backfill executed directly (never committed as a `.sql` file — the exact statement is
