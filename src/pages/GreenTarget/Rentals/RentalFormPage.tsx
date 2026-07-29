@@ -266,7 +266,12 @@ const RentalFormPage: React.FC = () => {
   // Load locations and **AUTO-SELECT FIRST LOCATION**
   useEffect(() => {
     let isMounted = true;
+    // `loading` is only true while a rental is being fetched, which now also
+    // covers the create -> edit hop after saving: the route changes but this
+    // component is reused, so without this guard the auto-select would race
+    // fetchRentalDetails and could overwrite the saved location.
     if (
+      !loading &&
       formData.customer_id > 0 &&
       (!initialFormData || formData.customer_id !== initialFormData.customer_id)
     ) {
@@ -292,7 +297,7 @@ const RentalFormPage: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [formData.customer_id, initialFormData]);
+  }, [formData.customer_id, initialFormData, loading]);
 
   // Monitor form changes
   useEffect(() => {
@@ -669,7 +674,15 @@ const RentalFormPage: React.FC = () => {
       toast.success(
         `Rental ${isEditMode ? "updated" : "created"} successfully!`
       );
-      navigate("/greentarget/rentals");
+      // A new rental lands on its own page so add-ons, the invoice and the
+      // pickup date can be handled straight away. Falls back to the list if the
+      // backend somehow returns no id.
+      const newRentalId: number | undefined = response?.rental?.rental_id;
+      if (!isEditMode && newRentalId) {
+        navigate(`/greentarget/rentals/${newRentalId}`, { replace: true });
+      } else {
+        navigate("/greentarget/rentals");
+      }
     } catch (error: any) {
       console.error("Error saving rental:", error);
       let errorMsg = "An unexpected error occurred.";

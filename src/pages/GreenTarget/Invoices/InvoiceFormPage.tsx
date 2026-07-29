@@ -24,6 +24,7 @@ import {
 } from "@tabler/icons-react";
 import clsx from "clsx";
 import { FormCombobox, SelectOption } from "../../../components/FormComponents";
+import { formatLocationDisplay } from "../../../utils/greenTarget/formatLocationDisplay";
 import SubmissionResultsModal from "../../../components/Invoice/SubmissionResultsModal";
 import { EInvoiceSubmissionResult } from "../../../types/types";
 import type {
@@ -47,6 +48,7 @@ interface Rental {
   date_placed: string;
   date_picked: string | null;
   location_address?: string;
+  location_site?: string | null;
   driver: string;
   customer_name?: string; // For display perhaps
   invoice_info?: {
@@ -1063,8 +1065,14 @@ const InvoiceFormPage: React.FC = () => {
                                   {new Date(
                                     rental.date_placed
                                   ).toLocaleDateString()}
-                                  {rental.location_address &&
-                                    ` • ${rental.location_address}`}
+                                  {formatLocationDisplay(
+                                    rental.location_site,
+                                    rental.location_address
+                                  ) &&
+                                    ` • ${formatLocationDisplay(
+                                      rental.location_site,
+                                      rental.location_address
+                                    )}`}
                                 </div>
                               </div>
                             </div>
@@ -1125,9 +1133,16 @@ const InvoiceFormPage: React.FC = () => {
                                   </>
                                 )}
                               </div>
-                              {rental.location_address && (
+                              {formatLocationDisplay(
+                                rental.location_site,
+                                rental.location_address
+                              ) && (
                                 <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                  Location: {rental.location_address}
+                                  Location:{" "}
+                                  {formatLocationDisplay(
+                                    rental.location_site,
+                                    rental.location_address
+                                  )}
                                 </div>
                               )}
                             </div>
