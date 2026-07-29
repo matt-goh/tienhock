@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-30",
+    ms: "Green Target — Journal Entries: jenis baucer Cash Payment, Bank Payment dan Journal kini boleh dikunci terus di Green Target, sama seperti di Tien Hock. Pilih jenis tersebut semasa membuat jurnal baharu dan nombor rujukan diisi automatik (contohnya PCE001/07 untuk Cash Payment). Sesuai untuk memasukkan payment voucher ke dalam akaun Green Target.",
+    en: "Green Target — Journal Entries: Cash Payment, Bank Payment and Journal voucher types can now be keyed directly in Green Target, just like in Tien Hock. Pick the type when creating a new journal and the reference number is filled in automatically (for example PCE001/07 for Cash Payment). This is where payment vouchers can now be entered into Green Target's accounts.",
+  },
+  {
+    date: "2026-07-30",
     ms: "Green Target — Senarai Sewaan dan senarai Invois kini mengingati paparan anda. Selepas membuka sewaan atau invois dan kembali semula, halaman yang sama, carian, julat tarikh, tapisan (termasuk \"Active Rentals Only\" serta tapisan pelanggan, status dan consolidation) dan kedudukan skrin dikekalkan — anda tidak perlu lagi menetapkannya semula setiap kali. Tetapan ini juga kekal apabila anda kembali ke halaman tersebut kemudian. Membuka senarai invois melalui pautan pelanggan tetap bermula pada halaman pertama seperti biasa.",
     en: "Green Target — The Rentals list and Invoices list now remember your view. After opening a rental or an invoice and coming back, the same page, search, date range, filters (including \"Active Rentals Only\" and the customer, status and consolidation filters) and scroll position are kept — you no longer have to set them again each time. They also stay in place when you return to the page later. Opening the invoice list from a customer link still starts on the first page as before.",
   },
