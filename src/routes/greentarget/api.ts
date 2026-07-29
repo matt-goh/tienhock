@@ -130,6 +130,8 @@ export const greenTargetApi = {
     );
   },
   getRental: (id: any) => api.get(`/greentarget/api/rentals/${id}`),
+  getRentalDetails: (id: any) =>
+    api.get(`/greentarget/api/rentals/${id}/details`),
   createRental: (data: any) => api.post("/greentarget/api/rentals", data),
   updateRental: (id: any, data: any) =>
     api.put(`/greentarget/api/rentals/${id}`, data),
