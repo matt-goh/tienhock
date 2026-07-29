@@ -1722,6 +1722,39 @@ consistent.
 `dev/import/greentarget-report-fixtures/verify-legacy-reports.mjs`, AGENTS/CLAUDE guidance, and the
 29 Jul changelog entry.
 
+### 10h. Deleted invoices must take their journal with them — FIXED (30 Jul 2026)
+
+`DELETE /greentarget/api/invoices/:invoice_id` (only reachable for a **cancelled** invoice, in the
+open period) removed the invoice row but left its invoice-owned `S` journal behind as
+`status='cancelled'`, still holding `reference_no` = the invoice number. Because
+`journal_entries_reference_no_key` is unique across **all** statuses while the invoice-number
+availability check only reads `greentarget.invoices`, the UI reported "Invoice number is available"
+and then the create failed with `duplicate key value violates unique constraint
+"journal_entries_reference_no_key"`. Any GT invoice number that was ever cancelled + deleted was
+permanently unusable. Observed on `2026/01013` (invoice 327, RIDZUAN, RM250, journal 1709).
+
+The delete path now removes the invoice's own cancelled sales journal in the same transaction —
+matched by `source_type='invoice' AND source_id = the invoice` **or** the invoice's
+`journal_entry_id` back-link (a journal adopted by `reference_no` keeps the back-link but not
+necessarily the source columns), and restricted to `entry_type='S' AND status='cancelled'` so a
+legacy `IMP` import, another document's journal, or a source-less manual journal can never match.
+Lines cascade. This deletes ledger data only in the one case where it is inert: the journal is
+cancelled (no report, trial balance or account ledger reads it), its source document is being
+destroyed, and it could never be restored anyway — the restore endpoint refuses a journal whose
+owning document is gone.
+
+`dev/migrations/2026-07-30_greentarget_orphan_invoice_journals.sql` clears the orphans the old path
+already created (guarded, idempotent, fail-closed; aborts if any GT payment or adjustment document
+still references one). Applied to dev 30 Jul 2026 — removed journal 1709 and its 2 lines;
+**production still pending.**
+
+Not affected: GT adjustment documents have no delete endpoint and `generateNextDocId` scans
+cancelled ids too, so an adjustment number is never reused; GT payment journals key on
+`REC-{payment_id}` and payment ids are never reused.
+
+**Files:** `src/routes/greentarget/invoices.js`,
+`dev/migrations/2026-07-30_greentarget_orphan_invoice_journals.sql`, and the 30 Jul changelog entry.
+
 ---
 
 *Update this file with a per-phase execution record as phases complete. Entry point for all

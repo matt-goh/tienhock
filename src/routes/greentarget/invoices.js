@@ -1275,7 +1275,7 @@ export default function (pool, defaultConfig) {
 
       // Check if invoice exists and is cancelled
       const invoiceCheck = await client.query(
-        "SELECT status, total_amount, date_issued FROM greentarget.invoices WHERE invoice_id = $1 FOR UPDATE",
+        "SELECT status, total_amount, date_issued, journal_entry_id FROM greentarget.invoices WHERE invoice_id = $1 FOR UPDATE",
         [numericInvoiceId]
       );
 
@@ -1346,6 +1346,36 @@ export default function (pool, defaultConfig) {
         "DELETE FROM greentarget.invoices WHERE invoice_id = $1",
         [numericInvoiceId]
       );
+
+      // Delete the invoice-owned S journal along with it. Only a cancelled
+      // invoice reaches this point, so the journal is already cancelled and has
+      // no ledger effect; leaving it behind would keep squatting
+      // reference_no = the invoice number (unique across ALL statuses), so that
+      // number could never be keyed again — it failed on
+      // journal_entries_reference_no_key at creation. The source document is
+      // gone, so the journal is also unrestorable dead weight. Guarded to this
+      // invoice's own sales journal — matched by source ownership OR the
+      // invoice's own back-link (a journal adopted by reference_no keeps the
+      // back-link but not always the source columns). A legacy import (IMP) or
+      // a journal belonging to any other document can never match.
+      const removedJournals = await client.query(
+        `DELETE FROM greentarget.journal_entries
+          WHERE entry_type = 'S'
+            AND status = 'cancelled'
+            AND (
+              (source_type = 'invoice' AND source_id = $1)
+              OR id = $2
+            )
+          RETURNING id, reference_no`,
+        [String(numericInvoiceId), invoice.journal_entry_id]
+      );
+      if (removedJournals.rows.length > 0) {
+        console.log(
+          `✓ Removed cancelled GT sales journal(s) with deleted invoice ${numericInvoiceId}: ${removedJournals.rows
+            .map((row) => `${row.id} (${row.reference_no})`)
+            .join(", ")}`
+        );
+      }
 
       await client.query("COMMIT");
 
