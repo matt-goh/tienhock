@@ -14,6 +14,7 @@ import {
   IconTrash,
   IconMapPin,
   IconTruck,
+  IconPencil,
   IconPhone,
   IconX,
   IconChevronDown,
@@ -273,6 +274,16 @@ const RentalCard = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                navigate(`/greentarget/rentals/${rental.rental_id}/edit`);
+              }}
+              className="p-1.5 hover:bg-default-100 dark:hover:bg-gray-700 text-default-500 dark:text-gray-400 rounded transition-colors"
+              title="Edit Rental"
+            >
+              <IconPencil size={16} stroke={1.5} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
                 onGenerateDeliveryOrder(rental);
               }}
               className="p-1.5 hover:bg-sky-100 dark:hover:bg-sky-900/30 text-sky-600 dark:text-sky-400 rounded transition-colors"
@@ -504,18 +515,9 @@ const RentalListPage = () => {
   };
 
   const handleCreateInvoice = (rental: Rental) => {
-    // Redirect to invoice creation page with rental ID
-    navigate(`/greentarget/invoices/new`, {
-      state: {
-        rental_id: rental.rental_id,
-        customer_id: rental.customer_id,
-        customer_name: rental.customer_name,
-        driver: rental.driver,
-        location_address: rental.location_address,
-        tong_no: rental.tong_no,
-        date_placed: rental.date_placed,
-        date_picked: rental.date_picked,
-      },
+    // Open the rental's details page with the Create Invoice modal auto-opened
+    navigate(`/greentarget/rentals/${rental.rental_id}`, {
+      state: { openInvoiceModal: true },
     });
   };
 

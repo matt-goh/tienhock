@@ -172,6 +172,61 @@ const handleEInvoiceStatusChange = (invoiceId, newStatus, pool, apiClient) => {
   }
 };
 
+/**
+ * Server-side guard for invoice rental links (previously client-side only):
+ * every rental must exist, belong to the invoice's customer, and not already
+ * be linked to a non-cancelled invoice. On update, the invoice being edited
+ * is excluded from the double-billing check. Throws an error with status 400
+ * naming the conflicting rental.
+ */
+const assertRentalLinksValid = async (
+  client,
+  customerId,
+  rentalIds,
+  excludeInvoiceId = null
+) => {
+  const badRequest = (message) => {
+    const error = new Error(message);
+    error.status = 400;
+    throw error;
+  };
+
+  const rentalResult = await client.query(
+    `SELECT rental_id, customer_id FROM greentarget.rentals WHERE rental_id = ANY($1)`,
+    [rentalIds]
+  );
+  const rentalsById = new Map(rentalResult.rows.map((row) => [row.rental_id, row]));
+
+  for (const rentalId of rentalIds) {
+    const rental = rentalsById.get(Number(rentalId));
+    if (!rental) {
+      badRequest(`Rental #${rentalId} does not exist.`);
+    }
+    if (rental.customer_id !== Number(customerId)) {
+      badRequest(
+        `Rental #${rentalId} belongs to a different customer and cannot be added to this invoice.`
+      );
+    }
+  }
+
+  const conflictResult = await client.query(
+    `SELECT ir.rental_id, i.invoice_number
+     FROM greentarget.invoice_rentals ir
+     JOIN greentarget.invoices i ON i.invoice_id = ir.invoice_id
+     WHERE ir.rental_id = ANY($1)
+       AND (i.status IS NULL OR i.status != 'cancelled')
+       AND ($2::int IS NULL OR ir.invoice_id != $2)`,
+    [rentalIds, excludeInvoiceId]
+  );
+
+  if (conflictResult.rows.length > 0) {
+    const conflict = conflictResult.rows[0];
+    badRequest(
+      `Rental #${conflict.rental_id} is already billed on invoice ${conflict.invoice_number}.`
+    );
+  }
+};
+
 export default function (pool, defaultConfig) {
   const router = Router();
 
@@ -775,8 +830,6 @@ export default function (pool, defaultConfig) {
       invoice_number, // Optional custom invoice number
     } = req.body;
 
-    console.log('Invoice creation request:', { type, customer_id, rental_ids, amount_before_tax, tax_amount, date_issued, invoice_number });
-
     const client = await pool.connect();
 
     try {
@@ -801,6 +854,12 @@ export default function (pool, defaultConfig) {
       }
       if (isNaN(numTaxAmount) || numTaxAmount < 0) {
         throw new Error("Invalid tax_amount provided.");
+      }
+
+      // Rentals must belong to this customer and must not already be billed on
+      // another non-cancelled invoice (was enforced client-side only).
+      if (type === "regular") {
+        await assertRentalLinksValid(client, customer_id, rental_ids);
       }
 
       // --- Logic ---
@@ -992,6 +1051,17 @@ export default function (pool, defaultConfig) {
 
       if (isNaN(numTaxAmount) || numTaxAmount < 0) {
         throw new Error("Invalid tax_amount provided.");
+      }
+
+      // Rentals must belong to this customer and must not already be billed on
+      // another non-cancelled invoice (excluding the invoice being edited).
+      if (type === "regular") {
+        await assertRentalLinksValid(
+          client,
+          customer_id,
+          rental_ids,
+          numericInvoiceId
+        );
       }
 
       // If invoice_number is provided, check for duplicates
