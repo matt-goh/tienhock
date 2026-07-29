@@ -30,6 +30,24 @@ requires separate approval).
 
 ---
 
+## Removed 30 Jul 2026 (second batch) — 2 files (GT manual payment types + rental add-ons removal)
+
+Applied to **dev and production** on 2026-07-30 (prod runs by the user), then removed per the project
+convention. Both existed at commit **`09596c44`** — recover with
+`git show 09596c44:dev/migrations/<filename>`.
+
+Dev state verified at removal: `greentarget.journal_entry_types` = 12 rows including `B`/`C`/`J`;
+`greentarget.rental_addons` and `greentarget.addon_paycodes` both gone (`to_regclass` NULL);
+`daily_lori_habuk_lines_source_type_chk` = PLACEMENT/PICKUP/MANUAL/DERIVED only, and all 359 existing
+lines are `MANUAL` (zero ADDON rows). Reruns are clean no-ops.
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-07-30_greentarget_manual_payment_types.sql` | Seeded the three Tien Hock manual journal entry types into `greentarget.journal_entry_types` — `B` (Bank Payment), `C` (Cash Payment), `J` (Journal) — names/descriptions copied verbatim from `public.journal_entry_types`, so staff can key GT payment vouchers on the Journal Entries page exactly like TH (request 29–30 Jul 2026). GT keeps its own design: **no header `cheque_no` machinery** — cheque/transaction references stay per LINE, the shared Journal form hides the TH cheque field for GT, and next-reference prefixes are C→PCE, B→PBE, J→JNL. `ON CONFLICT (code) DO NOTHING`, so a rerun is an exact no-op. Schema note: `CLAUDE.md`/`AGENTS.md` `greentarget.journal_entry_types`. | dev ✓, prod ✓ (both 2026-07-30) |
+| `2026-07-30_greentarget_remove_rental_addons.sql` | Removed the GT **rental add-ons** feature, which was never used — extra driver pay is keyed with the **Manual Item** button on the payroll details page, which reads the shared `pay_codes` catalogue and never touched these tables. Dropped `greentarget.rental_addons` + `greentarget.addon_paycodes` and rebuilt `daily_lori_habuk_lines_source_type_chk` without the `ADDON` value (now PLACEMENT/PICKUP/MANUAL/DERIVED). Guarded and fail-closed: aborts before dropping anything if any `greentarget.daily_lori_habuk_lines` row still carries `source_type='ADDON'`. Idempotent (`DROP TABLE IF EXISTS` + `DROP CONSTRAINT IF EXISTS` then re-add). Companion code removals: the `/greentarget/api/rental-addons` router, the addon-paycode CRUD in `payroll-rules.js`, the ADDON prefill branch in `driverTripRules.js`, the rentals `addon_count` column expression, `RentalAddonModal.tsx`, the rental form Add-ons section, the rental list add-on badge, and the Addon Paycodes section/modal on the Payroll Settings page. Narrative: [GT/GT_PAYROLL_PHASE2_HANDOVER.md](GT/GT_PAYROLL_PHASE2_HANDOVER.md) "Rental add-ons REMOVED (2026-07-30)" — add-on references in its Phase 2/3 sections are historical. | dev ✓, prod ✓ (both 2026-07-30) |
+
+---
+
 ## Removed 30 Jul 2026 — 1 file (GT orphaned invoice journals)
 
 Applied to **dev and production** on 2026-07-30 (prod run by the user), then removed per the project
