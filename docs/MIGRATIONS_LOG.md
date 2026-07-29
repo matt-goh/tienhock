@@ -30,6 +30,22 @@ requires separate approval).
 
 ---
 
+## Removed 30 Jul 2026 — 1 file (GT orphaned invoice journals)
+
+Applied to **dev and production** on 2026-07-30 (prod run by the user), then removed per the project
+convention. Recover with
+`git show ee180c6d:dev/migrations/2026-07-30_greentarget_orphan_invoice_journals.sql`.
+
+Dev state at removal: journal `1709` and its 2 lines gone; zero cancelled `greentarget`
+`entry_type='S'` journals whose source invoice no longer exists; `2026/01013` free to key again.
+A rerun is a clean no-op (`Orphaned GT sales journals to remove: none`).
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-07-30_greentarget_orphan_invoice_journals.sql` | Deleted cancelled Green Target sales journals whose invoice had been hard-deleted. `DELETE /greentarget/api/invoices/:invoice_id` (reachable only for a **cancelled** invoice, in the open period) used to remove the invoice row alone, leaving its invoice-owned `S` journal behind as `status='cancelled'` still holding `reference_no` = the invoice number. `journal_entries_reference_no_key` is unique across **all** statuses while the invoice-number availability check only reads `greentarget.invoices`, so the UI reported "Invoice number is available" and the create then failed with `duplicate key value violates unique constraint "journal_entries_reference_no_key"` — **any GT invoice number that was ever cancelled + deleted was permanently unusable**. Observed on `2026/01013` (invoice 327, RIDZUAN, RM250, journal 1709, DR CD_SD / CR TGA). Scope: `entry_type='S'` + `source_type='invoice'` + `status='cancelled'` + the source invoice genuinely gone + no invoice back-linking to it, so a legacy `IMP` import, a receipt/adjustment journal and a source-less manual journal are all excluded by construction; lines cascade. No ledger effect — a cancelled journal is read by no report, trial balance or account ledger, and it was unrestorable anyway (the restore endpoint refuses a journal whose owning document is gone). Guarded, idempotent, fail-closed (aborts if any GT payment or adjustment document still references an orphan); post-check asserts none remain. Companion code change: the delete path in `src/routes/greentarget/invoices.js` now removes the invoice's own cancelled sales journal in the same transaction, so no new orphan can be created. Narrative: GT_ACCOUNTING_HANDOVER.md §10h; changelog entry shipped 2026-07-30. | dev ✓, prod ✓ (both 2026-07-30) |
+
+---
+
 ## Removed 29 Jul 2026 — 1 file (GT salary voucher generator foundation)
 
 Applied and verified on dev, then removed per the project convention. Recover with

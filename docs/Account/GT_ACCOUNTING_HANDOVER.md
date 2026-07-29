@@ -1743,10 +1743,12 @@ cancelled (no report, trial balance or account ledger reads it), its source docu
 destroyed, and it could never be restored anyway — the restore endpoint refuses a journal whose
 owning document is gone.
 
-`dev/migrations/2026-07-30_greentarget_orphan_invoice_journals.sql` clears the orphans the old path
-already created (guarded, idempotent, fail-closed; aborts if any GT payment or adjustment document
-still references one). Applied to dev 30 Jul 2026 — removed journal 1709 and its 2 lines;
-**production still pending.**
+`2026-07-30_greentarget_orphan_invoice_journals.sql` cleared the orphans the old path already
+created (guarded, idempotent, fail-closed; aborts if any GT payment or adjustment document still
+references one). Applied to **dev and production** on 30 Jul 2026 — on dev it removed journal 1709
+and its 2 lines. The `.sql` file has since been removed per the project convention; recover it with
+`git show ee180c6d:dev/migrations/2026-07-30_greentarget_orphan_invoice_journals.sql`
+(see [MIGRATIONS_LOG.md](../MIGRATIONS_LOG.md)).
 
 Not affected: GT adjustment documents have no delete endpoint and `generateNextDocId` scans
 cancelled ids too, so an adjustment number is never reused; GT payment journals key on
