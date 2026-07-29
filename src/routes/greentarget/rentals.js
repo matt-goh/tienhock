@@ -93,6 +93,7 @@ export default function (pool) {
             c.name as customer_name,
             c.phone_number as customer_phone_number,
             l.address as location_address,
+            l.site as location_site,
             l.phone_number as location_phone_number,
             d.status as dumpster_status,
             pd.name as pickup_destination_name,
@@ -112,8 +113,7 @@ export default function (pool) {
                   WHEN i.status = 'cancelled' THEN 9
                   ELSE 3
                 END
-              LIMIT 1) as invoice_info,
-            (SELECT COUNT(*) FROM greentarget.rental_addons ra WHERE ra.rental_id = r.rental_id) as addon_count
+              LIMIT 1) as invoice_info
       `;
 
       const fromClause = `
@@ -616,8 +616,9 @@ export default function (pool) {
       // Get rental details with joined data
       const query = `
         SELECT r.*, 
-               c.name as customer_name, 
+               c.name as customer_name,
                l.address as location_address,
+               l.site as location_site,
                d.status as dumpster_status
         FROM greentarget.rentals r
         JOIN greentarget.customers c ON r.customer_id = c.customer_id
@@ -643,7 +644,11 @@ export default function (pool) {
           do_number: `DO-${rentalData.rental_id}`,
           date: rentalData.date_placed,
           customer: rentalData.customer_name,
-          location: rentalData.location_address || "N/A",
+          location:
+            [rentalData.location_site, rentalData.location_address]
+              .map((part) => (part || "").trim())
+              .filter(Boolean)
+              .join(" — ") || "N/A",
           dumpster: rentalData.tong_no,
           driver: rentalData.driver,
           remarks: rentalData.remarks || "",
@@ -658,6 +663,90 @@ export default function (pool) {
     }
   });
 
+  // Get aggregated rental details: rental row + ALL linked invoices (each with
+  // its payments), for the Rental Details page. Non-cancelled invoices first.
+  router.get("/:rental_id/details", async (req, res) => {
+    const { rental_id } = req.params;
+
+    try {
+      const rentalQuery = `
+        SELECT r.*,
+               c.name as customer_name,
+               c.phone_number as customer_phone_number,
+               l.address as location_address,
+               l.site as location_site,
+               l.phone_number as location_phone_number,
+               d.status as dumpster_status,
+               pd.name as pickup_destination_name
+        FROM greentarget.rentals r
+        JOIN greentarget.customers c ON r.customer_id = c.customer_id
+        LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
+        JOIN greentarget.dumpsters d ON r.tong_no = d.tong_no
+        LEFT JOIN greentarget.pickup_destinations pd ON r.pickup_destination = pd.code
+        WHERE r.rental_id = $1
+      `;
+
+      const rentalResult = await pool.query(rentalQuery, [rental_id]);
+
+      if (rentalResult.rows.length === 0) {
+        return res.status(404).json({ message: "Rental not found" });
+      }
+
+      // Every invoice linked to this rental, non-cancelled first.
+      const invoicesQuery = `
+        SELECT i.invoice_id, i.invoice_number, i.status, i.date_issued,
+               i.total_amount, i.balance_due
+        FROM greentarget.invoices i
+        JOIN greentarget.invoice_rentals ir ON i.invoice_id = ir.invoice_id
+        WHERE ir.rental_id = $1
+        ORDER BY
+          CASE WHEN i.status = 'cancelled' THEN 1 ELSE 0 END,
+          i.date_issued DESC,
+          i.invoice_id DESC
+      `;
+
+      const invoicesResult = await pool.query(invoicesQuery, [rental_id]);
+      const invoices = invoicesResult.rows;
+
+      // Attach each invoice's payments (all statuses, newest first).
+      if (invoices.length > 0) {
+        const invoiceIds = invoices.map((invoice) => invoice.invoice_id);
+        const paymentsQuery = `
+          SELECT payment_id, invoice_id, payment_date, amount_paid,
+                 payment_method, payment_reference, internal_reference,
+                 status, cancellation_date, cancellation_reason
+          FROM greentarget.payments
+          WHERE invoice_id = ANY($1)
+          ORDER BY payment_date DESC, payment_id DESC
+        `;
+        const paymentsResult = await pool.query(paymentsQuery, [invoiceIds]);
+
+        const paymentsByInvoice = new Map();
+        for (const payment of paymentsResult.rows) {
+          if (!paymentsByInvoice.has(payment.invoice_id)) {
+            paymentsByInvoice.set(payment.invoice_id, []);
+          }
+          paymentsByInvoice.get(payment.invoice_id).push(payment);
+        }
+
+        for (const invoice of invoices) {
+          invoice.payments = paymentsByInvoice.get(invoice.invoice_id) || [];
+        }
+      }
+
+      res.json({
+        rental: rentalResult.rows[0],
+        invoices,
+      });
+    } catch (error) {
+      console.error("Error fetching Green Target rental details:", error);
+      res.status(500).json({
+        message: "Error fetching rental details",
+        error: error.message,
+      });
+    }
+  });
+
   // Get rental by ID
   router.get("/:rental_id", async (req, res) => {
     const { rental_id } = req.params;
@@ -667,6 +756,7 @@ export default function (pool) {
         SELECT r.*,
                c.name as customer_name,
                l.address as location_address,
+               l.site as location_site,
                d.status as dumpster_status,
                pd.name as pickup_destination_name,
                (SELECT json_build_object(
@@ -686,8 +776,7 @@ export default function (pool) {
                     WHEN i.status = 'cancelled' THEN 9
                     ELSE 3
                   END
-                LIMIT 1) as invoice_info,
-               (SELECT COUNT(*) FROM greentarget.rental_addons ra WHERE ra.rental_id = r.rental_id) as addon_count
+                LIMIT 1) as invoice_info
         FROM greentarget.rentals r
         JOIN greentarget.customers c ON r.customer_id = c.customer_id
         LEFT JOIN greentarget.locations l ON r.location_id = l.location_id

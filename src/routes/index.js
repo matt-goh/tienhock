@@ -98,7 +98,6 @@ import greenTargetMonthlyWorkLogsRouter from "./greentarget/monthly-work-logs.js
 import greenTargetEmployeePayrollsRouter from "./greentarget/employee-payrolls.js";
 import greenTargetPickupDestinationsRouter from "./greentarget/pickup-destinations.js";
 import greenTargetPayrollRulesRouter from "./greentarget/payroll-rules.js";
-import greenTargetRentalAddonsRouter from "./greentarget/rental-addons.js";
 import greenTargetPinjamRecordsRouter from "./greentarget/pinjam-records.js";
 import greenTargetMidMonthPayrollsRouter from "./greentarget/mid-month-payrolls.js";
 import greenTargetAdjustmentDocsRouter from "./greentarget/adjustment-docs.js";
@@ -306,10 +305,6 @@ export default function setupRoutes(app, pool) {
   app.use(
     "/greentarget/api/payroll-rules",
     greenTargetPayrollRulesRouter(pool)
-  );
-  app.use(
-    "/greentarget/api/rental-addons",
-    greenTargetRentalAddonsRouter(pool)
   );
   app.use(
     "/greentarget/api/pinjam-records",

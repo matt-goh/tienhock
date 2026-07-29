@@ -26,7 +26,6 @@ import {
   ListboxButton as HeadlessListboxButton,
 } from "@headlessui/react";
 import LocationFormModal from "../../../components/GreenTarget/LocationFormModal";
-import RentalAddonModal from "../../../components/GreenTarget/RentalAddonModal";
 import { api } from "../../../routes/utils/api";
 import clsx from "clsx";
 import { FormCombobox, SelectOption } from "../../../components/FormComponents";
@@ -87,7 +86,6 @@ interface Rental {
   remarks: string | null;
   invoice_info?: InvoiceInfo | null;
   pickup_destination?: string | null;
-  addon_count?: number;
 }
 
 const formatLocationLabel = (location: Location): string => {
@@ -149,7 +147,6 @@ const RentalFormPage: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [customerQuery, setCustomerQuery] = useState("");
   const [pickupDestinations, setPickupDestinations] = useState<PickupDestination[]>([]);
-  const [isAddonModalOpen, setIsAddonModalOpen] = useState(false);
   const previousDateRef = React.useRef<string | null>(null); // Use useRef from React
 
   // Load reference data
@@ -266,7 +263,12 @@ const RentalFormPage: React.FC = () => {
   // Load locations and **AUTO-SELECT FIRST LOCATION**
   useEffect(() => {
     let isMounted = true;
+    // `loading` is only true while a rental is being fetched, which now also
+    // covers the create -> edit hop after saving: the route changes but this
+    // component is reused, so without this guard the auto-select would race
+    // fetchRentalDetails and could overwrite the saved location.
     if (
+      !loading &&
       formData.customer_id > 0 &&
       (!initialFormData || formData.customer_id !== initialFormData.customer_id)
     ) {
@@ -292,7 +294,7 @@ const RentalFormPage: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [formData.customer_id, initialFormData]);
+  }, [formData.customer_id, initialFormData, loading]);
 
   // Monitor form changes
   useEffect(() => {
@@ -326,7 +328,6 @@ const RentalFormPage: React.FC = () => {
         remarks: rental.remarks ?? null,
         invoice_info: rental.invoice_info || null,
         pickup_destination: rental.pickup_destination || null,
-        addon_count: parseInt(rental.addon_count) || 0,
       };
       setFormData(fetchedFormData);
       setInitialFormData(fetchedFormData);
@@ -638,7 +639,7 @@ const RentalFormPage: React.FC = () => {
     e.preventDefault();
     if (!validateForm()) return;
     setIsSaving(true);
-    const payload: Omit<Rental, "customer_name" | "location_address" | "addon_count"> = {
+    const payload: Omit<Rental, "customer_name" | "location_address"> = {
       customer_id: Number(formData.customer_id),
       location_id: formData.location_id ? Number(formData.location_id) : null,
       tong_no: formData.tong_no,
@@ -669,7 +670,15 @@ const RentalFormPage: React.FC = () => {
       toast.success(
         `Rental ${isEditMode ? "updated" : "created"} successfully!`
       );
-      navigate("/greentarget/rentals");
+      // A new rental lands on its own page so add-ons, the invoice and the
+      // pickup date can be handled straight away. Falls back to the list if the
+      // backend somehow returns no id.
+      const newRentalId: number | undefined = response?.rental?.rental_id;
+      if (!isEditMode && newRentalId) {
+        navigate(`/greentarget/rentals/${newRentalId}`, { replace: true });
+      } else {
+        navigate("/greentarget/rentals");
+      }
     } catch (error: any) {
       console.error("Error saving rental:", error);
       let errorMsg = "An unexpected error occurred.";
@@ -1458,37 +1467,6 @@ const RentalFormPage: React.FC = () => {
                 )}
               </div>
             </div>
-            {/* --- Add-ons Section --- */}
-            {isEditMode && formData.rental_id && (
-              <div className="border-b border-default-200 dark:border-gray-700 pb-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-base font-semibold leading-7 text-default-900 dark:text-gray-100">
-                    Add-ons
-                  </h2>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    color="sky"
-                    onClick={() => setIsAddonModalOpen(true)}
-                    icon={IconPlus}
-                  >
-                    Manage Add-ons
-                    {(formData.addon_count ?? 0) > 0 && (
-                      <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 rounded-full">
-                        {formData.addon_count}
-                      </span>
-                    )}
-                  </Button>
-                </div>
-                <p className="text-sm text-default-500 dark:text-gray-400">
-                  {(formData.addon_count ?? 0) === 0
-                    ? "No add-ons for this rental yet. Click 'Manage Add-ons' to add manual paycodes."
-                    : `${formData.addon_count} add-on${
-                        (formData.addon_count ?? 0) > 1 ? "s" : ""
-                      } attached to this rental.`}
-                </p>
-              </div>
-            )}
             {/* --- Remarks Section --- */}
             <div className="border-b border-default-200 dark:border-gray-700 pb-6">
               <label
@@ -1629,26 +1607,6 @@ const RentalFormPage: React.FC = () => {
         confirmButtonText="Discard"
         variant="danger"
       />
-      {formData.rental_id && (
-        <RentalAddonModal
-          isOpen={isAddonModalOpen}
-          onClose={() => setIsAddonModalOpen(false)}
-          rentalId={formData.rental_id}
-          onAddonsChanged={() => {
-            // Refresh the addon count
-            greenTargetApi.getRental(formData.rental_id!)
-              .then((rental) => {
-                setFormData((prev) => ({
-                  ...prev,
-                  addon_count: parseInt(rental.addon_count) || 0,
-                }));
-              })
-              .catch((error) => {
-                console.error("Error refreshing addon count:", error);
-              });
-          }}
-        />
-      )}
     </div>
   );
 };

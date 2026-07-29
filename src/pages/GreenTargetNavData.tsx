@@ -15,6 +15,7 @@ import GreenTargetDumpsterListPage from "./GreenTarget/Dumpsters/DumpsterListPag
 import GreenTargetDumpsterFormPage from "./GreenTarget/Dumpsters/DumpsterFormPage";
 import GreenTargetRentalListPage from "./GreenTarget/Rentals/RentalListPage";
 import GreenTargetRentalFormPage from "./GreenTarget/Rentals/RentalFormPage";
+import GreenTargetRentalDetailsPage from "./GreenTarget/Rentals/RentalDetailsPage";
 import GreenTargetDeliveryOrderPage from "./GreenTarget/Rentals/DeliveryOrderPage";
 import GreenTargetInvoiceListPage from "./GreenTarget/Invoices/InvoiceListPage";
 import GreenTargetInvoiceFormPage from "./GreenTarget/Invoices/InvoiceFormPage";
@@ -307,8 +308,13 @@ export const GreenTargetNavData: SidebarItem[] = [
         showInPopover: true,
       },
       {
-        name: "Edit Rental",
+        name: "Rental Details",
         path: "/rentals/:id",
+        component: GreenTargetRentalDetailsPage,
+      },
+      {
+        name: "Edit Rental",
+        path: "/rentals/:id/edit",
         component: GreenTargetRentalFormPage,
       },
       {

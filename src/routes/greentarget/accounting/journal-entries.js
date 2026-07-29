@@ -294,6 +294,9 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
         DN: "DRN",
         RN: "RFN",
         JV: "JV",
+        C: "PCE",
+        B: "PBE",
+        J: "JNL",
       };
       const prefix = prefixMap[type] || "JV";
       const pattern = `${prefix}%/${String(currentMonth).padStart(2, "0")}`;

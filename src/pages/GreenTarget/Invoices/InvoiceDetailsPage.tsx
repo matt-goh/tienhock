@@ -57,6 +57,7 @@ import { generateGTPDFFilename } from "../../../utils/greenTarget/PDF/generateGT
 import { pdf, Document } from "@react-pdf/renderer";
 import { generateQRDataUrl } from "../../../utils/invoice/einvoice/generateQRCode";
 import GTInvoiceAdjustmentDocsSection from "../../../components/AdjustmentDocs/GTInvoiceAdjustmentDocsSection";
+import { formatLocationDisplay } from "../../../utils/greenTarget/formatLocationDisplay";
 import type {
   CreateGreenTargetPaymentInput,
   GreenTargetPayment,
@@ -2739,8 +2740,14 @@ const InvoiceDetailsPage: React.FC = () => {
                                 </div>
                                 <div className="text-sm text-gray-500 dark:text-gray-400">
                                   Placed: {formatDate(rental.date_placed)}
-                                  {rental.location_address &&
-                                    ` • ${rental.location_address}`}
+                                  {formatLocationDisplay(
+                                    rental.location_site,
+                                    rental.location_address
+                                  ) &&
+                                    ` • ${formatLocationDisplay(
+                                      rental.location_site,
+                                      rental.location_address
+                                    )}`}
                                 </div>
                               </div>
                             </div>
@@ -2875,7 +2882,10 @@ const InvoiceDetailsPage: React.FC = () => {
                           Location
                         </div>
                         <div className="font-medium text-default-900 dark:text-gray-100">
-                          {rental.location_address || "No specific location"}
+                          {formatLocationDisplay(
+                            rental.location_site,
+                            rental.location_address
+                          ) || "No specific location"}
                         </div>
                       </div>
                     </div>

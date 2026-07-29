@@ -1,7 +1,7 @@
 // src/pages/GreenTarget/Payroll/GTDailyLoriHabukEntryPage.tsx
 // Green Target Daily Lori Habuk driver entry (Phase 3). Date-centric: pick a
 // date, see each DRIVER employee as a card with that day's trip lines. Rentals
-// prefill PLACEMENT/PICKUP/ADDON lines; manual habuk trips are added on top.
+// prefill PLACEMENT/PICKUP lines; manual habuk trips are added on top.
 // Monthly processing reads the saved lines (not live rentals).
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { format } from "date-fns";
@@ -25,7 +25,7 @@ import GTLeaveSection from "./GTLeaveSection";
 
 const API_BASE = "/greentarget/api/daily-lori-habuk";
 
-type SourceType = "PLACEMENT" | "PICKUP" | "ADDON" | "MANUAL" | "DERIVED";
+type SourceType = "PLACEMENT" | "PICKUP" | "MANUAL" | "DERIVED";
 
 interface TripLine {
   key: string;
@@ -66,7 +66,6 @@ const newKey = (): string => `line-${Date.now()}-${keyCounter++}`;
 const SOURCE_BADGE: Record<SourceType, string> = {
   PLACEMENT: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
   PICKUP: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300",
-  ADDON: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
   DERIVED: "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300",
   MANUAL: "bg-default-100 text-default-600 dark:bg-gray-700 dark:text-gray-300",
 };

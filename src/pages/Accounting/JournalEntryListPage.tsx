@@ -177,8 +177,8 @@ const getInitialStateFromParams = (
 };
 
 interface JournalEntryListContentProps {
-  // Cached Tien Hock entry types; Green Target has only IMP and no types
-  // endpoint, so it passes an empty list and skips the TH fetch entirely.
+  // Entry types for the filter pills: Tien Hock passes its cached types;
+  // Green Target fetches its own from the GT /types endpoint.
   entryTypes: JournalEntryTypeInfo[];
   isGreenTarget: boolean;
 }
@@ -290,8 +290,7 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
       params.append("offset", ((page - 1) * limit).toString());
 
       if (searchTerm) params.append("search", searchTerm);
-      // Green Target has only IMP entries; never send a TH type filter
-      if (!isGreenTarget && selectedTypes.length > 0)
+      if (selectedTypes.length > 0)
         params.append("entry_type", selectedTypes.join(","));
       if (selectedStatuses.length > 0) {
         // The UI's "Active" means "not cancelled"; the DB stores posted plus
@@ -562,13 +561,10 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
 
         {/* Filters - own row below the title/date controls; all pills flow in one wrapping line */}
         <div className="order-4 w-full flex flex-wrap items-center gap-1.5 min-w-0">
-          {/* Type pills - toggle each journal type on/off (none selected = show all).
-              Hidden for Green Target: these pills come from the Tien Hock type
-              cache; GT users filter by search instead. */}
-          {!isGreenTarget &&
-            entryTypes
-              .filter((type) => type.code !== LEGACY_IMPORT_ENTRY_TYPE)
-              .map((type) => {
+          {/* Type pills - toggle each journal type on/off (none selected = show all) */}
+          {entryTypes
+            .filter((type) => type.code !== LEGACY_IMPORT_ENTRY_TYPE)
+            .map((type) => {
                 const active = selectedTypes.includes(type.code);
                 return (
                   <button
@@ -597,9 +593,7 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
               })}
 
           {/* Divider */}
-          {!isGreenTarget && (
-            <span className="h-5 w-px bg-default-300 dark:bg-gray-600 mx-1" />
-          )}
+          <span className="h-5 w-px bg-default-300 dark:bg-gray-600 mx-1" />
 
           {/* Status pills */}
           {STATUS_OPTIONS.map((status) => {
@@ -931,13 +925,40 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
   );
 };
 
-// Tien Hock fetches its cached entry types for the filter pills; Green Target
-// has only IMP entries and no types endpoint, so it skips that fetch entirely.
+// Tien Hock fetches its cached entry types for the filter pills.
 const TienHockJournalEntryList: React.FC = () => {
   const { entryTypes } = useJournalEntryTypesCache();
   return (
     <JournalEntryListContent entryTypes={entryTypes} isGreenTarget={false} />
   );
+};
+
+// Green Target has no types cache, so it fetches its entry types from the GT
+// route on mount; the pills work exactly like Tien Hock's once loaded.
+const GreenTargetJournalEntryList: React.FC = () => {
+  const [entryTypes, setEntryTypes] = useState<JournalEntryTypeInfo[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadTypes = async () => {
+      try {
+        const response = await api.get(
+          "/greentarget/api/journal-entries/types"
+        );
+        if (!cancelled) setEntryTypes(response as JournalEntryTypeInfo[]);
+      } catch (err: unknown) {
+        console.error("Error fetching Green Target journal entry types:", err);
+        toast.error("Failed to load Green Target journal types");
+      }
+    };
+
+    loadTypes();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return <JournalEntryListContent entryTypes={entryTypes} isGreenTarget />;
 };
 
 interface JournalEntryListPageProps {
@@ -948,7 +969,7 @@ const JournalEntryListPage: React.FC<JournalEntryListPageProps> = ({
   company = "tienhock",
 }) => {
   if (company === "greentarget") {
-    return <JournalEntryListContent entryTypes={[]} isGreenTarget />;
+    return <GreenTargetJournalEntryList />;
   }
   return <TienHockJournalEntryList />;
 };

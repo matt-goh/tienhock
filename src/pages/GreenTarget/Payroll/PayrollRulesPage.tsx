@@ -27,7 +27,6 @@ import {
   IconX,
   IconChevronDown,
   IconRuler,
-  IconPackage,
   IconSearch,
   IconExternalLink,
 } from "@tabler/icons-react";
@@ -56,16 +55,6 @@ interface PayrollRule {
   priority: number;
   is_active: boolean;
   description: string | null;
-}
-
-interface AddonPaycode {
-  id: number;
-  pay_code_id: string;
-  display_name: string;
-  default_amount: number;
-  is_variable_amount: boolean;
-  sort_order: number;
-  pay_code_description?: string;
 }
 
 interface PayCode {
@@ -119,7 +108,6 @@ const PayrollRulesPage: React.FC = () => {
   // Data states
   const [destinations, setDestinations] = useState<PickupDestination[]>([]);
   const [rules, setRules] = useState<PayrollRule[]>([]);
-  const [addonPaycodes, setAddonPaycodes] = useState<AddonPaycode[]>([]);
   const [payCodes, setPayCodes] = useState<PayCode[]>([]);
   const [settings, setSettings] = useState<PayrollSettings>({});
   const [editedSettings, setEditedSettings] = useState<PayrollSettings>({});
@@ -128,17 +116,15 @@ const PayrollRulesPage: React.FC = () => {
   // Modal states
   const [isDestinationModalOpen, setIsDestinationModalOpen] = useState(false);
   const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
-  const [isAddonModalOpen, setIsAddonModalOpen] = useState(false);
   const [editingDestination, setEditingDestination] =
     useState<PickupDestination | null>(null);
   const [editingRule, setEditingRule] = useState<PayrollRule | null>(null);
-  const [editingAddon, setEditingAddon] = useState<AddonPaycode | null>(null);
 
   // Delete confirmation states
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{
-    type: "destination" | "rule" | "addon";
-    item: PickupDestination | PayrollRule | AddonPaycode;
+    type: "destination" | "rule";
+    item: PickupDestination | PayrollRule;
   } | null>(null);
 
   // Form states
@@ -162,14 +148,6 @@ const PayrollRulesPage: React.FC = () => {
     description: "",
   });
 
-  const [addonForm, setAddonForm] = useState({
-    pay_code_id: "",
-    display_name: "",
-    default_amount: 0,
-    is_variable_amount: false,
-    sort_order: 0,
-  });
-
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -180,11 +158,10 @@ const PayrollRulesPage: React.FC = () => {
   const fetchAllData = async () => {
     setIsLoading(true);
     try {
-      const [destinationsRes, rulesRes, addonsRes, payCodesRes, settingsRes] =
+      const [destinationsRes, rulesRes, payCodesRes, settingsRes] =
         await Promise.all([
           greenTargetApi.getPickupDestinations(),
           greenTargetApi.getPayrollRules(),
-          greenTargetApi.getAddonPaycodes(),
           greenTargetApi.request(
             "GET",
             "/greentarget/api/payroll-rules/pay-codes"
@@ -194,7 +171,6 @@ const PayrollRulesPage: React.FC = () => {
 
       setDestinations(destinationsRes || []);
       setRules(rulesRes || []);
-      setAddonPaycodes(addonsRes || []);
       setPayCodes(payCodesRes || []);
       setSettings(settingsRes || {});
       setEditedSettings(settingsRes || {});
@@ -258,8 +234,8 @@ const PayrollRulesPage: React.FC = () => {
   };
 
   const openDeleteConfirm = (
-    type: "destination" | "rule" | "addon",
-    item: PickupDestination | PayrollRule | AddonPaycode
+    type: "destination" | "rule",
+    item: PickupDestination | PayrollRule
   ) => {
     setDeleteTarget({ type, item });
     setDeleteConfirmOpen(true);
@@ -279,14 +255,6 @@ const PayrollRulesPage: React.FC = () => {
           (deleteTarget.item as PayrollRule).id
         );
         toast.success("Rule deleted");
-      } else if (deleteTarget.type === "addon") {
-        await greenTargetApi.request(
-          "DELETE",
-          `/greentarget/api/payroll-rules/addon-paycodes/${
-            (deleteTarget.item as AddonPaycode).id
-          }`
-        );
-        toast.success("Addon paycode deleted");
       }
       fetchAllData();
     } catch (error: unknown) {
@@ -306,13 +274,9 @@ const PayrollRulesPage: React.FC = () => {
       return `Delete destination "${
         (deleteTarget.item as PickupDestination).name
       }"?`;
-    } else if (deleteTarget.type === "rule") {
+    } else {
       const rule = deleteTarget.item as PayrollRule;
       return `Delete rule "${rule.description || rule.pay_code_id}"?`;
-    } else {
-      return `Delete addon paycode "${
-        (deleteTarget.item as AddonPaycode).display_name
-      }"?`;
     }
   };
 
@@ -414,63 +378,6 @@ const PayrollRulesPage: React.FC = () => {
     }
   };
 
-  // Addon handlers
-  const openAddonModal = (addon?: AddonPaycode) => {
-    if (addon) {
-      setEditingAddon(addon);
-      setAddonForm({
-        pay_code_id: addon.pay_code_id,
-        display_name: addon.display_name,
-        default_amount: addon.default_amount,
-        is_variable_amount: addon.is_variable_amount,
-        sort_order: addon.sort_order,
-      });
-    } else {
-      setEditingAddon(null);
-      setAddonForm({
-        pay_code_id: "",
-        display_name: "",
-        default_amount: 0,
-        is_variable_amount: false,
-        sort_order: addonPaycodes.length,
-      });
-    }
-    setIsAddonModalOpen(true);
-  };
-
-  const handleSaveAddon = async () => {
-    if (!addonForm.display_name) {
-      toast.error("Please fill in all required fields");
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      if (editingAddon) {
-        await greenTargetApi.request(
-          "PUT",
-          `/greentarget/api/payroll-rules/addon-paycodes/${editingAddon.id}`,
-          addonForm
-        );
-        toast.success("Addon paycode updated");
-      } else {
-        await greenTargetApi.request(
-          "POST",
-          "/greentarget/api/payroll-rules/addon-paycodes",
-          addonForm
-        );
-        toast.success("Addon paycode created");
-      }
-      setIsAddonModalOpen(false);
-      fetchAllData();
-    } catch (error) {
-      console.error("Error saving addon:", error);
-      toast.error("Failed to save addon paycode");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   // Settings handlers
   const handleLocalSettingChange = (key: string, value: string) => {
     setEditedSettings((prev) => ({
@@ -527,11 +434,6 @@ const PayrollRulesPage: React.FC = () => {
       (r.pay_code_id || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (r.description || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
-  const filteredAddonPaycodes = addonPaycodes.filter(
-    (a) =>
-      (a.pay_code_id || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.display_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
   const filteredDriverPayCodes = payCodes.filter(
     (p) =>
       (p.id || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -584,19 +486,6 @@ const PayrollRulesPage: React.FC = () => {
               </span>
               <span className="text-default-400 dark:text-gray-400">rules</span>
             </div>
-            <span className="text-default-300 dark:text-gray-600">•</span>
-            <div className="flex items-center gap-1.5">
-              <IconPackage
-                size={15}
-                className="text-emerald-600 dark:text-emerald-400"
-              />
-              <span className="font-medium text-default-700 dark:text-gray-200">
-                {addonPaycodes.length}
-              </span>
-              <span className="text-default-400 dark:text-gray-400">
-                addons
-              </span>
-            </div>
           </div>
         </div>
 
@@ -642,7 +531,7 @@ const PayrollRulesPage: React.FC = () => {
                   : "text-default-600 dark:text-gray-400 hover:text-default-800 dark:hover:text-gray-200"
               )}
             >
-              Rules & Addons
+              Rules
             </button>
             <button
               onClick={() => setActiveTab("settings")}
@@ -659,7 +548,7 @@ const PayrollRulesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Rules & Addons Tab */}
+      {/* Rules Tab */}
       {activeTab === "rules" && (
         <div className="space-y-3">
           {/* PLACEMENT Rules */}
@@ -880,128 +769,6 @@ const PayrollRulesPage: React.FC = () => {
                 )}
               </tbody>
             </table>
-          </div>
-
-          {/* Addon Paycodes Section */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-            <div className="px-4 py-2 border-b border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/50 flex items-center justify-between">
-              <div>
-                <span className="text-sm font-medium text-default-700 dark:text-gray-300">
-                  Addon Paycodes
-                </span>
-                <span className="text-xs text-default-400 dark:text-gray-500 ml-2">
-                  Manual add-ons for rentals
-                </span>
-              </div>
-              <button
-                onClick={() => openAddonModal()}
-                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition-colors"
-              >
-                <IconPlus size={14} />
-                Add Addon
-              </button>
-            </div>
-          <table className="w-full text-sm">
-            <thead className="bg-default-50 dark:bg-gray-700">
-              <tr>
-                <th className="px-4 py-2 text-left text-default-600 dark:text-gray-300 font-medium text-xs">
-                  Pay Code
-                </th>
-                <th className="px-4 py-2 text-left text-default-600 dark:text-gray-300 font-medium text-xs">
-                  Display Name
-                </th>
-                <th className="px-4 py-2 text-right text-default-600 dark:text-gray-300 font-medium text-xs w-28">
-                  Amount
-                </th>
-                <th className="px-4 py-2 text-center text-default-600 dark:text-gray-300 font-medium text-xs w-24">
-                  Type
-                </th>
-                <th className="px-4 py-2 text-center text-default-600 dark:text-gray-300 font-medium text-xs w-20">
-                  Order
-                </th>
-                <th className="px-4 py-2 text-center text-default-600 dark:text-gray-300 font-medium text-xs w-24">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredAddonPaycodes.map((addon) => (
-                <tr
-                  key={addon.id}
-                  className="border-b border-default-100 dark:border-gray-700"
-                >
-                  <td className="px-4 py-2">
-                    {addon.pay_code_id ? (
-                      <>
-                        <span className="font-mono font-medium text-sky-600 dark:text-sky-400 text-xs">
-                          {addon.pay_code_id}
-                        </span>
-                        {addon.pay_code_description && (
-                          <span className="text-default-500 dark:text-gray-400 text-xs ml-1">
-                            ({addon.pay_code_description})
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <span className="text-amber-600 dark:text-amber-400 text-xs italic">
-                        Not assigned
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2 text-default-800 dark:text-gray-200">
-                    {addon.display_name}
-                  </td>
-                  <td className="px-4 py-2 text-right font-mono text-default-800 dark:text-gray-200 text-xs">
-                    RM {(Number(addon.default_amount) || 0).toFixed(2)}
-                  </td>
-                  <td className="px-4 py-2 text-center">
-                    {addon.is_variable_amount ? (
-                      <span className="inline-flex items-center px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded text-xs">
-                        Variable
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-1.5 py-0.5 bg-default-100 dark:bg-gray-700 text-default-600 dark:text-gray-400 rounded text-xs">
-                        Fixed
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2 text-center text-default-600 dark:text-gray-400">
-                    {addon.sort_order}
-                  </td>
-                  <td className="px-4 py-2">
-                    <div className="flex items-center justify-center gap-1">
-                      <button
-                        onClick={() => openAddonModal(addon)}
-                        className="p-1 text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-900/20 rounded"
-                        title="Edit"
-                      >
-                        <IconEdit size={16} />
-                      </button>
-                      <button
-                        onClick={() => openDeleteConfirm("addon", addon)}
-                        className="p-1 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded"
-                        title="Delete"
-                      >
-                        <IconTrash size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {filteredAddonPaycodes.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-6 text-center text-default-500 dark:text-gray-400 text-sm"
-                  >
-                    {searchTerm
-                      ? "No addon paycodes matching search"
-                      : "No addon paycodes configured"}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
           </div>
 
           {/* Driver Pay Codes (read-only reference) */}
@@ -2013,259 +1780,6 @@ const PayrollRulesPage: React.FC = () => {
                       variant="filled"
                       color="amber"
                       onClick={handleSaveRule}
-                      disabled={isSaving}
-                    >
-                      {isSaving ? "Saving..." : "Save"}
-                    </Button>
-                  </div>
-                </DialogPanel>
-              </TransitionChild>
-            </div>
-          </div>
-        </Dialog>
-      </Transition>
-
-      {/* Addon Modal */}
-      <Transition appear show={isAddonModalOpen} as={Fragment}>
-        <Dialog
-          as="div"
-          className="relative z-50"
-          onClose={() => setIsAddonModalOpen(false)}
-        >
-          <TransitionChild
-            as={Fragment}
-            enter="ease-out duration-300"
-            enterFrom="opacity-0"
-            enterTo="opacity-100"
-            leave="ease-in duration-200"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
-            <div className="fixed inset-0 bg-black/30 dark:bg-black/50" />
-          </TransitionChild>
-
-          <div className="fixed inset-0 overflow-y-auto">
-            <div className="flex min-h-full items-center justify-center p-4">
-              <TransitionChild
-                as={Fragment}
-                enter="ease-out duration-300"
-                enterFrom="opacity-0 scale-95"
-                enterTo="opacity-100 scale-100"
-                leave="ease-in duration-200"
-                leaveFrom="opacity-100 scale-100"
-                leaveTo="opacity-0 scale-95"
-              >
-                <DialogPanel className="w-full max-w-md transform rounded-lg bg-white dark:bg-gray-800 shadow-xl transition-all">
-                  <div className="flex items-center justify-between border-b border-default-200 dark:border-gray-700 px-6 py-4">
-                    <DialogTitle className="text-lg font-semibold text-default-900 dark:text-gray-100">
-                      {editingAddon
-                        ? "Edit Addon Paycode"
-                        : "Add Addon Paycode"}
-                    </DialogTitle>
-                    <button
-                      onClick={() => setIsAddonModalOpen(false)}
-                      className="text-default-400 hover:text-default-600 dark:hover:text-gray-300"
-                    >
-                      <IconX size={20} />
-                    </button>
-                  </div>
-
-                  <div className="p-6 space-y-3">
-                    <div>
-                      <label className="block text-sm text-default-600 dark:text-gray-300 mb-1">
-                        Pay Code
-                      </label>
-                      <Listbox
-                        value={addonForm.pay_code_id}
-                        onChange={(value) => {
-                          const paycode = payCodes.find((p) => p.id === value);
-                          setAddonForm((prev) => ({
-                            ...prev,
-                            pay_code_id: value,
-                            default_amount: value
-                              ? Number(paycode?.rate_biasa) ||
-                                prev.default_amount
-                              : prev.default_amount,
-                          }));
-                        }}
-                      >
-                        <div className="relative">
-                          <ListboxButton className="relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-amber-500 sm:text-sm">
-                            <span
-                              className={clsx(
-                                "block truncate",
-                                addonForm.pay_code_id
-                                  ? "text-default-800 dark:text-gray-200"
-                                  : "text-amber-600 dark:text-amber-400 italic"
-                              )}
-                            >
-                              {addonForm.pay_code_id
-                                ? `${addonForm.pay_code_id} - ${
-                                    payCodes.find(
-                                      (p) => p.id === addonForm.pay_code_id
-                                    )?.description || ""
-                                  }`
-                                : "Not assigned"}
-                            </span>
-                            <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                              <IconChevronDown
-                                size={20}
-                                className="text-gray-400"
-                              />
-                            </span>
-                          </ListboxButton>
-                          <Transition
-                            as={Fragment}
-                            leave="transition ease-in duration-100"
-                            leaveFrom="opacity-100"
-                            leaveTo="opacity-0"
-                          >
-                            <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
-                              <ListboxOption
-                                value=""
-                                className="relative cursor-default select-none py-2 pl-3 pr-10 text-amber-600 dark:text-amber-400 data-[focus]:bg-amber-100 dark:data-[focus]:bg-amber-900/50 data-[focus]:text-amber-900 dark:data-[focus]:text-amber-100"
-                              >
-                                {({ selected }) => (
-                                  <>
-                                    <span
-                                      className={clsx(
-                                        "block truncate italic",
-                                        selected ? "font-medium" : "font-normal"
-                                      )}
-                                    >
-                                      Not assigned
-                                    </span>
-                                    {selected && (
-                                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-amber-600">
-                                        <IconCheck size={20} />
-                                      </span>
-                                    )}
-                                  </>
-                                )}
-                              </ListboxOption>
-                              {payCodes
-                                .filter((p) => p.id.startsWith("TRIP"))
-                                .map((paycode) => (
-                                  <ListboxOption
-                                    key={paycode.id}
-                                    value={paycode.id}
-                                    className="relative cursor-default select-none py-2 pl-3 pr-10 text-gray-900 dark:text-gray-100 data-[focus]:bg-amber-100 dark:data-[focus]:bg-amber-900/50 data-[focus]:text-amber-900 dark:data-[focus]:text-amber-100"
-                                  >
-                                    {({ selected }) => (
-                                      <>
-                                        <span
-                                          className={clsx(
-                                            "block truncate",
-                                            selected
-                                              ? "font-medium"
-                                              : "font-normal"
-                                          )}
-                                        >
-                                          {paycode.id} - {paycode.description}
-                                        </span>
-                                        {selected && (
-                                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-amber-600">
-                                            <IconCheck size={20} />
-                                          </span>
-                                        )}
-                                      </>
-                                    )}
-                                  </ListboxOption>
-                                ))}
-                            </ListboxOptions>
-                          </Transition>
-                        </div>
-                      </Listbox>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm text-default-600 dark:text-gray-300 mb-1">
-                        Display Name *
-                      </label>
-                      <input
-                        type="text"
-                        value={addonForm.display_name}
-                        onChange={(e) =>
-                          setAddonForm((prev) => ({
-                            ...prev,
-                            display_name: e.target.value,
-                          }))
-                        }
-                        className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-default-800 dark:text-gray-200"
-                        placeholder="e.g., Hantar Barang"
-                      />
-                    </div>
-
-                    <div className="flex gap-4">
-                      <div className="flex-1">
-                        <label className="block text-sm text-default-600 dark:text-gray-300 mb-1">
-                          Default Amount (RM)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={addonForm.default_amount}
-                          onChange={(e) =>
-                            setAddonForm((prev) => ({
-                              ...prev,
-                              default_amount: parseFloat(e.target.value) || 0,
-                            }))
-                          }
-                          className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-default-800 dark:text-gray-200"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <label className="block text-sm text-default-600 dark:text-gray-300 mb-1">
-                          Sort Order
-                        </label>
-                        <input
-                          type="number"
-                          value={addonForm.sort_order}
-                          onChange={(e) =>
-                            setAddonForm((prev) => ({
-                              ...prev,
-                              sort_order: parseInt(e.target.value) || 0,
-                            }))
-                          }
-                          className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-default-800 dark:text-gray-200"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 pt-2">
-                      <input
-                        type="checkbox"
-                        id="is_variable_amount"
-                        checked={addonForm.is_variable_amount}
-                        onChange={(e) =>
-                          setAddonForm((prev) => ({
-                            ...prev,
-                            is_variable_amount: e.target.checked,
-                          }))
-                        }
-                        className="w-4 h-4 rounded border-default-300 dark:border-gray-600"
-                      />
-                      <label
-                        htmlFor="is_variable_amount"
-                        className="text-sm text-default-600 dark:text-gray-300 cursor-pointer"
-                      >
-                        Variable amount (user can change)
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end gap-3 px-6 py-4 border-t border-default-200 dark:border-gray-700">
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsAddonModalOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="filled"
-                      color="amber"
-                      onClick={handleSaveAddon}
                       disabled={isSaving}
                     >
                       {isSaving ? "Saving..." : "Save"}

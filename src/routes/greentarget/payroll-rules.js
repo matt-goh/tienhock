@@ -57,23 +57,17 @@ export default function (pool) {
   router.get("/pay-codes", async (req, res) => {
     try {
       // Return every pay code mapped to the driver-side jobs (DRIVER /
-      // DRIVER_IKUT) plus any already configured as an addon paycode, so all the
-      // habuk trip codes (TRIP*, COMM_TARIK, COMM_TAMBAHAN, TBH5, TRIP_LB6, the
-      // _IKUT variants, etc.) are selectable when configuring rules & addons —
-      // not just the legacy TRIP* prefix set.
+      // DRIVER_IKUT), so all the habuk trip codes (TRIP*, COMM_TARIK,
+      // COMM_TAMBAHAN, TBH5, TRIP_LB6, the _IKUT variants, etc.) are selectable
+      // when configuring rules — not just the legacy TRIP* prefix set.
       const result = await pool.query(
         `SELECT DISTINCT pc.id, pc.description, pc.rate_biasa, pc.rate_ahad,
                 pc.rate_umum, pc.pay_type, pc.rate_unit, pc.is_active
          FROM pay_codes pc
          WHERE pc.is_active = true
-           AND (
-             pc.id IN (
-               SELECT pay_code_id FROM job_pay_codes
-               WHERE job_id IN ('DRIVER', 'DRIVER_IKUT')
-             )
-             OR pc.id IN (
-               SELECT pay_code_id FROM greentarget.addon_paycodes
-             )
+           AND pc.id IN (
+             SELECT pay_code_id FROM job_pay_codes
+             WHERE job_id IN ('DRIVER', 'DRIVER_IKUT')
            )
          ORDER BY pc.id`
       );
@@ -359,126 +353,6 @@ export default function (pool) {
     } catch (error) {
       console.error("Error evaluating payroll rule:", error);
       res.status(500).json({ error: "Failed to evaluate payroll rule" });
-    }
-  });
-
-  // GET addon paycodes - list of available manual add-on paycodes
-  router.get("/addon-paycodes/list", async (req, res) => {
-    try {
-      const result = await pool.query(
-        `SELECT
-          ap.id,
-          ap.pay_code_id,
-          ap.display_name,
-          ap.default_amount,
-          ap.is_variable_amount,
-          ap.sort_order,
-          ap.is_active,
-          pc.description as pay_code_description,
-          pc.rate_biasa
-        FROM greentarget.addon_paycodes ap
-        LEFT JOIN pay_codes pc ON ap.pay_code_id = pc.id
-        WHERE ap.is_active = true
-        ORDER BY ap.sort_order ASC`
-      );
-
-      res.json(result.rows);
-    } catch (error) {
-      console.error("Error fetching addon paycodes:", error);
-      res.status(500).json({ error: "Failed to fetch addon paycodes" });
-    }
-  });
-
-  // POST create addon paycode
-  router.post("/addon-paycodes", async (req, res) => {
-    try {
-      const { pay_code_id, display_name, default_amount, is_variable_amount, sort_order } = req.body;
-
-      if (!pay_code_id || !display_name) {
-        return res.status(400).json({ error: "pay_code_id and display_name are required" });
-      }
-
-      // Validate pay_code exists
-      const payCodeCheck = await pool.query(
-        `SELECT id FROM pay_codes WHERE id = $1`,
-        [pay_code_id]
-      );
-
-      if (payCodeCheck.rows.length === 0) {
-        return res.status(400).json({ error: "Invalid pay_code_id" });
-      }
-
-      const result = await pool.query(
-        `INSERT INTO greentarget.addon_paycodes (pay_code_id, display_name, default_amount, is_variable_amount, sort_order)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING *`,
-        [pay_code_id, display_name, default_amount || 0, is_variable_amount || false, sort_order || 0]
-      );
-
-      res.status(201).json(result.rows[0]);
-    } catch (error) {
-      console.error("Error creating addon paycode:", error);
-      if (error.code === '23505') {
-        return res.status(400).json({ error: "This pay code is already configured as an addon" });
-      }
-      res.status(500).json({ error: "Failed to create addon paycode" });
-    }
-  });
-
-  // PUT update addon paycode
-  router.put("/addon-paycodes/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { pay_code_id, display_name, default_amount, is_variable_amount, sort_order, is_active } = req.body;
-
-      const existingCheck = await pool.query(
-        `SELECT id FROM greentarget.addon_paycodes WHERE id = $1`,
-        [id]
-      );
-
-      if (existingCheck.rows.length === 0) {
-        return res.status(404).json({ error: "Addon paycode not found" });
-      }
-
-      const result = await pool.query(
-        `UPDATE greentarget.addon_paycodes
-         SET pay_code_id = COALESCE($1, pay_code_id),
-             display_name = COALESCE($2, display_name),
-             default_amount = COALESCE($3, default_amount),
-             is_variable_amount = COALESCE($4, is_variable_amount),
-             sort_order = COALESCE($5, sort_order),
-             is_active = COALESCE($6, is_active)
-         WHERE id = $7
-         RETURNING *`,
-        [pay_code_id, display_name, default_amount, is_variable_amount, sort_order, is_active, id]
-      );
-
-      res.json(result.rows[0]);
-    } catch (error) {
-      console.error("Error updating addon paycode:", error);
-      res.status(500).json({ error: "Failed to update addon paycode" });
-    }
-  });
-
-  // DELETE addon paycode
-  router.delete("/addon-paycodes/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-
-      const existingCheck = await pool.query(
-        `SELECT id FROM greentarget.addon_paycodes WHERE id = $1`,
-        [id]
-      );
-
-      if (existingCheck.rows.length === 0) {
-        return res.status(404).json({ error: "Addon paycode not found" });
-      }
-
-      await pool.query(`DELETE FROM greentarget.addon_paycodes WHERE id = $1`, [id]);
-      res.json({ message: "Addon paycode deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting addon paycode:", error);
-      res.status(500).json({ error: "Failed to delete addon paycode" });
     }
   });
 

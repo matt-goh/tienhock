@@ -27,6 +27,7 @@ import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import Button from "../../../components/Button";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import { formatLocationDisplay } from "../../../utils/greenTarget/formatLocationDisplay";
 
 interface Dumpster {
   tong_no: string;
@@ -42,6 +43,7 @@ interface Rental {
   date_picked: string | null;
   driver: string;
   location_address?: string | null;
+  location_site?: string | null;
 }
 
 interface DumpsterStatus {
@@ -698,14 +700,20 @@ const DumpsterListPage: React.FC = () => {
                         </span>
                       </div>
 
-                      {tooltipData.status.rental.location_address && (
+                      {formatLocationDisplay(
+                        tooltipData.status.rental.location_site,
+                        tooltipData.status.rental.location_address
+                      ) && (
                         <div className="flex items-start gap-2">
                           <IconMapPin
                             size={16}
                             className="mt-0.5 text-default-400 shrink-0"
                           />
                           <span className="text-default-600 dark:text-gray-300 text-sm">
-                            {tooltipData.status.rental.location_address}
+                            {formatLocationDisplay(
+                              tooltipData.status.rental.location_site,
+                              tooltipData.status.rental.location_address
+                            )}
                           </span>
                         </div>
                       )}

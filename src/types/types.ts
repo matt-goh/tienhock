@@ -642,6 +642,7 @@ export interface RentalDetail {
   date_picked?: string | null;
   driver?: string;
   location_address?: string;
+  location_site?: string | null;
   location_phone_number?: string;
 }
 

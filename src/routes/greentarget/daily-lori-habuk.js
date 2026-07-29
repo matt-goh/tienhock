@@ -123,29 +123,10 @@ export default function (pool) {
 
       // Rentals grouped by driver
       const rentalsByDriver = {};
-      const rentalIds = [];
       rentalsResult.rows.forEach((r) => {
         if (!rentalsByDriver[r.driver]) rentalsByDriver[r.driver] = [];
         rentalsByDriver[r.driver].push(r);
-        rentalIds.push(r.rental_id);
       });
-
-      // Addons for the matched rentals
-      const addonsByRental = {};
-      if (rentalIds.length > 0) {
-        const addonsResult = await pool.query(
-          `SELECT ra.*, pc.description AS pay_code_description, ap.display_name
-           FROM greentarget.rental_addons ra
-           JOIN pay_codes pc ON ra.pay_code_id = pc.id
-           LEFT JOIN greentarget.addon_paycodes ap ON ra.pay_code_id = ap.pay_code_id
-           WHERE ra.rental_id = ANY($1)`,
-          [rentalIds]
-        );
-        addonsResult.rows.forEach((a) => {
-          if (!addonsByRental[a.rental_id]) addonsByRental[a.rental_id] = [];
-          addonsByRental[a.rental_id].push(a);
-        });
-      }
 
       // Saved lines grouped by employee
       const savedByEmployee = {};
@@ -177,7 +158,6 @@ export default function (pool) {
       const ctx = {
         placementRules,
         pickupRules,
-        addonsByRental,
         allPayCodesMap,
         defaultInvoiceAmount,
       };

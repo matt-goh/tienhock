@@ -1016,15 +1016,17 @@ export default function (pool) {
     }
   });
 
-  // GET /closing-stock-reference - company-wide computed closing totals for the
-  // month, shown on the Material Stock page as the reference for confirming the
-  // financial-statement closing-stock values (closing_stock_values). Mirrors the
-  // /stock/with-opening accumulation (opening = all legacy purchase lines and
-  // journal-mapped purchases plus all adjustments before the month; closing =
-  // opening + the month's purchases + the month's adjustments) summed across
-  // the mee/bihun/shared buckets. Closing VALUE is linear in those sources, so
-  // grouping by category here is exact (display-row hiding on the page does not
-  // affect value sums). Informational only — nothing is written back.
+  // GET /closing-stock-reference - company-wide closing stock for the month,
+  // shown on the Material Stock page as the reference for confirming the
+  // financial-statement closing-stock values (closing_stock_values). The month's
+  // adjustment entries ARE the physical stock count for that month (quantity x
+  // unit cost), so closing stock is the exact-month adjustment value summed
+  // across the mee/bihun/shared buckets — never the cumulative
+  // /stock/with-opening closing, which carries every earlier month's count on
+  // top, and never plus purchases, which a physical count already includes.
+  // This matches the Grand Total printed at the bottom of the page. Grouping by
+  // category is exact (display-row hiding on the page does not affect value
+  // sums). Informational only — nothing is written back.
   router.get("/closing-stock-reference", async (req, res) => {
     try {
       const year = parseInt(req.query.year, 10);
@@ -1033,46 +1035,19 @@ export default function (pool) {
         return res.status(400).json({ message: "Valid year and month are required" });
       }
 
-      const nextPeriod = getNextPeriod(year, month);
-      const nextPeriodStart = getPeriodStart(nextPeriod.year, nextPeriod.month);
-
       const categoryResult = await pool.query(
         `
-          WITH legacy_purchases AS (
-            SELECT pil.material_id, SUM(pil.amount) AS value
-            FROM purchase_invoice_lines pil
-            JOIN purchase_invoices pi ON pi.id = pil.purchase_invoice_id
-            WHERE pi.invoice_date < $1
-            GROUP BY pil.material_id
-          ),
-          journal_purchases AS (
-            SELECT mam.material_id,
-                   SUM(jel.debit_amount - jel.credit_amount) AS value
-            FROM journal_entry_lines jel
-            JOIN journal_entries je ON je.id = jel.journal_entry_id
-            JOIN material_account_mappings mam ON mam.account_code = jel.account_code
-            WHERE je.status = 'posted' AND mam.is_active = true
-              AND je.entry_date < $1
-            GROUP BY mam.material_id
-          ),
-          adjustments AS (
-            SELECT mse.material_id, SUM(mse.adjustment_value) AS value
-            FROM material_stock_entries mse
-            WHERE mse.year < $2 OR (mse.year = $2 AND mse.month <= $3)
-            GROUP BY mse.material_id
-          )
           SELECT m.category,
-                 COALESCE(SUM(lp.value), 0)
-               + COALESCE(SUM(jp.value), 0)
-               + COALESCE(SUM(a.value), 0) AS closing_value
+                 COALESCE(SUM(mse.adjustment_value), 0) AS closing_value
           FROM materials m
-          LEFT JOIN legacy_purchases lp ON lp.material_id = m.id
-          LEFT JOIN journal_purchases jp ON jp.material_id = m.id
-          LEFT JOIN adjustments a ON a.material_id = m.id
+          LEFT JOIN material_stock_entries mse
+            ON mse.material_id = m.id
+           AND mse.year = $1
+           AND mse.month = $2
           WHERE m.is_active = true
           GROUP BY m.category
         `,
-        [nextPeriodStart, year, month]
+        [year, month]
       );
 
       const byCategory = {};
