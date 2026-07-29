@@ -210,6 +210,22 @@ Comprehensive scan of Phases 0–6 financial logic. One real bug found + fixed; 
 
 **🎉 GT payroll parity build complete (Phases 0–6).** Next session: process a real GT month and verify Phases 3–6 end-to-end (nothing has been processed in dev yet).
 
+## Rental add-ons REMOVED (2026-07-30)
+
+The rental add-ons feature described above is **gone** — it was never used. Extra
+driver pay is keyed with the **Manual Item** button on the payroll details page,
+which reads the shared `pay_codes` catalogue and never touched these tables.
+
+Removed: `greentarget.rental_addons` + `greentarget.addon_paycodes` (dropped),
+the `ADDON` value in the `daily_lori_habuk_lines.source_type` CHECK, the
+`/greentarget/api/rental-addons` router, the addon-paycode CRUD on
+`payroll-rules.js`, the ADDON prefill branch in `driverTripRules.js`, the
+rentals `addon_count` column expression, `RentalAddonModal.tsx`, the rental
+form's Add-ons section, the rental list add-on badge, and the Addon Paycodes
+section/modal on the Payroll Settings page. Migration:
+`dev/migrations/2026-07-30_greentarget_remove_rental_addons.sql`. References to
+add-ons in the Phase 2/3 sections above are historical.
+
 ## Reminders / repo rules in effect
 
 - Every schema change → update `AGENTS.md` + `CLAUDE.md` schema sections.

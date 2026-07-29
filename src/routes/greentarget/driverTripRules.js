@@ -2,7 +2,7 @@
 // Green Target DRIVER trip-line derivation from rentals (Phase 3).
 //
 // Extracted from the legacy DRIVER process-all calculation so the Daily Lori
-// Habuk prefill endpoint can suggest the same PLACEMENT/PICKUP/ADDON trip lines
+// Habuk prefill endpoint can suggest the same PLACEMENT/PICKUP trip lines
 // a driver earned on a given day. Once a daily log is saved, monthly processing
 // reads the saved lines — this helper only feeds the prefill suggestion.
 
@@ -53,7 +53,6 @@ const round2 = (n) => Math.round(n * 100) / 100;
  *                                   pickup_destination, invoice_amount)
  * @param {Object} ctx
  *   - placementRules, pickupRules   from greentarget.payroll_rules
- *   - addonsByRental                map rental_id -> [addon rows]
  *   - allPayCodesMap                map pay_code_id -> {rate_biasa, rate_unit, description, pay_type}
  *   - defaultInvoiceAmount          number
  * @returns {Array} line objects: { pay_code_id, description, rate_used,
@@ -63,7 +62,6 @@ export const buildPrefillLinesForDriverDate = (date, driverRentals, ctx) => {
   const {
     placementRules = [],
     pickupRules = [],
-    addonsByRental = {},
     allPayCodesMap = {},
     defaultInvoiceAmount = 200,
   } = ctx;
@@ -111,25 +109,6 @@ export const buildPrefillLinesForDriverDate = (date, driverRentals, ctx) => {
         });
       }
 
-      // Add-ons follow the rental's placement day.
-      const addons = addonsByRental[rental.rental_id] || [];
-      for (const addon of addons) {
-        const rate = parseFloat(addon.amount) || 0;
-        const qty = parseFloat(addon.quantity) || 0;
-        lines.push({
-          pay_code_id: addon.pay_code_id,
-          description:
-            addon.display_name ||
-            addon.pay_code_description ||
-            addon.pay_code_id,
-          rate_used: rate,
-          rate_unit: "Fixed",
-          quantity: qty,
-          amount: round2(rate * qty),
-          source_type: "ADDON",
-          rental_id: rental.rental_id,
-        });
-      }
     }
 
     // PICKUP line on the date the rental was picked up.

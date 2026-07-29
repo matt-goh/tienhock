@@ -410,30 +410,7 @@ export const greenTargetApi = {
       `/greentarget/api/payroll-rules/evaluate/${ruleType}?${params.toString()}`
     );
   },
-  getAddonPaycodes: () => api.get("/greentarget/api/payroll-rules/addon-paycodes/list"),
   getPayrollSettings: () => api.get("/greentarget/api/payroll-rules/settings/all"),
   updatePayrollSetting: (key: string, value: string) =>
     api.put(`/greentarget/api/payroll-rules/settings/${key}`, { value }),
-
-  // Rental addons endpoints
-  getRentalAddons: (rentalId: number) =>
-    api.get(`/greentarget/api/rental-addons/rentals/${rentalId}/addons`),
-  createRentalAddon: (
-    rentalId: number,
-    data: {
-      pay_code_id: string;
-      quantity?: number;
-      amount?: number;
-      notes?: string;
-      created_by?: string;
-    }
-  ) => api.post(`/greentarget/api/rental-addons/rentals/${rentalId}/addons`, data),
-  updateRentalAddon: (
-    id: number,
-    data: { quantity?: number; amount?: number; notes?: string }
-  ) => api.put(`/greentarget/api/rental-addons/${id}`, data),
-  deleteRentalAddon: (id: number) =>
-    api.delete(`/greentarget/api/rental-addons/${id}`),
-  getBatchRentalAddons: (rentalIds: number[]) =>
-    api.post("/greentarget/api/rental-addons/batch", { rental_ids: rentalIds }),
 };

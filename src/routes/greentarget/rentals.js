@@ -113,8 +113,7 @@ export default function (pool) {
                   WHEN i.status = 'cancelled' THEN 9
                   ELSE 3
                 END
-              LIMIT 1) as invoice_info,
-            (SELECT COUNT(*) FROM greentarget.rental_addons ra WHERE ra.rental_id = r.rental_id) as addon_count
+              LIMIT 1) as invoice_info
       `;
 
       const fromClause = `
@@ -693,8 +692,7 @@ export default function (pool) {
                     WHEN i.status = 'cancelled' THEN 9
                     ELSE 3
                   END
-                LIMIT 1) as invoice_info,
-               (SELECT COUNT(*) FROM greentarget.rental_addons ra WHERE ra.rental_id = r.rental_id) as addon_count
+                LIMIT 1) as invoice_info
         FROM greentarget.rentals r
         JOIN greentarget.customers c ON r.customer_id = c.customer_id
         LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
