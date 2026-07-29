@@ -14,6 +14,7 @@ import {
   IconTrash,
   IconMapPin,
   IconTruck,
+  IconPencil,
   IconPhone,
   IconX,
   IconChevronDown,
@@ -24,6 +25,8 @@ import TimeNavigator, { TimeRange } from "../../../components/TimeNavigator";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
+import { formatLocationDisplay } from "../../../utils/greenTarget/formatLocationDisplay";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
 
 interface PickupDestination {
@@ -41,6 +44,7 @@ interface Rental {
   customer_phone_number: string | null;
   location_id: number | null;
   location_address: string | null;
+  location_site: string | null;
   location_phone_number: string | null;
   tong_no: string;
   dumpster_status: string;
@@ -56,7 +60,6 @@ interface Rental {
   } | null;
   pickup_destination?: string | null;
   pickup_destination_name?: string | null;
-  addon_count?: number;
 }
 
 const toLocalDateString = (value: string): string => {
@@ -112,6 +115,10 @@ const RentalCard = ({
 
   const activeStatus = isActive();
   const duration = calculateDuration();
+  const locationLabel = formatLocationDisplay(
+    rental.location_site,
+    rental.location_address
+  );
   const hasInvoice = rental?.invoice_info?.status === "active" ||
     rental?.invoice_info?.status === "overdue" ||
     rental?.invoice_info?.status === "paid";
@@ -153,7 +160,7 @@ const RentalCard = ({
         {/* Customer Info */}
         <div className="mb-3">
           <h3
-            className="text-base font-semibold text-default-900 dark:text-gray-100 truncate cursor-pointer hover:text-sky-600 dark:hover:text-sky-400 transition-colors"
+            className="w-fit max-w-full text-base font-semibold text-default-900 dark:text-gray-100 truncate cursor-pointer hover:text-sky-600 dark:hover:text-sky-400 hover:underline transition-colors"
             title={rental.customer_name}
             onClick={(e) => {
               e.stopPropagation();
@@ -162,13 +169,13 @@ const RentalCard = ({
           >
             {rental.customer_name}
           </h3>
-          {rental.location_address && (
+          {locationLabel && (
             <p
               className="text-sm text-default-500 dark:text-gray-400 mt-1 truncate flex items-center gap-1.5"
-              title={rental.location_address}
+              title={locationLabel}
             >
               <IconMapPin size={14} className="flex-shrink-0" />
-              {rental.location_address}
+              {locationLabel}
             </p>
           )}
           {(rental.customer_phone_number || rental.location_phone_number) && (
@@ -228,14 +235,6 @@ const RentalCard = ({
                 </span>
               </div>
             )}
-            {(rental.addon_count ?? 0) > 0 && (
-              <div className="flex items-center gap-1 px-2 py-1 bg-amber-50 dark:bg-amber-900/20 rounded">
-                <IconPlus size={14} className="text-amber-500 dark:text-amber-400 flex-shrink-0" />
-                <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
-                  {rental.addon_count}
-                </span>
-              </div>
-            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -275,6 +274,16 @@ const RentalCard = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                navigate(`/greentarget/rentals/${rental.rental_id}/edit`);
+              }}
+              className="p-1.5 hover:bg-default-100 dark:hover:bg-gray-700 text-default-500 dark:text-gray-400 rounded transition-colors"
+              title="Edit Rental"
+            >
+              <IconPencil size={16} stroke={1.5} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
                 onGenerateDeliveryOrder(rental);
               }}
               className="p-1.5 hover:bg-sky-100 dark:hover:bg-sky-900/30 text-sky-600 dark:text-sky-400 rounded transition-colors"
@@ -311,20 +320,76 @@ const getDefaultDateRange = (): RentalDateRange => ({
   end: endOfDay(new Date()),
 });
 
+const FILTERS_STORAGE_KEY = "greentarget_rental_filters";
+const SCROLL_RESTORATION_KEY: string = "gt-rental-list";
+
+interface CachedRentalFilters {
+  search: string;
+  dateRange: RentalDateRange;
+  activeOnly: boolean;
+  page: number;
+}
+
+const parseCachedDate = (value: unknown): Date | null => {
+  if (typeof value !== "string") return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+// Restores the search, date range, "Active Rentals Only" toggle and page so
+// opening a rental (or an invoice from a card) and coming back lands on the
+// same view.
+const loadCachedFilters = (): CachedRentalFilters => {
+  const fallback: CachedRentalFilters = {
+    search: "",
+    dateRange: getDefaultDateRange(),
+    activeOnly: false,
+    page: 1,
+  };
+  try {
+    const cached = localStorage.getItem(FILTERS_STORAGE_KEY);
+    if (!cached) return fallback;
+    const parsed = JSON.parse(cached);
+    return {
+      search: typeof parsed.search === "string" ? parsed.search : "",
+      // A cleared date filter is stored as null and must survive the reload,
+      // so the cached range is taken verbatim rather than falling back.
+      dateRange: {
+        start: parseCachedDate(parsed.start),
+        end: parseCachedDate(parsed.end),
+      },
+      activeOnly: parsed.activeOnly === true,
+      page:
+        typeof parsed.page === "number" && parsed.page >= 1 ? parsed.page : 1,
+    };
+  } catch (e) {
+    console.error("Error loading cached rental filters:", e);
+    return fallback;
+  }
+};
+
 const RentalListPage = () => {
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // `searchInput` is what the user is typing; `appliedSearch` is what the
   // backend is filtering on, committed on blur or Enter.
-  const [searchInput, setSearchInput] = useState("");
-  const [appliedSearch, setAppliedSearch] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [searchInput, setSearchInput] = useState<string>(
+    () => loadCachedFilters().search
+  );
+  const [appliedSearch, setAppliedSearch] = useState<string>(
+    () => loadCachedFilters().search
+  );
+  const [currentPage, setCurrentPage] = useState<number>(
+    () => loadCachedFilters().page
+  );
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [activeOnly, setActiveOnly] = useState(false);
+  const [activeOnly, setActiveOnly] = useState<boolean>(
+    () => loadCachedFilters().activeOnly
+  );
   const [dateRange, setDateRange] = useState<RentalDateRange>(
-    getDefaultDateRange()
+    () => loadCachedFilters().dateRange
   );
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [rentalToDelete, setRentalToDelete] = useState<Rental | null>(null);
@@ -370,9 +435,11 @@ const RentalListPage = () => {
           ? { end_date: format(dateRange.end, "yyyy-MM-dd") }
           : {}),
       });
-      // Deleting the last row of the last page can leave us past the end.
-      if (currentPage > response.pagination.totalPages) {
-        setCurrentPage(response.pagination.totalPages);
+      // Deleting the last row of the last page — or restoring a cached page
+      // whose results have since shrunk — can leave us past the end.
+      const lastPage: number = Math.max(1, response.pagination.totalPages);
+      if (currentPage > lastPage) {
+        setCurrentPage(lastPage);
         return;
       }
       setRentals(response.data);
@@ -391,10 +458,38 @@ const RentalListPage = () => {
     fetchRentals();
   }, [fetchRentals]);
 
+  useScrollRestoration(SCROLL_RESTORATION_KEY, !loading);
+
+  // Cache the filters and current page. Page is reset to 1 explicitly by the
+  // filter handlers (never on restore), so the restored page survives mount.
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        FILTERS_STORAGE_KEY,
+        JSON.stringify({
+          search: appliedSearch,
+          start: dateRange.start ? dateRange.start.toISOString() : null,
+          end: dateRange.end ? dateRange.end.toISOString() : null,
+          activeOnly,
+          page: currentPage,
+        })
+      );
+    } catch (e) {
+      console.error("Error caching rental filters:", e);
+    }
+  }, [appliedSearch, dateRange, activeOnly, currentPage]);
+
   // Commit the typed search to the backend. Called on blur and on Enter.
   const commitSearch = () => {
     if (searchInput.trim() === appliedSearch) return;
     setAppliedSearch(searchInput.trim());
+    setCurrentPage(1);
+  };
+
+  const clearSearch = (): void => {
+    setSearchInput("");
+    if (appliedSearch === "") return;
+    setAppliedSearch("");
     setCurrentPage(1);
   };
 
@@ -420,18 +515,9 @@ const RentalListPage = () => {
   };
 
   const handleCreateInvoice = (rental: Rental) => {
-    // Redirect to invoice creation page with rental ID
-    navigate(`/greentarget/invoices/new`, {
-      state: {
-        rental_id: rental.rental_id,
-        customer_id: rental.customer_id,
-        customer_name: rental.customer_name,
-        driver: rental.driver,
-        location_address: rental.location_address,
-        tong_no: rental.tong_no,
-        date_placed: rental.date_placed,
-        date_picked: rental.date_picked,
-      },
+    // Open the rental's details page with the Create Invoice modal auto-opened
+    navigate(`/greentarget/rentals/${rental.rental_id}`, {
+      state: { openInvoiceModal: true },
     });
   };
 
@@ -694,7 +780,7 @@ const RentalListPage = () => {
             <input
               type="text"
               placeholder="Search"
-              className="w-full pl-11 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 focus:border-default-500 dark:focus:border-gray-500 rounded-full"
+              className="w-full pl-11 pr-10 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 focus:border-default-500 dark:focus:border-gray-500 rounded-full"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onBlur={commitSearch}
@@ -704,6 +790,17 @@ const RentalListPage = () => {
                 }
               }}
             />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-default-400 hover:text-default-600 dark:hover:text-gray-300"
+                title="Clear search"
+                aria-label="Clear search"
+              >
+                <IconX size={16} />
+              </button>
+            )}
           </div>
           <div className="flex">
             <Button

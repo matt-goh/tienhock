@@ -172,6 +172,61 @@ const handleEInvoiceStatusChange = (invoiceId, newStatus, pool, apiClient) => {
   }
 };
 
+/**
+ * Server-side guard for invoice rental links (previously client-side only):
+ * every rental must exist, belong to the invoice's customer, and not already
+ * be linked to a non-cancelled invoice. On update, the invoice being edited
+ * is excluded from the double-billing check. Throws an error with status 400
+ * naming the conflicting rental.
+ */
+const assertRentalLinksValid = async (
+  client,
+  customerId,
+  rentalIds,
+  excludeInvoiceId = null
+) => {
+  const badRequest = (message) => {
+    const error = new Error(message);
+    error.status = 400;
+    throw error;
+  };
+
+  const rentalResult = await client.query(
+    `SELECT rental_id, customer_id FROM greentarget.rentals WHERE rental_id = ANY($1)`,
+    [rentalIds]
+  );
+  const rentalsById = new Map(rentalResult.rows.map((row) => [row.rental_id, row]));
+
+  for (const rentalId of rentalIds) {
+    const rental = rentalsById.get(Number(rentalId));
+    if (!rental) {
+      badRequest(`Rental #${rentalId} does not exist.`);
+    }
+    if (rental.customer_id !== Number(customerId)) {
+      badRequest(
+        `Rental #${rentalId} belongs to a different customer and cannot be added to this invoice.`
+      );
+    }
+  }
+
+  const conflictResult = await client.query(
+    `SELECT ir.rental_id, i.invoice_number
+     FROM greentarget.invoice_rentals ir
+     JOIN greentarget.invoices i ON i.invoice_id = ir.invoice_id
+     WHERE ir.rental_id = ANY($1)
+       AND (i.status IS NULL OR i.status != 'cancelled')
+       AND ($2::int IS NULL OR ir.invoice_id != $2)`,
+    [rentalIds, excludeInvoiceId]
+  );
+
+  if (conflictResult.rows.length > 0) {
+    const conflict = conflictResult.rows[0];
+    badRequest(
+      `Rental #${conflict.rental_id} is already billed on invoice ${conflict.invoice_number}.`
+    );
+  }
+};
+
 export default function (pool, defaultConfig) {
   const router = Router();
 
@@ -277,6 +332,7 @@ export default function (pool, defaultConfig) {
                       'date_placed', r2.date_placed,
                       'date_picked', r2.date_picked,
                       'location_address', l2.address,
+                      'location_site', l2.site,
                       'location_phone_number', l2.phone_number
                     ) ORDER BY r2.rental_id
                   ),
@@ -556,6 +612,7 @@ export default function (pool, defaultConfig) {
                     'date_picked', r2.date_picked,
                     'driver', r2.driver,
                     'location_address', l2.address,
+                    'location_site', l2.site,
                     'location_phone_number', l2.phone_number
                   ) ORDER BY r2.rental_id
                 ),
@@ -647,6 +704,7 @@ export default function (pool, defaultConfig) {
                       'date_picked', r2.date_picked,
                       'driver', r2.driver,
                       'location_address', l2.address,
+                      'location_site', l2.site,
                       'location_phone_number', l2.phone_number
                     ) ORDER BY r2.rental_id
                   ),
@@ -772,8 +830,6 @@ export default function (pool, defaultConfig) {
       invoice_number, // Optional custom invoice number
     } = req.body;
 
-    console.log('Invoice creation request:', { type, customer_id, rental_ids, amount_before_tax, tax_amount, date_issued, invoice_number });
-
     const client = await pool.connect();
 
     try {
@@ -798,6 +854,12 @@ export default function (pool, defaultConfig) {
       }
       if (isNaN(numTaxAmount) || numTaxAmount < 0) {
         throw new Error("Invalid tax_amount provided.");
+      }
+
+      // Rentals must belong to this customer and must not already be billed on
+      // another non-cancelled invoice (was enforced client-side only).
+      if (type === "regular") {
+        await assertRentalLinksValid(client, customer_id, rental_ids);
       }
 
       // --- Logic ---
@@ -989,6 +1051,17 @@ export default function (pool, defaultConfig) {
 
       if (isNaN(numTaxAmount) || numTaxAmount < 0) {
         throw new Error("Invalid tax_amount provided.");
+      }
+
+      // Rentals must belong to this customer and must not already be billed on
+      // another non-cancelled invoice (excluding the invoice being edited).
+      if (type === "regular") {
+        await assertRentalLinksValid(
+          client,
+          customer_id,
+          rental_ids,
+          numericInvoiceId
+        );
       }
 
       // If invoice_number is provided, check for duplicates
@@ -1275,7 +1348,7 @@ export default function (pool, defaultConfig) {
 
       // Check if invoice exists and is cancelled
       const invoiceCheck = await client.query(
-        "SELECT status, total_amount, date_issued FROM greentarget.invoices WHERE invoice_id = $1 FOR UPDATE",
+        "SELECT status, total_amount, date_issued, journal_entry_id FROM greentarget.invoices WHERE invoice_id = $1 FOR UPDATE",
         [numericInvoiceId]
       );
 
@@ -1346,6 +1419,36 @@ export default function (pool, defaultConfig) {
         "DELETE FROM greentarget.invoices WHERE invoice_id = $1",
         [numericInvoiceId]
       );
+
+      // Delete the invoice-owned S journal along with it. Only a cancelled
+      // invoice reaches this point, so the journal is already cancelled and has
+      // no ledger effect; leaving it behind would keep squatting
+      // reference_no = the invoice number (unique across ALL statuses), so that
+      // number could never be keyed again — it failed on
+      // journal_entries_reference_no_key at creation. The source document is
+      // gone, so the journal is also unrestorable dead weight. Guarded to this
+      // invoice's own sales journal — matched by source ownership OR the
+      // invoice's own back-link (a journal adopted by reference_no keeps the
+      // back-link but not always the source columns). A legacy import (IMP) or
+      // a journal belonging to any other document can never match.
+      const removedJournals = await client.query(
+        `DELETE FROM greentarget.journal_entries
+          WHERE entry_type = 'S'
+            AND status = 'cancelled'
+            AND (
+              (source_type = 'invoice' AND source_id = $1)
+              OR id = $2
+            )
+          RETURNING id, reference_no`,
+        [String(numericInvoiceId), invoice.journal_entry_id]
+      );
+      if (removedJournals.rows.length > 0) {
+        console.log(
+          `✓ Removed cancelled GT sales journal(s) with deleted invoice ${numericInvoiceId}: ${removedJournals.rows
+            .map((row) => `${row.id} (${row.reference_no})`)
+            .join(", ")}`
+        );
+      }
 
       await client.query("COMMIT");
 

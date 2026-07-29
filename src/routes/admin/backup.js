@@ -569,6 +569,12 @@ export default function backupRouter(pool) {
               SELECT class.relkind = 'v'
                 FROM pg_class class
                WHERE class.oid = TO_REGCLASS('public.account_codes_hierarchy')
+            )
+            AND TO_REGCLASS('greentarget.account_codes_hierarchy') IS NOT NULL
+            AND (
+              SELECT class.relkind = 'v'
+                FROM pg_class class
+               WHERE class.oid = TO_REGCLASS('greentarget.account_codes_hierarchy')
             ) AS has_account_hierarchy_view,
           (
             SELECT COUNT(*)::integer
@@ -672,10 +678,14 @@ export default function backupRouter(pool) {
            AND class.relkind IN ('v', 'm', 'f')
          ORDER BY namespace.nspname, class.relname
       `, [REQUIRED_RESTORED_SCHEMAS]);
-      if (specialRelationRows.length !== 1
-        || specialRelationRows[0].schema_name !== 'public'
-        || specialRelationRows[0].relname !== 'account_codes_hierarchy'
-        || specialRelationRows[0].relkind !== 'v') {
+      const expectedViews = [
+        'greentarget.account_codes_hierarchy',
+        'public.account_codes_hierarchy',
+      ];
+      if (specialRelationRows.length !== expectedViews.length
+        || !specialRelationRows.every((row, index) =>
+          row.relkind === 'v'
+          && `${row.schema_name}.${row.relname}` === expectedViews[index])) {
         throw new RestoredDatabaseStructureError(
           'The SQL dump contains an unexpected view, materialized view, or foreign table'
         );
@@ -683,6 +693,10 @@ export default function backupRouter(pool) {
 
       await client.query(`
         ALTER VIEW public.account_codes_hierarchy
+        SET (security_invoker = true)
+      `);
+      await client.query(`
+        ALTER VIEW greentarget.account_codes_hierarchy
         SET (security_invoker = true)
       `);
     } finally {

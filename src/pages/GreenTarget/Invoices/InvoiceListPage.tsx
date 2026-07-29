@@ -56,6 +56,8 @@ import { pdf, Document } from "@react-pdf/renderer";
 import { generateQRDataUrl } from "../../../utils/invoice/einvoice/generateQRCode";
 import { FormCombobox, SelectOption } from "../../../components/FormComponents";
 import GTStatementModal from "../../../components/GreenTarget/GTStatementModal";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
+import { formatLocationDisplay } from "../../../utils/greenTarget/formatLocationDisplay";
 
 interface InvoiceCardProps {
   invoice: InvoiceGT;
@@ -81,12 +83,103 @@ interface InvoiceDateRange {
   end: Date | null;
 }
 
-interface StoredInvoiceDateRange {
+interface StoredInvoiceFilters {
   start?: string | null;
   end?: string | null;
+  search?: unknown;
+  filters?: unknown;
+  page?: unknown;
+}
+
+interface CachedInvoiceFilters {
+  search: string;
+  dateRange: InvoiceDateRange;
+  filters: InvoiceFilters;
+  page: number;
 }
 
 const STORAGE_KEY = "greentarget_invoice_filters";
+const SCROLL_RESTORATION_KEY: string = "gt-invoice-list";
+
+// Default filter values. `getDefaultFilters` hands out a fresh copy (including
+// its own status array) so the shared constant is never mutated in place.
+const DEFAULT_FILTERS: InvoiceFilters = {
+  customer_id: null,
+  status: ["active", "overdue", "paid", "cancelled"],
+  consolidation: "all",
+};
+
+const getDefaultFilters = (): InvoiceFilters => ({
+  customer_id: DEFAULT_FILTERS.customer_id,
+  status: [...(DEFAULT_FILTERS.status ?? [])],
+  consolidation: DEFAULT_FILTERS.consolidation,
+});
+
+const CONSOLIDATION_VALUES: InvoiceFilters["consolidation"][] = [
+  "all",
+  "individual",
+  "consolidated",
+];
+
+const parseCachedDate = (value: unknown): Date | null => {
+  if (typeof value !== "string") return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const getDefaultDateRange = (): InvoiceDateRange => ({
+  start: new Date(new Date().setMonth(new Date().getMonth() - 1)),
+  end: new Date(),
+});
+
+// Restores the search, date range, filter panel selections and page so opening
+// an invoice (or a rental from a card) and coming back lands on the same view.
+// Caches written before the filters/search/page were stored only hold the date
+// range, so every field falls back independently.
+const loadCachedFilters = (): CachedInvoiceFilters => {
+  const fallback: CachedInvoiceFilters = {
+    search: "",
+    dateRange: getDefaultDateRange(),
+    filters: getDefaultFilters(),
+    page: 1,
+  };
+  try {
+    const cached: string | null = localStorage.getItem(STORAGE_KEY);
+    if (!cached) return fallback;
+    const parsed: StoredInvoiceFilters = JSON.parse(cached);
+    const storedFilters = parsed.filters as Partial<InvoiceFilters> | undefined;
+    return {
+      search: typeof parsed.search === "string" ? parsed.search : "",
+      dateRange: {
+        start: parseCachedDate(parsed.start) ?? fallback.dateRange.start,
+        end: parseCachedDate(parsed.end) ?? fallback.dateRange.end,
+      },
+      filters: storedFilters
+        ? {
+            customer_id:
+              typeof storedFilters.customer_id === "string"
+                ? storedFilters.customer_id
+                : null,
+            status: Array.isArray(storedFilters.status)
+              ? storedFilters.status.filter(
+                  (s: unknown): s is string => typeof s === "string"
+                )
+              : getDefaultFilters().status,
+            consolidation: CONSOLIDATION_VALUES.includes(
+              storedFilters.consolidation as InvoiceFilters["consolidation"]
+            )
+              ? (storedFilters.consolidation as InvoiceFilters["consolidation"])
+              : DEFAULT_FILTERS.consolidation,
+          }
+        : getDefaultFilters(),
+      page:
+        typeof parsed.page === "number" && parsed.page >= 1 ? parsed.page : 1,
+    };
+  } catch (e) {
+    console.error("Error loading cached invoice filters:", e);
+    return fallback;
+  }
+};
 
 const MONEY_TOLERANCE: number = 0.005;
 
@@ -641,19 +734,28 @@ const InvoiceCard = ({
                   {invoice.rental_details.length > 1 ? "s" : ""})
                 </div>
                 <div className="grid grid-cols-1 gap-1">
-                  {invoice.rental_details.slice(0, 3).map((rental, index) => (
-                    <div
-                      key={rental.rental_id || index}
-                      className="flex items-center justify-between text-xs text-default-600 dark:text-gray-300 py-1 px-2 bg-default-50 dark:bg-gray-900/50 rounded cursor-pointer hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 transition-colors"
+                  {invoice.rental_details.slice(0, 3).map((rental, index) => {
+                    const rentalLocation: string = formatLocationDisplay(
+                      rental.location_site,
+                      rental.location_address
+                    );
+                    return (
+                      <div
+                        key={rental.rental_id || index}
+                        className="flex items-center justify-between text-xs text-default-600 dark:text-gray-300 py-1 px-2 bg-default-50 dark:bg-gray-900/50 rounded cursor-pointer hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 transition-colors"
                       onClick={(e) => {
                         e.stopPropagation();
                         if (rental.rental_id) {
                           navigate(`/greentarget/rentals/${rental.rental_id}`);
                         }
                       }}
-                      title="Click to view rental details"
+                      title={
+                        rentalLocation
+                          ? `${rentalLocation} — click to view rental details`
+                          : "Click to view rental details"
+                      }
                     >
-                      <div className="flex items-center">
+                      <div className="flex items-center min-w-0">
                         <IconTruck size={12} className="mr-1 flex-shrink-0" />
                         <span className="font-medium">
                           #{rental.rental_id || "N/A"}
@@ -661,6 +763,11 @@ const InvoiceCard = ({
                         {rental.tong_no && (
                           <span className="ml-1 text-default-500 dark:text-gray-400">
                             • {rental.tong_no}
+                          </span>
+                        )}
+                        {rental.location_site && (
+                          <span className="ml-1 truncate text-default-500 dark:text-gray-400">
+                            • {rental.location_site}
                           </span>
                         )}
                       </div>
@@ -675,7 +782,8 @@ const InvoiceCard = ({
                         )}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                   {invoice.rental_details.length > 3 && (
                     <div className="text-xs text-default-500 dark:text-gray-400 text-center py-1">
                       +{invoice.rental_details.length - 3} more rental
@@ -852,43 +960,27 @@ const InvoiceCard = ({
 
 const InvoiceListPage: React.FC = () => {
   const ITEMS_PER_PAGE = 12;
-  // Function to get initial dates from localStorage
-  const getInitialDates = (): InvoiceDateRange => {
-    const savedFilters: string | null = localStorage.getItem(STORAGE_KEY);
-    if (savedFilters) {
-      const { start, end }: StoredInvoiceDateRange = JSON.parse(savedFilters);
-      return {
-        start: start
-          ? new Date(start)
-          : new Date(new Date().setMonth(new Date().getMonth() - 1)),
-        end: end ? new Date(end) : new Date(),
-      };
-    }
-    return {
-      start: new Date(new Date().setMonth(new Date().getMonth() - 1)),
-      end: new Date(),
-    };
-  };
 
   // Month state - drives the consolidation modals; synced with the TimeNavigator.
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
 
-  // Define default filter values as constants
-  const DEFAULT_FILTERS: InvoiceFilters = {
-    customer_id: null,
-    status: ["active", "overdue", "paid", "cancelled"],
-    consolidation: "all",
-  };
-  const [dateRange, setDateRange] =
-    useState<InvoiceDateRange>(getInitialDates());
+  const [dateRange, setDateRange] = useState<InvoiceDateRange>(
+    () => loadCachedFilters().dateRange
+  );
   const [invoices, setInvoices] = useState<InvoiceGT[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // `searchInput` is what the user is typing; `appliedSearch` is what the
   // backend is filtering on, committed on blur or Enter.
-  const [searchInput, setSearchInput] = useState("");
-  const [appliedSearch, setAppliedSearch] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [searchInput, setSearchInput] = useState<string>(
+    () => loadCachedFilters().search
+  );
+  const [appliedSearch, setAppliedSearch] = useState<string>(
+    () => loadCachedFilters().search
+  );
+  const [currentPage, setCurrentPage] = useState<number>(
+    () => loadCachedFilters().page
+  );
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
@@ -917,12 +1009,12 @@ const InvoiceListPage: React.FC = () => {
   const [invoicesForPDF, setInvoicesForPDF] = useState<InvoiceGT[]>([]); // Holds detailed invoices for PDF
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<InvoiceFilters>(() => {
-    // Initialize filters potentially from URL params on first load
+    // Start from the cached filters, then let URL params override them
     const params = new URLSearchParams(window.location.search);
     const customerIdParam = params.get("customer_id");
     const statusParam = params.get("status");
 
-    let initialFilters = { ...DEFAULT_FILTERS }; // Start with defaults
+    let initialFilters: InvoiceFilters = loadCachedFilters().filters;
     if (customerIdParam) {
       initialFilters.customer_id = customerIdParam;
     }
@@ -952,16 +1044,33 @@ const InvoiceListPage: React.FC = () => {
     }
   }, [filters]); // This will reset hasViewedFilters whenever filters change
 
-  // Function to save dates to localStorage
-  const saveDatesToStorage = (startDate: Date, endDate: Date): void => {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        start: startDate.toISOString(),
-        end: endDate.toISOString(),
-      })
-    );
-  };
+  // Cache the search, date range, filters and page. Page is reset to 1
+  // explicitly by the filter handlers (never on restore), so the restored page
+  // survives mount.
+  useEffect(() => {
+    try {
+      // A customer deep-link clears the date range; keep whatever window was
+      // stored in that case instead of wiping the user's own selection.
+      const persistedRange: InvoiceDateRange =
+        dateRange.start && dateRange.end
+          ? dateRange
+          : loadCachedFilters().dateRange;
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          start: persistedRange.start
+            ? persistedRange.start.toISOString()
+            : null,
+          end: persistedRange.end ? persistedRange.end.toISOString() : null,
+          search: appliedSearch,
+          filters,
+          page: currentPage,
+        })
+      );
+    } catch (e) {
+      console.error("Error caching invoice filters:", e);
+    }
+  }, [dateRange, appliedSearch, filters, currentPage]);
 
   // Helper function to format a Date object into 'YYYY-MM-DD' string in local time
   const formatDateForAPI = (date: Date): string => {
@@ -979,7 +1088,6 @@ const InvoiceListPage: React.FC = () => {
     // Keep the consolidation modals' month in sync with the selection.
     setSelectedMonth(range.start);
 
-    saveDatesToStorage(range.start, range.end);
     setDateRange({ start: range.start, end: range.end });
 
     // Reset to first page when date changes
@@ -1023,9 +1131,11 @@ const InvoiceListPage: React.FC = () => {
         `/greentarget/api/invoices?${params.toString()}`
       );
 
-      // Deleting the last row of the last page can leave us past the end.
-      if (currentPage > response.pagination.totalPages) {
-        setCurrentPage(response.pagination.totalPages);
+      // Deleting the last row of the last page — or restoring a cached page
+      // whose results have since shrunk — can leave us past the end.
+      const lastPage: number = Math.max(1, response.pagination.totalPages);
+      if (currentPage > lastPage) {
+        setCurrentPage(lastPage);
         return;
       }
 
@@ -1122,6 +1232,10 @@ const InvoiceListPage: React.FC = () => {
         setFilters(newFilters);
       }
 
+      // A deep link builds its own result set, so the cached page no longer
+      // applies — always land on the first page.
+      setCurrentPage(1);
+
       // Mark initial params as processed so the main fetch effect can run
       setInitialParamsApplied(true);
     } else if (!initialParamsApplied) {
@@ -1140,6 +1254,8 @@ const InvoiceListPage: React.FC = () => {
     }
   }, [initialParamsApplied, fetchInvoices]);
 
+  useScrollRestoration(SCROLL_RESTORATION_KEY, initialParamsApplied && !loading);
+
   // Filter changes restart at page 1; batched with the filter update so the
   // fetch effect only runs once.
   const updateFilters = useCallback(
@@ -1154,6 +1270,13 @@ const InvoiceListPage: React.FC = () => {
   const commitSearch = (): void => {
     if (searchInput.trim() === appliedSearch) return;
     setAppliedSearch(searchInput.trim());
+    setCurrentPage(1);
+  };
+
+  const clearSearch = (): void => {
+    setSearchInput("");
+    if (appliedSearch === "") return;
+    setAppliedSearch("");
     setCurrentPage(1);
   };
 
@@ -1755,7 +1878,7 @@ const InvoiceListPage: React.FC = () => {
   };
 
   const clearFilters = () => {
-    setFilters(DEFAULT_FILTERS);
+    setFilters(getDefaultFilters());
     setCustomerQuery("");
     setCurrentPage(1);
   };
@@ -1903,8 +2026,8 @@ const InvoiceListPage: React.FC = () => {
 
               {/* Filters info dropdown panel - Improved */}
               {isFilterButtonHovered && (
-                <div className="absolute z-30 mt-2 w-72 bg-white dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-sky-100 py-3 px-4 text-sm animate-fadeIn transition-all duration-200 transform origin-top">
-                  <h3 className="font-semibold text-default-800 dark:text-gray-100 mb-2 border-b pb-1.5 border-default-100">
+                <div className="absolute z-30 mt-2 w-72 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-sky-100 dark:border-gray-700 py-3 px-4 text-sm animate-fadeIn transition-all duration-200 transform origin-top">
+                  <h3 className="font-semibold text-default-800 dark:text-gray-100 mb-2 border-b pb-1.5 border-default-100 dark:border-gray-700">
                     {activeFilterCount > 0 ? "Applied Filters" : "Filters"}
                   </h3>
                   {activeFilterCount === 0 ? (
@@ -1986,7 +2109,7 @@ const InvoiceListPage: React.FC = () => {
               <input
                 type="text"
                 placeholder="Search"
-                className="w-full pl-10 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 focus:border-default-500 dark:focus:border-gray-500 rounded-lg h-[40px]"
+                className="w-full pl-10 pr-10 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 focus:border-default-500 dark:focus:border-gray-500 rounded-lg h-[40px]"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 onBlur={commitSearch}
@@ -1996,6 +2119,17 @@ const InvoiceListPage: React.FC = () => {
                   }
                 }}
               />
+              {searchInput && (
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-default-400 hover:text-default-600 dark:hover:text-gray-300"
+                  title="Clear search"
+                  aria-label="Clear search"
+                >
+                  <IconX size={16} />
+                </button>
+              )}
             </div>
           </div>
         </div>
