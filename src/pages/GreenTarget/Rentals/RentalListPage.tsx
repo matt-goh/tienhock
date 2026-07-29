@@ -59,7 +59,6 @@ interface Rental {
   } | null;
   pickup_destination?: string | null;
   pickup_destination_name?: string | null;
-  addon_count?: number;
 }
 
 const toLocalDateString = (value: string): string => {
@@ -232,14 +231,6 @@ const RentalCard = ({
                 <IconTruck size={14} className="text-indigo-500 dark:text-indigo-400 flex-shrink-0" />
                 <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">
                   {rental.pickup_destination_name || rental.pickup_destination}
-                </span>
-              </div>
-            )}
-            {(rental.addon_count ?? 0) > 0 && (
-              <div className="flex items-center gap-1 px-2 py-1 bg-amber-50 dark:bg-amber-900/20 rounded">
-                <IconPlus size={14} className="text-amber-500 dark:text-amber-400 flex-shrink-0" />
-                <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
-                  {rental.addon_count}
                 </span>
               </div>
             )}
