@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-30",
+    ms: "Green Target — Journal Entries: senarai jurnal kini mempunyai tapisan jenis baucer seperti di Tien Hock. Klik pil jenis (contohnya C Cash Payment, REC Receipt, JV Journal Voucher) untuk memaparkan hanya jurnal jenis itu; pilih lebih daripada satu untuk gabungan, dan gunakan pil Active/Cancelled untuk tapisan status. Pilihan tapisan diingati apabila anda kembali ke halaman ini.",
+    en: "Green Target — Journal Entries: the journal list now has voucher-type filters like Tien Hock. Click a type pill (for example C Cash Payment, REC Receipt, JV Journal Voucher) to show only journals of that type; select several to combine them, and use the Active/Cancelled pills to filter by status. Your filter choices are remembered when you return to the page.",
+  },
+  {
+    date: "2026-07-30",
     ms: "Green Target — Journal Entries: jenis baucer Cash Payment, Bank Payment dan Journal kini boleh dikunci terus di Green Target, sama seperti di Tien Hock. Pilih jenis tersebut semasa membuat jurnal baharu dan nombor rujukan diisi automatik (contohnya PCE001/07 untuk Cash Payment). Sesuai untuk memasukkan payment voucher ke dalam akaun Green Target.",
     en: "Green Target — Journal Entries: Cash Payment, Bank Payment and Journal voucher types can now be keyed directly in Green Target, just like in Tien Hock. Pick the type when creating a new journal and the reference number is filled in automatically (for example PCE001/07 for Cash Payment). This is where payment vouchers can now be entered into Green Target's accounts.",
   },
