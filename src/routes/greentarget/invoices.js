@@ -277,6 +277,7 @@ export default function (pool, defaultConfig) {
                       'date_placed', r2.date_placed,
                       'date_picked', r2.date_picked,
                       'location_address', l2.address,
+                      'location_site', l2.site,
                       'location_phone_number', l2.phone_number
                     ) ORDER BY r2.rental_id
                   ),
@@ -556,6 +557,7 @@ export default function (pool, defaultConfig) {
                     'date_picked', r2.date_picked,
                     'driver', r2.driver,
                     'location_address', l2.address,
+                    'location_site', l2.site,
                     'location_phone_number', l2.phone_number
                   ) ORDER BY r2.rental_id
                 ),
@@ -647,6 +649,7 @@ export default function (pool, defaultConfig) {
                       'date_picked', r2.date_picked,
                       'driver', r2.driver,
                       'location_address', l2.address,
+                      'location_site', l2.site,
                       'location_phone_number', l2.phone_number
                     ) ORDER BY r2.rental_id
                   ),

@@ -93,6 +93,7 @@ export default function (pool) {
             c.name as customer_name,
             c.phone_number as customer_phone_number,
             l.address as location_address,
+            l.site as location_site,
             l.phone_number as location_phone_number,
             d.status as dumpster_status,
             pd.name as pickup_destination_name,
@@ -616,8 +617,9 @@ export default function (pool) {
       // Get rental details with joined data
       const query = `
         SELECT r.*, 
-               c.name as customer_name, 
+               c.name as customer_name,
                l.address as location_address,
+               l.site as location_site,
                d.status as dumpster_status
         FROM greentarget.rentals r
         JOIN greentarget.customers c ON r.customer_id = c.customer_id
@@ -643,7 +645,11 @@ export default function (pool) {
           do_number: `DO-${rentalData.rental_id}`,
           date: rentalData.date_placed,
           customer: rentalData.customer_name,
-          location: rentalData.location_address || "N/A",
+          location:
+            [rentalData.location_site, rentalData.location_address]
+              .map((part) => (part || "").trim())
+              .filter(Boolean)
+              .join(" — ") || "N/A",
           dumpster: rentalData.tong_no,
           driver: rentalData.driver,
           remarks: rentalData.remarks || "",
@@ -667,6 +673,7 @@ export default function (pool) {
         SELECT r.*,
                c.name as customer_name,
                l.address as location_address,
+               l.site as location_site,
                d.status as dumpster_status,
                pd.name as pickup_destination_name,
                (SELECT json_build_object(

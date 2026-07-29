@@ -27,7 +27,8 @@ interface AddonPaycode {
   id: number;
   pay_code_id: string;
   display_name: string;
-  default_amount: number;
+  // numeric columns arrive from the pg pool as strings
+  default_amount: number | string;
   is_variable_amount: boolean;
   sort_order: number;
 }
@@ -37,7 +38,7 @@ interface RentalAddon {
   rental_id: number;
   pay_code_id: string;
   quantity: number;
-  amount: number;
+  amount: number | string;
   notes: string | null;
   pay_code_description: string;
   display_name: string | null;
@@ -92,7 +93,8 @@ const RentalAddonModal = ({
   const handlePaycodeSelect = (paycode: AddonPaycode) => {
     setSelectedPaycode(paycode);
     if (!paycode.is_variable_amount) {
-      setNewAddonAmount(paycode.default_amount);
+      const defaultAmount = Number(paycode.default_amount);
+      setNewAddonAmount(Number.isFinite(defaultAmount) ? defaultAmount : "");
     } else {
       setNewAddonAmount("");
     }
@@ -143,8 +145,9 @@ const RentalAddonModal = ({
     }
   };
 
-  const formatAmount = (amount: number) => {
-    return `RM ${amount.toFixed(2)}`;
+  const formatAmount = (amount: number | string): string => {
+    const value = Number(amount);
+    return `RM ${(Number.isFinite(value) ? value : 0).toFixed(2)}`;
   };
 
   return (

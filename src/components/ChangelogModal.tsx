@@ -20,6 +20,16 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-30",
+    ms: "Green Target — Senarai Sewaan dan senarai Invois kini mengingati paparan anda. Selepas membuka sewaan atau invois dan kembali semula, halaman yang sama, carian, julat tarikh, tapisan (termasuk \"Active Rentals Only\" serta tapisan pelanggan, status dan consolidation) dan kedudukan skrin dikekalkan — anda tidak perlu lagi menetapkannya semula setiap kali. Tetapan ini juga kekal apabila anda kembali ke halaman tersebut kemudian. Membuka senarai invois melalui pautan pelanggan tetap bermula pada halaman pertama seperti biasa.",
+    en: "Green Target — The Rentals list and Invoices list now remember your view. After opening a rental or an invoice and coming back, the same page, search, date range, filters (including \"Active Rentals Only\" and the customer, status and consolidation filters) and scroll position are kept — you no longer have to set them again each time. They also stay in place when you return to the page later. Opening the invoice list from a customer link still starts on the first page as before.",
+  },
+  {
+    date: "2026-07-30",
+    ms: "Green Target — Site lokasi kini dipaparkan bersama alamat di mana-mana sahaja alamat sewaan ditunjukkan: kad senarai Sewaan, butiran sewaan pada kad Invois, pemilihan sewaan semasa membuat atau menyunting invois, halaman butiran Invois, tooltip pada halaman Tong, dan Delivery Order. Alamat dipaparkan sebagai \"Site — Alamat\"; lokasi tanpa Site kekal memaparkan alamat sahaja.",
+    en: "Green Target — A location's Site is now shown next to the address everywhere a rental address appears: the Rentals list cards, the rental details on Invoice cards, the rental picker when creating or editing an invoice, the Invoice details page, the Dumpsters page tooltip, and the Delivery Order. It reads as \"Site — Address\"; locations without a Site still show the address on its own.",
+  },
+  {
+    date: "2026-07-30",
     ms: "Green Target — Invois: nombor invois yang pernah dibatalkan dan kemudian dipadam kini boleh digunakan semula. Sebelum ini, walaupun sistem memberitahu \"Invoice number is available\", menyimpan invois tersebut gagal dengan mesej ralat teknikal kerana rekod perakaunan invois lama masih memegang nombor itu. Rekod perakaunan yang telah dibatalkan kini dipadam bersama invoisnya, dan rekod lama yang tertinggal telah dibersihkan. Tiada kesan pada lejar: rekod yang dibatalkan tidak pernah masuk ke dalam mana-mana laporan atau baki akaun.",
     en: "Green Target — Invoices: an invoice number that was cancelled and then deleted can now be used again. Previously the system said \"Invoice number is available\" but saving failed with a technical error, because the old invoice's accounting record still held that number. The cancelled accounting record is now removed together with its invoice, and the leftover records have been cleaned up. Nothing changes in the ledger: a cancelled record never appeared in any report or account balance.",
   },
