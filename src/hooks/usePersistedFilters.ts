@@ -135,20 +135,54 @@ export function usePersistedNumber(
   );
 }
 
-// Persisted search box where `?search=` on the current URL wins on mount (the
+// Persisted search box where `?search=` on the current URL wins on mount — the
 // payroll details pages deep-link into the add-on lists pre-filtered to one
-// employee).
+// employee.
+//
+// A term that arrived in the URL applies to THAT VISIT ONLY and is deliberately
+// never written to storage. A search term silently hides rows, so an old deep
+// link must not be able to leave a stale employee name filtering the page on
+// the next plain visit. As soon as the user edits the box the value differs from
+// the seeded term and persists as normal (including clearing it to ""), and a
+// visit with no `?search=` restores whatever the user last typed.
 export function usePersistedUrlSearch(
   key: string
 ): [string, React.Dispatch<React.SetStateAction<string>>] {
-  const readParam = (): string | null =>
-    new URLSearchParams(window.location.search).get("search")?.trim() ?? null;
+  const storageKey = `${STORAGE_PREFIX}${key}`;
 
-  return usePersistedFilters<string>(
-    key,
-    () => readParam() ?? "",
-    (cached) => readParam() ?? (typeof cached === "string" ? cached : null)
+  // Read the param once, at mount. These pages rewrite their own query string
+  // as the user changes month, so re-reading it later proves nothing.
+  const [seededTerm] = useState<string | null>(
+    () => new URLSearchParams(window.location.search).get("search")?.trim() ?? null
   );
+
+  const [term, setTerm] = useState<string>(() => {
+    if (seededTerm !== null) return seededTerm;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw !== null) {
+        const parsed: unknown = JSON.parse(raw);
+        if (typeof parsed === "string") return parsed;
+      }
+    } catch (e) {
+      console.error(`Error loading cached filters for ${key}:`, e);
+    }
+    return "";
+  });
+
+  // Comparing against the seeded term (rather than skipping the first write via
+  // a ref) keeps this idempotent, so React StrictMode's double-invoked effects
+  // can't slip the seeded term into storage.
+  useEffect(() => {
+    if (seededTerm !== null && term === seededTerm) return;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(term));
+    } catch (e) {
+      console.error(`Error caching filters for ${storageKey}:`, e);
+    }
+  }, [storageKey, term, seededTerm]);
+
+  return [term, setTerm];
 }
 
 // Persisted search box with no URL involvement.

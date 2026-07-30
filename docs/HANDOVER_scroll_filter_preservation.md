@@ -27,6 +27,16 @@ returning to a list restores its **filters** (search, month/date range, pills, p
     `GTPayrollDetailsPage` / `JPPayrollDetailsPage` deep-link into them with
     `?year=&month=&search=` and that link must beat the cached value.
 
+    The two differ on purpose. `usePersistedUrlNumber` **persists** the URL-seeded
+    year/month: the month is the page's primary axis, it's always visible in the
+    TimeNavigator and heading, and a stale month shows *different* rows, not *fewer* —
+    you notice immediately. `usePersistedUrlSearch` **never persists** a URL-seeded term:
+    a search silently hides rows, so an old deep link must not leave an employee name
+    filtering the page on the next plain visit. The seeded term applies to that visit only;
+    the moment the user edits the box (including clearing it) their value persists normally.
+    Implemented by comparing against the seeded term rather than skipping the first write
+    with a ref — StrictMode double-invokes effects in dev, which would defeat a ref.
+
   `JSON.stringify` cannot represent a `Set` (it serialises to `{}`), so never hand one to
   `usePersistedFilters` — persist a `string[]` and derive the Set, as
   `AccountCodeListPage` does.
