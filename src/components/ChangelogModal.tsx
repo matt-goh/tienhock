@@ -20,6 +20,9 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-30",
+    ms: "Green Target — Pelanggan kini boleh mempunyai Alamat Bil berasingan (contohnya alamat pejabat), selain daripada lokasi servis/pickup mereka. Isi ruangan Billing Address baharu pada borang pelanggan dan ia akan dipaparkan sebagai Billing Address pada bahagian BILLING TO invois PDF dan e-Invois individu pelanggan itu; kosongkannya untuk terus menggunakan alamat lokasi sewaan seperti sebelum ini. Alamat bil ini boleh diubah pada bila-bila masa melalui halaman sunting pelanggan.",
+    en: "Green Target — Customers can now have their own Billing Address (for example an office address), separate from their service/pickup locations. Fill in the new Billing Address field on the customer form and it appears as the Billing Address in the BILLING TO section of that customer's invoice PDFs and individual e-Invoices; leave it blank to keep billing to the rental location address as before. It can be changed anytime from the customer edit page.",
+  },
   {
     date: "2026-07-30",
     ms: "Green Target — Chart of Accounts: akaun pendua PBB1 telah dibuang. Akaun bank PBB yang sebenar ialah PBB_1 (PBB-A/C:3137836814); PBB1 hanyalah salinan dorman tanpa sebarang transaksi dan baki pembukaan sifar, jadi pembuangannya tidak mengubah sebarang baki atau jumlah laporan — ia hanya tidak lagi muncul sebagai baris 0.00 pada Trial Balance.",

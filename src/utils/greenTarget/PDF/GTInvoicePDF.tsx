@@ -428,10 +428,14 @@ const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice, qrCodeData }) => {
       billingAddressLines.push(label);
     }
   }
+  // A customer-level billing address (e.g. their office) takes priority over
+  // the rental location addresses.
+  const customerBillingAddress = (invoice.billing_address || "").trim();
   const billingAddress =
-    billingAddressLines.length > 0
+    customerBillingAddress ||
+    (billingAddressLines.length > 0
       ? billingAddressLines.join("\n")
-      : invoice.location_address || "-";
+      : invoice.location_address || "-");
 
   return (
     <Page size={"A4"} style={styles.page}>

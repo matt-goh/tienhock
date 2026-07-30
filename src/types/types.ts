@@ -653,6 +653,7 @@ export interface InvoiceGT {
   customer_id: number;
   customer_name: string;
   customer_phone_number?: string;
+  billing_address?: string;
   tin_number?: string;
   id_number?: string;
   additional_info?: string;
