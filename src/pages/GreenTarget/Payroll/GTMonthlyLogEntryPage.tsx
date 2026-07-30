@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Button from "../../../components/Button";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import MonthNavigator from "../../../components/MonthNavigator";
 import Checkbox from "../../../components/Checkbox";
@@ -81,6 +82,7 @@ const getActivityIdentity = (a: {
 
 const GTMonthlyLogEntryPage: React.FC = () => {
   const navigate = useNavigate();
+  const goBack = useSmartBack("/greentarget/payroll");
   const [searchParams] = useSearchParams();
 
   const {
@@ -425,7 +427,9 @@ const GTMonthlyLogEntryPage: React.FC = () => {
         await api.post("/greentarget/api/monthly-work-logs", payload);
         toast.success("Work log created successfully");
       }
-      navigate("/greentarget/payroll");
+      // Green Target has no work-log details route, so both create and edit
+      // return the user to wherever they came from.
+      goBack();
     } catch (error) {
       console.error("Error saving work log:", error);
       toast.error("Failed to save work log");
@@ -511,7 +515,7 @@ const GTMonthlyLogEntryPage: React.FC = () => {
       <div className="sticky top-0 z-20 bg-white dark:bg-gray-800 p-4 rounded-lg border border-default-200 dark:border-gray-700">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <BackButton onClick={() => navigate("/greentarget/payroll")} />
+            <BackButton fallbackPath="/greentarget/payroll" />
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
             <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">
               {existingWorkLog ? "Edit" : "New"} Office Monthly Entry

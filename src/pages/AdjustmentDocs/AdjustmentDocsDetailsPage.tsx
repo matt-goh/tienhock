@@ -283,9 +283,7 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
         {/* Header */}
         <div className="px-6 py-3 border-b border-default-200 dark:border-gray-700 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
           <div className="flex items-center gap-3">
-            <BackButton
-              onClick={() => navigate(paths.uiBase)}
-            />
+            <BackButton fallbackPath={paths.uiBase} />
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
             <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100 flex items-center gap-2 flex-wrap">
               {meta.label} {formatAdjustmentDocDisplayId(doc)}

@@ -360,7 +360,7 @@ const JPStaffDetailsPage: React.FC = () => {
   if (error || !staff) {
     return (
       <div className="container mx-auto px-4 py-6">
-        <BackButton onClick={() => navigate("/jellypolly/catalogue/staff")} />
+        <BackButton fallbackPath="/jellypolly/catalogue/staff" />
         <div className="mt-4 p-4 border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded">
           {error || "Staff member not found."}
         </div>
@@ -394,7 +394,7 @@ const JPStaffDetailsPage: React.FC = () => {
         {/* Header */}
         <div className="px-6 py-3 border-b border-default-200 dark:border-gray-700 flex justify-between items-start">
           <div className="flex items-center gap-4">
-            <BackButton onClick={() => navigate("/jellypolly/catalogue/staff")} />
+            <BackButton fallbackPath="/jellypolly/catalogue/staff" />
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 flex-wrap">

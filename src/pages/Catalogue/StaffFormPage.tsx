@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { Employee } from "../../types/types";
 import BackButton from "../../components/BackButton";
+import { useSmartBack } from "../../hooks/useSmartBack";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import {
@@ -45,6 +46,7 @@ const STAFF_ID_WHITESPACE_REGEX: RegExp = /\s/;
  */
 const StaffFormPage: React.FC = () => {
   const navigate = useNavigate();
+  const goBack = useSmartBack("/catalogue/staff");
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
@@ -360,13 +362,13 @@ const StaffFormPage: React.FC = () => {
     if (isFormChanged) {
       setShowBackConfirmation(true);
     } else {
-      navigate("/catalogue/staff");
+      goBack();
     }
   };
 
   const handleConfirmBack = () => {
     setShowBackConfirmation(false);
-    navigate("/catalogue/staff");
+    goBack();
   };
 
   // Fetch same-name staff for Head management
@@ -640,7 +642,13 @@ const StaffFormPage: React.FC = () => {
       toast.success(
         `Staff member ${isEditMode ? "updated" : "created"} successfully!`
       );
-      navigate("/catalogue/staff");
+      if (isEditMode) {
+        goBack();
+      } else {
+        // Show the staff member just created. `replace` drops this form from
+        // history, so Back returns to wherever the user started.
+        navigate(`/catalogue/staff/${formData.id}`, { replace: true });
+      }
     } catch (error) {
       if (error instanceof Error) {
         toast.error(error.message);

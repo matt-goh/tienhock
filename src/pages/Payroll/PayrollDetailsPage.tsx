@@ -28,6 +28,7 @@ import {
 import { format } from "date-fns";
 import Button from "../../components/Button";
 import BackButton from "../../components/BackButton";
+import { useSmartBack } from "../../hooks/useSmartBack";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import {
@@ -135,6 +136,13 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const hasConsumedPinjamScrollRef = useRef<boolean>(false);
 
   const [payroll, setPayroll] = useState<EmployeePayroll | null>(null);
+  // Keeps the selected month when the page was opened directly; a real in-app
+  // Back restores the list's own URL, month params included.
+  const goBack = useSmartBack(
+    payroll
+      ? `/payroll/monthly-payrolls?year=${payroll.year}&month=${payroll.month}`
+      : "/payroll/monthly-payrolls"
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<PayrollItem | null>(null);
@@ -380,14 +388,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       clearSearchClearOnReturn();
     }
 
-    // Navigate back with year and month params to preserve the selected month
-    if (payroll) {
-      navigate(
-        `/payroll/monthly-payrolls?year=${payroll.year}&month=${payroll.month}`,
-      );
-    } else {
-      navigate("/payroll/monthly-payrolls");
-    }
+    goBack();
   };
 
   const handleBackMouseDown = (

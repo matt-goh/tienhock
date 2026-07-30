@@ -338,7 +338,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
         {/* Header */}
         <div className="px-6 py-3 border-b border-default-200 dark:border-gray-700 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
           <div className="flex items-center gap-3">
-            <BackButton onClick={() => navigate(UI_BASE)} />
+            <BackButton fallbackPath={UI_BASE} />
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
             <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100 flex items-center gap-2">
               {meta.label} {formatAdjustmentDocId(doc.id)}

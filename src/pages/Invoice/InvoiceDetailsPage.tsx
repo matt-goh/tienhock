@@ -11,6 +11,7 @@ import type {
   ProductItem,
 } from "../../types/types";
 import BackButton from "../../components/BackButton";
+import { useSmartBack } from "../../hooks/useSmartBack";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
@@ -309,6 +310,7 @@ const getPaymentDateRange = (value: string): TimeRange => {
 
 const InvoiceDetailsPage: React.FC = () => {
   const navigate = useNavigate();
+  const goBack = useSmartBack("/sales/invoice");
   const location = useLocation();
   const locationState =
     (location.state as InvoiceDetailsLocationState | null) ?? {};
@@ -1688,19 +1690,7 @@ const InvoiceDetailsPage: React.FC = () => {
       : `/catalogue/customer/${customerId}`;
 
   const handleBackClick = (): void => {
-    if (locationState.fromList) {
-      navigate(-1);
-      return;
-    }
-    if (locationState.fromCustomerTransactions && locationState.previousPath) {
-      navigate(locationState.previousPath);
-      return;
-    }
-    if (locationState.fromCustomerTransactions && invoiceData?.customerid) {
-      navigate(getCustomerPagePath(invoiceData.customerid));
-      return;
-    }
-    navigate("/sales/invoice");
+    goBack();
   };
 
   // --- Render Logic ---

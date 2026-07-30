@@ -1,5 +1,11 @@
 // src/pages/Accounting/Reports/TrialBalancePage.tsx
-import React, { Fragment, useState, useEffect, useCallback } from "react";
+import React, {
+  Fragment,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from "react";
 import {
   Listbox,
   ListboxButton,
@@ -27,6 +33,65 @@ import { api } from "../../../routes/utils/api";
 import { generateTrialBalancePDF } from "../../../utils/accounting/TrialBalancePDF";
 import { GREENTARGET_INFO } from "../../../utils/invoice/einvoice/companyInfo";
 import toast from "react-hot-toast";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
+
+// Green Target keeps its own cache so browsing the GT trial balance never
+// overwrites the Tien Hock view's saved filters (and vice versa).
+const FILTERS_STORAGE_KEYS = {
+  tienhock: "trialBalanceFilters",
+  greentarget: "gtTrialBalanceFilters",
+} as const;
+
+const SCROLL_RESTORATION_KEYS = {
+  tienhock: "trial-balance",
+  greentarget: "gt-trial-balance",
+} as const;
+
+interface CachedTrialBalanceFilters {
+  month: Date;
+  searchTerm: string;
+  selectedLedgerType: string;
+  hideZeroBalance: boolean;
+  page: number;
+}
+
+// Restores the month, search, ledger-type, zero-balance toggle and page so
+// returning from an account ledger lands on the same view.
+const loadCachedFilters = (storageKey: string): CachedTrialBalanceFilters => {
+  const now = new Date();
+  const fallback: CachedTrialBalanceFilters = {
+    month: new Date(now.getFullYear(), now.getMonth(), 1),
+    searchTerm: "",
+    selectedLedgerType: "",
+    hideZeroBalance: true,
+    page: 1,
+  };
+
+  try {
+    const cached = localStorage.getItem(storageKey);
+    if (!cached) return fallback;
+    const parsed = JSON.parse(cached);
+    const month = typeof parsed.month === "string" ? new Date(parsed.month) : null;
+    return {
+      month:
+        month && !Number.isNaN(month.getTime())
+          ? new Date(month.getFullYear(), month.getMonth(), 1)
+          : fallback.month,
+      searchTerm:
+        typeof parsed.searchTerm === "string" ? parsed.searchTerm : "",
+      selectedLedgerType:
+        typeof parsed.selectedLedgerType === "string"
+          ? parsed.selectedLedgerType
+          : "",
+      hideZeroBalance: parsed.hideZeroBalance !== false,
+      page:
+        typeof parsed.page === "number" && parsed.page >= 1 ? parsed.page : 1,
+    };
+  } catch (e) {
+    console.error("Error loading cached trial balance filters:", e);
+    return fallback;
+  }
+};
 
 interface TrialBalanceAccount {
   code: string;
@@ -98,27 +163,65 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
   const reportsBasePath: string = isGreenTarget
     ? "/greentarget/api/financial-reports"
     : "/api/financial-reports";
+  const filtersStorageKey: string = FILTERS_STORAGE_KEYS[company];
   const [trialBalance, setTrialBalance] = useState<TrialBalanceData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState<string>("");
-  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
-  const [selectedLedgerType, setSelectedLedgerType] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState<string>(
+    () => loadCachedFilters(filtersStorageKey).searchTerm
+  );
+  const [debouncedSearch, setDebouncedSearch] = useState<string>(
+    () => loadCachedFilters(filtersStorageKey).searchTerm
+  );
+  const [selectedLedgerType, setSelectedLedgerType] = useState<string>(
+    () => loadCachedFilters(filtersStorageKey).selectedLedgerType
+  );
   const [exporting, setExporting] = useState<boolean>(false);
-  const [hideZeroBalance, setHideZeroBalance] = useState<boolean>(true);
-  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [hideZeroBalance, setHideZeroBalance] = useState<boolean>(
+    () => loadCachedFilters(filtersStorageKey).hideZeroBalance
+  );
+  const [currentPage, setCurrentPage] = useState<number>(
+    () => loadCachedFilters(filtersStorageKey).page
+  );
 
   // Month selection state
-  const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
+  const [selectedMonth, setSelectedMonth] = useState<Date>(
+    () => loadCachedFilters(filtersStorageKey).month
+  );
 
-  // Debounce the search input; new search always restarts from page 1
   useEffect(() => {
+    try {
+      localStorage.setItem(
+        filtersStorageKey,
+        JSON.stringify({
+          month: selectedMonth.toISOString(),
+          searchTerm,
+          selectedLedgerType,
+          hideZeroBalance,
+          page: currentPage,
+        })
+      );
+    } catch (e) {
+      console.error("Error caching trial balance filters:", e);
+    }
+  }, [
+    filtersStorageKey,
+    selectedMonth,
+    searchTerm,
+    selectedLedgerType,
+    hideZeroBalance,
+    currentPage,
+  ]);
+
+  // Debounce the search input; a changed search always restarts from page 1.
+  // The ref-guard skips the initial mount so the restored page survives.
+  const searchSeenRef = useRef<boolean>(false);
+  useEffect(() => {
+    const isInitialRun: boolean = !searchSeenRef.current;
+    searchSeenRef.current = true;
     const timer = setTimeout(() => {
       setDebouncedSearch(searchTerm);
-      setCurrentPage(1);
+      if (!isInitialRun) setCurrentPage(1);
     }, 400);
     return () => clearTimeout(timer);
   }, [searchTerm]);
@@ -159,6 +262,12 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
   useEffect(() => {
     fetchTrialBalance();
   }, [fetchTrialBalance]);
+
+  // Restore the previous scroll position when returning from an account ledger.
+  useScrollRestoration(
+    SCROLL_RESTORATION_KEYS[company],
+    !loading && !!trialBalance
+  );
 
   const handleMonthChange = (newMonth: Date): void => {
     setSelectedMonth(newMonth);

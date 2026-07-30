@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import Button from "../../../components/Button";
 import {
   FormInput,
@@ -45,6 +46,7 @@ interface Customer {
   id_number?: string;
   state?: string;
   additional_info?: string;
+  billing_address?: string;
 }
 
 interface SelectOption {
@@ -54,6 +56,7 @@ interface SelectOption {
 
 const CustomerFormPage: React.FC = () => {
   const navigate = useNavigate();
+  const goBack = useSmartBack("/greentarget/customers");
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
 
@@ -66,6 +69,7 @@ const CustomerFormPage: React.FC = () => {
     email: "",
     state: "12",
     additional_info: "",
+    billing_address: "",
   });
 
   const [initialFormData, setInitialFormData] = useState<Customer>({
@@ -77,6 +81,7 @@ const CustomerFormPage: React.FC = () => {
     email: "",
     state: "12",
     additional_info: "",
+    billing_address: "",
   });
 
   const [locations, setLocations] = useState<CustomerLocation[]>([]);
@@ -165,6 +170,7 @@ const CustomerFormPage: React.FC = () => {
         id_number: data.id_number || "",
         state: data.state || "12",
         additional_info: data.additional_info || "",
+        billing_address: data.billing_address || "",
         locations: fetchedLocations,
       };
 
@@ -212,13 +218,13 @@ const CustomerFormPage: React.FC = () => {
     if (isFormChanged) {
       setShowBackConfirmation(true);
     } else {
-      navigate("/greentarget/customers");
+      goBack();
     }
   };
 
   const handleConfirmBack = (): void => {
     setShowBackConfirmation(false);
-    navigate("/greentarget/customers");
+    goBack();
   };
 
   const handleAddLocation = (): void => {
@@ -332,6 +338,7 @@ const CustomerFormPage: React.FC = () => {
             email: formData.email,
             state: formData.state,
             additional_info: formData.additional_info,
+            billing_address: formData.billing_address,
           }
         );
       } else {
@@ -348,6 +355,7 @@ const CustomerFormPage: React.FC = () => {
             email: formData.email,
             state: formData.state,
             additional_info: formData.additional_info,
+            billing_address: formData.billing_address,
         });
       }
 
@@ -400,7 +408,13 @@ const CustomerFormPage: React.FC = () => {
       toast.success(
         `Customer ${isEditMode ? "updated" : "created"} successfully!`
       );
-      navigate("/greentarget/customers");
+      if (isEditMode) {
+        goBack();
+      } else {
+        // Show the customer just created. `replace` drops this form from
+        // history, so Back returns to wherever the user started.
+        navigate(`/greentarget/customers/${customerId}`, { replace: true });
+      }
     } catch (error) {
       if (error instanceof Error) {
         toast.error(error.message);
@@ -626,6 +640,13 @@ const CustomerFormPage: React.FC = () => {
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             {renderInput("name", "Customer Name")}
             {renderInput("phone_number", "Phone Number", "tel")}
+          </div>
+          <div className="mt-5">
+            {renderTextArea(
+              "billing_address",
+              "Billing Address (optional)",
+              "Office address shown as Billing Address on invoices and e-Invoices. Leave blank to bill to the service location."
+            )}
           </div>
           <div className="mt-5">
             {renderTextArea(

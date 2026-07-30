@@ -49,6 +49,11 @@ import {
   formatAdjustmentDocDisplayId,
   formatAdjustmentDocId,
 } from "../../utils/adjustments/formatDocId";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
+import {
+  usePersistedFilters,
+  reviveDate,
+} from "../../hooks/usePersistedFilters";
 
 interface FilterState {
   type: AdjustmentDocType | "all";
@@ -58,12 +63,43 @@ interface FilterState {
   searchTerm: string;
 }
 
+const getDefaultFilters = (): FilterState => {
+  const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const end = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
+  end.setHours(23, 59, 59, 999);
+  return {
+    type: "all",
+    dateRange: { start, end },
+    einvoiceStatus: null,
+    status: "active",
+    searchTerm: "",
+  };
+};
+
+// Dates survive the JSON round-trip as ISO strings, so rebuild them here.
+// An unusable cache returns null and the default month is used instead.
+const reviveFilters = (cached: any): FilterState | null => {
+  const start = reviveDate(cached?.dateRange?.start);
+  const end = reviveDate(cached?.dateRange?.end);
+  if (!start || !end) return null;
+  return {
+    type: TYPE_TAB_IDS.includes(cached.type) ? cached.type : "all",
+    dateRange: { start, end },
+    einvoiceStatus:
+      typeof cached.einvoiceStatus === "string" ? cached.einvoiceStatus : null,
+    status: typeof cached.status === "string" ? cached.status : null,
+    searchTerm: typeof cached.searchTerm === "string" ? cached.searchTerm : "",
+  };
+};
+
 const TYPE_TABS: Array<{ id: FilterState["type"]; label: string; icon: any }> = [
   { id: "all", label: "All", icon: IconLayoutGrid },
   { id: "debit_note", label: "DN", icon: IconFilePlus },
   { id: "credit_note", label: "CN", icon: IconFileMinus },
   { id: "refund_note", label: "RN", icon: IconRotate2 },
 ];
+
+const TYPE_TAB_IDS: string[] = TYPE_TABS.map((tab) => tab.id);
 
 interface Props {
   company?: AdjustmentDocsCompany;
@@ -94,22 +130,13 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
 
-  const [filters, setFilters] = useState<FilterState>(() => {
-    const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const end = new Date(
-      new Date().getFullYear(),
-      new Date().getMonth() + 1,
-      0
-    );
-    end.setHours(23, 59, 59, 999);
-    return {
-      type: "all",
-      dateRange: { start, end },
-      einvoiceStatus: null,
-      status: "active",
-      searchTerm: "",
-    };
-  });
+  // Filters persist per company so returning from a document detail page keeps
+  // the same tab, month, status and search the user had set.
+  const [filters, setFilters] = usePersistedFilters<FilterState>(
+    `${paths.company}AdjustmentDocsList`,
+    getDefaultFilters,
+    reviveFilters
+  );
 
   const {
     dateRange: filterDateRange,
@@ -157,6 +184,9 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
   useEffect(() => {
     fetchDocs();
   }, [fetchDocs]);
+
+  // Restore the previous scroll position when returning from a document.
+  useScrollRestoration(`${paths.company}-adjustment-docs-list`, !loading);
 
   const displayedDocs = useMemo(() => {
     if (filters.type === "all") return docs;

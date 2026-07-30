@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import Button from "../../../components/Button";
 import { Employee } from "../../../types/types";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import { format } from "date-fns";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Checkbox from "../../../components/Checkbox";
@@ -151,6 +152,9 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
   // Hardcode jobType for salesman page
   const jobType = "SALESMAN";
   const navigate = useNavigate();
+  const goBack = useSmartBack(
+    `/jellypolly/payroll/${jobType.toLowerCase().replace("_", "-")}-production`
+  );
   const { jobs: allJobs, loading: loadingJobs, refreshJobs } = useJPJobsCache();
   const { staffs: allStaffs, loading: loadingStaffs, refreshStaffs } = useJPStaffsCache();
   const { products: payrollProducts } = useProductsCache(["MEE", "BH", "JP"]);
@@ -1430,7 +1434,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
   };
 
   const handleBack = () => {
-    safeNavigate(`/jellypolly/payroll/${jobType.toLowerCase().replace("_", "-")}-production`);
+    safeNavigate(goBack);
   };
 
   const handleRefreshCache = async () => {
@@ -2058,12 +2062,17 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
 
     setIsSaving(true);
 
+    let newLogId: number | undefined;
     try {
       if (mode === "edit" && existingWorkLog) {
         await api.put(`/jellypolly/api/daily-work-logs/${existingWorkLog.id}`, payload);
         toast.success("Work log updated successfully");
       } else {
-        await api.post("/jellypolly/api/daily-work-logs", payload);
+        const response: { workLogId?: number } = await api.post(
+          "/jellypolly/api/daily-work-logs",
+          payload
+        );
+        newLogId = response?.workLogId;
         toast.success("Work log submitted successfully");
       }
 
@@ -2086,11 +2095,19 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
         ),
         leaveBalances: JSON.parse(JSON.stringify(leaveBalances)),
       });
-      // Navigate to details page after edit, list page after create
+      // Return to where the user came from after an edit; after a create, show
+      // the log just created (replace, so Back still returns to the origin).
       if (mode === "edit" && existingWorkLog) {
-        navigate(`/jellypolly/payroll/${jobType.toLowerCase().replace("_", "-")}-production/${existingWorkLog.id}`);
+        goBack();
+      } else if (newLogId) {
+        navigate(
+          `/jellypolly/payroll/${jobType
+            .toLowerCase()
+            .replace("_", "-")}-production/${newLogId}`,
+          { replace: true }
+        );
       } else {
-        navigate(`/jellypolly/payroll/${jobType.toLowerCase().replace("_", "-")}-production`);
+        goBack();
       }
     } catch (error: any) {
       console.error("Error saving work log:", error);

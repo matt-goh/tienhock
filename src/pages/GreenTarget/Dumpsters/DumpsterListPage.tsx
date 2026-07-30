@@ -28,6 +28,45 @@ import Button from "../../../components/Button";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { formatLocationDisplay } from "../../../utils/greenTarget/formatLocationDisplay";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
+import {
+  usePersistedFilters,
+  reviveDate,
+} from "../../../hooks/usePersistedFilters";
+
+const FILTERS_STORAGE_KEY = "gtDumpsterList";
+const SCROLL_RESTORATION_KEY = "gt-dumpster-list";
+
+interface DumpsterListFilters {
+  searchTerm: string;
+  statusFilter: string;
+  startDate: Date;
+  page: number;
+}
+
+const getDefaultFilters = (): DumpsterListFilters => {
+  const today = new Date();
+  return {
+    searchTerm: "",
+    statusFilter: "All",
+    startDate: new Date(today.getFullYear(), today.getMonth(), 1),
+    page: 1,
+  };
+};
+
+// The month anchor survives the JSON round-trip as an ISO string, so rebuild
+// it here; an unusable cache falls back to the current month.
+const reviveFilters = (cached: any): DumpsterListFilters | null => {
+  const startDate = reviveDate(cached?.startDate);
+  if (!startDate) return null;
+  return {
+    searchTerm: typeof cached.searchTerm === "string" ? cached.searchTerm : "",
+    statusFilter:
+      typeof cached.statusFilter === "string" ? cached.statusFilter : "All",
+    startDate,
+    page: typeof cached.page === "number" && cached.page >= 1 ? cached.page : 1,
+  };
+};
 
 interface Dumpster {
   tong_no: string;
@@ -56,13 +95,22 @@ const DumpsterListPage: React.FC = () => {
   const [dumpsters, setDumpsters] = useState<Dumpster[]>([]);
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("All");
-  const [startDate, setStartDate] = useState<Date>(() => {
-    const today = new Date();
-    return new Date(today.getFullYear(), today.getMonth(), 1);
-  });
-  const [currentPage, setCurrentPage] = useState(1);
+  // Search, status, month anchor and page persist so returning from a rental
+  // or dumpster form keeps the same view.
+  const [filters, setFilters] = usePersistedFilters<DumpsterListFilters>(
+    FILTERS_STORAGE_KEY,
+    getDefaultFilters,
+    reviveFilters
+  );
+  const { searchTerm, statusFilter, startDate, page: currentPage } = filters;
+  const setSearchTerm = (value: string): void =>
+    setFilters((prev) => ({ ...prev, searchTerm: value }));
+  const setStatusFilter = (value: string): void =>
+    setFilters((prev) => ({ ...prev, statusFilter: value }));
+  const setStartDate = (value: Date): void =>
+    setFilters((prev) => ({ ...prev, startDate: value }));
+  const setCurrentPage = (value: number): void =>
+    setFilters((prev) => ({ ...prev, page: value }));
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [dumpsterToDelete, setDumpsterToDelete] = useState<Dumpster | null>(
     null
@@ -74,6 +122,9 @@ const DumpsterListPage: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Restore the previous scroll position when returning from a rental.
+  useScrollRestoration(SCROLL_RESTORATION_KEY, !loading);
 
   const fetchData = async () => {
     try {

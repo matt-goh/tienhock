@@ -25,6 +25,7 @@ export default function (pool, defaultConfig) {
         SELECT i.*, 
               c.name as customer_name,
               c.phone_number as customer_phone_number,
+              c.billing_address,
               c.tin_number,
               c.id_type,
               c.id_number,
@@ -82,6 +83,12 @@ export default function (pool, defaultConfig) {
       }
 
       // 3. Extract customer data
+      // A customer-level billing address (e.g. their office) takes priority
+      // over the rental location address; pickup Sites are only appended when
+      // billing to the location address.
+      const hasBillingAddress = Boolean(
+        String(invoice.billing_address || "").trim()
+      );
       const customerData = {
         name: invoice.customer_name,
         phone_number: invoice.customer_phone_number,
@@ -90,8 +97,10 @@ export default function (pool, defaultConfig) {
         id_number: invoice.id_number,
         email: invoice.email,
         state: invoice.state,
-        address: invoice.location_address || "Tong Location",
-        sites: invoiceSites,
+        address: hasBillingAddress
+          ? invoice.billing_address
+          : invoice.location_address || "Tong Location",
+        sites: hasBillingAddress ? [] : invoiceSites,
       };
 
       // 4. Submit to MyInvois

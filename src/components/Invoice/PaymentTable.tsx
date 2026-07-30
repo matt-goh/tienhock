@@ -340,9 +340,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
         title="View journal entry"
       >
         <IconReceipt size={14} className="flex-shrink-0" />
-        <span className="font-mono">
-          {payment.journal_reference_no || "View Journal"}
-        </span>
+        <span>View Journal</span>
       </button>
     );
   };

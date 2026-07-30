@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { api } from "../../../routes/utils/api";
 import { SupplierWithSummary, SupplierInput } from "../../../types/types";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import Button from "../../../components/Button";
 import { FormInput } from "../../../components/FormComponents";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -22,6 +23,7 @@ interface SupplierFormData {
 
 const SupplierFormPage: React.FC = () => {
   const navigate = useNavigate();
+  const goBack = useSmartBack("/accounting/suppliers");
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id && id !== "new";
 
@@ -123,12 +125,12 @@ const SupplierFormPage: React.FC = () => {
     if (isFormChanged) {
       setShowBackConfirmation(true);
     } else {
-      navigate("/accounting/suppliers");
+      goBack();
     }
   };
 
   const handleConfirmBack = () => {
-    navigate("/accounting/suppliers");
+    goBack();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -159,12 +161,22 @@ const SupplierFormPage: React.FC = () => {
       if (isEditMode) {
         await api.put(`/api/suppliers/${id}`, payload);
         toast.success("Supplier updated successfully");
+        goBack();
       } else {
-        await api.post("/api/suppliers", payload);
+        const response: { supplier?: { id: number } } = await api.post(
+          "/api/suppliers",
+          payload
+        );
         toast.success("Supplier created successfully");
+        const newId: number | undefined = response?.supplier?.id;
+        // Show the supplier just created. `replace` drops this form from
+        // history, so Back returns to wherever the user started.
+        if (newId) {
+          navigate(`/accounting/suppliers/${newId}`, { replace: true });
+        } else {
+          goBack();
+        }
       }
-
-      navigate("/accounting/suppliers");
     } catch (err: unknown) {
       console.error("Error saving supplier:", err);
       const errorMessage =

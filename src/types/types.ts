@@ -406,7 +406,7 @@ export interface Payment {
   receipt_status?: "pending" | "posted" | "cancelled" | null;
   receipt_reference?: string | null;
   allocation_count?: number;
-  voucher_journal_id?: number | null; // journal to print the receipt voucher from (receipt's, else the row's own)
+  voucher_journal_id?: number | null; // journal to view/print the receipt voucher from (receipt's, else the row's own; auto-collection cash bills fall back to the invoice's sales journal)
   notes?: string;
   created_at?: string;
   status?: "active" | "cancelled" | "pending" | "overpaid";
@@ -653,6 +653,7 @@ export interface InvoiceGT {
   customer_id: number;
   customer_name: string;
   customer_phone_number?: string;
+  billing_address?: string;
   tin_number?: string;
   id_number?: string;
   additional_info?: string;

@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import { Employee } from "../../../types/types";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import Button from "../../../components/Button";
 import {
   FormInput,
@@ -27,6 +28,7 @@ const STAFF_ID_WHITESPACE_REGEX: RegExp = /\s/;
 
 const JPStaffAddPage: React.FC = () => {
   const navigate = useNavigate();
+  const goBack = useSmartBack("/jellypolly/catalogue/staff");
   const location = useLocation();
   const maritalStatusOptions = [
     { id: "Single", name: "Single" },
@@ -190,13 +192,13 @@ const JPStaffAddPage: React.FC = () => {
     if (isFormChanged) {
       setShowBackConfirmation(true);
     } else {
-      navigate("/jellypolly/catalogue/staff");
+      goBack();
     }
   };
 
   const handleConfirmBack = () => {
     setShowBackConfirmation(false);
-    navigate("/jellypolly/catalogue/staff");
+    goBack();
   };
 
   // Format IC Number with hyphens
@@ -375,7 +377,9 @@ const JPStaffAddPage: React.FC = () => {
       await refreshStaffs();
 
       toast.success("Staff member created successfully!");
-      navigate("/jellypolly/catalogue/staff");
+      // Show the staff member just created. `replace` drops this form from
+      // history, so Back returns to wherever the user started.
+      navigate(`/jellypolly/catalogue/staff/${formData.id}`, { replace: true });
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "An unexpected error occurred"

@@ -230,7 +230,10 @@ if (chart.length !== 503) die(`expected 503 chart rows, derived ${chart.length}`
   if (spaced.length !== 4 || !spaced.every((c) => GENUINE.has(c))) {
     die(`space-in-code rule violated - expected exactly the 4 genuine GTDB codes, got: ${spaced.join(", ")}`);
   }
-  // Trap 2: PBB1 and PBB_1 are two different accounts and must both survive.
+  // Trap 2: PBB1 and PBB_1 are two different accounts and must both survive
+  // in this historical payload. (The live chart later removed the dormant
+  // PBB1 on 2026-07-30 - see REMOVED_SEEDS in verify-chart.mjs - but the
+  // payload stays faithful to the printed evidence.)
   for (const c of ["PBB1", "PBB_1"]) if (!chart.some((r) => r.code === c)) die(`trap 2: ${c} is missing`);
   // Every non-excluded GTLD section must have a row; every GTDB section too.
   const codes = new Set(chart.map((r) => r.code));

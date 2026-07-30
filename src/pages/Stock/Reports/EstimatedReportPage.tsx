@@ -25,6 +25,11 @@ import EstimatedReportMappingModal, {
 } from "../../../components/Stock/EstimatedReportMappingModal";
 import { generateEstimatedReportPDF } from "../../../utils/stock/EstimatedReportPDF";
 import { api } from "../../../routes/utils/api";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
+import {
+  usePersistedFilters,
+  reviveDate,
+} from "../../../hooks/usePersistedFilters";
 
 type ProductLine = "mee" | "bihun";
 
@@ -493,7 +498,13 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
   );
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [productLine, setProductLine] = useState<ProductLine>("mee");
+  // The MEE/BIHUN toggle persists per view so returning to the report keeps the
+  // product line the user was reading.
+  const [productLine, setProductLine] = usePersistedFilters<ProductLine>(
+    `estimatedReportProductLine:${view}`,
+    () => "mee",
+    (cached) => (cached === "bihun" || cached === "mee" ? cached : null)
+  );
   const [expandedLineIds, setExpandedLineIds] = useState<Set<number>>(
     new Set()
   );
@@ -502,11 +513,22 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
   const [savingAddBack, setSavingAddBack] = useState<boolean>(false);
   const [exporting, setExporting] = useState<boolean>(false);
 
-  const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
-    const now = new Date();
-    const current = new Date(now.getFullYear(), now.getMonth(), 1);
-    return current < REPORT_MIN_MONTH ? new Date(REPORT_MIN_MONTH) : current;
-  });
+  // The selected month persists per view; the report has no data before
+  // REPORT_MIN_MONTH, so both the default and a restored value are clamped.
+  const [selectedMonth, setSelectedMonth] = usePersistedFilters<Date>(
+    `estimatedReportMonth:${view}`,
+    () => {
+      const now = new Date();
+      const current = new Date(now.getFullYear(), now.getMonth(), 1);
+      return current < REPORT_MIN_MONTH ? new Date(REPORT_MIN_MONTH) : current;
+    },
+    (cached) => {
+      const date = reviveDate(cached);
+      if (!date) return null;
+      const month = new Date(date.getFullYear(), date.getMonth(), 1);
+      return month < REPORT_MIN_MONTH ? new Date(REPORT_MIN_MONTH) : month;
+    }
+  );
 
   const fetchReport = useCallback(async (): Promise<void> => {
     const year = selectedMonth.getFullYear();
@@ -548,6 +570,9 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
   useEffect(() => {
     fetchMappings();
   }, [fetchMappings]);
+
+  // The report is long; restore the reading position on return.
+  useScrollRestoration(`estimated-report-${view}`, !loading && !!report);
 
   const lineReport = report?.reports?.[productLine] ?? null;
 

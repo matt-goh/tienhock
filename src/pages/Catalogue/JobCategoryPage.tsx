@@ -1,5 +1,11 @@
 // src/pages/Catalogue/JobCategoryPage.tsx
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import toast from "react-hot-toast";
 import {
   Listbox,
@@ -25,14 +31,51 @@ import { JobCategory, SelectOption } from "../../types/types";
 import JobCategoryModal from "../../components/Catalogue/JobCategoryModal"; // Import the modal
 import ConfirmationDialog from "../../components/ConfirmationDialog"; // Import confirmation dialog
 import Button from "../../components/Button"; // Import Button component
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
+import { usePersistedFilters } from "../../hooks/usePersistedFilters";
+
+const FILTERS_STORAGE_KEY = "jobCategoryList";
+const SCROLL_RESTORATION_KEY = "job-category-list";
+
+interface JobCategoryListFilters {
+  selectedSection: string;
+  searchTerm: string;
+  page: number;
+}
+
+const getDefaultFilters = (): JobCategoryListFilters => ({
+  selectedSection: "All Section",
+  searchTerm: "",
+  page: 1,
+});
+
+const reviveFilters = (cached: any): JobCategoryListFilters => ({
+  selectedSection:
+    typeof cached?.selectedSection === "string"
+      ? cached.selectedSection
+      : "All Section",
+  searchTerm: typeof cached?.searchTerm === "string" ? cached.searchTerm : "",
+  page: typeof cached?.page === "number" && cached.page >= 1 ? cached.page : 1,
+});
 
 const JobCategoryPage: React.FC = () => {
   // Cached data and state
   const { jobCategories, isLoading, error, refreshJobCategories } =
     useJobCategoriesCache(); // Use refreshJobCategories for refresh
   const [sections, setSections] = useState<SelectOption[]>([]);
-  const [selectedSection, setSelectedSection] = useState<string>("All Section");
-  const [searchTerm, setSearchTerm] = useState<string>("");
+  // Section, search and page persist so returning to the page keeps the same
+  // slice of the list.
+  const [listFilters, setListFilters] =
+    usePersistedFilters<JobCategoryListFilters>(
+      FILTERS_STORAGE_KEY,
+      getDefaultFilters,
+      reviveFilters
+    );
+  const { selectedSection, searchTerm } = listFilters;
+  const setSelectedSection = (value: string): void =>
+    setListFilters((prev) => ({ ...prev, selectedSection: value }));
+  const setSearchTerm = (value: string): void =>
+    setListFilters((prev) => ({ ...prev, searchTerm: value }));
 
   // Modal and Dialog States
   const [showModal, setShowModal] = useState(false);
@@ -43,7 +86,9 @@ const JobCategoryPage: React.FC = () => {
   const [categoryToDelete, setCategoryToDelete] = useState<JobCategory | null>(
     null
   );
-  const [currentPage, setCurrentPage] = useState<number>(1);
+  const currentPage: number = listFilters.page;
+  const setCurrentPage = (page: number): void =>
+    setListFilters((prev) => ({ ...prev, page }));
   const [itemsPerPage] = useState<number>(50);
 
   // Fetch available sections for filtering
@@ -108,10 +153,23 @@ const JobCategoryPage: React.FC = () => {
     [filteredJobCategories, itemsPerPage]
   );
 
-  // Reset to page 1 when filters change
+  // Reset to page 1 when a filter actually changes. The ref-guard skips the
+  // initial mount so the page number restored from the cache survives.
+  const filterSignature: string = `${selectedSection}|${searchTerm}`;
+  const prevFilterSignatureRef = useRef<string | null>(null);
   useEffect(() => {
-    setCurrentPage(1);
-  }, [selectedSection, searchTerm]);
+    if (
+      prevFilterSignatureRef.current !== null &&
+      prevFilterSignatureRef.current !== filterSignature
+    ) {
+      setCurrentPage(1);
+    }
+    prevFilterSignatureRef.current = filterSignature;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterSignature]);
+
+  // Restore the previous scroll position when returning to the page.
+  useScrollRestoration(SCROLL_RESTORATION_KEY, !isLoading);
 
   // --- Modal Handlers ---
   const handleAddClick = () => {
@@ -283,13 +341,13 @@ const JobCategoryPage: React.FC = () => {
     // Page navigation handlers
     const handleNextPage = () => {
       if (currentPage < totalPages) {
-        setCurrentPage((prev) => prev + 1);
+        setCurrentPage(currentPage + 1);
       }
     };
 
     const handlePrevPage = () => {
       if (currentPage > 1) {
-        setCurrentPage((prev) => prev - 1);
+        setCurrentPage(currentPage - 1);
       }
     };
 

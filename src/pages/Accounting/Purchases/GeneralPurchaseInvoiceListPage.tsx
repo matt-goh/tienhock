@@ -30,6 +30,7 @@ import {
   SelfBilledInvoiceStatus,
   SelfBilledInvoiceListItem,
 } from "../../../types/types";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 
 interface SubmissionDocument {
   internalId: string;
@@ -84,6 +85,7 @@ interface CachedGeneralPurchaseFilters {
   dateRange: TimeRange;
   invoiceStatuses: SelfBilledInvoiceStatus[];
   purchaseKinds: GeneralPurchaseKind[];
+  searchTerm: string;
 }
 
 interface StatusFilterOption<TValue extends string> {
@@ -93,6 +95,7 @@ interface StatusFilterOption<TValue extends string> {
 }
 
 const FILTERS_STORAGE_KEY = "generalPurchaseInvoiceListFilters";
+const SCROLL_RESTORATION_KEY = "general-purchase-invoice-list";
 
 const invoiceStatusFilterOptions: StatusFilterOption<SelfBilledInvoiceStatus>[] =
   [
@@ -243,6 +246,7 @@ const loadCachedFilters = (): CachedGeneralPurchaseFilters => {
     dateRange: getMonthRange(new Date()),
     invoiceStatuses: [],
     purchaseKinds: [],
+    searchTerm: "",
   };
 
   try {
@@ -254,6 +258,7 @@ const loadCachedFilters = (): CachedGeneralPurchaseFilters => {
       end?: unknown;
       invoiceStatuses?: unknown;
       purchaseKinds?: unknown;
+      searchTerm?: unknown;
     };
     const start =
       typeof parsed.start === "string" ? parseDateParam(parsed.start) : null;
@@ -271,6 +276,7 @@ const loadCachedFilters = (): CachedGeneralPurchaseFilters => {
       purchaseKinds: Array.isArray(parsed.purchaseKinds)
         ? parsed.purchaseKinds.filter(isPurchaseKindFilterValue)
         : [],
+      searchTerm: typeof parsed.searchTerm === "string" ? parsed.searchTerm : "",
     };
   } catch (error) {
     console.error("Error loading cached general purchase filters:", error);
@@ -349,7 +355,9 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
   const [invoices, setInvoices] = useState<SelfBilledInvoiceListItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [total, setTotal] = useState<number>(0);
-  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState<string>(
+    () => cachedFilters.searchTerm
+  );
   const [selectedInvoiceStatuses, setSelectedInvoiceStatuses] = useState<
     SelfBilledInvoiceStatus[]
   >(() => cachedFilters.invoiceStatuses);
@@ -441,12 +449,16 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
           end: formatDateForApi(dateRange.end),
           invoiceStatuses: selectedInvoiceStatuses,
           purchaseKinds: selectedPurchaseKinds,
+          searchTerm,
         })
       );
     } catch (error) {
       console.error("Error caching general purchase filters:", error);
     }
-  }, [dateRange, selectedInvoiceStatuses, selectedPurchaseKinds]);
+  }, [dateRange, selectedInvoiceStatuses, selectedPurchaseKinds, searchTerm]);
+
+  // Restore the previous scroll position when returning from a purchase form.
+  useScrollRestoration(SCROLL_RESTORATION_KEY, !loading);
 
   const totals = useMemo(() => {
     return invoices.reduce(

@@ -14,6 +14,26 @@ import { Supplier } from "../../../types/types";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Button from "../../../components/Button";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
+import { usePersistedFilters } from "../../../hooks/usePersistedFilters";
+
+const FILTERS_STORAGE_KEY = "suppliersList";
+const SCROLL_RESTORATION_KEY = "suppliers-list";
+
+interface SuppliersListFilters {
+  searchTerm: string;
+  showInactive: boolean;
+}
+
+const getDefaultFilters = (): SuppliersListFilters => ({
+  searchTerm: "",
+  showInactive: false,
+});
+
+const reviveFilters = (cached: any): SuppliersListFilters => ({
+  searchTerm: typeof cached?.searchTerm === "string" ? cached.searchTerm : "",
+  showInactive: cached?.showInactive === true,
+});
 
 const SuppliersListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -21,8 +41,18 @@ const SuppliersListPage: React.FC = () => {
   // State
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [showInactive, setShowInactive] = useState(false);
+  // Search and the inactive toggle persist so returning from a supplier form
+  // keeps the same view.
+  const [filters, setFilters] = usePersistedFilters<SuppliersListFilters>(
+    FILTERS_STORAGE_KEY,
+    getDefaultFilters,
+    reviveFilters
+  );
+  const { searchTerm, showInactive } = filters;
+  const setSearchTerm = (value: string): void =>
+    setFilters((prev) => ({ ...prev, searchTerm: value }));
+  const setShowInactive = (value: boolean): void =>
+    setFilters((prev) => ({ ...prev, showInactive: value }));
 
   // Delete dialog
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -45,6 +75,9 @@ const SuppliersListPage: React.FC = () => {
   useEffect(() => {
     fetchSuppliers();
   }, []);
+
+  // Restore the previous scroll position when returning from a supplier form.
+  useScrollRestoration(SCROLL_RESTORATION_KEY, !loading);
 
   // Filter suppliers
   const filteredSuppliers = useMemo(() => {
