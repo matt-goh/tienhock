@@ -568,7 +568,11 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
     if (!accountToDelete) return;
 
     try {
-      await api.delete(`/api/account-codes/${accountToDelete.code}`);
+      await api.delete(
+        isGreenTarget
+          ? `/greentarget/api/account-codes/${accountToDelete.code}`
+          : `/api/account-codes/${accountToDelete.code}`
+      );
       toast.success("Account code deleted successfully");
       setShowDeleteDialog(false);
       setAccountToDelete(null);
@@ -765,7 +769,7 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
             >
               <IconPencil size={18} />
             </button>
-            {!isGreenTarget && !node.is_system && (
+            {!node.is_system && (
               <button
                 onClick={(event: React.MouseEvent<HTMLButtonElement>): void =>
                   handleDeleteClick(node, event)
@@ -881,7 +885,7 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
             >
               <IconPencil size={18} />
             </button>
-            {!isGreenTarget && !account.is_system && (
+            {!account.is_system && (
               <button
                 onClick={(event: React.MouseEvent<HTMLButtonElement>): void =>
                   handleDeleteClick(account, event)

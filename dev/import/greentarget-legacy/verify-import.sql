@@ -239,6 +239,11 @@ WITH months(as_of) AS (
          SUM(running_balance_cents)::bigint AS opening_cents
     FROM greentarget.import_legacy_rows
    WHERE record_kind = 'opening'
+     -- Seeds deliberately removed from the live chart after the G4 load
+     -- (PBB1, 2026-07-30: dormant duplicate of PBB_1 with a zero fence -
+     -- dev/migrations/2026-07-30_greentarget_remove_pbb1.sql). Their staging
+     -- rows remain as historical evidence but no longer have a live anchor.
+     AND account_code NOT IN (VALUES ('PBB1'))
    GROUP BY account_code
 )
 SELECT months.as_of,
@@ -604,8 +609,8 @@ BEGIN
   -- Unlike Tien Hock, which shipped a named RM1,456,480.37 opening residue,
   -- Green Target's opening set must balance to EXACTLY zero once CD_SD carries
   -- its true 76,415.40 (G1: printed 65,705.40 + the 10,710.00 unbanked cash).
-  IF (v_anchor_count, v_anchor_cents) IS DISTINCT FROM (501::bigint, 0::bigint) THEN
-    RAISE EXCEPTION 'Opening anchors are % rows summing to % cents, expected exactly 501 rows summing to 0',
+  IF (v_anchor_count, v_anchor_cents) IS DISTINCT FROM (500::bigint, 0::bigint) THEN
+    RAISE EXCEPTION 'Opening anchors are % rows summing to % cents, expected exactly 500 rows summing to 0 (501 G4 fences minus the approved PBB1 removal)',
       v_anchor_count, v_anchor_cents;
   END IF;
 
@@ -639,12 +644,14 @@ BEGIN
     RAISE EXCEPTION 'CD_SD is not anchored at the evidenced 76,415.40';
   END IF;
 
-  -- The anchors are exactly the staged opening set, account for account.
+  -- The anchors are exactly the staged opening set, account for account,
+  -- excluding approved post-load removals (PBB1's zero fence, 2026-07-30).
   IF EXISTS (
     WITH staged AS (
       SELECT account_code, SUM(running_balance_cents)::bigint AS cents
         FROM greentarget.import_legacy_rows
        WHERE record_kind = 'opening'
+         AND account_code NOT IN (VALUES ('PBB1'))
        GROUP BY account_code
     )
     SELECT 1
@@ -682,8 +689,8 @@ BEGIN
     RAISE EXCEPTION 'A per-account month-end close differs from staging';
   END IF;
 
-  IF (SELECT COUNT(*) FROM actual_monthly_closes) <> 3006 THEN
-    RAISE EXCEPTION 'The month-end close matrix is not 501 accounts x 6 months';
+  IF (SELECT COUNT(*) FROM actual_monthly_closes) <> 3000 THEN
+    RAISE EXCEPTION 'The month-end close matrix is not 500 accounts x 6 months';
   END IF;
 
   -- 11. The named control totals -------------------------------------------
@@ -749,7 +756,7 @@ BEGIN
       v_th_accounts, v_th_journals, v_th_notes;
   END IF;
 
-  RAISE NOTICE 'G4 VERIFY OK: 1,705 journals / 4,401 lines / 501 anchors summing to 0.00, six month-ends exact';
+  RAISE NOTICE 'G4 VERIFY OK: 1,705 journals / 4,401 lines / 500 anchors summing to 0.00 (PBB1 fence approved-removed), six month-ends exact';
 END
 $acceptance$;
 

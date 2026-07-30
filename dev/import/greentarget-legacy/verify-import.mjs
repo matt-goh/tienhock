@@ -160,6 +160,14 @@ const legacyValidation = JSON.parse(
   fs.readFileSync(path.join(LEGACY, "generated", "validation-report.json"), "utf8")
 );
 
+/** Accounts deliberately removed from the live chart after the G4 load,
+ *  together with their zero opening fences. The fixtures still print them
+ *  (0.00 in every month), so the per-period reconciliation skips them; no
+ *  printed total is affected. */
+const REMOVED_ZERO_FENCES = new Set([
+  "PBB1", // removed 2026-07-30 - dev/migrations/2026-07-30_greentarget_remove_pbb1.sql
+]);
+
 const tbByPeriod = {};
 for (const period of PERIODS) {
   const file = path.join(FIXTURES, "data", `gt-tb-2026-${period}.csv`);
@@ -192,7 +200,11 @@ console.log("-- 0. import population -------------------------------------------
   const staging = scalar("SELECT count(*) FROM greentarget.import_legacy_rows");
   check(journals === "1705", "1,705 imported journals", `found ${journals}`);
   check(lines === "4401", "4,401 imported journal lines", `found ${lines}`);
-  check(anchors === "501", "501 opening anchors", `found ${anchors}`);
+  check(
+    anchors === String(501 - REMOVED_ZERO_FENCES.size),
+    `${501 - REMOVED_ZERO_FENCES.size} opening anchors (${REMOVED_ZERO_FENCES.size} approved zero-fence removal(s))`,
+    `found ${anchors}`
+  );
   check(staging === "4903", "4,903 staging rows", `found ${staging}`);
 
   const anchorSum = scalar(
@@ -273,6 +285,9 @@ for (const period of PERIODS) {
 
   for (const row of printedAccounts) {
     const code = normalizePrinted(row.acc_code);
+    // Approved removal: the fixture still prints it (0.00 every month) but
+    // its live account and zero fence are deliberately gone.
+    if (REMOVED_ZERO_FENCES.has(code)) continue;
     const debit = printedCents(row.debit);
     const credit = printedCents(row.credit);
 

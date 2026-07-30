@@ -591,7 +591,6 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
 
   // Delete handler
   const handleDeleteClick = (): void => {
-    if (isGreenTarget) return;
     if (isSystem) {
       toast.error("Cannot delete system account code");
       return;
@@ -606,7 +605,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
   };
 
   const handleConfirmDelete = async (): Promise<void> => {
-    if (!code || isGreenTarget) return;
+    if (!code) return;
 
     setIsSaving(true);
     try {
@@ -1534,7 +1533,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
 
             {/* Form Actions */}
             <div className="p-6 flex justify-end items-center space-x-3 border-t border-default-200 dark:border-gray-700">
-              {isEditMode && !isGreenTarget && !isSystem && (
+              {isEditMode && !isSystem && (
                 <Button
                   type="button"
                   color="rose"
@@ -1564,16 +1563,14 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
       </div>
 
       {/* Dialogs */}
-      {!isGreenTarget && (
-        <ConfirmationDialog
-          isOpen={showDeleteDialog}
-          onClose={(): void => setShowDeleteDialog(false)}
-          onConfirm={handleConfirmDelete}
-          title="Delete Account Code"
-          message={`Adakah anda pasti mahu memadam akaun "${formData.code}"? Tindakan ini tidak boleh dibatalkan.`}
-          confirmButtonText="Delete"
-        />
-      )}
+      <ConfirmationDialog
+        isOpen={showDeleteDialog}
+        onClose={(): void => setShowDeleteDialog(false)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Account Code"
+        message={`Adakah anda pasti mahu memadam akaun "${formData.code}"? Tindakan ini tidak boleh dibatalkan.`}
+        confirmButtonText="Delete"
+      />
 
       <ConfirmationDialog
         isOpen={pendingNavigation !== null}
