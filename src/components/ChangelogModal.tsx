@@ -20,8 +20,15 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-30",
-    ms: "Green Target — Invois: bahagian BILLING TO pada PDF invois kini memaparkan alamat bil pelanggan bersama Site lokasi (contohnya \"Kolombong — Lot 5, Jalan ...\"), diambil dari lokasi sewaan pada invois tersebut. Jika invois meliputi beberapa lokasi, setiap lokasi dipaparkan pada baris berasingan. Sebelum ini ruangan Billing Address sentiasa kosong (\"-\").",
-    en: "Green Target — Invoices: the BILLING TO section of the invoice PDF now shows the customer's billing address together with the location Site (for example \"Kolombong — Lot 5, Jalan ...\"), taken from the rental locations on that invoice. Invoices covering several locations list each one on its own line. Previously the Billing Address field was always blank (\"-\").",
+  {
+    date: "2026-07-30",
+    ms: "Green Target — Chart of Accounts: akaun pendua PBB1 telah dibuang. Akaun bank PBB yang sebenar ialah PBB_1 (PBB-A/C:3137836814); PBB1 hanyalah salinan dorman tanpa sebarang transaksi dan baki pembukaan sifar, jadi pembuangannya tidak mengubah sebarang baki atau jumlah laporan — ia hanya tidak lagi muncul sebagai baris 0.00 pada Trial Balance.",
+    en: "Green Target — Chart of Accounts: the duplicate account PBB1 has been removed. The real PBB bank account is PBB_1 (PBB-A/C:3137836814); PBB1 was only a dormant copy with no transactions and a zero opening balance, so removing it changes no balance or report total — it simply no longer appears as a 0.00 row on the Trial Balance.",
+  },
+  {
+    date: "2026-07-30",
+    ms: "Green Target — Chart of Accounts: akaun baharu yang tidak lagi diperlukan kini boleh dipadam, sama seperti di Tien Hock. Butang padam muncul pada senarai akaun dan halaman sunting akaun. Akaun sistem, akaun yang mempunyai sub-akaun, dan akaun yang sudah mempunyai catatan jurnal atau baki pembukaan tidak boleh dipadam — sistem akan menyekatnya dan menerangkan sebabnya, supaya sejarah perakaunan kekal selamat.",
+    en: "Green Target — Chart of Accounts: account codes that are no longer needed can now be deleted, just like in Tien Hock. A delete button appears on the account list and on the account edit page. System accounts, accounts with sub-accounts, and accounts that already have journal entries or an opening balance cannot be deleted — the system blocks them and explains why, so accounting history stays safe.",
   },
   {
     date: "2026-07-30",
