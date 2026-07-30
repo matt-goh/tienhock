@@ -6,6 +6,7 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { Customer, CustomProduct } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
+import { useSmartBack } from "../../hooks/useSmartBack";
 import {
   FormInput,
   FormInputWithStatus,
@@ -33,6 +34,7 @@ import { IconBuildingSkyscraper, IconBuildingStore } from "@tabler/icons-react";
 
 const CustomerFormPage: React.FC = () => {
   const navigate = useNavigate();
+  const goBack = useSmartBack("/catalogue/customer");
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
   // Deep-link to a specific tab via ?tab=credit | ?tab=transactions (from the
@@ -305,13 +307,13 @@ const CustomerFormPage: React.FC = () => {
     if (isFormChanged) {
       setShowBackConfirmation(true);
     } else {
-      navigate("/catalogue/customer");
+      goBack();
     }
   };
 
   const handleConfirmBack = () => {
     setShowBackConfirmation(false);
-    navigate("/catalogue/customer");
+    goBack();
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -729,7 +731,7 @@ const CustomerFormPage: React.FC = () => {
   if (error) {
     return (
       <div className="container mx-auto px-4 py-6">
-        <BackButton onClick={() => navigate("/catalogue/customer")} />
+        <BackButton fallbackPath="/catalogue/customer" />
         <div className="mt-4 p-4 border border-red-300 bg-red-50 text-red-700 rounded">
           Error: {error}
         </div>

@@ -5,6 +5,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import Button from "../../../components/Button";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -113,6 +114,7 @@ const formatDateForInput = (dateString: string | null): string => {
 
 const RentalFormPage: React.FC = () => {
   const navigate = useNavigate();
+  const goBack = useSmartBack("/greentarget/rentals");
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
 
@@ -428,11 +430,11 @@ const RentalFormPage: React.FC = () => {
   // Navigation handlers
   const handleBackClick = () => {
     if (isFormChanged) setShowBackConfirmation(true);
-    else navigate("/greentarget/rentals");
+    else goBack();
   };
   const handleConfirmBack = () => {
     setShowBackConfirmation(false);
-    navigate("/greentarget/rentals");
+    goBack();
   };
 
   // Date/Dumpster helpers

@@ -27,6 +27,7 @@ import {
   refreshAccountCodesCache,
 } from "../../utils/accounting/useAccountingCache";
 import BackButton from "../../components/BackButton";
+import { useSmartBack } from "../../hooks/useSmartBack";
 import Button from "../../components/Button";
 import AccountCodeCombobox from "../../components/Accounting/AccountCodeCombobox";
 import ChequeReuseWarning from "../../components/Accounting/ChequeReuseWarning";
@@ -536,6 +537,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
   const journalEntriesPath: string = isGreenTarget
     ? "/greentarget/accounting/journal-entries"
     : "/accounting/journal-entries";
+  const goBack = useSmartBack(journalEntriesPath);
   const lastEntryTypeKey: string = isGreenTarget
     ? GT_LAST_ENTRY_TYPE_KEY
     : LAST_ENTRY_TYPE_KEY;
@@ -979,13 +981,13 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
     if (isFormChanged) {
       setShowBackConfirmation(true);
     } else {
-      navigate(journalEntriesPath);
+      goBack();
     }
   };
 
   const handleConfirmBack = () => {
     setShowBackConfirmation(false);
-    navigate(journalEntriesPath);
+    goBack();
   };
 
   // Validation
@@ -1153,7 +1155,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
   if (error) {
     return (
       <div className="space-y-3">
-        <BackButton onClick={() => navigate(journalEntriesPath)} />
+        <BackButton fallbackPath={journalEntriesPath} />
         <div className="p-4 border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-lg">
           {error}
         </div>

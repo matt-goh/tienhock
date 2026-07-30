@@ -12,6 +12,7 @@ import Button from "../../../components/Button";
 import { FormListbox } from "../../../components/FormComponents";
 import { Employee } from "../../../types/types";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import { format } from "date-fns";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Checkbox from "../../../components/Checkbox";
@@ -147,6 +148,9 @@ const JPDailyLogEntryPage: React.FC<JPDailyLogEntryPageProps> = ({
   jobType = "MEE",
 }) => {
   const navigate = useNavigate();
+  const goBack = useSmartBack(
+    `/jellypolly/payroll/${jobType.toLowerCase().replace("_", "-")}-production`
+  );
   const { jobs: allJobs, loading: loadingJobs, refreshJobs } = useJPJobsCache();
   const { staffs: allStaffs, loading: loadingStaffs, refreshStaffs } = useJPStaffsCache();
   const [isRefreshingCache, setIsRefreshingCache] = useState(false);
@@ -1580,7 +1584,7 @@ const JPDailyLogEntryPage: React.FC<JPDailyLogEntryPageProps> = ({
   };
 
   const handleBack = () => {
-    safeNavigate(`/jellypolly/payroll/${jobType.toLowerCase().replace("_", "-")}-production`);
+    safeNavigate(goBack);
   };
 
   const handleRefreshCache = async () => {

@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { api } from "../../../routes/utils/api";
 import { Material, MaterialCategory, MaterialAppliesTo, MaterialVariant } from "../../../types/types";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import Button from "../../../components/Button";
 import {
   FormInput,
@@ -72,6 +73,7 @@ const appliesToOptions: SelectOption[] = [
 
 const MaterialFormPage: React.FC = () => {
   const navigate = useNavigate();
+  const goBack = useSmartBack("/materials");
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id && id !== "new";
 
@@ -301,7 +303,7 @@ const MaterialFormPage: React.FC = () => {
     if (isFormChanged) {
       setShowBackConfirmation(true);
     } else {
-      navigate("/materials");
+      goBack();
     }
   };
 
@@ -384,7 +386,7 @@ const MaterialFormPage: React.FC = () => {
       <div className="space-y-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm px-6 py-3">
           <div className="flex items-center gap-4">
-            <BackButton onClick={() => navigate("/materials")} />
+            <BackButton fallbackPath="/materials" />
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
             <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">
               Material

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import Button from "../../../components/Button";
 import { Employee } from "../../../types/types";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import { format } from "date-fns";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Checkbox from "../../../components/Checkbox";
@@ -145,6 +146,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   jobType = "MAINTENANCE",
 }) => {
   const navigate = useNavigate();
+  const goBack = useSmartBack(
+    `/payroll/${jobType.toLowerCase().replace("_", "-")}-monthly`
+  );
   const {
     staffs: allStaffs,
     loading: loadingStaffs,
@@ -1211,7 +1215,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     if (onCancel) {
       onCancel();
     } else {
-      navigate(`/payroll/${jobType.toLowerCase().replace("_", "-")}-monthly`);
+      goBack();
     }
   };
 

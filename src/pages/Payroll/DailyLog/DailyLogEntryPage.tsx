@@ -12,6 +12,7 @@ import Button from "../../../components/Button";
 import { FormListbox } from "../../../components/FormComponents";
 import { Employee } from "../../../types/types";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import { format } from "date-fns";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Checkbox from "../../../components/Checkbox";
@@ -141,6 +142,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   jobType = "MEE",
 }) => {
   const navigate = useNavigate();
+  const goBack = useSmartBack(`/payroll/${jobType.toLowerCase()}-production`);
   const { jobs: allJobs, loading: loadingJobs, refreshJobs } = useJobsCache();
   const { staffs: allStaffs, loading: loadingStaffs, refreshStaffs } = useStaffsCache();
   const [isRefreshingCache, setIsRefreshingCache] = useState(false);
@@ -1568,7 +1570,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   };
 
   const handleBack = () => {
-    safeNavigate(`/payroll/${jobType.toLowerCase()}-production`);
+    safeNavigate(goBack);
   };
 
   const handleRefreshCache = async () => {
