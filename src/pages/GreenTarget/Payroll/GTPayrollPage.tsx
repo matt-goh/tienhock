@@ -38,6 +38,7 @@ import {
 import type { MidMonthPayroll } from "../../../utils/payroll/midMonthPayrollUtils";
 import { getMonthName } from "../../../utils/payroll/payrollUtils";
 import { PrintBatchPayslipsButton } from "../../../utils/payroll/PayslipButtons";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 
 interface GTMonthlyPayroll {
   id: number;
@@ -324,35 +325,7 @@ const GTPayrollPage: React.FC = () => {
     payroll.year === selectedYear &&
     payroll.month === selectedMonthNumber;
 
-  useEffect(() => {
-    if (!isPayrollScrollReady) return;
-
-    const container: HTMLElement | null = document.querySelector("main");
-    if (!container) return;
-
-    const storageKey: string = `scroll:${scrollStorageKey}`;
-    const savedPosition: string | null = sessionStorage.getItem(storageKey);
-    const parsedScrollPosition: number = Number.parseInt(
-      savedPosition || "",
-      10
-    );
-    const scrollPosition: number = Number.isFinite(parsedScrollPosition)
-      ? parsedScrollPosition
-      : 0;
-    const animationFrameId: number = requestAnimationFrame((): void => {
-      container.scrollTop = scrollPosition;
-    });
-
-    const handleScroll = (): void => {
-      sessionStorage.setItem(storageKey, String(container.scrollTop));
-    };
-    container.addEventListener("scroll", handleScroll, { passive: true });
-
-    return (): void => {
-      cancelAnimationFrame(animationFrameId);
-      container.removeEventListener("scroll", handleScroll);
-    };
-  }, [isPayrollScrollReady, scrollStorageKey]);
+  useScrollRestoration(scrollStorageKey, isPayrollScrollReady);
 
   useEffect(() => {
     const savedListState: GTPayrollListState =

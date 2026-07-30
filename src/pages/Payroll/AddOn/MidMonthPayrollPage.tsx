@@ -40,6 +40,12 @@ import type {
   PinjamDetail,
   PinjamReportData,
 } from "../../../utils/payroll/PinjamReportPDF";
+import {
+  usePersistedFilters,
+  usePersistedUrlNumber,
+  usePersistedUrlSearch,
+} from "../../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
 
 type MidMonthSubview = "summary" | "pinjam";
@@ -60,36 +66,6 @@ interface MidMonthPinjamData {
 }
 
 const MidMonthPayrollPage: React.FC = () => {
-  // Get initial values from URL params or defaults
-  const getInitialYear = (): number => {
-    const params = new URLSearchParams(window.location.search);
-    const yearParam = params.get("year");
-    if (yearParam) {
-      const year = parseInt(yearParam, 10);
-      if (!isNaN(year) && year >= 2000 && year <= 2100) {
-        return year;
-      }
-    }
-    return new Date().getFullYear();
-  };
-
-  const getInitialMonth = (): number => {
-    const params = new URLSearchParams(window.location.search);
-    const monthParam = params.get("month");
-    if (monthParam) {
-      const month = parseInt(monthParam, 10);
-      if (!isNaN(month) && month >= 1 && month <= 12) {
-        return month;
-      }
-    }
-    return new Date().getMonth() + 1;
-  };
-
-  const getInitialSearch = (): string => {
-    const params: URLSearchParams = new URLSearchParams(window.location.search);
-    return params.get("search") || "";
-  };
-
   // State
   const [payrolls, setPayrolls] = useState<MidMonthPayroll[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -103,18 +79,40 @@ const MidMonthPayrollPage: React.FC = () => {
   const [pinjamByEmp, setPinjamByEmp] = useState<
     Record<string, MidMonthPinjamData>
   >({});
-  const [activeSubview, setActiveSubview] =
-    useState<MidMonthSubview>("summary");
+  const [activeSubview, setActiveSubview] = usePersistedFilters<MidMonthSubview>(
+    "midMonthPayrollListSubview",
+    () => "summary",
+    (cached) => (cached === "summary" || cached === "pinjam" ? cached : null)
+  );
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isGeneratingExport, setIsGeneratingExport] = useState(false);
   const [isPrintDropdownOpen, setIsPrintDropdownOpen] = useState(false);
   const printDropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { staffs } = useStaffsCache();
 
-  // Filters - initialize from URL params
-  const [currentYear, setCurrentYear] = useState(getInitialYear);
-  const [currentMonth, setCurrentMonth] = useState(getInitialMonth);
-  const [searchQuery, setSearchQuery] = useState<string>(getInitialSearch);
+  // Filters - a URL param wins on mount, otherwise the last values used
+  const [currentYear, setCurrentYear] = usePersistedUrlNumber(
+    "midMonthPayrollListYear",
+    "year",
+    2000,
+    2100,
+    () => new Date().getFullYear()
+  );
+  const [currentMonth, setCurrentMonth] = usePersistedUrlNumber(
+    "midMonthPayrollListMonth",
+    "month",
+    1,
+    12,
+    () => new Date().getMonth() + 1
+  );
+  const [searchQuery, setSearchQuery] = usePersistedUrlSearch(
+    "midMonthPayrollListSearch"
+  );
+
+  useScrollRestoration(
+    "mid-month-payroll-list",
+    !isLoading && payrolls.length > 0
+  );
 
   // Month range for the TimeNavigator (the page always targets one month).
   const monthRange = useMemo(

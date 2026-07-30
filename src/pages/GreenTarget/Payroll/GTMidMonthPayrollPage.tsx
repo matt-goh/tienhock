@@ -41,6 +41,11 @@ import {
   PinjamBreakdownCard,
   PinjamReportTable,
 } from "../../../components/Payroll/CompanySalaryReportTables";
+import {
+  usePersistedFilters,
+  usePersistedNumber,
+} from "../../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import type {
   PinjamDetail,
   PinjamReportData,
@@ -319,15 +324,33 @@ const GTMidMonthPayrollPage: React.FC = () => {
   const [pinjamByEmp, setPinjamByEmp] = useState<
     Record<string, MidMonthPinjamData>
   >({});
-  const [activeSubview, setActiveSubview] =
-    useState<MidMonthSubview>("summary");
+  const [activeSubview, setActiveSubview] = usePersistedFilters<MidMonthSubview>(
+    "gtMidMonthPayrollListSubview",
+    () => "summary",
+    (cached) => (cached === "summary" || cached === "pinjam" ? cached : null)
+  );
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isGeneratingExport, setIsGeneratingExport] = useState(false);
   const { staffs } = useStaffsCache();
 
   // Filters
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
+  const [currentYear, setCurrentYear] = usePersistedNumber(
+    "gtMidMonthPayrollListYear",
+    2000,
+    2100,
+    () => new Date().getFullYear()
+  );
+  const [currentMonth, setCurrentMonth] = usePersistedNumber(
+    "gtMidMonthPayrollListMonth",
+    1,
+    12,
+    () => new Date().getMonth() + 1
+  );
+
+  useScrollRestoration(
+    "gt-mid-month-payroll-list",
+    !isLoading && payrolls.length > 0
+  );
 
   // Month range for the TimeNavigator (the page always targets one month).
   const monthRange = useMemo(

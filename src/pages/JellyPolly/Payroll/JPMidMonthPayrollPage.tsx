@@ -49,6 +49,11 @@ import type {
   PinjamDetail,
   PinjamReportData,
 } from "../../../utils/payroll/PinjamReportPDF";
+import {
+  usePersistedFilters,
+  usePersistedNumber,
+} from "../../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
 
 const JP_COMPANY_NAME = "JELLY POLLY";
@@ -320,8 +325,11 @@ const JPMidMonthPayrollPage: React.FC = () => {
   const [pinjamByEmp, setPinjamByEmp] = useState<
     Record<string, MidMonthPinjamData>
   >({});
-  const [activeSubview, setActiveSubview] =
-    useState<MidMonthSubview>("summary");
+  const [activeSubview, setActiveSubview] = usePersistedFilters<MidMonthSubview>(
+    "jpMidMonthPayrollListSubview",
+    () => "summary",
+    (cached) => (cached === "summary" || cached === "pinjam" ? cached : null)
+  );
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isGeneratingExport, setIsGeneratingExport] = useState(false);
   const { staffs } = useJPStaffsCache();
@@ -339,8 +347,23 @@ const JPMidMonthPayrollPage: React.FC = () => {
   );
 
   // Filters
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
+  const [currentYear, setCurrentYear] = usePersistedNumber(
+    "jpMidMonthPayrollListYear",
+    2000,
+    2100,
+    () => new Date().getFullYear()
+  );
+  const [currentMonth, setCurrentMonth] = usePersistedNumber(
+    "jpMidMonthPayrollListMonth",
+    1,
+    12,
+    () => new Date().getMonth() + 1
+  );
+
+  useScrollRestoration(
+    "jp-mid-month-payroll-list",
+    !isLoading && payrolls.length > 0
+  );
 
   // Month range for the TimeNavigator (the page always targets one month).
   const monthRange = useMemo(
