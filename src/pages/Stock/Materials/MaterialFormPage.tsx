@@ -325,12 +325,22 @@ const MaterialFormPage: React.FC = () => {
       if (isEditMode) {
         await api.put(`/api/materials/${id}`, formData);
         toast.success("Material updated successfully");
+        goBack();
       } else {
-        await api.post("/api/materials", formData);
+        const response: { material?: { id: number } } = await api.post(
+          "/api/materials",
+          formData
+        );
         toast.success("Material created successfully");
+        const newId: number | undefined = response?.material?.id;
+        // Show the material just created. `replace` drops this form from
+        // history, so Back returns to wherever the user started.
+        if (newId) {
+          navigate(`/materials/${newId}`, { replace: true });
+        } else {
+          goBack();
+        }
       }
-
-      navigate("/materials");
     } catch (err: any) {
       console.error("Error saving material:", err);
       toast.error(err.message || "Failed to save material");

@@ -576,7 +576,16 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
           console.error("Error refreshing account codes cache:", refreshError);
         }
       );
-      navigate(accountCodesPagePath);
+      if (isEditMode) {
+        navigateBack();
+      } else {
+        // Show the account code just created. `replace` drops this form from
+        // history, so Back returns to wherever the user started.
+        navigate(
+          `${accountCodesPagePath}/${encodeURIComponent(submittedAccountCode)}`,
+          { replace: true }
+        );
+      }
     } catch (err: unknown) {
       console.error("Error saving account code:", err);
       const errorMessage = err instanceof Error ? err.message : `Failed to ${isEditMode ? "update" : "create"} account code`;

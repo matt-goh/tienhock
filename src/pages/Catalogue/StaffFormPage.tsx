@@ -642,7 +642,13 @@ const StaffFormPage: React.FC = () => {
       toast.success(
         `Staff member ${isEditMode ? "updated" : "created"} successfully!`
       );
-      navigate("/catalogue/staff");
+      if (isEditMode) {
+        goBack();
+      } else {
+        // Show the staff member just created. `replace` drops this form from
+        // history, so Back returns to wherever the user started.
+        navigate(`/catalogue/staff/${formData.id}`, { replace: true });
+      }
     } catch (error) {
       if (error instanceof Error) {
         toast.error(error.message);

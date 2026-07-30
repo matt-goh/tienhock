@@ -21,6 +21,37 @@ import Button from "../../components/Button";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
+import { usePersistedFilters } from "../../hooks/usePersistedFilters";
+
+const FILTERS_STORAGE_KEY = "staffList";
+const SCROLL_RESTORATION_KEY = "staff-list";
+
+// Search, the filter-menu selections and the page all persist so returning
+// from a staff form lands on the same slice of the list.
+interface StaffListCache {
+  searchTerm: string;
+  filters: FilterOptions;
+  page: number;
+}
+
+const getDefaultStaffListCache = (): StaffListCache => ({
+  searchTerm: "",
+  filters: { showResigned: false, jobFilter: null, applyJobFilter: true },
+  page: 1,
+});
+
+const reviveStaffListCache = (cached: any): StaffListCache => {
+  const defaults = getDefaultStaffListCache();
+  return {
+    searchTerm: typeof cached?.searchTerm === "string" ? cached.searchTerm : "",
+    filters:
+      cached?.filters && typeof cached.filters === "object"
+        ? (cached.filters as FilterOptions)
+        : defaults.filters,
+    page: typeof cached?.page === "number" && cached.page >= 1 ? cached.page : 1,
+  };
+};
 
 const EmployeeCard = ({
   employee,
@@ -181,17 +212,22 @@ const StaffPage = () => {
     error,
     refreshStaffs,
   } = useStaffsCache();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [listCache, setListCache] = usePersistedFilters<StaffListCache>(
+    FILTERS_STORAGE_KEY,
+    getDefaultStaffListCache,
+    reviveStaffListCache
+  );
+  const { searchTerm, filters, page: currentPage } = listCache;
+  const setSearchTerm = (value: string): void =>
+    setListCache((prev) => ({ ...prev, searchTerm: value }));
+  const setFilters = (value: FilterOptions): void =>
+    setListCache((prev) => ({ ...prev, filters: value }));
+  const setCurrentPage = (value: number): void =>
+    setListCache((prev) => ({ ...prev, page: value }));
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(
     null
   );
-  const [filters, setFilters] = useState<FilterOptions>({
-    showResigned: false,
-    jobFilter: null,
-    applyJobFilter: true,
-  });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const navigate = useNavigate();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -277,9 +313,23 @@ const StaffPage = () => {
     return filteredEmployees.slice(startIndex, startIndex + ITEMS_PER_PAGE);
   }, [filteredEmployees, currentPage]);
 
+  // Reset to page 1 when a filter actually changes. The ref-guard skips the
+  // initial mount so the page number restored from the cache survives.
+  const filterSignature: string = JSON.stringify([searchTerm, filters]);
+  const prevFilterSignatureRef = useRef<string | null>(null);
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, filters]);
+    if (
+      prevFilterSignatureRef.current !== null &&
+      prevFilterSignatureRef.current !== filterSignature
+    ) {
+      setCurrentPage(1);
+    }
+    prevFilterSignatureRef.current = filterSignature;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterSignature]);
+
+  // Restore the previous scroll position when returning from a staff form.
+  useScrollRestoration(SCROLL_RESTORATION_KEY, !loading);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);

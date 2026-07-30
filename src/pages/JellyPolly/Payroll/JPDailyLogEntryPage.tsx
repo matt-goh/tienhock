@@ -1827,12 +1827,17 @@ const JPDailyLogEntryPage: React.FC<JPDailyLogEntryPageProps> = ({
 
     setIsSaving(true);
 
+    let newLogId: number | undefined;
     try {
       if (mode === "edit" && existingWorkLog) {
         await api.put(`/jellypolly/api/daily-work-logs/${existingWorkLog.id}`, payload);
         toast.success("Work log updated successfully");
       } else {
-        await api.post("/jellypolly/api/daily-work-logs", payload);
+        const response: { workLogId?: number } = await api.post(
+          "/jellypolly/api/daily-work-logs",
+          payload
+        );
+        newLogId = response?.workLogId;
         toast.success("Work log submitted successfully");
       }
 
@@ -1852,11 +1857,19 @@ const JPDailyLogEntryPage: React.FC<JPDailyLogEntryPageProps> = ({
         forceOTHours: JSON.parse(JSON.stringify(forceOTHours)),
         isCleaningMode: isCleaningMode,
       });
-      // Navigate to details page after edit, list page after create
+      // Return to where the user came from after an edit; after a create, show
+      // the log just created (replace, so Back still returns to the origin).
       if (mode === "edit" && existingWorkLog) {
-        navigate(`/jellypolly/payroll/${jobType.toLowerCase().replace("_", "-")}-production/${existingWorkLog.id}`);
+        goBack();
+      } else if (newLogId) {
+        navigate(
+          `/jellypolly/payroll/${jobType
+            .toLowerCase()
+            .replace("_", "-")}-production/${newLogId}`,
+          { replace: true }
+        );
       } else {
-        navigate(`/jellypolly/payroll/${jobType.toLowerCase().replace("_", "-")}-production`);
+        goBack();
       }
     } catch (error: any) {
       console.error("Error saving work log:", error);

@@ -408,7 +408,13 @@ const CustomerFormPage: React.FC = () => {
       toast.success(
         `Customer ${isEditMode ? "updated" : "created"} successfully!`
       );
-      navigate("/greentarget/customers");
+      if (isEditMode) {
+        goBack();
+      } else {
+        // Show the customer just created. `replace` drops this form from
+        // history, so Back returns to wherever the user started.
+        navigate(`/greentarget/customers/${customerId}`, { replace: true });
+      }
     } catch (error) {
       if (error instanceof Error) {
         toast.error(error.message);

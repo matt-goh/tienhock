@@ -15,6 +15,11 @@ import { Payment } from "../../types/types";
 import PaymentTable from "../../components/Invoice/PaymentTable";
 import PaymentForm from "../../components/Invoice/PaymentForm";
 import StyledListbox from "../../components/StyledListbox";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
+import {
+  usePersistedFilters,
+  reviveDate,
+} from "../../hooks/usePersistedFilters";
 
 interface PaymentFilters {
   dateRange: {
@@ -26,6 +31,37 @@ interface PaymentFilters {
   searchTerm: string;
 }
 
+const FILTERS_STORAGE_KEY = "jpPaymentList";
+const SCROLL_RESTORATION_KEY = "jp-payment-list";
+
+const getDefaultFilters = (): PaymentFilters => {
+  const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const end = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
+  end.setHours(23, 59, 59, 999); // Set to end of day
+
+  return {
+    dateRange: { start, end },
+    paymentMethod: null,
+    status: "active", // Default to active payments
+    searchTerm: "",
+  };
+};
+
+// Dates survive the JSON round-trip as ISO strings, so rebuild them here.
+// An unusable cache returns null and the default month is used instead.
+const reviveFilters = (cached: any): PaymentFilters | null => {
+  const start = reviveDate(cached?.dateRange?.start);
+  const end = reviveDate(cached?.dateRange?.end);
+  if (!start || !end) return null;
+  return {
+    dateRange: { start, end },
+    paymentMethod:
+      typeof cached.paymentMethod === "string" ? cached.paymentMethod : null,
+    status: typeof cached.status === "string" ? cached.status : null,
+    searchTerm: typeof cached.searchTerm === "string" ? cached.searchTerm : "",
+  };
+};
+
 const PaymentPage: React.FC = () => {
   const navigate = useNavigate();
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -34,25 +70,13 @@ const PaymentPage: React.FC = () => {
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
 
-  const [filters, setFilters] = useState<PaymentFilters>(() => {
-    const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const end = new Date(
-      new Date().getFullYear(),
-      new Date().getMonth() + 1,
-      0
-    );
-    end.setHours(23, 59, 59, 999); // Set to end of day
-
-    return {
-      dateRange: {
-        start,
-        end,
-      },
-      paymentMethod: null,
-      status: "active", // Default to active payments
-      searchTerm: "",
-    };
-  });
+  // Filters persist across navigation so returning from an invoice lands on
+  // the same month, method and status the user was looking at.
+  const [filters, setFilters] = usePersistedFilters<PaymentFilters>(
+    FILTERS_STORAGE_KEY,
+    getDefaultFilters,
+    reviveFilters
+  );
 
   // Fetch payments
   const fetchPayments = useCallback(async () => {
@@ -120,6 +144,9 @@ const PaymentPage: React.FC = () => {
   useEffect(() => {
     fetchPayments();
   }, [fetchPayments]);
+
+  // Restore the previous scroll position when returning (e.g. from an invoice).
+  useScrollRestoration(SCROLL_RESTORATION_KEY, !loading);
 
   // Unified Time Navigator change handler. Handles day, month, and custom-range
   // selections from the single TimeNavigator control.

@@ -6,8 +6,21 @@ import { FormInput, FormListbox } from "../../../components/FormComponents";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import TimeNavigator from "../../../components/TimeNavigator";
 import { api } from "../../../routes/utils/api";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
+import { usePersistedFilters } from "../../../hooks/usePersistedFilters";
 
 type InvoiceSource = "purchase_invoices" | "self_billed_invoices";
+
+const FILTERS_STORAGE_KEY = "supplierPaymentList";
+const SCROLL_RESTORATION_KEY = "supplier-payment-list";
+
+interface SupplierPaymentFilters {
+  source: "" | InvoiceSource;
+  start_date: string;
+  end_date: string;
+  status: "active" | "all";
+  search: string;
+}
 
 // Parse a yyyy-MM-dd string into a local Date (null when empty/invalid).
 const parseYmd = (s: string): Date | null => {
@@ -66,24 +79,54 @@ function formatDate(value: string | null): string {
   });
 }
 
+// Dates are stored as bare yyyy-MM-dd strings, so they round-trip through
+// JSON untouched.
+const getDefaultFilters = (): SupplierPaymentFilters => {
+  const today = new Date();
+  return {
+    source: "",
+    start_date: format(
+      new Date(today.getFullYear(), today.getMonth() - 2, 1),
+      "yyyy-MM-dd"
+    ),
+    end_date: format(today, "yyyy-MM-dd"),
+    status: "active",
+    search: "",
+  };
+};
+
+const reviveFilters = (cached: any): SupplierPaymentFilters | null => {
+  if (
+    typeof cached?.start_date !== "string" ||
+    typeof cached?.end_date !== "string"
+  ) {
+    return null;
+  }
+  return {
+    source:
+      cached.source === "purchase_invoices" ||
+      cached.source === "self_billed_invoices"
+        ? cached.source
+        : "",
+    start_date: cached.start_date,
+    end_date: cached.end_date,
+    status: cached.status === "all" ? "all" : "active",
+    search: typeof cached.search === "string" ? cached.search : "",
+  };
+};
+
 const SupplierPaymentListPage: React.FC = () => {
   const navigate = useNavigate();
-  const today = new Date();
-  const defaultStart = format(
-    new Date(today.getFullYear(), today.getMonth() - 2, 1),
-    "yyyy-MM-dd"
-  );
-  const defaultEnd = format(today, "yyyy-MM-dd");
 
   const [rows, setRows] = useState<SupplierPaymentRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [filters, setFilters] = useState({
-    source: "" as "" | InvoiceSource,
-    start_date: defaultStart,
-    end_date: defaultEnd,
-    status: "active" as "active" | "all",
-    search: "",
-  });
+  // Filters persist so returning from a payment form keeps the same source,
+  // date range, status and search.
+  const [filters, setFilters] = usePersistedFilters<SupplierPaymentFilters>(
+    FILTERS_STORAGE_KEY,
+    getDefaultFilters,
+    reviveFilters
+  );
 
   const fetchPayments = useCallback(async (): Promise<void> => {
     setLoading(true);
@@ -113,6 +156,9 @@ const SupplierPaymentListPage: React.FC = () => {
   useEffect(() => {
     fetchPayments();
   }, [fetchPayments]);
+
+  // Restore the previous scroll position when returning from a payment form.
+  useScrollRestoration(SCROLL_RESTORATION_KEY, !loading);
 
   const filteredRows = useMemo(() => {
     if (!filters.search.trim()) return rows;

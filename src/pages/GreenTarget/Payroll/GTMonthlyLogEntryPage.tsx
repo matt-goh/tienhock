@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Button from "../../../components/Button";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import MonthNavigator from "../../../components/MonthNavigator";
 import Checkbox from "../../../components/Checkbox";
@@ -81,6 +82,7 @@ const getActivityIdentity = (a: {
 
 const GTMonthlyLogEntryPage: React.FC = () => {
   const navigate = useNavigate();
+  const goBack = useSmartBack("/greentarget/payroll");
   const [searchParams] = useSearchParams();
 
   const {
@@ -425,7 +427,9 @@ const GTMonthlyLogEntryPage: React.FC = () => {
         await api.post("/greentarget/api/monthly-work-logs", payload);
         toast.success("Work log created successfully");
       }
-      navigate("/greentarget/payroll");
+      // Green Target has no work-log details route, so both create and edit
+      // return the user to wherever they came from.
+      goBack();
     } catch (error) {
       console.error("Error saving work log:", error);
       toast.error("Failed to save work log");

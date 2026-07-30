@@ -679,7 +679,7 @@ const RentalFormPage: React.FC = () => {
       if (!isEditMode && newRentalId) {
         navigate(`/greentarget/rentals/${newRentalId}`, { replace: true });
       } else {
-        navigate("/greentarget/rentals");
+        goBack();
       }
     } catch (error: any) {
       console.error("Error saving rental:", error);
