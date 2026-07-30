@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import Button from "../../../components/Button";
 import {
   FormInput,
@@ -55,6 +56,7 @@ interface SelectOption {
 
 const CustomerFormPage: React.FC = () => {
   const navigate = useNavigate();
+  const goBack = useSmartBack("/greentarget/customers");
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
 
@@ -216,13 +218,13 @@ const CustomerFormPage: React.FC = () => {
     if (isFormChanged) {
       setShowBackConfirmation(true);
     } else {
-      navigate("/greentarget/customers");
+      goBack();
     }
   };
 
   const handleConfirmBack = (): void => {
     setShowBackConfirmation(false);
-    navigate("/greentarget/customers");
+    goBack();
   };
 
   const handleAddLocation = (): void => {

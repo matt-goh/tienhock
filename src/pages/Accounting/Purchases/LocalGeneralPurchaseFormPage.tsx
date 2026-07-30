@@ -1082,7 +1082,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <BackButton onClick={() => navigate(backUrl)} />
+          <BackButton fallbackPath={backUrl} />
           <span className="text-default-300 dark:text-gray-600">|</span>
           <div>
             <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">

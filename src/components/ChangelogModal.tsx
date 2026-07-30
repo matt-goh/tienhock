@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-30",
+    ms: "Butang Back di seluruh sistem kini membawa anda kembali ke halaman yang anda datang, bukan sentiasa ke senarai utama. Contohnya, jika anda membuka borang pelanggan daripada senarai invois, Back akan kembali ke senarai invois itu (lengkap dengan carian, bulan dan kedudukan skrol anda) dan bukan lagi melompat ke halaman Customer. Jika anda membuka halaman itu terus melalui pautan yang ditampal, dimuat semula, atau dalam tab baharu, Back masih membawa anda ke senarai berkaitan seperti sebelum ini. Amaran \"Discard Changes\" pada borang yang belum disimpan kekal sama.",
+    en: "Back buttons across the system now return you to the page you actually came from, instead of always jumping to the main list. For example, if you open a customer form from an invoice list, Back now returns you to that invoice list (with your search, month and scroll position intact) rather than jumping to the Customer page. If you opened the page directly from a pasted link, a refresh, or a new tab, Back still takes you to the related list as before. The \"Discard Changes\" warning on unsaved forms is unchanged.",
+  },
+  {
+    date: "2026-07-30",
     ms: "Estimated P&L / Unit Cost — Angka JAGUNG Bihun bulan Jun telah dibetulkan mengikut kiraan stok fizikal sebenar: stok penutup JAGUNG kini RM22,086.00 (sebelum ini RM21,546.00) dan stok pembuka RM33,209.00 (sebelum ini RM38,829.00), kerana kiraan beg yang dimasukkan sebelum ini tersilap satu digit. Jumlah stok, P/L, ACCUMULATIVE dan unit cost Bihun Jun turut berubah mengikut pembetulan ini. Add Back Jun (MEE 9,658.83 / BIHUN 6,662.66) juga telah dimasukkan, jadi baris FINAL P/L kini memaparkan jumlah akhir seperti yang dikira oleh bos.",
     en: "Estimated P&L / Unit Cost — June Bihun JAGUNG figures have been corrected to the actual physical stock counts: JAGUNG closing stock is now RM22,086.00 (was RM21,546.00) and opening stock RM33,209.00 (was RM38,829.00), because the previously keyed bag counts were off by one digit. June Bihun stock totals, P/L, ACCUMULATIVE and unit cost move accordingly. The June Add Back amounts (MEE 9,658.83 / BIHUN 6,662.66) have also been entered, so the FINAL P/L line now shows the final figures as worked out by the boss.",
   },

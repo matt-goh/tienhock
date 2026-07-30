@@ -511,7 +511,7 @@ const GTMonthlyLogEntryPage: React.FC = () => {
       <div className="sticky top-0 z-20 bg-white dark:bg-gray-800 p-4 rounded-lg border border-default-200 dark:border-gray-700">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <BackButton onClick={() => navigate("/greentarget/payroll")} />
+            <BackButton fallbackPath="/greentarget/payroll" />
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
             <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">
               {existingWorkLog ? "Edit" : "New"} Office Monthly Entry

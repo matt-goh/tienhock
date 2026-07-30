@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import Button from "../../../components/Button";
 import { Employee } from "../../../types/types";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import { format } from "date-fns";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Checkbox from "../../../components/Checkbox";
@@ -151,6 +152,9 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
   // Hardcode jobType for salesman page
   const jobType = "SALESMAN";
   const navigate = useNavigate();
+  const goBack = useSmartBack(
+    `/jellypolly/payroll/${jobType.toLowerCase().replace("_", "-")}-production`
+  );
   const { jobs: allJobs, loading: loadingJobs, refreshJobs } = useJPJobsCache();
   const { staffs: allStaffs, loading: loadingStaffs, refreshStaffs } = useJPStaffsCache();
   const { products: payrollProducts } = useProductsCache(["MEE", "BH", "JP"]);
@@ -1430,7 +1434,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
   };
 
   const handleBack = () => {
-    safeNavigate(`/jellypolly/payroll/${jobType.toLowerCase().replace("_", "-")}-production`);
+    safeNavigate(goBack);
   };
 
   const handleRefreshCache = async () => {

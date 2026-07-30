@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import { Employee } from "../../../types/types";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import { api } from "../../../routes/utils/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import {
@@ -46,6 +47,7 @@ const STAFF_ID_WHITESPACE_REGEX: RegExp = /\s/;
  */
 const JPStaffFormPage: React.FC = () => {
   const navigate = useNavigate();
+  const goBack = useSmartBack("/jellypolly/catalogue/staff");
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
@@ -362,13 +364,13 @@ const JPStaffFormPage: React.FC = () => {
     if (isFormChanged) {
       setShowBackConfirmation(true);
     } else {
-      navigate("/jellypolly/catalogue/staff");
+      goBack();
     }
   };
 
   const handleConfirmBack = () => {
     setShowBackConfirmation(false);
-    navigate("/jellypolly/catalogue/staff");
+    goBack();
   };
 
   // Fetch same-name staff for Head management

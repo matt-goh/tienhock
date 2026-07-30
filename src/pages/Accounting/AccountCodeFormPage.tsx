@@ -11,6 +11,7 @@ import {
   refreshAccountCodesCache,
 } from "../../utils/accounting/useAccountingCache";
 import BackButton from "../../components/BackButton";
+import { useSmartBack } from "../../hooks/useSmartBack";
 import Button from "../../components/Button";
 import {
   FormInput,
@@ -168,6 +169,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
   const accountCodesPagePath: string = isGreenTarget
     ? "/greentarget/accounting/account-codes"
     : "/accounting/account-codes";
+  const goBack = useSmartBack(accountCodesPagePath);
 
   // Cached reference data
   const { ledgerTypes: allLedgerTypes, isLoading: ledgerTypesLoading } =
@@ -452,12 +454,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
   };
 
   const navigateBack = (): void => {
-    if (window.history.length > 1) {
-      navigate(-1);
-      return;
-    }
-
-    navigate(accountCodesPagePath);
+    goBack();
   };
 
   const handleBackClick = (): void => {

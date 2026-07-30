@@ -1947,7 +1947,7 @@ const InvoiceDetailsPage: React.FC = () => {
       {/* Header with actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
         <div className="flex items-center gap-4">
-          <BackButton onClick={() => navigate("/greentarget/invoices")} />
+          <BackButton fallbackPath="/greentarget/invoices" />
           <div className="h-6 w-px bg-default-300 dark:bg-default-700"></div>
           <h1 className="text-2xl font-bold text-default-900 dark:text-gray-100 flex flex-wrap items-center gap-2 min-w-0">
             <IconFileInvoice

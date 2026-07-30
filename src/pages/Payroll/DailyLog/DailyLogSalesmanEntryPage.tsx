@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import Button from "../../../components/Button";
 import { Employee } from "../../../types/types";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import { format } from "date-fns";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Checkbox from "../../../components/Checkbox";
@@ -146,6 +147,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
   // Hardcode jobType for salesman page
   const jobType = "SALESMAN";
   const navigate = useNavigate();
+  const goBack = useSmartBack(`/payroll/${jobType.toLowerCase()}-production`);
   const { jobs: allJobs, loading: loadingJobs, refreshJobs } = useJobsCache();
   const { staffs: allStaffs, loading: loadingStaffs, refreshStaffs } = useStaffsCache();
   const { products: payrollProducts } = useProductsCache(["MEE", "BH", "JP"]);
@@ -1415,7 +1417,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
   };
 
   const handleBack = () => {
-    safeNavigate(`/payroll/${jobType.toLowerCase()}-production`);
+    safeNavigate(goBack);
   };
 
   const handleRefreshCache = async () => {

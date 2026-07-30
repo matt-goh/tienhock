@@ -460,7 +460,7 @@ const PayrollRulesPage: React.FC = () => {
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
         {/* Left side: Back button, Title, Stats */}
         <div className="flex items-center gap-3">
-          <BackButton onClick={() => navigate("/greentarget/payroll")} />
+          <BackButton fallbackPath="/greentarget/payroll" />
           <span className="text-default-300 dark:text-gray-600">|</span>
           <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
             Payroll Settings

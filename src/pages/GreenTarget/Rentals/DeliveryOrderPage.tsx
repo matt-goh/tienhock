@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { IconPrinter, IconDownload } from "@tabler/icons-react";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import Button from "../../../components/Button";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -21,6 +22,7 @@ interface DeliveryOrderData {
 const DeliveryOrderPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const goBack = useSmartBack(`/greentarget/rentals/${id}`);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deliveryOrderData, setDeliveryOrderData] =
@@ -55,7 +57,7 @@ const DeliveryOrderPage: React.FC = () => {
   };
 
   const handleBackClick = () => {
-    navigate(`/greentarget/rentals/${id}`);
+    goBack();
   };
 
   const handlePrint = () => {
