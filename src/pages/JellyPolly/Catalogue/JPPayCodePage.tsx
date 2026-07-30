@@ -33,14 +33,54 @@ import AssociatePayCodesWithJobsModal from "../../../components/Catalogue/Associ
 import AssociatePayCodesWithEmployeesModal from "../../../components/Catalogue/AssociatePayCodesWithEmployeesModal";
 import JobsAndEmployeesUsingPayCodeTooltip from "../../../components/Catalogue/JobsAndEmployeesUsingPayCodeTooltip";
 import RefreshPayCodeCacheButton from "../../../components/Catalogue/RefreshPayCodeCacheButton";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
+import { usePersistedFilters } from "../../../hooks/usePersistedFilters";
+
+const FILTERS_STORAGE_KEY = "jpPayCodeList";
+const SCROLL_RESTORATION_KEY = "jp-pay-code-list";
+
+interface PayCodeListFilters {
+  selectedType: string;
+  selectedJob: string;
+  searchTerm: string;
+  page: number;
+}
+
+const getDefaultFilters = (): PayCodeListFilters => ({
+  selectedType: "All",
+  selectedJob: "All",
+  searchTerm: "",
+  page: 1,
+});
+
+const reviveFilters = (cached: any): PayCodeListFilters => ({
+  selectedType:
+    typeof cached?.selectedType === "string" ? cached.selectedType : "All",
+  selectedJob:
+    typeof cached?.selectedJob === "string" ? cached.selectedJob : "All",
+  searchTerm: typeof cached?.searchTerm === "string" ? cached.searchTerm : "",
+  page: typeof cached?.page === "number" && cached.page >= 1 ? cached.page : 1,
+});
 
 const JPPayCodePage: React.FC = () => {
   const location = useLocation();
   // State
   const [filteredCodes, setFilteredCodes] = useState<PayCode[]>([]);
-  const [selectedType, setSelectedType] = useState<string>("All");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedJob, setSelectedJob] = useState<string>("All");
+  // Type/job/search selections and the page persist so returning to the page
+  // keeps the same slice of the list. The reset-page refs below are seeded
+  // from these restored values, so nothing is clobbered on mount.
+  const [listFilters, setListFilters] = usePersistedFilters<PayCodeListFilters>(
+    FILTERS_STORAGE_KEY,
+    getDefaultFilters,
+    reviveFilters
+  );
+  const { selectedType, selectedJob, searchTerm } = listFilters;
+  const setSelectedType = (value: string): void =>
+    setListFilters((prev) => ({ ...prev, selectedType: value }));
+  const setSelectedJob = (value: string): void =>
+    setListFilters((prev) => ({ ...prev, selectedJob: value }));
+  const setSearchTerm = (value: string): void =>
+    setListFilters((prev) => ({ ...prev, searchTerm: value }));
 
   // Hooks for data and caching
   const {
@@ -68,7 +108,9 @@ const JPPayCodePage: React.FC = () => {
     useState(false);
 
   // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
+  const currentPage: number = listFilters.page;
+  const setCurrentPage = (page: number): void =>
+    setListFilters((prev) => ({ ...prev, page }));
   const [itemsPerPage] = useState(100);
 
   // Pay type options
@@ -129,7 +171,11 @@ const JPPayCodePage: React.FC = () => {
     if (idParam) {
       setSearchTerm(idParam);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search]);
+
+  // Restore the previous scroll position when returning to the page.
+  useScrollRestoration(SCROLL_RESTORATION_KEY, !loading);
 
   // --- Derived State ---
   const payCodeToJobsMap = useMemo(() => {
@@ -435,10 +481,10 @@ const JPPayCodePage: React.FC = () => {
 
   const Pagination = () => {
     const handleNextPage = () => {
-      if (currentPage < totalPages) setCurrentPage((prev) => prev + 1);
+      if (currentPage < totalPages) setCurrentPage(currentPage + 1);
     };
     const handlePrevPage = () => {
-      if (currentPage > 1) setCurrentPage((prev) => prev - 1);
+      if (currentPage > 1) setCurrentPage(currentPage - 1);
     };
     const handlePageChange = (page: number) => setCurrentPage(page);
     const pageNumbers: number[] = [];

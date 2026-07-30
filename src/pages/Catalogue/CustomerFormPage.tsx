@@ -572,7 +572,15 @@ const CustomerFormPage: React.FC = () => {
       // --- Post-Save Actions ---
       await Promise.all([refreshCustomersCache(), refreshAccountCodesCache()]);
       toast.success(successMessage);
-      navigate("/catalogue/customer");
+      if (isEditMode) {
+        goBack();
+      } else {
+        // Show the customer just created. `replace` drops this form from
+        // history, so Back returns to wherever the user started.
+        navigate(`/catalogue/customer/${customerIdForProducts}`, {
+          replace: true,
+        });
+      }
     } catch (error: any) {
       console.error(
         `Error ${isEditMode ? "updating" : "creating"} customer:`,

@@ -375,7 +375,9 @@ const StaffAddPage: React.FC = () => {
       await refreshStaffs();
 
       toast.success("Staff member created successfully!");
-      navigate("/catalogue/staff");
+      // Show the staff member just created. `replace` drops this form from
+      // history, so Back returns to wherever the user started.
+      navigate(`/catalogue/staff/${formData.id}`, { replace: true });
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "An unexpected error occurred"

@@ -14,6 +14,8 @@ import {
 } from "../../../utils/accounting/GTBalanceSheetPDF";
 import { GTStatementItem } from "../../../utils/accounting/GTIncomeStatementPDF";
 import toast from "react-hot-toast";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
+import { usePersistedMonth } from "../../../hooks/usePersistedFilters";
 
 interface LineItem {
   note: string | null;
@@ -109,10 +111,11 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState<boolean>(false);
 
-  const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
+  // The selected month persists per company so returning to the report reopens
+  // the period the user was reading.
+  const [selectedMonth, setSelectedMonth] = usePersistedMonth(
+    isGT ? "gtBalanceSheetMonth" : "balanceSheetMonth"
+  );
 
   const fetchData = useCallback(async (): Promise<void> => {
     const year = selectedMonth.getFullYear();
@@ -142,6 +145,12 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // The statement is long; restore the reading position on return.
+  useScrollRestoration(
+    isGT ? "gt-balance-sheet" : "balance-sheet",
+    !loading && (!!data || !!gtData)
+  );
 
   const handleMonthChange = (newMonth: Date): void => {
     setSelectedMonth(newMonth);

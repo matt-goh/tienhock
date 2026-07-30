@@ -1,5 +1,5 @@
 // src/pages/Accounting/AccountCodeListPage.tsx
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   IconSearch,
   IconPlus,
@@ -38,6 +38,7 @@ import ListboxSelect, {
   ListboxSelectOption,
 } from "../../components/ListboxSelect";
 import useAccountCodeFavourites from "../../hooks/useAccountCodeFavourites";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 
 // Financial statement note interface
 interface FinancialStatementNote {
@@ -65,6 +66,66 @@ interface TreeDisplayRow extends VisibleTreeRow {
 type PaginationPageItem = number | "ellipsis";
 
 const ACCOUNT_CODES_PAGE_SIZE = 100;
+
+// Green Target keeps its own cache so browsing the GT chart never overwrites
+// the Tien Hock view's saved filters (and vice versa).
+const FILTERS_STORAGE_KEYS = {
+  tienhock: "accountCodeListFilters",
+  greentarget: "gtAccountCodeListFilters",
+} as const;
+
+const SCROLL_RESTORATION_KEYS = {
+  tienhock: "account-code-list",
+  greentarget: "gt-account-code-list",
+} as const;
+
+interface CachedAccountCodeFilters {
+  searchTerm: string;
+  selectedLedgerType: string;
+  showInactive: boolean;
+  viewMode: "tree" | "flat";
+  page: number;
+  expandedNodes: string[];
+}
+
+const DEFAULT_CACHED_FILTERS: CachedAccountCodeFilters = {
+  searchTerm: "",
+  selectedLedgerType: "All",
+  showInactive: false,
+  viewMode: "tree",
+  page: 1,
+  expandedNodes: [],
+};
+
+// Restores the search/ledger-type/view selections, the current page and which
+// tree branches were open, so returning from an account detail page lands on
+// the same view instead of a collapsed page 1.
+const loadCachedFilters = (storageKey: string): CachedAccountCodeFilters => {
+  try {
+    const cached = localStorage.getItem(storageKey);
+    if (!cached) return DEFAULT_CACHED_FILTERS;
+    const parsed = JSON.parse(cached);
+    return {
+      searchTerm:
+        typeof parsed.searchTerm === "string" ? parsed.searchTerm : "",
+      selectedLedgerType:
+        typeof parsed.selectedLedgerType === "string"
+          ? parsed.selectedLedgerType
+          : "All",
+      showInactive: parsed.showInactive === true,
+      viewMode: parsed.viewMode === "flat" ? "flat" : "tree",
+      page: typeof parsed.page === "number" && parsed.page >= 1 ? parsed.page : 1,
+      expandedNodes: Array.isArray(parsed.expandedNodes)
+        ? parsed.expandedNodes.filter(
+            (code: unknown): code is string => typeof code === "string"
+          )
+        : [],
+    };
+  } catch (e) {
+    console.error("Error loading cached account code filters:", e);
+    return DEFAULT_CACHED_FILTERS;
+  }
+};
 
 export interface AccountCodeListPageProps {
   company?: "tienhock" | "greentarget";
@@ -191,15 +252,56 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
     fsNotesLoading ||
     (!isGreenTarget && favouritesLoading);
 
-  // Local state
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+  const filtersStorageKey: string = FILTERS_STORAGE_KEYS[company];
 
-  // Filters
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedLedgerType, setSelectedLedgerType] = useState<string>("All");
-  const [showInactive, setShowInactive] = useState(false);
-  const [viewMode, setViewMode] = useState<"tree" | "flat">("tree");
-  const [currentPage, setCurrentPage] = useState<number>(1);
+  // Local state
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(
+    () => new Set(loadCachedFilters(filtersStorageKey).expandedNodes)
+  );
+
+  // Filters - restored from the per-company cache so returning to the page
+  // keeps the same search, ledger type, view mode and page.
+  const [searchTerm, setSearchTerm] = useState(
+    () => loadCachedFilters(filtersStorageKey).searchTerm
+  );
+  const [selectedLedgerType, setSelectedLedgerType] = useState<string>(
+    () => loadCachedFilters(filtersStorageKey).selectedLedgerType
+  );
+  const [showInactive, setShowInactive] = useState(
+    () => loadCachedFilters(filtersStorageKey).showInactive
+  );
+  const [viewMode, setViewMode] = useState<"tree" | "flat">(
+    () => loadCachedFilters(filtersStorageKey).viewMode
+  );
+  const [currentPage, setCurrentPage] = useState<number>(
+    () => loadCachedFilters(filtersStorageKey).page
+  );
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        filtersStorageKey,
+        JSON.stringify({
+          searchTerm,
+          selectedLedgerType,
+          showInactive,
+          viewMode,
+          page: currentPage,
+          expandedNodes: [...expandedNodes],
+        })
+      );
+    } catch (e) {
+      console.error("Error caching account code filters:", e);
+    }
+  }, [
+    filtersStorageKey,
+    searchTerm,
+    selectedLedgerType,
+    showInactive,
+    viewMode,
+    currentPage,
+    expandedNodes,
+  ]);
 
   // Delete dialog
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -489,15 +591,28 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
     return pageItems;
   }, [effectiveCurrentPage, totalPages]);
 
+  // Reset to page 1 when a filter actually changes. The ref-guard skips the
+  // initial mount so the page number restored from the cache survives.
+  const filterSignature: string = `${searchTerm}|${selectedLedgerType}|${showInactive}|${viewMode}`;
+  const prevFilterSignatureRef = useRef<string | null>(null);
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, selectedLedgerType, showInactive, viewMode]);
+    if (
+      prevFilterSignatureRef.current !== null &&
+      prevFilterSignatureRef.current !== filterSignature
+    ) {
+      setCurrentPage(1);
+    }
+    prevFilterSignatureRef.current = filterSignature;
+  }, [filterSignature]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
       setCurrentPage(totalPages);
     }
   }, [currentPage, totalPages]);
+
+  // Restore the previous scroll position when returning from an account form.
+  useScrollRestoration(SCROLL_RESTORATION_KEYS[company], !loading);
 
   const handlePageChange = (page: number): void => {
     const nextPage: number = Math.min(Math.max(page, 1), totalPages);

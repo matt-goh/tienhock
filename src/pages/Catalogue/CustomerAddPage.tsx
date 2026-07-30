@@ -310,7 +310,9 @@ const CustomerAddPage: React.FC = () => {
       // --- Post-Save Actions ---
       await Promise.all([refreshCustomersCache(), refreshAccountCodesCache()]);
       toast.success("Customer created successfully!");
-      navigate("/catalogue/customer");
+      // Show the customer just created. `replace` drops this form from history,
+      // so Back from the new customer returns to wherever the user started.
+      navigate(`/catalogue/customer/${newCustomerId}`, { replace: true });
     } catch (error: any) {
       console.error("Error creating customer:", error);
       toast.error(

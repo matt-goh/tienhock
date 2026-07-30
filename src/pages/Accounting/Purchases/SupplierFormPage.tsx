@@ -161,12 +161,22 @@ const SupplierFormPage: React.FC = () => {
       if (isEditMode) {
         await api.put(`/api/suppliers/${id}`, payload);
         toast.success("Supplier updated successfully");
+        goBack();
       } else {
-        await api.post("/api/suppliers", payload);
+        const response: { supplier?: { id: number } } = await api.post(
+          "/api/suppliers",
+          payload
+        );
         toast.success("Supplier created successfully");
+        const newId: number | undefined = response?.supplier?.id;
+        // Show the supplier just created. `replace` drops this form from
+        // history, so Back returns to wherever the user started.
+        if (newId) {
+          navigate(`/accounting/suppliers/${newId}`, { replace: true });
+        } else {
+          goBack();
+        }
       }
-
-      navigate("/accounting/suppliers");
     } catch (err: unknown) {
       console.error("Error saving supplier:", err);
       const errorMessage =

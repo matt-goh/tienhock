@@ -1094,10 +1094,15 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
         toast.success("Journal entry created successfully");
       }
 
-      // Lead the user to the saved entry's details page
-      navigate(
-        entryId ? `${journalEntriesPath}/${entryId}` : journalEntriesPath
-      );
+      // After an edit, return to where the user came from (normally the entry's
+      // own details page). After a create, show the entry just created.
+      if (isEditMode) {
+        goBack();
+      } else if (entryId) {
+        navigate(`${journalEntriesPath}/${entryId}`, { replace: true });
+      } else {
+        goBack();
+      }
     } catch (err: unknown) {
       console.error("Error saving journal entry:", err);
       const errorMessage = err instanceof Error ? err.message : "Unknown error";

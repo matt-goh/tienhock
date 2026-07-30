@@ -177,7 +177,17 @@ const DumpsterFormPage: React.FC = () => {
         });
         toast.success("Dumpster created successfully!");
       }
-      navigate("/greentarget/dumpsters");
+      if (isEditMode) {
+        goBack();
+      } else {
+        // Show the dumpster just created (the route key is its tong number).
+        // `replace` drops this form from history, so Back returns to wherever
+        // the user started.
+        navigate(
+          `/greentarget/dumpsters/${encodeURIComponent(formData.tong_no)}`,
+          { replace: true }
+        );
+      }
     } catch (error: any) {
       if (error.message && error.message.includes("already exists")) {
         toast.error("A dumpster with this number already exists");

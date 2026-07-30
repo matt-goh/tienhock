@@ -1161,15 +1161,29 @@ const JPMonthlyLogEntryPage: React.FC<JPMonthlyLogEntryPageProps> = ({
         deletedLeaveIds: deletedLeaveIds,
       };
 
+      const monthlyBasePath: string = `/jellypolly/payroll/${jobType
+        .toLowerCase()
+        .replace("_", "-")}-monthly`;
+
       if (mode === "edit" && existingWorkLog) {
         await api.put(`/jellypolly/api/monthly-work-logs/${existingWorkLog.id}`, payload);
         toast.success("Monthly work log updated successfully");
+        goBack();
       } else {
-        await api.post("/jellypolly/api/monthly-work-logs", payload);
+        const response: { workLogId?: number } = await api.post(
+          "/jellypolly/api/monthly-work-logs",
+          payload
+        );
         toast.success("Monthly work log created successfully");
+        const newLogId: number | undefined = response?.workLogId;
+        // Show the log just created. `replace` drops this form from history,
+        // so Back returns to wherever the user started.
+        if (newLogId) {
+          navigate(`${monthlyBasePath}/${newLogId}`, { replace: true });
+        } else {
+          goBack();
+        }
       }
-
-      navigate(`/jellypolly/payroll/${jobType.toLowerCase().replace("_", "-")}-monthly`);
     } catch (error: any) {
       console.error("Error saving monthly work log:", error);
       console.error("Error details:", error?.data);
