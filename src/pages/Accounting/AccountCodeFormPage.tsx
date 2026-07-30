@@ -11,6 +11,7 @@ import {
   refreshAccountCodesCache,
 } from "../../utils/accounting/useAccountingCache";
 import BackButton from "../../components/BackButton";
+import { useSmartBack } from "../../hooks/useSmartBack";
 import Button from "../../components/Button";
 import {
   FormInput,
@@ -168,6 +169,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
   const accountCodesPagePath: string = isGreenTarget
     ? "/greentarget/accounting/account-codes"
     : "/accounting/account-codes";
+  const goBack = useSmartBack(accountCodesPagePath);
 
   // Cached reference data
   const { ledgerTypes: allLedgerTypes, isLoading: ledgerTypesLoading } =
@@ -452,12 +454,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
   };
 
   const navigateBack = (): void => {
-    if (window.history.length > 1) {
-      navigate(-1);
-      return;
-    }
-
-    navigate(accountCodesPagePath);
+    goBack();
   };
 
   const handleBackClick = (): void => {
@@ -579,7 +576,16 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
           console.error("Error refreshing account codes cache:", refreshError);
         }
       );
-      navigate(accountCodesPagePath);
+      if (isEditMode) {
+        navigateBack();
+      } else {
+        // Show the account code just created. `replace` drops this form from
+        // history, so Back returns to wherever the user started.
+        navigate(
+          `${accountCodesPagePath}/${encodeURIComponent(submittedAccountCode)}`,
+          { replace: true }
+        );
+      }
     } catch (err: unknown) {
       console.error("Error saving account code:", err);
       const errorMessage = err instanceof Error ? err.message : `Failed to ${isEditMode ? "update" : "create"} account code`;
@@ -591,7 +597,6 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
 
   // Delete handler
   const handleDeleteClick = (): void => {
-    if (isGreenTarget) return;
     if (isSystem) {
       toast.error("Cannot delete system account code");
       return;
@@ -606,7 +611,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
   };
 
   const handleConfirmDelete = async (): Promise<void> => {
-    if (!code || isGreenTarget) return;
+    if (!code) return;
 
     setIsSaving(true);
     try {
@@ -1534,7 +1539,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
 
             {/* Form Actions */}
             <div className="p-6 flex justify-end items-center space-x-3 border-t border-default-200 dark:border-gray-700">
-              {isEditMode && !isGreenTarget && !isSystem && (
+              {isEditMode && !isSystem && (
                 <Button
                   type="button"
                   color="rose"
@@ -1564,16 +1569,14 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
       </div>
 
       {/* Dialogs */}
-      {!isGreenTarget && (
-        <ConfirmationDialog
-          isOpen={showDeleteDialog}
-          onClose={(): void => setShowDeleteDialog(false)}
-          onConfirm={handleConfirmDelete}
-          title="Delete Account Code"
-          message={`Adakah anda pasti mahu memadam akaun "${formData.code}"? Tindakan ini tidak boleh dibatalkan.`}
-          confirmButtonText="Delete"
-        />
-      )}
+      <ConfirmationDialog
+        isOpen={showDeleteDialog}
+        onClose={(): void => setShowDeleteDialog(false)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Account Code"
+        message={`Adakah anda pasti mahu memadam akaun "${formData.code}"? Tindakan ini tidak boleh dibatalkan.`}
+        confirmButtonText="Delete"
+      />
 
       <ConfirmationDialog
         isOpen={pendingNavigation !== null}

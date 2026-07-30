@@ -31,8 +31,30 @@ import {
 import { refreshAccountCodesCache } from "../../utils/accounting/useAccountingCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import BranchLinkageModal from "../../components/Catalogue/BranchLinkageModal";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
+import { usePersistedFilters } from "../../hooks/usePersistedFilters";
 
 const ITEMS_PER_PAGE = 20;
+const FILTERS_STORAGE_KEY = "customerList";
+const SCROLL_RESTORATION_KEY = "customer-list";
+
+interface CustomerListFilters {
+  selectedSalesman: string;
+  page: number;
+}
+
+const getDefaultFilters = (): CustomerListFilters => ({
+  selectedSalesman: "All Salesmen",
+  page: 1,
+});
+
+const reviveFilters = (cached: any): CustomerListFilters => ({
+  selectedSalesman:
+    typeof cached?.selectedSalesman === "string"
+      ? cached.selectedSalesman
+      : "All Salesmen",
+  page: typeof cached?.page === "number" && cached.page >= 1 ? cached.page : 1,
+});
 
 const CustomerPage: React.FC = () => {
   const navigate = useNavigate();
@@ -41,10 +63,20 @@ const CustomerPage: React.FC = () => {
     // Retrieve saved search term from sessionStorage
     return sessionStorage.getItem("customerSearchTerm") || "";
   });
-  const [currentPage, setCurrentPage] = useState(1);
+  // Salesman filter and page persist so returning from a customer form lands
+  // on the same slice of the list.
+  const [filters, setFilters] = usePersistedFilters<CustomerListFilters>(
+    FILTERS_STORAGE_KEY,
+    getDefaultFilters,
+    reviveFilters
+  );
+  const currentPage: number = filters.page;
+  const selectedSalesman: string = filters.selectedSalesman;
+  const setCurrentPage = (page: number): void =>
+    setFilters((prev) => ({ ...prev, page }));
+  const setSelectedSalesman = (salesman: string): void =>
+    setFilters((prev) => ({ ...prev, selectedSalesman: salesman }));
   const [salesmen, setSalesmen] = useState<string[]>(["All Salesmen"]);
-  const [selectedSalesman, setSelectedSalesman] =
-    useState<string>("All Salesmen");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(
     null
@@ -121,9 +153,23 @@ const CustomerPage: React.FC = () => {
     return filteredCustomers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
   }, [filteredCustomers, currentPage]);
 
+  // Reset to page 1 when a filter actually changes. The ref-guard skips the
+  // initial mount so the page number restored from the cache survives.
+  const filterSignature: string = `${searchTerm}|${selectedSalesman}`;
+  const prevFilterSignatureRef = useRef<string | null>(null);
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, selectedSalesman]);
+    if (
+      prevFilterSignatureRef.current !== null &&
+      prevFilterSignatureRef.current !== filterSignature
+    ) {
+      setCurrentPage(1);
+    }
+    prevFilterSignatureRef.current = filterSignature;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterSignature]);
+
+  // Restore the previous scroll position when returning from a customer form.
+  useScrollRestoration(SCROLL_RESTORATION_KEY, !isLoading);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);

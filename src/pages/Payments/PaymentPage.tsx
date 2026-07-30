@@ -17,6 +17,11 @@ import PaymentForm, {
 import PaymentCancellationErrorDialog from "../../components/Invoice/PaymentCancellationErrorDialog";
 import ReceiptDetailsDialog from "../../components/Invoice/ReceiptDetailsDialog";
 import StyledListbox from "../../components/StyledListbox";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
+import {
+  usePersistedFilters,
+  reviveDate,
+} from "../../hooks/usePersistedFilters";
 
 interface PaymentFilters {
   dateRange: {
@@ -27,6 +32,36 @@ interface PaymentFilters {
   status: string | null;
   searchTerm: string;
 }
+
+const FILTERS_STORAGE_KEY = "paymentList";
+
+const getDefaultFilters = (): PaymentFilters => {
+  const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const end = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
+  end.setHours(23, 59, 59, 999); // Set to end of day
+
+  return {
+    dateRange: { start, end },
+    paymentMethod: null,
+    status: "active", // Default to active payments
+    searchTerm: "",
+  };
+};
+
+// Dates survive the JSON round-trip as ISO strings, so rebuild them here.
+// An unusable cache returns null and the default month is used instead.
+const reviveFilters = (cached: any): PaymentFilters | null => {
+  const start = reviveDate(cached?.dateRange?.start);
+  const end = reviveDate(cached?.dateRange?.end);
+  if (!start || !end) return null;
+  return {
+    dateRange: { start, end },
+    paymentMethod:
+      typeof cached.paymentMethod === "string" ? cached.paymentMethod : null,
+    status: typeof cached.status === "string" ? cached.status : null,
+    searchTerm: typeof cached.searchTerm === "string" ? cached.searchTerm : "",
+  };
+};
 
 const PaymentPage: React.FC = () => {
   const navigate = useNavigate();
@@ -64,25 +99,23 @@ const PaymentPage: React.FC = () => {
     }
   };
 
-  const [filters, setFilters] = useState<PaymentFilters>(() => {
-    const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const end = new Date(
-      new Date().getFullYear(),
-      new Date().getMonth() + 1,
-      0
-    );
-    end.setHours(23, 59, 59, 999); // Set to end of day
+  // Keep the deep-link param in sync when a group is opened from the table, so
+  // returning from a journal entry re-opens the same payment group dialog.
+  const handleViewPaymentGroup = (receiptId: number): void => {
+    setSelectedReceiptId(receiptId);
+    if (searchParams.get("receipt") !== String(receiptId)) {
+      searchParams.set("receipt", String(receiptId));
+      setSearchParams(searchParams, { replace: true });
+    }
+  };
 
-    return {
-      dateRange: {
-        start,
-        end,
-      },
-      paymentMethod: null,
-      status: "active", // Default to active payments
-      searchTerm: "",
-    };
-  });
+  // Filters persist across navigation so returning from an invoice/journal
+  // lands on the same month, method and status the user was looking at.
+  const [filters, setFilters] = usePersistedFilters<PaymentFilters>(
+    FILTERS_STORAGE_KEY,
+    getDefaultFilters,
+    reviveFilters
+  );
 
   // Fetch payments
   const fetchPayments = useCallback(async () => {
@@ -139,6 +172,9 @@ const PaymentPage: React.FC = () => {
   useEffect(() => {
     fetchPayments();
   }, [fetchPayments]);
+
+  // Restore the previous scroll position when returning (e.g. from a journal entry).
+  useScrollRestoration("payment-list", !loading);
 
   // Unified Time Navigator change handler. Handles day, month, and custom-range
   // selections from the single TimeNavigator control.
@@ -310,7 +346,7 @@ const PaymentPage: React.FC = () => {
           onRefresh={fetchPayments}
           onCancellationError={setPaymentCancellationError}
           onAddPaymentToGroup={handleAddPaymentToGroup}
-          onViewPaymentGroup={setSelectedReceiptId}
+          onViewPaymentGroup={handleViewPaymentGroup}
           requiresClearanceDate
         />
       )}
@@ -319,7 +355,7 @@ const PaymentPage: React.FC = () => {
         error={paymentCancellationError}
         onClose={() => setPaymentCancellationError(null)}
         onViewPaymentGroup={(receiptId: number): void => {
-          setSelectedReceiptId(receiptId);
+          handleViewPaymentGroup(receiptId);
           setPaymentCancellationError(null);
         }}
         onViewJournal={(journalEntryId: number): void => {

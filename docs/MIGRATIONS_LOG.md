@@ -30,6 +30,25 @@ requires separate approval).
 
 ---
 
+## Removed 30 Jul 2026 (third batch) — 2 files (GT customer billing address + PBB1 removal)
+
+Applied to **dev and production** on 2026-07-30 (prod runs by the user), then removed per the project
+convention. Both existed at commit **`971c157c`** — recover with
+`git show 971c157c:dev/migrations/<filename>`.
+
+Dev state verified at removal: `greentarget.customers.billing_address` exists as nullable `text`
+(0 customers have one keyed yet, so every invoice/e-Invoice still bills to its rental locations);
+`greentarget.account_codes` = **502** rows with no `PBB1`, and
+`greentarget.account_opening_balances` = **500** rows summing to exactly **0.00** with no `PBB1`
+fence. Reruns are clean no-ops (`ADD COLUMN IF NOT EXISTS`; `PBB1 already removed - nothing to do`).
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-07-30_greentarget_customer_billing_address.sql` | Added `greentarget.customers.billing_address` (nullable `text`) — a customer's office/billing address, separate from their service/pickup locations. When set, GT invoice PDFs and individual sales/adjustment e-Invoices bill to it instead of the rental location addresses, and pickup Sites are **not** appended to the e-Invoice address lines; NULL = the previous behaviour (bill to the rental location address(es)). Single `ALTER TABLE … ADD COLUMN IF NOT EXISTS` — no data written, no default, no constraint, nothing else touched, so a rerun is an exact no-op. Companion code: the GT customer form field, `GTInvoicePDF.tsx`, and the individual e-Invoice address builder. Schema note: `CLAUDE.md`/`AGENTS.md` `greentarget.customers`; changelog entry shipped 2026-07-30. | dev ✓, prod ✓ (both 2026-07-30) |
+| `2026-07-30_greentarget_remove_pbb1.sql` | Removed the dormant duplicate bank account **`PBB1`** from the GT chart. `PBB_1` is the real, active account (594 journal lines, opening anchor 19,797.31); `PBB1` was a G3-seeded lookalike with the **identical** description (`PBB-A/C:3137836814 (BW)`), **zero** journal lines and a single **0.00** opening fence, so its removal changes no balance and no report total — it simply stops printing as a 0.00 Trial Balance row. Deleted the zero fence, then the account, through the same guards as the new GT delete endpoint: refuses a system account, an account with children, an account with any journal line, and an account whose opening anchors are multiple or non-zero; post-check asserts the anchor set still sums to exactly 0.00. Guarded, idempotent, fail-closed, one transaction. **Do not rerun the G3 chart load after this** — `ON CONFLICT DO NOTHING` would re-create `PBB1`; the removal is instead recorded as approved in the verifiers (`REMOVED_SEEDS` in `verify-chart.mjs`, `REMOVED_ZERO_FENCES` in `verify-import.mjs`, and the `NOT IN (VALUES ('PBB1'))` filters in `verify-import.sql`, whose G4 gate now expects 500 anchors), and `build-chart.mjs` trap 2 still requires both codes in the *generated* payload. Schema notes: `CLAUDE.md`/`AGENTS.md` `greentarget.account_codes` + `greentarget.account_opening_balances`. Narrative: [Account/GT_ACCOUNTING_HANDOVER.md](Account/GT_ACCOUNTING_HANDOVER.md) "Post-G7 — Chart of Accounts maintenance"; changelog entry shipped 2026-07-30. | dev ✓, prod ✓ (both 2026-07-30) |
+
+---
+
 ## Removed 30 Jul 2026 (second batch) — 2 files (GT manual payment types + rental add-ons removal)
 
 Applied to **dev and production** on 2026-07-30 (prod runs by the user), then removed per the project

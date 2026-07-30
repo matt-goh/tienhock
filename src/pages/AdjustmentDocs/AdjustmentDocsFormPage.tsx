@@ -12,6 +12,7 @@ import {
 } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import BackButton from "../../components/BackButton";
+import { useSmartBack } from "../../hooks/useSmartBack";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { FormInput, FormListbox } from "../../components/FormComponents";
@@ -193,6 +194,7 @@ const getMaxCreditNoteAmount = (sourceInvoice: ExtendedInvoiceData): number =>
 const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
   const navigate = useNavigate();
   const paths = getAdjustmentDocsPaths(company);
+  const goBack = useSmartBack(paths.uiBase);
   const [params, setParams] = useSearchParams();
   const type = parseType(params.get("type"));
   const urlInvoiceId = params.get("invoiceId") || "";
@@ -935,7 +937,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
     if (isFormDirty && !isSaving) {
       setShowBackConfirm(true);
     } else {
-      navigate(invoice ? `${paths.invoiceUiBase}/${invoice.id}` : paths.uiBase);
+      goBack();
     }
   };
 
@@ -962,7 +964,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700">
           <div className="px-6 py-3 border-b border-default-200 dark:border-gray-700 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
             <div className="flex items-center gap-3">
-              <BackButton onClick={() => navigate(paths.uiBase)} />
+              <BackButton fallbackPath={paths.uiBase} />
               <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
               <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
                 {TYPE_LABEL[type]} Baru - Pilih Invois
@@ -1584,9 +1586,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
       <ConfirmationDialog
         isOpen={showBackConfirm}
         onClose={() => setShowBackConfirm(false)}
-        onConfirm={() =>
-          navigate(invoice ? `${paths.invoiceUiBase}/${invoice.id}` : paths.uiBase)
-        }
+        onConfirm={goBack}
         title="Discard Draft"
         message="Are you sure you want to leave? Your changes will be lost."
         confirmButtonText="Discard"

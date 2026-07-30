@@ -289,9 +289,7 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
         title="View journal entry"
       >
         <IconReceipt size={14} />
-        <span className="font-mono">
-          {payment.journal_reference_no || `#${payment.journal_entry_id}`}
-        </span>
+        <span>View Journal</span>
       </button>
     ) : (
       <span className="text-xs text-gray-400 dark:text-gray-500">-</span>

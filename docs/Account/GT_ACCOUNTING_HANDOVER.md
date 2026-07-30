@@ -17,8 +17,9 @@ backend-clone question and produced the §3d operational bridge
 nav section (Journal Entries, Account Ledger, Trial Balance, Income Statement, Balance Sheet, Chart
 of Accounts) runs the shared TH pages over GT route clones, and the GT Debtors report is re-pointed
 at the imported ledger (June 2026 total RM156,782.22). G7 enabled journal maintenance, and the
-28 Jul follow-up enabled Chart of Accounts create/edit maintenance while keeping codes immutable
-and providing no delete workflow. **G7 shipped organic posting: GT
+28 Jul follow-up enabled Chart of Accounts create/edit maintenance while keeping codes immutable,
+and the 30 Jul follow-up added a guarded delete workflow (TH-parity blocks plus an opening-anchor
+block). **G7 shipped organic posting: GT
 invoices, payments and adjustments dated on/after 2026-07-01 now own balanced journals in the
 `greentarget` schema, manual journals are keyed from the shared Journal pages, and the R8 posting
 lock protects every pre-July accounting mutation. The 29 Jul payment-entry follow-up deliberately
@@ -306,7 +307,8 @@ Do not re-litigate these.
 
 **R6 clarification (28 Jul 2026):** authorised users may manually create a GT account from Chart of
 Accounts, including a manually approved debtor child. R6 still forbids *automatic* account creation
-by invoice/payment posting or a customer sync. The application never renames or deletes a code; a
+by invoice/payment posting or a customer sync. The application never renames a code; deletion is
+possible only through the guarded Chart of Accounts delete (see "Live maintenance policy"), and a
 posted service must continue to resolve an already-existing active account.
 
 ### The seven blocking questions — ANSWERED 25 Jul 2026
@@ -1456,8 +1458,19 @@ the same way. The other legacy accounts remain roots because that is the structu
   changes reject self/descendant cycles and recalculate the branch's denormalised `level` values.
   Every save supplies the row's `expected_updated_at`; a stale edit receives 409 and must reload
   instead of silently overwriting another user's work.
-- The account code is the immutable identity. It is disabled on edit, the API rejects a rename, and
-  GT has no delete endpoint or delete button.
+- The account code is the immutable identity. It is disabled on edit and the API rejects a rename.
+  Delete (30 Jul 2026) mirrors Tien Hock: the shared pages show a delete button/dialog and
+  `DELETE /greentarget/api/account-codes/:code` blocks system accounts, accounts with children and
+  accounts with journal lines, and — stricter than TH, matching the deactivation guard below —
+  also blocks accounts carrying an opening anchor, so a delete can never strand ledger history.
+  Seed deletions must additionally be recorded as approved removals in the import verifiers
+  (`REMOVED_SEEDS` in `verify-chart.mjs`, `REMOVED_ZERO_FENCES` in `verify-import.mjs` and the
+  exclusion filters in `verify-import.sql`), or the next fixture-backed verify run fails on the
+  missing seed. First instance, same day: the dormant duplicate `PBB1` (identical description to
+  `PBB_1`, zero journal lines, a single 0.00 opening fence) was removed via
+  `dev/migrations/2026-07-30_greentarget_remove_pbb1.sql` after its fence was deleted; the live
+  chart is now 502 seeds and 500 anchors, still summing to exactly 0.00. A G3 chart-load rerun
+  would re-create it via `ON CONFLICT DO NOTHING` — do not rerun the load.
 - A system account keeps its active status, parent, ledger type and report note. An ordinary account
   with journal history or an opening anchor must remain active so historical balances stay visible;
   an account with children must be emptied/re-parented before deactivation.

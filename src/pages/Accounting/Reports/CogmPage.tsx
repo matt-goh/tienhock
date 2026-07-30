@@ -8,6 +8,8 @@ import ReportSourceGuide from "../../../components/Accounting/ReportSourceGuide"
 import { api } from "../../../routes/utils/api";
 import { generateCogmPDF } from "../../../utils/accounting/CogmPDF";
 import toast from "react-hot-toast";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
+import { usePersistedMonth } from "../../../hooks/usePersistedFilters";
 
 interface LineItem {
   note: string;
@@ -47,10 +49,9 @@ const CogmPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState<boolean>(false);
 
-  const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
+  // The selected month persists so returning to the report reopens the period
+  // the user was reading.
+  const [selectedMonth, setSelectedMonth] = usePersistedMonth("cogmMonth");
 
   const fetchData = useCallback(async (): Promise<void> => {
     const year = selectedMonth.getFullYear();
@@ -72,6 +73,9 @@ const CogmPage: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // The statement is long; restore the reading position on return.
+  useScrollRestoration("cogm", !loading && !!data);
 
   const handleMonthChange = (newMonth: Date): void => {
     setSelectedMonth(newMonth);

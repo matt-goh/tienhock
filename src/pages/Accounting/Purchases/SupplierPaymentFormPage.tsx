@@ -4,6 +4,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { IconX } from "@tabler/icons-react";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import Button from "../../../components/Button";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import { FormInput, FormListbox } from "../../../components/FormComponents";
@@ -333,7 +334,7 @@ const SupplierPaymentFormPage: React.FC = () => {
       if (newId) {
         navigate(`/accounting/supplier-payments/${newId}`, { replace: true });
       } else {
-        navigate("/accounting/supplier-payments");
+        goBack();
       }
     } catch (error: unknown) {
       console.error("Error recording supplier payment:", error);
@@ -368,6 +369,7 @@ const SupplierPaymentFormPage: React.FC = () => {
   const backUrl: string = isEditMode
     ? "/accounting/supplier-payments"
     : invoiceUrl || "/accounting/supplier-payments";
+  const goBack = useSmartBack(backUrl);
 
   if (loading) {
     return (
@@ -381,7 +383,7 @@ const SupplierPaymentFormPage: React.FC = () => {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <BackButton onClick={() => navigate(backUrl)} />
+          <BackButton fallbackPath={backUrl} />
           <span className="text-default-300 dark:text-gray-600">|</span>
           <div>
             <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">

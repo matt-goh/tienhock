@@ -27,6 +27,11 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import { useAuth } from "../../../contexts/AuthContext";
 import Checkbox from "../../../components/Checkbox";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
+import { usePersistedFilters } from "../../../hooks/usePersistedFilters";
+
+const FILTERS_STORAGE_KEY = "gtCustomerList";
+const SCROLL_RESTORATION_KEY = "gt-customer-list";
 
 interface CustomerLocationSummary {
   location_id: number;
@@ -80,6 +85,28 @@ const PAYMENT_LABELS: Record<Signup["payment_method"], string> = {
   qr: "QR",
 };
 
+interface CustomerListFilters {
+  activeSignupTab: StatusTab;
+  searchTerm: string;
+  showInactive: boolean;
+}
+
+const getDefaultFilters = (): CustomerListFilters => ({
+  activeSignupTab: "pending",
+  searchTerm: "",
+  showInactive: true,
+});
+
+const reviveFilters = (cached: any): CustomerListFilters => ({
+  activeSignupTab:
+    cached?.activeSignupTab === "processed" ||
+    cached?.activeSignupTab === "rejected"
+      ? cached.activeSignupTab
+      : "pending",
+  searchTerm: typeof cached?.searchTerm === "string" ? cached.searchTerm : "",
+  showInactive: cached?.showInactive !== false,
+});
+
 const SIGNUP_TABS: { key: StatusTab; label: string }[] = [
   { key: "pending", label: "Pending" },
   { key: "processed", label: "Processed" },
@@ -90,10 +117,23 @@ const CustomerListPage = (): JSX.Element => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // Signup tab, search and the inactive toggle persist so returning from a
+  // customer form keeps the same view.
+  const [filters, setFilters] = usePersistedFilters<CustomerListFilters>(
+    FILTERS_STORAGE_KEY,
+    getDefaultFilters,
+    reviveFilters
+  );
+  const { activeSignupTab, searchTerm, showInactive } = filters;
+  const setActiveSignupTab = (tab: StatusTab): void =>
+    setFilters((prev) => ({ ...prev, activeSignupTab: tab }));
+  const setSearchTerm = (value: string): void =>
+    setFilters((prev) => ({ ...prev, searchTerm: value }));
+  const setShowInactive = (value: boolean): void =>
+    setFilters((prev) => ({ ...prev, showInactive: value }));
+
   const [signups, setSignups] = useState<Signup[]>([]);
   const [signupsLoading, setSignupsLoading] = useState<boolean>(true);
-  const [activeSignupTab, setActiveSignupTab] =
-    useState<StatusTab>("pending");
   const [signupToConvert, setSignupToConvert] = useState<Signup | null>(null);
   const [signupToReject, setSignupToReject] = useState<Signup | null>(null);
   const [signupToDelete, setSignupToDelete] = useState<Signup | null>(null);
@@ -102,12 +142,10 @@ const CustomerListPage = (): JSX.Element => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState<string>("");
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(
     null
   );
   const [showDeleteDialog, setShowDeleteDialog] = useState<boolean>(false);
-  const [showInactive, setShowInactive] = useState<boolean>(true);
 
   const fetchSignups = useCallback(async (): Promise<void> => {
     try {
@@ -131,6 +169,9 @@ const CustomerListPage = (): JSX.Element => {
   useEffect((): void => {
     fetchCustomers();
   }, []);
+
+  // Restore the previous scroll position when returning from a customer form.
+  useScrollRestoration(SCROLL_RESTORATION_KEY, !loading);
 
   const fetchCustomers = async (): Promise<void> => {
     try {

@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { Customer, CustomProduct } from "../../types/types"; // Removed Employee if not used
 import BackButton from "../../components/BackButton";
+import { useSmartBack } from "../../hooks/useSmartBack";
 import Button from "../../components/Button";
 import {
   FormInput,
@@ -22,6 +23,7 @@ import LoadingSpinner from "../../components/LoadingSpinner"; // Import LoadingS
 
 const CustomerAddPage: React.FC = () => {
   const navigate = useNavigate();
+  const goBack = useSmartBack("/catalogue/customer");
   // State for custom products specific to this new customer
   const [customProducts, setCustomProducts] = useState<CustomProduct[]>([]); // Renamed for clarity
   const { salesmen: salesmenData, isLoading: salesmenLoading } =
@@ -131,13 +133,13 @@ const CustomerAddPage: React.FC = () => {
     if (isFormChanged) {
       setShowBackConfirmation(true);
     } else {
-      navigate("/catalogue/customer");
+      goBack();
     }
   };
 
   const handleConfirmBack = () => {
     setShowBackConfirmation(false);
-    navigate("/catalogue/customer");
+    goBack();
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -308,7 +310,9 @@ const CustomerAddPage: React.FC = () => {
       // --- Post-Save Actions ---
       await Promise.all([refreshCustomersCache(), refreshAccountCodesCache()]);
       toast.success("Customer created successfully!");
-      navigate("/catalogue/customer");
+      // Show the customer just created. `replace` drops this form from history,
+      // so Back from the new customer returns to wherever the user started.
+      navigate(`/catalogue/customer/${newCustomerId}`, { replace: true });
     } catch (error: any) {
       console.error("Error creating customer:", error);
       toast.error(

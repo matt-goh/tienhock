@@ -16,6 +16,7 @@ import {
   roundMoney,
 } from "../../utils/moneyUtils";
 import BackButton from "../../components/BackButton";
+import { useSmartBack } from "../../hooks/useSmartBack";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
@@ -40,6 +41,7 @@ import SubmissionResultsModal from "../../components/Invoice/SubmissionResultsMo
 
 const InvoiceFormPage: React.FC = () => {
   const navigate = useNavigate();
+  const goBack = useSmartBack("/sales/invoice");
 
   // --- State ---
   const [invoiceData, setInvoiceData] = useState<ExtendedInvoiceData | null>(
@@ -356,13 +358,13 @@ const InvoiceFormPage: React.FC = () => {
     if (isFormDirty && !isSaving) {
       setShowBackConfirmation(true);
     } else if (!isSaving) {
-      navigate("/sales/invoice");
+      goBack();
     }
   };
   const handleConfirmBack = () => {
     // Logic remains the same
     setShowBackConfirmation(false);
-    navigate("/sales/invoice");
+    goBack();
   };
 
   const handleHeaderInputChange = useCallback(

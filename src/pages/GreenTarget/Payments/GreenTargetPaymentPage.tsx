@@ -11,6 +11,11 @@ import StyledListbox from "../../../components/StyledListbox";
 import TimeNavigator from "../../../components/TimeNavigator";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import { GreenTargetPayment } from "../../../types/greenTargetTypes";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
+import {
+  usePersistedFilters,
+  reviveDate,
+} from "../../../hooks/usePersistedFilters";
 
 interface PaymentFilters {
   dateRange: {
@@ -21,6 +26,38 @@ interface PaymentFilters {
   status: string | null;
   searchTerm: string;
 }
+
+const FILTERS_STORAGE_KEY = "gtPaymentList";
+const SCROLL_RESTORATION_KEY = "gt-payment-list";
+
+const getDefaultFilters = (): PaymentFilters => {
+  const now: Date = new Date();
+  const start: Date = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end: Date = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  end.setHours(23, 59, 59, 999);
+
+  return {
+    dateRange: { start, end },
+    paymentMethod: null,
+    status: "active",
+    searchTerm: "",
+  };
+};
+
+// Dates survive the JSON round-trip as ISO strings, so rebuild them here.
+// An unusable cache returns null and the default month is used instead.
+const reviveFilters = (cached: any): PaymentFilters | null => {
+  const start: Date | null = reviveDate(cached?.dateRange?.start);
+  const end: Date | null = reviveDate(cached?.dateRange?.end);
+  if (!start || !end) return null;
+  return {
+    dateRange: { start, end },
+    paymentMethod:
+      typeof cached.paymentMethod === "string" ? cached.paymentMethod : null,
+    status: typeof cached.status === "string" ? cached.status : null,
+    searchTerm: typeof cached.searchTerm === "string" ? cached.searchTerm : "",
+  };
+};
 
 const getReceiptGroupKey = (payment: GreenTargetPayment): string => {
   if (!payment.internal_reference) {
@@ -52,19 +89,13 @@ const GreenTargetPaymentPage: React.FC = () => {
   const [selectedPayment, setSelectedPayment] =
     useState<GreenTargetPayment | null>(null);
 
-  const [filters, setFilters] = useState<PaymentFilters>(() => {
-    const now: Date = new Date();
-    const start: Date = new Date(now.getFullYear(), now.getMonth(), 1);
-    const end: Date = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    end.setHours(23, 59, 59, 999);
-
-    return {
-      dateRange: { start, end },
-      paymentMethod: null,
-      status: "active",
-      searchTerm: "",
-    };
-  });
+  // Filters persist across navigation so returning from an invoice lands on
+  // the same month, method and status the user was looking at.
+  const [filters, setFilters] = usePersistedFilters<PaymentFilters>(
+    FILTERS_STORAGE_KEY,
+    getDefaultFilters,
+    reviveFilters
+  );
 
   const fetchPayments = useCallback(async (): Promise<void> => {
     setLoading(true);
@@ -189,6 +220,9 @@ const GreenTargetPaymentPage: React.FC = () => {
   useEffect((): void => {
     void fetchPayments();
   }, [fetchPayments]);
+
+  // Restore the previous scroll position when returning (e.g. from an invoice).
+  useScrollRestoration(SCROLL_RESTORATION_KEY, !loading);
 
   const handleTimeNavigatorChange = useCallback(
     (range: { start: Date; end: Date }): void => {

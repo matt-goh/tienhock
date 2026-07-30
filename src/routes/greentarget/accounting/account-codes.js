@@ -1,9 +1,11 @@
 // src/routes/greentarget/accounting/account-codes.js
 //
 // Green Target Account Code + Ledger Type routes. The account-code reads clone
-// the shared Tien Hock page contract, while POST / and PUT /:code provide the
-// deliberately smaller GT mutation surface: account codes cannot be renamed
-// or deleted, but their accounting metadata can be maintained. Every query is
+// the shared Tien Hock page contract, while POST /, PUT /:code and
+// DELETE /:code provide the GT mutation surface: account codes cannot be
+// renamed, deletion is guarded like Tien Hock's (system accounts, parents
+// with children, and accounts with journal lines or opening anchors are
+// blocked), and accounting metadata can be maintained. Every query is
 // explicitly schema-qualified so no GT request can touch Tien Hock's chart.
 //
 // GT's chart is flat except the DEBTOR control + its 28 children, and its
@@ -448,7 +450,7 @@ export default function createGreenTargetAccountCodesRouter(pool) {
   });
 
   // POST / - Create a GT account. Codes are normalized once at creation and
-  // remain immutable thereafter; delete is deliberately not exposed.
+  // remain immutable thereafter.
   router.post("/", async (req, res) => {
     const body =
       req.body && typeof req.body === "object" && !Array.isArray(req.body)
@@ -696,7 +698,7 @@ export default function createGreenTargetAccountCodesRouter(pool) {
   });
 
   // PUT /:code - Update accounting metadata. The route key is authoritative;
-  // any attempted rename is rejected and no delete endpoint exists.
+  // any attempted rename is rejected.
   router.put("/:code", async (req, res) => {
     const { code } = req.params;
     const body =
@@ -1136,6 +1138,118 @@ export default function createGreenTargetAccountCodesRouter(pool) {
 
       res.status(500).json({
         message: "Error updating Green Target account code",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  // DELETE /:code - Delete a GT account code. Mirrors the Tien Hock delete:
+  // system accounts, parents with children, and accounts with accounting
+  // history are blocked. GT additionally blocks accounts carrying an opening
+  // balance anchor (consistent with its stricter deactivation guard), so a
+  // delete can never strand ledger history or an anchor. The parent self-FK
+  // is ON DELETE SET NULL, but the children check fires first so a delete
+  // never silently orphans a branch.
+  router.delete("/:code", async (req, res) => {
+    const { code } = req.params;
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "LOCK TABLE greentarget.account_codes IN SHARE ROW EXCLUSIVE MODE"
+      );
+
+      const accountResult = await client.query(
+        `SELECT is_system
+         FROM greentarget.account_codes
+         WHERE code = $1
+         FOR UPDATE`,
+        [code]
+      );
+      if (accountResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({
+          message: `Account code '${code}' not found`,
+        });
+      }
+      if (accountResult.rows[0].is_system) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: "Cannot delete system account code",
+        });
+      }
+
+      const usageResult = await client.query(
+        `SELECT
+           EXISTS (
+             SELECT 1
+             FROM greentarget.account_codes
+             WHERE parent_code = $1
+           ) AS has_children,
+           EXISTS (
+             SELECT 1
+             FROM greentarget.journal_entry_lines
+             WHERE account_code = $1
+           ) AS has_journal_lines,
+           EXISTS (
+             SELECT 1
+             FROM greentarget.account_opening_balances
+             WHERE account_code = $1
+           ) AS has_opening_balance`,
+        [code]
+      );
+      const usage = usageResult.rows[0];
+
+      if (usage.has_children) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message:
+            "Cannot delete account with child accounts. Delete children first or reassign them.",
+        });
+      }
+      if (usage.has_journal_lines) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message:
+            "Cannot delete account that has been used in journal entries. Its balances must stay visible in Green Target reports.",
+        });
+      }
+      if (usage.has_opening_balance) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message:
+            "Cannot delete account that carries an opening balance. Its balances must stay visible in Green Target reports.",
+        });
+      }
+
+      const result = await client.query(
+        `DELETE FROM greentarget.account_codes
+         WHERE code = $1
+         RETURNING code`,
+        [code]
+      );
+
+      await client.query("COMMIT");
+      res.json({
+        message: "Account code deleted successfully",
+        code: result.rows[0].code,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error deleting Green Target account code:", error);
+
+      if (error.code === "23503") {
+        return res.status(409).json({
+          message:
+            "This account is still referenced by other Green Target records and cannot be deleted.",
+        });
+      }
+
+      res.status(500).json({
+        message: "Error deleting Green Target account code",
         error: error.message,
       });
     } finally {

@@ -36,9 +36,16 @@ import { generateGTAdjustmentDocPDFFilename } from "../../../utils/greenTarget/P
 import { generateGTAdjustmentDocPDFBlob } from "../../../utils/greenTarget/PDF/AdjustmentDocs/GTAdjustmentDocPDFHandler";
 import { GTAdjustmentDocFull } from "../../../services/gt-adjustment-doc-pdf.service";
 import { formatAdjustmentDocId } from "../../../utils/adjustments/formatDocId";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
+import {
+  usePersistedFilters,
+  reviveDate,
+} from "../../../hooks/usePersistedFilters";
 
 const API_BASE = "/greentarget/api/adjustment-docs";
 const UI_BASE = "/greentarget/adjustment-docs";
+const FILTERS_STORAGE_KEY = "gtAdjustmentDocsList";
+const SCROLL_RESTORATION_KEY = "gt-adjustment-docs-list";
 
 interface GTAdjDoc {
   id: string;
@@ -80,6 +87,37 @@ const TYPE_TABS: Array<{ id: FilterState["type"]; label: string; icon: any }> = 
   { id: "credit_note", label: "CN", icon: IconFileMinus },
   { id: "refund_note", label: "RN", icon: IconRotate2 },
 ];
+
+const TYPE_TAB_IDS: string[] = TYPE_TABS.map((tab) => tab.id);
+
+const getDefaultFilters = (): FilterState => {
+  const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const end = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
+  end.setHours(23, 59, 59, 999);
+  return {
+    type: "all",
+    dateRange: { start, end },
+    einvoiceStatus: null,
+    status: "active",
+    searchTerm: "",
+  };
+};
+
+// Dates survive the JSON round-trip as ISO strings, so rebuild them here.
+// An unusable cache returns null and the default month is used instead.
+const reviveFilters = (cached: any): FilterState | null => {
+  const start = reviveDate(cached?.dateRange?.start);
+  const end = reviveDate(cached?.dateRange?.end);
+  if (!start || !end) return null;
+  return {
+    type: TYPE_TAB_IDS.includes(cached.type) ? cached.type : "all",
+    dateRange: { start, end },
+    einvoiceStatus:
+      typeof cached.einvoiceStatus === "string" ? cached.einvoiceStatus : null,
+    status: typeof cached.status === "string" ? cached.status : null,
+    searchTerm: typeof cached.searchTerm === "string" ? cached.searchTerm : "",
+  };
+};
 
 function toIsoDate(d: Date): string {
   const y = d.getFullYear();
@@ -147,22 +185,13 @@ const GTAdjustmentDocsListPage: React.FC = () => {
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
 
-  const [filters, setFilters] = useState<FilterState>(() => {
-    const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const end = new Date(
-      new Date().getFullYear(),
-      new Date().getMonth() + 1,
-      0
-    );
-    end.setHours(23, 59, 59, 999);
-    return {
-      type: "all",
-      dateRange: { start, end },
-      einvoiceStatus: null,
-      status: "active",
-      searchTerm: "",
-    };
-  });
+  // Filters persist so returning from a document detail page keeps the same
+  // tab, month, status and search the user had set.
+  const [filters, setFilters] = usePersistedFilters<FilterState>(
+    FILTERS_STORAGE_KEY,
+    getDefaultFilters,
+    reviveFilters
+  );
 
   const fetchDocs = useCallback(async () => {
     setLoading(true);
@@ -196,6 +225,9 @@ const GTAdjustmentDocsListPage: React.FC = () => {
   useEffect(() => {
     fetchDocs();
   }, [fetchDocs]);
+
+  // Restore the previous scroll position when returning from a document.
+  useScrollRestoration(SCROLL_RESTORATION_KEY, !loading);
 
   // Unified Time Navigator change handler. Handles day, month, and custom-range
   // selections from the single TimeNavigator control.

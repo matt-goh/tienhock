@@ -20,6 +20,7 @@ export default function (pool) {
         c.email,
         c.state,
         c.additional_info,
+        c.billing_address,
         COALESCE((
           SELECT json_agg(
             json_build_object(
@@ -62,6 +63,7 @@ export default function (pool) {
       email,
       state,
       additional_info,
+      billing_address,
     } = req.body;
 
     if (!name) {
@@ -78,9 +80,10 @@ export default function (pool) {
         id_number, 
         email, 
         state,
-        additional_info
+        additional_info,
+        billing_address
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
     `;
       const result = await pool.query(query, [
@@ -92,6 +95,7 @@ export default function (pool) {
         email || null,
         state || "12",
         additional_info || null, // Add this line
+        billing_address || null,
       ]);
 
       res.status(201).json({
@@ -119,6 +123,7 @@ export default function (pool) {
       email,
       state,
       additional_info,
+      billing_address,
     } = req.body;
 
     try {
@@ -133,8 +138,9 @@ export default function (pool) {
         email = $6,
         state = $7,
         additional_info = $8,
+        billing_address = $9,
         last_activity_date = CURRENT_DATE
-      WHERE customer_id = $9
+      WHERE customer_id = $10
       RETURNING *
     `;
       const result = await pool.query(query, [
@@ -146,6 +152,7 @@ export default function (pool) {
         email || null,
         state || "12",
         additional_info || null,
+        billing_address || null,
         id,
       ]);
 

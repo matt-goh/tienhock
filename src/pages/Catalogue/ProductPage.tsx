@@ -22,6 +22,8 @@ import {
 import { FormListbox } from "../../components/FormComponents";
 import { useCustomersCache } from "../../utils/catalogue/useCustomerCache";
 import CustomersUsingProductTooltip from "../../components/Catalogue/CustomersUsingProductTooltip";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
+import { usePersistedFilters } from "../../hooks/usePersistedFilters";
 
 interface Product {
   id: string;
@@ -50,7 +52,13 @@ const ProductPage: React.FC = () => {
   const [productToReactivate, setProductToReactivate] = useState<Product | null>(null);
   const [hardDeleteConfirmOpen, setHardDeleteConfirmOpen] = useState<boolean>(false);
   const [productToHardDelete, setProductToHardDelete] = useState<Product | null>(null);
-  const [typeFilter, setTypeFilter] = useState<string>("all");
+  // The product-type filter persists so returning to the page keeps the same
+  // slice of the catalogue.
+  const [typeFilter, setTypeFilter] = usePersistedFilters<string>(
+    "productListTypeFilter",
+    () => "all",
+    (cached) => (typeof cached === "string" ? cached : null)
+  );
   const {
     customers,
     isLoading: isCustomersLoading,
@@ -109,6 +117,9 @@ const ProductPage: React.FC = () => {
       toast.error("Failed to load products. Please try refreshing.");
     }
   }, [cacheError]);
+
+  // The catalogue is a single long table; restore the scroll position on return.
+  useScrollRestoration("product-list", !cacheLoading && products.length > 0);
 
   const handleCreateProduct = useCallback(() => {
     setModalMode("create");

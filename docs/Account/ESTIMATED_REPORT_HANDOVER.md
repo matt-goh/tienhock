@@ -2,15 +2,21 @@
 
 Status: **ALL PHASES COMPLETE — production rollout done 2026-07-28 (§9.4 checklist executed during the GT G8 window); the report is live** | Started: 2026-07-23 | Owner: Kimi (planning/Q&A) → Claude (Phase 1) → Claude (Phase 2) → GPT-5.6 Sol (Phase 3) → Kimi (Phase 4) → Kimi (Phase 5)
 
-Phase 3 runs the shipped engine against the complete June fixture with **392 exact
-checks, 70 explicitly derived/documented deltas and 0 failures** (§9). Both approved
+Phase 3 runs the shipped engine against the complete June fixture with **415 exact
+checks, 57 explicitly derived/documented deltas and 0 failures** (§9). Both approved
 data fixes are applied to dev and production through a guarded, idempotent migration
 (prod: 2026-07-28, re-pinned read-only first, ALREADY FINAL on rerun). Every remaining
 delta is explicitly classified and gated — no formula
-or mapping guess was added. Q15 was resolved on 2026-07-28 (co-worker keyed the
-mis-posted RM40 diesel difference correctly in production — see §2 item 15); Q14
-remains deliberately deferred under §7.2 and can be corrected from source evidence
-during any later phase.
+or mapping guess was added. **Q14 and Q15 are both CLOSED and verified against the
+fresh production import on 2026-07-30**: Q15 was the mis-posted RM40 diesel difference
+(§2 item 15), and Q14 was three June MEE label/sticker rows keyed at their stale
+material default rate (§2 item 14). No open co-worker question remains. **The §9.5
+JAGUNG fork is RESOLVED (2026-07-30): the boss confirmed her handwritten JAGUNG
+figures are the true physical counts (the keyed May/June counts were one-digit
+typos), a guarded migration corrected both rows and keyed the June Add Backs, the
+fixture/verifier were re-based onto the corrected profile, and the verifier is green
+(415 exact / 57 deltas / 0 failures). PU_MSD 540.00 final decision: no journal, ever —
+the boss absorbs it in the Add Back input.** Production still needs the migration.
 
 This doc tracks the implementation of the boss-only "Estimated P&L & Unit Cost" report
 (legacy names: "MEE/BIHUN ESTIMATED" + "ESTIMATED/COST"). It is updated at every phase
@@ -78,9 +84,12 @@ P&L page (per product line, per month):
 - `P/L = GROSS − EXPENSES`
 - `ACCUMULATIVE = prior accum + current P/L`
 - `FINAL = P/L + ADD_BACK` (new input). Against the printed atomic rows, June targets
-  are MEE 9,658.83 → **−22,679.30** and BIHUN 6,662.66 → **77,185.09**. The handwritten
+  are MEE 9,658.83 → **−22,679.30** and BIHUN 6,662.66 → **77,185.09**. ~~The handwritten
   BIHUN 83,345.09 uses a separate JAGUNG stock scenario and is retained as evidence,
-  not as the canonical parity target.
+  not as the canonical parity target.~~ **SUPERSEDED 2026-07-30 (§9.5): the boss
+  confirmed the handwritten JAGUNG figures are the true physical counts, so 83,345.09
+  is the canonical BIHUN June FINAL and 77,185.09 was computed from the mis-keyed
+  stock.**
 
 Unit-cost page:
 - `PRODUCTION` = Σ `production_entries.bags_packed` for saleable products
@@ -90,9 +99,10 @@ Unit-cost page:
 - `TOTAL = ingredients + packing + salary + salesman + habuk + expenses_line`
 - `FINAL UNIT COST = (TOTAL + machine_repair − add_back) / PRODUCTION`. Canonical
   printed-source targets recomputed from the atomic rows are **MEE 8.872433 / BIHUN
-  14.255106**. The handwritten 8.872386 / 14.050356 values are internally inconsistent
+  14.255106** (BIHUN superseded 2026-07-30: **14.050400** on the corrected JAGUNG
+  profile, §9.5). The handwritten 8.872386 / 14.050356 values are internally inconsistent
   or use the alternate JAGUNG scenario; they are annotations, not engine targets.
-  Current post-fix live values are 8.812917 / 14.246057 (§9.2).
+  Current post-fix live values are 8.812917 / 14.042016 (§9.2).
 - `expenses_line` = 50% shared pool + product transportation (MEE 63,729.82 /
   BIHUN 64,238.82; diff = BTRA 509.00 ✓ vs June journals). `MBRMB` belongs in this
   shared pool at 50%; it must not also be added to the separate machine-repair line.
@@ -127,9 +137,11 @@ BIHUN packing materials, BFIN→kilang.
 ### 1.4 Anchors (accumulative P/L seeds, as of 2026-06-01)
 
 - MEE: **−166,900.31** (printed accum −199,238.44 − printed June P/L −32,338.13)
-- BIHUN: **404,935.44** (printed accum 475,457.87 − printed June P/L 70,522.43;
-  the handwritten-corrected P/L 76,682.43 was a boss manual adjustment using
-  hand-corrected JAGUNG stock figures — DB reproduces the printed values)
+- BIHUN: **404,935.44** (printed accum 475,457.87 − printed June P/L 70,522.43).
+  Since the 2026-07-30 JAGUNG correction (§9.5) the June P/L is the boss-confirmed
+  76,682.43, so the corrected June ACCUMULATIVE is **481,617.87** = anchor 404,935.44
+  + 76,682.43 (the printed/struck 475,457.87 used the mis-keyed JAGUNG P/L). The
+  anchor itself is unchanged and remains user-confirmed.
 - **Both confirmed by the user** (Q7).
 
 ---
@@ -239,12 +251,39 @@ audit trail and are SUPERSEDED by the answers above — do not act on them direc
 
 ### Round 3 (raised by the Phase 1 baseline replay, 2026-07-25 — not yet sent)
 
-14. **June MEE small-packing stock is RM883.60 higher in the system than printed.**
-    `CS_MPMS` seeds to 82,769.54 against a printed 81,885.94. The mapping is not at
-    fault: the same membership reproduces `CS_MPMB`, `OS_MPMB`, `CS_BPMS` and `OS_BPMS`
-    exactly and `OS_MPMS` to within RM0.08. This is a June keying difference on the MEE
-    packing sheet, the same class as FIX-2, and needs a line-by-line comparison against
-    the June source sheet. Do not adjust the mapping to close it.
+14. ~~**June MEE small-packing stock is RM883.60 higher in the system than printed.**~~
+    **CLOSED 2026-07-30 — corrected by the co-worker in production, verified against the
+    fresh prod import.** `CS_MPMS` seeded to 82,769.54 against a printed 81,885.94. The
+    mapping was never at fault: the same membership reproduces `CS_MPMB`, `OS_MPMB`,
+    `CS_BPMS` and `OS_BPMS` exactly and `OS_MPMS` to within RM0.08. **Root cause: three
+    June MEE label/sticker rows were keyed at the stale *material default* rate instead
+    of the actual June rate** — so the answer to the Q14 message was *harga*, not
+    *kuantiti*. Every quantity was already right; only `unit_cost` was wrong, and
+    `/stock/batch` derives `adjustment_value = adjustment_quantity × unit_cost`
+    ([`materials.js:1129`](../../src/routes/accounting/materials.js#L1129)), so the wrong
+    rate inflated the stored value directly:
+
+    | Row (June 2026, `mee`) | Qty | Old rate | Old value | New rate | New value | Delta |
+    |---|---:|---:|---:|---:|---:|---:|
+    | `M35`/47 LABEL 5" X 6" WE-QQ | 47,879 | 0.0800 | 3,830.32 | 0.0750 | 3,590.92 | −239.40 |
+    | `M40` STICKER LABEL RAMEE | 70,840 | 0.2300 | 16,293.20 | 0.2250 | 15,939.00 | −354.20 |
+    | `M8`/46 LABEL 5" X 6" ME-Q | 58,000 | 0.0400 | 2,320.00 | 0.0350 | 2,030.00 | −290.00 |
+    | **Total** | | | **22,443.52** | | **21,559.92** | **−883.60** |
+
+    The correct rates were independently confirmed by the May rows, which carry the
+    right *values* against the same stale rates (May `M35` 3,590.85 ÷ 47,878 = 0.075;
+    `M40` 15,939.00 ÷ 70,840 = 0.225; `M8`/46 2,651.95 ÷ 75,770 = 0.035). The three rows
+    were saved in production in one batch at 2026-07-29 07:47:08 and nothing else in
+    `material_stock_entries` was touched — the only other row edited in that window is
+    the B14 variant-118 row from the FIX-2 parity migration's production run. `CS_MPMS`
+    now equals the printed 81,885.94 **exactly**, and every downstream MEE figure moved
+    by precisely RM883.60. Verified in `verify-estimated-report.mjs` by a dedicated
+    `q14.*` evidence gate.
+
+    *Footnote:* `M35` stores 3,590.92 rather than 3,590.93 because `47879 × 0.075`
+    evaluates to `3590.9249999999997` in IEEE-754 before the `numeric(15,2)` cast. The
+    printed total agrees, so this half-sen artifact is what makes the parity exact to
+    the cent; do not "fix" it without re-checking the print.
 
 15. ~~**VRE-DIESEL (LORI SALESMAN SAHAJA) is RM20.00 short.**~~ **CLOSED 2026-07-28 —
     co-worker answered and fixed it in production.** Rosa: *"Kurang key in RM40 di
@@ -272,9 +311,11 @@ and the applied dev data fixes.
 ### 2.1 Bahasa Melayu messages
 
 Q11 / Q12 / Q13 were **sent and answered** (answers above); kept for the record.
-Q14 is **still to send**. Q15 was **answered directly by the co-worker on 2026-07-28**
-(Rosa found and fixed the RM40 mis-keying in production — §2 item 15), so its message
-below was never sent and stays for the record only.
+Q14 was **sent and acted on — the co-worker re-rated the three June rows in production
+on 2026-07-29** (§2 item 14). Q15 was **answered directly by the co-worker on
+2026-07-28** (Rosa found and fixed the RM40 mis-keying in production — §2 item 15), so
+its message below was never sent and stays for the record only. **No question is
+outstanding.**
 
 **Q11 — PU_MSD RM540** *(answered: no purchase, material discontinued)*
 
@@ -316,7 +357,9 @@ below was never sent and stays for the record only.
 > kongsi 50/50, bukan masukkan sekali lagi dalam Machine Repair, supaya tidak dikira dua
 > kali. Kalau ada breakdown lama, boleh share sekali. Terima kasih.
 
-**Q14 — stock plastik kecil Mee Jun**
+**Q14 — stock plastik kecil Mee Jun** *(answered: harga seunit tersalah pada tiga baris
+label/sticker — 0.08→0.075, 0.23→0.225, 0.04→0.035; dibetulkan dalam produksi
+2026-07-29, tepat −RM883.60)*
 
 > Hi, boleh tolong semak stock plastik kecil (SMALL PLASTIC-MEE) bagi Jun 2026? Ikut
 > sistem jumlahnya RM82,769.54, tetapi laporan lama tunjuk RM81,885.94 — beza
@@ -357,7 +400,10 @@ RM53 on OIL6389, the missing RM40 parked on CA_WA; Rosa re-pointed it in product
       `dev/import/closing-stock-report/verify-estimated-report.mjs` runs the shipped
       engine against the June fixture and guards all atomic/derived values; §5 fixes
       applied to dev and proven idempotent; Q10 reconciled as an irreducible legacy
-      page-to-page discrepancy; Q14/Q15 explicitly deferred per the user. See §9.
+      page-to-page discrepancy; Q14/Q15 explicitly deferred per the user, then both
+      **closed and re-verified on 2026-07-30** against the fresh production import,
+      and the same-day BIHUN JAGUNG fork (**§9.5, RESOLVED**) was corrected and
+      re-based the same day (415 exact / 57 deltas / 0 failures). See §9.
 - [x] **Phase 4 — Frontend** (2026-07-28): `src/pages/Stock/Reports/EstimatedReportPage.tsx`,
       nav "Reports" group in `src/pages/TienHockNavData.tsx` (`/stock/reports/estimated`),
       drilldowns (join on the engine-emitted `lineId`), Add Back input, mappings modal
@@ -372,12 +418,52 @@ RM53 on OIL6389, the missing RM40 parked on CA_WA; Rosa re-pointed it in product
       page → MEE + BIHUN unit cost — user decision, revised same-day from the
       initial combined four-page set) from the already-fetched report response.
       Changelog entry shipped. See §12.
-- [ ] **Phase 6 — Wrap-up**: apply any evidence-backed Q14/Q15 corrections received,
-      production migration rollout, changelog entry,
-      AGENTS.md/CLAUDE.md updates, bug-scan offer.
+- [ ] **Phase 6 — Wrap-up**: ~~apply any evidence-backed Q14/Q15 corrections received~~
+      **DONE — both were fixed by the co-worker directly in production and verified
+      here on 2026-07-30 (§2 items 14/15); no migration or code change was needed from
+      our side, only the verifier's expected-delta map**; production migration rollout,
+      changelog entry, AGENTS.md/CLAUDE.md updates, bug-scan offer.
 
 ## 4. Progress log
 
+- 2026-07-30 — **Q14 CLOSED and Q15 confirmed in dev; last open question gone.** The
+  user imported a fresh production dump, so both co-worker fixes are now in dev.
+  **Q14:** `CS_MPMS` is exactly the printed **81,885.94** (was 82,769.54). Root cause
+  was three June MEE label/sticker rows keyed at their stale *material default* rate
+  (`M35` 0.0800→0.0750, `M40` 0.2300→0.2250, `M8`/46 0.0400→0.0350), summing to exactly
+  −RM883.60 — a *price* error, not a quantity error; full evidence table in §2 item 14.
+  The correction was one production batch save at 2026-07-29 07:47:08 touching only
+  those three rows. **Q15:** the VRE-DIESEL/SALESMAN rows now land exact, as §2 item 15
+  predicted for the first prod→dev refresh. Every one of the 19 stale-expectation
+  failures moved by exactly RM883.60 (or its per-bag equivalent), confirming the fix
+  cascaded cleanly and nothing else shifted. Verifier changes: dropped the
+  `mee.pl.closing.CS_MPMS.amount` root delta, narrowed
+  `mee.unit.packing.PLASTIC (SMALL).amount` from −88,368 to −8 sen (only the documented
+  RM0.08 May opening noise survives), and added a `q14.*` evidence gate that pins all
+  three rows' quantity/rate/value so a regression is named rather than diffuse. Result:
+  **415 exact checks / 57 documented deltas / 0 failures / 15 notes, exit 0.**
+  Three new informational notes record latent stale-rate risks — see §7.5.
+  **Caveat:** a *separate* June BIHUN JAGUNG edit landed in dev at 07:38 the same day,
+  part-way through this session, and briefly made the verifier exit 1 on the BIHUN
+  side (20 BIHUN failures, 0 MEE). It was the boss-confirmed JAGUNG stock correction
+  from the parallel P&L session — unrelated to Q14/Q15 and **RESOLVED in §9.5** the
+  same day (fixture re-based onto the corrected profile; verifier green again).
+- 2026-07-30 — **§9.5 RESOLVED: JAGUNG corrections + June Add Backs + PU_MSD final
+  decision.** The user presented the legacy June P&L printouts with the incorrect
+  amounts circled on both product lines. Root cause: the BIHUN JAGUNG physical counts
+  were keyed with one-digit typos (May KK RICE 276→196 bags; June HOMCO 399→409
+  bags) and the legacy print had been generated from the same mis-keyed data, so the
+  boss's handwritten corrections — previously filed as an "alternate scenario" — were
+  the true figures all along. Applied
+  `dev/migrations/2026-07-30_estimated_report_jagung_stock_fixes.sql` to dev
+  (guarded, idempotent; **production pending**), keyed the June Add Backs (MEE
+  9,658.83 / BIHUN 6,662.66), re-based the fixture and verifier onto the corrected
+  profile, and re-ran green: **415 exact / 57 deltas / 0 failures**. CS JAGUNG
+  22,086.00, OS JAGUNG 33,209.00, unit-cost JAGUNG usage 28,403.00, CS total
+  414,685.86 and OS total 486,311.65 all reproduce the boss's figures exactly.
+  **PU_MSD 540.00 final decision (user): never key a journal — she absorbs it in the
+  Add Back input.** BRET 265.10 stays a documented snapshot delta (engine 268.30).
+  See §9.5.
 - 2026-07-28 — **Phase 5 done.** PDF printing shipped:
   `src/utils/stock/EstimatedReportPDF.tsx` (new) renders the report straight from
   the already-fetched `EstimatedReportResponse` (no refetch, nothing hardcoded),
@@ -718,39 +804,30 @@ decide, every mapping is seeded, and the Phase 3 parity gate is green (§9).
 
 ### 7.2 Questions still to ask the co-worker
 
-- **Q14** — June MEE small-packing stock is RM883.60 higher than the print. Mapping is
-  proven correct; needs a line-by-line check of the June MEE packing sheet.
+**None — every question is closed.**
+
+- ~~**Q14** — June MEE small-packing stock is RM883.60 higher than the print.~~
+  **CLOSED 2026-07-30.** The co-worker re-rated three June MEE label/sticker rows in
+  production on 2026-07-29 (`M35` 0.0800→0.0750, `M40` 0.2300→0.2250, `M8`/46
+  0.0400→0.0350 = exactly −RM883.60). `CS_MPMS` is now the printed 81,885.94 exactly.
+  Full evidence table in §2 item 14.
 - ~~**Q15** — VRE-DIESEL (LORI SALESMAN SAHAJA) is RM20.00 short (RM40.00 in the pool) and
   no June `OIL*` posting explains it.~~ **CLOSED 2026-07-28** — Rosa traced it to
   PCE003/06 (bill RM93 keyed as RM53 on `OIL6389`, the RM40 balance parked on `CA_WA`)
-  and re-pointed the RM40 in production; see §2 item 15. The dev DB still shows the
-  unfixed rows until the next production→dev refresh.
+  and re-pointed the RM40 in production; see §2 item 15. **Confirmed in dev on
+  2026-07-30** after the production import: the VRE-DIESEL/SALESMAN rows land exact.
 
-Q14 has a ready-to-send Bahasa Melayu message in §2.1 (the Q15 message was never
-needed and is kept for the record).
+Both Bahasa Melayu messages stay in §2.1 for the record.
 
-**Deferred-fix protocol (user decision, 2026-07-28):** the answers to Q14/Q15 are NOT
-required before Phase 3 and may arrive at any time — during any phase or after
-Phase 6 wrap-up. Both are pure source-data corrections with no engine, mapping,
-frontend or PDF impact: the report derives every value live, so fixing the source
-data automatically corrects the report on the next run. When the user @-references
-this handover with the co-worker's answers, the workflow is:
-
-- **Q14** — identify the mis-keyed June MEE small-packing row(s) from the answer and
-  correct `material_stock_entries` for year 2026 / month 6 (target delta:
-  −RM883.60 on the `CS_MPMS` bucket). Key the correction into June 2026 itself,
-  NOT the current month, and note that it shifts June closing stock and therefore
-  every later month's derived opening stock by the same amount.
-- ~~**Q15** — key the missing RM40.00 June diesel posting (or reclassify the
-  mis-posted one) onto the correct salesman-lorry `OIL*` account(s) with a June
-  2026 date, per the co-worker's evidence; target delta: +RM20.00 per product line
-  after the 50% split.~~ **DONE 2026-07-28 by the co-worker directly in production**
-  (PCE003/06: the RM40 was re-pointed off `CA_WA` onto the diesel account — §2 item
-  15). No migration or code change from our side was needed; the report picks the
-  correction up live. The dev DB is intentionally untouched, so the dev verifier
-  still reports this delta until the next production→dev refresh.
-- After either fix, re-run `verify-estimated-report.mjs` and update the Phase 3
-  delta table (§9.2) plus this section to close the item.
+~~**Deferred-fix protocol (user decision, 2026-07-28)**~~ — **discharged.** Both items
+turned out to be pure source-data corrections with no engine, mapping, frontend or PDF
+impact, exactly as the protocol anticipated: the co-worker fixed each one directly in
+production, the report derives every value live, and the only change needed on our side
+was retiring the two stale expected deltas in `verify-estimated-report.mjs`. Keep the
+protocol's core rule for any future source correction: **key the fix into the month it
+belongs to, never the current month**, because a stock correction shifts that month's
+closing stock and therefore every later month's derived opening stock by the same
+amount. After any such fix, re-run `verify-estimated-report.mjs` and update §9.2.
 
 ### 7.3 Phase 3 conclusions / remaining legacy-source deltas
 
@@ -790,6 +867,39 @@ this handover with the co-worker's answers, the workflow is:
 - The two mapping assumptions in §6.3 (`M23D` → `MTEP3`; `B18` deliberately unmapped).
   Neither material has ever been keyed, so nothing is affected today.
 - Whether the boss is happy that `MBKH` is counted twice by the legacy formulas (§6.4).
+
+### 7.5 Latent stale-rate risks (found while closing Q14, 2026-07-30)
+
+Neither affects today's numbers. Both are surfaced as `INFO` notes by
+`verify-estimated-report.mjs` so they cannot rot silently, and **both need user approval
+before any data change** — this is the same class as the standing variant-118 note.
+
+1. **The three Q14 materials still carry their old default rate.** `M35` defaults to
+   RM0.0800, `M40` to RM0.2300 and `M8` to RM0.0400, while their true June rates are
+   RM0.0750 / RM0.2250 / RM0.0350. The Q14 fix corrected June 2026 rows only. A future
+   month keyed without an explicit rate would pick the default back up and reintroduce
+   the same overstatement. (`materials.default_unit_cost`; variant 118 / RM282.50 is the
+   pre-existing instance of this pattern.)
+2. **Five 2026 rows store a value that disagrees with `quantity × unit_cost`.**
+   `/stock/batch` recomputes `adjustment_value` from the rate on every save
+   ([`materials.js:1129`](../../src/routes/accounting/materials.js#L1129)), so re-saving
+   one of these months through the Material Stock page would silently change its value
+   even if the user edits nothing else:
+
+   | Row | Stored value | Would become | Drift |
+   |---|---:|---:|---:|
+   | 2026-05 `mee` `M35`/47 | 3,590.85 | 3,830.24 | +239.39 |
+   | 2026-05 `mee` `M40` | 15,939.00 | 16,293.20 | +354.20 |
+   | 2026-05 `mee` `M8`/46 | 2,651.95 | 3,030.80 | +378.85 |
+   | 2026-05 `bihun` `B6B`/101 | 1,374.39 | 1,527.10 | +152.71 |
+   | 2026-06 `bihun` `B6B`/101 | 1,320.52 | 1,467.25 | +146.73 |
+
+   The stored values are the *correct* ones — they match the print, which is why June
+   `OS_MPMS` is within RM0.08 and BIHUN closing stock is exact. It is the `unit_cost`
+   field that is stale. Re-saving May 2026 `mee` would inflate June's derived opening
+   stock by RM972.44; re-saving June `bihun` would break BIHUN closing parity by
+   RM146.73. Fixing the rates in place (values unchanged) would remove the trap, but
+   that is a data change on closed months and needs the user's go-ahead.
 
 ---
 
@@ -836,14 +946,14 @@ rows, production 20,691 / 30,092, and both `expenseBreakdown` salary/habuk subto
 
 | Row | Engine | Printed | Delta | Status |
 |---|---|---|---|---|
-| MEE `CS_MPMS` (in CLOSING total) | +883.60 | — | +883.60 | Q14, open |
+| MEE `CS_MPMS` (in CLOSING total) | +883.60 | — | +883.60 | Q14 CLOSED 2026-07-30 — stale default rates on three June rows |
 | MEE `OS_MPMS` (in OPENING total) | −0.08 | — | −0.08 | keying noise |
 | MEE `PU_MSD` | 0.00 | 540.00 | −540.00 | Q11 CLOSED — permanent and correct |
 | MEE `MRET` | 1,517.80 | 1,519.10 | −1.30 | documented source snapshot delta |
 | BIHUN `PU_BBER` | 495,131.40 | 130,631.40 | +364,500.00 | FIX-1 applied to dev in Phase 3 |
 | BIHUN `CS_BPMB` | 16,891.75 | 16,891.45 | +0.30 | FIX-2 applied to dev in Phase 3 |
 | BIHUN `BRET` | 268.30 | 265.10 | +3.20 | documented source snapshot delta |
-| SALESMAN subtotal (both lines) | −20.00 | — | −20.00 | Q15 CLOSED 2026-07-28 — fixed in production; dev keeps the delta until refresh |
+| SALESMAN subtotal (both lines) | −20.00 | — | −20.00 | Q15 CLOSED 2026-07-28 — fixed in production; confirmed in dev after the 2026-07-30 refresh |
 | MACHINE REPAIR MEE / BIHUN | 4,391.59 / 2,045.98 | 4,200.30 / 2,319.22 | +191.29 / −273.24 | Q13 CLOSED, residual is source classification |
 | EXPENSES line (both lines) | 63,750.76 / 64,259.76 | 63,729.82 / 64,238.82 | +20.94 | payroll residual (§7.3) + 0.03 rounding, see below |
 
@@ -943,11 +1053,22 @@ Temporary Add Back inserts use explicit negative IDs so PostgreSQL's non-transac
 sequence does not advance; post-run checks confirmed `estimated_report_inputs` stayed
 at 0 rows and its sequence stayed at 5.
 
-Final dev run:
+Dev run of 2026-07-30, against the fresh production import, with Q14 and Q15 both
+closed and no other change in flight:
 
 ```text
-392 exact checks / 70 documented direct-and-cascading deltas / 0 failures / 11 notes
+415 exact checks / 57 documented direct-and-cascading deltas / 0 failures / 15 notes
 ```
+
+The Phase 3 run, before either source correction reached dev, read
+`392 exact checks / 70 deltas / 0 failures / 11 notes`. The 2026-07-30 run also adds a
+`q14.*` evidence gate pinning the quantity, rate and value of all three corrected rows,
+so a regression to the stale default rates is reported by name rather than as a diffuse
+cascade.
+
+> **The June BIHUN JAGUNG fork from that day is RESOLVED — see §9.5.** The fixture
+> and verifier were re-based onto the boss-confirmed corrected profile and the same
+> `415 exact / 57 deltas / 0 failures` result now includes the corrected JAGUNG rows.
 
 Exit 0 means there is no unexpected drift; documented deltas remain visible as
 `EXPECTED`. Exit 1 means an amount, row set, formula, anchor, approved fix or expected
@@ -960,29 +1081,41 @@ deltas: `PU_BBER` is 130,631.40 on both sides and `CS_BPMB` is 16,891.45 on both
 
 | Root comparison | Engine | Printed | Delta | Treatment |
 |---|---:|---:|---:|---|
-| MEE `CS_MPMS` | 82,769.54 | 81,885.94 | +883.60 | Q14 deferred source-sheet correction |
+| ~~MEE `CS_MPMS`~~ | 81,885.94 | 81,885.94 | **0.00** | **Q14 CLOSED 2026-07-30 — no longer a delta** (§2 item 14) |
 | MEE `OS_MPMS` | 85,789.29 | 85,789.37 | −0.08 | documented May keying noise |
 | MEE `PU_MSD` | 0.00 | 540.00 | −540.00 | Q11 permanent/correct: no purchase exists |
 | MEE `MRET` | 1,517.80 | 1,519.10 | −1.30 | physical-return snapshot delta |
 | BIHUN `BRET` | 268.30 | 265.10 | +3.20 | physical-return snapshot delta |
-| SALESMAN diesel (each line) | 1,065.85 | 1,085.85 | −20.00 | Q15 CLOSED 2026-07-28 — co-worker fixed the RM40 mis-key in production; dev retains this delta until the next prod→dev refresh, then it must go exact |
+| ~~SALESMAN diesel (each line)~~ | 1,085.85 | 1,085.85 | **0.00** | **Q15 CLOSED — no longer a delta** since the 2026-07-30 prod→dev refresh (§2 item 15) |
 | Unit EXPENSES MEE / BIHUN | 63,750.76 / 64,259.76 | 63,729.82 / 64,238.82 | +20.94 / +20.94 | JVSL snapshot + visible-row rounding |
 | MACHINE REPAIR MEE / BIHUN | 4,391.59 / 2,045.98 | 4,200.30 / 2,319.22 | +191.29 / −273.24 | Q13 formula confirmed; source classification |
+
+The `CS_MPMS` and SALESMAN-diesel rows are kept struck-through as history: both were
+real deltas through Phase 3–5 and are cited elsewhere in this doc. The live root-delta
+set is now just the five remaining rows, all legacy-source or classification residue.
 
 Together, those root comparisons account for every downstream difference. The most
 useful headline comparisons, after applying the boss's Add Back only inside the
 verifier transaction, are:
 
-| Headline | Engine | Canonical printed-source target | Delta |
-|---|---:|---:|---:|
-| MEE P/L | −31,321.99 | −32,338.13 | +1,016.14 |
-| MEE ACCUMULATIVE | −198,222.30 | −199,238.44 | +1,016.14 |
-| MEE FINAL P/L (+9,658.83) | −21,663.16 | −22,679.30 | +1,016.14 |
-| MEE FINAL UNIT COST | 8.812917 | 8.872433 | −0.059516 |
-| BIHUN P/L | 70,584.32 | 70,522.43 | +61.89 |
-| BIHUN ACCUMULATIVE | 475,519.76 | 475,457.87 | +61.89 |
-| BIHUN FINAL P/L (+6,662.66) | 77,246.98 | 77,185.09 | +61.89 |
-| BIHUN FINAL UNIT COST | 14.246057 | 14.255106 | −0.009049 |
+Values below are the **current** (post-Q14/Q15) figures, measured 2026-07-30 against
+the fresh production import. The Phase 3 column records what the same headline read
+before those two source corrections landed.
+
+| Headline | Engine | Canonical printed-source target | Delta | Phase 3 delta |
+|---|---:|---:|---:|---:|
+| MEE P/L | −32,225.59 | −32,338.13 | +112.54 | +1,016.14 |
+| MEE ACCUMULATIVE | −199,125.90 | −199,238.44 | +112.54 | +1,016.14 |
+| MEE FINAL P/L (+9,658.83) | −22,566.76 | −22,679.30 | +112.54 | +1,016.14 |
+| MEE FINAL UNIT COST | 8.856588 | 8.872433 | −0.015845 | −0.059516 |
+| BIHUN P/L | 70,564.32 | 70,522.43 | +41.89 | +61.89 |
+| BIHUN ACCUMULATIVE | 475,499.76 | 475,457.87 | +41.89 | +61.89 |
+| BIHUN FINAL P/L (+6,662.66) | 77,226.98 | 77,185.09 | +41.89 | +61.89 |
+| BIHUN FINAL UNIT COST | 14.246721 | 14.255106 | −0.008385 | −0.009049 |
+
+Every MEE headline improved by exactly RM903.60 (Q14's RM883.60 + Q15's RM20.00) and
+every BIHUN headline by exactly RM20.00 (Q15), which is the arithmetic proof that both
+corrections cascaded cleanly and moved nothing else.
 
 The canonical unit targets above are recomputed from the printed atomic rows. They do
 not blindly use internally inconsistent OCR/handwritten composite fields: the stored
@@ -1025,9 +1158,11 @@ original legacy P&L configuration/account breakdown could close this further.
   authentication only; obtain the user's boss identity/role rule and add server-side
   authorization before production exposure.~~ **RESOLVED 2026-07-28 — user: all
   logged-in staff.** No authorization work remained for Phase 4.
-- Q14 does not block UI work (Q15 was resolved in production on 2026-07-28). When Q14
+- ~~Q14 does not block UI work (Q15 was resolved in production on 2026-07-28). When Q14
   evidence arrives, correct the June source rows and rerun the verifier under §7.2; do
-  not add report-only overrides.
+  not add report-only overrides.~~ **RESOLVED 2026-07-30** — the co-worker corrected the
+  three June rows in production and the verifier was rerun; no report-only override was
+  added, exactly as required (§2 item 14).
 - ~~Before production exposure, apply both the Phase 1 foundation migration and the
   Phase 3 parity data-fix migration.~~ **DONE 2026-07-28** (§9.4 checklist executed;
   the foundation was already live in prod, the parity fixes were applied and
@@ -1061,6 +1196,62 @@ Historical checklist (for the record):
    `expected-june-2026.json`, AGENTS.md and CLAUDE.md, and record the migration's
    applied/removal lifecycle in `docs/MIGRATIONS_LOG.md`. Keep §4's historical note
    that production was untouched during Phase 3.
+
+### 9.5 RESOLVED 2026-07-30 — June BIHUN JAGUNG stock corrections (boss-confirmed) + June Add Backs keyed
+
+*(Opened by the parallel Q14 session as "OPEN — concurrent June BIHUN JAGUNG edit
+(2026-07-30 07:38), needs a decision"; resolved the same day. The "concurrent edit"
+was this correction landing mid-verification.)*
+
+**The decision: the boss's handwritten JAGUNG figures are the true physical counts.**
+Shown the legacy June printouts, the user circled the incorrect amounts on both the
+BIHUN and MEE P&L pages: CS JAGUNG 22,086.00, OS JAGUNG working 33,209.00 (+ the
+34,636.09 row figure), BRET 265.10, the two Add Backs, and MEE PU_MSD 540.00. The
+keyed stock counts were one-digit typos against the physical sheets, and the legacy
+print itself had been generated from the same mis-keyed data (its struck totals
+414,145.86 / 491,931.65 / P&L 70,522.43 match the old keyed state exactly — which is
+why the *printed* profile used to be the parity target).
+
+Corrected by the guarded, idempotent migration
+`dev/migrations/2026-07-30_estimated_report_jagung_stock_fixes.sql` (applied to dev;
+**production pending**):
+
+| Row | Was | Now | Evidence |
+|---|---:|---:|---|
+| 2026-05 `bihun` `B3`/11 (KK RICE + TRANSPORT) | 276 × 70.25 = 19,389.00 | **196 × 70.25 = 13,769.00** | May JAGUNG = 13,769.00 + 19,440.00 (HOMCO 360×54) = **33,209.00** = the boss's own working figure |
+| 2026-06 `bihun` `B3`/12 (HOMCO) | 399 × 54.00 = 21,546.00 | **409 × 54.00 = 22,086.00** | 409 × 54 = 22,086.00 exactly = the boss's circled closing figure |
+| `estimated_report_inputs` MEE 2026-06 | — | **add_back 9,658.83** | boss's handwritten "Add Back + 9658.83" |
+| `estimated_report_inputs` BIHUN 2026-06 | — | **add_back 6,662.66** | boss's handwritten "Add Back + 6662.66" |
+
+Independent confirmations: corrected CS total **414,685.86** and OS total
+**486,311.65** (the boss's handwritten totals) reproduce exactly; the unit-cost
+JAGUNG usage becomes **28,403.00** = the boss's handwritten unit-cost figure
+(33,209.00 + 17,280.00 − 22,086.00); and the FINAL P&L boxes land at
+83,345.09 + 41.89 (documented expenses delta) for BIHUN. The 34,636.09 OS row
+figure = 33,209.00 + 1,427.09 (May SODIUM) because the legacy print's amount column
+is shifted one row up in the stock sections — SODIUM keeps its own row in the new
+report and is untouched.
+
+**Fixture/verifier re-based onto the corrected profile** (§9.5's first option): the
+BIHUN JAGUNG atomic rows and the `_printed` composites in `expected-june-2026.json`
+now carry the corrected values (struck values preserved in `*_struck` fields and
+`correction_note`s), and `verify-estimated-report.mjs` is green: **415 exact checks,
+57 documented deltas, 0 failures**. The remaining BIHUN deltas are the documented
+BRET +3.20 and the Q10-class expenses +41.89 — both unchanged and still gated.
+
+**PU_MSD 540.00 — FINAL decision (user, 2026-07-30):** no PUR journal will ever be
+keyed for the printed 540.00; the boss absorbs it in the Add Back input herself.
+This supersedes the interim "co-worker keys the journal" answer given earlier the
+same day. The Q11 delta entries (`mee.pl.purchase.PU_MSD.amount` −540.00 and the
+unit-cost ingredient row) therefore stay in the verifier permanently.
+
+**BRET 265.10:** kept as the documented physical-return snapshot delta (engine
+268.30); the user did not ask to investigate the RM3.20. MRET likewise.
+
+Caveat carried over from the Q14 session: the Material Stock page's May/June grand
+totals move with these corrections (−5,620.00 May bihun / +540.00 June bihun) — that
+is the point of the fix, but anyone comparing against a pre-2026-07-30 export should
+know.
 
 ---
 
@@ -1212,10 +1403,12 @@ modern clean design.
 
 ### 11.4 Open items Phase 5 must NOT try to fix (context only)
 
-- **Q14** (June MEE small-packing +RM883.60) is still open — §7.2 protocol applies.
-- **Q15 is closed in production**, but the dev DB intentionally keeps the unfixed
+- ~~**Q14** (June MEE small-packing +RM883.60) is still open — §7.2 protocol applies.~~
+  **CLOSED 2026-07-30** (§2 item 14).
+- ~~**Q15 is closed in production**, but the dev DB intentionally keeps the unfixed
   rows, so `verify-estimated-report.mjs` still shows the VRE-DIESEL/SALESMAN delta
-  in dev until the next prod→dev refresh (§2 item 15).
+  in dev until the next prod→dev refresh (§2 item 15).~~ **The refresh happened on
+  2026-07-30 and the rows are exact.**
 - API limitation: a mapping line's `notes` cannot be cleared via
   `PUT /mappings/:lineId` (§10).
 - The June Add Back values (MEE 9,658.83 / BIHUN 6,662.66) are still unkeyed — the
@@ -1286,4 +1479,5 @@ Decisions and details worth knowing:
 - The §11.4 open items were left untouched as instructed: Q14, the dev-only Q15
   delta, the mapping-notes clearing limitation, the unkeyed June Add Back values
   (the PDF prints whatever is keyed — 0.00 if nothing is), and variant 118's
-  `default_unit_cost`.
+  `default_unit_cost`. *(Historical record of Phase 5. Q14 and the dev-only Q15 delta
+  have since been closed — 2026-07-30, §4 and §7.2.)*

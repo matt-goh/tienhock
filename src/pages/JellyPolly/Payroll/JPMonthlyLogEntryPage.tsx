@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import Button from "../../../components/Button";
 import { Employee } from "../../../types/types";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import { format } from "date-fns";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Checkbox from "../../../components/Checkbox";
@@ -147,6 +148,9 @@ const JPMonthlyLogEntryPage: React.FC<JPMonthlyLogEntryPageProps> = ({
   jobType = "MAINTENANCE",
 }) => {
   const navigate = useNavigate();
+  const goBack = useSmartBack(
+    `/jellypolly/payroll/${jobType.toLowerCase().replace("_", "-")}-monthly`
+  );
   const {
     staffs: allStaffs,
     loading: loadingStaffs,
@@ -1157,15 +1161,29 @@ const JPMonthlyLogEntryPage: React.FC<JPMonthlyLogEntryPageProps> = ({
         deletedLeaveIds: deletedLeaveIds,
       };
 
+      const monthlyBasePath: string = `/jellypolly/payroll/${jobType
+        .toLowerCase()
+        .replace("_", "-")}-monthly`;
+
       if (mode === "edit" && existingWorkLog) {
         await api.put(`/jellypolly/api/monthly-work-logs/${existingWorkLog.id}`, payload);
         toast.success("Monthly work log updated successfully");
+        goBack();
       } else {
-        await api.post("/jellypolly/api/monthly-work-logs", payload);
+        const response: { workLogId?: number } = await api.post(
+          "/jellypolly/api/monthly-work-logs",
+          payload
+        );
         toast.success("Monthly work log created successfully");
+        const newLogId: number | undefined = response?.workLogId;
+        // Show the log just created. `replace` drops this form from history,
+        // so Back returns to wherever the user started.
+        if (newLogId) {
+          navigate(`${monthlyBasePath}/${newLogId}`, { replace: true });
+        } else {
+          goBack();
+        }
       }
-
-      navigate(`/jellypolly/payroll/${jobType.toLowerCase().replace("_", "-")}-monthly`);
     } catch (error: any) {
       console.error("Error saving monthly work log:", error);
       console.error("Error details:", error?.data);
@@ -1184,7 +1202,7 @@ const JPMonthlyLogEntryPage: React.FC<JPMonthlyLogEntryPageProps> = ({
     if (onCancel) {
       onCancel();
     } else {
-      navigate(`/jellypolly/payroll/${jobType.toLowerCase().replace("_", "-")}-monthly`);
+      goBack();
     }
   };
 

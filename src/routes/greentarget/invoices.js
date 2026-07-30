@@ -317,6 +317,7 @@ export default function (pool, defaultConfig) {
         SELECT i.*,
               c.name as customer_name,
               c.phone_number as customer_phone_number,
+              c.billing_address,
               c.tin_number,
               c.id_number,
               c.id_type,
@@ -598,6 +599,7 @@ export default function (pool, defaultConfig) {
       SELECT i.*,
             c.name as customer_name,
             c.phone_number as customer_phone_number,
+              c.billing_address,
             c.tin_number,
             c.id_number,
             c.id_type,
@@ -691,6 +693,7 @@ export default function (pool, defaultConfig) {
               SELECT i.*,
               c.name as customer_name,
               c.phone_number as customer_phone_number,
+              c.billing_address,
               c.tin_number,
               c.id_number,
               -- Aggregate rental information for multi-rental invoices

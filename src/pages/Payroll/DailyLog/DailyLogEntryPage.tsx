@@ -12,6 +12,7 @@ import Button from "../../../components/Button";
 import { FormListbox } from "../../../components/FormComponents";
 import { Employee } from "../../../types/types";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import { format } from "date-fns";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Checkbox from "../../../components/Checkbox";
@@ -141,6 +142,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   jobType = "MEE",
 }) => {
   const navigate = useNavigate();
+  const goBack = useSmartBack(`/payroll/${jobType.toLowerCase()}-production`);
   const { jobs: allJobs, loading: loadingJobs, refreshJobs } = useJobsCache();
   const { staffs: allStaffs, loading: loadingStaffs, refreshStaffs } = useStaffsCache();
   const [isRefreshingCache, setIsRefreshingCache] = useState(false);
@@ -1568,7 +1570,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   };
 
   const handleBack = () => {
-    safeNavigate(`/payroll/${jobType.toLowerCase()}-production`);
+    safeNavigate(goBack);
   };
 
   const handleRefreshCache = async () => {
@@ -1811,12 +1813,17 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
     setIsSaving(true);
 
+    let newLogId: number | undefined;
     try {
       if (mode === "edit" && existingWorkLog) {
         await api.put(`/api/daily-work-logs/${existingWorkLog.id}`, payload);
         toast.success("Work log updated successfully");
       } else {
-        await api.post("/api/daily-work-logs", payload);
+        const response: { workLogId?: number } = await api.post(
+          "/api/daily-work-logs",
+          payload
+        );
+        newLogId = response?.workLogId;
         toast.success("Work log submitted successfully");
       }
 
@@ -1836,11 +1843,17 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         forceOTHours: JSON.parse(JSON.stringify(forceOTHours)),
         isCleaningMode: isCleaningMode,
       });
-      // Navigate to details page after edit, list page after create
+      // Return to where the user came from after an edit; after a create, show
+      // the log just created (replace, so Back still returns to the origin).
       if (mode === "edit" && existingWorkLog) {
-        navigate(`/payroll/${jobType.toLowerCase()}-production/${existingWorkLog.id}`);
+        goBack();
+      } else if (newLogId) {
+        navigate(
+          `/payroll/${jobType.toLowerCase()}-production/${newLogId}`,
+          { replace: true }
+        );
       } else {
-        navigate(`/payroll/${jobType.toLowerCase()}-production`);
+        goBack();
       }
     } catch (error: any) {
       console.error("Error saving work log:", error);

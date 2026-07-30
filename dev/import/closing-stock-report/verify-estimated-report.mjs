@@ -68,10 +68,10 @@ const exercisedRootDeltas = new Set();
  * @type {Map<string, ExpectedDelta>}
  */
 const ROOT_MONEY_DELTAS = new Map([
-  [
-    "mee.pl.closing.CS_MPMS.amount",
-    { delta: 88360, reason: "Q14: June MEE small-packing source sheet is still under review" },
-  ],
+  // Q14 RESOLVED 2026-07-29 in production (three June MEE label/sticker rows were
+  // keyed at the stale material default rate instead of the June rate: M35 0.0800
+  // -> 0.0750, M40 0.2300 -> 0.2250, M8/ME-Q 0.0400 -> 0.0350, together exactly
+  // -RM883.60). CS_MPMS now lands exact and intentionally carries no expected delta.
   [
     "mee.pl.opening.OS_MPMS.amount",
     { delta: -8, reason: "documented May keying noise" },
@@ -94,7 +94,7 @@ const ROOT_MONEY_DELTAS = new Map([
   ],
   [
     "mee.unit.packing.PLASTIC (SMALL).amount",
-    { delta: -88368, reason: "derived from Q14 closing stock and the RM0.08 opening noise" },
+    { delta: -8, reason: "derived from the RM0.08 May opening keying noise" },
   ],
   // Q15 RESOLVED 2026-07-28 in production (Rosa re-pointed the parked RM40 from
   // CA_WA to OIL6389 on PCE003/06; +RM20.00 per product line after the 50% split).
@@ -380,9 +380,13 @@ function addBackFixture(fixtureLine) {
 }
 
 /**
- * Preserve the internally coherent handwritten BIHUN scenario as evidence without
- * treating it as an engine target. These checks fail if its fixture relationships
- * drift, while the canonical engine comparisons continue to use printed atomic rows.
+ * Preserve the internally coherent handwritten BIHUN scenario as evidence.
+ * Since 2026-07-30 the boss confirmed the handwritten JAGUNG figures were the
+ * true physical counts, the fixture's atomic rows and _printed composites carry
+ * the corrected values (identical to the _handwritten ones), and the engine
+ * parity comparisons target them directly. These checks now mostly gate the
+ * corrected profile against itself, plus the preserved struck values; they
+ * still fail if the fixture relationships drift.
  *
  * @param {object} fixture
  */
@@ -499,12 +503,14 @@ function compareAlternateFixtureEvidence(fixture) {
     measure: "unit",
   });
 
-  const printedIngredientTotal = sumRowAmounts(unit.ingredients);
+  const printedIngredientTotal = sumMoney(
+    unit.ingredients.map((row) => Number(row.amount_struck ?? row.amount))
+  );
   checkStructure(
     "bihun.fixture.printed.ingredientSubtotalOcrGap",
-    "BIHUN printed ingredient subtotal preserves the RM900 OCR discrepancy",
+    "BIHUN struck printed ingredient subtotal preserves the RM900 OCR discrepancy",
     scaled(printedIngredientTotal - Number(unit.ingredients_subtotal.amount_printed), "money") === 90000,
-    `atomic ${printedIngredientTotal.toFixed(2)} vs stored ${Number(unit.ingredients_subtotal.amount_printed).toFixed(2)}`
+    `struck atomic ${printedIngredientTotal.toFixed(2)} vs stored ${Number(unit.ingredients_subtotal.amount_printed).toFixed(2)}`
   );
   const handwrittenIngredientTotal = sumMoney(
     unit.ingredients.map((row) => Number(row.amount_handwritten ?? row.amount))
@@ -908,8 +914,8 @@ function compareUnitCost(productLine, report, fixtureLine, unitFixture) {
   } else {
     informationalNotes.push(
       `BIHUN stored total-before-repair/total amounts ${unitFixture.total_before_repair.amount.toFixed(2)} / ` +
-        `${unitFixture.total.amount.toFixed(2)} belong to the alternate handwritten JAGUNG scenario; ` +
-        `printed atomic rows canonically total ${beforeFixture.toFixed(2)} / ${totalFixture.toFixed(2)}. ` +
+        `${unitFixture.total.amount.toFixed(2)} are the boss-confirmed JAGUNG scenario, which is the canonical ` +
+        `engine profile since the 2026-07-30 stock corrections (atomic rows total ${beforeFixture.toFixed(2)} / ${totalFixture.toFixed(2)}). ` +
         `Their displayed units also sit 0.000045 below their own amount/production math.`
     );
   }
@@ -995,8 +1001,9 @@ function compareUnitCost(productLine, report, fixtureLine, unitFixture) {
   }
   if (productLine === "bihun") {
     informationalNotes.push(
-      `BIHUN atomic printed ingredient rows sum to 276,904.54; the fixture's 276,004.54 printed subtotal ` +
-        `is an OCR inconsistency and 270,744.54 is the separate handwritten JAGUNG scenario; its displayed ` +
+      `BIHUN atomic ingredient rows sum to 270,744.54, the boss-confirmed JAGUNG scenario (canonical since ` +
+        `2026-07-30); the struck printed subtotal 276,004.54 belonged to the mis-keyed JAGUNG scenario ` +
+        `(struck atomic sum 276,904.54, a 900.00 OCR ambiguity). The handwritten subtotal's displayed ` +
         `unit is 0.000001 below normal six-decimal rounding.`
     );
   }
@@ -1163,9 +1170,9 @@ function compareProfitAndLoss(productLine, report, fixtureLine, unitReferences) 
     });
   } else {
     informationalNotes.push(
-      "BIHUN handwritten closing/opening/usage/gross/P&L composite fields are an alternate JAGUNG scenario; " +
-        "the verifier gates their internal consistency separately and uses the printed atomic-source profile " +
-        "for engine parity."
+      "BIHUN handwritten closing/opening/usage/gross/P&L composite fields are the boss-confirmed JAGUNG " +
+        "scenario; since the 2026-07-30 stock corrections they are the engine-parity profile and the " +
+        "verifier gates their internal consistency in compareAlternateFixtureEvidence."
     );
   }
 
@@ -1456,7 +1463,42 @@ async function loadFixEvidence(client) {
        JOIN material_variants v ON v.id = e.variant_id AND v.material_id = e.material_id
       WHERE e.id = 171`
   );
-  return { journal: journal.rows[0] || null, stock: stock.rows[0] || null };
+  // Q14: the three June MEE label/sticker rows the co-worker re-rated in production
+  // on 2026-07-29. Each had been keyed at the stale material default instead of the
+  // June rate; together they were the whole +RM883.60 CS_MPMS overstatement.
+  const q14 = await client.query(
+    `SELECT m.code AS material_code, e.variant_id,
+            e.adjustment_quantity, e.unit_cost, e.adjustment_value,
+            m.default_unit_cost
+       FROM material_stock_entries e
+       JOIN materials m ON m.id = e.material_id
+      WHERE e.year = 2026 AND e.month = 6 AND e.product_line = 'mee'
+        AND (
+          (m.code = 'M35' AND e.variant_id = 47)
+          OR (m.code = 'M40' AND e.variant_id IS NULL)
+          OR (m.code = 'M8' AND e.variant_id = 46)
+        )
+      ORDER BY m.code`
+  );
+  // Rows whose stored value disagrees with quantity x unit_cost. /stock/batch
+  // recomputes the value from the rate on every save, so any such row silently
+  // changes value the next time its month is re-saved through the Material Stock page.
+  const inconsistent = await client.query(
+    `SELECT e.year, e.month, e.product_line, m.code AS material_code, e.variant_id,
+            e.unit_cost, e.adjustment_value,
+            ROUND(e.adjustment_quantity * e.unit_cost, 2) AS quantity_times_cost
+       FROM material_stock_entries e
+       JOIN materials m ON m.id = e.material_id
+      WHERE e.year = 2026 AND e.product_line IN ('mee', 'bihun')
+        AND ABS(e.adjustment_value - ROUND(e.adjustment_quantity * e.unit_cost, 2)) > 0.01
+      ORDER BY e.month, e.product_line, m.code`
+  );
+  return {
+    journal: journal.rows[0] || null,
+    stock: stock.rows[0] || null,
+    q14: q14.rows,
+    inconsistent: inconsistent.rows,
+  };
 }
 
 /** @param {object} evidence */
@@ -1557,6 +1599,80 @@ function compareFixEvidence(evidence) {
           "future fallback pricing needs separate user approval."
       );
     }
+  }
+
+  // Q14 — the June rate corrections applied in production on 2026-07-29.
+  const Q14_ROWS = [
+    { code: "M8", variantId: 46, quantity: 58000, unitCost: 0.035, value: 2030, staleDefault: 0.04 },
+    { code: "M35", variantId: 47, quantity: 47879, unitCost: 0.075, value: 3590.92, staleDefault: 0.08 },
+    { code: "M40", variantId: null, quantity: 70840, unitCost: 0.225, value: 15939, staleDefault: 0.23 },
+  ];
+  checkStructure(
+    "q14.rowSet",
+    "Q14 row set remains the three June MEE label/sticker rows",
+    evidence.q14.length === Q14_ROWS.length &&
+      Q14_ROWS.every((expected) =>
+        evidence.q14.some(
+          (row) =>
+            row.material_code === expected.code &&
+            (row.variant_id === null ? null : Number(row.variant_id)) === expected.variantId
+        )
+      ),
+    JSON.stringify(evidence.q14)
+  );
+  for (const expected of Q14_ROWS) {
+    const row = evidence.q14.find(
+      (candidate) =>
+        candidate.material_code === expected.code &&
+        (candidate.variant_id === null ? null : Number(candidate.variant_id)) === expected.variantId
+    );
+    if (!row) continue;
+    const label = `Q14 ${expected.code}${expected.variantId ? `/${expected.variantId}` : ""}`;
+    compareNumber({
+      id: `q14.${expected.code}.quantity`,
+      label: `${label} quantity`,
+      actual: row.adjustment_quantity,
+      expected: expected.quantity,
+      measure: "unit",
+    });
+    compareNumber({
+      id: `q14.${expected.code}.unitCost`,
+      label: `${label} June unit cost`,
+      actual: row.unit_cost,
+      expected: expected.unitCost,
+      measure: "unit",
+    });
+    compareNumber({
+      id: `q14.${expected.code}.value`,
+      label: `${label} stock value`,
+      actual: row.adjustment_value,
+      expected: expected.value,
+      measure: "money",
+    });
+    if (Number(row.default_unit_cost) === expected.staleDefault) {
+      informationalNotes.push(
+        `Material ${expected.code} still defaults to RM${expected.staleDefault.toFixed(4)} ` +
+          `while its June rate is RM${expected.unitCost.toFixed(4)}. The Q14 fix covers June 2026 only; ` +
+          `a later month keyed without an explicit rate would reintroduce the overstatement.`
+      );
+    }
+  }
+
+  if (evidence.inconsistent.length > 0) {
+    informationalNotes.push(
+      `${evidence.inconsistent.length} 2026 stock row(s) store a value that disagrees with ` +
+        `quantity x unit_cost, so re-saving their month through the Material Stock page would ` +
+        `change the value: ` +
+        evidence.inconsistent
+          .map(
+            (row) =>
+              `${row.year}-${String(row.month).padStart(2, "0")} ${row.product_line} ` +
+              `${row.material_code}${row.variant_id ? `/${row.variant_id}` : ""} ` +
+              `${Number(row.adjustment_value).toFixed(2)} -> ${Number(row.quantity_times_cost).toFixed(2)}`
+          )
+          .join("; ") +
+        "."
+    );
   }
 }
 

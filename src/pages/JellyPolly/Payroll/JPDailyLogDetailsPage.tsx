@@ -16,6 +16,7 @@ import {
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
@@ -113,6 +114,9 @@ const JPDailyLogDetailsPage: React.FC<JPDailyLogDetailsPageProps> = ({
 }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const goBack = useSmartBack(
+    `/jellypolly/payroll/${jobType.toLowerCase().replace("_", "-")}-production`
+  );
   const [workLog, setWorkLog] = useState<DailyWorkLog | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const jobConfig = getJPJobConfig(jobType);
@@ -144,7 +148,7 @@ const JPDailyLogDetailsPage: React.FC<JPDailyLogDetailsPageProps> = ({
   };
 
   const handleBack = () => {
-    navigate(`/jellypolly/payroll/${jobType.toLowerCase().replace("_", "-")}-production`);
+    goBack();
   };
 
   const handleEdit = () => {

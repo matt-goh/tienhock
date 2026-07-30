@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import Button from "../../../components/Button";
 import { Employee } from "../../../types/types";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import { format } from "date-fns";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Checkbox from "../../../components/Checkbox";
@@ -145,6 +146,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   jobType = "MAINTENANCE",
 }) => {
   const navigate = useNavigate();
+  const goBack = useSmartBack(
+    `/payroll/${jobType.toLowerCase().replace("_", "-")}-monthly`
+  );
   const {
     staffs: allStaffs,
     loading: loadingStaffs,
@@ -1184,15 +1188,29 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
         deletedLeaveIds: deletedLeaveIds,
       };
 
+      const monthlyBasePath: string = `/payroll/${jobType
+        .toLowerCase()
+        .replace("_", "-")}-monthly`;
+
       if (mode === "edit" && existingWorkLog) {
         await api.put(`/api/monthly-work-logs/${existingWorkLog.id}`, payload);
         toast.success("Monthly work log updated successfully");
+        goBack();
       } else {
-        await api.post("/api/monthly-work-logs", payload);
+        const response: { workLogId?: number } = await api.post(
+          "/api/monthly-work-logs",
+          payload
+        );
         toast.success("Monthly work log created successfully");
+        const newLogId: number | undefined = response?.workLogId;
+        // Show the log just created. `replace` drops this form from history,
+        // so Back returns to wherever the user started.
+        if (newLogId) {
+          navigate(`${monthlyBasePath}/${newLogId}`, { replace: true });
+        } else {
+          goBack();
+        }
       }
-
-      navigate(`/payroll/${jobType.toLowerCase().replace("_", "-")}-monthly`);
     } catch (error: any) {
       console.error("Error saving monthly work log:", error);
       console.error("Error details:", error?.data);
@@ -1211,7 +1229,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     if (onCancel) {
       onCancel();
     } else {
-      navigate(`/payroll/${jobType.toLowerCase().replace("_", "-")}-monthly`);
+      goBack();
     }
   };
 

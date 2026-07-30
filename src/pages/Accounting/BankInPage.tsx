@@ -14,6 +14,28 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import TimeNavigator from "../../components/TimeNavigator";
 import { api } from "../../routes/utils/api";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
+
+const FILTERS_STORAGE_KEY = "bankInListDateRange";
+const SCROLL_RESTORATION_KEY = "bank-in-list";
+
+// The history-table date filter is stored as bare yyyy-MM-dd strings, so it
+// round-trips through JSON untouched (empty string = "All dates").
+const loadCachedDateRange = (): { start: string; end: string } => {
+  try {
+    const cached = localStorage.getItem(FILTERS_STORAGE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      return {
+        start: typeof parsed.start === "string" ? parsed.start : "",
+        end: typeof parsed.end === "string" ? parsed.end : "",
+      };
+    }
+  } catch (e) {
+    console.error("Error loading cached bank-in date range:", e);
+  }
+  return { start: "", end: "" };
+};
 
 // Parse a yyyy-MM-dd string into a local Date (null when empty/invalid).
 const parseYmd = (s: string): Date | null => {
@@ -94,8 +116,24 @@ const BankInPage: React.FC = () => {
   const [cancelTarget, setCancelTarget] = useState<BankInRow | null>(null);
 
   // History-table date filter (scopes only the bank-in list, not the pools/receipts).
-  const [filterStart, setFilterStart] = useState<string>("");
-  const [filterEnd, setFilterEnd] = useState<string>("");
+  // Restored from cache so returning from a journal keeps the same range.
+  const [filterStart, setFilterStart] = useState<string>(
+    () => loadCachedDateRange().start
+  );
+  const [filterEnd, setFilterEnd] = useState<string>(
+    () => loadCachedDateRange().end
+  );
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        FILTERS_STORAGE_KEY,
+        JSON.stringify({ start: filterStart, end: filterEnd })
+      );
+    } catch (e) {
+      console.error("Error caching bank-in date range:", e);
+    }
+  }, [filterStart, filterEnd]);
 
   const [postingDate, setPostingDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
   const [bankAccount, setBankAccount] = useState<string>("BANK_PBB");
@@ -134,6 +172,10 @@ const BankInPage: React.FC = () => {
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  // Restore the previous scroll position when returning from an RV journal.
+  // Only the history list is restorable, so skip it while a form is open.
+  useScrollRestoration(SCROLL_RESTORATION_KEY, !loading && !formMode);
 
   const fetchNextRv = useCallback(async (dateStr: string) => {
     try {

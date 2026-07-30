@@ -46,6 +46,17 @@ const EXPECT = {
   notes: 34,
 };
 
+/** Seeds deliberately removed from the live chart after the G3 load. The
+ *  historical payload (fixtures, G0 chains, staging, journals) still contains
+ *  them - only the live account row and its zero opening fence were deleted,
+ *  so the verifier treats their absence as approved, not corruption. */
+const REMOVED_SEEDS = new Map([
+  [
+    "PBB1",
+    "Removed 2026-07-30: dormant duplicate of PBB_1 (identical printed description, zero journal lines, single 0.00 opening fence). User-directed; dev/migrations/2026-07-30_greentarget_remove_pbb1.sql.",
+  ],
+]);
+
 /** ledger_type rule (G3 decision 5) - keyed on the PRINTED APPX so it is
  *  stable regardless of how fs_note is interpreted. */
 const BK_NOTE = "19"; // Cash At Bank
@@ -299,13 +310,13 @@ const isUntouchedSeed = (row) =>
   row.created_by === G3_CREATED_BY && row.updated_by === G3_CREATED_BY;
 
 check(
-  db.size >= EXPECT.chartRows,
-  `database holds at least the ${EXPECT.chartRows} required legacy accounts`,
+  db.size >= EXPECT.chartRows - REMOVED_SEEDS.size,
+  `database holds at least the ${EXPECT.chartRows - REMOVED_SEEDS.size} required legacy accounts (${REMOVED_SEEDS.size} approved removal(s))`,
   `found ${db.size}`
 );
 
 {
-  const missing = [...expected.keys()].filter((c) => !db.has(c));
+  const missing = [...expected.keys()].filter((c) => !db.has(c) && !REMOVED_SEEDS.has(c));
   const extra = [...db.keys()].filter((c) => !expected.has(c));
   check(missing.length === 0, "every source account exists in the chart", missing.slice(0, 10).join(", "));
   check(
@@ -325,13 +336,13 @@ check(
 {
   const unresolved = tbByPeriod["06"]
     .map((r) => normalizePrinted(r.acc_code))
-    .filter((c) => !db.has(c));
+    .filter((c) => !db.has(c) && !REMOVED_SEEDS.has(c));
   check(unresolved.length === 0, "all 474 printed TB accounts + DEBTOR resolve", unresolved.join(", "));
 }
 
 // Every non-excluded GTLD ledger section has a chart row (the import needs one).
 {
-  const orphan = gtld.filter((s) => !s.excluded && !db.has(s.code)).map((s) => s.code);
+  const orphan = gtld.filter((s) => !s.excluded && !db.has(s.code) && !REMOVED_SEEDS.has(s.code)).map((s) => s.code);
   check(orphan.length === 0, "every non-excluded GTLD ledger section has a chart row", orphan.join(", "));
 }
 // Every GTDB debtor section has a chart row (G4 journal lines FK to these).
@@ -389,12 +400,16 @@ console.log("\n-- 2. field fidelity --------------------------------------------
 {
   const pbb1 = db.get("PBB1");
   const pbb_1 = db.get("PBB_1");
+  // PBB1 was deliberately removed from the live chart on 2026-07-30 (see
+  // REMOVED_SEEDS). If it is ever re-created, the original duplicate-identity
+  // assertion applies again.
   check(
-    !!pbb1 &&
-      !!pbb_1 &&
-      ((!isUntouchedSeed(pbb1) || !isUntouchedSeed(pbb_1)) ||
+    !!pbb_1 &&
+      (!pbb1 ||
+        !isUntouchedSeed(pbb1) ||
+        !isUntouchedSeed(pbb_1) ||
         (pbb1.description === pbb_1.description && pbb1.description === "PBB-A/C:3137836814 (BW)")),
-    "trap 2: PBB1 and PBB_1 remain separate identities; untouched descriptions retain the evidenced duplicate"
+    "trap 2: PBB_1 survives; PBB1 is an approved removal (or, if re-created, keeps the evidenced duplicate identity)"
   );
   const genuineSpace = ["AE ENTERPRISE", "LEE DECOR", "RUMAH MERAH", "SUN TARGET"];
   const kept = genuineSpace.filter((c) => db.has(c));
@@ -413,7 +428,7 @@ console.log("\n-- 2. field fidelity --------------------------------------------
   }
   const shared = [...byDesc.values()].filter((n) => n > 1).length;
   check(
-    shared > 0 && legacyDbRows.length === EXPECT.chartRows,
+    shared > 0 && legacyDbRows.length === EXPECT.chartRows - REMOVED_SEEDS.size,
     `trap 3: ${shared} legacy descriptions are shared by >1 code and no seed identity was deduped`
   );
 }
@@ -553,6 +568,7 @@ console.log("\n-- 5. printed-statement reconciliation (June 2026) --------------
   let missingChain = [];
   for (const [code, evidence] of expected) {
     if (code === "DEBTOR" || code === "BTFS") continue; // no ledger movement by design
+    if (REMOVED_SEEDS.has(code)) continue; // approved removal - its G0 section chain stays in the historical payload
     const s = sections.get(code);
     if (!s) {
       missingChain.push(code);

@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import Button from "../../../components/Button";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -23,6 +24,7 @@ interface Dumpster {
 
 const DumpsterFormPage: React.FC = () => {
   const navigate = useNavigate();
+  const goBack = useSmartBack("/greentarget/dumpsters");
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
 
@@ -118,13 +120,13 @@ const DumpsterFormPage: React.FC = () => {
     if (isFormChanged) {
       setShowBackConfirmation(true);
     } else {
-      navigate("/greentarget/dumpsters");
+      goBack();
     }
   };
 
   const handleConfirmBack = () => {
     setShowBackConfirmation(false);
-    navigate("/greentarget/dumpsters");
+    goBack();
   };
 
   const checkDuplicateTongNo = async (value: string) => {
@@ -175,7 +177,17 @@ const DumpsterFormPage: React.FC = () => {
         });
         toast.success("Dumpster created successfully!");
       }
-      navigate("/greentarget/dumpsters");
+      if (isEditMode) {
+        goBack();
+      } else {
+        // Show the dumpster just created (the route key is its tong number).
+        // `replace` drops this form from history, so Back returns to wherever
+        // the user started.
+        navigate(
+          `/greentarget/dumpsters/${encodeURIComponent(formData.tong_no)}`,
+          { replace: true }
+        );
+      }
     } catch (error: any) {
       if (error.message && error.message.includes("already exists")) {
         toast.error("A dumpster with this number already exists");

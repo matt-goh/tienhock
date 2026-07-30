@@ -21,6 +21,7 @@ import {
   useJournalEntryTypesCache,
 } from "../../utils/accounting/useAccountingCache";
 import BackButton from "../../components/BackButton";
+import { useSmartBack } from "../../hooks/useSmartBack";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
@@ -85,6 +86,7 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
   const journalEntriesPath: string = isGreenTarget
     ? "/greentarget/accounting/journal-entries"
     : "/accounting/journal-entries";
+  const goBack = useSmartBack(journalEntriesPath);
 
   // Data state
   const [entry, setEntry] = useState<JournalEntry | null>(null);
@@ -198,7 +200,7 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
 
   // Handlers
   const handleBack = () => {
-    navigate(journalEntriesPath);
+    goBack();
   };
 
   const handleEdit = () => {

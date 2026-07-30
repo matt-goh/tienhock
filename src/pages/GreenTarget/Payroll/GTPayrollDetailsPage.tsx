@@ -569,7 +569,7 @@ const GTPayrollDetailsPage: React.FC = () => {
     <div className="space-y-3 pb-6">
       <div className="sticky top-1 z-20 -mx-1 flex flex-col items-start justify-between gap-2 rounded-lg border border-default-200 bg-white/95 px-3 py-2 shadow-sm backdrop-blur dark:border-gray-700 dark:bg-gray-800/95 md:flex-row md:items-center">
         <div className="flex min-w-0 items-center gap-4">
-          <BackButton onClick={() => navigate(payrollListUrl)} />
+          <BackButton fallbackPath={payrollListUrl} />
           <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
           <div className="min-w-0">
             <h1

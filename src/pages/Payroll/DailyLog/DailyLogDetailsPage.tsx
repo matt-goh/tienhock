@@ -16,6 +16,7 @@ import {
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
@@ -113,6 +114,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
 }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const goBack = useSmartBack(`/payroll/${jobType.toLowerCase()}-production`);
   const [workLog, setWorkLog] = useState<DailyWorkLog | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const jobConfig = getJobConfig(jobType);
@@ -144,7 +146,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
   };
 
   const handleBack = () => {
-    navigate(`/payroll/${jobType.toLowerCase()}-production`);
+    goBack();
   };
 
   const handleEdit = () => {

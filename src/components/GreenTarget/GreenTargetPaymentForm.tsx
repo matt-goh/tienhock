@@ -93,7 +93,6 @@ const getApiErrorMessage = (error: unknown): string => {
 };
 
 const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
-  payment,
   onClose,
   onSuccess,
 }) => {
@@ -366,19 +365,11 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex bg-black/55 sm:p-3">
       <div className="flex h-full w-full flex-col overflow-hidden bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900 sm:rounded-xl sm:border sm:border-gray-200">
-        <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700 sm:px-5">
-          <div className="min-w-0">
-            <h3 className="truncate text-lg font-semibold text-gray-900 dark:text-gray-100">
-              {payment ? "Edit Payment" : "Record New Payment"}
-            </h3>
-            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
-              Record a customer payment and choose the invoices it pays.
-            </p>
-          </div>
+        <div className="flex flex-shrink-0 items-center justify-end border-b border-gray-200 px-2 py-1 dark:border-gray-700 sm:px-3">
           <button
             type="button"
             onClick={onClose}
-            className="ml-3 flex-shrink-0 rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+            className="flex-shrink-0 rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
             disabled={isSubmitting}
             aria-label="Close payment form"
           >

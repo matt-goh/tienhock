@@ -15,6 +15,7 @@ import {
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import { api } from "../../../routes/utils/api";
@@ -86,6 +87,9 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
 }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const goBack = useSmartBack(
+    `/payroll/${jobType.toLowerCase().replace("_", "-")}-monthly`
+  );
   const jobConfig = getJobConfig(jobType);
   const supportsDayTypeHours = jobType !== "OFFICE";
 
@@ -122,7 +126,7 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
   }, [id, jobType, navigate]);
 
   const handleBack = () => {
-    navigate(`/payroll/${jobType.toLowerCase().replace("_", "-")}-monthly`);
+    goBack();
   };
 
   const handleEdit = () => {

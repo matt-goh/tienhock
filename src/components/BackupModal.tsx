@@ -25,6 +25,9 @@ import { useLocation, useNavigate } from "react-router-dom";
 // Use Vite's built-in MODE for frontend environment detection
 const NODE_ENV = import.meta.env.MODE;
 
+// Upper bound for one backup download; the fetch always settles within this
+const DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1000;
+
 interface BackupModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -80,6 +83,8 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
   const [downloadingBackup, setDownloadingBackup] = useState<string | null>(
     null
   );
+  const [downloadedBytes, setDownloadedBytes] = useState<number | null>(null);
+  const downloadAbortRef = useRef<AbortController | null>(null);
   const isBlockingOperation = restoring || uploading || downloading;
   const isBusy = loading || isBlockingOperation;
   const isSqlReplacementAvailable: boolean = NODE_ENV === "development";
@@ -88,6 +93,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
   // Reset backup name when modal closes
   useEffect(() => {
     if (!isOpen) {
+      downloadAbortRef.current?.abort();
       setBackupName(defaultBackUpName);
       setShowBackupNameInput(false);
       setSqlFileToReplaceFrom(null);
@@ -339,9 +345,18 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
   };
 
   const handleDownload = async (filename: string) => {
+    // Guarantee the fetch always settles so the modal can never be stuck
+    const abortController = new AbortController();
+    downloadAbortRef.current = abortController;
+    const timeoutId = setTimeout(
+      () => abortController.abort(),
+      DOWNLOAD_TIMEOUT_MS
+    );
+
     try {
       setDownloading(true);
       setDownloadingBackup(filename);
+      setDownloadedBytes(null);
       setError(null);
 
       // Use the same pattern as the api utility but handle blob response
@@ -353,20 +368,21 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
             "Content-Type": "application/json",
             "x-session-id": sessionId,
           },
+          signal: abortController.signal,
         }
       );
 
       // Check if response is ok before trying to get blob
       if (!response.ok) {
         // Try to get error message from JSON response
+        let message = `Download failed with status: ${response.status}`;
         try {
           const errorData = await response.json();
-          throw new Error(
-            errorData.message || errorData.error || "Download failed"
-          );
+          message = errorData.message || errorData.error || message;
         } catch {
-          throw new Error(`Download failed with status: ${response.status}`);
+          // Response was not JSON (e.g. a gateway error page); keep generic message
         }
+        throw new Error(message);
       }
 
       // Get the filename from response headers or use the original filename
@@ -380,8 +396,25 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
         }
       }
 
+      // Stream the body with progress so large SQL conversions show movement
+      let blob: Blob;
+      if (response.body) {
+        const reader = response.body.getReader();
+        const chunks: BlobPart[] = [];
+        let received = 0;
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+          received += value.byteLength;
+          setDownloadedBytes(received);
+        }
+        blob = new Blob(chunks, { type: "application/sql" });
+      } else {
+        blob = await response.blob();
+      }
+
       // Create blob and download
-      const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -393,11 +426,20 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
 
       toast.success("Backup downloaded successfully!");
     } catch (error: any) {
-      console.error("Download failed:", error);
-      toast.error(`Failed to download backup: ${error.message}`);
+      if (abortController.signal.aborted) {
+        toast.error("Download was cancelled or timed out. Please try again.");
+      } else {
+        console.error("Download failed:", error);
+        toast.error(`Failed to download backup: ${error.message}`);
+      }
     } finally {
+      clearTimeout(timeoutId);
+      if (downloadAbortRef.current === abortController) {
+        downloadAbortRef.current = null;
+      }
       setDownloading(false);
       setDownloadingBackup(null);
+      setDownloadedBytes(null);
     }
   };
 
@@ -460,6 +502,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
 
   useEffect(() => {
     return () => {
+      downloadAbortRef.current?.abort();
       stopRestoreStatusPolling();
       toast.dismiss("restore-status");
     };
@@ -532,7 +575,15 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
         <Dialog
           className="fixed inset-0 z-50 overflow-y-auto"
           open={isOpen}
-          onClose={isBlockingOperation ? () => {} : onClose}
+          onClose={
+            restoring || uploading
+              ? () => {}
+              : () => {
+                  // A download is read-only; closing cancels it cleanly
+                  downloadAbortRef.current?.abort();
+                  onClose();
+                }
+          }
         >
           <div className="min-h-screen px-4 text-center">
             <TransitionChild
@@ -833,7 +884,12 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                         </h3>
                         <p className="text-default-600 dark:text-gray-300">
                           {downloading
-                            ? "Preparing the SQL backup download..."
+                            ? downloadedBytes !== null
+                              ? `Downloading SQL backup... ${(
+                                  downloadedBytes /
+                                  (1024 * 1024)
+                                ).toFixed(1)} MB received`
+                              : "Preparing the SQL backup download..."
                             : restorePhase === "INITIALIZATION"
                             ? "Preparing database replacement..."
                             : restorePhase === "DATABASE_VALIDATION"
@@ -855,7 +911,9 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                             : "Please wait while the database is being restored"}
                         </p>
                         <p className="text-sm text-default-500 dark:text-gray-400">
-                          Please keep this window open until it finishes.
+                          {downloading
+                            ? "Large backups can take several minutes. Closing this window cancels the download."
+                            : "Please keep this window open until it finishes."}
                         </p>
                       </div>
                     </div>

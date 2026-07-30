@@ -5,6 +5,7 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import BackButton from "../../../components/BackButton";
+import { useSmartBack } from "../../../hooks/useSmartBack";
 import Button from "../../../components/Button";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -90,6 +91,9 @@ const InvoiceFormPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
+  const goBack = useSmartBack(
+    isEditMode && id ? `/greentarget/invoices/${id}` : "/greentarget/invoices"
+  );
   const location = useLocation();
   const rentalData = location.state; // Data passed from RentalListPage potentially
 
@@ -569,18 +573,11 @@ const InvoiceFormPage: React.FC = () => {
   };
   const handleBackClick = () => {
     if (isFormChanged) setShowBackConfirmation(true);
-    else
-      navigate(
-        isEditMode && id
-          ? `/greentarget/invoices/${id}`
-          : "/greentarget/invoices"
-      );
+    else goBack();
   };
   const handleConfirmBack = () => {
     setShowBackConfirmation(false);
-    navigate(
-      isEditMode && id ? `/greentarget/invoices/${id}` : "/greentarget/invoices"
-    );
+    goBack();
   };
 
   // --- FORM VALIDATION & SUBMIT ---

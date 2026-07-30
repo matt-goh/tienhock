@@ -1405,7 +1405,7 @@ const InvoiceDetailsPage: React.FC = () => {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-4">
-          <BackButton onClick={() => navigate("/jellypolly/sales/invoice")} />
+          <BackButton fallbackPath="/jellypolly/sales/invoice" />
           <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
           <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
             Invoice Details
@@ -1422,7 +1422,7 @@ const InvoiceDetailsPage: React.FC = () => {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-4">
-          <BackButton onClick={() => navigate("/jellypolly/sales/invoice")} />
+          <BackButton fallbackPath="/jellypolly/sales/invoice" />
           <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
           <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
             Invoice Details
@@ -1504,13 +1504,7 @@ const InvoiceDetailsPage: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
         <div className="flex items-center gap-4">
           <BackButton
-            onClick={() => {
-              if (location.state?.fromList) {
-                navigate(-1);
-              } else {
-                navigate("/jellypolly/sales/invoice");
-              }
-            }}
+            fallbackPath="/jellypolly/sales/invoice"
             disabled={isLoading}
           />
           <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
