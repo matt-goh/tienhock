@@ -2368,7 +2368,8 @@ export default function (pool, config) {
             p.payment_method, p.payment_reference, p.internal_reference,
             p.bank_account, p.journal_entry_id, p.is_auto_collection,
             p.receipt_allocation_id, ra.receipt_id,
-            COALESCE(r.journal_entry_id, p.journal_entry_id) as voucher_journal_id,
+            COALESCE(r.journal_entry_id, p.journal_entry_id,
+              CASE WHEN p.is_auto_collection THEN i.journal_entry_id END) as voucher_journal_id,
             r.status as receipt_status, r.display_reference as receipt_reference,
             (SELECT COUNT(*)::integer
                FROM receipts group_r
@@ -2382,10 +2383,12 @@ export default function (pool, config) {
             p.notes, p.created_at, p.status, p.cancellation_date,
             je.reference_no as journal_reference_no
           FROM payments p
+          LEFT JOIN invoices i ON i.id = p.invoice_id
           LEFT JOIN receipt_allocations ra ON ra.id = p.receipt_allocation_id
           LEFT JOIN receipts r ON r.id = ra.receipt_id
           LEFT JOIN journal_entries je
-            ON je.id = COALESCE(r.journal_entry_id, p.journal_entry_id)
+            ON je.id = COALESCE(r.journal_entry_id, p.journal_entry_id,
+              CASE WHEN p.is_auto_collection THEN i.journal_entry_id END)
           WHERE p.invoice_id = $1
           ORDER BY p.payment_date DESC, p.created_at DESC
           `,

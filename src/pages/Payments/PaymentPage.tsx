@@ -17,6 +17,7 @@ import PaymentForm, {
 import PaymentCancellationErrorDialog from "../../components/Invoice/PaymentCancellationErrorDialog";
 import ReceiptDetailsDialog from "../../components/Invoice/ReceiptDetailsDialog";
 import StyledListbox from "../../components/StyledListbox";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 
 interface PaymentFilters {
   dateRange: {
@@ -60,6 +61,16 @@ const PaymentPage: React.FC = () => {
     setSelectedReceiptId(null);
     if (searchParams.has("receipt")) {
       searchParams.delete("receipt");
+      setSearchParams(searchParams, { replace: true });
+    }
+  };
+
+  // Keep the deep-link param in sync when a group is opened from the table, so
+  // returning from a journal entry re-opens the same payment group dialog.
+  const handleViewPaymentGroup = (receiptId: number): void => {
+    setSelectedReceiptId(receiptId);
+    if (searchParams.get("receipt") !== String(receiptId)) {
+      searchParams.set("receipt", String(receiptId));
       setSearchParams(searchParams, { replace: true });
     }
   };
@@ -139,6 +150,9 @@ const PaymentPage: React.FC = () => {
   useEffect(() => {
     fetchPayments();
   }, [fetchPayments]);
+
+  // Restore the previous scroll position when returning (e.g. from a journal entry).
+  useScrollRestoration("payment-list", !loading);
 
   // Unified Time Navigator change handler. Handles day, month, and custom-range
   // selections from the single TimeNavigator control.
@@ -310,7 +324,7 @@ const PaymentPage: React.FC = () => {
           onRefresh={fetchPayments}
           onCancellationError={setPaymentCancellationError}
           onAddPaymentToGroup={handleAddPaymentToGroup}
-          onViewPaymentGroup={setSelectedReceiptId}
+          onViewPaymentGroup={handleViewPaymentGroup}
           requiresClearanceDate
         />
       )}
@@ -319,7 +333,7 @@ const PaymentPage: React.FC = () => {
         error={paymentCancellationError}
         onClose={() => setPaymentCancellationError(null)}
         onViewPaymentGroup={(receiptId: number): void => {
-          setSelectedReceiptId(receiptId);
+          handleViewPaymentGroup(receiptId);
           setPaymentCancellationError(null);
         }}
         onViewJournal={(journalEntryId: number): void => {

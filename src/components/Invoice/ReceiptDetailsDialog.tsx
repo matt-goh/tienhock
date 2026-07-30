@@ -871,13 +871,10 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                                     <Link
                                       key={journal.id}
                                       to={`/accounting/journal-entries/${journal.id}`}
-                                      onClick={handleClose}
                                       className="inline-flex items-center gap-1 font-medium text-sky-600 hover:underline dark:text-sky-400"
                                     >
                                       <IconReceipt size={15} />
-                                      <span className="font-mono">
-                                        {journal.reference_no || "View Journal"}
-                                      </span>
+                                      <span>View Journal</span>
                                       <IconExternalLink size={13} />
                                     </Link>
                                   )
