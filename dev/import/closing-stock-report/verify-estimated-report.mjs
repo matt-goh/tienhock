@@ -380,9 +380,13 @@ function addBackFixture(fixtureLine) {
 }
 
 /**
- * Preserve the internally coherent handwritten BIHUN scenario as evidence without
- * treating it as an engine target. These checks fail if its fixture relationships
- * drift, while the canonical engine comparisons continue to use printed atomic rows.
+ * Preserve the internally coherent handwritten BIHUN scenario as evidence.
+ * Since 2026-07-30 the boss confirmed the handwritten JAGUNG figures were the
+ * true physical counts, the fixture's atomic rows and _printed composites carry
+ * the corrected values (identical to the _handwritten ones), and the engine
+ * parity comparisons target them directly. These checks now mostly gate the
+ * corrected profile against itself, plus the preserved struck values; they
+ * still fail if the fixture relationships drift.
  *
  * @param {object} fixture
  */
@@ -499,12 +503,14 @@ function compareAlternateFixtureEvidence(fixture) {
     measure: "unit",
   });
 
-  const printedIngredientTotal = sumRowAmounts(unit.ingredients);
+  const printedIngredientTotal = sumMoney(
+    unit.ingredients.map((row) => Number(row.amount_struck ?? row.amount))
+  );
   checkStructure(
     "bihun.fixture.printed.ingredientSubtotalOcrGap",
-    "BIHUN printed ingredient subtotal preserves the RM900 OCR discrepancy",
+    "BIHUN struck printed ingredient subtotal preserves the RM900 OCR discrepancy",
     scaled(printedIngredientTotal - Number(unit.ingredients_subtotal.amount_printed), "money") === 90000,
-    `atomic ${printedIngredientTotal.toFixed(2)} vs stored ${Number(unit.ingredients_subtotal.amount_printed).toFixed(2)}`
+    `struck atomic ${printedIngredientTotal.toFixed(2)} vs stored ${Number(unit.ingredients_subtotal.amount_printed).toFixed(2)}`
   );
   const handwrittenIngredientTotal = sumMoney(
     unit.ingredients.map((row) => Number(row.amount_handwritten ?? row.amount))
@@ -908,8 +914,8 @@ function compareUnitCost(productLine, report, fixtureLine, unitFixture) {
   } else {
     informationalNotes.push(
       `BIHUN stored total-before-repair/total amounts ${unitFixture.total_before_repair.amount.toFixed(2)} / ` +
-        `${unitFixture.total.amount.toFixed(2)} belong to the alternate handwritten JAGUNG scenario; ` +
-        `printed atomic rows canonically total ${beforeFixture.toFixed(2)} / ${totalFixture.toFixed(2)}. ` +
+        `${unitFixture.total.amount.toFixed(2)} are the boss-confirmed JAGUNG scenario, which is the canonical ` +
+        `engine profile since the 2026-07-30 stock corrections (atomic rows total ${beforeFixture.toFixed(2)} / ${totalFixture.toFixed(2)}). ` +
         `Their displayed units also sit 0.000045 below their own amount/production math.`
     );
   }
@@ -995,8 +1001,9 @@ function compareUnitCost(productLine, report, fixtureLine, unitFixture) {
   }
   if (productLine === "bihun") {
     informationalNotes.push(
-      `BIHUN atomic printed ingredient rows sum to 276,904.54; the fixture's 276,004.54 printed subtotal ` +
-        `is an OCR inconsistency and 270,744.54 is the separate handwritten JAGUNG scenario; its displayed ` +
+      `BIHUN atomic ingredient rows sum to 270,744.54, the boss-confirmed JAGUNG scenario (canonical since ` +
+        `2026-07-30); the struck printed subtotal 276,004.54 belonged to the mis-keyed JAGUNG scenario ` +
+        `(struck atomic sum 276,904.54, a 900.00 OCR ambiguity). The handwritten subtotal's displayed ` +
         `unit is 0.000001 below normal six-decimal rounding.`
     );
   }
@@ -1163,9 +1170,9 @@ function compareProfitAndLoss(productLine, report, fixtureLine, unitReferences) 
     });
   } else {
     informationalNotes.push(
-      "BIHUN handwritten closing/opening/usage/gross/P&L composite fields are an alternate JAGUNG scenario; " +
-        "the verifier gates their internal consistency separately and uses the printed atomic-source profile " +
-        "for engine parity."
+      "BIHUN handwritten closing/opening/usage/gross/P&L composite fields are the boss-confirmed JAGUNG " +
+        "scenario; since the 2026-07-30 stock corrections they are the engine-parity profile and the " +
+        "verifier gates their internal consistency in compareAlternateFixtureEvidence."
     );
   }
 
