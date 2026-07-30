@@ -8,6 +8,7 @@ import {
   toAmount,
 } from "../../invoice/einvoice/consolidatedReceiptGrouping";
 import GreenTargetLogo from "../../GreenTargetLogo.png";
+import { formatLocationDisplay } from "../formatLocationDisplay";
 
 // Define styles
 const styles = StyleSheet.create({
@@ -416,6 +417,22 @@ const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice, qrCodeData }) => {
   // Create order details for the table using the new line items logic
   const orderDetails = generateLineItems(invoice);
 
+  // Billing address: unique rental locations (site — address), one per line
+  const billingAddressLines: string[] = [];
+  for (const rental of invoice.rental_details ?? []) {
+    const label = formatLocationDisplay(
+      rental.location_site,
+      rental.location_address
+    );
+    if (label && !billingAddressLines.includes(label)) {
+      billingAddressLines.push(label);
+    }
+  }
+  const billingAddress =
+    billingAddressLines.length > 0
+      ? billingAddressLines.join("\n")
+      : invoice.location_address || "-";
+
   return (
     <Page size={"A4"} style={styles.page}>
       {/* Header Section */}
@@ -550,7 +567,7 @@ const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice, qrCodeData }) => {
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Billing Address</Text>
               <Text style={styles.infoValue}>
-                {invoice.location_address || "-"}
+                {billingAddress}
               </Text>
             </View>
             <View style={styles.infoRow}>

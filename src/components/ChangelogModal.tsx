@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-30",
+    ms: "Green Target — Invois: bahagian BILLING TO pada PDF invois kini memaparkan alamat bil pelanggan bersama Site lokasi (contohnya \"Kolombong — Lot 5, Jalan ...\"), diambil dari lokasi sewaan pada invois tersebut. Jika invois meliputi beberapa lokasi, setiap lokasi dipaparkan pada baris berasingan. Sebelum ini ruangan Billing Address sentiasa kosong (\"-\").",
+    en: "Green Target — Invoices: the BILLING TO section of the invoice PDF now shows the customer's billing address together with the location Site (for example \"Kolombong — Lot 5, Jalan ...\"), taken from the rental locations on that invoice. Invoices covering several locations list each one on its own line. Previously the Billing Address field was always blank (\"-\").",
+  },
+  {
+    date: "2026-07-30",
     ms: "Database Backups — Memuat turun backup tidak lagi kelihatan tersekat. Semasa backup dimuat turun, jumlah data yang diterima kini dipaparkan secara langsung (contohnya \"42.5 MB received\") supaya backup besar yang mengambil masa beberapa minit jelas sedang berjalan. Muat turun juga kini mempunyai had masa dan boleh dibatalkan dengan menutup tetingkap, jadi tetingkap backup tidak akan tersepit selamanya jika sambungan terputus.",
     en: "Database Backups — Downloading a backup no longer looks stuck. While a backup downloads, the amount of data received is now shown live (for example \"42.5 MB received\") so large backups that take several minutes are clearly progressing. The download also has a time limit and can be cancelled by closing the window, so the backup window can never be trapped forever if the connection stalls.",
   },
