@@ -25,6 +25,11 @@ const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   },
   {
     date: "2026-07-30",
+    ms: "Payments — lajur Journal pada halaman Payments dan di dalam tetingkap kumpulan bayaran kini memaparkan pautan \"View Journal\" menggantikan kod dalaman seperti REC-202607-0223, dan kutipan bil tunai turut dipautkan ke jurnal invoisnya. Selepas melihat jurnal dan menekan Back, anda kembali tepat ke kedudukan asal: halaman Payments mengekalkan kedudukan skrol, dan kumpulan bayaran yang sedang dibuka terbuka semula secara automatik.",
+    en: "Payments — the Journal column on the Payments page and inside the payment group dialog now shows a \"View Journal\" link instead of internal codes like REC-202607-0223, and cash-bill collections now link to their invoice's journal entry too. After viewing a journal and going Back, you land exactly where you were: the Payments page keeps your scroll position, and the payment group you had open re-opens automatically.",
+  },
+  {
+    date: "2026-07-30",
     ms: "Estimated P&L / Unit Cost — Angka JAGUNG Bihun bulan Jun telah dibetulkan mengikut kiraan stok fizikal sebenar: stok penutup JAGUNG kini RM22,086.00 (sebelum ini RM21,546.00) dan stok pembuka RM33,209.00 (sebelum ini RM38,829.00), kerana kiraan beg yang dimasukkan sebelum ini tersilap satu digit. Jumlah stok, P/L, ACCUMULATIVE dan unit cost Bihun Jun turut berubah mengikut pembetulan ini. Add Back Jun (MEE 9,658.83 / BIHUN 6,662.66) juga telah dimasukkan, jadi baris FINAL P/L kini memaparkan jumlah akhir seperti yang dikira oleh bos.",
     en: "Estimated P&L / Unit Cost — June Bihun JAGUNG figures have been corrected to the actual physical stock counts: JAGUNG closing stock is now RM22,086.00 (was RM21,546.00) and opening stock RM33,209.00 (was RM38,829.00), because the previously keyed bag counts were off by one digit. June Bihun stock totals, P/L, ACCUMULATIVE and unit cost move accordingly. The June Add Back amounts (MEE 9,658.83 / BIHUN 6,662.66) have also been entered, so the FINAL P/L line now shows the final figures as worked out by the boss.",
   },
