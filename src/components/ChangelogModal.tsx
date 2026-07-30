@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-07-30",
+    ms: "Estimated P&L / Unit Cost — Angka JAGUNG Bihun bulan Jun telah dibetulkan mengikut kiraan stok fizikal sebenar: stok penutup JAGUNG kini RM22,086.00 (sebelum ini RM21,546.00) dan stok pembuka RM33,209.00 (sebelum ini RM38,829.00), kerana kiraan beg yang dimasukkan sebelum ini tersilap satu digit. Jumlah stok, P/L, ACCUMULATIVE dan unit cost Bihun Jun turut berubah mengikut pembetulan ini. Add Back Jun (MEE 9,658.83 / BIHUN 6,662.66) juga telah dimasukkan, jadi baris FINAL P/L kini memaparkan jumlah akhir seperti yang dikira oleh bos.",
+    en: "Estimated P&L / Unit Cost — June Bihun JAGUNG figures have been corrected to the actual physical stock counts: JAGUNG closing stock is now RM22,086.00 (was RM21,546.00) and opening stock RM33,209.00 (was RM38,829.00), because the previously keyed bag counts were off by one digit. June Bihun stock totals, P/L, ACCUMULATIVE and unit cost move accordingly. The June Add Back amounts (MEE 9,658.83 / BIHUN 6,662.66) have also been entered, so the FINAL P/L line now shows the final figures as worked out by the boss.",
+  },
+  {
+    date: "2026-07-30",
     ms: "Green Target — Pelanggan kini boleh mempunyai Alamat Bil berasingan (contohnya alamat pejabat), selain daripada lokasi servis/pickup mereka. Isi ruangan Billing Address baharu pada borang pelanggan dan ia akan dipaparkan sebagai Billing Address pada bahagian BILLING TO invois PDF dan e-Invois individu pelanggan itu; kosongkannya untuk terus menggunakan alamat lokasi sewaan seperti sebelum ini. Alamat bil ini boleh diubah pada bila-bila masa melalui halaman sunting pelanggan.",
     en: "Green Target — Customers can now have their own Billing Address (for example an office address), separate from their service/pickup locations. Fill in the new Billing Address field on the customer form and it appears as the Billing Address in the BILLING TO section of that customer's invoice PDFs and individual e-Invoices; leave it blank to keep billing to the rental location address as before. It can be changed anytime from the customer edit page.",
   },

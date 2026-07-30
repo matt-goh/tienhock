@@ -87,7 +87,7 @@
     ],
     "totals": { "bags": 32172, "amount": 541667.60 },
     "closing_stock": [
-      { "code": "CS_BJAG", "description": "JAGUNG", "amount": 21546.00, "amount_handwritten": 22086.00, "verified_db": true, "maps_to": "material B3 (bihun)", "delta_note": "printed value matches DB; handwritten 22,086.00 was a boss manual correction" },
+      { "code": "CS_BJAG", "description": "JAGUNG", "amount": 22086.00, "amount_struck": 21546.00, "amount_handwritten": 22086.00, "verified_db": true, "maps_to": "material B3 (bihun)", "delta_note": "CORRECTED 2026-07-30: boss-confirmed physical count 409 bags x RM54.00 = 22,086.00 (the keyed 399 bags / struck printed 21,546.00 was a one-digit typo; the boss's handwritten figure was right)" },
       { "code": "CS_BSDM", "description": "SODIUM", "amount": 1269.95, "verified_db": true, "maps_to": "material SODIUM_1 (+SODIUM_2) (bihun)" },
       { "code": "CS_BTH2", "description": "TH-2", "amount": 0.00, "verified_db": true, "maps_to": "material B2 (bihun)" },
       { "code": "CS_BBER", "description": "BERAS", "amount": 194663.40, "verified_db": true, "maps_to": "material B19 (bihun)" },
@@ -99,9 +99,9 @@
       { "code": "CS_BTAP", "description": "SELOTAPE", "amount": 811.20, "verified_db": true, "maps_to": "material B17 (bihun)" },
       { "code": "CS_BFIN", "description": "STOCK LORRY & KILANG", "amount": 81409.52, "verified_db": true, "maps_to": "material_stock_kilang_entries bihun sum" }
     ],
-    "closing_stock_subtotals": { "packing": 47886.59, "with_finished_printed": 414145.86, "with_finished_handwritten": 414685.86, "grand_total_with_sales_handwritten": 956353.46 },
+    "closing_stock_subtotals": { "packing": 47886.59, "with_finished_printed": 414685.86, "with_finished_struck": 414145.86, "with_finished_handwritten": 414685.86, "grand_total_with_sales_handwritten": 956353.46, "correction_note": "with_finished_printed updated 2026-07-30 to the boss-corrected total; the struck 414,145.86 was printed from the mis-keyed JAGUNG count" },
     "opening_stock": [
-      { "code": "OS_BJAG", "description": "JAGUNG", "amount": 38829.00, "amount_handwritten": 33209.00, "verified_db": true, "delta_note": "printed value matches DB (May closing); handwritten 33,209.00 was a boss manual correction" },
+      { "code": "OS_BJAG", "description": "JAGUNG", "amount": 33209.00, "amount_struck": 38829.00, "amount_handwritten": 33209.00, "verified_db": true, "delta_note": "CORRECTED 2026-07-30: boss-confirmed May physical count = 196 bags x RM70.25 (KK RICE) + 360 bags x RM54.00 (HOMCO) = 33,209.00 (the keyed 276 KK RICE bags / struck printed 38,829.00 was a one-digit typo)" },
       { "code": "OS_BSDM", "description": "SODIUM METALBISULPHITE", "amount": 1427.09, "verified_db": true },
       { "code": "OS_BTH2", "description": "TH-2", "amount": 0.00, "verified_db": true },
       { "code": "OS_BBER", "description": "BERAS", "amount": 208934.50, "verified_db": true },
@@ -113,7 +113,7 @@
       { "code": "OS_BTAP", "description": "SELOTAPE-BIHUN", "amount": 1583.40, "verified_db": true },
       { "code": "OS_BFIN", "description": "FINISH PRODUCTS", "amount": 116869.50, "verified_db": true }
     ],
-    "opening_stock_subtotals": { "jagung_sodium_group_handwritten": 34636.09, "packing": 68799.26, "grand_total_printed": 491931.65, "grand_total_handwritten": 486311.65 },
+    "opening_stock_subtotals": { "jagung_sodium_group_handwritten": 34636.09, "packing": 68799.26, "grand_total_printed": 486311.65, "grand_total_struck": 491931.65, "grand_total_handwritten": 486311.65, "correction_note": "grand_total_printed updated 2026-07-30 to the boss-corrected total; the struck 491,931.65 was printed from the mis-keyed JAGUNG count" },
     "purchases": [
       { "code": "PU_BJAG", "description": "JAGUNG", "amount": 17280.00, "verified_db": true },
       { "code": "PU_BSDM", "description": "SODIUM METALBISULPHITE", "amount": 0.00, "verified_db": true },
@@ -129,16 +129,18 @@
     ],
     "purchase_total": 255491.40,
     "footer": {
-      "os_plus_purchases_plus_returns_printed": 747688.15,
+      "os_plus_purchases_plus_returns_printed": 742068.15,
       "os_plus_purchases_plus_returns_handwritten": 742068.15,
-      "gross_profit_printed": 208125.31,
+      "gross_profit_printed": 214285.31,
       "gross_profit_handwritten": 214285.31,
       "expenses": 137602.88,
-      "pl_printed": 70522.43,
+      "pl_printed": 76682.43,
       "pl_handwritten": 76682.43,
-      "accumulative": 475457.87,
+      "accumulative": 481617.87,
+      "accumulative_struck": 475457.87,
       "add_back_handwritten": 6662.66,
-      "final_pl_handwritten": 83345.09
+      "final_pl_handwritten": 83345.09,
+      "correction_note": "CORRECTED 2026-07-30: the _printed usage/gross/P&L fields now hold the boss-corrected JAGUNG scenario (identical to _handwritten; the struck values 747,688.15 / 208,125.31 / 70,522.43 / 475,457.87 were printed from the mis-keyed JAGUNG counts). accumulative = confirmed anchor 404,935.44 + corrected P/L 76,682.43 = 481,617.87"
     }
   },
   "unit_cost": {
@@ -196,13 +198,13 @@
       "sales": { "amount": 541667.60, "unit": 16.836616 },
       "production_bags": 30092,
       "ingredients": [
-        { "name": "JAGUNG", "amount": 34563.00, "amount_handwritten": 28403.00, "unit_handwritten": 0.943872, "verified_db": true, "delta_note": "printed 34,563.00 = DB-derived (OS 38,829 + PU 17,280 - CS 21,546); handwritten uses corrected stock values" },
+        { "name": "JAGUNG", "amount": 28403.00, "amount_struck": 34563.00, "amount_handwritten": 28403.00, "unit_handwritten": 0.943872, "verified_db": true, "delta_note": "CORRECTED 2026-07-30: boss-confirmed usage OS 33,209.00 + PU 17,280.00 - CS 22,086.00 = 28,403.00; the struck 34,563.00 used the mis-keyed stock counts" },
         { "name": "SAGO", "amount": 97281.90, "unit": 3.232816, "verified_db": true },
         { "name": "BERAS", "amount": 144902.50, "unit": 4.815316, "verified_db": true, "delta_note": "uses corrected PU_BBER 40,500.00 leg of journal 000199" },
         { "name": "SODIUM METALBISULHITE", "amount": 157.14, "unit": 0.005222, "verified_db": true },
         { "name": "TH-2", "amount": 0.00, "unit": 0.0, "verified_db": true }
       ],
-      "ingredients_subtotal": { "amount_printed": 276004.54, "amount_handwritten": 270744.54, "unit_handwritten": 8.997226, "ocr_note": "component sum with printed JAGUNG is 276,904.54 - 900.00 OCR ambiguity on the struck figure" },
+      "ingredients_subtotal": { "amount_printed": 276004.54, "amount_handwritten": 270744.54, "unit_handwritten": 8.997226, "ocr_note": "the struck printed subtotal 276,004.54 belongs to the mis-keyed JAGUNG scenario (its atomic rows summed 276,904.54, a 900.00 OCR ambiguity); the corrected atomic rows sum to the boss's handwritten 270,744.54" },
       "packing": [
         { "name": "SELOTAPE", "amount": 772.20, "unit": 0.025661, "verified_db": true },
         { "name": "PLASTIC (SMALL)", "amount": 14983.94, "unit": 0.497938, "verified_db": true },
@@ -241,7 +243,9 @@
   },
   "data_issues_confirmed": [
     "CORRECTED IN DEV AND PRODUCTION 2026-07-28: journal 000199 PU_BBER/CR_PN now records 40,500.00 per particulars '300BAG XRM135'",
-    "PU_MSD 540.00 is legacy-only and permanently 0.00 in our data - the material is discontinued for Mee and no purchase exists (Q11, answered 2026-07-25). Never treat it as missing data",
+    "CORRECTED IN DEV 2026-07-30 (production pending): BIHUN JAGUNG keyed stock counts were one-digit typos against the physical sheets - May KK RICE + TRANSPORT 276 -> 196 bags (19,389.00 -> 13,769.00) and June HOMCO 399 -> 409 bags (21,546.00 -> 22,086.00). The boss's handwritten 22,086.00 / 33,209.00 / unit-cost usage 28,403.00 were right all along; the legacy print itself had been generated from the same mis-keyed data (its struck totals 414,145.86 / 491,931.65 / 70,522.43 match the old DB exactly)",
+    "CORRECTED IN DEV 2026-07-30 (production pending): June 2026 Add Backs keyed from the boss's handwriting - MEE 9,658.83 / BIHUN 6,662.66",
+    "PU_MSD 540.00 is legacy-only and permanently 0.00 in our data - the material is discontinued for Mee and no purchase exists (Q11, answered 2026-07-25). Never treat it as missing data. FINAL DECISION 2026-07-30 (user): no PUR journal will ever be keyed for the printed 540.00 - she absorbs it in the Add Back input instead",
     "MRET/BRET are derived sales returns (returnproduct x invoice-line price), not journals. June: MEE 1,517.80 vs printed 1,519.10, BIHUN 268.30 vs printed 265.10 - genuine source deltas, unaffected by the month window",
     "SUPERSEDED 2026-07-25 (Phase 2): the '1-MNL +20 bags/+146.00' and '2-BCM3 +205 bags/+3,499.00' sales deltas were an artefact of deriving the invoice month from the UTC calendar date, which pulls in 2026-07-01 00:00-08:00 KL. With the correct Asia/Kuala_Lumpur epoch-ms window both products, and both product-line sales totals, match the print to the cent. The print was right",
     "SUPERSEDED 2026-07-25 (Q12): salary is journal-only. The June JVSL payroll voucher exists in production and posts to exactly the legacy formula accounts; all twelve payroll rows match the print. There is no payroll fallback",
