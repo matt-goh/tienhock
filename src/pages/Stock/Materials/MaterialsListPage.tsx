@@ -22,6 +22,11 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import Button from "../../../components/Button";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import clsx from "clsx";
+import {
+  usePersistedFilters,
+  usePersistedSearch,
+} from "../../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 
 // Category labels for display
 const categoryLabels: Record<MaterialCategory, string> = {
@@ -56,10 +61,24 @@ const MaterialsListPage: React.FC = () => {
   // State
   const [materials, setMaterials] = useState<MaterialWithVariants[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [showInactive, setShowInactive] = useState(false);
+  const [searchTerm, setSearchTerm] = usePersistedSearch("materialsListSearch");
+  const [selectedCategory, setSelectedCategory] = usePersistedFilters<string>(
+    "materialsListCategory",
+    () => "all",
+    (cached) =>
+      typeof cached === "string" &&
+      categoryPills.some((pill) => pill.value === cached)
+        ? cached
+        : null
+  );
+  const [showInactive, setShowInactive] = usePersistedFilters<boolean>(
+    "materialsListShowInactive",
+    () => false,
+    (cached) => (typeof cached === "boolean" ? cached : null)
+  );
   const [expandedMaterials, setExpandedMaterials] = useState<Set<number>>(new Set());
+
+  useScrollRestoration("materials-list", !loading && materials.length > 0);
 
   // Delete dialog
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);

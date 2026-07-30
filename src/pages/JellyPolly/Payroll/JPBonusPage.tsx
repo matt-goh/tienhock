@@ -26,6 +26,11 @@ import {
   staffHoldsJPJob,
 } from "../../../configs/jpPayrollJobConfigs";
 import { api } from "../../../routes/utils/api";
+import {
+  usePersistedUrlNumber,
+  usePersistedUrlSearch,
+} from "../../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
 
 const API_BASE = "/jellypolly/api/incentives";
@@ -43,31 +48,6 @@ interface Bonus {
 }
 
 const JPBonusPage: React.FC = () => {
-  const getInitialYear = (): number => {
-    const params = new URLSearchParams(window.location.search);
-    const yearParam = params.get("year");
-    if (yearParam) {
-      const year = parseInt(yearParam, 10);
-      if (!isNaN(year) && year >= 2000 && year <= 2100) return year;
-    }
-    return new Date().getFullYear();
-  };
-
-  const getInitialMonth = (): number => {
-    const params = new URLSearchParams(window.location.search);
-    const monthParam = params.get("month");
-    if (monthParam) {
-      const month = parseInt(monthParam, 10);
-      if (!isNaN(month) && month >= 1 && month <= 12) return month;
-    }
-    return new Date().getMonth() + 1;
-  };
-
-  const getInitialSearch = (): string => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("search") || "";
-  };
-
   const { staffs } = useJPStaffsCache();
   // Staff holding at least one JP payroll job in staffs.job
   const allowedEmployeeIds = useMemo(
@@ -79,7 +59,8 @@ const JPBonusPage: React.FC = () => {
   );
 
   const [bonuses, setBonuses] = useState<Bonus[]>([]);
-  const [searchQuery, setSearchQuery] = useState<string>(getInitialSearch);
+  const [searchQuery, setSearchQuery] =
+    usePersistedUrlSearch("jpBonusListSearch");
   const [isLoading, setIsLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -87,8 +68,23 @@ const JPBonusPage: React.FC = () => {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  const [currentYear, setCurrentYear] = useState(getInitialYear);
-  const [currentMonth, setCurrentMonth] = useState(getInitialMonth);
+  // A URL param wins on mount, otherwise the last month used
+  const [currentYear, setCurrentYear] = usePersistedUrlNumber(
+    "jpBonusListYear",
+    "year",
+    2000,
+    2100,
+    () => new Date().getFullYear()
+  );
+  const [currentMonth, setCurrentMonth] = usePersistedUrlNumber(
+    "jpBonusListMonth",
+    "month",
+    1,
+    12,
+    () => new Date().getMonth() + 1
+  );
+
+  useScrollRestoration("jp-bonus-list", !isLoading && bonuses.length > 0);
 
   const monthRange = useMemo(
     () => ({
