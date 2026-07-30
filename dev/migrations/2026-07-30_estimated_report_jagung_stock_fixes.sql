@@ -1,5 +1,7 @@
 \set ON_ERROR_STOP on
 
+-- This is ran in prod but unsure if it correctly applied
+
 -- June 2026 Estimated P&L corrections: JAGUNG (Tepung Jagung, material 27/B3,
 -- bihun bucket) physical stock counts were mis-keyed by one digit, and the
 -- boss's June Add Back values were never keyed.
