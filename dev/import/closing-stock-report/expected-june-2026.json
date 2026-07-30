@@ -28,7 +28,7 @@
       { "code": "CS_MTEP1", "description": "TEPUNG", "amount": 7482.72, "verified_db": true, "maps_to": "material M23B (mee)" },
       { "code": "CS_MTEP2", "description": "TEPUNG", "amount": 0.00, "verified_db": true, "maps_to": "material M23C (mee)" },
       { "code": "CS_MTEP3", "description": "STORK W", "amount": 7486.08, "verified_db": true, "maps_to": "material M23 (mee)" },
-      { "code": "CS_MPMS", "description": "PACKING MATERIAL SMALL", "amount": 81885.94, "verified_db": false, "maps_to": "Q8-confirmed mee SMALL packing membership", "delta_note": "system is RM883.60 higher; Q14 source-sheet check remains open" },
+      { "code": "CS_MPMS", "description": "PACKING MATERIAL SMALL", "amount": 81885.94, "verified_db": true, "maps_to": "Q8-confirmed mee SMALL packing membership", "delta_note": "Q14 CLOSED 2026-07-30: was RM883.60 higher because three June MEE label/sticker rows (M35, M40, M8/46) were keyed at their stale material default rate; corrected in production 2026-07-29 and now exact" },
       { "code": "CS_MPMB", "description": "PACKING MATERIAL BIG", "amount": 23461.25, "verified_db": true, "maps_to": "Q8-confirmed mee BIG packing membership" },
       { "code": "CS_MTAP", "description": "SELOTAPE", "amount": 69.30, "verified_db": true, "maps_to": "material M22 (mee)" },
       { "code": "CS_MFIN", "description": "STOCK LORRY & KILANG", "amount": 58277.70, "verified_db": true, "maps_to": "material_stock_kilang_entries mee sum" }
