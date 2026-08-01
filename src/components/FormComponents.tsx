@@ -152,6 +152,12 @@ interface ListboxProps {
   required?: boolean;
   placeholder?: string;
   optionsPosition?: "top" | "bottom";
+  /**
+   * Opt-in: render the options panel in a portal anchored to the button, so it
+   * escapes an ancestor with `overflow` (e.g. a horizontally scrollable table)
+   * instead of being clipped. Overrides `optionsPosition` when set.
+   */
+  anchor?: "top" | "top start" | "top end" | "bottom" | "bottom start" | "bottom end";
   className?: string;
   renderOption?: (
     option: SelectOption,
@@ -170,6 +176,7 @@ export const FormListbox: React.FC<ListboxProps> = ({
   required = false,
   placeholder = "Select...",
   optionsPosition = "bottom",
+  anchor,
   className = "",
   renderOption,
 }) => {
@@ -223,9 +230,16 @@ export const FormListbox: React.FC<ListboxProps> = ({
             leaveTo="opacity-0"
           >
             <ListboxOptions
+              {...(anchor ? { anchor } : {})}
               className={clsx(
-                "absolute z-10 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none sm:text-sm",
-                optionsPosition === "top" ? "bottom-full mb-1" : "mt-1"
+                "max-h-60 overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none sm:text-sm",
+                anchor
+                  ? // Portalled: width comes from the button, not the (fixed) panel.
+                    "z-50 w-[var(--button-width)] [--anchor-gap:0.25rem]"
+                  : clsx(
+                      "absolute z-10 w-full",
+                      optionsPosition === "top" ? "bottom-full mb-1" : "mt-1"
+                    )
               )}
             >
               {options.map((option) => (

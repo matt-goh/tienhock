@@ -1,11 +1,13 @@
-// src/routes/payroll/leave-management.js
+// src/routes/jellypolly/leave-management.js
 import { Router } from "express";
+import { reprocessJPEmployeesSafe } from "./jpPayrollProcessor.js";
 
 const PACKING_CUTI_NOTE_PREFIX = "PACKING_CUTI";
-const PACKING_CUTI_JOB_TYPES = new Set(["MEE_PACKING", "BH_PACKING"]);
+// JP has a single packing job (JP_PACKING = Ice Polly & Jelly Cup packing),
+// where TH splits packing into MEE_PACKING / BH_PACKING.
+const PACKING_CUTI_JOB_TYPES = new Set(["JP_PACKING"]);
 const PACKING_PRODUCT_TYPES = {
-  MEE_PACKING: "MEE",
-  BH_PACKING: "BH",
+  JP_PACKING: "JP",
 };
 const VALID_LEAVE_TYPES = new Set([
   "cuti_umum",
@@ -98,6 +100,11 @@ const getCutiTahunanAdvanceDaysExpression = () => "1::numeric";
 const getPackingCutiNote = (jobType) => `${PACKING_CUTI_NOTE_PREFIX}:${jobType}`;
 
 const isValidDateString = (date) => /^\d{4}-\d{2}-\d{2}$/.test(date || "");
+
+const yearMonthOf = (dateString) => {
+  const [year, month] = dateString.split("-").map((part) => parseInt(part, 10));
+  return { year, month };
+};
 
 const createRequestError = (message) => {
   const error = new Error(message);
@@ -298,14 +305,22 @@ export default function (pool) {
         }
       }
 
-      await client.query(
+      // Everyone this request touches (removed + re-inserted) needs their JP
+      // payroll re-run, since leave amount_paid feeds gross.
+      const affectedEmployeeIds = new Set(employeeIds);
+
+      const deletedResult = await client.query(
         `
           DELETE FROM jellypolly.leave_records
           WHERE leave_date = $1
             AND notes = $2
+          RETURNING employee_id
         `,
         [date, note],
       );
+      for (const row of deletedResult.rows) {
+        affectedEmployeeIds.add(row.employee_id);
+      }
 
       const savedEntries = [];
       for (const entry of normalizedEntries) {
@@ -331,6 +346,16 @@ export default function (pool) {
       }
 
       await client.query("COMMIT");
+
+      if (affectedEmployeeIds.size > 0) {
+        const { year, month } = yearMonthOf(date);
+        await reprocessJPEmployeesSafe(pool, {
+          year,
+          month,
+          employeeIds: Array.from(affectedEmployeeIds),
+        });
+      }
+
       res.json({
         message: "Packing cuti entries saved successfully",
         entries: savedEntries,
