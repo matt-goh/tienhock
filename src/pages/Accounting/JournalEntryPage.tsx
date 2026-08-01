@@ -60,6 +60,7 @@ interface JournalLineFormData {
   line_number: number;
   account_code: string;
   reference: string;
+  cheque_reference: string;
   particulars: string;
   debit_amount: string;
   credit_amount: string;
@@ -109,6 +110,7 @@ const emptyLine = (lineNumber: number): JournalLineFormData => ({
   line_number: lineNumber,
   account_code: "",
   reference: "",
+  cheque_reference: "",
   particulars: "",
   debit_amount: "",
   credit_amount: "",
@@ -783,6 +785,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
         account_code: line.account_code,
         // Edit the STORED reference, not the resolved display value
         reference: line.internal_reference || line.reference || "",
+        cheque_reference: line.cheque_reference || "",
         particulars: line.particulars || "",
         debit_amount: line.debit_amount > 0 ? line.debit_amount.toString() : "",
         credit_amount:
@@ -1066,6 +1069,9 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
           debit_amount: parseFloat(line.debit_amount) || 0,
           credit_amount: parseFloat(line.credit_amount) || 0,
           reference: line.reference || undefined,
+          cheque_reference: isGreenTarget
+            ? line.cheque_reference || undefined
+            : undefined,
           particulars: line.particulars || undefined,
         }));
 
@@ -1356,7 +1362,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                         Account
                       </th>
                       <th className="px-3 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-24">
-                        Reference
+                        {isGreenTarget ? "Chq No" : "Reference"}
                       </th>
                       <th className="px-3 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider">
                         Description
@@ -1410,13 +1416,23 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                           />
                         </td>
 
-                        {/* Reference */}
+                        {/* General line reference / GT cheque reference */}
                         <td className="px-1 py-1">
                           <input
                             type="text"
-                            value={line.reference}
+                            value={
+                              isGreenTarget
+                                ? line.cheque_reference
+                                : line.reference
+                            }
                             onChange={(e) =>
-                              handleLineChange(index, "reference", e.target.value)
+                              handleLineChange(
+                                index,
+                                isGreenTarget
+                                  ? "cheque_reference"
+                                  : "reference",
+                                e.target.value
+                              )
                             }
                             onFocus={() => setFocusedCell({ row: index, col: "reference" })}
                             onBlur={() => setFocusedCell(null)}

@@ -658,19 +658,31 @@ console.log("\n-- 6. phase boundaries ------------------------------------------
   const jel = scalar(`SELECT count(*) FROM greentarget.journal_entry_lines jel
     JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
    WHERE je.source_type = 'legacy_import'`);
-  const aob = scalar("SELECT count(*) FROM greentarget.account_opening_balances");
+  const aob = scalar(
+    "SELECT count(*) FROM greentarget.account_opening_balances WHERE as_of_date = DATE '2026-01-01'"
+  );
   const ilr = scalar("SELECT count(*) FROM greentarget.import_legacy_rows");
   check(je === "1705", "greentarget.journal_entries holds the 1,705 G4 legacy journals", `found ${je}`);
   check(jel === "4401", "greentarget.journal_entry_lines holds the 4,401 G4 lines", `found ${jel}`);
-  check(aob === "501", "greentarget.account_opening_balances holds the 501 G4 anchors", `found ${aob}`);
+  check(
+    aob === "500",
+    "greentarget.account_opening_balances holds the 500 G4 anchors at 2026-01-01 after the approved PBB1 zero-fence removal",
+    `found ${aob}`
+  );
   check(ilr === "4903", "greentarget.import_legacy_rows holds the 4,903 G4 staging rows", `found ${ilr}`);
 
   const thAc = scalar("SELECT count(*) FROM public.account_codes");
-  const thJe = scalar("SELECT count(*) FROM public.journal_entries");
   const thNotes = scalar("SELECT count(*) FROM public.financial_statement_notes");
   check(thAc === "2827", "public.account_codes unmoved at 2,827", `found ${thAc}`);
-  check(thJe === "8238", "public.journal_entries unmoved at 8,238", `found ${thJe}`);
   check(thNotes === "33", "public.financial_statement_notes unmoved at 33", `found ${thNotes}`);
+  // TH's ledger is live and grows with ordinary Tien Hock keying, so this is a
+  // floor, not an equality (see verify-import.mjs section 6).
+  const thJe = Number(scalar("SELECT count(*) FROM public.journal_entries"));
+  check(
+    thJe >= 8238,
+    "public.journal_entries never shrinks below the 8,238 G8 floor",
+    `found ${thJe}`
+  );
 
   // BTFS: carried as a chart entry with NO ledger movement. G4 must give it no
   // opening anchor - that absence is what reproduces its blank/blank printing,

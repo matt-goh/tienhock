@@ -60,6 +60,9 @@ const reviveFilters = (cached: any): PaymentFilters | null => {
 };
 
 const getReceiptGroupKey = (payment: GreenTargetPayment): string => {
+  if (payment.receipt_id) {
+    return `receipt_${payment.receipt_id}`;
+  }
   if (!payment.internal_reference) {
     return `single_${payment.payment_id}`;
   }
@@ -356,7 +359,7 @@ const GreenTargetPaymentPage: React.FC = () => {
         </div>
       </div>
 
-      {loading ? (
+      {loading && payments.length === 0 ? (
         <div className="flex h-64 items-center justify-center">
           <LoadingSpinner />
         </div>

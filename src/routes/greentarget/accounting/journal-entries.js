@@ -42,6 +42,24 @@ const GT_ADJUSTMENT_DOC_TYPE_LABELS = {
 };
 
 /**
+ * @typedef {Object} GTManualJournalLinePayload
+ * @property {string} account_code
+ * @property {number|string|null|undefined} debit_amount
+ * @property {number|string|null|undefined} credit_amount
+ * @property {string|null|undefined} [reference] General line reference.
+ * @property {string|null|undefined} [cheque_reference] Per-line cheque or transaction reference.
+ * @property {string|null|undefined} [particulars]
+ */
+
+/**
+ * @typedef {Object} GTManualJournalPayload
+ * @property {string} reference_no
+ * @property {string} entry_type
+ * @property {string} entry_date
+ * @property {GTManualJournalLinePayload[]} lines
+ */
+
+/**
  * Resolve the document that auto-created an organic GT journal into a display
  * label and frontend path for the Journal Details "View Source" link. Returns
  * null for manual journals, legacy imports, or when the source row is gone.
@@ -89,6 +107,20 @@ async function resolveGTJournalSource(pool, entry) {
           payment.invoice_number || payment.invoice_id
         }`,
         path: `/greentarget/invoices/${encodeURIComponent(payment.invoice_id)}`,
+      };
+    }
+    case "receipt": {
+      const receiptResult = await pool.query(
+        `SELECT display_reference
+           FROM greentarget.receipts
+          WHERE id = $1`,
+        [source_id]
+      );
+      if (receiptResult.rows.length === 0) return null;
+      return {
+        type: "receipt",
+        label: `Receipt ${receiptResult.rows[0].display_reference}`,
+        path: "/greentarget/payments",
       };
     }
     case "adjustment": {
@@ -274,7 +306,7 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
 
   // GET /next-reference/:type - Next reference for a manual entry. GT's
   // organic system journals own their natural keys (invoice number,
-  // REC-{payment_id}, doc id), so this sequence only serves hand-keyed
+  // GTR-{receipt_id}, doc id), so this sequence only serves hand-keyed
   // journals; the shape mirrors TH's PREFIXnnn/MM algorithm.
   router.get("/next-reference/:type", async (req, res) => {
     try {
@@ -415,6 +447,11 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
     return false;
   };
 
+  /**
+   * @param {GTManualJournalPayload} body
+   * @param {import("express").Response} res
+   * @returns {GTManualJournalPayload | null}
+   */
   const validateJournalPayload = (body, res) => {
     const { reference_no, entry_type, entry_date, lines } = body;
     if (entry_type === LEGACY_IMPORT_ENTRY_TYPE) {
@@ -527,6 +564,7 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
           debit: parseFloat(line.debit_amount) || 0,
           credit: parseFloat(line.credit_amount) || 0,
           reference: line.reference || null,
+          chequeReference: line.cheque_reference || null,
           particulars: line.particulars || null,
         })),
       });
@@ -665,8 +703,9 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
         await client.query(
           `INSERT INTO greentarget.journal_entry_lines (
              journal_entry_id, line_number, account_code,
-             debit_amount, credit_amount, reference, particulars, display_order
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+             debit_amount, credit_amount, reference, particulars,
+             cheque_reference, display_order
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
           [
             id,
             index + 1,
@@ -675,6 +714,7 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
             (parseFloat(line.credit_amount) || 0).toFixed(2),
             line.reference || null,
             line.particulars || null,
+            line.cheque_reference || null,
             index + 1,
           ]
         );
@@ -733,6 +773,13 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
         return res
           .status(400)
           .json({ message: "Journal entry is already cancelled" });
+      }
+      if (existing.source_type !== null) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({
+          message: `This journal is owned by a ${existing.source_type} document. Cancel the source document or receipt instead so its operational balance and journal remain in sync.`,
+          detail: `source_type: ${existing.source_type}, source_id: ${existing.source_id}`,
+        });
       }
 
       assertGreenTargetAccountingDateUnlocked(

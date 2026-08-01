@@ -22,6 +22,8 @@ export interface GreenTargetInvoice {
   tin_number?: string;
   id_number?: string;
   consolidated_part_of?: any;
+  debtor_account_code?: string | null;
+  revenue_account_code?: "TGA" | "TGB" | "WS_OTH" | null;
 }
 
 export interface GreenTargetPayment {
@@ -36,12 +38,55 @@ export interface GreenTargetPayment {
   bank_account?: "PBB_1" | null;
   journal_entry_id?: number | null;
   journal_reference_no?: string | null;
+  receipt_id?: number;
+  posting_date?: string | null;
   notes?: string | null;
   status?: "active" | "pending" | "cancelled" | null;
   customer_name?: string;
   customerid?: string;
   created_at?: string;
   cancellation_date?: string | null;
+}
+
+export type GreenTargetReceiptStatus = "pending" | "posted" | "cancelled";
+
+export interface GreenTargetReceiptGroupHeader {
+  receipt_id: number;
+  display_reference: string;
+  received_date: string;
+  posting_date: string | null;
+  payment_method: GreenTargetPayment["payment_method"];
+  payment_reference: string | null;
+  bank_account: string;
+  status: GreenTargetReceiptStatus;
+  origin: "erp" | "legacy_operational";
+  total_amount: number;
+  cancellation_date: string | null;
+  cancellation_reason: string | null;
+}
+
+export interface GreenTargetReceiptGroupJournal {
+  journal_entry_id: number;
+  reference_no: string;
+  entry_date: string;
+  status: string;
+}
+
+export interface GreenTargetReceiptGroupAllocation {
+  payment_id: number;
+  invoice_id: number;
+  invoice_number: string;
+  customer_id: number;
+  customer_name: string;
+  amount_paid: number;
+  status: GreenTargetPayment["status"];
+}
+
+export interface GreenTargetReceiptGroupDetails {
+  receipt: GreenTargetReceiptGroupHeader;
+  representative_payment_id: number | null;
+  journal: GreenTargetReceiptGroupJournal | null;
+  allocations: GreenTargetReceiptGroupAllocation[];
 }
 
 export interface GreenTargetPaymentAllocationInput {
@@ -64,6 +109,12 @@ export interface CreateGreenTargetPaymentBatchInput {
   payment_reference: string | null;
   internal_reference: string;
   allocations: GreenTargetPaymentAllocationInput[];
+}
+
+export interface UpdateGreenTargetPaymentReferencesInput {
+  internal_reference?: string | null;
+  payment_reference?: string | null;
+  expected_internal_reference?: string;
 }
 
 export interface GreenTargetPaymentMutationResponse {

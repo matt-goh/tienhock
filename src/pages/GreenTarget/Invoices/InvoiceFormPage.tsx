@@ -24,7 +24,14 @@ import {
   IconSquare,
 } from "@tabler/icons-react";
 import clsx from "clsx";
-import { FormCombobox, SelectOption } from "../../../components/FormComponents";
+import {
+  FormCombobox,
+  SelectOption,
+} from "../../../components/FormComponents";
+import GTInvoiceAccountFields, {
+  GT_DEFAULT_REVENUE_ACCOUNT,
+  GTRevenueAccountCode,
+} from "../../../components/GreenTarget/GTInvoiceAccountFields";
 import { formatLocationDisplay } from "../../../utils/greenTarget/formatLocationDisplay";
 import SubmissionResultsModal from "../../../components/Invoice/SubmissionResultsModal";
 import { EInvoiceSubmissionResult } from "../../../types/types";
@@ -40,6 +47,7 @@ interface Customer {
   id_number: string;
   name: string;
   phone_number?: string | null; // Added phone number for Combobox display
+  debtor_account_code?: string | null;
 }
 
 interface Rental {
@@ -69,6 +77,8 @@ interface Invoice {
   tax_amount: number;
   total_amount?: number; // Calculated
   date_issued: string; // YYYY-MM-DD
+  debtor_account_code: string;
+  revenue_account_code: "" | GTRevenueAccountCode;
 }
 
 const toLocalDateInputValue = (value: string | null | undefined): string => {
@@ -105,6 +115,8 @@ const InvoiceFormPage: React.FC = () => {
     tax_amount: 0,
     date_issued: format(new Date(), "yyyy-MM-dd"),
     rental_ids: [], // Changed to array
+    debtor_account_code: "",
+    revenue_account_code: GT_DEFAULT_REVENUE_ACCOUNT,
   });
   const [initialFormData, setInitialFormData] = useState<Invoice | null>(null); // For change detection
 
@@ -165,21 +177,29 @@ const InvoiceFormPage: React.FC = () => {
         tax_amount: 0,
         date_issued: format(new Date(), "yyyy-MM-dd"),
         rental_ids: [], // Changed to array
+        debtor_account_code: "",
+        revenue_account_code: GT_DEFAULT_REVENUE_ACCOUNT,
       };
       setInitialFormData(defaultInitialState);
       // Apply rentalData if it exists
       if (rentalData?.customer_id) {
         const rentalIds = rentalData.rental_id ? [rentalData.rental_id] : [];
+        const rentalCustomer = customers.find(
+          (customer: Customer): boolean =>
+            customer.customer_id === Number(rentalData.customer_id)
+        );
         setFormData((prev) => ({
           ...prev,
           ...defaultInitialState,
           customer_id: rentalData.customer_id,
           rental_ids: rentalIds,
+          debtor_account_code: rentalCustomer?.debtor_account_code || "",
         }));
         setInitialFormData((prev) => ({
           ...(prev ?? defaultInitialState),
           customer_id: rentalData.customer_id,
           rental_ids: rentalIds,
+          debtor_account_code: rentalCustomer?.debtor_account_code || "",
         }));
       } else {
         setFormData(defaultInitialState); // Set form state too
@@ -370,6 +390,8 @@ const InvoiceFormPage: React.FC = () => {
         amount_before_tax: parseFloat(inv.amount_before_tax.toString()),
         tax_amount: parseFloat(inv.tax_amount.toString()),
         date_issued: toLocalDateInputValue(inv.date_issued),
+        debtor_account_code: inv.debtor_account_code || "",
+        revenue_account_code: inv.revenue_account_code || "",
       };
       setFormData(parsed);
       setInitialFormData(parsed);
@@ -446,22 +468,16 @@ const InvoiceFormPage: React.FC = () => {
     validateInvoiceNumber,
   ]);
 
-  const isRentalActive = (datePickedStr: string | null | undefined) => {
+  const isRentalActive = (
+    datePickedStr: string | null | undefined
+  ): boolean => {
     if (!datePickedStr) return true;
-    try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      // Extract just the date part to avoid timezone conversion issues
-      const dateOnly = datePickedStr.split("T")[0]; // Get '2025-08-12' from '2025-08-12T00:00:00.000Z'
-      const pickup = new Date(dateOnly + "T00:00:00"); // Parse as local date
-      pickup.setHours(0, 0, 0, 0);
+    const pickupDate: string = toLocalDateInputValue(datePickedStr);
+    if (!pickupDate) return false;
 
-      // A rental is active if the pickup date is today or in the future
-      // A rental is completed if the pickup date is in the past
-      return !isNaN(pickup.getTime()) && pickup >= today;
-    } catch {
-      return false;
-    }
+    // Preserve this form's existing rule that pickup today is still selectable,
+    // but compare the Malaysia-local calendar dates instead of slicing UTC.
+    return pickupDate >= format(new Date(), "yyyy-MM-dd");
   };
   const getOptionName = (
     options: SelectOption[],
@@ -532,7 +548,15 @@ const InvoiceFormPage: React.FC = () => {
     const newCustId =
       selectedId && typeof selectedId === "string" ? Number(selectedId) : 0;
     if (newCustId !== formData.customer_id) {
-      setFormData((p) => ({ ...p, customer_id: newCustId, rental_ids: [] }));
+      const selectedCustomer = customers.find(
+        (customer: Customer): boolean => customer.customer_id === newCustId
+      );
+      setFormData((p) => ({
+        ...p,
+        customer_id: newCustId,
+        rental_ids: [],
+        debtor_account_code: selectedCustomer?.debtor_account_code || "",
+      }));
       setSelectedRentals([]);
       setCustomerQuery("");
     }
@@ -593,6 +617,13 @@ const InvoiceFormPage: React.FC = () => {
 
     if (!formData.customer_id || formData.customer_id <= 0) {
       toast.error("Select customer");
+      return false;
+    }
+    // The debtor account is deliberately NOT required: an empty value means a
+    // sundry / counter customer and the server posts it to CD_SD, exactly as
+    // the legacy system did for every counter sale.
+    if (!formData.revenue_account_code) {
+      toast.error("Select TGA, TGB or WS_OTH for this invoice");
       return false;
     }
     const selCust = customers.find(
@@ -673,6 +704,8 @@ const InvoiceFormPage: React.FC = () => {
         total_amount: Number(totalAmount),
         date_issued: formData.date_issued,
         invoice_number: formData.invoice_number?.trim() || undefined,
+        debtor_account_code: formData.debtor_account_code,
+        revenue_account_code: formData.revenue_account_code,
       };
       if (isEditMode && formData.invoice_id)
         invData.invoice_id = formData.invoice_id;
@@ -856,9 +889,10 @@ const InvoiceFormPage: React.FC = () => {
     name: c.name,
     phone_number: c.phone_number,
   }));
-  const selectedCustomerForEinvoice = customers.find(
+  const selectedCustomer: Customer | undefined = customers.find(
     (c) => c.customer_id === formData.customer_id
   );
+  const selectedCustomerForEinvoice = selectedCustomer;
   const canSubmitEinvoice = !!(
     selectedCustomerForEinvoice?.tin_number &&
     selectedCustomerForEinvoice?.id_number &&
@@ -992,6 +1026,27 @@ const InvoiceFormPage: React.FC = () => {
                 mode="single"
               />
             </div>
+          </div>
+
+          <div className="mt-6">
+            <GTInvoiceAccountFields
+              customerId={formData.customer_id || null}
+              customerDefaultCode={selectedCustomer?.debtor_account_code || null}
+              debtorAccountCode={formData.debtor_account_code}
+              revenueAccountCode={formData.revenue_account_code}
+              onDebtorChange={(accountCode: string): void =>
+                setFormData((current: Invoice): Invoice => ({
+                  ...current,
+                  debtor_account_code: accountCode,
+                }))
+              }
+              onRevenueChange={(accountCode: GTRevenueAccountCode): void =>
+                setFormData((current: Invoice): Invoice => ({
+                  ...current,
+                  revenue_account_code: accountCode,
+                }))
+              }
+            />
           </div>
 
           {/* Conditional Fields (Regular Invoice - Multiple Rental Selection) */}

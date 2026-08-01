@@ -7,22 +7,16 @@
 // principle.
 //
 // Journal shape, taken from the imported legacy evidence:
-//   credit sales (I#/#):    DR debtor child   / CR note-7 revenue
-//   counter sales (#/#):    DR CD_SD          / CR TGA or TGB
+//   DR the selected debtor child / CR the selected TGA, TGB or WS_OTH.
 // GT posts gross = revenue with NO tax line: the entire import contains zero
 // tax postings and all 153 operational invoices carry tax_amount 0.
 //
-// Account resolution (handover R6 + the debtor-map):
-//   receivable = the customer's APPROVED legacy debtor child from
-//     debtor-map.json, else CD_SD (the legacy sundry-debtors account that
-//     carried every counter sale). No account is ever created here.
-//   revenue    = mapped debtor -> WS_OTH (statement sales), or WS_OTH4 for the
-//     TH intercompany debtor; unmapped counter sale -> TGB when any linked
-//     rental uses a B-prefixed tong (TONG B), else TGA. The B-prefix rule is
-//     consistent with all 35 ERP-matched legacy counter sales (every one is
-//     TGA with a plain-numbered tong); the TGB branch rests on the structural
-//     B1-B17 vs plain-number tong split, documented in the G7 execution
-//     record.
+// Account resolution follows the LEGACY split (restored GT-P7, 31 Jul 2026,
+// after measuring the import): a customer with a named trade-debtor account
+// posts to it, and a customer without one is a sundry/counter customer that
+// posts straight to the CD_SD control - exactly as all 1,011 imported `#/#`
+// counter invoices did. The invoice snapshots whichever account was used, and
+// the customer holds the reusable default. Nothing is ever auto-created.
 import {
   lookupApprovedDebtorMapping,
   GT_SUNDRY_DEBTOR_ACCOUNT,
@@ -39,20 +33,20 @@ import {
 } from "./posting-utils.js";
 
 /**
- * @param {number|null|undefined} customerId
- * @returns {string} The receivable account for an invoice/payment journal.
+ * @type {ReadonlySet<string>}
  */
-export function resolveGTReceivableAccount(customerId) {
-  const mapping = lookupApprovedDebtorMapping(customerId);
-  return mapping ? mapping.gt_account_code : GT_SUNDRY_DEBTOR_ACCOUNT;
-}
+export const GT_INVOICE_REVENUE_ACCOUNTS = new Set([
+  "TGA",
+  "TGB",
+  "WS_OTH",
+]);
 
 /**
  * @param {import("pg").PoolClient} client
  * @param {number} invoiceId
- * @returns {Promise<boolean>} True when any linked rental uses a B-tong.
+ * @returns {Promise<boolean>}
  */
-async function hasBTongRental(client, invoiceId) {
+async function hasLegacyBTongRental(client, invoiceId) {
   const result = await client.query(
     `SELECT EXISTS(
        SELECT 1
@@ -67,16 +61,133 @@ async function hasBTongRental(client, invoiceId) {
 }
 
 /**
+ * Historical revenue fallback for invoices created before GT-P1 account
+ * snapshots. Named legacy debtors use statement revenue; counter invoices use
+ * the evidenced tong split.
+ *
  * @param {import("pg").PoolClient} client
- * @param {{invoice_id: number, customer_id: number|null}} invoice
- * @returns {Promise<string>} The revenue account for the invoice journal.
+ * @param {{invoice_id?: number|null, customer_id?: number|null}} invoice
+ * @returns {Promise<string>}
+ */
+export async function resolveGTLegacyRevenueAccount(client, invoice) {
+  const legacyMapping = lookupApprovedDebtorMapping(invoice.customer_id);
+  if (legacyMapping) {
+    return legacyMapping.legacy_code === "TH" ? "WS_OTH4" : "WS_OTH";
+  }
+  return (await hasLegacyBTongRental(client, invoice.invoice_id))
+    ? "TGB"
+    : "TGA";
+}
+
+/**
+ * @param {import("pg").PoolClient} client
+ * @param {string} accountCode
+ * @param {boolean} [allowControlAccount]
+ * @returns {Promise<string>}
+ */
+async function validateGTReceivableAccount(
+  client,
+  accountCode,
+  allowControlAccount = false
+) {
+  const result = await client.query(
+    `SELECT ac.code, ac.description, ac.ledger_type, ac.is_active,
+            EXISTS (
+              SELECT 1
+                FROM greentarget.account_codes child
+               WHERE child.parent_code = ac.code
+                 AND child.is_active = true
+            ) AS has_active_children
+       FROM greentarget.account_codes ac
+      WHERE ac.code = $1
+      FOR SHARE`,
+    [accountCode]
+  );
+  const account = result.rows[0];
+  if (!account) {
+    throw Object.assign(
+      new Error(`Green Target debtor account ${accountCode} does not exist`),
+      { statusCode: 400 }
+    );
+  }
+  if (
+    account.ledger_type !== "TD" ||
+    account.is_active !== true ||
+    (!allowControlAccount &&
+      (account.has_active_children || account.code === "CD_SD"))
+  ) {
+    throw Object.assign(
+      new Error(
+        `Green Target debtor account ${accountCode} must be an active trade-debtor leaf account`
+      ),
+      { statusCode: 400 }
+    );
+  }
+  return account.code;
+}
+
+/**
+ * @param {import("pg").PoolClient} client
+ * @param {{invoice_id?: number|null, customer_id?: number|null, debtor_account_code?: string|null}} invoice
+ * @returns {Promise<string>} The receivable account for an invoice/adjustment.
+ */
+export async function resolveGTReceivableAccount(client, invoice) {
+  if (
+    !Object.prototype.hasOwnProperty.call(invoice, "debtor_account_code")
+  ) {
+    const legacyMapping = lookupApprovedDebtorMapping(invoice.customer_id);
+    return legacyMapping
+      ? legacyMapping.gt_account_code
+      : GT_SUNDRY_DEBTOR_ACCOUNT;
+  }
+  let accountCode = String(invoice.debtor_account_code || "").trim();
+  if (!accountCode && invoice.customer_id !== null && invoice.customer_id !== undefined) {
+    const mappingResult = await client.query(
+      `SELECT debtor_account_code
+         FROM greentarget.customers
+        WHERE customer_id = $1
+        FOR SHARE`,
+      [invoice.customer_id]
+    );
+    accountCode = String(mappingResult.rows[0]?.debtor_account_code || "").trim();
+  }
+  // No named account = a SUNDRY / counter customer, which posts straight to
+  // CD_SD. This is exactly what the legacy system did: all 1,011 imported
+  // `#/#` counter invoices debit CD_SD and not one of the 746 CD_SD children
+  // carries a single Jan-Jun journal line (those names lived in a separate
+  // trade-debtors listing, outside the ledger). Only the ~11 named credit
+  // customers of the `I#/#` family ever had their own account. Nothing is
+  // auto-created and no name is ever auto-matched (handover R6).
+  if (!accountCode) {
+    accountCode = GT_SUNDRY_DEBTOR_ACCOUNT;
+  }
+  return validateGTReceivableAccount(
+    client,
+    accountCode,
+    accountCode === GT_SUNDRY_DEBTOR_ACCOUNT
+  );
+}
+
+/**
+ * @param {import("pg").PoolClient} client
+ * @param {{invoice_id?: number|null, customer_id?: number|null, revenue_account_code?: string|null}} invoice
+ * @returns {Promise<string>} The snapshotted revenue account.
  */
 export async function resolveGTRevenueAccount(client, invoice) {
-  const mapping = lookupApprovedDebtorMapping(invoice.customer_id);
-  if (mapping) {
-    return mapping.legacy_code === "TH" ? "WS_OTH4" : "WS_OTH";
+  if (
+    !Object.prototype.hasOwnProperty.call(invoice, "revenue_account_code")
+  ) {
+    return resolveGTLegacyRevenueAccount(client, invoice);
   }
-  return (await hasBTongRental(client, invoice.invoice_id)) ? "TGB" : "TGA";
+  const accountCode = String(invoice.revenue_account_code || "").trim();
+  if (!GT_INVOICE_REVENUE_ACCOUNTS.has(accountCode)) {
+    throw Object.assign(
+      new Error("Select TGA, TGB or WS_OTH for the Green Target invoice"),
+      { statusCode: 400 }
+    );
+  }
+  await ensureGTAccountsExist(client, [accountCode]);
+  return accountCode;
 }
 
 /**
@@ -137,9 +248,22 @@ export async function syncGTSalesJournalEntry(client, invoice, createdBy = null)
 
   if (journalId) {
     const overrideCheck = await client.query(
-      "SELECT manual_override FROM greentarget.journal_entries WHERE id = $1",
+      `SELECT status, manual_override
+         FROM greentarget.journal_entries
+        WHERE id = $1`,
       [journalId]
     );
+    if (
+      overrideCheck.rows[0]?.status === "cancelled" &&
+      invoice.status !== "cancelled"
+    ) {
+      throw Object.assign(
+        new Error(
+          `Invoice ${invoice.invoice_number} is linked to a cancelled sales journal and must be resolved before the invoice can be re-synchronised`
+        ),
+        { statusCode: 409 }
+      );
+    }
     if (overrideCheck.rows[0]?.manual_override) {
       // Hand-edited and detached from the invoice: the sync backs off, but
       // cancellation below still cascades (TH rule).
@@ -159,7 +283,7 @@ export async function syncGTSalesJournalEntry(client, invoice, createdBy = null)
     return null;
   }
 
-  const receivableAccount = resolveGTReceivableAccount(invoice.customer_id);
+  const receivableAccount = await resolveGTReceivableAccount(client, invoice);
   const revenueAccount = await resolveGTRevenueAccount(client, invoice);
   await ensureGTAccountsExist(client, [receivableAccount, revenueAccount]);
 
