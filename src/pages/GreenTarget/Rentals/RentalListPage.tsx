@@ -327,6 +327,7 @@ interface CachedRentalFilters {
   search: string;
   dateRange: RentalDateRange;
   activeOnly: boolean;
+  noInvoiceOnly: boolean;
   page: number;
 }
 
@@ -336,14 +337,15 @@ const parseCachedDate = (value: unknown): Date | null => {
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
-// Restores the search, date range, "Active Rentals Only" toggle and page so
-// opening a rental (or an invoice from a card) and coming back lands on the
-// same view.
+// Restores the search, date range, "Active Rentals Only" / "No Invoice Only"
+// toggles and page so opening a rental (or an invoice from a card) and coming
+// back lands on the same view.
 const loadCachedFilters = (): CachedRentalFilters => {
   const fallback: CachedRentalFilters = {
     search: "",
     dateRange: getDefaultDateRange(),
     activeOnly: false,
+    noInvoiceOnly: false,
     page: 1,
   };
   try {
@@ -359,6 +361,7 @@ const loadCachedFilters = (): CachedRentalFilters => {
         end: parseCachedDate(parsed.end),
       },
       activeOnly: parsed.activeOnly === true,
+      noInvoiceOnly: parsed.noInvoiceOnly === true,
       page:
         typeof parsed.page === "number" && parsed.page >= 1 ? parsed.page : 1,
     };
@@ -387,6 +390,9 @@ const RentalListPage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [activeOnly, setActiveOnly] = useState<boolean>(
     () => loadCachedFilters().activeOnly
+  );
+  const [noInvoiceOnly, setNoInvoiceOnly] = useState<boolean>(
+    () => loadCachedFilters().noInvoiceOnly
   );
   const [dateRange, setDateRange] = useState<RentalDateRange>(
     () => loadCachedFilters().dateRange
@@ -428,6 +434,7 @@ const RentalListPage = () => {
         limit: ITEMS_PER_PAGE,
         ...(appliedSearch ? { search: appliedSearch } : {}),
         ...(activeOnly ? { active_only: true } : {}),
+        ...(noInvoiceOnly ? { no_invoice: true } : {}),
         ...(dateRange.start
           ? { start_date: format(dateRange.start, "yyyy-MM-dd") }
           : {}),
@@ -452,7 +459,7 @@ const RentalListPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, appliedSearch, activeOnly, dateRange]);
+  }, [currentPage, appliedSearch, activeOnly, noInvoiceOnly, dateRange]);
 
   useEffect(() => {
     fetchRentals();
@@ -471,13 +478,14 @@ const RentalListPage = () => {
           start: dateRange.start ? dateRange.start.toISOString() : null,
           end: dateRange.end ? dateRange.end.toISOString() : null,
           activeOnly,
+          noInvoiceOnly,
           page: currentPage,
         })
       );
     } catch (e) {
       console.error("Error caching rental filters:", e);
     }
-  }, [appliedSearch, dateRange, activeOnly, currentPage]);
+  }, [appliedSearch, dateRange, activeOnly, noInvoiceOnly, currentPage]);
 
   // Commit the typed search to the backend. Called on blur and on Enter.
   const commitSearch = () => {
@@ -505,6 +513,11 @@ const RentalListPage = () => {
 
   const handleActiveOnlyToggle = (): void => {
     setActiveOnly((prev) => !prev);
+    setCurrentPage(1);
+  };
+
+  const handleNoInvoiceOnlyToggle = (): void => {
+    setNoInvoiceOnly((prev) => !prev);
     setCurrentPage(1);
   };
 
@@ -751,6 +764,30 @@ const RentalListPage = () => {
               )}
               <span className="ml-2 font-medium whitespace-nowrap">
                 Active Rentals Only
+              </span>
+            </button>
+          </div>
+          <div className="flex items-center">
+            <button
+              type="button"
+              onClick={handleNoInvoiceOnlyToggle}
+              className="p-2 rounded-full transition-opacity duration-200 hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 active:bg-default-200 flex items-center"
+            >
+              {noInvoiceOnly ? (
+                <IconSquareCheckFilled
+                  className="text-blue-600"
+                  width={20}
+                  height={20}
+                />
+              ) : (
+                <IconSquare
+                  className="text-default-400"
+                  width={20}
+                  height={20}
+                />
+              )}
+              <span className="ml-2 font-medium whitespace-nowrap">
+                No Invoice Only
               </span>
             </button>
           </div>

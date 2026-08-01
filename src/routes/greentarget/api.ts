@@ -111,6 +111,7 @@ export const greenTargetApi = {
       location_id?: string | number;
       tong_no?: string;
       active_only?: boolean;
+      no_invoice?: boolean;
       search?: string;
       start_date?: string;
       end_date?: string;
