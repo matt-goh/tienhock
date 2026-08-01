@@ -1,5 +1,33 @@
 // GreenTarget-specific type definitions
 
+export type GreenTargetRevenueAccountCode = "TGA" | "TGB" | "WS_OTH";
+export type GreenTargetRevenueSplitAccountCode =
+  | GreenTargetRevenueAccountCode
+  | "WS_OTH4";
+
+/**
+ * One ordered revenue line for a Green Target invoice journal. Account codes
+ * are intentionally not unique: the legacy journals sometimes contain two
+ * separate lines posted to the same revenue account.
+ */
+export interface GreenTargetRevenueSplit {
+  line_number: number;
+  account_code: GreenTargetRevenueSplitAccountCode;
+  amount: number;
+}
+
+export interface GreenTargetDebtorSubledgerIdentity {
+  code: string;
+  description: string;
+  control_account_code: string;
+  kind: string;
+  effective_from: string;
+  effective_to: string | null;
+  sort_order: number;
+  is_active: boolean;
+  is_selectable: boolean;
+}
+
 export interface GreenTargetInvoice {
   invoice_id: number;
   invoice_number: string;
@@ -23,7 +51,14 @@ export interface GreenTargetInvoice {
   id_number?: string;
   consolidated_part_of?: any;
   debtor_account_code?: string | null;
-  revenue_account_code?: "TGA" | "TGB" | "WS_OTH" | null;
+  receivable_account_code?: string | null;
+  revenue_account_code?: GreenTargetRevenueSplitAccountCode | null;
+  revenue_splits?: GreenTargetRevenueSplit[];
+  edit_dependencies?: {
+    has_receipts: boolean;
+    has_adjustments: boolean;
+    journal_manual_override: boolean;
+  };
 }
 
 export interface GreenTargetPayment {

@@ -1,311 +1,541 @@
-// src/components/GreenTarget/GTInvoiceAccountFields.tsx
-//
-// The accounting block shared by every Green Target invoice-creation screen
-// (the full invoice form and the rental quick-create modal), so both screens
-// store the same two account snapshots and the `S` journal posts identically
-// from either entry point: DR the receivable / CR the revenue, no tax line.
-//
-// It follows the LEGACY split, measured from the Jan-Jun import:
-//   * A customer with NO named trade-debtor account is a sundry / counter
-//     customer and posts straight to the CD_SD control. All 1,011 imported
-//     `#/#` counter invoices did exactly this, and not one of the 746 CD_SD
-//     children carries a Jan-Jun journal line - those names lived in a
-//     separate trade-debtors listing, outside the ledger.
-//   * Only a named credit customer (the ~11 accounts used by the `I#/#`
-//     family) posts to its own account.
-// So there is nothing to key and nothing to create: the field is informational
-// unless the user deliberately assigns a named account. No account is ever
-// auto-created, and no customer name is ever auto-matched (handover R6).
-//
-// Revenue is a one-click pill row defaulting to TGA.
-import React, { useEffect, useMemo, useState } from "react";
+import React, {
+  Fragment,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import {
+  Dialog,
+  DialogPanel,
+  DialogTitle,
+  Transition,
+  TransitionChild,
+} from "@headlessui/react";
+import { IconPlus, IconX } from "@tabler/icons-react";
 import toast from "react-hot-toast";
-import { IconPencil } from "@tabler/icons-react";
+import Button from "../Button";
 import { FormCombobox, SelectOption } from "../FormComponents";
 import { api } from "../../routes/utils/api";
+import type {
+  GreenTargetDebtorSubledgerIdentity,
+  GreenTargetRevenueAccountCode,
+  GreenTargetRevenueSplit,
+} from "../../types/greenTargetTypes";
+import GTRevenueSplitEditor from "./GTRevenueSplitEditor";
 
-/** The only revenue accounts a NEW Green Target invoice may use. */
 export const GT_REVENUE_ACCOUNTS = ["TGA", "TGB", "WS_OTH"] as const;
-
-export type GTRevenueAccountCode = (typeof GT_REVENUE_ACCOUNTS)[number];
-
-/**
- * Measured on the frozen import: TGA is credited by 928 revenue-crediting
- * legacy journals, TGB by 106 and WS_OTH by 61 (legacy-only WS_OTH4 by 6, and
- * it is never offered). A static constant, not a runtime query - the import
- * cannot change, and deriving it from live invoices would feed this default
- * back into itself.
- */
+export type GTRevenueAccountCode = GreenTargetRevenueAccountCode;
 export const GT_DEFAULT_REVENUE_ACCOUNT: GTRevenueAccountCode = "TGA";
 
-export const GT_REVENUE_ACCOUNT_LABELS: Record<
-  GTRevenueAccountCode,
-  { title: string; description: string }
-> = {
-  TGA: { title: "TGA", description: "Tong A / general rental income" },
-  TGB: { title: "TGB", description: "Tong B rental income" },
-  WS_OTH: { title: "WS_OTH", description: "Other sales" },
+const DEBTOR_SUBLEDGER_ENDPOINT =
+  "/greentarget/api/account-codes/debtor-subledger";
+const DEBTOR_SEARCH_LIMIT = 50;
+
+const identityLabel = (
+  identity: GreenTargetDebtorSubledgerIdentity
+): string =>
+  `${identity.code} - ${identity.description} (posts to ${identity.control_account_code})`;
+
+const errorMessage = (error: unknown): string => {
+  if (!error || typeof error !== "object") return "Unknown error";
+  const candidate = error as {
+    message?: string;
+    data?: { message?: string; error?: string };
+    response?: { data?: { message?: string; error?: string } };
+  };
+  return (
+    candidate.response?.data?.message ||
+    candidate.response?.data?.error ||
+    candidate.data?.message ||
+    candidate.data?.error ||
+    candidate.message ||
+    "Unknown error"
+  );
 };
 
-/** The Green Target sundry-debtor control: the legacy counter-sale receivable. */
-export const GT_SUNDRY_DEBTOR_ACCOUNT = "CD_SD";
-
-const DEBTOR_ACCOUNTS_ENDPOINT =
-  "/greentarget/api/account-codes?flat=true&ledger_type=TD&is_active=true";
-const DEBTOR_OPTIONS_PAGE_SIZE = 50;
-
-export interface GTDebtorAccount {
-  code: string;
-  description: string;
-  ledger_type: string | null;
-  parent_code: string | null;
-  sort_order: number;
-  is_active: boolean;
-}
-
-/**
- * Load Green Target's active trade-debtor LEAF accounts once, for the rare
- * case where the user deliberately assigns a named account. The CD_SD control
- * and the top-level DEBTOR control are excluded: CD_SD is offered as its own
- * explicit "sundry" choice rather than as a list entry.
- */
-export const useGTDebtorAccounts = (): {
-  accounts: GTDebtorAccount[];
-  options: SelectOption[];
-  loading: boolean;
-} => {
-  const [accounts, setAccounts] = useState<GTDebtorAccount[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-
-  useEffect((): (() => void) => {
-    let isCurrentRequest = true;
-
-    const fetchAccounts = async (): Promise<void> => {
-      try {
-        const rows = await api.get<GTDebtorAccount[]>(DEBTOR_ACCOUNTS_ENDPOINT);
-        if (!isCurrentRequest) return;
-        setAccounts(
-          rows.filter(
-            (account: GTDebtorAccount): boolean =>
-              account.code !== GT_SUNDRY_DEBTOR_ACCOUNT &&
-              account.parent_code !== null
-          )
-        );
-      } catch (fetchError: unknown) {
-        console.error("Failed to load GT debtor accounts:", fetchError);
-        if (isCurrentRequest) {
-          toast.error("Failed to load trade debtor accounts");
-        }
-      } finally {
-        if (isCurrentRequest) setLoading(false);
-      }
-    };
-
-    void fetchAccounts();
-    return (): void => {
-      isCurrentRequest = false;
-    };
-  }, []);
-
-  const options: SelectOption[] = useMemo(
-    (): SelectOption[] =>
-      accounts.map(
-        (account: GTDebtorAccount): SelectOption => ({
-          id: account.code,
-          name: `${account.code} - ${account.description}`,
-        })
-      ),
-    [accounts]
-  );
-
-  return { accounts, options, loading };
+const mergeIdentities = (
+  rows: ReadonlyArray<GreenTargetDebtorSubledgerIdentity>
+): GreenTargetDebtorSubledgerIdentity[] => {
+  const byCode = new Map<string, GreenTargetDebtorSubledgerIdentity>();
+  rows.forEach((row: GreenTargetDebtorSubledgerIdentity): void => {
+    if (!byCode.has(row.code)) byCode.set(row.code, row);
+  });
+  return Array.from(byCode.values());
 };
 
 interface GTInvoiceAccountFieldsProps {
-  /** The selected customer, or null while none is chosen. */
   customerId: number | null;
-  /** The customer's saved named account, or null when they are sundry. */
+  customerName?: string | null;
   customerDefaultCode: string | null;
-  /** "" or "CD_SD" both mean sundry: the server posts to CD_SD. */
   debtorAccountCode: string;
-  revenueAccountCode: GTRevenueAccountCode | "";
   onDebtorChange: (accountCode: string) => void;
-  onRevenueChange: (accountCode: GTRevenueAccountCode) => void;
+  dateIssued: string;
+  invoiceTotal: number;
+  revenueSplits: ReadonlyArray<GreenTargetRevenueSplit>;
+  onRevenueSplitsChange: (splits: GreenTargetRevenueSplit[]) => void;
   disabled?: boolean;
-  /**
-   * True while the caller is still fetching `customerDefaultCode`. Stops the
-   * field flashing "Sundry" before the answer lands.
-   */
+  debtorDisabled?: boolean;
+  revenueDisabled?: boolean;
   customerDefaultLoading?: boolean;
-  /** "panel" for the full form, "plain" inside the rental quick-create modal. */
   variant?: "panel" | "plain";
 }
 
 const GTInvoiceAccountFields: React.FC<GTInvoiceAccountFieldsProps> = ({
   customerId,
+  customerName = null,
   customerDefaultCode,
   debtorAccountCode,
-  revenueAccountCode,
   onDebtorChange,
-  onRevenueChange,
+  dateIssued,
+  invoiceTotal,
+  revenueSplits,
+  onRevenueSplitsChange,
   disabled = false,
+  debtorDisabled = false,
+  revenueDisabled = false,
   customerDefaultLoading = false,
   variant = "panel",
 }) => {
-  const { accounts, options, loading } = useGTDebtorAccounts();
   const [debtorQuery, setDebtorQuery] = useState<string>("");
-  const [showPicker, setShowPicker] = useState<boolean>(false);
+  const [searchResults, setSearchResults] = useState<
+    GreenTargetDebtorSubledgerIdentity[]
+  >([]);
+  const [selectedIdentity, setSelectedIdentity] =
+    useState<GreenTargetDebtorSubledgerIdentity | null>(null);
+  const [selectedIdentityUnavailable, setSelectedIdentityUnavailable] =
+    useState<boolean>(false);
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [searchFailed, setSearchFailed] = useState<boolean>(false);
 
-  const isSundry: boolean =
-    !debtorAccountCode || debtorAccountCode === GT_SUNDRY_DEBTOR_ACCOUNT;
-  const selectedAccount: GTDebtorAccount | undefined = accounts.find(
-    (account: GTDebtorAccount): boolean => account.code === debtorAccountCode
-  );
+  const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false);
+  const [newCode, setNewCode] = useState<string>("");
+  const [newDescription, setNewDescription] = useState<string>("");
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState<boolean>(false);
 
-  const debtorSummary: React.ReactNode = (
-    <div className="space-y-1">
-      <p className="block text-sm font-medium text-default-700 dark:text-gray-200">
-        Trade Debtor Account
-      </p>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="font-mono text-sm font-medium text-default-900 dark:text-gray-100">
-          {isSundry ? GT_SUNDRY_DEBTOR_ACCOUNT : debtorAccountCode}
-        </span>
-        <span className="text-sm text-default-500 dark:text-gray-400">
-          {isSundry
-            ? "Sundry / counter customer"
-            : selectedAccount?.description || ""}
-        </span>
-        <button
-          type="button"
-          onClick={(): void => setShowPicker(true)}
-          disabled={disabled}
-          className="inline-flex items-center gap-1 text-xs font-medium text-sky-600 hover:text-sky-700 disabled:opacity-60 dark:text-sky-400 dark:hover:text-sky-300"
-        >
-          <IconPencil size={14} />
-          {isSundry ? "Assign a named account" : "Change"}
-        </button>
-      </div>
-      <p className="text-xs text-default-500 dark:text-gray-400">
-        {isSundry
-          ? "Posts to CD_SD, the same as every counter sale in the legacy ledger. Nothing to key."
-          : customerDefaultCode === debtorAccountCode
-          ? "Customer's named account, applied automatically."
-          : "Named account chosen for this invoice only."}
-      </p>
-    </div>
-  );
+  useEffect((): void => {
+    if (!debtorAccountCode && customerDefaultCode) {
+      onDebtorChange(customerDefaultCode);
+    }
+  }, [customerDefaultCode, debtorAccountCode, onDebtorChange]);
 
-  const debtorPicker: React.ReactNode = (
-    <div className="space-y-2">
-      <FormCombobox
-        name="debtor_account_code"
-        label="Trade Debtor Account"
-        value={debtorAccountCode || undefined}
-        onChange={(selectedId: string | string[] | null): void => {
-          onDebtorChange(typeof selectedId === "string" ? selectedId : "");
-          setDebtorQuery("");
-          setShowPicker(false);
-        }}
-        options={options}
-        query={debtorQuery}
-        setQuery={setDebtorQuery}
-        placeholder={
-          loading ? "Loading debtor accounts..." : "Search debtor code or name..."
+  useEffect((): (() => void) => {
+    let isCurrent = true;
+    const timer = window.setTimeout((): void => {
+      const loadIdentities = async (): Promise<void> => {
+        setIsSearching(true);
+        setSearchFailed(false);
+        try {
+          const params = new URLSearchParams({
+            search: debtorQuery.trim(),
+            limit: String(DEBTOR_SEARCH_LIMIT),
+          });
+          if (dateIssued) params.set("as_of", dateIssued);
+          const rows = await api.get<GreenTargetDebtorSubledgerIdentity[]>(
+            `${DEBTOR_SUBLEDGER_ENDPOINT}?${params.toString()}`
+          );
+          if (isCurrent) setSearchResults(rows);
+        } catch (searchError: unknown) {
+          console.error("Failed to search GT debtor identities:", searchError);
+          if (isCurrent) {
+            setSearchResults([]);
+            setSearchFailed(true);
+          }
+        } finally {
+          if (isCurrent) setIsSearching(false);
         }
-        disabled={disabled || loading}
-        mode="single"
-        maxVisibleOptions={DEBTOR_OPTIONS_PAGE_SIZE}
-      />
-      <button
-        type="button"
-        onClick={(): void => {
-          onDebtorChange("");
-          setDebtorQuery("");
-          setShowPicker(false);
-        }}
-        className="text-xs font-medium text-default-500 hover:text-default-700 dark:text-gray-400 dark:hover:text-gray-200"
-      >
-        Cancel - keep this a sundry counter sale (CD_SD)
-      </button>
-    </div>
+      };
+      void loadIdentities();
+    }, debtorQuery ? 250 : 0);
+
+    return (): void => {
+      isCurrent = false;
+      window.clearTimeout(timer);
+    };
+  }, [dateIssued, debtorQuery]);
+
+  useEffect((): (() => void) => {
+    let isCurrent = true;
+    if (!debtorAccountCode) {
+      setSelectedIdentity(null);
+      setSelectedIdentityUnavailable(false);
+      return (): void => {
+        isCurrent = false;
+      };
+    }
+    setSelectedIdentity(null);
+    setSelectedIdentityUnavailable(false);
+
+    const loadSelectedIdentity = async (): Promise<void> => {
+      try {
+        const params = new URLSearchParams({
+          search: debtorAccountCode,
+          limit: String(DEBTOR_SEARCH_LIMIT),
+        });
+        if (dateIssued) params.set("as_of", dateIssued);
+        const rows = await api.get<GreenTargetDebtorSubledgerIdentity[]>(
+          `${DEBTOR_SUBLEDGER_ENDPOINT}?${params.toString()}`
+        );
+        if (!isCurrent) return;
+        const exactIdentity =
+          rows.find(
+            (row: GreenTargetDebtorSubledgerIdentity): boolean =>
+              row.code === debtorAccountCode
+          ) || null;
+        setSelectedIdentity(exactIdentity);
+        setSelectedIdentityUnavailable(exactIdentity === null);
+      } catch (selectedError: unknown) {
+        console.error("Failed to load selected GT debtor identity:", selectedError);
+        if (isCurrent) {
+          setSelectedIdentity(null);
+          setSelectedIdentityUnavailable(false);
+        }
+      }
+    };
+    void loadSelectedIdentity();
+
+    return (): void => {
+      isCurrent = false;
+    };
+  }, [dateIssued, debtorAccountCode]);
+
+  const identities: GreenTargetDebtorSubledgerIdentity[] = useMemo(
+    (): GreenTargetDebtorSubledgerIdentity[] =>
+      mergeIdentities([
+        ...(selectedIdentity ? [selectedIdentity] : []),
+        ...searchResults.filter(
+          (identity: GreenTargetDebtorSubledgerIdentity): boolean =>
+            identity.is_selectable
+        ),
+      ]),
+    [searchResults, selectedIdentity]
   );
 
-  const debtorField: React.ReactNode = !customerId ? (
-    <p className="text-xs text-default-500 dark:text-gray-400">
-      Select a customer to resolve the trade debtor account.
-    </p>
-  ) : customerDefaultLoading ? (
-    <p className="text-xs text-default-500 dark:text-gray-400">
-      Resolving the trade debtor account...
-    </p>
-  ) : showPicker ? (
-    debtorPicker
-  ) : (
-    debtorSummary
-  );
+  const identityOptions: SelectOption[] = useMemo((): SelectOption[] => {
+    const options = identities.map(
+      (identity: GreenTargetDebtorSubledgerIdentity): SelectOption => ({
+        id: identity.code,
+        name: identityLabel(identity),
+      })
+    );
+    if (
+      debtorAccountCode &&
+      !options.some((option: SelectOption): boolean => option.id === debtorAccountCode)
+    ) {
+      options.unshift({
+        id: debtorAccountCode,
+        name: `${debtorAccountCode} - selected identity`,
+      });
+    }
+    return options;
+  }, [debtorAccountCode, identities]);
+
+  const openCreateIdentity = (): void => {
+    setNewCode("");
+    setNewDescription(customerName?.trim() || "");
+    setCreateError(null);
+    setIsCreateOpen(true);
+  };
+
+  const closeCreateIdentity = (): void => {
+    if (!isCreating) setIsCreateOpen(false);
+  };
+
+  const createIdentity = async (): Promise<void> => {
+    const code = newCode.trim();
+    const description = newDescription.trim();
+    if (!code || !description) {
+      setCreateError("Code and description are required.");
+      return;
+    }
+    if (!dateIssued) {
+      setCreateError("Select the invoice date before creating an identity.");
+      return;
+    }
+
+    setIsCreating(true);
+    setCreateError(null);
+    try {
+      const response = await api.post<{
+        debtorAccount: GreenTargetDebtorSubledgerIdentity;
+      }>(DEBTOR_SUBLEDGER_ENDPOINT, {
+        code,
+        description,
+        effective_from: dateIssued,
+      });
+      const identity = response.debtorAccount;
+      setSelectedIdentity(identity);
+      setSelectedIdentityUnavailable(false);
+      setSearchResults((current: GreenTargetDebtorSubledgerIdentity[]) =>
+        mergeIdentities([identity, ...current])
+      );
+      onDebtorChange(identity.code);
+      setDebtorQuery("");
+      setIsCreateOpen(false);
+      toast.success(`CD/SD identity ${identity.code} created`);
+    } catch (creationError: unknown) {
+      const message = errorMessage(creationError);
+      setCreateError(message);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const selectedControlAccount = selectedIdentity?.control_account_code || null;
+  const selectionUnavailable =
+    selectedIdentityUnavailable ||
+    (selectedIdentity !== null && !selectedIdentity.is_selectable);
 
   const body: React.ReactNode = (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <div>{debtorField}</div>
-      <div className="space-y-2">
-        <p className="block text-sm font-medium text-default-700 dark:text-gray-200">
-          Revenue Account <span className="text-red-500">*</span>
-        </p>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {GT_REVENUE_ACCOUNTS.map((account: GTRevenueAccountCode) => {
-            const active: boolean = revenueAccountCode === account;
-            return (
-              <button
-                key={account}
-                type="button"
-                onClick={(): void => onRevenueChange(account)}
-                disabled={disabled}
-                aria-pressed={active}
-                title={GT_REVENUE_ACCOUNT_LABELS[account].description}
-                className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border transition-colors select-none whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60 ${
-                  active
-                    ? "border-sky-500 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300"
-                    : "border-default-300 dark:border-gray-600 text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700"
-                }`}
-              >
-                <span className="font-semibold">
-                  {GT_REVENUE_ACCOUNT_LABELS[account].title}
-                </span>
-                <span
-                  className={
-                    active
-                      ? "text-sky-600/80 dark:text-sky-300/80"
-                      : "text-default-500 dark:text-gray-400"
-                  }
-                >
-                  {GT_REVENUE_ACCOUNT_LABELS[account].description}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+        <FormCombobox
+          name="debtor_account_code"
+          label="Trade Debtor Identity"
+          value={debtorAccountCode || undefined}
+          onChange={(selected: string | string[] | null): void => {
+            onDebtorChange(typeof selected === "string" ? selected : "");
+            setDebtorQuery("");
+          }}
+          options={identityOptions}
+          query={debtorQuery}
+          setQuery={setDebtorQuery}
+          placeholder={
+            isSearching
+              ? "Searching debtor identities..."
+              : "Search debtor code or customer name..."
+          }
+          disabled={disabled || debtorDisabled || customerDefaultLoading}
+          required
+          mode="single"
+          maxVisibleOptions={DEBTOR_SEARCH_LIMIT}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          color="sky"
+          size="sm"
+          icon={IconPlus}
+          iconSize={15}
+          onClick={openCreateIdentity}
+          disabled={
+            disabled || debtorDisabled || customerDefaultLoading || !customerId || !dateIssued
+          }
+          className="mb-0.5 whitespace-nowrap"
+        >
+          Create CD/SD Identity
+        </Button>
       </div>
+
+      <div className="min-h-5 text-xs">
+        {customerDefaultLoading ? (
+          <span className="text-default-500 dark:text-gray-400">
+            Loading the customer's default identity...
+          </span>
+        ) : debtorAccountCode ? (
+          <span
+            className={
+              selectionUnavailable
+                ? "text-rose-700 dark:text-rose-300"
+                : "text-default-600 dark:text-gray-300"
+            }
+          >
+            {selectionUnavailable
+              ? `${debtorAccountCode} is not selectable for the invoice date.`
+              : selectedControlAccount
+              ? `${debtorAccountCode} posts to ${selectedControlAccount} in the general ledger.`
+              : `Resolving where ${debtorAccountCode} posts in the general ledger...`}
+          </span>
+        ) : (
+          <span className="text-amber-700 dark:text-amber-300">
+            Select or create the customer identity that must appear in the
+            Trade Debtors sub-schedule.
+          </span>
+        )}
+        {searchFailed && (
+          <span className="ml-2 text-rose-700 dark:text-rose-300">
+            Identity search could not be loaded.
+          </span>
+        )}
+      </div>
+
+      <GTRevenueSplitEditor
+        totalAmount={invoiceTotal}
+        splits={revenueSplits}
+        onChange={onRevenueSplitsChange}
+        disabled={disabled || revenueDisabled}
+      />
     </div>
   );
 
-  if (variant === "plain") {
-    return <div className="space-y-3">{body}</div>;
-  }
-
   return (
-    <div className="rounded-lg border border-sky-200 bg-sky-50/60 p-4 dark:border-sky-900 dark:bg-sky-950/20">
-      <div className="mb-3">
-        <h2 className="text-sm font-semibold text-default-800 dark:text-gray-100">
-          Accounting
-        </h2>
-        <p className="text-xs text-default-500 dark:text-gray-400">
-          These selections create the invoice journal automatically: debit the
-          trade debtor, credit the revenue account.
-        </p>
-      </div>
-      {body}
-    </div>
+    <>
+      {variant === "plain" ? (
+        body
+      ) : (
+        <div className="rounded-lg border border-sky-200 bg-sky-50/60 p-4 dark:border-sky-900 dark:bg-sky-950/20">
+          <div className="mb-3">
+            <h2 className="text-sm font-semibold text-default-800 dark:text-gray-100">
+              Accounting
+            </h2>
+            <p className="text-xs text-default-500 dark:text-gray-400">
+              Choose the Trade Debtors identity and allocate the invoice total
+              to its revenue journal lines.
+            </p>
+          </div>
+          {body}
+        </div>
+      )}
+
+      <Transition appear show={isCreateOpen} as={Fragment}>
+        <Dialog as="div" className="relative z-[70]" onClose={closeCreateIdentity}>
+          <TransitionChild
+            as={Fragment}
+            enter="ease-out duration-200"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-150"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black/40" />
+          </TransitionChild>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4">
+              <TransitionChild
+                as={Fragment}
+                enter="ease-out duration-200"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-150"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <DialogPanel
+                  className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl dark:bg-gray-800"
+                  onKeyDown={(event: React.KeyboardEvent<HTMLDivElement>): void => {
+                    if (
+                      event.key === "Enter" &&
+                      !isCreating &&
+                      newCode.trim() &&
+                      newDescription.trim()
+                    ) {
+                      event.preventDefault();
+                      void createIdentity();
+                    }
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <DialogTitle className="text-base font-semibold text-default-900 dark:text-gray-100">
+                        Create CD/SD Identity
+                      </DialogTitle>
+                      <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
+                        This name will appear in the Trade Debtors sub-schedule
+                        and will post to the CD_SD control account.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={closeCreateIdentity}
+                      disabled={isCreating}
+                      aria-label="Close create identity dialog"
+                      className="rounded-lg p-1 text-default-400 hover:bg-default-100 hover:text-default-700 disabled:opacity-50 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                    >
+                      <IconX size={18} />
+                    </button>
+                  </div>
+
+                  <div className="mt-4 space-y-4">
+                    <div>
+                      <label
+                        htmlFor="gt-new-debtor-code"
+                        className="block text-sm font-medium text-default-700 dark:text-gray-200"
+                      >
+                        Identity Code <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        id="gt-new-debtor-code"
+                        type="text"
+                        value={newCode}
+                        onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
+                          setNewCode(event.target.value.toUpperCase())
+                        }
+                        maxLength={50}
+                        disabled={isCreating}
+                        placeholder="e.g. CD-NEWCUSTOMER"
+                        className="mt-1 block w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="gt-new-debtor-description"
+                        className="block text-sm font-medium text-default-700 dark:text-gray-200"
+                      >
+                        Customer / Identity Name{" "}
+                        <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        id="gt-new-debtor-description"
+                        type="text"
+                        value={newDescription}
+                        onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
+                          setNewDescription(event.target.value)
+                        }
+                        maxLength={255}
+                        disabled={isCreating}
+                        className="mt-1 block w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                      />
+                    </div>
+
+                    <div className="rounded-lg bg-default-50 px-3 py-2 text-xs dark:bg-gray-900/40">
+                      <span className="text-default-500 dark:text-gray-400">
+                        Effective from
+                      </span>
+                      <span className="ml-2 font-medium text-default-800 dark:text-gray-100">
+                        {dateIssued || "Select the invoice date first"}
+                      </span>
+                    </div>
+
+                    {createError && (
+                      <p className="text-sm text-rose-700 dark:text-rose-300">
+                        {createError}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="mt-5 flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={closeCreateIdentity}
+                      disabled={isCreating}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="filled"
+                      color="sky"
+                      size="sm"
+                      onClick={(): void => {
+                        void createIdentity();
+                      }}
+                      disabled={isCreating || !newCode.trim() || !newDescription.trim()}
+                    >
+                      {isCreating ? "Creating..." : "Create and Select"}
+                    </Button>
+                  </div>
+                </DialogPanel>
+              </TransitionChild>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
+    </>
   );
 };
 

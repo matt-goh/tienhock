@@ -23,9 +23,10 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import GTInvoiceAccountFields, {
   GT_DEFAULT_REVENUE_ACCOUNT,
-  GTRevenueAccountCode,
 } from "../../../components/GreenTarget/GTInvoiceAccountFields";
 import { formatLocationDisplay } from "../../../utils/greenTarget/formatLocationDisplay";
+import { toCents } from "../../../utils/moneyUtils";
+import type { GreenTargetRevenueSplit } from "../../../types/greenTargetTypes";
 
 interface PickupDestination {
   id: number;
@@ -202,9 +203,15 @@ const RentalDetailsPage: React.FC = () => {
     useState(false);
   const [selectedRentalIds, setSelectedRentalIds] = useState<number[]>([]);
   const [invoiceAmount, setInvoiceAmount] = useState<string>("200.00");
-  const [invoiceRevenueAccount, setInvoiceRevenueAccount] = useState<
-    "" | GTRevenueAccountCode
-  >(GT_DEFAULT_REVENUE_ACCOUNT);
+  const [invoiceRevenueSplits, setInvoiceRevenueSplits] = useState<
+    GreenTargetRevenueSplit[]
+  >([
+    {
+      line_number: 1,
+      account_code: GT_DEFAULT_REVENUE_ACCOUNT,
+      amount: 200,
+    },
+  ]);
   const [invoiceDebtorAccount, setInvoiceDebtorAccount] = useState<string>("");
   // The customer's saved default, loaded when the modal opens. Null means the
   // customer has never been given one, which is the only case that needs a
@@ -278,7 +285,13 @@ const RentalDetailsPage: React.FC = () => {
     setIsInvoiceModalOpen(true);
     setSelectedRentalIds([rental.rental_id]);
     setInvoiceAmount("200.00");
-    setInvoiceRevenueAccount(GT_DEFAULT_REVENUE_ACCOUNT);
+    setInvoiceRevenueSplits([
+      {
+        line_number: 1,
+        account_code: GT_DEFAULT_REVENUE_ACCOUNT,
+        amount: 200,
+      },
+    ]);
     setInvoiceDebtorAccount("");
     setCustomerDefaultDebtorAccount(null);
     setDateIssued(format(new Date(), "yyyy-MM-dd"));
@@ -288,8 +301,8 @@ const RentalDetailsPage: React.FC = () => {
     setPaymentInternalReference("");
     setPaymentReference("");
     setIsLoadingCustomerRentals(true);
-    // The customer's default debtor account keeps the invoice's accounting
-    // silent in the common case; a failure here only means the picker opens.
+    // Preselect the customer's saved logical debtor identity when available;
+    // the shared accounting block still displays where it posts in the GL.
     setIsLoadingCustomerDefault(true);
     void greenTargetApi
       .getCustomer(rental.customer_id)
@@ -360,7 +373,7 @@ const RentalDetailsPage: React.FC = () => {
       toast.error("Select at least one rental.");
       return;
     }
-    if (isNaN(amount) || amount < 0) {
+    if (isNaN(amount) || amount <= 0) {
       toast.error("Please enter a valid amount.");
       return;
     }
@@ -368,12 +381,29 @@ const RentalDetailsPage: React.FC = () => {
       toast.error("Date issued is required.");
       return;
     }
-    if (!invoiceRevenueAccount) {
-      toast.error("Select TGA, TGB or WS_OTH for the invoice.");
+    if (!invoiceDebtorAccount.trim()) {
+      toast.error("Select or create a Trade Debtor identity.");
       return;
     }
-    // No debtor check: an empty value means a sundry / counter customer, which
-    // the server posts to CD_SD exactly as the legacy system did.
+    const hasInvalidRevenueSplit: boolean =
+      invoiceRevenueSplits.length === 0 ||
+      invoiceRevenueSplits.some(
+        (split: GreenTargetRevenueSplit): boolean =>
+          !Number.isFinite(Number(split.amount)) || toCents(Number(split.amount)) <= 0
+      );
+    const allocatedRevenueCents: number = invoiceRevenueSplits.reduce(
+      (sum: number, split: GreenTargetRevenueSplit): number =>
+        sum + toCents(Number(split.amount)),
+      0
+    );
+    if (hasInvalidRevenueSplit) {
+      toast.error("Enter an amount greater than RM 0.00 for every revenue line.");
+      return;
+    }
+    if (allocatedRevenueCents !== toCents(amount)) {
+      toast.error("Revenue allocation must equal the invoice total.");
+      return;
+    }
     if (recordPayment && !paymentInternalReference.trim()) {
       toast.error(
         "Green Target Reference No. is required to record a payment."
@@ -389,9 +419,10 @@ const RentalDetailsPage: React.FC = () => {
         rental_ids: selectedRentalIds,
         amount_before_tax: amount,
         tax_amount: 0,
+        total_amount: amount,
         date_issued: dateIssued,
         debtor_account_code: invoiceDebtorAccount,
-        revenue_account_code: invoiceRevenueAccount,
+        revenue_splits: invoiceRevenueSplits,
       });
       toast.success(`Invoice ${response.invoice.invoice_number} created`);
       if (recordPayment) {
@@ -1104,11 +1135,14 @@ const RentalDetailsPage: React.FC = () => {
                     <GTInvoiceAccountFields
                       variant="plain"
                       customerId={rental.customer_id}
+                      customerName={rental.customer_name}
                       customerDefaultCode={customerDefaultDebtorAccount}
                       debtorAccountCode={invoiceDebtorAccount}
-                      revenueAccountCode={invoiceRevenueAccount}
                       onDebtorChange={setInvoiceDebtorAccount}
-                      onRevenueChange={setInvoiceRevenueAccount}
+                      dateIssued={dateIssued}
+                      invoiceTotal={Number(invoiceAmount) || 0}
+                      revenueSplits={invoiceRevenueSplits}
+                      onRevenueSplitsChange={setInvoiceRevenueSplits}
                       disabled={isCreatingInvoice}
                       customerDefaultLoading={isLoadingCustomerDefault}
                     />

@@ -1862,6 +1862,101 @@ function assertAppliedActionsAreNoOps(beforePlan, afterPlan) {
   }
 }
 
+/**
+ * The 2026-08-01 debtor-dimension migration intentionally retires every
+ * temporary CD_SD GL child. The original repair planner therefore cannot use
+ * "active child" as its readiness test after that cutover. In the new model,
+ * verify the already-backfilled July source journals and their logical tags
+ * directly and finish as a read-only no-op.
+ *
+ * @param {import("pg").PoolClient} client
+ * @returns {Promise<boolean>} true when the new debtor dimension is installed
+ */
+async function verifyPostDimensionJulyState(client) {
+  const schemaResult = await client.query(
+    `SELECT to_regclass('greentarget.debtor_subledger_registry') IS NOT NULL
+              AS has_registry,
+            NOT EXISTS (
+              SELECT 1 FROM greentarget.account_codes
+               WHERE parent_code = 'CD_SD' AND is_active = true
+            ) AS shells_retired`
+  );
+  if (
+    schemaResult.rows[0]?.has_registry !== true ||
+    schemaResult.rows[0]?.shells_retired !== true
+  ) {
+    return false;
+  }
+
+  const invoiceResult = await client.query(
+    `SELECT COUNT(*)::integer AS live_invoices,
+            COUNT(*) FILTER (
+              WHERE journal.id IS NOT NULL
+                AND journal.status = 'posted'
+                AND journal.source_type = 'invoice'
+                AND journal.source_id = invoice.invoice_id::text
+                AND EXISTS (
+                  SELECT 1 FROM greentarget.journal_entry_lines line
+                   WHERE line.journal_entry_id = journal.id
+                     AND line.debit_amount > 0
+                     AND line.account_code = invoice.receivable_account_code
+                     AND line.debtor_subledger_code = invoice.debtor_account_code
+                )
+            )::integer AS valid_invoices
+       FROM greentarget.invoices invoice
+       LEFT JOIN greentarget.journal_entries journal
+         ON journal.id = invoice.journal_entry_id
+      WHERE invoice.date_issued >= $1::date
+        AND invoice.date_issued < $2::date
+        AND invoice.status <> 'cancelled'
+        AND COALESCE(invoice.is_consolidated, false) = false`,
+    [PERIOD_START, PERIOD_END]
+  );
+  const receiptResult = await client.query(
+    `SELECT COUNT(*)::integer AS posted_receipts,
+            COUNT(*) FILTER (
+              WHERE journal.id IS NOT NULL
+                AND journal.status = 'posted'
+                AND journal.entry_type = 'REC'
+                AND journal.source_type = 'receipt'
+                AND journal.source_id = receipt.id::text
+            )::integer AS valid_receipts
+       FROM greentarget.receipts receipt
+       LEFT JOIN greentarget.journal_entries journal
+         ON journal.id = receipt.journal_entry_id
+      WHERE receipt.status = 'posted'
+        AND receipt.posting_date >= $1::date
+        AND receipt.posting_date < $2::date`,
+    [PERIOD_START, PERIOD_END]
+  );
+  const tagResult = await client.query(
+    `SELECT COUNT(*)::integer AS untagged_cd_sd_lines
+       FROM greentarget.journal_entry_lines line
+       JOIN greentarget.journal_entries journal ON journal.id = line.journal_entry_id
+      WHERE journal.entry_date >= $1::date
+        AND journal.entry_date < $2::date
+        AND line.account_code = 'CD_SD'
+        AND line.debtor_subledger_code IS NULL`,
+    [PERIOD_START, PERIOD_END]
+  );
+
+  const invoiceState = invoiceResult.rows[0];
+  const receiptState = receiptResult.rows[0];
+  if (
+    invoiceState.live_invoices !== invoiceState.valid_invoices ||
+    receiptState.posted_receipts !== receiptState.valid_receipts ||
+    tagResult.rows[0].untagged_cd_sd_lines !== 0
+  ) {
+    fail(
+      `post-dimension July verification failed: invoices ${invoiceState.valid_invoices}/${invoiceState.live_invoices}, receipts ${receiptState.valid_receipts}/${receiptState.posted_receipts}, untagged CD_SD lines ${tagResult.rows[0].untagged_cd_sd_lines}`
+    );
+  }
+  console.log(
+    `POST-DIMENSION NO-OP: ${invoiceState.valid_invoices}/${invoiceState.live_invoices} live July invoices and ${receiptState.valid_receipts}/${receiptState.posted_receipts} posted July receipts own valid journals; every July CD_SD line is tagged.`
+  );
+  return true;
+}
+
 async function main() {
   if (suppliedArgs.includes("--help")) {
     console.log(
@@ -1880,6 +1975,12 @@ async function main() {
     } else {
       await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
       transactionOpen = true;
+    }
+
+    if (await verifyPostDimensionJulyState(client)) {
+      await client.query("ROLLBACK");
+      transactionOpen = false;
+      return;
     }
 
     const audit = await collectAudit(client, fixtures);

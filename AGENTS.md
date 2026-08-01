@@ -264,6 +264,14 @@ GT's ledger is a **clone**, never a share: no GT row lives in a `public` account
 - `greentarget.payments.receipt_id` - required FK to `greentarget.receipts(id)`; existing `greentarget.payments` rows remain the per-invoice allocation/balance records, while all rows under one receipt share confirmation, reference edits, cancellation, `PBB_1`, and the receipt-owned journal
 - `greentarget.locations` - location_id, customer_id (FK greentarget.customers ON DELETE CASCADE), site (optional short location label, usually one word; all distinct Sites from an invoice's rentals are appended after its primary billing address in individual Green Target sales and adjustment e-Invoices), address (required), phone_number. Locations may have a NULL site when no label is needed
 
+**Green Target debtor-dimension/revenue-split schema (2026-08-01; dev applied, production pending):**
+
+- `greentarget.debtor_subledger_registry` - logical debtor identity, description, GL control, kind, effective range, immutable source order/provenance, active/selectable flags and audit fields. Dev has 780 rows (27 named, one non-selectable `CD_SD`, 746 legacy sundry, six July sundry); 779 are selectable. `CD_SD (UNALLOCATED)` remains snapshot reconciliation metadata only.
+- `customers.debtor_account_code` and `invoices.debtor_account_code` now reference that registry; `invoices.receivable_account_code` snapshots the actual GL control. `journal_entry_lines.debtor_subledger_code` tags every new `CD_SD` movement with its logical identity.
+- `invoice_revenue_splits` and `adjustment_revenue_splits` store dense ordered account/amount rows; duplicate accounts are deliberate and totals must balance exactly. New entry allows TGA/TGB/WS_OTH; WS_OTH4 is inherited historical data only.
+- `invoice_number_sequences` stores transactional year + counter/named series counters; manually keyed conforming numbers advance the counter.
+- The 752 former `CD_SD` GL child shells are inactive and their July openings are consolidated into one RM65,705.40 control anchor. `/greentarget/api/debtors/legacy-list` reads registry-effective identities plus tagged movements and hides only rows whose three printed figures are all zero.
+
 **Green Target Payroll (greentarget schema):**
 
 - `greentarget.payroll_employees` - id, employee_id, job_type, date_added, is_active, notes

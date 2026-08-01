@@ -30,14 +30,15 @@ import {
 } from "../../../components/FormComponents";
 import GTInvoiceAccountFields, {
   GT_DEFAULT_REVENUE_ACCOUNT,
-  GTRevenueAccountCode,
 } from "../../../components/GreenTarget/GTInvoiceAccountFields";
 import { formatLocationDisplay } from "../../../utils/greenTarget/formatLocationDisplay";
+import { toCents } from "../../../utils/moneyUtils";
 import SubmissionResultsModal from "../../../components/Invoice/SubmissionResultsModal";
 import { EInvoiceSubmissionResult } from "../../../types/types";
 import type {
   CreateGreenTargetPaymentInput,
   GreenTargetPayment,
+  GreenTargetRevenueSplit,
 } from "../../../types/greenTargetTypes";
 
 // Interfaces
@@ -78,7 +79,12 @@ interface Invoice {
   total_amount?: number; // Calculated
   date_issued: string; // YYYY-MM-DD
   debtor_account_code: string;
-  revenue_account_code: "" | GTRevenueAccountCode;
+  revenue_splits: GreenTargetRevenueSplit[];
+  edit_dependencies?: {
+    has_receipts: boolean;
+    has_adjustments: boolean;
+    journal_manual_override: boolean;
+  };
 }
 
 const toLocalDateInputValue = (value: string | null | undefined): string => {
@@ -116,7 +122,13 @@ const InvoiceFormPage: React.FC = () => {
     date_issued: format(new Date(), "yyyy-MM-dd"),
     rental_ids: [], // Changed to array
     debtor_account_code: "",
-    revenue_account_code: GT_DEFAULT_REVENUE_ACCOUNT,
+    revenue_splits: [
+      {
+        line_number: 1,
+        account_code: GT_DEFAULT_REVENUE_ACCOUNT,
+        amount: 200,
+      },
+    ],
   });
   const [initialFormData, setInitialFormData] = useState<Invoice | null>(null); // For change detection
 
@@ -178,7 +190,13 @@ const InvoiceFormPage: React.FC = () => {
         date_issued: format(new Date(), "yyyy-MM-dd"),
         rental_ids: [], // Changed to array
         debtor_account_code: "",
-        revenue_account_code: GT_DEFAULT_REVENUE_ACCOUNT,
+        revenue_splits: [
+          {
+            line_number: 1,
+            account_code: GT_DEFAULT_REVENUE_ACCOUNT,
+            amount: 200,
+          },
+        ],
       };
       setInitialFormData(defaultInitialState);
       // Apply rentalData if it exists
@@ -391,7 +409,24 @@ const InvoiceFormPage: React.FC = () => {
         tax_amount: parseFloat(inv.tax_amount.toString()),
         date_issued: toLocalDateInputValue(inv.date_issued),
         debtor_account_code: inv.debtor_account_code || "",
-        revenue_account_code: inv.revenue_account_code || "",
+        revenue_splits:
+          Array.isArray(inv.revenue_splits) && inv.revenue_splits.length > 0
+            ? inv.revenue_splits.map(
+                (split: GreenTargetRevenueSplit): GreenTargetRevenueSplit => ({
+                  line_number: Number(split.line_number),
+                  account_code: split.account_code,
+                  amount: Number(split.amount),
+                })
+              )
+            : [
+                {
+                  line_number: 1,
+                  account_code:
+                    inv.revenue_account_code || GT_DEFAULT_REVENUE_ACCOUNT,
+                  amount: Number(inv.total_amount),
+                },
+              ],
+        edit_dependencies: inv.edit_dependencies,
       };
       setFormData(parsed);
       setInitialFormData(parsed);
@@ -619,11 +654,30 @@ const InvoiceFormPage: React.FC = () => {
       toast.error("Select customer");
       return false;
     }
-    // The debtor account is deliberately NOT required: an empty value means a
-    // sundry / counter customer and the server posts it to CD_SD, exactly as
-    // the legacy system did for every counter sale.
-    if (!formData.revenue_account_code) {
-      toast.error("Select TGA, TGB or WS_OTH for this invoice");
+    if (!formData.debtor_account_code.trim()) {
+      toast.error("Select or create a Trade Debtor identity");
+      return false;
+    }
+    const invoiceTotalCents: number = toCents(
+      Number(formData.amount_before_tax || 0) + Number(formData.tax_amount || 0)
+    );
+    const hasInvalidRevenueSplit: boolean =
+      formData.revenue_splits.length === 0 ||
+      formData.revenue_splits.some(
+        (split: GreenTargetRevenueSplit): boolean =>
+          !Number.isFinite(Number(split.amount)) || toCents(Number(split.amount)) <= 0
+      );
+    const allocatedRevenueCents: number = formData.revenue_splits.reduce(
+      (sum: number, split: GreenTargetRevenueSplit): number =>
+        sum + toCents(Number(split.amount)),
+      0
+    );
+    if (hasInvalidRevenueSplit) {
+      toast.error("Enter an amount greater than RM 0.00 for every revenue line");
+      return false;
+    }
+    if (allocatedRevenueCents !== invoiceTotalCents) {
+      toast.error("Revenue allocation must equal the invoice total");
       return false;
     }
     const selCust = customers.find(
@@ -705,7 +759,7 @@ const InvoiceFormPage: React.FC = () => {
         date_issued: formData.date_issued,
         invoice_number: formData.invoice_number?.trim() || undefined,
         debtor_account_code: formData.debtor_account_code,
-        revenue_account_code: formData.revenue_account_code,
+        revenue_splits: formData.revenue_splits,
       };
       if (isEditMode && formData.invoice_id)
         invData.invoice_id = formData.invoice_id;
@@ -862,6 +916,18 @@ const InvoiceFormPage: React.FC = () => {
   const totalAmount =
     (Number(formData.amount_before_tax) || 0) +
     (Number(formData.tax_amount) || 0);
+  const editDependencies = formData.edit_dependencies;
+  const documentIdentityLocked: boolean = Boolean(
+    isEditMode &&
+      (editDependencies?.has_receipts ||
+        editDependencies?.has_adjustments ||
+        editDependencies?.journal_manual_override)
+  );
+  const revenueAllocationLocked: boolean = Boolean(
+    isEditMode &&
+      (editDependencies?.has_adjustments ||
+        editDependencies?.journal_manual_override)
+  );
 
   // --- RENDER ---
 
@@ -920,6 +986,14 @@ const InvoiceFormPage: React.FC = () => {
             </div>
           </div>
         </div>
+        {documentIdentityLocked && (
+          <div className="mx-6 mt-5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+            Invoice number, date, customer, amount, rentals, and debtor identity
+            are locked because receipt/adjustment history or a detached journal
+            depends on them. Revenue allocation remains editable only when no
+            adjustment or detached journal exists.
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="p-6">
           {/* First row with invoice number and customer */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -943,6 +1017,7 @@ const InvoiceFormPage: React.FC = () => {
                   name="invoice_number"
                   value={formData.invoice_number || ""}
                   onChange={handleInputChange}
+                  disabled={isSaving || documentIdentityLocked}
                   className={clsx(
                     "block w-full px-3 py-2 border rounded-lg shadow-sm",
                     "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
@@ -995,6 +1070,7 @@ const InvoiceFormPage: React.FC = () => {
                 name="date_issued"
                 value={formData.date_issued}
                 onChange={handleInputChange}
+                disabled={isSaving || documentIdentityLocked}
                 required
                 className={clsx(
                   "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
@@ -1021,7 +1097,7 @@ const InvoiceFormPage: React.FC = () => {
                 query={customerQuery}
                 setQuery={setCustomerQuery}
                 placeholder="Search or Select Customer..."
-                disabled={isEditMode}
+                disabled={isEditMode || documentIdentityLocked}
                 required={true}
                 mode="single"
               />
@@ -1031,27 +1107,39 @@ const InvoiceFormPage: React.FC = () => {
           <div className="mt-6">
             <GTInvoiceAccountFields
               customerId={formData.customer_id || null}
+              customerName={selectedCustomer?.name || null}
               customerDefaultCode={selectedCustomer?.debtor_account_code || null}
               debtorAccountCode={formData.debtor_account_code}
-              revenueAccountCode={formData.revenue_account_code}
+              dateIssued={formData.date_issued}
+              invoiceTotal={totalAmount}
+              revenueSplits={formData.revenue_splits}
               onDebtorChange={(accountCode: string): void =>
                 setFormData((current: Invoice): Invoice => ({
                   ...current,
                   debtor_account_code: accountCode,
                 }))
               }
-              onRevenueChange={(accountCode: GTRevenueAccountCode): void =>
+              onRevenueSplitsChange={(splits: GreenTargetRevenueSplit[]): void =>
                 setFormData((current: Invoice): Invoice => ({
                   ...current,
-                  revenue_account_code: accountCode,
+                  revenue_splits: splits,
                 }))
               }
+              disabled={isSaving}
+              debtorDisabled={documentIdentityLocked}
+              revenueDisabled={revenueAllocationLocked}
             />
           </div>
 
           {/* Conditional Fields (Regular Invoice - Multiple Rental Selection) */}
           {formData.type === "regular" && (
-            <div className="mt-6">
+            <div
+              className={clsx(
+                "mt-6",
+                documentIdentityLocked && "pointer-events-none opacity-60"
+              )}
+              aria-disabled={documentIdentityLocked}
+            >
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
                   Select Rentals <span className="text-red-500">*</span>
@@ -1242,6 +1330,7 @@ const InvoiceFormPage: React.FC = () => {
                     name="amount_before_tax"
                     value={formData.amount_before_tax}
                     onChange={handleInputChange}
+                    disabled={isSaving || documentIdentityLocked}
                     min="0"
                     step="1"
                     required
@@ -1274,6 +1363,7 @@ const InvoiceFormPage: React.FC = () => {
                     name="tax_amount"
                     value={formData.tax_amount}
                     onChange={handleInputChange}
+                    disabled={isSaving || documentIdentityLocked}
                     min="0"
                     step="1"
                     className={clsx(
