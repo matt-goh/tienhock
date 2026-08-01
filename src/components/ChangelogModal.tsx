@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-01",
+    ms: "Carta Akaun: akaun induk seperti DEBTOR dan CL_TP kini boleh dibuka dan ditutup seperti akaun induk yang lain. Sebelum ini, induk yang semua anaknya adalah akaun biasa dipaparkan sebagai folder tanpa anak panah, jadi senarai anaknya langsung tidak boleh dilihat kecuali melalui carian. Anak akaun kekal tersembunyi sehingga anda membukanya, jadi paparan asal masih ringkas seperti biasa.",
+    en: "Chart of Accounts: parent accounts such as DEBTOR and CL_TP can now be opened and closed like any other parent. Previously, a parent whose children were all ordinary accounts showed as a folder with no arrow, so its children could not be seen at all except by searching. Children stay hidden until you open the parent, so the default view is still as compact as before.",
+  },
+  {
+    date: "2026-08-01",
     ms: "Green Target: apabila membatalkan resit dari tetingkap butiran, anda kini boleh memasukkan sebab pilihan dan sebab itu akan dipaparkan apabila resit dibuka semula. Nota Kredit/Debit kini menggunakan akaun penghutang dan hasil yang sama seperti invois asal; invois lama yang tiada jurnal masih mengikut kaedah lama TGA/TGB/WS_OTH. Pemilih Tong dalam borang invois juga kini membaca tarikh kutipan mengikut tarikh Malaysia, jadi tarikh tidak lagi beralih sehari lebih awal.",
     en: "Green Target: when cancelling a receipt from its details window, you can now enter an optional reason and see it when the receipt is reopened. Credit and Debit Notes now use the same debtor and revenue accounts as their original invoice; old invoices with no journal keep the legacy TGA/TGB/WS_OTH rule. The Dumpster picker on the invoice form now also reads pickup dates as Malaysia dates, so they no longer shift one day earlier.",
   },
