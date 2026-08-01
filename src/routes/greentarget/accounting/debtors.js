@@ -6,12 +6,9 @@
 //
 // Mounted at /greentarget/api/debtors (src/routes/index.js).
 //
-// GT has no open-item subledger (no invoices/payments tables for sales): its
-// debtor ledger is a RUNNING-BALANCE ledger imported from the legacy system.
-// Through June 2026, the 28 trade debtors are the direct TD children of the
-// DEBTOR control account. From July, CD_SD is a control account whose direct
-// children carry its detailed balances; top-level reports roll active TD
-// descendants into their original direct-DEBTOR row.
+// GT debtor reports remain GL-backed. The 28 legacy page-1 balances are direct
+// TD controls under DEBTOR. CD_SD remains one GL control, while its named
+// sundry-debtor identity is carried separately on each receivable journal line.
 //
 //   * GET /                  — one pseudo-salesman group ("Trade Debtors") with
 //                              one pseudo-customer per TD child. B/F row for the
@@ -35,6 +32,7 @@ import {
   getMonthPeriod,
   validateYearMonth,
 } from "./report-engine.js";
+import { buildGreenTargetLegacyDebtorList } from "./trade-debtor-list.js";
 
 /** Every GT opening anchor sits on this date; the imported ledger starts here. */
 const LEGACY_LEDGER_START = "2026-01-01";
@@ -43,7 +41,7 @@ const LEGACY_LEDGER_START = "2026-01-01";
 const DEFAULT_YEAR = 2026;
 const DEFAULT_MONTH = 6;
 
-/** CD_SD child ledgers become the source of truth from this date onward. */
+/** CD_SD identity-level posting starts from this date onward. */
 const DEBTOR_SUBLEDGER_CUTOVER = "2026-07-01";
 
 /** Round to whole cents (same convention as report-engine.js). */
@@ -63,21 +61,6 @@ const pad2 = (n) => String(n).padStart(2, "0");
 /** @param {string} startStr Local yyyy-MM-dd month start. */
 const useDescendantAggregation = (startStr) =>
   startStr >= DEBTOR_SUBLEDGER_CUTOVER;
-
-/**
- * @param {number} year
- * @param {number} month
- * @returns {{ year: number, month: number, startStr: string, endStr: string }}
- */
-const getPreviousMonthPeriod = (year, month) => {
-  const previousYear = month === 1 ? year - 1 : year;
-  const previousMonth = month === 1 ? 12 : month - 1;
-  return {
-    year: previousYear,
-    month: previousMonth,
-    ...getMonthPeriod(previousYear, previousMonth),
-  };
-};
 
 /**
  * FIFO-age signed monthly net buckets into the four report buckets.
@@ -613,15 +596,42 @@ export default function createGreenTargetDebtorsRouter(pool) {
     }
   });
 
-  // GET /sub-schedule/CD_SD - Detailed sundry-debtor schedule. June 2026 is
-  // the immutable imported snapshot; later months roll the child ledgers
-  // forward from their latest anchors. July's previous-month column comes
-  // from the June snapshot because child-ledger posting starts on 1 July.
+  // GET /legacy-list - One official legacy-style report payload: direct Trade
+  // Debtors for page 1 and the independently-tagged CD_SD subledger thereafter.
+  router.get("/legacy-list", async (req, res) => {
+    const period = resolvePeriod(req.query, res);
+    if (!period) return;
+    const { year, month } = period;
+    const { startStr } = getMonthPeriod(year, month);
+    if (startStr < "2026-06-01") {
+      return res.status(400).json({
+        message: "The legacy Trade Debtor List is available from June 2026 onward",
+      });
+    }
+
+    try {
+      const report = await buildGreenTargetLegacyDebtorList(pool, {
+        year,
+        month,
+        hideZero: req.query.hideZero === "1",
+      });
+      res.json(report);
+    } catch (error) {
+      console.error("Error fetching Green Target legacy debtor list:", error);
+      res.status(500).json({
+        message: "Error fetching Green Target legacy debtor list",
+        error: error.message,
+      });
+    }
+  });
+
+  // GET /sub-schedule/CD_SD - Searchable/paginated view of the same official
+  // CD_SD report section. Totals always remain the full GL control totals.
   router.get("/sub-schedule/CD_SD", async (req, res) => {
     const period = resolvePeriod(req.query, res);
     if (!period) return;
     const { year, month } = period;
-    const { startStr, endStr } = getMonthPeriod(year, month);
+    const { startStr } = getMonthPeriod(year, month);
     if (startStr < "2026-06-01") {
       return res.status(400).json({
         message: "CD_SD sub-schedule is available from June 2026 onward",
@@ -629,209 +639,14 @@ export default function createGreenTargetDebtorsRouter(pool) {
     }
 
     try {
-      const previousPeriod = getPreviousMonthPeriod(year, month);
-      let result;
-      if (startStr === "2026-06-01") {
-        result = await pool.query(
-          `WITH children AS (
-             SELECT code, description, sort_order
-               FROM greentarget.account_codes
-              WHERE parent_code = 'CD_SD'
-                AND ledger_type = 'TD'
-                AND is_active = true
-           ),
-           current_snapshot AS (
-             SELECT account_code,
-                    closing_balance,
-                    movement,
-                    source_page,
-                    source_row
-               FROM greentarget.debtor_subledger_snapshots
-              WHERE as_of_month = $1::date
-           ),
-           previous_snapshot AS (
-             SELECT account_code, movement
-               FROM greentarget.debtor_subledger_snapshots
-              WHERE as_of_month = $2::date
-           ),
-           schedule_accounts AS (
-             SELECT ch.code, ch.description, ch.sort_order
-               FROM children ch
-             UNION ALL
-             SELECT current_snapshot.account_code AS code,
-                    CASE
-                      WHEN current_snapshot.account_code = 'CD_SD (UNALLOCATED)'
-                      THEN 'UNALLOCATED LEGACY / UNMAPPED CONTROL BALANCE'
-                      ELSE current_snapshot.account_code
-                    END AS description,
-                    2147483647 AS sort_order
-               FROM current_snapshot
-              WHERE NOT EXISTS (
-                SELECT 1
-                  FROM children ch
-                 WHERE ch.code = current_snapshot.account_code
-              )
-           )
-           SELECT schedule_accounts.code,
-                  schedule_accounts.description,
-                  COALESCE(current_snapshot.closing_balance, 0)::numeric(14,2)
-                    AS closing_balance,
-                  COALESCE(current_snapshot.movement, 0)::numeric(14,2)
-                    AS current_month,
-                  COALESCE(previous_snapshot.movement, 0)::numeric(14,2)
-                    AS previous_month,
-                  current_snapshot.source_page,
-                  current_snapshot.source_row
-             FROM schedule_accounts
-             LEFT JOIN current_snapshot
-               ON current_snapshot.account_code = schedule_accounts.code
-             LEFT JOIN previous_snapshot
-               ON previous_snapshot.account_code = schedule_accounts.code
-            ORDER BY current_snapshot.source_page ASC NULLS LAST,
-                     current_snapshot.source_row ASC NULLS LAST,
-                     schedule_accounts.sort_order ASC,
-                     schedule_accounts.code ASC`,
-          [startStr, previousPeriod.startStr]
-        );
-      } else {
-        const useSnapshotPrevious = startStr === DEBTOR_SUBLEDGER_CUTOVER;
-        result = await pool.query(
-          `WITH children AS (
-             SELECT code, description, sort_order
-               FROM greentarget.account_codes
-              WHERE parent_code = 'CD_SD'
-                AND ledger_type = 'TD'
-                AND is_active = true
-           ),
-           schedule_accounts AS (
-             SELECT ch.code,
-                    ch.code AS ledger_account_code,
-                    ch.description,
-                    ch.sort_order
-               FROM children ch
-             UNION ALL
-             SELECT 'CD_SD (UNALLOCATED)' AS code,
-                    'CD_SD' AS ledger_account_code,
-                    'UNALLOCATED LEGACY / UNMAPPED CONTROL BALANCE' AS description,
-                    2147483647 AS sort_order
-           ),
-           anchors AS (
-             SELECT schedule_accounts.code AS account_code,
-                    anchor.as_of_date,
-                    anchor.amount
-               FROM schedule_accounts
-               LEFT JOIN LATERAL (
-                 SELECT aob.as_of_date, aob.amount
-                   FROM greentarget.account_opening_balances aob
-                  WHERE aob.account_code = schedule_accounts.ledger_account_code
-                    AND aob.as_of_date <= $1::date
-                  ORDER BY aob.as_of_date DESC
-                  LIMIT 1
-               ) anchor ON true
-           ),
-           movement AS (
-             SELECT schedule_accounts.code AS account_code,
-                    SUM(CASE
-                          WHEN je.entry_date >= COALESCE(a.as_of_date, $5::date)
-                           AND je.entry_date <= $1::date
-                          THEN jel.debit_amount - jel.credit_amount ELSE 0
-                        END) AS closing_movement,
-                    SUM(CASE
-                          WHEN je.entry_date >= $2::date
-                           AND je.entry_date <= $1::date
-                          THEN jel.debit_amount - jel.credit_amount ELSE 0
-                        END) AS current_month,
-                    SUM(CASE
-                          WHEN je.entry_date >= $3::date
-                           AND je.entry_date <= $4::date
-                          THEN jel.debit_amount - jel.credit_amount ELSE 0
-                        END) AS previous_month
-               FROM schedule_accounts
-               JOIN greentarget.journal_entry_lines jel
-                 ON jel.account_code = schedule_accounts.ledger_account_code
-               JOIN greentarget.journal_entries je
-                 ON je.id = jel.journal_entry_id
-               LEFT JOIN anchors a
-                 ON a.account_code = schedule_accounts.code
-              WHERE je.status = 'posted'
-                AND je.entry_date <= $1::date
-              GROUP BY schedule_accounts.code
-           ),
-           previous_snapshot AS (
-             SELECT account_code, movement
-               FROM greentarget.debtor_subledger_snapshots
-              WHERE as_of_month = $3::date
-           ),
-           display_order AS (
-             SELECT account_code, source_page, source_row
-               FROM greentarget.debtor_subledger_snapshots
-              WHERE as_of_month = '2026-06-01'::date
-           )
-           SELECT schedule_accounts.code,
-                  schedule_accounts.description,
-                  (COALESCE(a.amount, 0)
-                   + COALESCE(m.closing_movement, 0))::numeric(14,2)
-                    AS closing_balance,
-                  COALESCE(m.current_month, 0)::numeric(14,2) AS current_month,
-                  (CASE WHEN $6::boolean
-                        THEN COALESCE(previous_snapshot.movement, 0)
-                        ELSE COALESCE(m.previous_month, 0)
-                   END)::numeric(14,2) AS previous_month,
-                  display_order.source_page,
-                  display_order.source_row
-             FROM schedule_accounts
-             LEFT JOIN anchors a ON a.account_code = schedule_accounts.code
-             LEFT JOIN movement m ON m.account_code = schedule_accounts.code
-             LEFT JOIN previous_snapshot
-               ON previous_snapshot.account_code = schedule_accounts.code
-             LEFT JOIN display_order
-               ON display_order.account_code = schedule_accounts.code
-            ORDER BY display_order.source_page ASC NULLS LAST,
-                     display_order.source_row ASC NULLS LAST,
-                     schedule_accounts.sort_order ASC,
-                     schedule_accounts.code ASC`,
-          [
-            endStr,
-            startStr,
-            previousPeriod.startStr,
-            previousPeriod.endStr,
-            LEGACY_LEDGER_START,
-            useSnapshotPrevious,
-          ]
-        );
-      }
-
-      const totals = {
-        closing_balance: 0,
-        current_month: 0,
-        previous_month: 0,
-      };
-      const allRows = result.rows.map((row) => {
-        const scheduleRow = {
-          account_no: row.code,
-          particular: row.description || "UNNAMED",
-          closing_balance: num(row.closing_balance),
-          current_month: num(row.current_month),
-          previous_month: num(row.previous_month),
-          source_page: row.source_page === null ? null : Number(row.source_page),
-          source_row: row.source_row === null ? null : Number(row.source_row),
-        };
-        totals.closing_balance += scheduleRow.closing_balance;
-        totals.current_month += scheduleRow.current_month;
-        totals.previous_month += scheduleRow.previous_month;
-        return scheduleRow;
-      });
-
       const includeZero = req.query.includeZero === "1";
       const hideZero = req.query.hideZero === "1" || !includeZero;
-      let rows = hideZero
-        ? allRows.filter(
-            (row) =>
-              Math.abs(row.closing_balance) > 0.005 ||
-              Math.abs(row.current_month) > 0.005 ||
-              Math.abs(row.previous_month) > 0.005
-          )
-        : allRows;
+      const report = await buildGreenTargetLegacyDebtorList(pool, {
+        year,
+        month,
+        hideZero,
+      });
+      let rows = report.cd_sd.rows;
 
       const search = String(req.query.search || "").trim().toLowerCase();
       if (search) {
@@ -854,17 +669,16 @@ export default function createGreenTargetDebtorsRouter(pool) {
       );
       rows = rows.slice((page - 1) * limit, page * limit);
 
-      for (const key of Object.keys(totals)) {
-        totals[key] = money(totals[key]);
-      }
-
       res.json({
-        statement_date: toDisplayDate(endStr),
-        statement_month: month,
-        statement_year: year,
+        statement_date: report.statement_date,
+        statement_month: report.statement_month,
+        statement_year: report.statement_year,
         rows,
-        totals,
+        totals: report.cd_sd.control_totals,
+        visible_totals: report.cd_sd.visible_totals,
+        reconciliation_residual: report.cd_sd.reconciliation_residual,
         total_accounts: totalAccounts,
+        full_population: report.cd_sd.full_population,
         page,
         limit,
         total_pages: totalPages,
@@ -1116,13 +930,27 @@ export default function createGreenTargetDebtorsRouter(pool) {
         return customer;
       });
 
-      // The printed body lists only nonzero closes; includeZero=1 (the
-      // interactive By Customer view) returns the full population with
-      // server-side search, zero-balance filter and pagination.
+      // A row is hidden only when every printed amount is zero, so a debtor
+      // with in-month activity remains visible even when it closes at zero.
+      // includeZero=1 lets the interactive view request the full population.
+      /**
+       * @param {{
+       *   bal_bf: number,
+       *   current_invoices: number,
+       *   payment: number,
+       *   total_due: number
+       * }} customer
+       * @returns {boolean}
+       */
+      const hasAnyPrintedAmount = (customer) =>
+        Math.abs(customer.bal_bf) > 0.005 ||
+        Math.abs(customer.current_invoices) > 0.005 ||
+        Math.abs(customer.payment) > 0.005 ||
+        Math.abs(customer.total_due) > 0.005;
       let customers =
         req.query.includeZero === "1"
           ? allCustomers
-          : allCustomers.filter((c) => Math.abs(c.total_due) > 0.005);
+          : allCustomers.filter(hasAnyPrintedAmount);
 
       let totalCustomers = customers.length;
       let page = 1;
@@ -1136,7 +964,7 @@ export default function createGreenTargetDebtorsRouter(pool) {
           );
         }
         if (req.query.hideZero === "1") {
-          customers = customers.filter((c) => Math.abs(c.total_due) > 0.005);
+          customers = customers.filter(hasAnyPrintedAmount);
         }
         totalCustomers = customers.length;
         if (req.query.page || req.query.limit) {

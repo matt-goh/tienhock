@@ -10,12 +10,11 @@ import {
 import type {
   GreenTargetDebtorSubScheduleResponse,
   GreenTargetDebtorSubScheduleRow,
-  GreenTargetDebtorSubScheduleTotals,
 } from "../../types/greenTargetDebtorSubSchedule";
 import { GREENTARGET_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
 
-const ROWS_PER_PAGE = 42;
+const ROWS_PER_PAGE = 44;
 
 const styles = StyleSheet.create({
   page: {
@@ -106,6 +105,7 @@ const styles = StyleSheet.create({
 
 const formatAmount = (amount: number): string => {
   const normalizedAmount: number = Number(amount || 0);
+  if (Math.abs(normalizedAmount) <= 0.005) return ".00";
   const absoluteAmount: string = Math.abs(normalizedAmount).toLocaleString(
     "en-MY",
     {
@@ -123,22 +123,6 @@ const getMovementLabel = (year: number, month: number): string => {
       year: "numeric",
     })
     .toUpperCase();
-};
-
-const calculateTotals = (
-  rows: GreenTargetDebtorSubScheduleRow[]
-): GreenTargetDebtorSubScheduleTotals => {
-  return rows.reduce<GreenTargetDebtorSubScheduleTotals>(
-    (
-      totals: GreenTargetDebtorSubScheduleTotals,
-      row: GreenTargetDebtorSubScheduleRow
-    ): GreenTargetDebtorSubScheduleTotals => ({
-      closing_balance: totals.closing_balance + Number(row.closing_balance || 0),
-      current_month: totals.current_month + Number(row.current_month || 0),
-      previous_month: totals.previous_month + Number(row.previous_month || 0),
-    }),
-    { closing_balance: 0, current_month: 0, previous_month: 0 }
-  );
 };
 
 const chunkRows = (
@@ -161,9 +145,6 @@ const GreenTargetDebtorSubSchedulePDF: React.FC<
   GreenTargetDebtorSubSchedulePDFProps
 > = ({ data }) => {
   const pages: GreenTargetDebtorSubScheduleRow[][] = chunkRows(data.rows);
-  const displayedTotals: GreenTargetDebtorSubScheduleTotals = calculateTotals(
-    data.rows
-  );
   const currentMonthLabel: string = getMovementLabel(
     data.statement_year,
     data.statement_month
@@ -243,13 +224,13 @@ const GreenTargetDebtorSubSchedulePDF: React.FC<
                   <Text style={styles.accountColumn} />
                   <Text style={styles.particularColumn}>TOTAL BALANCE TO DATE</Text>
                   <Text style={styles.amountColumn}>
-                    {formatAmount(displayedTotals.closing_balance)}
+                    {formatAmount(data.totals.closing_balance)}
                   </Text>
                   <Text style={styles.amountColumn}>
-                    {formatAmount(displayedTotals.current_month)}
+                    {formatAmount(data.totals.current_month)}
                   </Text>
                   <Text style={styles.amountColumn}>
-                    {formatAmount(displayedTotals.previous_month)}
+                    {formatAmount(data.totals.previous_month)}
                   </Text>
                 </View>
                 <View style={styles.doubleLine} />
@@ -257,7 +238,7 @@ const GreenTargetDebtorSubSchedulePDF: React.FC<
             )}
 
             <Text style={styles.pageNumber} fixed>
-              CD_SD CHILD ACCOUNT SCHEDULE
+              CD_SD DEBTOR SUB-SCHEDULE
             </Text>
           </Page>
         )

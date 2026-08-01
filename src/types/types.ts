@@ -1226,6 +1226,8 @@ export interface JournalEntryLine {
   internal_reference?: string | null; // Stored line reference when a display reference is returned
   display_reference?: string | null; // Exact legacy-visible line reference
   cheque_reference?: string | null; // Per-line cheque/transaction reference
+  debtor_subledger_code?: string | null; // GT logical debtor identity; may differ from the GL account
+  debtor_subledger_description?: string | null; // GT identity description for edit/display
   particulars?: string; // Line description
   created_at?: string;
 }
@@ -1247,6 +1249,7 @@ export interface JournalEntryLineInput {
   credit_amount: number;
   reference?: string;
   cheque_reference?: string;
+  debtor_subledger_code?: string;
   particulars?: string;
 }
 

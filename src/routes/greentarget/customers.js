@@ -1,6 +1,6 @@
 // src/routes/greentarget/customers.js
 import { Router } from "express";
-import { resolveGTReceivableAccount } from "./accounting/sales-journal.js";
+import { resolveGTDebtorAssignment } from "./accounting/sales-journal.js";
 
 export default function (pool) {
   const router = Router();
@@ -75,9 +75,11 @@ export default function (pool) {
 
     try {
       const resolvedDebtorAccount = debtor_account_code
-        ? await resolveGTReceivableAccount(pool, {
+        ? (
+            await resolveGTDebtorAssignment(pool, {
             debtor_account_code,
-          })
+            })
+          ).debtorAccountCode
         : null;
       const query = `
       INSERT INTO greentarget.customers (
@@ -146,9 +148,11 @@ export default function (pool) {
       );
       const resolvedDebtorAccount =
         shouldUpdateDebtorAccount && debtor_account_code
-          ? await resolveGTReceivableAccount(pool, {
-              debtor_account_code,
-            })
+          ? (
+              await resolveGTDebtorAssignment(pool, {
+                debtor_account_code,
+              })
+            ).debtorAccountCode
           : null;
       const query = `
       UPDATE greentarget.customers

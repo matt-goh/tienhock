@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-01",
+    ms: "Green Target: invois kini menyimpan identiti penghutang CD/SD secara berasingan walaupun jurnal kekal masuk ke akaun kawalan CD_SD, supaya jadual penghutang mengikut nama pelanggan sama seperti sistem lama. Invois dan Nota Kredit/Debit juga boleh membahagikan jumlah hasil mengikut susunan TGA, TGB dan WS_OTH. Laporan Trade Debtors rasmi kini mengekalkan susunan dan jumlah rekod lama, dengan pilihan menyembunyikan pelanggan hanya apabila ketiga-tiga amaun mereka sifar. Medan utama invois dikunci selepas mempunyai sejarah resit atau pelarasan supaya rujukan dan baki tidak terpisah.",
+    en: "Green Target: invoices now retain a separate CD/SD debtor identity even though the journal continues posting to the CD_SD control, so the named customer schedule works like the legacy system. Invoices and Credit/Debit Notes can also split revenue in order across TGA, TGB and WS_OTH. The official Trade Debtors report preserves the legacy order and totals, with an option to hide customers only when all three amounts are zero. Key invoice fields are locked once receipt or adjustment history exists so references and balances cannot drift apart.",
+  },
+  {
+    date: "2026-08-01",
     ms: "Carta Akaun: akaun induk seperti DEBTOR dan CL_TP kini boleh dibuka dan ditutup seperti akaun induk yang lain. Sebelum ini, induk yang semua anaknya adalah akaun biasa dipaparkan sebagai folder tanpa anak panah, jadi senarai anaknya langsung tidak boleh dilihat kecuali melalui carian. Anak akaun kekal tersembunyi sehingga anda membukanya, jadi paparan asal masih ringkas seperti biasa.",
     en: "Chart of Accounts: parent accounts such as DEBTOR and CL_TP can now be opened and closed like any other parent. Previously, a parent whose children were all ordinary accounts showed as a folder with no arrow, so its children could not be seen at all except by searching. Children stay hidden until you open the parent, so the default view is still as compact as before.",
   },

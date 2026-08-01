@@ -33,6 +33,7 @@ import AccountCodeCombobox from "../../components/Accounting/AccountCodeCombobox
 import ChequeReuseWarning from "../../components/Accounting/ChequeReuseWarning";
 import useAccountCodeFavourites from "../../hooks/useAccountCodeFavourites";
 import {
+  FormCombobox,
   FormInput,
   FormListbox,
   SelectOption,
@@ -54,6 +55,9 @@ import {
   IconFileText,
   IconCheck,
 } from "@tabler/icons-react";
+import type {
+  GreenTargetDebtorSubledgerIdentity,
+} from "../../types/greenTargetTypes";
 
 interface JournalLineFormData {
   id?: number;
@@ -61,6 +65,8 @@ interface JournalLineFormData {
   account_code: string;
   reference: string;
   cheque_reference: string;
+  debtor_subledger_code: string;
+  debtor_subledger_description: string;
   particulars: string;
   debit_amount: string;
   credit_amount: string;
@@ -89,6 +95,9 @@ const HEADER_LISTBOX_CLASSNAME: string =
 const HEADER_TIME_NAVIGATOR_TRIGGER_CLASSNAME: string =
   "w-full !h-[38px] justify-between !bg-white dark:!bg-gray-900/50 !font-normal disabled:!bg-gray-50 dark:disabled:!bg-gray-800";
 const ACCOUNT_CODE_PATTERN: RegExp = /^[A-Za-z0-9\-_.]+$/;
+const GT_DEBTOR_SUBLEDGER_ENDPOINT: string =
+  "/greentarget/api/account-codes/debtor-subledger";
+const GT_DEBTOR_SEARCH_LIMIT: number = 50;
 
 // Load the last journal type the user selected (shared cache with the list page session)
 const loadLastEntryType = (
@@ -111,10 +120,239 @@ const emptyLine = (lineNumber: number): JournalLineFormData => ({
   account_code: "",
   reference: "",
   cheque_reference: "",
+  debtor_subledger_code: "",
+  debtor_subledger_description: "",
   particulars: "",
   debit_amount: "",
   credit_amount: "",
 });
+
+const getGTDebtorIdentityLabel = (
+  identity: GreenTargetDebtorSubledgerIdentity
+): string =>
+  `${identity.code} - ${identity.description} (posts to ${identity.control_account_code})`;
+
+const mergeGTDebtorIdentities = (
+  rows: ReadonlyArray<GreenTargetDebtorSubledgerIdentity>
+): GreenTargetDebtorSubledgerIdentity[] => {
+  const identitiesByCode = new Map<
+    string,
+    GreenTargetDebtorSubledgerIdentity
+  >();
+  rows.forEach((identity: GreenTargetDebtorSubledgerIdentity): void => {
+    if (!identitiesByCode.has(identity.code)) {
+      identitiesByCode.set(identity.code, identity);
+    }
+  });
+  return Array.from(identitiesByCode.values());
+};
+
+interface GTJournalDebtorIdentitySelectorProps {
+  lineNumber: number;
+  value: string;
+  description: string;
+  entryDate: string;
+  disabled: boolean;
+  onChange: (code: string, description: string) => void;
+}
+
+const GTJournalDebtorIdentitySelector: React.FC<
+  GTJournalDebtorIdentitySelectorProps
+> = ({
+  lineNumber,
+  value,
+  description,
+  entryDate,
+  disabled,
+  onChange,
+}) => {
+  const [query, setQuery] = useState<string>("");
+  const [searchResults, setSearchResults] = useState<
+    GreenTargetDebtorSubledgerIdentity[]
+  >([]);
+  const [selectedIdentity, setSelectedIdentity] =
+    useState<GreenTargetDebtorSubledgerIdentity | null>(null);
+  const [selectedIdentityUnavailable, setSelectedIdentityUnavailable] =
+    useState<boolean>(false);
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [searchFailed, setSearchFailed] = useState<boolean>(false);
+
+  useEffect((): (() => void) => {
+    let isCurrent: boolean = true;
+    const timer: number = window.setTimeout(
+      (): void => {
+        const loadIdentities = async (): Promise<void> => {
+          setIsSearching(true);
+          setSearchFailed(false);
+          try {
+            const params: URLSearchParams = new URLSearchParams({
+              search: query.trim(),
+              limit: String(GT_DEBTOR_SEARCH_LIMIT),
+            });
+            if (entryDate) params.set("as_of", entryDate);
+            const rows: GreenTargetDebtorSubledgerIdentity[] =
+              await api.get<GreenTargetDebtorSubledgerIdentity[]>(
+                `${GT_DEBTOR_SUBLEDGER_ENDPOINT}?${params.toString()}`
+              );
+            if (isCurrent) setSearchResults(rows);
+          } catch (searchError: unknown) {
+            console.error(
+              "Failed to search Green Target debtor identities:",
+              searchError
+            );
+            if (isCurrent) {
+              setSearchResults([]);
+              setSearchFailed(true);
+            }
+          } finally {
+            if (isCurrent) setIsSearching(false);
+          }
+        };
+        void loadIdentities();
+      },
+      query ? 250 : 0
+    );
+
+    return (): void => {
+      isCurrent = false;
+      window.clearTimeout(timer);
+    };
+  }, [entryDate, query]);
+
+  useEffect((): (() => void) => {
+    let isCurrent: boolean = true;
+    if (!value) {
+      setSelectedIdentity(null);
+      setSelectedIdentityUnavailable(false);
+      return (): void => {
+        isCurrent = false;
+      };
+    }
+
+    setSelectedIdentity(null);
+    setSelectedIdentityUnavailable(false);
+    const loadSelectedIdentity = async (): Promise<void> => {
+      try {
+        const params: URLSearchParams = new URLSearchParams({
+          search: value,
+          limit: String(GT_DEBTOR_SEARCH_LIMIT),
+        });
+        if (entryDate) params.set("as_of", entryDate);
+        const rows: GreenTargetDebtorSubledgerIdentity[] =
+          await api.get<GreenTargetDebtorSubledgerIdentity[]>(
+            `${GT_DEBTOR_SUBLEDGER_ENDPOINT}?${params.toString()}`
+          );
+        if (!isCurrent) return;
+        const exactIdentity: GreenTargetDebtorSubledgerIdentity | null =
+          rows.find(
+            (identity: GreenTargetDebtorSubledgerIdentity): boolean =>
+              identity.code === value
+          ) || null;
+        setSelectedIdentity(exactIdentity);
+        setSelectedIdentityUnavailable(exactIdentity === null);
+      } catch (selectedError: unknown) {
+        console.error(
+          "Failed to load selected Green Target debtor identity:",
+          selectedError
+        );
+        if (isCurrent) {
+          setSelectedIdentity(null);
+          setSelectedIdentityUnavailable(false);
+        }
+      }
+    };
+    void loadSelectedIdentity();
+
+    return (): void => {
+      isCurrent = false;
+    };
+  }, [entryDate, value]);
+
+  const identities: GreenTargetDebtorSubledgerIdentity[] = useMemo(
+    (): GreenTargetDebtorSubledgerIdentity[] =>
+      mergeGTDebtorIdentities([
+        ...(selectedIdentity ? [selectedIdentity] : []),
+        ...searchResults.filter(
+          (identity: GreenTargetDebtorSubledgerIdentity): boolean =>
+            identity.is_selectable
+        ),
+      ]),
+    [searchResults, selectedIdentity]
+  );
+
+  const options: SelectOption[] = useMemo((): SelectOption[] => {
+    const availableOptions: SelectOption[] = identities.map(
+      (identity: GreenTargetDebtorSubledgerIdentity): SelectOption => ({
+        id: identity.code,
+        name: getGTDebtorIdentityLabel(identity),
+      })
+    );
+    if (
+      value &&
+      !availableOptions.some(
+        (option: SelectOption): boolean => option.id === value
+      )
+    ) {
+      availableOptions.unshift({
+        id: value,
+        name: `${value} - ${description || "selected identity"} (posts to CD_SD)`,
+      });
+    }
+    return availableOptions;
+  }, [description, identities, value]);
+
+  return (
+    <div className="mt-1.5 space-y-1">
+      <FormCombobox
+        name={`debtor_subledger_code_${lineNumber}`}
+        label="Trade Debtor Identity"
+        value={value || undefined}
+        onChange={(selected: string | string[] | null): void => {
+          const selectedCode: string =
+            typeof selected === "string" ? selected : "";
+          const identity: GreenTargetDebtorSubledgerIdentity | undefined =
+            identities.find(
+              (candidate: GreenTargetDebtorSubledgerIdentity): boolean =>
+                candidate.code === selectedCode
+            );
+          onChange(
+            selectedCode,
+            identity?.description ||
+              (selectedCode === value ? description : "")
+          );
+          setQuery("");
+        }}
+        options={options}
+        query={query}
+        setQuery={setQuery}
+        mode="single"
+        required
+        disabled={disabled}
+        maxVisibleOptions={GT_DEBTOR_SEARCH_LIMIT}
+        placeholder={
+          isSearching
+            ? "Searching debtor identities..."
+            : "Search debtor code or customer name..."
+        }
+      />
+      <p className="px-1 text-[11px] leading-4 text-default-500 dark:text-gray-400">
+        Required for the Trade Debtors sub-schedule. The general ledger line
+        remains posted to CD_SD.
+      </p>
+      {selectedIdentityUnavailable && (
+        <p className="px-1 text-[11px] leading-4 text-rose-700 dark:text-rose-300">
+          {value} is not selectable for this journal date. Choose another
+          identity before saving.
+        </p>
+      )}
+      {searchFailed && (
+        <p className="px-1 text-[11px] leading-4 text-rose-700 dark:text-rose-300">
+          Debtor identity search could not be loaded.
+        </p>
+      )}
+    </div>
+  );
+};
 
 const parseLocalDateString = (dateString: string): Date | null => {
   const match: RegExpMatchArray | null = dateString.match(
@@ -786,6 +1024,9 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
         // Edit the STORED reference, not the resolved display value
         reference: line.internal_reference || line.reference || "",
         cheque_reference: line.cheque_reference || "",
+        debtor_subledger_code: line.debtor_subledger_code || "",
+        debtor_subledger_description:
+          line.debtor_subledger_description || "",
         particulars: line.particulars || "",
         debit_amount: line.debit_amount > 0 ? line.debit_amount.toString() : "",
         credit_amount:
@@ -898,8 +1139,17 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
     value: string
   ) => {
     setFormData((prev) => {
-      const newLines = [...prev.lines];
-      newLines[index] = { ...newLines[index], [field]: value };
+      const newLines: JournalLineFormData[] = [...prev.lines];
+      const previousLine: JournalLineFormData = newLines[index];
+      newLines[index] = { ...previousLine, [field]: value };
+
+      // A debtor tag belongs to one specific GL control account. Keep tags
+      // returned on untouched named-debtor lines, but never carry one across
+      // an account change where it would describe a different posting.
+      if (field === "account_code" && value !== previousLine.account_code) {
+        newLines[index].debtor_subledger_code = "";
+        newLines[index].debtor_subledger_description = "";
+      }
 
       // Auto-clear opposite amount field
       if (field === "debit_amount" && value && parseFloat(value) > 0) {
@@ -908,6 +1158,23 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
         newLines[index].debit_amount = "";
       }
 
+      return { ...prev, lines: newLines };
+    });
+  };
+
+  const handleDebtorSubledgerChange = (
+    index: number,
+    code: string,
+    description: string
+  ): void => {
+    setFormData((prev: JournalEntryFormData): JournalEntryFormData => {
+      if (!prev.lines[index]) return prev;
+      const newLines: JournalLineFormData[] = [...prev.lines];
+      newLines[index] = {
+        ...newLines[index],
+        debtor_subledger_code: code,
+        debtor_subledger_description: description,
+      };
       return { ...prev, lines: newLines };
     });
   };
@@ -948,6 +1215,8 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
       newLines[quickAddTargetLineIndex] = {
         ...newLines[quickAddTargetLineIndex],
         account_code: accountCode.code,
+        debtor_subledger_code: "",
+        debtor_subledger_description: "",
       };
 
       return { ...prev, lines: newLines };
@@ -1025,6 +1294,16 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
         return false;
       }
       if (
+        isGreenTarget &&
+        line.account_code === "CD_SD" &&
+        !line.debtor_subledger_code.trim()
+      ) {
+        toast.error(
+          `Select a Trade Debtor identity for CD_SD line ${line.line_number}`
+        );
+        return false;
+      }
+      if (
         (parseFloat(line.debit_amount) || 0) === 0 &&
         (parseFloat(line.credit_amount) || 0) === 0
       ) {
@@ -1063,7 +1342,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
             (parseFloat(line.debit_amount) > 0 ||
               parseFloat(line.credit_amount) > 0)
         )
-        .map((line, index) => ({
+        .map((line, index): JournalEntryLineInput => ({
           line_number: index + 1,
           account_code: line.account_code,
           debit_amount: parseFloat(line.debit_amount) || 0,
@@ -1072,6 +1351,12 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
           cheque_reference: isGreenTarget
             ? line.cheque_reference || undefined
             : undefined,
+          ...(isGreenTarget && line.debtor_subledger_code.trim()
+            ? {
+                debtor_subledger_code:
+                  line.debtor_subledger_code.trim(),
+              }
+            : {}),
           particulars: line.particulars || undefined,
         }));
 
@@ -1389,31 +1674,57 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
 
                         {/* Account Code */}
                         <td className="px-1 py-1">
-                          <AccountCodeCombobox
-                            value={line.account_code}
-                            accounts={allAccountCodes}
-                            company={company}
-                            onChange={(value: string) =>
-                              handleLineChange(index, "account_code", value)
-                            }
-                            onAddAccount={
-                              isGreenTarget
-                                ? undefined
-                                : (query: string) =>
-                                    handleOpenQuickAddAccount(index, query)
-                            }
-                            disabled={isSaving}
-                            hierarchical
-                            favouriteCodes={
-                              isGreenTarget ? undefined : favouriteCodes
-                            }
-                            pendingFavouriteCodes={
-                              isGreenTarget ? undefined : pendingFavouriteCodes
-                            }
-                            onToggleFavourite={
-                              isGreenTarget ? undefined : toggleFavourite
-                            }
-                          />
+                          <div>
+                            <AccountCodeCombobox
+                              value={line.account_code}
+                              accounts={allAccountCodes}
+                              company={company}
+                              onChange={(value: string) =>
+                                handleLineChange(index, "account_code", value)
+                              }
+                              onAddAccount={
+                                isGreenTarget
+                                  ? undefined
+                                  : (query: string) =>
+                                      handleOpenQuickAddAccount(index, query)
+                              }
+                              disabled={isSaving}
+                              hierarchical
+                              favouriteCodes={
+                                isGreenTarget ? undefined : favouriteCodes
+                              }
+                              pendingFavouriteCodes={
+                                isGreenTarget
+                                  ? undefined
+                                  : pendingFavouriteCodes
+                              }
+                              onToggleFavourite={
+                                isGreenTarget ? undefined : toggleFavourite
+                              }
+                            />
+                            {isGreenTarget &&
+                              line.account_code === "CD_SD" && (
+                                <GTJournalDebtorIdentitySelector
+                                  lineNumber={line.line_number}
+                                  value={line.debtor_subledger_code}
+                                  description={
+                                    line.debtor_subledger_description
+                                  }
+                                  entryDate={formData.entry_date}
+                                  disabled={isSaving}
+                                  onChange={(
+                                    code: string,
+                                    description: string
+                                  ): void =>
+                                    handleDebtorSubledgerChange(
+                                      index,
+                                      code,
+                                      description
+                                    )
+                                  }
+                                />
+                              )}
+                          </div>
                         </td>
 
                         {/* General line reference / GT cheque reference */}

@@ -188,6 +188,12 @@ const GTDebtorSubSchedulePage: React.FC = () => {
 
   const rows: GreenTargetDebtorSubScheduleRow[] = data?.rows ?? [];
   const totalPages: number = Math.max(1, data?.total_pages ?? 1);
+  const hasReconciliationResidual: boolean = Boolean(
+    data &&
+      (Math.abs(data.reconciliation_residual.closing_balance) > ZERO_TOLERANCE ||
+        Math.abs(data.reconciliation_residual.current_month) > ZERO_TOLERANCE ||
+        Math.abs(data.reconciliation_residual.previous_month) > ZERO_TOLERANCE)
+  );
 
   return (
     <div className="w-full">
@@ -210,12 +216,12 @@ const GTDebtorSubSchedulePage: React.FC = () => {
                 className="text-emerald-600 dark:text-emerald-400"
               />
               <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
-                CD/SD Child Debtor Schedule
+                CD/SD Debtor Sub-Schedule
               </h1>
             </div>
             <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
-              Child accounts under CD_SD, with month-end balance and two months
-              of movement.
+              Named sundry-debtor identities assigned to the CD_SD control,
+              with month-end balance and two months of movement.
             </p>
           </div>
         </div>
@@ -310,6 +316,22 @@ const GTDebtorSubSchedulePage: React.FC = () => {
         </div>
       )}
 
+      {data && !loading && hasReconciliationResidual && (
+        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+          <p className="font-medium">Unallocated control reconciliation</p>
+          <p className="mt-1 text-xs">
+            The legacy source did not name a customer for RM{" "}
+            {formatCurrency(data.reconciliation_residual.closing_balance)} of
+            the closing control, RM{" "}
+            {formatCurrency(data.reconciliation_residual.current_month)} of the
+            current movement and RM{" "}
+            {formatCurrency(data.reconciliation_residual.previous_month)} of the
+            previous movement. These amounts remain in the control totals but
+            are not presented as a customer account.
+          </p>
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-lg border border-default-200 bg-white dark:border-gray-700 dark:bg-gray-800">
         {loading ? (
           <div className="flex h-72 items-center justify-center">
@@ -351,7 +373,7 @@ const GTDebtorSubSchedulePage: React.FC = () => {
                   className="mx-auto mb-3 text-default-300 dark:text-gray-600"
                 />
                 <h2 className="font-medium text-default-800 dark:text-gray-100">
-                  No matching child accounts
+                  No matching debtors
                 </h2>
                 <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
                   {hideZero
@@ -394,7 +416,20 @@ const GTDebtorSubSchedulePage: React.FC = () => {
                           }`}
                         >
                           <td className="whitespace-nowrap px-3 py-2 font-mono font-medium">
-                            {row.account_no}
+                            <button
+                              type="button"
+                              className="text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400"
+                              onClick={(): void =>
+                                navigate(
+                                  `/greentarget/accounting/reports/account-ledger?account=${encodeURIComponent(
+                                    row.account_no
+                                  )}`
+                                )
+                              }
+                              title={`Open ${row.account_no} account ledger`}
+                            >
+                              {row.account_no}
+                            </button>
                           </td>
                           <td className="px-3 py-2">{row.particular}</td>
                           <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">

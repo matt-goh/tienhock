@@ -833,27 +833,45 @@ export async function buildBalanceSheet(pool, { year, month }) {
  */
 export async function listLedgerAccounts(pool) {
   const result = await pool.query(
-    `SELECT
-       ac.code,
-       ac.description,
-       ac.ledger_type,
-       ac.parent_code,
-       ac.level,
-       ac.sort_order,
-       ac.is_active,
-       ac.is_system,
-       ac.fs_note,
-       COALESCE(usage.transaction_count, 0)::int AS transaction_count
-     FROM greentarget.account_codes ac
-     LEFT JOIN (
+    `WITH gl_usage AS (
        SELECT jel.account_code, COUNT(*)::int AS transaction_count
          FROM greentarget.journal_entry_lines jel
          JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
         WHERE je.status = 'posted'
         GROUP BY jel.account_code
-     ) usage ON usage.account_code = ac.code
-     WHERE ac.is_active = true
-     ORDER BY ac.sort_order ASC NULLS LAST, ac.code ASC`
+     ), subledger_usage AS (
+       SELECT jel.debtor_subledger_code AS code,
+              COUNT(*)::int AS transaction_count
+         FROM greentarget.journal_entry_lines jel
+         JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
+        WHERE je.status = 'posted'
+          AND jel.debtor_subledger_code IS NOT NULL
+        GROUP BY jel.debtor_subledger_code
+     )
+     SELECT *
+       FROM (
+         SELECT ac.code, ac.description, ac.ledger_type, ac.parent_code,
+                ac.level, ac.sort_order, ac.is_active, ac.is_system, ac.fs_note,
+                COALESCE(usage.transaction_count, 0)::int AS transaction_count,
+                false AS is_subledger
+           FROM greentarget.account_codes ac
+           LEFT JOIN gl_usage usage ON usage.account_code = ac.code
+          WHERE ac.is_active = true
+
+         UNION ALL
+
+         SELECT registry.code, registry.description, 'TD'::varchar AS ledger_type,
+                'CD_SD'::varchar AS parent_code, 3 AS level,
+                registry.sort_order, registry.is_active, false AS is_system,
+                '22'::varchar AS fs_note,
+                COALESCE(usage.transaction_count, 0)::int AS transaction_count,
+                true AS is_subledger
+           FROM greentarget.debtor_subledger_registry registry
+           LEFT JOIN subledger_usage usage ON usage.code = registry.code
+          WHERE registry.kind = 'sundry'
+            AND registry.is_active = true
+       ) accounts
+      ORDER BY is_subledger, sort_order ASC NULLS LAST, code ASC`
   );
   return result.rows.map((row) => ({
     ...row,
@@ -887,9 +905,20 @@ export async function listLedgerAccounts(pool) {
  */
 export async function buildAccountLedger(pool, accountCode, startStr, endStr) {
   const accountResult = await pool.query(
-    `SELECT code, description, ledger_type, fs_note, parent_code
+    `SELECT code, description, ledger_type, fs_note, parent_code, false AS is_subledger
        FROM greentarget.account_codes
-      WHERE code = $1`,
+      WHERE code = $1 AND is_active = true
+
+     UNION ALL
+
+     SELECT registry.code, registry.description, 'TD'::varchar AS ledger_type,
+            '22'::varchar AS fs_note, 'CD_SD'::varchar AS parent_code,
+            true AS is_subledger
+       FROM greentarget.debtor_subledger_registry registry
+      WHERE registry.code = $1
+        AND registry.kind = 'sundry'
+        AND registry.is_active = true
+     LIMIT 1`,
     [accountCode]
   );
   if (accountResult.rows.length === 0) {
@@ -898,14 +927,29 @@ export async function buildAccountLedger(pool, accountCode, startStr, endStr) {
     throw error;
   }
   const account = accountResult.rows[0];
+  const isSubledger = account.is_subledger === true;
 
   const anchorResult = await pool.query(
-    `SELECT to_char(as_of_date, 'YYYY-MM-DD') AS as_of_date, amount
-       FROM greentarget.account_opening_balances
-      WHERE account_code = $1 AND as_of_date <= $2::date
-      ORDER BY as_of_date DESC
+    `SELECT to_char(anchor_date, 'YYYY-MM-DD') AS as_of_date, amount
+       FROM (
+         SELECT as_of_date AS anchor_date, amount
+           FROM greentarget.account_opening_balances
+          WHERE $3::boolean = false
+            AND account_code = $1
+            AND as_of_date <= $2::date
+
+         UNION ALL
+
+         SELECT (as_of_month + INTERVAL '1 month')::date AS anchor_date,
+                closing_balance AS amount
+           FROM greentarget.debtor_subledger_snapshots
+          WHERE $3::boolean = true
+            AND account_code = $1
+            AND (as_of_month + INTERVAL '1 month')::date <= $2::date
+       ) anchors
+      ORDER BY anchor_date DESC
       LIMIT 1`,
-    [accountCode, startStr]
+    [accountCode, startStr, isSubledger]
   );
 
   let openingBalance;
@@ -918,10 +962,16 @@ export async function buildAccountLedger(pool, accountCode, startStr, endStr) {
          FROM greentarget.journal_entry_lines jel
          JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
         WHERE je.status = 'posted'
-          AND jel.account_code = $1
+          AND (
+            ($4::boolean = false AND jel.account_code = $1)
+            OR
+            ($4::boolean = true AND (
+              jel.debtor_subledger_code = $1 OR jel.account_code = $1
+            ))
+          )
           AND je.entry_date >= $2::date
           AND je.entry_date < $3::date`,
-      [accountCode, anchor.as_of_date, startStr]
+      [accountCode, anchor.as_of_date, startStr, isSubledger]
     );
     openingBalance = money(anchorAmount + num(sinceResult.rows[0].movement));
     openingSource = { type: "anchored", as_of_date: anchor.as_of_date, amount: anchorAmount };
@@ -931,9 +981,15 @@ export async function buildAccountLedger(pool, accountCode, startStr, endStr) {
          FROM greentarget.journal_entry_lines jel
          JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
         WHERE je.status = 'posted'
-          AND jel.account_code = $1
+          AND (
+            ($3::boolean = false AND jel.account_code = $1)
+            OR
+            ($3::boolean = true AND (
+              jel.debtor_subledger_code = $1 OR jel.account_code = $1
+            ))
+          )
           AND je.entry_date < $2::date`,
-      [accountCode, startStr]
+      [accountCode, startStr, isSubledger]
     );
     openingBalance = money(num(openingResult.rows[0].opening));
     openingSource = { type: "derived" };
@@ -971,7 +1027,13 @@ export async function buildAccountLedger(pool, accountCode, startStr, endStr) {
      FROM greentarget.journal_entry_lines jel
      JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
      WHERE je.status = 'posted'
-       AND jel.account_code = $1
+       AND (
+         ($4::boolean = false AND jel.account_code = $1)
+         OR
+         ($4::boolean = true AND (
+           jel.debtor_subledger_code = $1 OR jel.account_code = $1
+         ))
+       )
        AND je.entry_date >= $2::date
        AND je.entry_date <= $3::date
      ORDER BY DATE_TRUNC('month', je.entry_date) ASC,
@@ -981,7 +1043,7 @@ export async function buildAccountLedger(pool, accountCode, startStr, endStr) {
               jel.display_order ASC NULLS LAST,
               jel.line_number ASC,
               jel.id ASC`,
-    [accountCode, startStr, endStr]
+    [accountCode, startStr, endStr, isSubledger]
   );
 
   let running = openingBalance;

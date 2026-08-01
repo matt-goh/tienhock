@@ -48,6 +48,8 @@ const GT_ADJUSTMENT_DOC_TYPE_LABELS = {
  * @property {number|string|null|undefined} credit_amount
  * @property {string|null|undefined} [reference] General line reference.
  * @property {string|null|undefined} [cheque_reference] Per-line cheque or transaction reference.
+ * @property {string|null|undefined} [debtor_subledger_code] Logical debtor
+ * identity for a CD_SD control-account line.
  * @property {string|null|undefined} [particulars]
  */
 
@@ -412,10 +414,14 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
           jel.particulars,
           jel.cheque_reference,
           jel.display_order,
+          jel.debtor_subledger_code,
+          registry.description AS debtor_subledger_description,
           ac.description as account_description
         FROM greentarget.journal_entry_lines jel
         JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
         LEFT JOIN greentarget.account_codes ac ON jel.account_code = ac.code
+        LEFT JOIN greentarget.debtor_subledger_registry registry
+          ON registry.code = jel.debtor_subledger_code
         WHERE jel.journal_entry_id = $1
         ORDER BY jel.line_number
       `;
@@ -508,6 +514,86 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
     return { reference_no, entry_type, entry_date, lines };
   };
 
+  /**
+   * @param {import("pg").PoolClient} client
+   * @param {GTManualJournalLinePayload[]} lines
+   * @param {string} entryDate
+   * @returns {Promise<void>}
+   */
+  const validateDebtorSubledgerLines = async (client, lines, entryDate) => {
+    const requestedCodes = [
+      ...new Set(
+        lines
+          .map((line) => String(line.debtor_subledger_code || "").trim())
+          .filter(Boolean)
+      ),
+    ];
+    const registryResult = requestedCodes.length
+      ? await client.query(
+          `SELECT code, control_account_code, effective_from, effective_to,
+                  is_active, is_selectable
+             FROM greentarget.debtor_subledger_registry
+            WHERE code = ANY($1)
+            FOR SHARE`,
+          [requestedCodes]
+        )
+      : { rows: [] };
+    const registryByCode = new Map(
+      registryResult.rows.map((row) => [row.code, row])
+    );
+
+    for (let index = 0; index < lines.length; index++) {
+      const line = lines[index];
+      const accountCode = String(line.account_code || "").trim();
+      const debtorCode = String(line.debtor_subledger_code || "").trim();
+      if (accountCode === "CD_SD" && !debtorCode) {
+        throw Object.assign(
+          new Error(
+            `Line ${index + 1}: select the CD/SD debtor identity represented by this CD_SD movement`
+          ),
+          { statusCode: 400 }
+        );
+      }
+      if (!debtorCode) continue;
+      const registry = registryByCode.get(debtorCode);
+      if (!registry) {
+        throw Object.assign(
+          new Error(`Line ${index + 1}: debtor identity ${debtorCode} does not exist`),
+          { statusCode: 400 }
+        );
+      }
+      if (
+        registry.is_active !== true ||
+        registry.is_selectable !== true ||
+        registry.control_account_code !== accountCode
+      ) {
+        throw Object.assign(
+          new Error(
+            `Line ${index + 1}: debtor identity ${debtorCode} does not post to ${accountCode}`
+          ),
+          { statusCode: 400 }
+        );
+      }
+      const effectiveFrom = toLocalAccountingDateString(
+        registry.effective_from
+      );
+      const effectiveTo = registry.effective_to
+        ? toLocalAccountingDateString(registry.effective_to)
+        : null;
+      if (
+        entryDate < effectiveFrom ||
+        (effectiveTo !== null && entryDate >= effectiveTo)
+      ) {
+        throw Object.assign(
+          new Error(
+            `Line ${index + 1}: debtor identity ${debtorCode} is not effective on ${entryDate}`
+          ),
+          { statusCode: 400 }
+        );
+      }
+    }
+  };
+
   // POST / - Create a manual journal entry (posted immediately).
   router.post("/", async (req, res) => {
     const payload = validateJournalPayload(req.body, res);
@@ -552,6 +638,7 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
         client,
         lines.map((line) => line.account_code)
       );
+      await validateDebtorSubledgerLines(client, lines, entryDate);
 
       const journalId = await insertGTJournal(client, {
         referenceNo: reference_no.trim(),
@@ -565,6 +652,7 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
           credit: parseFloat(line.credit_amount) || 0,
           reference: line.reference || null,
           chequeReference: line.cheque_reference || null,
+          debtorSubledgerCode: line.debtor_subledger_code || null,
           particulars: line.particulars || null,
         })),
       });
@@ -579,7 +667,7 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
       await client.query("ROLLBACK");
       if (handleAccountingPeriodLock(error, res)) return;
       console.error("Error creating Green Target journal entry:", error);
-      res.status(500).json({
+      res.status(error.statusCode || error.status || 500).json({
         message: "Error creating Green Target journal entry",
         error: error.message,
       });
@@ -650,6 +738,7 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
         client,
         lines.map((line) => line.account_code)
       );
+      await validateDebtorSubledgerLines(client, lines, entryDate);
 
       const isSystemOwned =
         existing.source_type !== null ||
@@ -704,8 +793,8 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
           `INSERT INTO greentarget.journal_entry_lines (
              journal_entry_id, line_number, account_code,
              debit_amount, credit_amount, reference, particulars,
-             cheque_reference, display_order
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+             cheque_reference, display_order, debtor_subledger_code
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
           [
             id,
             index + 1,
@@ -716,6 +805,7 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
             line.particulars || null,
             line.cheque_reference || null,
             index + 1,
+            line.debtor_subledger_code || null,
           ]
         );
       }
@@ -732,7 +822,7 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
       await client.query("ROLLBACK");
       if (handleAccountingPeriodLock(error, res)) return;
       console.error("Error updating Green Target journal entry:", error);
-      res.status(500).json({
+      res.status(error.statusCode || error.status || 500).json({
         message: "Error updating Green Target journal entry",
         error: error.message,
       });
@@ -855,6 +945,21 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
         `Journal entry ${existing.reference_no} restore`
       );
 
+      const restoreLinesResult = await client.query(
+        `SELECT account_code, debit_amount, credit_amount,
+                reference, cheque_reference, particulars,
+                debtor_subledger_code
+           FROM greentarget.journal_entry_lines
+          WHERE journal_entry_id = $1
+          ORDER BY line_number`,
+        [id]
+      );
+      await validateDebtorSubledgerLines(
+        client,
+        restoreLinesResult.rows,
+        toLocalAccountingDateString(existing.entry_date)
+      );
+
       await client.query(
         "UPDATE greentarget.journal_entries SET status = 'posted', updated_at = NOW(), updated_by = $2 WHERE id = $1",
         [id, req.staffId || null]
@@ -866,7 +971,7 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
       await client.query("ROLLBACK");
       if (handleAccountingPeriodLock(error, res)) return;
       console.error("Error restoring Green Target journal entry:", error);
-      res.status(500).json({
+      res.status(error.statusCode || 500).json({
         message: "Error restoring Green Target journal entry",
         error: error.message,
       });

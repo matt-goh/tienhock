@@ -20,7 +20,10 @@ export interface GreenTargetDebtorSubScheduleResponse {
   statement_year: number;
   rows: GreenTargetDebtorSubScheduleRow[];
   totals: GreenTargetDebtorSubScheduleTotals;
+  visible_totals: GreenTargetDebtorSubScheduleTotals;
+  reconciliation_residual: GreenTargetDebtorSubScheduleTotals;
   total_accounts: number;
+  full_population: number;
   page: number;
   limit: number;
   total_pages: number;

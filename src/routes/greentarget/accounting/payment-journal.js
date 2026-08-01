@@ -21,7 +21,7 @@ import {
   assertGreenTargetAccountingDateUnlocked,
   toLocalAccountingDateString,
 } from "./posting-lock.js";
-import { resolveGTReceivableAccount } from "./sales-journal.js";
+import { resolveGTDebtorAssignment } from "./sales-journal.js";
 import {
   ensureGTAccountsExist,
   insertGTJournal,
@@ -42,7 +42,8 @@ export const GT_BANK_ACCOUNT = "PBB_1";
 async function fetchGTReceiptAllocations(client, receiptId) {
   const result = await client.query(
     `SELECT p.*, i.invoice_number, i.date_issued, i.customer_id,
-            i.debtor_account_code, c.name AS customer_name
+            i.debtor_account_code, i.receivable_account_code,
+            c.name AS customer_name
        FROM greentarget.payments p
        JOIN greentarget.invoices i ON i.invoice_id = p.invoice_id
        JOIN greentarget.customers c ON c.customer_id = i.customer_id
@@ -138,11 +139,15 @@ export async function syncGTReceiptJournalEntry(
     }
   }
 
-  /** @type {Array<{accountCode: string, credit: number, reference: string, particulars: string}>} */
+  /** @type {Array<{accountCode: string, credit: number, reference: string,
+   *   particulars: string, debtorSubledgerCode: string}>} */
   const creditLines = [];
   let totalAmount = 0;
   for (const allocation of allocations) {
-    const debtorAccount = await resolveGTReceivableAccount(client, allocation);
+    const debtorAssignment = await resolveGTDebtorAssignment(
+      client,
+      allocation
+    );
     const amount = Number(allocation.amount_paid);
     if (!Number.isFinite(amount) || amount <= 0) {
       throw Object.assign(
@@ -153,10 +158,11 @@ export async function syncGTReceiptJournalEntry(
     totalAmount += amount;
     const allocationReference = String(allocation.invoice_number);
     creditLines.push({
-      accountCode: debtorAccount,
+      accountCode: debtorAssignment.receivableAccountCode,
       credit: amount,
       reference: allocationReference,
       particulars: `REF : ${allocationReference} /${allocation.customer_name}`,
+      debtorSubledgerCode: debtorAssignment.debtorSubledgerCode,
     });
   }
   totalAmount = Math.round(totalAmount * 100) / 100;

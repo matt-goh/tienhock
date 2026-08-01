@@ -26,6 +26,7 @@ import {
 } from "@tabler/icons-react";
 import { validateCustomerIdentity } from "../../../utils/greenTarget/customerValidation";
 import { api } from "../../../routes/utils/api";
+import type { GreenTargetDebtorSubledgerIdentity } from "../../../types/greenTargetTypes";
 
 interface CustomerLocation {
   location_id?: number;
@@ -50,14 +51,6 @@ interface Customer {
   additional_info?: string;
   billing_address?: string;
   debtor_account_code?: string;
-}
-
-interface DebtorAccount {
-  code: string;
-  description: string;
-  ledger_type: string | null;
-  parent_code: string | null;
-  is_active: boolean;
 }
 
 interface SelectOption {
@@ -152,32 +145,42 @@ const CustomerFormPage: React.FC = () => {
     }
   }, [id, isEditMode]);
 
-  useEffect(() => {
-    const fetchDebtorAccounts = async (): Promise<void> => {
-      try {
-        const accounts = await api.get<DebtorAccount[]>(
-          "/greentarget/api/account-codes?flat=true&ledger_type=TD&is_active=true"
-        );
-        setDebtorAccountOptions(
-          accounts
-            .filter(
-              (account: DebtorAccount): boolean =>
-                account.code !== "CD_SD" && account.parent_code !== null
-            )
-            .map(
-              (account: DebtorAccount): SelectOption => ({
+  useEffect((): (() => void) => {
+    let isCurrent = true;
+    const timer = window.setTimeout((): void => {
+      const fetchDebtorAccounts = async (): Promise<void> => {
+        try {
+          const search =
+            debtorAccountQuery.trim() || formData.debtor_account_code || "";
+          const params = new URLSearchParams({ search, limit: "50" });
+          const accounts = await api.get<
+            GreenTargetDebtorSubledgerIdentity[]
+          >(
+            `/greentarget/api/account-codes/debtor-subledger?${params.toString()}`
+          );
+          if (!isCurrent) return;
+          setDebtorAccountOptions(
+            accounts.map(
+              (
+                account: GreenTargetDebtorSubledgerIdentity
+              ): SelectOption => ({
                 id: account.code,
-                name: `${account.code} - ${account.description}`,
+                name: `${account.code} - ${account.description} (posts to ${account.control_account_code})`,
               })
             )
-        );
-      } catch (fetchError: unknown) {
-        console.error("Failed to load GT debtor accounts:", fetchError);
-        toast.error("Failed to load trade debtor accounts");
-      }
+          );
+        } catch (fetchError: unknown) {
+          console.error("Failed to load GT debtor identities:", fetchError);
+          if (isCurrent) toast.error("Failed to load trade debtor identities");
+        }
+      };
+      void fetchDebtorAccounts();
+    }, debtorAccountQuery ? 250 : 0);
+    return (): void => {
+      isCurrent = false;
+      window.clearTimeout(timer);
     };
-    void fetchDebtorAccounts();
-  }, []);
+  }, [debtorAccountQuery, formData.debtor_account_code]);
 
   useEffect(() => {
     const hasChanged =
@@ -691,7 +694,7 @@ const CustomerFormPage: React.FC = () => {
           <div className="mt-5">
             <FormCombobox
               name="debtor_account_code"
-              label="Trade Debtor Account"
+              label="Default Debtor Identity"
               value={formData.debtor_account_code || undefined}
               onChange={(selectedId: string | string[] | null): void => {
                 setFormData((current: Customer): Customer => ({
@@ -704,13 +707,13 @@ const CustomerFormPage: React.FC = () => {
               options={debtorAccountOptions}
               query={debtorAccountQuery}
               setQuery={setDebtorAccountQuery}
-              placeholder="Search debtor code or name..."
+              placeholder="Search named or CD/SD identity..."
               mode="single"
             />
             <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
-              Required before this customer can be invoiced. New invoices
-              snapshot this account so later mapping changes do not rewrite
-              earlier journals.
+              Optional customer default. Every invoice still snapshots a
+              logical identity; CD/SD identities post to the CD_SD control and
+              remain separately visible in the debtor sub-schedule.
             </p>
           </div>
           <div className="mt-5">

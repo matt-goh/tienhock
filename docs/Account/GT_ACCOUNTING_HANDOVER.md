@@ -2250,6 +2250,93 @@ Post-rollout, confirm on screen: the CD/SD sub-schedule totals RM65,705.40 at 30
 both on and off, the Debtors report opens each child's ledger, and a new invoice uses `CD_SD` for a
 sundry customer (or its assigned named account) plus the selected `TGA`/`TGB`/`WS_OTH` revenue.
 
+#### GT-P9 to GT-P12 - debtor dimension, mixed revenue and exact Trade Debtors parity (1 Aug 2026; DEV APPLIED, PRODUCTION PENDING)
+
+This section supersedes GT-P7's accepted `CD_SD (UNALLOCATED)` future-entry trade-off. The legacy
+system had two simultaneous dimensions and the ERP now preserves both:
+
+1. **GL control:** all sundry/counter activity posts to `CD_SD`.
+2. **Customer subledger:** every invoice, receipt, adjustment or manual `CD_SD` journal line carries
+   an explicit named logical identity. No future amount silently falls into the residual.
+
+The imported evidence measured for the decision was 1,100 Jan-Jun invoice journals totalling
+RM265,208.20: 1,085 two-line journals, 14 ordered three-line journals with duplicate revenue
+accounts, and mixed invoice `I2026/0036` (DR SUTERA 338 / CR TGA 230 / CR WS_OTH 108). All 1,011
+counter numbers use `YYYY/#####` and debit `CD_SD`; the 89 named numbers use `IYYYY/####`.
+
+**Phase 1 - real debtor subledger.** Migration
+`dev/migrations/2026-08-01_greentarget_debtor_dimension.sql` creates the registry and was applied to
+dev twice (the second run was a clean idempotence proof). It contains 780 identities: 27 named, one
+non-selectable `CD_SD` control, 746 immutable PDF identities and six July identities. The former 752
+GL child shells are inactive; all July child postings were rewritten to `CD_SD` without changing a
+cent and tagged through `journal_entry_lines.debtor_subledger_code`; the 746 child July anchors plus
+the residual were consolidated into one `CD_SD` anchor of RM65,705.40. Invoice 324 is explicitly
+guarded as `K-TRANSPORT`; cancelled duplicate 342 remains cancelled. The residual is not a registry
+customer and remains source/reconciliation metadata only.
+
+Both invoice entry points and the customer default use a server-search registry picker. A user may
+create a new CD/SD identity inline with an effective date. New invoices require an identity and
+snapshot both the logical identity and actual GL control. Manual Journal Entry requires the same
+identity on every `CD_SD` line. Account Ledger can read an identity from the June snapshot plus
+post-cutover tags. Registry-linked chart shells cannot be edited/reactivated/deleted through Chart
+of Accounts, preventing report/GL identity drift.
+
+**Phase 2 - ordered revenue allocations and edit integrity.** Migration
+`dev/migrations/2026-08-01_greentarget_invoice_revenue_splits.sql` was applied to dev twice. Invoice
+entry supports an ordered list of TGA/TGB/WS_OTH amounts, preserves duplicate account rows and
+requires exact cent equality to the invoice total. `WS_OTH4` is never offered for new entry and can
+only be inherited by historical data. CN/DN entry preserves a full mixed invoice exactly; a partial
+mixed adjustment requires its own exact allocation across accounts used by the invoice. Transactional
+counter/named invoice-number sequences are scoped by accounting year and are advanced by conforming
+manual numbers.
+
+Invoice number/date/customer/amount/rentals/debtor identity are locked once any receipt history
+exists. All accounting identity/revenue fields are locked once adjustment history or a detached
+journal exists. A save recomputes balance from active payments plus active CN/DN/paired-RN effects
+and preserves `overdue`; it cannot overwrite an adjusted balance. Revenue-only edits remain allowed
+after receipts because receipt references/allocations do not depend on revenue.
+
+**Phase 3 - `GT_TRADE_DEBTORS.pdf` output.** The official endpoint is
+`GET /greentarget/api/debtors/legacy-list`; the GT Debtors Print action uses
+`GreenTargetTradeDebtorListPDF.tsx`. Search is deliberately ignored by this official print, while
+the hide-zero toggle is respected by backend and PDF. A row is hidden only if closing, current-month
+and previous-month figures are all zero, so movement-only zero-close customers remain visible.
+Direct and sundry membership/order are effective-date aware. Children print 44 per page: June show
+all is exactly 18 pages (28 direct on page 1; 44 on pages 2-17; 42 on page 18). The RM1,860 close /
+RM0 June / -RM160 May residual is shown only as reconciliation metadata; the final child footer is
+the full `CD_SD` control.
+
+**Measured dev verification:**
+
+- `verify-trade-debtor-list.mjs`: **35/35** - all 28 direct and 746 child identities, descriptions,
+  order and amounts; RM156,782.22 direct close; RM63,845.40 named child close; RM65,705.40 control;
+  residual; no July leakage; 18-page and hide-zero composition.
+- `verify-multi-allocation-receipt.mjs`: **21/21** - mixed and duplicate ordered sales credits plus a real POST/cancel route fixture with
+  RM100 + RM80 allocations, one REC journal (two tagged `CD_SD` credits + one RM180 `PBB_1` debit),
+  balance restoration and pending cheque/no-journal behaviour; outer transaction rollback leaves no
+  fixture rows.
+- Existing immutable import/chart suites remain green: **66 + 59 gates** and all 2,844 printed
+  per-account comparisons.
+- Both new migrations succeeded on first application and idempotent rerun. No npm build, TypeScript
+  check or lint command was run, per repository rule 10; only focused syntax/parser/diff checks.
+
+**Production continuation (do not skip the earlier GT-P5 rollout steps):** after backup and after
+the 30/31-Jul migrations/backfills in the existing runbook have succeeded, apply these in order:
+
+```bash
+psql -v ON_ERROR_STOP=1 -f dev/migrations/2026-08-01_greentarget_debtor_dimension.sql
+psql -v ON_ERROR_STOP=1 -f dev/migrations/2026-08-01_greentarget_invoice_revenue_splits.sql
+node dev/import/greentarget-legacy/verify-import.mjs
+node dev/import/greentarget-legacy/verify-chart.mjs
+node dev/import/greentarget-legacy/verify-trade-debtor-list.mjs
+node dev/import/greentarget-legacy/verify-multi-allocation-receipt.mjs
+```
+
+Stop on any guard failure; production ids/state may differ and neither migration guesses. The receipt
+fixture does not cover cheque confirmation, concurrent requests, duplicate-reference rejection or a
+real fixture commit. Those paths remain covered structurally by the receipt service but are explicit
+test limitations, not known posting defects.
+
 ---
 
 *Update this file with a per-phase execution record as phases complete. Entry point for all
