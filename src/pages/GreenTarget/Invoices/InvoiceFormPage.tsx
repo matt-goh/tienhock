@@ -1,5 +1,11 @@
 // src/pages/GreenTarget/Invoices/InvoiceFormPage.tsx
-import React, { useState, useEffect, useCallback, Fragment } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  Fragment,
+} from "react";
 import { format } from "date-fns";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -20,14 +26,12 @@ import {
 import {
   IconChevronDown,
   IconCheck,
+  IconSearch,
   IconSquareCheckFilled,
   IconSquare,
 } from "@tabler/icons-react";
 import clsx from "clsx";
-import {
-  FormCombobox,
-  SelectOption,
-} from "../../../components/FormComponents";
+import { SelectOption } from "../../../components/FormComponents";
 import GTInvoiceAccountFields, {
   GT_DEFAULT_REVENUE_ACCOUNT,
 } from "../../../components/GreenTarget/GTInvoiceAccountFields";
@@ -67,6 +71,25 @@ interface Rental {
     status: string;
   } | null;
 }
+
+interface RentalGroup {
+  customer_id: number;
+  customer_name: string;
+  rentals: Rental[];
+}
+
+interface PaginatedRentals {
+  data: Rental[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+// One page of the billable-rental picker. The backend caps `limit` at 100.
+const RENTALS_PER_PAGE = 20;
 
 interface Invoice {
   invoice_id?: number;
@@ -138,7 +161,12 @@ const InvoiceFormPage: React.FC = () => {
   const [selectedRentals, setSelectedRentals] = useState<Rental[]>([]); // Changed to array
 
   // UI State
-  const [customerQuery, setCustomerQuery] = useState(""); // For customer combobox search
+  const [rentalQuery, setRentalQuery] = useState(""); // Rental picker search box
+  const [appliedRentalQuery, setAppliedRentalQuery] = useState(""); // Debounced
+  const [rentalPage, setRentalPage] = useState(1);
+  const [rentalTotal, setRentalTotal] = useState(0);
+  const [rentalTotalPages, setRentalTotalPages] = useState(1);
+  const [rentalsLoading, setRentalsLoading] = useState(true);
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
@@ -266,32 +294,39 @@ const InvoiceFormPage: React.FC = () => {
     }
   }, [formData.customer_id, customers]);
 
-  // Fetch available rentals when customer or type changes
+  // Edit mode keeps the customer-scoped list so the invoice's own rentals show.
   useEffect(() => {
-    if (formData.customer_id && formData.type === "regular") {
+    if (isEditMode && formData.customer_id > 0) {
       fetchAvailableRentals(formData.customer_id);
-    } else {
-      setAvailableRentals([]);
-      setSelectedRentals([]);
     }
-  }, [formData.customer_id, formData.type]);
+  }, [isEditMode, formData.customer_id]);
 
-  // Select rentals when availableRentals or formData.rental_ids changes
+  // The selection is authoritative and must survive paging and searching, so a
+  // rental is only ever added here — never dropped because the page it came
+  // from is no longer loaded. Ids that arrive from outside the picker (edit
+  // mode, or a rental handed over by another page) are hydrated from whichever
+  // page happens to contain them.
   useEffect(() => {
-    if (
-      formData.type === "regular" &&
-      formData.rental_ids &&
-      formData.rental_ids.length > 0 &&
-      availableRentals.length > 0
-    ) {
-      const currentSelectedRentals = availableRentals.filter((r) =>
-        formData.rental_ids!.includes(r.rental_id)
-      );
-      setSelectedRentals(currentSelectedRentals);
-    } else {
-      setSelectedRentals([]);
+    const rentalIds: number[] = formData.rental_ids || [];
+    if (rentalIds.length === 0) {
+      if (selectedRentals.length > 0) setSelectedRentals([]);
+      return;
     }
-  }, [formData.rental_ids, formData.type, availableRentals]);
+    const missingIds: number[] = rentalIds.filter(
+      (rentalId: number): boolean =>
+        !selectedRentals.some((r: Rental): boolean => r.rental_id === rentalId)
+    );
+    if (missingIds.length === 0) return;
+    const hydrated: Rental[] = availableRentals.filter((r: Rental): boolean =>
+      missingIds.includes(r.rental_id)
+    );
+    if (hydrated.length > 0) {
+      setSelectedRentals((current: Rental[]): Rental[] => [
+        ...current,
+        ...hydrated,
+      ]);
+    }
+  }, [availableRentals, formData.rental_ids, selectedRentals]);
 
   // Auto-calculate invoice amount based on selected rentals (RM 200 per rental)
   useEffect(() => {
@@ -333,6 +368,30 @@ const InvoiceFormPage: React.FC = () => {
     isAmountManuallyChanged,
   ]);
 
+  // Group the loaded page by customer so the list stays readable and the
+  // one-customer-per-invoice rule is obvious.
+  const rentalGroups: RentalGroup[] = useMemo((): RentalGroup[] => {
+    const groups = new Map<number, RentalGroup>();
+    availableRentals.forEach((rental: Rental): void => {
+      const group: RentalGroup | undefined = groups.get(rental.customer_id);
+      if (group) {
+        group.rentals.push(rental);
+      } else {
+        groups.set(rental.customer_id, {
+          customer_id: rental.customer_id,
+          customer_name:
+            rental.customer_name || `Customer #${rental.customer_id}`,
+          rentals: [rental],
+        });
+      }
+    });
+
+    return Array.from(groups.values()).sort(
+      (a: RentalGroup, b: RentalGroup): number =>
+        a.customer_name.localeCompare(b.customer_name)
+    );
+  }, [availableRentals]);
+
   // --- DATA FETCHING ---
 
   const fetchCustomers = async () => {
@@ -345,12 +404,69 @@ const InvoiceFormPage: React.FC = () => {
     }
   };
 
+  const fetchBillableRentals = useCallback(async (): Promise<void> => {
+    setRentalsLoading(true);
+    try {
+      const params = new URLSearchParams({
+        no_invoice: "true",
+        page: rentalPage.toString(),
+        limit: RENTALS_PER_PAGE.toString(),
+      });
+      if (appliedRentalQuery) params.set("search", appliedRentalQuery);
+      // Once the first rental fixes the customer, only their rentals can be
+      // added, so the list narrows instead of paging past everyone else's.
+      if (formData.customer_id > 0) {
+        params.set("customer_id", formData.customer_id.toString());
+      }
+      const response: PaginatedRentals = await api.get(
+        `/greentarget/api/rentals?${params.toString()}`
+      );
+      // A narrowing filter can leave us past the end of the result set.
+      const lastPage: number = Math.max(1, response.pagination.totalPages);
+      if (rentalPage > lastPage) {
+        setRentalPage(lastPage);
+        return;
+      }
+      setAvailableRentals(response.data);
+      setRentalTotal(response.pagination.total);
+      setRentalTotalPages(lastPage);
+    } catch (err) {
+      console.error("Error fetching billable rentals:", err);
+      toast.error("Failed load rentals.");
+      setAvailableRentals([]);
+      setRentalTotal(0);
+      setRentalTotalPages(1);
+    } finally {
+      setRentalsLoading(false);
+    }
+  }, [appliedRentalQuery, formData.customer_id, rentalPage]);
+
+  // Create mode lists every rental that can still be invoiced, across all
+  // customers, so the user picks the work first and the customer follows.
+  useEffect(() => {
+    if (!isEditMode) {
+      fetchBillableRentals();
+    }
+  }, [isEditMode, fetchBillableRentals]);
+
+  // Searching is server-side, so it must reach every page, not just the one
+  // currently loaded. Any new search restarts at page 1.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedRentalQuery(rentalQuery.trim());
+      setRentalPage(1);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [rentalQuery]);
+
   const fetchAvailableRentals = async (customerId: number) => {
     if (!customerId || customerId <= 0) {
       setAvailableRentals([]);
       setSelectedRentals([]);
+      setRentalsLoading(false);
       return;
     }
+    setRentalsLoading(true);
     try {
       const params = new URLSearchParams({
         customer_id: customerId.toString(),
@@ -388,6 +504,8 @@ const InvoiceFormPage: React.FC = () => {
       toast.error("Failed load rentals.");
       setAvailableRentals([]);
       setSelectedRentals([]);
+    } finally {
+      setRentalsLoading(false);
     }
   };
 
@@ -579,23 +697,31 @@ const InvoiceFormPage: React.FC = () => {
     }
   };
 
-  const handleCustomerChange = (selectedId: string | string[] | null) => {
-    const newCustId =
-      selectedId && typeof selectedId === "string" ? Number(selectedId) : 0;
-    if (newCustId !== formData.customer_id) {
-      const selectedCustomer = customers.find(
-        (customer: Customer): boolean => customer.customer_id === newCustId
+  // Apply a new rental selection and keep the derived customer in sync.
+  const applyRentalSelection = (nextSelectedRentals: Rental[]): void => {
+    setSelectedRentals(nextSelectedRentals);
+    const nextCustomerId: number =
+      nextSelectedRentals.length > 0 ? nextSelectedRentals[0].customer_id : 0;
+    // The list narrows to (or reopens from) the selected customer, so start
+    // that new result set at its first page.
+    if (nextCustomerId !== formData.customer_id) setRentalPage(1);
+    setFormData((p: Invoice): Invoice => {
+      if (nextCustomerId === p.customer_id) {
+        return { ...p, rental_ids: nextSelectedRentals.map((r) => r.rental_id) };
+      }
+      const nextCustomer = customers.find(
+        (customer: Customer): boolean =>
+          customer.customer_id === nextCustomerId
       );
-      setFormData((p) => ({
+      return {
         ...p,
-        customer_id: newCustId,
-        rental_ids: [],
-        debtor_account_code: selectedCustomer?.debtor_account_code || "",
-      }));
-      setSelectedRentals([]);
-      setCustomerQuery("");
-    }
+        customer_id: nextCustomerId,
+        rental_ids: nextSelectedRentals.map((r) => r.rental_id),
+        debtor_account_code: nextCustomer?.debtor_account_code || "",
+      };
+    });
   };
+
   // Handle multiple rental selection
   const handleRentalToggle = (rental: Rental) => {
     const isSelected = selectedRentals.some(
@@ -603,24 +729,30 @@ const InvoiceFormPage: React.FC = () => {
     );
 
     if (isSelected) {
-      // Remove rental from selection
-      const newSelectedRentals = selectedRentals.filter(
-        (r) => r.rental_id !== rental.rental_id
+      applyRentalSelection(
+        selectedRentals.filter((r) => r.rental_id !== rental.rental_id)
       );
-      setSelectedRentals(newSelectedRentals);
-      setFormData((p) => ({
-        ...p,
-        rental_ids: newSelectedRentals.map((r) => r.rental_id),
-      }));
-    } else {
-      // Add rental to selection
-      const newSelectedRentals = [...selectedRentals, rental];
-      setSelectedRentals(newSelectedRentals);
-      setFormData((p) => ({
-        ...p,
-        rental_ids: newSelectedRentals.map((r) => r.rental_id),
-      }));
+      return;
     }
+
+    // One invoice bills one customer, so a rental from another customer can
+    // only be added after the current selection is cleared.
+    if (
+      formData.customer_id > 0 &&
+      rental.customer_id !== formData.customer_id
+    ) {
+      toast.error(
+        "An invoice covers a single customer. Clear the selected rentals to bill another customer."
+      );
+      return;
+    }
+
+    applyRentalSelection([...selectedRentals, rental]);
+  };
+
+  const handleClearRentals = (): void => {
+    applyRentalSelection([]);
+    setIsAmountManuallyChanged(false);
   };
   const handlePaymentMethodChange = (methodIdString: string): void => {
     const nextPaymentMethod =
@@ -650,8 +782,15 @@ const InvoiceFormPage: React.FC = () => {
       return false;
     }
 
+    if (
+      formData.type === "regular" &&
+      (!formData.rental_ids || formData.rental_ids.length === 0)
+    ) {
+      toast.error("Select at least one rental");
+      return false;
+    }
     if (!formData.customer_id || formData.customer_id <= 0) {
-      toast.error("Select customer");
+      toast.error("Select a rental to set the customer");
       return false;
     }
     if (!formData.debtor_account_code.trim()) {
@@ -683,13 +822,6 @@ const InvoiceFormPage: React.FC = () => {
     const selCust = customers.find(
       (c) => c.customer_id === formData.customer_id
     );
-    if (
-      formData.type === "regular" &&
-      (!formData.rental_ids || formData.rental_ids.length === 0)
-    ) {
-      toast.error("Select at least one rental");
-      return false;
-    }
     if (!formData.date_issued) {
       toast.error("Specify issue date");
       return false;
@@ -949,12 +1081,6 @@ const InvoiceFormPage: React.FC = () => {
     );
   }
 
-  // Prepare options for Combobox/Listboxes
-  const customerOptionsForCombobox: SelectOption[] = customers.map((c) => ({
-    id: c.customer_id,
-    name: c.name,
-    phone_number: c.phone_number,
-  }));
   const selectedCustomer: Customer | undefined = customers.find(
     (c) => c.customer_id === formData.customer_id
   );
@@ -1081,54 +1207,43 @@ const InvoiceFormPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Second row with customer */}
+          {/* Second row: the customer is derived from the selected rentals */}
           <div className="mt-6">
             <div className="space-y-2">
-              <FormCombobox
-                name="customer_id"
-                label="Customer"
-                value={
-                  formData.customer_id > 0
-                    ? formData.customer_id.toString()
-                    : undefined
-                }
-                onChange={handleCustomerChange}
-                options={customerOptionsForCombobox}
-                query={customerQuery}
-                setQuery={setCustomerQuery}
-                placeholder="Search or Select Customer..."
-                disabled={isEditMode || documentIdentityLocked}
-                required={true}
-                mode="single"
-              />
+              <span className="block text-sm font-medium text-default-700 dark:text-gray-200">
+                Customer <span className="text-red-500">*</span>
+              </span>
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900/50 px-3 py-2">
+                {selectedCustomer ? (
+                  <div className="min-w-0">
+                    <div className="truncate font-medium text-default-900 dark:text-gray-100">
+                      {selectedCustomer.name}
+                    </div>
+                    {selectedCustomer.phone_number && (
+                      <div className="text-xs text-default-500 dark:text-gray-400">
+                        {selectedCustomer.phone_number}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-sm text-default-500 dark:text-gray-400">
+                    Select a rental below — the customer is set from your
+                    selection.
+                  </span>
+                )}
+                {!isEditMode &&
+                  !documentIdentityLocked &&
+                  formData.customer_id > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearRentals}
+                      className="shrink-0 text-sm text-sky-600 hover:text-sky-700 hover:underline dark:text-sky-400"
+                    >
+                      Change customer
+                    </button>
+                  )}
+              </div>
             </div>
-          </div>
-
-          <div className="mt-6">
-            <GTInvoiceAccountFields
-              customerId={formData.customer_id || null}
-              customerName={selectedCustomer?.name || null}
-              customerDefaultCode={selectedCustomer?.debtor_account_code || null}
-              debtorAccountCode={formData.debtor_account_code}
-              dateIssued={formData.date_issued}
-              invoiceTotal={totalAmount}
-              revenueSplits={formData.revenue_splits}
-              onDebtorChange={(accountCode: string): void =>
-                setFormData((current: Invoice): Invoice => ({
-                  ...current,
-                  debtor_account_code: accountCode,
-                }))
-              }
-              onRevenueSplitsChange={(splits: GreenTargetRevenueSplit[]): void =>
-                setFormData((current: Invoice): Invoice => ({
-                  ...current,
-                  revenue_splits: splits,
-                }))
-              }
-              disabled={isSaving}
-              debtorDisabled={documentIdentityLocked}
-              revenueDisabled={revenueAllocationLocked}
-            />
           </div>
 
           {/* Conditional Fields (Regular Invoice - Multiple Rental Selection) */}
@@ -1144,94 +1259,213 @@ const InvoiceFormPage: React.FC = () => {
                 <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
                   Select Rentals <span className="text-red-500">*</span>
                   <span className="text-sm font-normal text-default-500 dark:text-gray-400 ml-1">
-                    (Click to select multiple rentals)
+                    {isEditMode
+                      ? "(Rentals cannot be changed after the invoice is created)"
+                      : "(Every rental still waiting to be invoiced — pick one or more from the same customer)"}
                   </span>
                 </label>
 
-                {!formData.customer_id ? (
+                {!isEditMode && (
+                  <>
+                    <div className="relative">
+                      <IconSearch
+                        size={18}
+                        className="pointer-events-none absolute inset-y-0 left-3 my-auto text-default-400 dark:text-gray-500"
+                      />
+                      <input
+                        type="text"
+                        value={rentalQuery}
+                        onChange={(
+                          event: React.ChangeEvent<HTMLInputElement>
+                        ): void => setRentalQuery(event.target.value)}
+                        placeholder="Search customer, site, address, dumpster, driver or rental no..."
+                        className={clsx(
+                          "block w-full pl-10 pr-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
+                          "bg-white dark:bg-gray-700",
+                          "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                        )}
+                      />
+                    </div>
+                    {formData.customer_id > 0 && (
+                      <p className="text-xs text-default-500 dark:text-gray-400">
+                        Showing only {selectedCustomer?.name || "this customer"}
+                        's remaining rentals. Use "Change customer" above to
+                        browse every customer again.
+                      </p>
+                    )}
+                  </>
+                )}
+
+                {rentalsLoading ? (
                   <div className="p-4 border border-default-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-center">
-                    Select customer first
+                    Loading rentals...
                   </div>
-                ) : availableRentals.length === 0 ? (
+                ) : rentalGroups.length === 0 ? (
                   <div className="p-4 border border-default-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-center">
-                    No available rentals found for this customer
+                    {appliedRentalQuery
+                      ? "No rentals match your search"
+                      : "No rentals are waiting to be invoiced"}
                   </div>
                 ) : (
-                  <div className="border border-default-300 dark:border-gray-600 rounded-lg divide-y divide-default-200 dark:divide-gray-700 max-h-80 overflow-y-auto">
-                    {availableRentals.map((rental) => {
-                      const isSelected = selectedRentals.some(
-                        (r) => r.rental_id === rental.rental_id
-                      );
-                      const isActive = isRentalActive(rental.date_picked);
+                  <div className="border border-default-300 dark:border-gray-600 rounded-lg max-h-96 overflow-y-auto">
+                    {rentalGroups.map((group: RentalGroup) => {
+                      const isOtherCustomer: boolean =
+                        formData.customer_id > 0 &&
+                        group.customer_id !== formData.customer_id;
 
                       return (
-                        <div
-                          key={rental.rental_id}
-                          onClick={() =>
-                            !isEditMode && handleRentalToggle(rental)
-                          }
-                          className={clsx(
-                            "p-4 cursor-pointer transition-colors relative",
-                            isEditMode
-                              ? "cursor-not-allowed"
-                              : "hover:bg-gray-50 dark:hover:bg-gray-700",
-                            isSelected
-                              ? "bg-sky-50 dark:bg-sky-900/30 border-l-[4px] border-l-sky-400 dark:border-l-sky-500 !border-t-0 !border-r-0 !border-b-0"
-                              : ""
-                          )}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              <div className="flex items-center">
-                                {isSelected ? (
-                                  <IconSquareCheckFilled
-                                    className="text-sky-600 dark:text-sky-400"
-                                    size={20}
-                                  />
-                                ) : (
-                                  <IconSquare
-                                    className="text-gray-400 dark:text-gray-500"
-                                    size={20}
-                                  />
-                                )}
-                              </div>
-                              <div>
-                                <div className="font-medium text-gray-900 dark:text-gray-100">
-                                  Rental #{rental.rental_id} - Dumpster{" "}
-                                  {rental.tong_no}
+                        <div key={group.customer_id}>
+                          <div
+                            className={clsx(
+                              "sticky top-0 z-10 flex items-center justify-between gap-3 px-4 py-2",
+                              "border-b border-default-200 dark:border-gray-700",
+                              isOtherCustomer
+                                ? "bg-gray-100 dark:bg-gray-900"
+                                : "bg-default-50 dark:bg-gray-900/80"
+                            )}
+                          >
+                            <span
+                              className={clsx(
+                                "truncate text-sm font-semibold",
+                                isOtherCustomer
+                                  ? "text-default-400 dark:text-gray-500"
+                                  : "text-default-800 dark:text-gray-100"
+                              )}
+                            >
+                              {group.customer_name}
+                            </span>
+                            <span className="shrink-0 text-xs text-default-500 dark:text-gray-400">
+                              {group.rentals.length} rental
+                              {group.rentals.length === 1 ? "" : "s"}
+                            </span>
+                          </div>
+
+                          <div className="divide-y divide-default-200 dark:divide-gray-700">
+                            {group.rentals.map((rental: Rental) => {
+                              const isSelected = selectedRentals.some(
+                                (r) => r.rental_id === rental.rental_id
+                              );
+                              const isActive = isRentalActive(
+                                rental.date_picked
+                              );
+                              const locationDisplay: string =
+                                formatLocationDisplay(
+                                  rental.location_site,
+                                  rental.location_address
+                                );
+
+                              return (
+                                <div
+                                  key={rental.rental_id}
+                                  onClick={() =>
+                                    !isEditMode && handleRentalToggle(rental)
+                                  }
+                                  className={clsx(
+                                    "p-4 cursor-pointer transition-colors relative",
+                                    isEditMode
+                                      ? "cursor-not-allowed"
+                                      : "hover:bg-gray-50 dark:hover:bg-gray-700",
+                                    isOtherCustomer && "opacity-50",
+                                    isSelected
+                                      ? "bg-sky-50 dark:bg-sky-900/30 border-l-[4px] border-l-sky-400 dark:border-l-sky-500 !border-t-0 !border-r-0 !border-b-0"
+                                      : ""
+                                  )}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-3">
+                                      <div className="flex items-center">
+                                        {isSelected ? (
+                                          <IconSquareCheckFilled
+                                            className="text-sky-600 dark:text-sky-400"
+                                            size={20}
+                                          />
+                                        ) : (
+                                          <IconSquare
+                                            className="text-gray-400 dark:text-gray-500"
+                                            size={20}
+                                          />
+                                        )}
+                                      </div>
+                                      <div>
+                                        <div className="font-medium text-gray-900 dark:text-gray-100">
+                                          Rental #{rental.rental_id} - Dumpster{" "}
+                                          {rental.tong_no}
+                                        </div>
+                                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                                          Placed:{" "}
+                                          {new Date(
+                                            rental.date_placed
+                                          ).toLocaleDateString()}
+                                          {locationDisplay &&
+                                            ` • ${locationDisplay}`}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <span
+                                        className={clsx(
+                                          "text-xs font-medium px-2 py-1 rounded-full",
+                                          isActive
+                                            ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
+                                            : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                                        )}
+                                      >
+                                        {isActive ? "Ongoing" : "Completed"}
+                                      </span>
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="text-sm text-gray-500 dark:text-gray-400">
-                                  Placed:{" "}
-                                  {new Date(
-                                    rental.date_placed
-                                  ).toLocaleDateString()}
-                                  {formatLocationDisplay(
-                                    rental.location_site,
-                                    rental.location_address
-                                  ) &&
-                                    ` • ${formatLocationDisplay(
-                                      rental.location_site,
-                                      rental.location_address
-                                    )}`}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <span
-                                className={clsx(
-                                  "text-xs font-medium px-2 py-1 rounded-full",
-                                  isActive
-                                    ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
-                                    : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
-                                )}
-                              >
-                                {isActive ? "Ongoing" : "Completed"}
-                              </span>
-                            </div>
+                              );
+                            })}
                           </div>
                         </div>
                       );
                     })}
+                  </div>
+                )}
+
+                {!isEditMode && !rentalsLoading && rentalTotal > 0 && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                    <span className="text-xs text-default-500 dark:text-gray-400">
+                      Showing {(rentalPage - 1) * RENTALS_PER_PAGE + 1}-
+                      {Math.min(rentalPage * RENTALS_PER_PAGE, rentalTotal)} of{" "}
+                      {rentalTotal} rental{rentalTotal === 1 ? "" : "s"}
+                    </span>
+                    {rentalTotalPages > 1 && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          color="secondary"
+                          onClick={(): void =>
+                            setRentalPage((page: number): number =>
+                              Math.max(1, page - 1)
+                            )
+                          }
+                          disabled={rentalPage <= 1}
+                        >
+                          Previous
+                        </Button>
+                        <span className="text-xs text-default-600 dark:text-gray-300">
+                          Page {rentalPage} of {rentalTotalPages}
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          color="secondary"
+                          onClick={(): void =>
+                            setRentalPage((page: number): number =>
+                              Math.min(rentalTotalPages, page + 1)
+                            )
+                          }
+                          disabled={rentalPage >= rentalTotalPages}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1308,6 +1542,33 @@ const InvoiceFormPage: React.FC = () => {
               </div>
             </div>
           )}
+
+          <div className="mt-6">
+            <GTInvoiceAccountFields
+              customerId={formData.customer_id || null}
+              customerName={selectedCustomer?.name || null}
+              customerDefaultCode={selectedCustomer?.debtor_account_code || null}
+              debtorAccountCode={formData.debtor_account_code}
+              dateIssued={formData.date_issued}
+              invoiceTotal={totalAmount}
+              revenueSplits={formData.revenue_splits}
+              onDebtorChange={(accountCode: string): void =>
+                setFormData((current: Invoice): Invoice => ({
+                  ...current,
+                  debtor_account_code: accountCode,
+                }))
+              }
+              onRevenueSplitsChange={(splits: GreenTargetRevenueSplit[]): void =>
+                setFormData((current: Invoice): Invoice => ({
+                  ...current,
+                  revenue_splits: splits,
+                }))
+              }
+              disabled={isSaving}
+              debtorDisabled={documentIdentityLocked}
+              revenueDisabled={revenueAllocationLocked}
+            />
+          </div>
 
           {/* Amount and Tax Section */}
           <div className="mt-6 border-t dark:border-gray-700 pt-6">
