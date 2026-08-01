@@ -186,6 +186,7 @@ export default function (pool) {
         whereClause += ` AND (
           c.name ILIKE ${searchParam} OR
           l.address ILIKE ${searchParam} OR
+          l.site ILIKE ${searchParam} OR
           r.driver ILIKE ${searchParam} OR
           r.tong_no ILIKE ${searchParam} OR
           CAST(r.rental_id AS TEXT) ILIKE ${searchParam}

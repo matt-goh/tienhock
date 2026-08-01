@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-08-02",
+    ms: "Green Target: halaman Cipta Invois kini terus memaparkan semua penyewaan tong yang masih belum diinvois, dikumpulkan mengikut pelanggan dan lengkap dengan Site/alamat, tanpa perlu memilih pelanggan dahulu. Cari mengikut nama pelanggan, Site, alamat, no. tong, pemandu atau no. penyewaan, kemudian tandakan penyewaan yang hendak diinvoiskan; pelanggan invois diisi secara automatik daripada penyewaan pertama yang ditanda. Satu invois masih untuk satu pelanggan sahaja — penyewaan pelanggan lain dipaparkan malap dan butang \"Change customer\" membersihkan pilihan untuk menukar pelanggan.",
+    en: "Green Target: the Create Invoice page now lists every rental still waiting to be invoiced right away, grouped by customer and showing each Site/address, instead of asking you to pick a customer first. Search by customer name, Site, address, dumpster no., driver or rental no., then tick the rentals to bill; the invoice customer is filled in automatically from the first rental you tick. One invoice still covers one customer — other customers' rentals are dimmed, and \"Change customer\" clears the selection so you can switch.",
+  },
+  {
     date: "2026-08-01",
     ms: "Jelly Polly: halaman baharu \"Packing Cuti\" di bawah Gaji → Log Harian untuk merekod cuti pekerja pembungkusan Ice Polly & Jelly Cup, sama seperti halaman Packing Cuti Tien Hock. Pilih tarikh, tanda pekerja yang bercuti, pilih jenis cuti dan masukkan amaun bayaran; baki cuti setiap pekerja dipaparkan terus di dalam senarai. Amaun yang disimpan terus ditambah ke gaji kasar bulan tersebut. Cuti tidak boleh direkod untuk pekerja yang sudah ada rekod pengeluaran pada hari yang sama, atau yang sudah ada cuti direkod dari halaman lain.",
     en: "Jelly Polly: a new \"Packing Cuti\" page under Payroll → Daily Logs for recording leave for the Ice Polly & Jelly Cup packing workers, matching the Tien Hock Packing Cuti page. Pick a date, tick the workers on leave, choose the leave type and enter the amount paid; each worker's remaining leave balance is shown in the list. Saved amounts are added to that month's gross pay straight away. Leave cannot be recorded for a worker who already has production recorded on the same day, or who already has leave recorded from another page.",
