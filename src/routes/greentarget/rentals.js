@@ -74,6 +74,7 @@ export default function (pool) {
       location_id,
       tong_no,
       active_only,
+      no_invoice,
       search,
       start_date,
       end_date,
@@ -152,6 +153,18 @@ export default function (pool) {
         whereClause += ` AND (r.date_picked IS NULL OR r.date_picked > $${paramCounter}::date)`;
         filterParams.push(localToday());
         paramCounter++;
+      }
+
+      if (no_invoice === "true") {
+        // Same rule the invoice form uses to decide a rental is still billable:
+        // a cancelled invoice does not count as invoiced.
+        whereClause += ` AND NOT EXISTS (
+          SELECT 1
+          FROM greentarget.invoice_rentals ir
+          JOIN greentarget.invoices i ON i.invoice_id = ir.invoice_id
+          WHERE ir.rental_id = r.rental_id
+            AND (i.status IS NULL OR i.status != 'cancelled')
+        )`;
       }
 
       if (start_date) {
