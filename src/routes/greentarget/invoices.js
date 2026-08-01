@@ -1,8 +1,13 @@
 // src/routes/greentarget/invoices.js
 import { Router } from "express";
 import GTEInvoiceApiClientFactory from "../../utils/greenTarget/einvoice/GTEInvoiceApiClientFactory.js";
-import { syncGTSalesJournalEntry } from "./accounting/sales-journal.js";
+import {
+  resolveGTReceivableAccount,
+  resolveGTRevenueAccount,
+  syncGTSalesJournalEntry,
+} from "./accounting/sales-journal.js";
 import { assertGreenTargetAccountingDateUnlocked } from "./accounting/posting-lock.js";
+import { GT_SUNDRY_DEBTOR_ACCOUNT } from "./accounting/debtor-map.js";
 
 // Map to track pending invoices with their timeout handlers
 const pendingInvoiceTimeouts = new Map();
@@ -831,6 +836,8 @@ export default function (pool, defaultConfig) {
       tax_amount = 0, // Default tax to 0 if not provided
       date_issued,
       invoice_number, // Optional custom invoice number
+      debtor_account_code,
+      revenue_account_code,
     } = req.body;
 
     const client = await pool.connect();
@@ -864,6 +871,26 @@ export default function (pool, defaultConfig) {
       if (type === "regular") {
         await assertRentalLinksValid(client, customer_id, rental_ids);
       }
+      const resolvedDebtorAccount = await resolveGTReceivableAccount(client, {
+        customer_id: Number(customer_id),
+        debtor_account_code,
+      });
+      const resolvedRevenueAccount = await resolveGTRevenueAccount(client, {
+        revenue_account_code,
+      });
+      // Only a NAMED account becomes the customer's reusable default. CD_SD is
+      // the sundry fallback, not a decision, so storing it would look like a
+      // deliberate assignment and would hide the customer from a later
+      // evidence-backed link to its real legacy account.
+      if (resolvedDebtorAccount !== GT_SUNDRY_DEBTOR_ACCOUNT) {
+        await client.query(
+          `UPDATE greentarget.customers
+              SET debtor_account_code = $1
+            WHERE customer_id = $2
+              AND debtor_account_code IS NULL`,
+          [resolvedDebtorAccount, customer_id]
+        );
+      }
 
       // --- Logic ---
       let finalInvoiceNumber;
@@ -892,9 +919,9 @@ export default function (pool, defaultConfig) {
         INSERT INTO greentarget.invoices (
           invoice_number, type, customer_id,
           amount_before_tax, tax_amount, total_amount, date_issued,
-          balance_due
+          balance_due, debtor_account_code, revenue_account_code
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *;
       `;
 
@@ -907,6 +934,8 @@ export default function (pool, defaultConfig) {
         total_amount.toFixed(2),
         date_issued,
         total_amount.toFixed(2), // Initial balance_due
+        resolvedDebtorAccount,
+        resolvedRevenueAccount,
       ]);
 
       const createdInvoice = invoiceResult.rows[0];
@@ -951,7 +980,8 @@ export default function (pool, defaultConfig) {
       // Send specific error messages back if validation failed
       res
         .status(
-          error.status ||
+          error.statusCode ||
+            error.status ||
             (error.message.includes("Missing required") ||
             error.message.includes("Invalid")
               ? 400
@@ -1007,6 +1037,8 @@ export default function (pool, defaultConfig) {
       amount_before_tax,
       tax_amount = 0,
       date_issued,
+      debtor_account_code,
+      revenue_account_code,
     } = req.body;
 
     const numericInvoiceId = parseInt(invoice_id, 10);
@@ -1021,7 +1053,10 @@ export default function (pool, defaultConfig) {
 
       // Check if invoice exists
       const invoiceCheck = await client.query(
-        "SELECT * FROM greentarget.invoices WHERE invoice_id = $1",
+        `SELECT *
+           FROM greentarget.invoices
+          WHERE invoice_id = $1
+          FOR UPDATE`,
         [numericInvoiceId]
       );
 
@@ -1066,6 +1101,68 @@ export default function (pool, defaultConfig) {
           numericInvoiceId
         );
       }
+      const customerChanged =
+        Number(customer_id) !== Number(invoiceCheck.rows[0].customer_id);
+      // CD_SD is the legitimate sundry/counter receivable (restored GT-P7), so
+      // moving an invoice back to it is allowed like any other account change;
+      // the dependency guards below still protect invoices with receipts or
+      // active adjustments.
+      const resolvedDebtorAccount = await resolveGTReceivableAccount(client, {
+        invoice_id: numericInvoiceId,
+        customer_id: Number(customer_id),
+        debtor_account_code:
+          debtor_account_code !== undefined
+            ? debtor_account_code
+            : customerChanged
+            ? null
+            : invoiceCheck.rows[0].debtor_account_code,
+      });
+      const resolvedRevenueAccount = await resolveGTRevenueAccount(client, {
+        revenue_account_code:
+          revenue_account_code !== undefined
+            ? revenue_account_code
+            : invoiceCheck.rows[0].revenue_account_code,
+      });
+      const debtorChanged =
+        resolvedDebtorAccount !== invoiceCheck.rows[0].debtor_account_code;
+      const revenueChanged =
+        resolvedRevenueAccount !== invoiceCheck.rows[0].revenue_account_code;
+      if (customerChanged || debtorChanged || revenueChanged) {
+        const dependentDocumentResult = await client.query(
+          `SELECT
+             EXISTS (
+               SELECT 1
+                 FROM greentarget.payments p
+                 JOIN greentarget.receipts r ON r.id = p.receipt_id
+                WHERE p.invoice_id = $1
+             ) AS has_receipts,
+             EXISTS (
+               SELECT 1
+                 FROM greentarget.adjustment_documents
+                WHERE original_invoice_id = $1
+                  AND status = 'active'
+                  AND COALESCE(is_consolidated, false) = false
+             ) AS has_adjustments`,
+          [numericInvoiceId]
+        );
+        const dependencies = dependentDocumentResult.rows[0];
+        if (dependencies.has_receipts && (customerChanged || debtorChanged)) {
+          throw Object.assign(
+            new Error(
+              "The invoice customer or debtor account cannot be changed because Green Target receipt history references this invoice, including cancelled receipts. Keep the receipt audit trail unchanged."
+            ),
+            { statusCode: 409 }
+          );
+        }
+        if (dependencies.has_adjustments) {
+          throw Object.assign(
+            new Error(
+              "The invoice accounting accounts cannot be changed while an active adjustment references it. Cancel the adjustment first."
+            ),
+            { statusCode: 409 }
+          );
+        }
+      }
 
       // If invoice_number is provided, check for duplicates
       let finalInvoiceNumber = invoiceCheck.rows[0].invoice_number; // Keep existing if not provided
@@ -1102,6 +1199,8 @@ export default function (pool, defaultConfig) {
             tax_amount = $5,
             total_amount = $6,
             date_issued = $7,
+            debtor_account_code = $9,
+            revenue_account_code = $10,
             balance_due = $6 - COALESCE(
               (SELECT SUM(amount_paid) 
                FROM greentarget.payments 
@@ -1121,6 +1220,8 @@ export default function (pool, defaultConfig) {
         total_amount.toFixed(2),
         date_issued,
         numericInvoiceId,
+        resolvedDebtorAccount,
+        resolvedRevenueAccount,
       ]);
 
       // Update rental associations in junction table
@@ -1164,7 +1265,7 @@ export default function (pool, defaultConfig) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error(`Error updating Green Target invoice ${invoice_id}:`, error);
-      res.status(error.status || (error.message.includes("Missing required") ||
+      res.status(error.statusCode || error.status || (error.message.includes("Missing required") ||
         error.message.includes("Invalid") ||
         error.message.includes("already exists") ? 400 : 500)).json({
         message: error.message || "Error updating invoice",
@@ -1228,17 +1329,26 @@ export default function (pool, defaultConfig) {
         });
       }
 
-      // Check if there are any *active* payments for this invoice
+      // An invoice cannot be cancelled while any owning receipt is still
+      // active or awaiting cheque clearance. Cancel the whole receipt first
+      // so every allocation and the consolidated REC journal stay in sync.
       const paymentsCheck = await client.query(
-        "SELECT COUNT(*) FROM greentarget.payments WHERE invoice_id = $1 AND (status IS NULL OR status = 'active')",
+        `SELECT p.payment_id, p.receipt_id, p.status, r.display_reference
+           FROM greentarget.payments p
+           JOIN greentarget.receipts r ON r.id = p.receipt_id
+          WHERE p.invoice_id = $1
+            AND (p.status IS NULL OR p.status IN ('active', 'pending'))
+          ORDER BY p.payment_id`,
         [numericInvoiceId]
       );
 
-      if (parseInt(paymentsCheck.rows[0].count) > 0) {
-        await client.query("ROLLBACK"); // Release lock
-        throw new Error(
-          "Cannot cancel invoice: it has active payments. Cancel the payments first."
-        );
+      if (paymentsCheck.rows.length > 0) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({
+          message:
+            "Cannot cancel invoice: it has an active or pending Green Target receipt. Cancel the receipt first.",
+          receipts: paymentsCheck.rows,
+        });
       }
 
       // G7: the posting lock must fire BEFORE the MyInvois API side effect —
@@ -1392,28 +1502,26 @@ export default function (pool, defaultConfig) {
         });
       }
 
-      // Check if there are any payments for this invoice and get payment details
+      // Durable receipt allocations are accounting audit history. Never tear
+      // one payment out of its receipt (especially a multi-invoice receipt),
+      // because that would desynchronise the receipt total and REC journal.
       const paymentsCheck = await client.query(
-        `SELECT payment_id, amount_paid, payment_date, payment_method, status 
-         FROM greentarget.payments 
-         WHERE invoice_id = $1 
-         ORDER BY payment_date DESC`,
+        `SELECT p.payment_id, p.receipt_id, p.amount_paid, p.payment_date,
+                p.payment_method, p.status, r.display_reference
+           FROM greentarget.payments p
+           JOIN greentarget.receipts r ON r.id = p.receipt_id
+          WHERE p.invoice_id = $1
+          ORDER BY p.payment_date DESC`,
         [numericInvoiceId]
       );
 
-      // If force delete is requested, delete payments first
-      if (paymentsCheck.rows.length > 0 && req.query.force === 'true') {
-        // Delete all payments for this invoice
-        await client.query(
-          "DELETE FROM greentarget.payments WHERE invoice_id = $1",
-          [numericInvoiceId]
-        );
-      } else if (paymentsCheck.rows.length > 0) {
+      if (paymentsCheck.rows.length > 0) {
         await client.query("ROLLBACK");
-        return res.status(400).json({
-          message: "Cannot delete invoice: it has associated payments.",
+        return res.status(409).json({
+          message:
+            "Cannot delete invoice: it has Green Target receipt history. Keep the cancelled invoice and receipt as an audit trail; force delete is not available.",
           payments: paymentsCheck.rows,
-          canForceDelete: true
+          canForceDelete: false,
         });
       }
 

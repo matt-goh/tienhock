@@ -8,8 +8,8 @@
 // blocked), and accounting metadata can be maintained. Every query is
 // explicitly schema-qualified so no GT request can touch Tien Hock's chart.
 //
-// GT's chart is flat except the DEBTOR control + its 28 children, and its
-// sort_order IS the printed Trial Balance line number, so the flat list is
+// GT's chart is flat except the DEBTOR control and the CD_SD sub-ledger branch,
+// and its sort_order IS the printed Trial Balance line number, so the flat list is
 // served in printed order. fs_note is a real FK here (unlike TH), so the
 // note name is joined straight from greentarget.financial_statement_notes.
 // Mutations are protected by session auth + the restore guard at the mount in
@@ -17,7 +17,8 @@
 // statement note so a newly-created account cannot disappear from reports.
 import { Router } from "express";
 
-const ACCOUNT_CODE_PATTERN = /^[A-Z0-9._-]+$/;
+const ACCOUNT_CODE_PATTERN = /^[A-Z0-9._ -]+$/;
+const TRADE_DEBTOR_PARENT_CODES = new Set(["DEBTOR", "CD_SD"]);
 const RESERVED_ACCOUNT_CODES = new Set(["NEW", "CHILDREN", ".", ".."]);
 const MAX_ACCOUNT_CODE_LENGTH = 50;
 const MAX_DESCRIPTION_LENGTH = 255;
@@ -479,7 +480,7 @@ export default function createGreenTargetAccountCodesRouter(pool) {
     if (!ACCOUNT_CODE_PATTERN.test(normalizedCode)) {
       return res.status(400).json({
         message:
-          "Account code can only contain letters, numbers, hyphens, underscores, and periods",
+          "Account code can only contain letters, numbers, spaces, hyphens, underscores, and periods",
       });
     }
     if (RESERVED_ACCOUNT_CODES.has(normalizedCode)) {
@@ -531,14 +532,15 @@ export default function createGreenTargetAccountCodesRouter(pool) {
       });
     }
     if (
-      (normalizedLedgerType === "TD" || normalizedParentCode === "DEBTOR") &&
+      (normalizedLedgerType === "TD" ||
+        TRADE_DEBTOR_PARENT_CODES.has(normalizedParentCode)) &&
       (normalizedLedgerType !== "TD" ||
-        normalizedParentCode !== "DEBTOR" ||
+        !TRADE_DEBTOR_PARENT_CODES.has(normalizedParentCode) ||
         normalizedFsNote !== "22")
     ) {
       return res.status(400).json({
         message:
-          "Trade debtor accounts must use ledger type 'TD', parent 'DEBTOR', and financial statement note '22'",
+          "Trade debtor accounts must use ledger type 'TD', parent 'DEBTOR' or 'CD_SD', and financial statement note '22'",
       });
     }
 
@@ -636,7 +638,7 @@ export default function createGreenTargetAccountCodesRouter(pool) {
           });
         }
         if (
-          normalizedParentCode !== "DEBTOR" &&
+          !TRADE_DEBTOR_PARENT_CODES.has(normalizedParentCode) &&
           parentResult.rows[0].ledger_type === "TD"
         ) {
           await client.query("ROLLBACK");
@@ -874,7 +876,7 @@ export default function createGreenTargetAccountCodesRouter(pool) {
         });
       }
 
-      // The DEBTOR control is the only current system row. Keep its structural
+      // System control rows (including DEBTOR and CD_SD) keep their structural
       // fields fixed while still allowing harmless description/order/notes edits.
       if (existing.is_system) {
         if (!nextIsActive) {
@@ -900,18 +902,19 @@ export default function createGreenTargetAccountCodesRouter(pool) {
         !existing.is_system &&
         (existing.ledger_type === "TD" ||
           existing.parent_code === "DEBTOR" ||
+          existing.parent_code === "CD_SD" ||
           nextLedgerType === "TD" ||
-          nextParentCode === "DEBTOR");
+          TRADE_DEBTOR_PARENT_CODES.has(nextParentCode));
       if (
         isDebtorMember &&
         (nextLedgerType !== "TD" ||
-          nextParentCode !== "DEBTOR" ||
+          !TRADE_DEBTOR_PARENT_CODES.has(nextParentCode) ||
           nextFsNote !== "22")
       ) {
         await client.query("ROLLBACK");
         return res.status(400).json({
           message:
-          "Trade debtor accounts must keep ledger type 'TD', parent 'DEBTOR', and financial statement note '22'",
+            "Trade debtor accounts must keep ledger type 'TD', parent 'DEBTOR' or 'CD_SD', and financial statement note '22'",
         });
       }
 
@@ -1023,7 +1026,7 @@ export default function createGreenTargetAccountCodesRouter(pool) {
           });
         }
         if (
-          nextParentCode !== "DEBTOR" &&
+          !TRADE_DEBTOR_PARENT_CODES.has(nextParentCode) &&
           parentResult.rows[0].ledger_type === "TD"
         ) {
           await client.query("ROLLBACK");

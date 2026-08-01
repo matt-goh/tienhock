@@ -21,6 +21,10 @@ import Button from "../../../components/Button";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { greenTargetApi } from "../../../routes/greentarget/api";
+import GTInvoiceAccountFields, {
+  GT_DEFAULT_REVENUE_ACCOUNT,
+  GTRevenueAccountCode,
+} from "../../../components/GreenTarget/GTInvoiceAccountFields";
 import { formatLocationDisplay } from "../../../utils/greenTarget/formatLocationDisplay";
 
 interface PickupDestination {
@@ -198,6 +202,17 @@ const RentalDetailsPage: React.FC = () => {
     useState(false);
   const [selectedRentalIds, setSelectedRentalIds] = useState<number[]>([]);
   const [invoiceAmount, setInvoiceAmount] = useState<string>("200.00");
+  const [invoiceRevenueAccount, setInvoiceRevenueAccount] = useState<
+    "" | GTRevenueAccountCode
+  >(GT_DEFAULT_REVENUE_ACCOUNT);
+  const [invoiceDebtorAccount, setInvoiceDebtorAccount] = useState<string>("");
+  // The customer's saved default, loaded when the modal opens. Null means the
+  // customer has never been given one, which is the only case that needs a
+  // human decision here.
+  const [customerDefaultDebtorAccount, setCustomerDefaultDebtorAccount] =
+    useState<string | null>(null);
+  const [isLoadingCustomerDefault, setIsLoadingCustomerDefault] =
+    useState<boolean>(false);
   const [dateIssued, setDateIssued] = useState<string>(
     format(new Date(), "yyyy-MM-dd")
   );
@@ -263,6 +278,9 @@ const RentalDetailsPage: React.FC = () => {
     setIsInvoiceModalOpen(true);
     setSelectedRentalIds([rental.rental_id]);
     setInvoiceAmount("200.00");
+    setInvoiceRevenueAccount(GT_DEFAULT_REVENUE_ACCOUNT);
+    setInvoiceDebtorAccount("");
+    setCustomerDefaultDebtorAccount(null);
     setDateIssued(format(new Date(), "yyyy-MM-dd"));
     setRecordPayment(false);
     setPaymentDate(format(new Date(), "yyyy-MM-dd"));
@@ -270,6 +288,20 @@ const RentalDetailsPage: React.FC = () => {
     setPaymentInternalReference("");
     setPaymentReference("");
     setIsLoadingCustomerRentals(true);
+    // The customer's default debtor account keeps the invoice's accounting
+    // silent in the common case; a failure here only means the picker opens.
+    setIsLoadingCustomerDefault(true);
+    void greenTargetApi
+      .getCustomer(rental.customer_id)
+      .then((customer: { debtor_account_code?: string | null }): void => {
+        const defaultCode: string = customer?.debtor_account_code || "";
+        setCustomerDefaultDebtorAccount(defaultCode || null);
+        setInvoiceDebtorAccount(defaultCode);
+      })
+      .catch((customerError: unknown): void => {
+        console.error("Error loading the customer's debtor account:", customerError);
+      })
+      .finally((): void => setIsLoadingCustomerDefault(false));
     try {
       const data: CustomerRentalOption[] = await greenTargetApi.getRentals({
         customer_id: rental.customer_id,
@@ -336,6 +368,12 @@ const RentalDetailsPage: React.FC = () => {
       toast.error("Date issued is required.");
       return;
     }
+    if (!invoiceRevenueAccount) {
+      toast.error("Select TGA, TGB or WS_OTH for the invoice.");
+      return;
+    }
+    // No debtor check: an empty value means a sundry / counter customer, which
+    // the server posts to CD_SD exactly as the legacy system did.
     if (recordPayment && !paymentInternalReference.trim()) {
       toast.error(
         "Green Target Reference No. is required to record a payment."
@@ -352,6 +390,8 @@ const RentalDetailsPage: React.FC = () => {
         amount_before_tax: amount,
         tax_amount: 0,
         date_issued: dateIssued,
+        debtor_account_code: invoiceDebtorAccount,
+        revenue_account_code: invoiceRevenueAccount,
       });
       toast.success(`Invoice ${response.invoice.invoice_number} created`);
       if (recordPayment) {
@@ -1058,6 +1098,23 @@ const RentalDetailsPage: React.FC = () => {
                         className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:focus:ring-sky-400"
                       />
                     </div>
+                  </div>
+
+                  <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50/60 p-3 dark:border-sky-900 dark:bg-sky-950/20">
+                    <GTInvoiceAccountFields
+                      variant="plain"
+                      customerId={rental.customer_id}
+                      customerDefaultCode={customerDefaultDebtorAccount}
+                      debtorAccountCode={invoiceDebtorAccount}
+                      revenueAccountCode={invoiceRevenueAccount}
+                      onDebtorChange={setInvoiceDebtorAccount}
+                      onRevenueChange={setInvoiceRevenueAccount}
+                      disabled={isCreatingInvoice}
+                      customerDefaultLoading={isLoadingCustomerDefault}
+                    />
+                    <p className="mt-2 text-xs text-default-500 dark:text-gray-400">
+                      Creates the matching Green Target sales journal.
+                    </p>
                   </div>
 
                   {/* Record Payment */}

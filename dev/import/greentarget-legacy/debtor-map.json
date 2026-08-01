@@ -1,13 +1,18 @@
 {
   "schemaVersion": 1,
-  "_comment": "Green Target legacy debtor code -> greentarget.customers mapping (handover R6). Created in G3 alongside the chart-of-accounts load, which created the 28 debtor accounts from the GTDB LEDGER sections - never from greentarget.customers. This file records which of them additionally have an ERP customer, and NOTHING consumes it yet.",
+  "_comment": "Green Target legacy debtor code -> greentarget.customers mapping (handover R6). Created in G3 alongside the chart-of-accounts load, which created the 28 debtor accounts from the GTDB LEDGER sections - never from greentarget.customers. This file records which of them additionally have an ERP customer; live invoice entry does not consume it, but the snapshot-less legacy revenue fallback does.",
   "rules": [
     "R6: the legacy ledger is the authority for who owes Green Target money. These 28 accounts are import-owned.",
     "Any future debtor sync must be NON-DESTRUCTIVE: it may never delete or rename an import-owned child, and it may not mint a child for an ERP customer that has no ledger presence without explicit approval.",
-    "A mapping is only usable once approved:true. G3 approves nothing - both candidates below are inexact (handover 3e) and need the user to confirm they are the same legal entity.",
+    "A mapping is only usable once approved:true. G3 approved nothing; the user approved PAUMIN and NURI on 31 Jul 2026 and left SUTERA unapproved.",
     "Handover question 4: the TH debtor is Tien Hock Food Ind. S/B. The two companies are INDEPENDENT - never auto-post one company document into the other ledger; reconcile by hand."
   ],
-  "status": "DRAFT - no mapping approved. 2 of 28 legacy debtors have an ERP candidate; 26 have none.",
+  "status": "SUPERSEDED as the live authority (GT-P1, 30 Jul 2026). PAUMIN (customer 17) and NURI (customer 22) were approved by the user on 31 Jul 2026 (handover 10i, GT-P4 decision 4) and are recorded below for the audit trail. SUTERA (customer 20) remains unapproved and inexact. 3 of 28 legacy debtors have an ERP candidate; 25 have none.",
+  "_supersededBy": [
+    "The live receivable for a Green Target invoice is greentarget.invoices.debtor_account_code (snapshotted per invoice), defaulted from greentarget.customers.debtor_account_code. Approving a mapping now means setting those columns, not editing this file.",
+    "resolveGTReceivableAccount/resolveGTLegacyRevenueAccount in src/routes/greentarget/accounting/sales-journal.js consult this file only for snapshot-less legacy compatibility. Current invoice creation uses its explicit snapshots; an old CN/DN whose invoice has no organic/imported journal or revenue snapshot deliberately uses the approved legacy mapping before the B-tong/TGA fallback. Editing approved:true here can therefore change that old-invoice fallback and requires evidence.",
+    "Only dev/import/greentarget-legacy/backfill-july-automatic-journals.mjs still reads this file; it reports the approved flag but never gates on it."
+  ],
   "debtors": [
     {
       "legacy_code": "AE ENTERPRISE",
@@ -168,7 +173,16 @@
       "gt_account_code": "NURI",
       "sort_order": 1020,
       "closing_2026_06_30": "1080.00",
-      "erp_customer": null
+      "erp_customer": {
+        "customer_id": 22,
+        "customer_name": "SYARIKAT PENIAGAAN PERABOT NURI SDN BHD",
+        "confidence": "strong",
+        "basis": "Legacy description \"SYT PERNIAGAAN PERABOT NURI S/B\" matches the ERP customer name modulo abbreviation; the account carries a real RM1,080.00 legacy close.",
+        "approved": true,
+        "approved_on": "2026-07-31",
+        "approved_by": "user (handover 10i, GT-P4 decision 4)",
+        "applied_as": "greentarget.customers.debtor_account_code = 'NURI'"
+      }
     },
     {
       "legacy_code": "PAN",
@@ -189,7 +203,10 @@
         "customer_name": "PAUMIN HARDWARE SDN BHD",
         "confidence": "strong",
         "basis": "Legacy description \"PAUMIN HARDWARE SDN. BHD.\" matches the ERP customer name modulo punctuation.",
-        "approved": false
+        "approved": true,
+        "approved_on": "2026-07-31",
+        "approved_by": "user (handover 10i, GT-P4 decision 4)",
+        "applied_as": "greentarget.customers.debtor_account_code = 'PAUMIN'"
       }
     },
     {

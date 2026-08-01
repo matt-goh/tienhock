@@ -283,6 +283,13 @@ interface ComboboxProps {
   required?: boolean;
   placeholder?: string;
   optionsPosition?: "top" | "bottom";
+  /**
+   * Render at most this many options at a time, with a "Load more..." row.
+   * Omit for the default behaviour of rendering every match. Set it on lists
+   * of several hundred options (e.g. Green Target's ~780 trade-debtor leaves)
+   * where rendering them all makes the dropdown visibly lag.
+   */
+  maxVisibleOptions?: number;
 }
 
 export const FormCombobox: React.FC<ComboboxProps> = ({
@@ -298,8 +305,18 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
   required = false,
   placeholder = "Search...",
   optionsPosition = "bottom",
+  maxVisibleOptions,
 }) => {
   const isMultiple = mode === "multiple";
+  const [visibleCount, setVisibleCount] = React.useState<number>(
+    maxVisibleOptions ?? 0
+  );
+
+  // Every new search starts a fresh page, so "Load more" never carries an
+  // earlier query's scroll depth into a different result set.
+  React.useEffect(() => {
+    if (maxVisibleOptions) setVisibleCount(maxVisibleOptions);
+  }, [query, maxVisibleOptions]);
 
   // Normalize value for internal Headless UI state
   // For single mode, Headless UI expects the selected object or null/undefined
@@ -329,6 +346,11 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
             .replace(/\s+/g, "")
             .includes(query.toLowerCase().replace(/\s+/g, ""))
         );
+
+  const visibleOptions = maxVisibleOptions
+    ? filteredOptions.slice(0, visibleCount)
+    : filteredOptions;
+  const hiddenOptionCount = filteredOptions.length - visibleOptions.length;
 
   // Handle change from Headless UI, converting option object(s) back to ID(s)
   const handleChange = (selected: SelectOption | SelectOption[] | null) => {
@@ -442,7 +464,7 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
                   Nothing found.
                 </div>
               ) : (
-                filteredOptions.map((option) => (
+                visibleOptions.map((option) => (
                   <ComboboxOption
                     key={option.id}
                     className={({ active }) =>
@@ -512,6 +534,22 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
                     )}
                   </ComboboxOption>
                 ))
+              )}
+              {hiddenOptionCount > 0 && (
+                <button
+                  type="button"
+                  // onMouseDown, because Headless UI closes the panel on blur
+                  // before a click would land.
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    setVisibleCount(
+                      (current) => current + (maxVisibleOptions ?? 0)
+                    );
+                  }}
+                  className="w-full border-t border-default-200 dark:border-gray-700 py-2 px-3 text-left text-sm font-medium text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30"
+                >
+                  Load more... ({hiddenOptionCount} more)
+                </button>
               )}
             </ComboboxOptions>
           </Transition>

@@ -980,7 +980,9 @@ export default function (pool, myInvoisGTConfig) {
       await client.query("BEGIN");
 
       const invQuery = await client.query(
-        `SELECT invoice_id, invoice_number, customer_id, balance_due, total_amount, status
+        `SELECT invoice_id, invoice_number, customer_id,
+                debtor_account_code, revenue_account_code,
+                balance_due, total_amount, status
            FROM greentarget.invoices WHERE invoice_id = $1 FOR UPDATE`,
         [original_invoice_id]
       );

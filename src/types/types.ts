@@ -673,6 +673,8 @@ export interface InvoiceGT {
   current_balance: number;
   date_issued: string;
   balance_due: number;
+  debtor_account_code?: string | null;
+  revenue_account_code?: "TGA" | "TGB" | "WS_OTH" | null;
   statement_period_start?: string;
   statement_period_end?: string;
   status: "paid" | "unpaid" | "cancelled" | "overdue";
@@ -1220,9 +1222,10 @@ export interface JournalEntryLine {
   account_description?: string; // For display
   debit_amount: number;
   credit_amount: number;
-  reference?: string; // e.g., cheque number
+  reference?: string; // Resolved/general line reference
   internal_reference?: string | null; // Stored line reference when a display reference is returned
   display_reference?: string | null; // Exact legacy-visible line reference
+  cheque_reference?: string | null; // Per-line cheque/transaction reference
   particulars?: string; // Line description
   created_at?: string;
 }
@@ -1243,6 +1246,7 @@ export interface JournalEntryLineInput {
   debit_amount: number;
   credit_amount: number;
   reference?: string;
+  cheque_reference?: string;
   particulars?: string;
 }
 

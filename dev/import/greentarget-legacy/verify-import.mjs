@@ -196,30 +196,36 @@ console.log("-- 0. import population -------------------------------------------
        JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
       WHERE je.source_type = 'legacy_import'`
   );
-  const anchors = scalar("SELECT count(*) FROM greentarget.account_opening_balances");
+  const anchors = scalar(
+    "SELECT count(*) FROM greentarget.account_opening_balances WHERE as_of_date = DATE '2026-01-01'"
+  );
   const staging = scalar("SELECT count(*) FROM greentarget.import_legacy_rows");
   check(journals === "1705", "1,705 imported journals", `found ${journals}`);
   check(lines === "4401", "4,401 imported journal lines", `found ${lines}`);
   check(
     anchors === String(501 - REMOVED_ZERO_FENCES.size),
-    `${501 - REMOVED_ZERO_FENCES.size} opening anchors (${REMOVED_ZERO_FENCES.size} approved zero-fence removal(s))`,
+    `${501 - REMOVED_ZERO_FENCES.size} G4 opening anchors at 2026-01-01 (${REMOVED_ZERO_FENCES.size} approved zero-fence removal(s))`,
     `found ${anchors}`
   );
   check(staging === "4903", "4,903 staging rows", `found ${staging}`);
 
   const anchorSum = scalar(
-    "SELECT COALESCE(SUM(ROUND(amount*100)),0)::bigint FROM greentarget.account_opening_balances"
+    "SELECT COALESCE(SUM(ROUND(amount*100)),0)::bigint FROM greentarget.account_opening_balances WHERE as_of_date = DATE '2026-01-01'"
   );
   check(
     anchorSum === "0",
-    "the opening anchor set balances to EXACTLY 0.00 (no named residue, unlike Tien Hock's RM1,456,480.37)",
+    "the G4 2026-01-01 anchor set balances to EXACTLY 0.00 (no named residue, unlike Tien Hock's RM1,456,480.37)",
     `found ${money(Number(anchorSum))}`
   );
 
   const badDate = scalar(
-    "SELECT count(*) FROM greentarget.account_opening_balances WHERE as_of_date <> DATE '2026-01-01'"
+    "SELECT count(*) FROM greentarget.account_opening_balances WHERE created_by = 'legacy-import' AND as_of_date <> DATE '2026-01-01'"
   );
-  check(badDate === "0", "every anchor is dated 2026-01-01 (R4)", `found ${badDate}`);
+  check(
+    badDate === "0",
+    "every legacy-import/G4 anchor is dated 2026-01-01 (R4)",
+    `found ${badDate}`
+  );
 
   const unbalanced = scalar(`
     SELECT count(*) FROM (
@@ -256,6 +262,7 @@ for (const period of PERIODS) {
                     AND headers.entry_date <= DATE '${asOf}'
                ), 0))::bigint
        FROM greentarget.account_opening_balances anchors
+      WHERE anchors.as_of_date = DATE '2026-01-01'
       ORDER BY anchors.account_code`,
     ["code", "cents"]
   );
@@ -389,7 +396,9 @@ console.log("\n-- 3. the derived CD_SD cash path -------------------------------
     actualPath.map(money).join(" / ")
   );
 
-  const anchor = scalar("SELECT ROUND(amount*100)::bigint FROM greentarget.account_opening_balances WHERE account_code='CD_SD'");
+  const anchor = scalar(
+    "SELECT ROUND(amount*100)::bigint FROM greentarget.account_opening_balances WHERE account_code='CD_SD' AND as_of_date = DATE '2026-01-01'"
+  );
   check(anchor === "7641540", "CD_SD anchors at the evidenced 76,415.40, not the 65,705.40 its section prints", `found ${money(Number(anchor))}`);
 
   const legs = query(
@@ -497,16 +506,38 @@ console.log("\n-- 5. provenance and print order --------------------------------
   );
   check(families.length === 9, "all nine G0-decoded families are represented", `found ${families.length}`);
 
-  // posting_sequence must be a dense 1..N within each month, so a ledger
-  // ordered by (month, posting_sequence, display_order) is well-defined.
+  // Within the IMPORTED months posting_sequence must be a dense 1..N: that
+  // density is the measured evidence of the legacy print order (G4), so a gap
+  // means a row was lost. Scope it to the import, not to every month.
   const badSequence = scalar(`
     SELECT count(*) FROM (
       SELECT DATE_TRUNC('month', entry_date) AS m,
              count(*) AS n, min(posting_sequence) AS lo, max(posting_sequence) AS hi,
              count(DISTINCT posting_sequence) AS distinct_n
-        FROM greentarget.journal_entries GROUP BY 1
+        FROM greentarget.journal_entries
+       WHERE source_type = 'legacy_import'
+       GROUP BY 1
     ) x WHERE lo <> 1 OR hi <> n OR distinct_n <> n`);
-  check(badSequence === "0", "posting_sequence is a dense 1..N within every month", `${badSequence} month(s) broken`);
+  check(badSequence === "0", "posting_sequence is a dense 1..N within every imported month", `${badSequence} month(s) broken`);
+
+  // Organic months cannot be dense: deleting an invoice takes its journal with
+  // it (10h) and cancelled journals keep their sequence, both leaving legitimate
+  // gaps. What a ledger actually needs is an unambiguous order, so assert that
+  // every sequence is present, positive and unique within its month.
+  const badOrganicSequence = scalar(`
+    SELECT count(*) FROM (
+      SELECT DATE_TRUNC('month', entry_date) AS m,
+             count(*) AS n, min(posting_sequence) AS lo,
+             count(DISTINCT posting_sequence) AS distinct_n
+        FROM greentarget.journal_entries
+       WHERE source_type IS DISTINCT FROM 'legacy_import'
+       GROUP BY 1
+    ) x WHERE lo < 1 OR lo IS NULL OR distinct_n <> n`);
+  check(
+    badOrganicSequence === "0",
+    "posting_sequence is present, positive and unique within every organic month",
+    `${badOrganicSequence} month(s) broken`
+  );
 
   const cheques = scalar("SELECT count(*) FROM greentarget.journal_entry_lines WHERE cheque_reference IS NOT NULL");
   check(cheques === "1014", "all 1,014 per-line cheque / bank transaction references survived (named trap 5)", `found ${cheques}`);
@@ -534,14 +565,34 @@ console.log("\n-- 5. provenance and print order --------------------------------
 
 console.log("\n-- 6. Tien Hock isolation ------------------------------------------");
 {
+  // TH's structural tables are stable, so they are still asserted exactly: they
+  // are what a mis-scoped GT clone would actually corrupt.
   const thAccounts = scalar("SELECT count(*) FROM public.account_codes");
-  const thJournals = scalar("SELECT count(*) FROM public.journal_entries");
-  const thLines = scalar("SELECT count(*) FROM public.journal_entry_lines");
   const thNotes = scalar("SELECT count(*) FROM public.financial_statement_notes");
   check(thAccounts === "2827", "public.account_codes unmoved at 2,827", `found ${thAccounts}`);
-  check(thJournals === "8238", "public.journal_entries unmoved at 8,238", `found ${thJournals}`);
   check(thNotes === "33", "public.financial_statement_notes unmoved at 33", `found ${thNotes}`);
+
+  // TH's ledger is LIVE: ordinary Tien Hock keying grows it every day, so an
+  // equality baseline here only measures how long ago it was written. The
+  // isolation invariant is that GT work never REMOVES a TH journal.
+  const thJournals = Number(scalar("SELECT count(*) FROM public.journal_entries"));
+  const thLines = scalar("SELECT count(*) FROM public.journal_entry_lines");
+  check(
+    thJournals >= 8238,
+    "public.journal_entries never shrinks below the 8,238 G8 floor",
+    `found ${thJournals}`
+  );
   check(Number(thLines) > 0, "public.journal_entry_lines still populated", `found ${thLines}`);
+
+  // The sharp isolation test: 69 GT codes collide with TH codes by name, but a
+  // code that exists ONLY in GT can never legitimately appear in a TH line.
+  const gtOnlyInTh = scalar(`
+    SELECT count(*) FROM public.journal_entry_lines l
+     WHERE l.account_code IN (
+       SELECT g.code FROM greentarget.account_codes g
+        LEFT JOIN public.account_codes t ON t.code = g.code
+        WHERE t.code IS NULL)`);
+  check(gtOnlyInTh === "0", "no Tien Hock journal line references a GT-only account code", `found ${gtOnlyInTh}`);
 }
 
 console.log("");

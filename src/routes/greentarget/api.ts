@@ -14,6 +14,8 @@ import type {
   GreenTargetPaymentBatchResponse,
   GreenTargetPaymentMutationResponse,
   GreenTargetPaymentReferenceAvailability,
+  GreenTargetReceiptGroupDetails,
+  UpdateGreenTargetPaymentReferencesInput,
 } from "../../types/greenTargetTypes";
 
 export const greenTargetApi = {
@@ -266,6 +268,12 @@ export const greenTargetApi = {
         includeCancelled ? "?include_cancelled=true" : ""
       }`
     ),
+  getReceiptGroup: (
+    receiptId: number
+  ): Promise<GreenTargetReceiptGroupDetails> =>
+    api.get<GreenTargetReceiptGroupDetails>(
+      `/greentarget/api/payments/receipts/${receiptId}/group`
+    ),
   checkInternalPaymentRef: (
     ref: string,
     excludePaymentId?: number
@@ -288,10 +296,12 @@ export const greenTargetApi = {
       { reason }
     ),
   confirmPayment: (
-    paymentId: number
+    paymentId: number,
+    postingDate: string
   ): Promise<GreenTargetPaymentMutationResponse> =>
     api.put<GreenTargetPaymentMutationResponse>(
-      `/greentarget/api/payments/${paymentId}/confirm`
+      `/greentarget/api/payments/${paymentId}/confirm`,
+      { posting_date: postingDate }
     ),
   createPayment: (
     data: CreateGreenTargetPaymentInput
@@ -309,9 +319,7 @@ export const greenTargetApi = {
     ),
   updatePayment: (
     id: number,
-    data: Partial<
-      Pick<GreenTargetPayment, "internal_reference" | "payment_reference">
-    >
+    data: UpdateGreenTargetPaymentReferencesInput
   ): Promise<GreenTargetPaymentMutationResponse> =>
     api.put<GreenTargetPaymentMutationResponse>(
       `/greentarget/api/payments/${id}`,

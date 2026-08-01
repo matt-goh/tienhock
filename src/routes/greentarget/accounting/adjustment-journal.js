@@ -7,8 +7,8 @@
 //   credit_note:  DR revenue / CR receivable   (inverse of the S journal)
 //   debit_note:   DR receivable / CR revenue   (the S journal again)
 //   refund_note:  DR receivable / CR PBB_1     (inverse of the REC journal)
-// receivable = the original invoice's receivable account (approved debtor
-// child, else CD_SD). revenue = the revenue account the ORIGINAL INVOICE
+// receivable = the original invoice's snapshotted debtor child. revenue = the
+// revenue account the ORIGINAL INVOICE
 // actually posted to — its organic S journal first, then its imported legacy
 // journal (display_reference = invoice_number), else the sales resolution
 // rule. GT posts gross with no tax line, mirroring sales (no OUTPUT_TAX
@@ -17,6 +17,7 @@
 import { assertGreenTargetAccountingDateUnlocked } from "./posting-lock.js";
 import {
   resolveGTReceivableAccount,
+  resolveGTLegacyRevenueAccount,
   resolveGTRevenueAccount,
 } from "./sales-journal.js";
 import { GT_BANK_ACCOUNT } from "./payment-journal.js";
@@ -42,7 +43,7 @@ function formatDisplayReference(docId) {
  * first, then its imported legacy journal, else the rule-based resolution.
  *
  * @param {import("pg").PoolClient} client
- * @param {object} invoice The original greentarget.invoices row.
+ * @param {{invoice_id: number, invoice_number: string, customer_id?: number|null, revenue_account_code?: string|null}} invoice The original greentarget.invoices row.
  * @returns {Promise<string>}
  */
 async function resolveOriginalRevenueAccount(client, invoice) {
@@ -74,7 +75,10 @@ async function resolveOriginalRevenueAccount(client, invoice) {
     return imported.rows[0].account_code;
   }
 
-  return resolveGTRevenueAccount(client, invoice);
+  if (String(invoice.revenue_account_code || "").trim()) {
+    return resolveGTRevenueAccount(client, invoice);
+  }
+  return resolveGTLegacyRevenueAccount(client, invoice);
 }
 
 /**
@@ -107,9 +111,11 @@ export async function postGTAdjustmentJournalEntry(
     `${doc.type.replace("_", " ")} ${doc.id}`
   );
 
-  const receivableAccount = resolveGTReceivableAccount(
-    doc.customer_id ?? invoice.customer_id
-  );
+  const receivableAccount = await resolveGTReceivableAccount(client, {
+    invoice_id: invoice.invoice_id,
+    customer_id: doc.customer_id ?? invoice.customer_id,
+    debtor_account_code: invoice.debtor_account_code,
+  });
   const totalAmount = Number(doc.total_amount);
   const displayReference = formatDisplayReference(doc.id);
   const description = `${displayReference} - INV/NO : ${invoice.invoice_number} /${

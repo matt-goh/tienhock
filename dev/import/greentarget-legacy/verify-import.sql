@@ -278,7 +278,8 @@ SELECT months.as_of,
              AND headers.entry_date <= months.as_of
         ), 0))::bigint AS close_cents
   FROM months
- CROSS JOIN greentarget.account_opening_balances anchors;
+ CROSS JOIN greentarget.account_opening_balances anchors
+ WHERE anchors.as_of_date = DATE '2026-01-01';
 
 CREATE UNIQUE INDEX ON actual_monthly_closes (as_of, account_code);
 
@@ -604,7 +605,8 @@ BEGIN
   -- 9. Opening anchors ------------------------------------------------------
   SELECT COUNT(*), COALESCE(SUM(ROUND(amount * 100)), 0)::bigint
     INTO v_anchor_count, v_anchor_cents
-    FROM greentarget.account_opening_balances;
+    FROM greentarget.account_opening_balances
+   WHERE as_of_date = DATE '2026-01-01';
 
   -- Unlike Tien Hock, which shipped a named RM1,456,480.37 opening residue,
   -- Green Target's opening set must balance to EXACTLY zero once CD_SD carries
@@ -616,9 +618,10 @@ BEGIN
 
   IF EXISTS (
     SELECT 1 FROM greentarget.account_opening_balances
-     WHERE as_of_date <> DATE '2026-01-01'
+     WHERE created_by = 'legacy-import'
+       AND as_of_date <> DATE '2026-01-01'
   ) THEN
-    RAISE EXCEPTION 'An opening anchor is not dated 2026-01-01 (R4)';
+    RAISE EXCEPTION 'A legacy-import/G4 opening anchor is not dated 2026-01-01 (R4)';
   END IF;
 
   -- DEBTOR is a control parent and BTFS is the account the scans print
@@ -640,7 +643,8 @@ BEGIN
 
   IF (SELECT ROUND(amount * 100)::bigint
         FROM greentarget.account_opening_balances
-       WHERE account_code = 'CD_SD') <> 7641540 THEN
+       WHERE account_code = 'CD_SD'
+         AND as_of_date = DATE '2026-01-01') <> 7641540 THEN
     RAISE EXCEPTION 'CD_SD is not anchored at the evidenced 76,415.40';
   END IF;
 
@@ -656,7 +660,11 @@ BEGIN
     )
     SELECT 1
       FROM staged
-      FULL JOIN greentarget.account_opening_balances anchors USING (account_code)
+      FULL JOIN (
+        SELECT account_code, amount
+          FROM greentarget.account_opening_balances
+         WHERE as_of_date = DATE '2026-01-01'
+      ) anchors USING (account_code)
      WHERE staged.cents IS DISTINCT FROM ROUND(anchors.amount * 100)::bigint
   ) THEN
     RAISE EXCEPTION 'An opening anchor differs from its staged opening balance';
@@ -673,6 +681,7 @@ BEGIN
       JOIN greentarget.financial_statement_notes notes
         ON notes.code = accounts.fs_note
      WHERE notes.report_section = 'income_statement'
+       AND anchors.as_of_date = DATE '2026-01-01'
        AND accounts.updated_by = 'G3_CHART_LOAD'
        AND anchors.amount <> 0
   ) THEN
