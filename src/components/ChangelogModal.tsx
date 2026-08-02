@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-02",
+    ms: "Green Target: halaman Bayaran kini turut memautkan bayaran lama sebelum pemindahan ke catatan jurnalnya, termasuk kutipan tunai kaunter. Bayaran seperti ini tidak mempunyai jurnal sendiri kerana wangnya sudah berada di dalam lejar yang diimport, jadi pautan \"View Journal\" membawa anda ke catatan invois berkenaan dan ditanda \"Imported\". Bayaran sebelum Januari 2026 masih tiada catatan jurnal kerana ia terkandung di dalam baki pembukaan — tanda \"-\" kini menerangkan sebabnya apabila anda menuding padanya.",
+    en: "Green Target: the Payments page now also links older pre-changeover payments to their journal entry, including counter cash collections. These payments have no journal of their own because their money is already inside the imported ledger, so \"View Journal\" takes you to the invoice's own entry and is marked \"Imported\". Payments before January 2026 still have no journal entry because they sit inside the opening balances — hovering the \"-\" now explains why.",
+  },
+  {
+    date: "2026-08-02",
     ms: "Green Target: semasa merekod bayaran daripada borang invois atau Butiran Sewaan, nombor rujukan Green Target yang sudah digunakan kini boleh disambungkan kepada resit sedia ada selepas anda mengesahkannya. Tarikh, kaedah dan rujukan cek/transaksi resit itu dikekalkan, dan satu resit boleh meliputi beberapa invois. Klik nombor rujukan Green Target pada halaman Butiran Invois, Butiran Sewaan atau Sunting Sewaan untuk membuka tetingkap resit terus di halaman yang sama — tanpa meninggalkan halaman itu — dan tetingkap tersebut menunjukkan setiap invois yang dijelaskan oleh resit itu serta sewaan di belakang setiap satu.",
     en: "Green Target: when recording a payment from the invoice form or Rental Details, a Green Target reference that is already in use can now be joined to its existing receipt after you confirm it. The receipt's date, method and cheque/transaction reference stay unchanged, and one receipt can cover several invoices. Click the Green Target reference number on Invoice Details, Rental Details or Rental Edit to open the receipt window right there — without leaving the page you are on — showing every invoice that receipt settles and the rentals behind each one.",
   },

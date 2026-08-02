@@ -437,12 +437,28 @@ export default function (pool) {
                r.origin AS receipt_origin,
                r.journal_entry_id AS receipt_journal_entry_id,
                COALESCE(r.journal_entry_id, p.journal_entry_id) AS journal_entry_id,
+               imp.id AS imported_journal_entry_id,
+               imp.display_reference AS imported_journal_reference,
                i.invoice_number,
                c.name as customer_name
         FROM greentarget.payments p
         JOIN greentarget.receipts r ON r.id = p.receipt_id
         JOIN greentarget.invoices i ON p.invoice_id = i.invoice_id
         JOIN greentarget.customers c ON i.customer_id = c.customer_id
+        -- A pre-cutover receipt posts no journal of its own: its money is
+        -- already inside the imported Jan-Jun ledger, sitting in the CD_SD
+        -- counter-cash leg of the invoice's own '#/#' journal. Resolve that
+        -- journal so those rows still link to where the collection landed
+        -- (the GT analogue of Tien Hock's auto-collection -> invoice journal
+        -- fallback). Only the counter/cash family qualifies; a credit
+        -- invoice's journal is the sale, not the collection.
+        LEFT JOIN greentarget.journal_entries imp
+          ON COALESCE(r.journal_entry_id, p.journal_entry_id) IS NULL
+         AND r.origin = 'legacy_operational'
+         AND r.status = 'posted'
+         AND imp.source_type = 'legacy_import'
+         AND imp.legacy_entry_type = '#/#'
+         AND imp.display_reference = i.invoice_number
       `;
 
       const queryParams = [];
@@ -600,6 +616,9 @@ export default function (pool) {
                 c.name AS customer_name,
                 p.amount_paid,
                 p.status AS payment_status,
+                imp.id AS imported_journal_entry_id,
+                imp.display_reference AS imported_journal_reference,
+                imp.entry_date AS imported_journal_entry_date,
                 -- A payment's rentals are always DERIVED through its invoice
                 -- (invoice_rentals), never denormalised onto the payment. Kept
                 -- as a subquery so the statement stays one row per allocation.
@@ -632,6 +651,16 @@ export default function (pool) {
              ON i.invoice_id = p.invoice_id
            LEFT JOIN greentarget.customers c
              ON c.customer_id = i.customer_id
+           -- Pre-cutover receipts own no journal; their collection lives in
+           -- the CD_SD leg of the invoice's imported '#/#' journal. See the
+           -- list endpoint above for the full reasoning.
+           LEFT JOIN greentarget.journal_entries imp
+             ON r.journal_entry_id IS NULL
+            AND r.origin = 'legacy_operational'
+            AND r.status = 'posted'
+            AND imp.source_type = 'legacy_import'
+            AND imp.legacy_entry_type = '#/#'
+            AND imp.display_reference = i.invoice_number
           WHERE r.id = $1
           ORDER BY p.payment_id`,
         [receiptId]
@@ -663,6 +692,13 @@ export default function (pool) {
           amount_paid: Number(allocation.amount_paid),
           status: allocation.payment_status || "active",
           rentals: allocation.invoice_rentals || [],
+          imported_journal: allocation.imported_journal_entry_id
+            ? {
+                journal_entry_id: Number(allocation.imported_journal_entry_id),
+                reference_no: allocation.imported_journal_reference,
+                entry_date: allocation.imported_journal_entry_date,
+              }
+            : null,
         }));
 
       res.json({
