@@ -58,6 +58,7 @@ import { pdf, Document } from "@react-pdf/renderer";
 import { generateQRDataUrl } from "../../../utils/invoice/einvoice/generateQRCode";
 import GTInvoiceAdjustmentDocsSection from "../../../components/AdjustmentDocs/GTInvoiceAdjustmentDocsSection";
 import { formatLocationDisplay } from "../../../utils/greenTarget/formatLocationDisplay";
+import GreenTargetReceiptDetailsDialog from "../../../components/GreenTarget/GreenTargetReceiptDetailsDialog";
 import type {
   CreateGreenTargetPaymentInput,
   GreenTargetPayment,
@@ -66,6 +67,7 @@ import type {
 interface Payment {
   payment_id: number;
   invoice_id: number;
+  receipt_id?: number | null;
   payment_date: string;
   amount_paid: number;
   payment_method: string;
@@ -236,6 +238,9 @@ const InvoiceDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [invoice, setInvoice] = useState<InvoiceGT | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const location = useLocation();
@@ -3068,7 +3073,24 @@ const InvoiceDetailsPage: React.FC = () => {
                           </div>
                         ) : (
                           <div className="flex items-center space-x-2">
-                            <span>{payment.internal_reference || "-"}</span>
+                            {payment.receipt_id ? (
+                              <button
+                                type="button"
+                                onClick={(): void =>
+                                  setSelectedReceiptId(
+                                    payment.receipt_id ?? null
+                                  )
+                                }
+                                className="text-sky-600 hover:underline dark:text-sky-400"
+                                title={`View receipt ${
+                                  payment.internal_reference || ""
+                                } and every invoice it settles`}
+                              >
+                                {payment.internal_reference || "View receipt"}
+                              </button>
+                            ) : (
+                              <span>{payment.internal_reference || "-"}</span>
+                            )}
                             {payment.status !== "cancelled" && (
                               <button
                                 onClick={() => handleEditInternalRef(payment)}
@@ -3450,6 +3472,17 @@ const InvoiceDetailsPage: React.FC = () => {
           isSyncingCancellation ? "Processing..." : "Cancel e-Invoice & Update"
         }
         variant="danger"
+      />
+
+      {/* One receipt can settle several invoices, so the reference opens the
+          whole receipt here rather than navigating away from this invoice. */}
+      <GreenTargetReceiptDetailsDialog
+        receiptId={selectedReceiptId}
+        isOpen={selectedReceiptId !== null}
+        onClose={(): void => setSelectedReceiptId(null)}
+        onChanged={async (): Promise<void> => {
+          if (id) await fetchInvoiceDetails(parseInt(id));
+        }}
       />
 
       {/* PDF Handlers (Rendered conditionally) */}

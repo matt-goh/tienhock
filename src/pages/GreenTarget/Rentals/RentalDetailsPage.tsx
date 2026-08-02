@@ -7,7 +7,7 @@ import React, {
   useState,
 } from "react";
 import { format } from "date-fns";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   IconChevronDown,
   IconFileInvoice,
@@ -25,6 +25,7 @@ import toast from "react-hot-toast";
 import BackButton from "../../../components/BackButton";
 import Button from "../../../components/Button";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
+import GreenTargetReceiptDetailsDialog from "../../../components/GreenTarget/GreenTargetReceiptDetailsDialog";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import GTInvoiceAccountFields, {
@@ -196,6 +197,9 @@ const RentalDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
 
   const [rental, setRental] = useState<RentalDetails | null>(null);
+  const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(
+    null
+  );
   const [invoices, setInvoices] = useState<LinkedInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -904,13 +908,21 @@ const RentalDetailsPage: React.FC = () => {
                                 </td>
                                 <td className="py-1.5 pr-3 text-default-600 dark:text-gray-400">
                                   {payment.receipt_id ? (
-                                    <Link
-                                      to={`/greentarget/payments?receipt=${payment.receipt_id}`}
+                                    <button
+                                      type="button"
+                                      onClick={(): void =>
+                                        setSelectedReceiptId(
+                                          payment.receipt_id
+                                        )
+                                      }
                                       className="text-sky-600 hover:underline dark:text-sky-400"
+                                      title={`View receipt ${
+                                        payment.internal_reference || ""
+                                      } and every invoice it settles`}
                                     >
                                       {payment.internal_reference ||
                                         "View receipt"}
-                                    </Link>
+                                    </button>
                                   ) : (
                                     payment.internal_reference || "-"
                                   )}
@@ -940,6 +952,15 @@ const RentalDetailsPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* One receipt can settle several invoices, so the reference opens the
+          whole receipt here rather than navigating away from this rental. */}
+      <GreenTargetReceiptDetailsDialog
+        receiptId={selectedReceiptId}
+        isOpen={selectedReceiptId !== null}
+        onClose={(): void => setSelectedReceiptId(null)}
+        onChanged={fetchDetails}
+      />
 
       {/* Delete confirmation */}
       <ConfirmationDialog
