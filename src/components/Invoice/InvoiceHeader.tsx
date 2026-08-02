@@ -2,6 +2,7 @@
 import React from "react";
 import { ExtendedInvoiceData, Customer } from "../../types/types"; // Use updated types
 import { FormInput, FormListbox } from "../FormComponents"; // Reusable components
+import PillSelect, { PillSelectOption } from "../PillSelect";
 import { CustomerCombobox } from "./CustomerCombobox"; // Reusable component
 import {
   formatDateForInput,
@@ -13,6 +14,14 @@ interface SelectOption {
   id: string;
   name: string;
 }
+
+// "I"/"C" are the invoice-number prefixes; they map to INVOICE/CASH.
+type InvoiceTypeCode = "I" | "C";
+
+const INVOICE_TYPE_OPTIONS: ReadonlyArray<PillSelectOption<InvoiceTypeCode>> = [
+  { value: "I", label: "Invoice" },
+  { value: "C", label: "Cash" },
+];
 
 interface InvoiceHeaderProps {
   invoice: ExtendedInvoiceData;
@@ -123,25 +132,25 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
         </div>
 
         {/* Type */}
-        <FormListbox
-          name="type"
-          label="Type"
-          // Find the name corresponding to the current paymenttype ID
-          value={invoice.paymenttype === "CASH" ? "C" : "I"} // Pass the ID value
-          onChange={(value) => {
-            const newType = value === "C" ? "CASH" : "INVOICE";
-            onInputChange("paymenttype", newType);
-            if (invoice.id) {
-              onInputChange("id", invoice.id);
-            }
-          }}
-          options={[
-            // Ensure options have id/name matching FormListbox expectations
-            { id: "I", name: "Invoice" },
-            { id: "C", name: "Cash" },
-          ]}
-          disabled={readOnly} // Use readOnly
-        />
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+            Type
+          </label>
+          <PillSelect<InvoiceTypeCode>
+            value={invoice.paymenttype === "CASH" ? "C" : "I"}
+            onChange={(value: InvoiceTypeCode) => {
+              const newType = value === "C" ? "CASH" : "INVOICE";
+              onInputChange("paymenttype", newType);
+              if (invoice.id) {
+                onInputChange("id", invoice.id);
+              }
+            }}
+            options={INVOICE_TYPE_OPTIONS}
+            disabled={readOnly} // Use readOnly
+            ariaLabel="Invoice type"
+            className="min-h-[38px]"
+          />
+        </div>
 
         {/* Date */}
         <FormInput

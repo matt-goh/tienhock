@@ -1,6 +1,7 @@
 import React from "react";
 import Checkbox from "../Checkbox";
-import { FormInput, FormListbox } from "../FormComponents";
+import { FormInput } from "../FormComponents";
+import PillSelect, { PillSelectOption } from "../PillSelect";
 
 export type SupplierPaymentMethod =
   | "cash"
@@ -43,16 +44,20 @@ interface SupplierPaymentInlineSectionProps {
   footer?: React.ReactNode;
 }
 
-const paymentMethodOptions: { id: SupplierPaymentMethod; name: string }[] = [
-  { id: "bank_transfer", name: "Bank Transfer" },
-  { id: "cheque", name: "Cheque" },
-  { id: "cash", name: "Cash" },
-  { id: "online", name: "Online" },
+const PAYMENT_METHOD_OPTIONS: ReadonlyArray<
+  PillSelectOption<SupplierPaymentMethod>
+> = [
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "cheque", label: "Cheque" },
+  { value: "cash", label: "Cash" },
+  { value: "online", label: "Online" },
 ];
 
-const bankAccountOptions: { id: SupplierBankAccount; name: string }[] = [
-  { id: "BANK_PBB", name: "Public Bank" },
-  { id: "BANK_ABB", name: "Alliance Bank" },
+const BANK_ACCOUNT_OPTIONS: ReadonlyArray<
+  PillSelectOption<SupplierBankAccount>
+> = [
+  { value: "BANK_PBB", label: "Public Bank" },
+  { value: "BANK_ABB", label: "Alliance Bank" },
 ];
 
 const roundMoney = (value: number): number => Math.round(value * 100) / 100;
@@ -224,29 +229,37 @@ const SupplierPaymentInlineSection: React.FC<SupplierPaymentInlineSectionProps> 
               disabled={disabled}
               required
             />
-            <FormListbox
-              name="supplier_payment_method"
-              label="Payment Method"
-              value={draft.payment_method}
-              onChange={(value: string) =>
-                updateDraft("payment_method", value as SupplierPaymentMethod)
-              }
-              options={paymentMethodOptions}
-              disabled={disabled}
-              required
-            />
-            {draft.payment_method !== "cash" && (
-              <FormListbox
-                name="supplier_payment_bank_account"
-                label="Bank Account"
-                value={draft.bank_account}
-                onChange={(value: string) =>
-                  updateDraft("bank_account", value as SupplierBankAccount)
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                Payment Method <span className="text-red-500">*</span>
+              </label>
+              <PillSelect<SupplierPaymentMethod>
+                value={draft.payment_method}
+                onChange={(value: SupplierPaymentMethod) =>
+                  updateDraft("payment_method", value)
                 }
-                options={bankAccountOptions}
+                options={PAYMENT_METHOD_OPTIONS}
                 disabled={disabled}
-                required
+                ariaLabel="Payment method"
+                className="min-h-[38px]"
               />
+            </div>
+            {draft.payment_method !== "cash" && (
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                  Bank Account <span className="text-red-500">*</span>
+                </label>
+                <PillSelect<SupplierBankAccount>
+                  value={draft.bank_account}
+                  onChange={(value: SupplierBankAccount) =>
+                    updateDraft("bank_account", value)
+                  }
+                  options={BANK_ACCOUNT_OPTIONS}
+                  disabled={disabled}
+                  ariaLabel="Bank account"
+                  className="min-h-[38px]"
+                />
+              </div>
             )}
             <FormInput
               name="supplier_payment_reference"

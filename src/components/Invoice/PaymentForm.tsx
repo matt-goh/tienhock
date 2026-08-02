@@ -9,7 +9,8 @@ import {
 } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import Checkbox from "../../components/Checkbox";
-import { FormInput, FormListbox } from "../../components/FormComponents";
+import { FormInput } from "../../components/FormComponents";
+import PillSelect, { PillSelectOption } from "../../components/PillSelect";
 import { Payment, InvoiceData } from "../../types/types";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
@@ -23,6 +24,20 @@ export type RecordablePaymentMethod = Exclude<
   Payment["payment_method"],
   "contra" | "overpayment"
 >;
+
+const PAYMENT_METHOD_OPTIONS: ReadonlyArray<
+  PillSelectOption<RecordablePaymentMethod>
+> = [
+  { value: "cash", label: "Cash" },
+  { value: "cheque", label: "Cheque" },
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "online", label: "Online" },
+];
+
+const BANK_ACCOUNT_OPTIONS: ReadonlyArray<PillSelectOption<string>> = [
+  { value: "BANK_PBB", label: "Public Bank" },
+  { value: "BANK_ABB", label: "Alliance Bank" },
+];
 
 export interface PaymentFormInitialValues {
   payment_date?: string;
@@ -280,18 +295,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     bank_account: initialValues?.bank_account ?? "BANK_PBB",
     notes: initialValues?.notes ?? "",
   }));
-
-  const paymentMethodOptions = [
-    { id: "cash", name: "Cash" },
-    { id: "cheque", name: "Cheque" },
-    { id: "bank_transfer", name: "Bank Transfer" },
-    { id: "online", name: "Online" },
-  ];
-
-  const bankAccountOptions = [
-    { id: "BANK_PBB", name: "Public Bank" },
-    { id: "BANK_ABB", name: "Alliance Bank" },
-  ];
 
   const fetchUnpaidInvoices = useCallback(async () => {
     const requestId: number = invoiceRequestIdRef.current + 1;
@@ -1025,33 +1028,41 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                       triggerClassName="min-w-0 flex-1 justify-between"
                     />
                   </div>
-                  <FormListbox
-                    name="payment_method"
-                    label="Payment Method"
-                    value={groupPaymentMethod}
-                    onChange={(value: string | number) =>
-                      setFormData({
-                        ...formData,
-                        payment_method: value as RecordablePaymentMethod,
-                      })
-                    }
-                    options={paymentMethodOptions}
-                    disabled={isSubmitting || bankingFieldsLocked}
-                  />
-                  {groupPaymentMethod !== "cash" && (
-                    <FormListbox
-                      name="bank_account"
-                      label="Deposit To"
-                      value={groupBankAccount}
-                      onChange={(value: string | number) =>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">
+                      Payment Method
+                    </label>
+                    <PillSelect<RecordablePaymentMethod>
+                      value={groupPaymentMethod}
+                      onChange={(value: RecordablePaymentMethod) =>
                         setFormData({
                           ...formData,
-                          bank_account: String(value),
+                          payment_method: value,
                         })
                       }
-                      options={bankAccountOptions}
+                      options={PAYMENT_METHOD_OPTIONS}
                       disabled={isSubmitting || bankingFieldsLocked}
+                      ariaLabel="Payment method"
                     />
+                  </div>
+                  {groupPaymentMethod !== "cash" && (
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">
+                        Deposit To
+                      </label>
+                      <PillSelect
+                        value={groupBankAccount}
+                        onChange={(value: string) =>
+                          setFormData({
+                            ...formData,
+                            bank_account: value,
+                          })
+                        }
+                        options={BANK_ACCOUNT_OPTIONS}
+                        disabled={isSubmitting || bankingFieldsLocked}
+                        ariaLabel="Deposit to"
+                      />
+                    </div>
                   )}
                   <FormInput
                     name="payment_reference"

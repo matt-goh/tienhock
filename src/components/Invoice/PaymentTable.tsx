@@ -12,7 +12,7 @@ import TimeNavigator, {
   type TimeRange,
 } from "../../components/TimeNavigator";
 import { printCashReceiptVoucherPDF } from "../../utils/accounting/CashReceiptVoucherPDF";
-import { FormListbox } from "../../components/FormComponents";
+import PillSelect, { PillSelectOption } from "../../components/PillSelect";
 import {
   IconCircleCheck,
   IconBan,
@@ -32,6 +32,11 @@ import {
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import { useCustomersCache } from "../../utils/catalogue/useCustomerCache";
+
+const BANK_ACCOUNT_OPTIONS: ReadonlyArray<PillSelectOption<string>> = [
+  { value: "BANK_PBB", label: "Public Bank" },
+  { value: "BANK_ABB", label: "Alliance Bank" },
+];
 
 interface PaymentTableProps {
   payments: Payment[];
@@ -915,18 +920,17 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                 </div>
               ) : usesTienHockReceiptAccounting ? (
                 <div>
-                  <FormListbox
-                    name="bank_account"
-                    label="Deposit To"
+                  <label className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300">
+                    Deposit To
+                  </label>
+                  <PillSelect
                     value={selectedBankAccount}
                     onChange={(value: string): void =>
                       setSelectedBankAccount(value)
                     }
-                    options={[
-                      { id: "BANK_PBB", name: "Public Bank" },
-                      { id: "BANK_ABB", name: "Alliance Bank" },
-                    ]}
+                    options={BANK_ACCOUNT_OPTIONS}
                     disabled={confirmingPaymentId !== null}
+                    ariaLabel="Deposit to"
                   />
                   <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
                     Choose the bank account for this older pending payment.

@@ -7,7 +7,8 @@ import BackButton from "../../../components/BackButton";
 import { useSmartBack } from "../../../hooks/useSmartBack";
 import Button from "../../../components/Button";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
-import { FormInput, FormListbox } from "../../../components/FormComponents";
+import { FormInput } from "../../../components/FormComponents";
+import PillSelect, { PillSelectOption } from "../../../components/PillSelect";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { api } from "../../../routes/utils/api";
 
@@ -46,16 +47,16 @@ interface SupplierPaymentDetail {
   supplier_name: string;
 }
 
-const paymentMethodOptions = [
-  { id: "bank_transfer", name: "Bank Transfer" },
-  { id: "cheque", name: "Cheque" },
-  { id: "cash", name: "Cash" },
-  { id: "online", name: "Online" },
+const PAYMENT_METHOD_OPTIONS: ReadonlyArray<PillSelectOption<string>> = [
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "cheque", label: "Cheque" },
+  { value: "cash", label: "Cash" },
+  { value: "online", label: "Online" },
 ];
 
-const bankAccountOptions = [
-  { id: "BANK_PBB", name: "Public Bank" },
-  { id: "BANK_ABB", name: "Alliance Bank" },
+const BANK_ACCOUNT_OPTIONS: ReadonlyArray<PillSelectOption<string>> = [
+  { value: "BANK_PBB", label: "Public Bank" },
+  { value: "BANK_ABB", label: "Alliance Bank" },
 ];
 
 const VALID_SOURCES: InvoiceSource[] = [
@@ -506,27 +507,33 @@ const SupplierPaymentFormPage: React.FC = () => {
             disabled={!canEdit}
             required
           />
-          <FormListbox
-            name="payment_method"
-            label="Payment Method"
-            value={formData.payment_method}
-            onChange={(value: string) =>
-              updateField("payment_method", value)
-            }
-            options={paymentMethodOptions}
-            disabled={!canEdit}
-            required
-          />
-          {formData.payment_method !== "cash" && (
-            <FormListbox
-              name="bank_account"
-              label="Bank Account"
-              value={formData.bank_account}
-              onChange={(value: string) => updateField("bank_account", value)}
-              options={bankAccountOptions}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+              Payment Method <span className="text-red-500">*</span>
+            </label>
+            <PillSelect<string>
+              value={formData.payment_method}
+              onChange={(value: string) => updateField("payment_method", value)}
+              options={PAYMENT_METHOD_OPTIONS}
               disabled={!canEdit}
-              required
+              ariaLabel="Payment method"
+              className="min-h-[38px]"
             />
+          </div>
+          {formData.payment_method !== "cash" && (
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                Bank Account <span className="text-red-500">*</span>
+              </label>
+              <PillSelect<string>
+                value={formData.bank_account}
+                onChange={(value: string) => updateField("bank_account", value)}
+                options={BANK_ACCOUNT_OPTIONS}
+                disabled={!canEdit}
+                ariaLabel="Bank account"
+                className="min-h-[38px]"
+              />
+            </div>
           )}
           <FormInput
             name="payment_reference"
