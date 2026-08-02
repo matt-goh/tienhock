@@ -7,6 +7,11 @@ import React, {
   useRef,
   useState,
 } from "react";
+import {
+  IconAlertTriangle,
+  IconCheck,
+  IconLoader2,
+} from "@tabler/icons-react";
 import Checkbox from "../Checkbox";
 import { FormCombobox, SelectOption } from "../FormComponents";
 import { api } from "../../routes/utils/api";
@@ -23,6 +28,7 @@ export const GT_DEFAULT_REVENUE_ACCOUNT: GTRevenueAccountCode = "TGA";
 
 const DEBTOR_SUBLEDGER_ENDPOINT =
   "/greentarget/api/account-codes/debtor-subledger";
+const DEBTOR_AVAILABILITY_ENDPOINT = `${DEBTOR_SUBLEDGER_ENDPOINT}/availability`;
 const DEBTOR_SEARCH_LIMIT = 50;
 const IDENTITY_CODE_PREFIX = "CD-";
 const MAX_IDENTITY_CODE_LENGTH = 50;
@@ -77,11 +83,51 @@ const mergeIdentities = (
   return Array.from(byCode.values());
 };
 
+interface DebtorCodeAvailabilityResponse {
+  code: string;
+  available: boolean;
+  reason?: "taken" | "invalid";
+  message?: string;
+  taken_by?: string;
+  source?: "identity" | "account";
+}
+
+/**
+ * `unknown` means the check itself could not run. It never blocks the save --
+ * the POST is the real guard, so a check outage must not stop invoicing.
+ */
 type CodeAvailability =
   | { state: "idle" }
   | { state: "checking" }
   | { state: "available" }
-  | { state: "taken"; takenBy: string };
+  | { state: "taken"; takenBy: string; source: "identity" | "account" }
+  | { state: "invalid"; message: string }
+  | { state: "unknown" };
+
+const readAvailability = (
+  response: DebtorCodeAvailabilityResponse
+): CodeAvailability => {
+  if (response.available) return { state: "available" };
+  if (response.reason === "invalid") {
+    return {
+      state: "invalid",
+      message: response.message || "Kod identiti ini tidak sah.",
+    };
+  }
+  return {
+    state: "taken",
+    takenBy: response.taken_by || "identiti sedia ada",
+    source: response.source === "account" ? "account" : "identity",
+  };
+};
+
+const takenMessage = (
+  code: string,
+  availability: Extract<CodeAvailability, { state: "taken" }>
+): string =>
+  `${code} sudah digunakan oleh ${availability.takenBy}${
+    availability.source === "account" ? " (kod akaun sedia ada)" : ""
+  }. Sila ubah kod sebelum menyimpan.`;
 
 /**
  * Imperative surface the invoice screens use at save time. A staged identity is
@@ -155,6 +201,8 @@ const GTInvoiceAccountFields = forwardRef<
   const [codeAvailability, setCodeAvailability] = useState<CodeAvailability>({
     state: "idle",
   });
+  // Bumped to force a re-check of an unchanged code after a rejected save.
+  const [availabilityNonce, setAvailabilityNonce] = useState<number>(0);
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState<boolean>(false);
 
@@ -284,12 +332,21 @@ const GTInvoiceAccountFields = forwardRef<
     };
   }, [dateIssued, debtorAccountCode]);
 
-  // Advisory collision check on the prefilled code. The server still rejects a
-  // duplicate, but the user should see it before pressing save.
+  // Collision check on the staged code, answered by the exact-match endpoint
+  // that applies the same rules the POST enforces. Results are cached per code
+  // and only fetched after the user stops typing, so editing a code costs one
+  // request and re-typing a code already seen costs none.
+  const availabilityCacheRef = useRef<Map<string, CodeAvailability>>(new Map());
   useEffect((): (() => void) => {
     const code = newCode.trim().toUpperCase();
     if (!isCreatingNewIdentity || !code) {
       setCodeAvailability({ state: "idle" });
+      return (): void => undefined;
+    }
+
+    const cached = availabilityCacheRef.current.get(code);
+    if (cached) {
+      setCodeAvailability(cached);
       return (): void => undefined;
     }
 
@@ -298,34 +355,26 @@ const GTInvoiceAccountFields = forwardRef<
     const timer = window.setTimeout((): void => {
       const checkCode = async (): Promise<void> => {
         try {
-          const params = new URLSearchParams({ search: code, limit: "20" });
-          const rows = await api.get<GreenTargetDebtorSubledgerIdentity[]>(
-            `${DEBTOR_SUBLEDGER_ENDPOINT}?${params.toString()}`
+          const params = new URLSearchParams({ code });
+          const response = await api.get<DebtorCodeAvailabilityResponse>(
+            `${DEBTOR_AVAILABILITY_ENDPOINT}?${params.toString()}`
           );
-          if (!isCurrent) return;
-          const clash =
-            rows.find(
-              (row: GreenTargetDebtorSubledgerIdentity): boolean =>
-                row.code.toUpperCase() === code
-            ) || null;
-          setCodeAvailability(
-            clash
-              ? { state: "taken", takenBy: clash.description }
-              : { state: "available" }
-          );
+          const availability = readAvailability(response);
+          availabilityCacheRef.current.set(code, availability);
+          if (isCurrent) setCodeAvailability(availability);
         } catch (checkError: unknown) {
           console.error("Failed to check GT identity code:", checkError);
-          if (isCurrent) setCodeAvailability({ state: "idle" });
+          if (isCurrent) setCodeAvailability({ state: "unknown" });
         }
       };
       void checkCode();
-    }, 300);
+    }, 350);
 
     return (): void => {
       isCurrent = false;
       window.clearTimeout(timer);
     };
-  }, [isCreatingNewIdentity, newCode]);
+  }, [availabilityNonce, isCreatingNewIdentity, newCode]);
 
   const identities: GreenTargetDebtorSubledgerIdentity[] = useMemo(
     (): GreenTargetDebtorSubledgerIdentity[] =>
@@ -395,6 +444,18 @@ const GTInvoiceAccountFields = forwardRef<
       setCreateError(message);
       throw new Error(message);
     }
+    // A known clash is refused here so the save never spends a round trip on a
+    // code the user was already told is unusable. `checking`/`unknown` fall
+    // through: the POST is transactional and reports the duplicate itself.
+    if (codeAvailability.state === "taken") {
+      const message = takenMessage(code, codeAvailability);
+      setCreateError(message);
+      throw new Error(message);
+    }
+    if (codeAvailability.state === "invalid") {
+      setCreateError(codeAvailability.message);
+      throw new Error(codeAvailability.message);
+    }
 
     setIsCreating(true);
     setCreateError(null);
@@ -407,6 +468,11 @@ const GTInvoiceAccountFields = forwardRef<
         effective_from: dateIssued,
       });
       const identity = response.debtorAccount;
+      availabilityCacheRef.current.set(identity.code.toUpperCase(), {
+        state: "taken",
+        takenBy: identity.description,
+        source: "identity",
+      });
       setSelectedIdentity(identity);
       setSelectedIdentityUnavailable(false);
       setSearchResults((current: GreenTargetDebtorSubledgerIdentity[]) =>
@@ -418,11 +484,17 @@ const GTInvoiceAccountFields = forwardRef<
     } catch (creationError: unknown) {
       const message = errorMessage(creationError);
       setCreateError(message);
+      // The server saw something the cached check did not (a code taken since,
+      // or a rule the preview cannot model). Drop the stale answer and re-check
+      // so the field shows the reason next to the input, not only in a toast.
+      availabilityCacheRef.current.delete(code);
+      setAvailabilityNonce((current: number): number => current + 1);
       throw new Error(message);
     } finally {
       setIsCreating(false);
     }
   }, [
+    codeAvailability,
     dateIssued,
     debtorAccountCode,
     isCreatingNewIdentity,
@@ -443,6 +515,58 @@ const GTInvoiceAccountFields = forwardRef<
     (selectedIdentity !== null && !selectedIdentity.is_selectable);
 
   const previewCode: string = newCode.trim().toUpperCase();
+  const codeRejected: boolean =
+    codeAvailability.state === "taken" || codeAvailability.state === "invalid";
+
+  const codeStatus: React.ReactNode = ((): React.ReactNode => {
+    switch (codeAvailability.state) {
+      case "checking":
+        return (
+          <span className="inline-flex items-center gap-1.5 text-default-500 dark:text-gray-400">
+            <IconLoader2 size={14} className="animate-spin" />
+            Menyemak sama ada {previewCode} sudah digunakan...
+          </span>
+        );
+      case "taken":
+        return (
+          <span className="inline-flex items-start gap-1.5 text-rose-700 dark:text-rose-300">
+            <IconAlertTriangle size={14} className="mt-px shrink-0" />
+            {takenMessage(previewCode, codeAvailability)}
+          </span>
+        );
+      case "invalid":
+        return (
+          <span className="inline-flex items-start gap-1.5 text-rose-700 dark:text-rose-300">
+            <IconAlertTriangle size={14} className="mt-px shrink-0" />
+            {codeAvailability.message}
+          </span>
+        );
+      case "available":
+        return (
+          <span className="inline-flex items-start gap-1.5 text-emerald-700 dark:text-emerald-300">
+            <IconCheck size={14} className="mt-px shrink-0" />
+            {previewCode} belum digunakan. Identiti ini akan dicipta semasa
+            menyimpan, berkuat kuasa {dateIssued || "tarikh invois"}, dan masuk
+            ke CD_SD dalam lejar am.
+          </span>
+        );
+      case "unknown":
+        return (
+          <span className="inline-flex items-start gap-1.5 text-amber-700 dark:text-amber-300">
+            <IconAlertTriangle size={14} className="mt-px shrink-0" />
+            {previewCode} tidak dapat disemak sekarang. Sistem akan menyemak
+            sekali lagi semasa menyimpan.
+          </span>
+        );
+      default:
+        return (
+          <span className="text-default-600 dark:text-gray-300">
+            Identiti ini akan dicipta semasa menyimpan, berkuat kuasa{" "}
+            {dateIssued || "tarikh invois"}, dan masuk ke CD_SD dalam lejar am.
+          </span>
+        );
+    }
+  })();
 
   const body: React.ReactNode = (
     <div className="space-y-4">
@@ -480,7 +604,13 @@ const GTInvoiceAccountFields = forwardRef<
                 maxLength={MAX_IDENTITY_CODE_LENGTH}
                 disabled={identityLocked || isCreating}
                 placeholder="cth. CD-PELANGGANBAHARU"
-                className="mt-1 block w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100"
+                aria-invalid={codeRejected}
+                aria-describedby="gt-new-debtor-code-status"
+                className={`mt-1 block w-full rounded-lg border bg-white px-3 py-2 text-sm text-default-900 focus:outline-none focus:ring-1 disabled:opacity-60 dark:bg-gray-900/50 dark:text-gray-100 ${
+                  codeRejected
+                    ? "border-rose-400 focus:border-rose-500 focus:ring-rose-500 dark:border-rose-700"
+                    : "border-default-300 focus:border-sky-500 focus:ring-sky-500 dark:border-gray-600"
+                }`}
               />
             </div>
             <div>
@@ -504,23 +634,15 @@ const GTInvoiceAccountFields = forwardRef<
             </div>
           </div>
 
-          <div className="min-h-5 text-xs">
-            {codeAvailability.state === "taken" ? (
-              <span className="text-rose-700 dark:text-rose-300">
-                {previewCode} sudah digunakan oleh {codeAvailability.takenBy}.
-                Sila ubah kod sebelum menyimpan.
-              </span>
-            ) : (
-              <span className="text-default-600 dark:text-gray-300">
-                {previewCode || "Identiti ini"} akan dicipta semasa menyimpan,
-                berkuat kuasa {dateIssued || "tarikh invois"}, dan masuk ke
-                CD_SD dalam lejar am.
-                {codeAvailability.state === "available" && " Kod ini kosong."}
-              </span>
-            )}
+          <div
+            id="gt-new-debtor-code-status"
+            aria-live="polite"
+            className="min-h-5 text-xs"
+          >
+            {codeStatus}
           </div>
 
-          {createError && (
+          {createError && !codeRejected && (
             <p className="text-sm text-rose-700 dark:text-rose-300">
               {createError}
             </p>

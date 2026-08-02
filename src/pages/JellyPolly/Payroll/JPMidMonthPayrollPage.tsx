@@ -24,11 +24,10 @@ import {
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
-import {
-  FormCombobox,
-  FormInput,
-  FormListbox,
-} from "../../../components/FormComponents";
+import { FormCombobox, FormInput } from "../../../components/FormComponents";
+import PillSelect, {
+  PillSelectOption,
+} from "../../../components/PillSelect";
 import TimeNavigator from "../../../components/TimeNavigator";
 import { api } from "../../../routes/utils/api";
 import { getMonthName } from "../../../utils/payroll/payrollUtils";
@@ -92,10 +91,14 @@ interface JPPayrollEmployee {
   employee_name: string;
 }
 
-const PAYMENT_METHOD_OPTIONS = [
-  { id: "Cash", name: "Cash" },
-  { id: "Bank", name: "Bank" },
-  { id: "Cheque", name: "Cheque" },
+type MidMonthPaymentMethod = "Cash" | "Bank" | "Cheque";
+
+const PAYMENT_METHOD_OPTIONS: ReadonlyArray<
+  PillSelectOption<MidMonthPaymentMethod>
+> = [
+  { value: "Cash", label: "Cash" },
+  { value: "Bank", label: "Bank" },
+  { value: "Cheque", label: "Cheque" },
 ];
 
 interface JPMidMonthPayrollModalProps {
@@ -265,15 +268,20 @@ const JPMidMonthPayrollModal: React.FC<JPMidMonthPayrollModalProps> = ({
                   />
 
                   {/* Payment Method */}
-                  <FormListbox
-                    name="paymentMethod"
-                    label="Payment Method"
-                    value={paymentMethod}
-                    onChange={(value) =>
-                      setPaymentMethod(value as "Cash" | "Bank" | "Cheque")
-                    }
-                    options={PAYMENT_METHOD_OPTIONS}
-                  />
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                      Payment Method
+                    </label>
+                    <PillSelect<MidMonthPaymentMethod>
+                      value={paymentMethod}
+                      onChange={(value: MidMonthPaymentMethod) =>
+                        setPaymentMethod(value)
+                      }
+                      options={PAYMENT_METHOD_OPTIONS}
+                      ariaLabel="Payment method"
+                      size="md"
+                    />
+                  </div>
                 </div>
 
                 {/* Modal Actions */}

@@ -1,10 +1,16 @@
 // src/components/Invoice/PaymentForm.tsx
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { format } from "date-fns";
-import { IconX, IconTrash } from "@tabler/icons-react";
+import {
+  IconAlertTriangle,
+  IconLoader2,
+  IconTrash,
+  IconX,
+} from "@tabler/icons-react";
 import Button from "../../components/Button";
 import Checkbox from "../../components/Checkbox";
-import { FormInput, FormListbox } from "../../components/FormComponents";
+import { FormInput } from "../../components/FormComponents";
+import PillSelect, { PillSelectOption } from "../../components/PillSelect";
 import { Payment, InvoiceData } from "../../types/types";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
@@ -18,6 +24,20 @@ export type RecordablePaymentMethod = Exclude<
   Payment["payment_method"],
   "contra" | "overpayment"
 >;
+
+const PAYMENT_METHOD_OPTIONS: ReadonlyArray<
+  PillSelectOption<RecordablePaymentMethod>
+> = [
+  { value: "cash", label: "Cash" },
+  { value: "cheque", label: "Cheque" },
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "online", label: "Online" },
+];
+
+const BANK_ACCOUNT_OPTIONS: ReadonlyArray<PillSelectOption<string>> = [
+  { value: "BANK_PBB", label: "Public Bank" },
+  { value: "BANK_ABB", label: "Alliance Bank" },
+];
 
 export interface PaymentFormInitialValues {
   payment_date?: string;
@@ -56,6 +76,41 @@ interface PaymentFormData {
 
 interface PaymentCreationResult {
   isOverpayment?: boolean;
+}
+
+interface PaymentReferenceUsageRow {
+  payment_id: number;
+  invoice_id: string;
+  payment_date: string;
+  amount_paid: number | string;
+  payment_method: string;
+  customerid?: string | null;
+}
+
+interface ReceiptReferenceUsageRow {
+  id: number;
+  display_reference: string;
+  received_date: string;
+  payment_method: string;
+  debit_account: string;
+  status: string;
+  origin: string;
+  total_amount: number;
+  allocation_count: number;
+}
+
+// Only an ERP receipt can be joined: getReceiptGroup also matches on origin, so
+// a new receipt could never land in a pre-cutover import_opening group anyway.
+const canJoinReceiptGroup = (receipt: ReceiptReferenceUsageRow): boolean =>
+  receipt.origin === "erp";
+
+interface PaymentReferenceUsage {
+  reference: string;
+  count: number;
+  // Tien Hock groups payments under a receipt; Jelly Polly has stand-alone
+  // payment rows. Exactly one of these is populated.
+  payments?: PaymentReferenceUsageRow[];
+  receipts?: ReceiptReferenceUsageRow[];
 }
 
 interface ReceiptPaymentAllocation {
@@ -219,7 +274,17 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   >(null);
   const [importedReconciliation, setImportedReconciliation] =
     useState<ImportedPaymentReconciliationState | null>(null);
+  // Jelly Polly has no receipt header to group payments under, so a re-used
+  // reference cannot be "joined" to anything. It is reported with the payments
+  // already carrying it and must be confirmed before saving.
+  const [referenceUsage, setReferenceUsage] =
+    useState<PaymentReferenceUsage | null>(null);
+  const [isCheckingReference, setIsCheckingReference] =
+    useState<boolean>(false);
+  const [confirmedDuplicateReference, setConfirmedDuplicateReference] =
+    useState<string | null>(null);
   const invoiceRequestIdRef = useRef<number>(0);
+  const referenceRequestIdRef = useRef<number>(0);
 
   const [formData, setFormData] = useState<PaymentFormData>(() => ({
     payment_date: getInitialPaymentDate(initialValues?.payment_date),
@@ -230,18 +295,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     bank_account: initialValues?.bank_account ?? "BANK_PBB",
     notes: initialValues?.notes ?? "",
   }));
-
-  const paymentMethodOptions = [
-    { id: "cash", name: "Cash" },
-    { id: "cheque", name: "Cheque" },
-    { id: "bank_transfer", name: "Bank Transfer" },
-    { id: "online", name: "Online" },
-  ];
-
-  const bankAccountOptions = [
-    { id: "BANK_PBB", name: "Public Bank" },
-    { id: "BANK_ABB", name: "Alliance Bank" },
-  ];
 
   const fetchUnpaidInvoices = useCallback(async () => {
     const requestId: number = invoiceRequestIdRef.current + 1;
@@ -296,6 +349,107 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       }
     }
   }, [apiEndpoint, invoiceDateRange, invoicesEndpoint]);
+
+  // Debounced "is this reference already in use?" check. Tien Hock looks at
+  // receipts (its reference is repeatable, so a match is reported, never
+  // forbidden) and Jelly Polly at payments on other invoices; both must be
+  // acknowledged before saving so a mis-keyed reference cannot pass silently.
+  useEffect((): (() => void) => {
+    const reference: string = formData.payment_reference.trim();
+    const requestId: number = referenceRequestIdRef.current + 1;
+    referenceRequestIdRef.current = requestId;
+
+    // A reference group is an existing group the user deliberately opened this
+    // form from, so its reference is expected to match and is not a warning.
+    if (referenceGroup) {
+      setReferenceUsage(null);
+      setIsCheckingReference(false);
+      return (): void => undefined;
+    }
+
+    if (!reference) {
+      setReferenceUsage(null);
+      setIsCheckingReference(false);
+      return (): void => undefined;
+    }
+
+    setIsCheckingReference(true);
+    const usageEndpoint: string = useGroupedReceipt
+      ? `/api/receipts/by-reference/${encodeURIComponent(reference)}`
+      : `${apiEndpoint}/reference-usage/${encodeURIComponent(reference)}`;
+    const timeoutId: number = window.setTimeout((): void => {
+      void api
+        .get<PaymentReferenceUsage>(usageEndpoint)
+        .then((usage: PaymentReferenceUsage): void => {
+          if (referenceRequestIdRef.current !== requestId) return;
+          setReferenceUsage(usage && usage.count > 0 ? usage : null);
+        })
+        .catch((error: unknown): void => {
+          // A failed check must not block recording a payment: the server still
+          // rejects a same-invoice duplicate on save.
+          console.error("Error checking the payment reference:", error);
+          if (referenceRequestIdRef.current !== requestId) return;
+          setReferenceUsage(null);
+        })
+        .finally((): void => {
+          if (referenceRequestIdRef.current === requestId) {
+            setIsCheckingReference(false);
+          }
+        });
+    }, 400);
+
+    return (): void => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [apiEndpoint, formData.payment_reference, referenceGroup, useGroupedReceipt]);
+
+  // The confirmation is stored as the reference it was given for, so editing
+  // the reference always requires a fresh decision.
+  const trimmedPaymentReference: string = formData.payment_reference.trim();
+  const isDuplicateReferenceConfirmed: boolean =
+    confirmedDuplicateReference !== null &&
+    confirmedDuplicateReference === trimmedPaymentReference;
+
+  // Tien Hock: a payment group is simply the receipts sharing a reference AND
+  // its banking details, so "add another payment to this reference" is a second
+  // receipt keyed with the group's own date, method and account — no existing
+  // receipt or posted journal is touched. Joining is the default because a
+  // re-used reference almost always means the earlier keying missed something.
+  const joinableReceipt: ReceiptReferenceUsageRow | null =
+    useGroupedReceipt && referenceUsage?.receipts?.length
+      ? referenceUsage.receipts.find(canJoinReceiptGroup) || null
+      : null;
+  const joinedReceiptGroup: ReceiptReferenceUsageRow | null =
+    isDuplicateReferenceConfirmed ? joinableReceipt : null;
+  const groupPaymentDate: string = joinedReceiptGroup
+    ? format(new Date(joinedReceiptGroup.received_date), "yyyy-MM-dd")
+    : formData.payment_date;
+  const groupPaymentMethod: RecordablePaymentMethod = joinedReceiptGroup
+    ? (joinedReceiptGroup.payment_method as RecordablePaymentMethod)
+    : formData.payment_method;
+  const groupBankAccount: string =
+    joinedReceiptGroup && joinedReceiptGroup.payment_method !== "cash"
+      ? joinedReceiptGroup.debit_account
+      : formData.bank_account;
+  const bankingFieldsLocked: boolean =
+    Boolean(referenceGroup) || joinedReceiptGroup !== null;
+
+  // Auto-tick the moment a match appears, so the common case is a no-op for the
+  // user. Keyed per reference, so unticking sticks and a new reference decides
+  // again.
+  const offeredReferenceRef = useRef<string | null>(null);
+  useEffect((): void => {
+    if (!useGroupedReceipt) return;
+    const offered: string | null =
+      referenceUsage && joinableReceipt ? referenceUsage.reference : null;
+    if (offered === null) {
+      offeredReferenceRef.current = null;
+      return;
+    }
+    if (offeredReferenceRef.current === offered) return;
+    offeredReferenceRef.current = offered;
+    setConfirmedDuplicateReference(offered);
+  }, [joinableReceipt, referenceUsage, useGroupedReceipt]);
 
   // Fetch unpaid invoices
   useEffect(() => {
@@ -506,6 +660,21 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       return;
     }
 
+    if (isCheckingReference) {
+      toast.error("Wait for the payment reference check to finish");
+      return;
+    }
+    // Tien Hock's reference is repeatable, and the join box is ticked by
+    // default, so unticking it is already a deliberate choice and needs no
+    // second gate. Jelly Polly has nothing to join, so its confirmation is the
+    // only thing standing between a typo and a mis-keyed reference.
+    if (!useGroupedReceipt && referenceUsage && !isDuplicateReferenceConfirmed) {
+      toast.error(
+        "Confirm that this reference really is the same transfer, or use a different one"
+      );
+      return;
+    }
+
     // Check for ALL overpayments
     const overpaymentInvoices = selectedInvoices.filter(
       ({ invoice, amountToPay }) => amountToPay > invoice.balance_due
@@ -572,22 +741,22 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           reconciliationRequest = {
             allocations: moneyAllocations,
             payment_reference: paymentReference,
-            received_date: formData.payment_date,
-            payment_method: formData.payment_method,
+            received_date: groupPaymentDate,
+            payment_method: groupPaymentMethod,
             bank_account:
-              formData.payment_method === "cash"
-                ? undefined
-                : formData.bank_account,
+              groupPaymentMethod === "cash" ? undefined : groupBankAccount,
             notes: notes || undefined,
           };
         }
 
+        // Joining a group means matching its banking details exactly — that is
+        // what makes getReceiptGroup treat this receipt as part of it.
         const result = await api.post("/api/receipts", {
-          payment_method: formData.payment_method,
+          payment_method: groupPaymentMethod,
           bank_account:
-            formData.payment_method === "cash" ? undefined : formData.bank_account,
+            groupPaymentMethod === "cash" ? undefined : groupBankAccount,
           display_reference: paymentReference || undefined,
-          received_date: formData.payment_date,
+          received_date: groupPaymentDate,
           notes: notes || undefined,
           allocations: moneyAllocations,
           overpayment_allocations:
@@ -607,6 +776,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             payment_reference: paymentReference || undefined,
             bank_account: formData.payment_method === 'cash' ? 'CASH' : formData.bank_account,
             notes: notes || undefined,
+            // The user has seen which other invoices carry this reference and
+            // confirmed it is the same transfer.
+            confirm_duplicate_reference: isDuplicateReferenceConfirmed
+              ? true
+              : undefined,
           });
           results.push(result);
         }
@@ -840,43 +1014,57 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                       Payment Date <span className="text-red-500">*</span>
                     </label>
                     <TimeNavigator
-                      range={paymentDateRange}
+                      range={
+                        joinedReceiptGroup
+                          ? getPaymentDateRange(groupPaymentDate)
+                          : paymentDateRange
+                      }
                       onChange={handlePaymentDateChange}
                       modes={["day"]}
                       presets={false}
                       allowFuture
-                      disabled={isSubmitting || Boolean(referenceGroup)}
+                      disabled={isSubmitting || bankingFieldsLocked}
                       className="flex w-full"
                       triggerClassName="min-w-0 flex-1 justify-between"
                     />
                   </div>
-                  <FormListbox
-                    name="payment_method"
-                    label="Payment Method"
-                    value={formData.payment_method}
-                    onChange={(value: string | number) =>
-                      setFormData({
-                        ...formData,
-                        payment_method: value as RecordablePaymentMethod,
-                      })
-                    }
-                    options={paymentMethodOptions}
-                    disabled={isSubmitting || Boolean(referenceGroup)}
-                  />
-                  {formData.payment_method !== "cash" && (
-                    <FormListbox
-                      name="bank_account"
-                      label="Deposit To"
-                      value={formData.bank_account}
-                      onChange={(value: string | number) =>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">
+                      Payment Method
+                    </label>
+                    <PillSelect<RecordablePaymentMethod>
+                      value={groupPaymentMethod}
+                      onChange={(value: RecordablePaymentMethod) =>
                         setFormData({
                           ...formData,
-                          bank_account: String(value),
+                          payment_method: value,
                         })
                       }
-                      options={bankAccountOptions}
-                      disabled={isSubmitting || Boolean(referenceGroup)}
+                      options={PAYMENT_METHOD_OPTIONS}
+                      disabled={isSubmitting || bankingFieldsLocked}
+                      ariaLabel="Payment method"
+                    size="md"
                     />
+                  </div>
+                  {groupPaymentMethod !== "cash" && (
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">
+                        Deposit To
+                      </label>
+                      <PillSelect
+                        value={groupBankAccount}
+                        onChange={(value: string) =>
+                          setFormData({
+                            ...formData,
+                            bank_account: value,
+                          })
+                        }
+                        options={BANK_ACCOUNT_OPTIONS}
+                        disabled={isSubmitting || bankingFieldsLocked}
+                        ariaLabel="Deposit to"
+                      size="md"
+                      />
+                    </div>
                   )}
                   <FormInput
                     name="payment_reference"
@@ -890,11 +1078,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                           }`
                     }
                     placeholder={
-                      formData.payment_method === "cheque"
+                      groupPaymentMethod === "cheque"
                         ? "Cheque number"
-                        : formData.payment_method === "bank_transfer"
+                        : groupPaymentMethod === "bank_transfer"
                         ? "Transaction reference"
-                        : formData.payment_method === "online"
+                        : groupPaymentMethod === "online"
                         ? "Transaction ID"
                         : "Reference number"
                     }
@@ -908,6 +1096,96 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                     disabled={isSubmitting || Boolean(referenceGroup)}
                     required={selectedInvoices.length > 1}
                   />
+                  {isCheckingReference && (
+                    <div className="flex items-center gap-2 text-xs text-default-500 dark:text-gray-400">
+                      <IconLoader2 size={14} className="animate-spin" />
+                      Checking this reference number...
+                    </div>
+                  )}
+                  {referenceUsage && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
+                      <div className="flex items-start gap-2">
+                        <IconAlertTriangle
+                          size={16}
+                          className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                            Reference {referenceUsage.reference} is already used
+                            by {referenceUsage.count}{" "}
+                            {useGroupedReceipt ? "receipt" : "payment"}
+                            {referenceUsage.count === 1 ? "" : "s"}.
+                          </p>
+                          <ul className="mt-2 space-y-1 text-xs text-amber-800 dark:text-amber-200">
+                            {(referenceUsage.receipts || []).map(
+                              (
+                                usage: ReceiptReferenceUsageRow
+                              ): React.ReactNode => (
+                                <li key={usage.id}>
+                                  {formatCurrency(usage.total_amount)} on{" "}
+                                  {format(
+                                    new Date(usage.received_date),
+                                    "dd/MM/yyyy"
+                                  )}{" "}
+                                  — {usage.allocation_count} invoice
+                                  {usage.allocation_count === 1 ? "" : "s"}
+                                  {usage.status === "pending"
+                                    ? " (pending cheque)"
+                                    : ""}
+                                </li>
+                              )
+                            )}
+                            {(referenceUsage.payments || []).map(
+                              (
+                                usage: PaymentReferenceUsageRow
+                              ): React.ReactNode => (
+                                <li key={usage.payment_id}>
+                                  Invoice {usage.invoice_id}
+                                  {usage.customerid
+                                    ? ` (${usage.customerid})`
+                                    : ""}{" "}
+                                  — {formatCurrency(Number(usage.amount_paid))}{" "}
+                                  on{" "}
+                                  {format(
+                                    new Date(usage.payment_date),
+                                    "dd/MM/yyyy"
+                                  )}
+                                </li>
+                              )
+                            )}
+                          </ul>
+                          {(!useGroupedReceipt || joinableReceipt) && (
+                            <div className="mt-3">
+                              <Checkbox
+                                checked={isDuplicateReferenceConfirmed}
+                                onChange={(checked: boolean): void =>
+                                  setConfirmedDuplicateReference(
+                                    checked ? trimmedPaymentReference : null
+                                  )
+                                }
+                                disabled={isSubmitting}
+                                size={18}
+                                label={
+                                  useGroupedReceipt
+                                    ? "Add this payment to that group"
+                                    : "This is the same transfer — record it under the same reference"
+                                }
+                              />
+                            </div>
+                          )}
+                          <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                            {useGroupedReceipt
+                              ? !joinableReceipt
+                                ? "That is a pre-changeover record, so this payment cannot be added to it. It will be recorded on its own, sharing only the reference number."
+                                : joinedReceiptGroup
+                                ? `The group's date, payment method and account are used as they are, so this payment appears under ${referenceUsage.reference} alongside the payments above. Nothing already recorded is changed.`
+                                : "Unticked: this is recorded as its own payment with its own date and method, sharing only the reference number."
+                              : "Each invoice keeps its own payment record; they are only linked by this reference."}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <FormInput
                     name="notes"
                     label="Notes (Optional)"
@@ -1242,13 +1520,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                       selectedInvoices.length === 1 ? "" : "s"
                     } selected`}
                 {selectedInvoices.length > 0 &&
-                  formData.payment_method === "cheque" && (
+                  groupPaymentMethod === "cheque" && (
                     <span className="ml-1 text-amber-600 dark:text-amber-400">
                       - Pending until confirmed
                     </span>
                   )}
                 {selectedInvoices.length > 0 &&
-                  formData.payment_method === "cash" && (
+                  groupPaymentMethod === "cash" && (
                     <span className="ml-1 text-amber-600 dark:text-amber-400">
                       - Remains unbanked until Cash Bank-In
                     </span>
@@ -1277,7 +1555,14 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
               <Button
                 type="submit"
                 color="sky"
-                disabled={isSubmitting || selectedInvoices.length === 0}
+                disabled={
+                  isSubmitting ||
+                  selectedInvoices.length === 0 ||
+                  isCheckingReference ||
+                  (!useGroupedReceipt &&
+                    referenceUsage !== null &&
+                    !isDuplicateReferenceConfirmed)
+                }
               >
                 {isSubmitting ? "Processing..." : "Record Payment"}
               </Button>

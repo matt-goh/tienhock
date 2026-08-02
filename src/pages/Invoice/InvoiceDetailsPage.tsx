@@ -17,6 +17,7 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import SubmissionResultsModal from "../../components/Invoice/SubmissionResultsModal";
 import { FormInput, FormListbox } from "../../components/FormComponents";
+import PillSelect, { PillSelectOption } from "../../components/PillSelect";
 import TimeNavigator, { type TimeRange } from "../../components/TimeNavigator";
 import {
   getInvoiceDetailsBundle,
@@ -82,6 +83,24 @@ import {
   isZeroValueBill,
 } from "../../utils/invoice/invoiceDisplayStatus";
 import type { InvoiceDisplayStatus } from "../../utils/invoice/invoiceDisplayStatus";
+
+const PAYMENT_METHOD_OPTIONS: ReadonlyArray<PillSelectOption<string>> = [
+  { value: "cash", label: "Cash" },
+  { value: "cheque", label: "Cheque" },
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "online", label: "Online" },
+];
+
+const BANK_ACCOUNT_OPTIONS: ReadonlyArray<PillSelectOption<string>> = [
+  { value: "BANK_PBB", label: "Public Bank" },
+  { value: "BANK_ABB", label: "Alliance Bank" },
+];
+
+const PAYMENT_TYPE_OPTIONS: ReadonlyArray<PillSelectOption<"CASH" | "INVOICE">> =
+  [
+    { value: "CASH", label: "Cash" },
+    { value: "INVOICE", label: "Invoice" },
+  ];
 
 // --- Helper: Read-only Line Items Table ---
 const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
@@ -1770,12 +1789,6 @@ const InvoiceDetailsPage: React.FC = () => {
   const isEligibleForEinvoiceByDate = isInvoiceDateEligibleForEinvoice(
     invoiceData.createddate
   );
-  const paymentMethodOptions = [
-    { id: "cash", name: "Cash" },
-    { id: "cheque", name: "Cheque" },
-    { id: "bank_transfer", name: "Bank Transfer" },
-    { id: "online", name: "Online" },
-  ];
 
   const customerNamesForPDF: Record<string, string> =
     invoiceData.customerid && invoiceData.customerName
@@ -2196,27 +2209,34 @@ const InvoiceDetailsPage: React.FC = () => {
 
                 {/* Row 2: Payment Method and Bank Account */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <FormListbox
-                    name="payment_method"
-                    label="Payment Method"
-                    value={paymentFormData.payment_method}
-                    onChange={handlePaymentMethodChange}
-                    options={paymentMethodOptions}
-                    disabled={isProcessingPayment}
-                  />
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                      Payment Method
+                    </label>
+                    <PillSelect<string>
+                      value={paymentFormData.payment_method}
+                      onChange={handlePaymentMethodChange}
+                      options={PAYMENT_METHOD_OPTIONS}
+                      disabled={isProcessingPayment}
+                      ariaLabel="Payment method"
+                    size="md"
+                    />
+                  </div>
 
                   {paymentFormData.payment_method !== "cash" ? (
-                    <FormListbox
-                      name="bank_account"
-                      label="Deposit To"
-                      value={paymentFormData.bank_account || "BANK_PBB"}
-                      onChange={handleBankAccountChange}
-                      options={[
-                        { id: "BANK_PBB", name: "Public Bank" },
-                        { id: "BANK_ABB", name: "Alliance Bank" },
-                      ]}
-                      disabled={isProcessingPayment}
-                    />
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                        Deposit To
+                      </label>
+                      <PillSelect<string>
+                        value={paymentFormData.bank_account || "BANK_PBB"}
+                        onChange={handleBankAccountChange}
+                        options={BANK_ACCOUNT_OPTIONS}
+                        disabled={isProcessingPayment}
+                        ariaLabel="Deposit to"
+                      size="md"
+                      />
+                    </div>
                   ) : (
                     <div className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
                       <span className="text-sm text-gray-500 dark:text-gray-400 italic">
@@ -2890,18 +2910,18 @@ const InvoiceDetailsPage: React.FC = () => {
                 </div>
               ) : (
                 <div>
-                  <FormListbox
-                    name="bank_account"
-                    label="Deposit To"
+                  <label className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300">
+                    Deposit To
+                  </label>
+                  <PillSelect<string>
                     value={selectedBankAccountForConfirm}
                     onChange={(value: string): void =>
                       setSelectedBankAccountForConfirm(value)
                     }
-                    options={[
-                      { id: "BANK_PBB", name: "Public Bank" },
-                      { id: "BANK_ABB", name: "Alliance Bank" },
-                    ]}
+                    options={BANK_ACCOUNT_OPTIONS}
                     disabled={isConfirmingPayment}
+                    ariaLabel="Deposit to"
+                  size="md"
                   />
                   <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
                     Choose the bank account for this older pending payment.
@@ -3297,20 +3317,19 @@ const InvoiceDetailsPage: React.FC = () => {
               </button>
             </div>
 
-            <div className="mb-4">
-              <FormListbox
-                name="paymenttype"
-                label="Select Payment Type"
+            <div className="mb-4 space-y-2">
+              <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                Select Payment Type
+              </label>
+              <PillSelect<"CASH" | "INVOICE">
                 value={selectedPaymentType}
-                onChange={(value) =>
-                  setSelectedPaymentType(value as "CASH" | "INVOICE")
+                onChange={(value: "CASH" | "INVOICE") =>
+                  setSelectedPaymentType(value)
                 }
-                options={[
-                  { id: "CASH", name: "Cash" },
-                  { id: "INVOICE", name: "Invoice" },
-                ]}
-                placeholder="Select payment type..."
+                options={PAYMENT_TYPE_OPTIONS}
                 disabled={isUpdatingPaymentType}
+                ariaLabel="Payment type"
+              size="md"
               />
             </div>
 

@@ -1,7 +1,6 @@
 // src/components/GreenTarget/AssociatedInvoiceDisplay.tsx
 import React from "react";
 import { format } from "date-fns";
-import { Link } from "react-router-dom";
 import {
   IconAlertTriangle,
   IconCircleCheck,
@@ -34,6 +33,9 @@ interface InvoiceInfo {
 interface AssociatedInvoiceDisplayProps {
   invoiceInfo: InvoiceInfo | null;
   onViewInvoice?: (invoiceId: number) => void;
+  // Supplied by the owner so the receipt opens in a dialog on the current page
+  // instead of navigating away from a form that may hold unsaved edits.
+  onViewReceipt?: (receiptId: number) => void;
   className?: string;
 }
 
@@ -54,6 +56,7 @@ const formatPaymentDate = (value: string): string => {
 const AssociatedInvoiceDisplay: React.FC<AssociatedInvoiceDisplayProps> = ({
   invoiceInfo,
   onViewInvoice,
+  onViewReceipt,
   className = "",
 }) => {
   if (!invoiceInfo) {
@@ -219,14 +222,18 @@ const AssociatedInvoiceDisplay: React.FC<AssociatedInvoiceDisplayProps> = ({
                         {PAYMENT_METHOD_LABELS[payment.payment_method]}
                       </td>
                       <td className="py-2 pr-3 text-gray-600 dark:text-gray-400">
-                        {payment.receipt_id !== null ? (
-                          <Link
-                            to={`/greentarget/payments?receipt=${payment.receipt_id}`}
+                        {payment.receipt_id !== null && onViewReceipt ? (
+                          <button
+                            type="button"
+                            onClick={(): void =>
+                              onViewReceipt(payment.receipt_id as number)
+                            }
                             className="inline-flex items-center font-medium text-sky-600 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300"
+                            title="View this receipt and every invoice it settles"
                           >
                             {reference}
                             <IconExternalLink size={12} className="ml-1" />
-                          </Link>
+                          </button>
                         ) : (
                           reference
                         )}
