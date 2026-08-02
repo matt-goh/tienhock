@@ -1,7 +1,9 @@
 # Green Target Accounting — Build-Out & Legacy Jan–Jun 2026 Import (Handover Plan)
 
-**Created 25 Jul 2026. Status: PHASES G0–G8 COMPLETE — LIVE IN PRODUCTION since 28 Jul 2026 (G4 and G5 on 27 Jul
-2026, G6 and G7 on 28 Jul 2026, G8 production rollout 28 Jul night — record in §10f) —
+**Created 25 Jul 2026. Status: PHASES G0–G8 AND GT-P1–GT-P12 COMPLETE — LIVE IN PRODUCTION (G4 and G5 on 27 Jul
+2026, G6 and G7 on 28 Jul 2026, G8 production rollout 28 Jul night — record in §10f; the GT-P1–GT-P12
+invoice/receipt parity, CD_SD sub-ledger and debtor-dimension work rolled out to production on
+2 Aug 2026 — [GT-P5 v2 execution record](#gt-p5-v2-execution-record)) —
 see the execution records in §9. Source intake and the staging pipeline exist and pass every gate; all
 66 scan pages are transcribed and validated; the `greentarget` accounting tables, the 34-note GT
 catalogue and the 503-account chart of accounts are all loaded; **the Jan–Jun 2026 legacy ledger is
@@ -1797,7 +1799,7 @@ its actual bank-clearance/posting date.
 | GT-P7 — restore the legacy debtor model | ✅ complete (31 Jul 2026) | Code only. A customer with no named account posts to `CD_SD`, exactly as all 1,011 legacy counter invoices did. Nothing is keyed, nothing is auto-created. Unblocks all 42 defaultless customers and the 25 open pre-cutover invoices. |
 | GT-P8 — ERP-vs-ledger reconciliation | ✅ applied to dev (31 Jul 2026) | Legacy ledger is the source of truth. 13 exact-name account links written and 24 stale ERP invoices (RM5,270) closed by non-posting historical receipts; 1 genuine RM230 bill kept open. No journal posted or changed. |
 | GT-P13 — receipt joining + rental traceability | ✅ implemented in code (2 Aug 2026) | Invoice and rental entry can explicitly add a payment allocation to an existing durable receipt; receipt and rental links now work in both directions. No schema change. |
-| GT-P5 — production rollout | ⏳ pending, runbook corrected | The original ordering is **superseded**. Use [GT-P5 v2](#gt-p5-v2--corrected-production-rollout-runbook-2-aug-2026) at the end of this file: nine steps, proven end to end on a dev database freshly imported from production. Blocked on one decision — the debtor identity for any GT invoice issued since that dump. |
+| GT-P5 — production rollout | ✅ **COMPLETE (2 Aug 2026)** | Applied to `tienhock_prod` in the [GT-P5 v2](#gt-p5-v2--corrected-production-rollout-runbook-2-aug-2026) order — nine steps, six SQL files and two `.mjs` scripts, every guard green on the first attempt. `CD_SD` closes at RM67,615.40 and TD at RM159,102.22, both tying independently. [Execution record](#gt-p5-v2-execution-record). The original GT-P5 ordering remains **superseded**. |
 
 #### Complete legacy journal-family inventory
 
@@ -1838,7 +1840,8 @@ restored from the Journal page; their invoice/receipt lifecycle owns that state.
   cancellation blocks active **and pending** receipt allocations; hard/force delete blocks any
   durable receipt history so a grouped receipt or its journal can never be orphaned.
 
-Migration: `dev/migrations/2026-07-30_greentarget_invoice_receipt_parity.sql` (applied to dev only).
+Migration: `2026-07-30_greentarget_invoice_receipt_parity.sql` (**applied to dev and production**;
+file removed after the 2-Aug rollout — recover at commit `050110d0`).
 It created 130 receipt headers for the 130 existing payment allocations without inventing any
 historical journal: 128 posted, two cancelled; the one existing cancelled payment journal remains
 linked only as migration provenance.
@@ -1854,7 +1857,8 @@ close and -RM160.00 May movement**. It is shown as `CD_SD (UNALLOCATED)` in the 
 and is never invented as a chart child. The 1-Jul ledger cutover uses 746 child anchors totalling
 RM63,845.40 plus a direct `CD_SD` anchor of RM1,860.00.
 
-Migration: `dev/migrations/2026-07-30_greentarget_cd_sd_subledger.sql` (applied to dev only),
+Migration: `2026-07-30_greentarget_cd_sd_subledger.sql` (**applied to dev and production**; file
+removed after the 2-Aug rollout — recover at commit `050110d0`),
 generated from `cd_sd_subledger_evidence.csv` by `build-cd-sd-subledger.mjs`. It is guarded and
 idempotent, creates the snapshot table plus 746 active TD children below the protected `CD_SD`
 control, and refuses to modify any pre-July anchor or legacy journal.
@@ -2174,9 +2178,10 @@ and the July automatic-journal backfill dry run remains clean (0 actions, 0 bloc
 > **[GT-P5 v2](#gt-p5-v2--corrected-production-rollout-runbook-2-aug-2026)** at the end of this file.
 > Everything below is retained because the pre-flight rationale and the id warnings still apply.
 
-Everything above is **dev only**. Production still has the pre-GT-P1 GT invoice/receipt behaviour.
-Run in this order, after a backup, and stop at the first failure — every step is guarded and
-idempotent, so a partial run can be resumed rather than forced.
+*(Historical: at the time this was written, everything above was dev-only and production still had
+the pre-GT-P1 GT invoice/receipt behaviour. Production was brought up to date on 2 Aug 2026 via
+GT-P5 v2, not via this ordering.)* Run in this order, after a backup, and stop at the first failure —
+every step is guarded and idempotent, so a partial run can be resumed rather than forced.
 
 ```bash
 # 0. Back up first. The CD_SD cutover writes 747 opening anchors.
@@ -2257,7 +2262,7 @@ Post-rollout, confirm on screen: the CD/SD sub-schedule totals RM65,705.40 at 30
 both on and off, the Debtors report opens each child's ledger, and a new invoice uses `CD_SD` for a
 sundry customer (or its assigned named account) plus the selected `TGA`/`TGB`/`WS_OTH` revenue.
 
-#### GT-P9 to GT-P12 - debtor dimension, mixed revenue and exact Trade Debtors parity (1 Aug 2026; DEV APPLIED, PRODUCTION PENDING)
+#### GT-P9 to GT-P12 - debtor dimension, mixed revenue and exact Trade Debtors parity (1 Aug 2026; ✅ DEV AND PRODUCTION, prod 2 Aug 2026)
 
 This section supersedes GT-P7's accepted `CD_SD (UNALLOCATED)` future-entry trade-off. The legacy
 system had two simultaneous dimensions and the ERP now preserves both:
@@ -2327,19 +2332,11 @@ the full `CD_SD` control.
 - Both new migrations succeeded on first application and idempotent rerun. No npm build, TypeScript
   check or lint command was run, per repository rule 10; only focused syntax/parser/diff checks.
 
-**Production continuation (do not skip the earlier GT-P5 rollout steps):** after backup and after
-the 30/31-Jul migrations/backfills in the existing runbook have succeeded, apply these in order:
-
-```bash
-psql -v ON_ERROR_STOP=1 -f dev/migrations/2026-08-01_greentarget_debtor_dimension.sql
-psql -v ON_ERROR_STOP=1 -f dev/migrations/2026-08-01_greentarget_invoice_revenue_splits.sql
-node dev/import/greentarget-legacy/verify-import.mjs
-node dev/import/greentarget-legacy/verify-chart.mjs
-node dev/import/greentarget-legacy/verify-trade-debtor-list.mjs
-node dev/import/greentarget-legacy/verify-multi-allocation-receipt.mjs
-```
-
-Stop on any guard failure; production ids/state may differ and neither migration guesses. The receipt
+**Production: ✅ applied 2 Aug 2026** as steps 8–9 of the
+[GT-P5 v2 runbook](#gt-p5-v2--corrected-production-rollout-runbook-2-aug-2026) — see the
+[execution record](#gt-p5-v2-execution-record). Do not run these two migrations standalone: they
+require the post-backfill journal state that steps 1–7 produce, and both `.sql` files were removed
+after the rollout (recover at commit `050110d0`). The receipt
 fixture does not cover cheque confirmation, concurrent requests, duplicate-reference rejection or a
 real fixture commit. Those paths remain covered structurally by the receipt service but are explicit
 test limitations, not known posting defects.
@@ -2390,17 +2387,23 @@ re-run as clean idempotent no-ops.
 
 <a id="gt-p5-v2--corrected-production-rollout-runbook-2-aug-2026"></a>
 
-#### GT-P5 v2 — corrected production rollout runbook (2 Aug 2026, ⏳ NOT YET RUN)
+#### GT-P5 v2 — corrected production rollout runbook (2 Aug 2026, ✅ COMPLETE)
 
 **This subsection supersedes the original GT-P5 runbook above and is the only ordering that should be
 executed against production.** The dev database it was proven on **is a fresh import of production**,
-so the data shape, ids and guards are known to match — the sequence below ran end to end with every
-guard green. It has not been run against the live production database.
+so the data shape, ids and guards were known to match. **Executed against `tienhock_prod` on
+2 Aug 2026** — every step green, every number identical to the rehearsal. Execution record:
+[§GT-P5 v2 execution record](#gt-p5-v2-execution-record) at the end of this subsection.
 
-##### Status: ready, pending ONE decision from the user
+##### Status: ✅ applied to production 2 Aug 2026
 
-There are two blockers. The second is mechanical; the first needs a human answer and must be resolved
-**before** the window opens.
+Blocker 1 was cleared by the production pre-flight below: `tienhock_prod` returned exactly the
+fifteen expected July invoices, no August invoice, and no customer needing a new debtor decision.
+Blocker 2 was, in the event, **already tripped** — see the execution record.
+
+Keep the runbook below for reference on any future GT database (a dev refresh from production will
+need the same sequence replayed). Re-run the blocker-1 pre-flight first: it is period-relative, and
+office keying moves it.
 
 **Blocker 1 — post-cutover documents created since the dump (needs a decision).**
 `2026-08-01_greentarget_debtor_dimension.sql` requires every `CD_SD` journal line dated
@@ -2415,33 +2418,52 @@ Measured, not inferred: seeding one such invoice into the rebuilt dev database a
 `debtor_dimension`'s `v_bad_active_source` guard verbatim returned the offending line id.
 
 Run this against **production** before anything else. It needs no new columns, so it is safe on the
-current production schema:
+current production schema. It deliberately does **not** filter on `CD_SD`, on journal status or on
+invoice status: a filtered query cannot see a live July invoice whose journal is cancelled or absent,
+and step 5's post-condition checks *every* live July invoice, not only the ones already sitting on
+the control.
 
 ```sql
-SELECT i.invoice_id, i.invoice_number, i.date_issued, i.status, c.name AS customer
+SELECT i.invoice_id, i.invoice_number, i.date_issued, i.status, c.name AS customer,
+       i.journal_entry_id, j.status AS journal_status
   FROM greentarget.invoices i
   JOIN greentarget.customers c ON c.customer_id = i.customer_id
-  JOIN greentarget.journal_entries j ON j.id = i.journal_entry_id
-  JOIN greentarget.journal_entry_lines l
-    ON l.journal_entry_id = j.id AND l.debit_amount > 0
+  LEFT JOIN greentarget.journal_entries j ON j.id = i.journal_entry_id
  WHERE i.date_issued >= DATE '2026-07-01'
-   AND i.status <> 'cancelled'
-   AND j.status = 'posted'
-   AND l.account_code = 'CD_SD'
  ORDER BY i.date_issued, i.invoice_id;
 ```
 
-Expected result — exactly these twelve, all already handled by the steps below:
+**Expected result — exactly these fifteen invoices, all handled by the steps below.** Confirmed
+against `tienhock_prod` on 2 Aug 2026: 15 rows, latest `date_issued` `2026-07-29`, **no August
+invoice**, every row carries a `journal_entry_id`, and only `1706`/`1707` are `cancelled`.
 
-`325, 326, 334, 335, 337, 338, 339, 340, 341, 343, 345, 347`
+| Invoice(s) | Customer | Resolved by |
+| --- | --- | --- |
+| `325`, `343` | MS BERJAYA RESOURCES | step 6 restores journal `1706`; `CD-MS` audited mapping in step 3 |
+| `326` | Zexie Carmelia | step 6 restores journal `1707`; `CD-ZEXIE` in step 5 |
+| `334`, `335`, `337`, `339`, `340` | MIZAN, ALIS WODI, ABE, KELVIN YAP, MIMIE E | step 5, the six new `CD-` leaves |
+| `338`, `341`, `345` | ENRICH AURA, HUNG TAI, DCH | step 3 `--apply-safe`, the audited mappings in `backfill-july-automatic-journals.mjs` |
+| `342` | APG GEOTECHNICS | step 6 cancels it (duplicate of locked reference `2026/01009`) |
+| `344`, `346` | PAUMIN, NURI | step 5, approved onto their existing legacy leaves |
+| `347` | FOREGAL WOOD PRODUCTS | step 4 links the customer; step 5 snapshots it onto the invoice |
 
-(`344`/`346` are absent because PAUMIN/NURI are named leaves; `342` is absent because it is the
-cancelled duplicate.) **Every extra row is a customer needing a debtor decision** — which named
-`CD_SD` identity it is, or a new leaf — exactly the call made for the six July customers in GT-P4.
-Capture the rows, decide each one, and extend
-`2026-07-31_greentarget_july_debtor_decisions.sql` (or add a sibling migration with the same guard
-style) to cover them. Do not widen the date window without deciding the identities: the guard exists
-precisely so no amount silently falls into the unallocated residual.
+`327`–`333` and `336` are absent because they are pre-July invoices, outside the guard's window.
+
+⚠ **Do not use a `CD_SD`-filtered variant of this query as the production expectation.** An earlier
+revision of this runbook published one, together with an expected twelve
+(`325, 326, 334, 335, 337, 338, 339, 340, 341, 343, 345, 347`). That set was captured on the
+*post-rollout* dev database and cannot match a pre-rollout production, for three reasons that are all
+correct behaviour: `325`/`326` are excluded pre-rollout because their journals are still cancelled;
+`342` appears pre-rollout because it has not been cancelled yet; and `344`/`346` appear pre-rollout
+because PAUMIN/NURI have no `debtor_account_code` until step 1 creates the column and step 5 fills
+it, so GT-P7 fell back to the control.
+
+**Any row outside the fifteen above is a customer needing a debtor decision** — which named `CD_SD`
+identity it is, or a new leaf — exactly the call made for the six July customers in GT-P4. Capture
+the rows, decide each one, and extend `2026-07-31_greentarget_july_debtor_decisions.sql` (or add a
+sibling migration with the same guard style) to cover them. Do not widen the date window without
+deciding the identities: the guard exists precisely so no amount silently falls into the unallocated
+residual.
 
 **Blocker 2 — code version (mechanical).** Deploying HEAD before the migrations breaks production
 immediately: the GT-P9 services query `greentarget.debtor_subledger_registry`, which does not exist
@@ -2455,17 +2477,30 @@ Do this in a maintenance window with nobody keying GT invoices. Every step is gu
 fail-closed — stop at the first failure and resume rather than forcing.
 
 ```bash
+# ---------------------------------------------------------------------------
+# Server preamble - the connection details are NOT the dev defaults.
+# The production database is `tienhock_prod`; there is no `tienhock` database
+# and the `tienhock` OS user has no matching role, so a bare `psql -f ...`
+# fails with: FATAL: database "tienhock" does not exist.
+# The .mjs scripts do not read .env and default to tienhock@localhost:5434
+# (the dev Docker DB), so they need DB_* exported explicitly.
+# ---------------------------------------------------------------------------
+export DB_HOST=localhost DB_PORT=5432 DB_NAME=tienhock_prod DB_USER=postgres
+export DB_PASSWORD="$(pm2 env 0 | sed -n 's/^DB_PASSWORD: //p')"   # verify it is non-empty
+
 # 0.  BACK UP the production database. Step 2 writes 747 opening anchors.
 
-# 0a. Blocker-1 pre-flight (above) - must return ONLY the twelve known invoices.
+# 0a. Blocker-1 pre-flight (above) - must return ONLY the fifteen known invoices.
 # 0b. Receipt-identity pre-flight - the two queries in the superseded GT-P5
 #     step 0a above. BOTH must return 0 rows.
 
 # 1.  Schema + durable receipt headers (one header per normalized reference)
-psql -v ON_ERROR_STOP=1 -f dev/migrations/2026-07-30_greentarget_invoice_receipt_parity.sql
+sudo -u postgres psql -d tienhock_prod -v ON_ERROR_STOP=1 \
+  -f dev/migrations/2026-07-30_greentarget_invoice_receipt_parity.sql
 
 # 2.  CD_SD children, May/June snapshots, 1-Jul anchors
-psql -v ON_ERROR_STOP=1 -f dev/migrations/2026-07-30_greentarget_cd_sd_subledger.sql
+sudo -u postgres psql -d tienhock_prod -v ON_ERROR_STOP=1 \
+  -f dev/migrations/2026-07-30_greentarget_cd_sd_subledger.sql
 
 # 3.  Journal re-syncs need PRE-GT-P9 services. Omit --apply-safe first to dry run.
 git checkout de09f185 -- src/routes/greentarget dev/import/greentarget-legacy
@@ -2474,10 +2509,12 @@ node dev/import/greentarget-legacy/backfill-july-automatic-journals.mjs --apply-
 # 4.  ERP-vs-ledger reconciliation. MUST precede step 5: it supplies the 13
 #     exact-name customer links that step 5 asserts. This file is the one the
 #     original runbook omitted entirely.
-psql -v ON_ERROR_STOP=1 -f dev/migrations/2026-07-31_greentarget_erp_ledger_reconciliation.sql
+sudo -u postgres psql -d tienhock_prod -v ON_ERROR_STOP=1 \
+  -f dev/migrations/2026-07-31_greentarget_erp_ledger_reconciliation.sql
 
 # 5.  The approved July decisions - master data only, posts no journal
-psql -v ON_ERROR_STOP=1 -f dev/migrations/2026-07-31_greentarget_july_debtor_decisions.sql
+sudo -u postgres psql -d tienhock_prod -v ON_ERROR_STOP=1 \
+  -f dev/migrations/2026-07-31_greentarget_july_debtor_decisions.sql
 
 # 6.  Restore journals 1706/1707, cancel duplicate 342 - DRY RUN FIRST
 node dev/import/greentarget-legacy/apply-july-lifecycle-decisions.mjs
@@ -2489,8 +2526,10 @@ node dev/import/greentarget-legacy/backfill-july-automatic-journals.mjs --apply
 
 # 8.  Back to HEAD, then the debtor-dimension migrations
 git checkout HEAD -- src/routes/greentarget dev/import/greentarget-legacy
-psql -v ON_ERROR_STOP=1 -f dev/migrations/2026-08-01_greentarget_debtor_dimension.sql
-psql -v ON_ERROR_STOP=1 -f dev/migrations/2026-08-01_greentarget_invoice_revenue_splits.sql
+sudo -u postgres psql -d tienhock_prod -v ON_ERROR_STOP=1 \
+  -f dev/migrations/2026-08-01_greentarget_debtor_dimension.sql
+sudo -u postgres psql -d tienhock_prod -v ON_ERROR_STOP=1 \
+  -f dev/migrations/2026-08-01_greentarget_invoice_revenue_splits.sql
 
 # 9.  Deploy HEAD code and restart PM2, THEN verify.
 node dev/import/greentarget-legacy/verify-import.mjs               # 66 gates
@@ -2498,6 +2537,19 @@ node dev/import/greentarget-legacy/verify-chart.mjs                # 59 gates
 node dev/import/greentarget-legacy/verify-trade-debtor-list.mjs    # 35 gates
 node dev/import/greentarget-legacy/verify-multi-allocation-receipt.mjs  # 21; needs the server up
 ```
+
+If `psql -f` fails on permissions, the `postgres` user cannot traverse the checkout — the same
+gotcha (c) as the G8 rollout, since scp-created directories come down `750`. Either re-apply
+`chmod o+x ~ && chmod -R a+rX ~/tienhock-app`, or feed the file on stdin so it is read as *you*:
+
+```bash
+sudo -u postgres psql -d tienhock_prod -v ON_ERROR_STOP=1 < dev/migrations/<file>.sql
+```
+
+None of the six SQL files use `\copy` or `\i`, so stdin is safe for all of them. The two `.mjs`
+rollout scripts read only `cd_sd_subledger_evidence.csv` and `debtor-map.json`, which **are** tracked
+in git — nothing needs scp'ing for steps 3, 6 and 7. Only the step 9 verifiers need the gitignored
+`generated/validation-report.json` and `greentarget-report-fixtures/data/*.csv` (gotcha (b)).
 
 So it is **six SQL files but nine steps**: two `.mjs` scripts sit between the migrations and the
 working tree changes code version twice. The scripts open their own `pg` pool and do not call the
@@ -2527,6 +2579,68 @@ from production rather than assuming they carried over.
 - The receipt fixture does not cover cheque confirmation, concurrent requests, duplicate-reference
   rejection or a real fixture commit. Those paths are structurally covered by the receipt service but
   remain explicit test limitations, not known posting defects.
+
+<a id="gt-p5-v2-execution-record"></a>
+
+##### GT-P5 v2 execution record — ✅ COMPLETE (2 Aug 2026)
+
+Applied to `tienhock_prod` on the Hetzner server, in the nine-step order above, after a BackupModal
+safety backup. Production matched the dump exactly — 15 July invoices, journal ids `1706`/`1707`/
+`1724` identical — so every guarded id assertion passed on the first attempt and no step was
+re-run or forced.
+
+| Step | What ran | Result |
+|------|----------|--------|
+| 0a | Blocker-1 pre-flight | **15 rows**, latest `date_issued` 2026-07-29, no August invoice, every row carrying a `journal_entry_id`, only `1706`/`1707` cancelled |
+| 0b | Receipt-identity pre-flight | Not run separately — its two queries **are** the first two guards in step 1, and step 1 reached `COMMIT` |
+| 1 | `2026-07-30_greentarget_invoice_receipt_parity.sql` | 15 invoice snapshots, **130** receipt headers, **130** payments linked |
+| 2 | `2026-07-30_greentarget_cd_sd_subledger.sql` | `746 canonical children; 1,494 May/June snapshot rows; July anchors 747 rows / 65,705.40; pre-July anchors unchanged` |
+| 3 | `backfill-july-automatic-journals.mjs --apply-safe` (pinned to `de09f185`) | 4 audited mappings applied (`CD-ENRICH` 338, `HUNG TAI` 341, `CD-MS` 343, `CD-DCH` 345); 14 review blockers left untouched, 0 global blockers |
+| 4 | `2026-07-31_greentarget_erp_ledger_reconciliation.sql` | 13 customer links, 24 invoices closed, `GT-P8 assertions passed`, no journal touched |
+| 5 | `2026-07-31_greentarget_july_debtor_decisions.sql` | 6 new leaves, PAUMIN/NURI approved, **10** invoice snapshots resolved |
+| 6 | `apply-july-lifecycle-decisions.mjs --apply` | `1706` restored → DR `CD-MS` / CR `TGB`; `1707` restored → DR `CD-ZEXIE` / CR `TGA`; `342` cancelled with journal `1724` (duplicates imported `1590`) |
+| 7 | `backfill-july-automatic-journals.mjs --apply` | Dry run clean (**0** global, **0** document blockers); 8 invoice re-syncs, 3 consolidated `REC` journals, 4 no-ops, 2 cancelled receipts skipped |
+| 8 | `2026-08-01_greentarget_debtor_dimension.sql` + `…_invoice_revenue_splits.sql` | `780 logical identities (779 selectable), 752 GL child shells retired, CD_SD 2026-07-01 control anchor RM65,705.40, July trade-debtor money unchanged`; 15 revenue splits backfilled |
+| 9 | Deploy + verify | `verify-import.mjs` **66 gates / 2,844 comparisons**, `verify-chart.mjs` **59 gates**, `verify-multi-allocation-receipt.mjs` **21 gates** |
+
+**Independent tie-outs at close.** `CD_SD` closes at **67,615.40** = the 65,705.40 1-Jul control
+anchor + 1,910.00 July movement; TD closes at **159,102.22** = the printed June 156,782.22 +
+2,320.00; `PBB_1` July movement **730.00** = the three receipts posted in step 7 (250 + 250 + 230).
+The on-screen sub-schedule confirmed the same close with the RM1,860.00 residual held in the control
+totals and **not** rendered as a customer account, and August movement 0.00 — independently
+re-confirming the pre-flight's "no August invoice" finding.
+
+**`verify-trade-debtor-list.mjs` was not run.** Its *first* gate hash-pins `GT_TRADE_DEBTORS.pdf` at
+the repo root, and that gitignored scan is not on the server, so it aborted before opening a database
+connection — it proved nothing either way. Every data invariant it asserts is already covered
+elsewhere: 156,782.22 by `verify-import`/`verify-chart`, 65,705.40 and the 1,860.00 residual by the
+migrations' own post-conditions, the 746 identities by the tracked hash-pinned
+`cd_sd_subledger_evidence.csv`, and "all July CD_SD movement is assigned to a sundry identity" by
+`debtor_dimension`'s fail-closed `v_untagged_control` guard. What it *uniquely* covers is
+presentation — row order, hide-zero retaining 14 direct / 83 child rows, the residual not rendering
+as a customer row, and 18-page/3-page PDF pagination — and that was confirmed on screen instead. Copy
+the PDF to the repo root if you ever want the automated form.
+
+**Three server-environment gotchas this run discovered** (the runbook above has been corrected for
+all three):
+
+1. **The production database is `tienhock_prod`.** The `tienhock` OS user has no matching role, so a
+   bare `psql -f …` fails with `FATAL: database "tienhock" does not exist`. Use
+   `sudo -u postgres psql -d tienhock_prod -v ON_ERROR_STOP=1 -f …`, run from `~/tienhock-app` —
+   sudo preserves the working directory, so a relative path resolves against wherever you actually
+   are, not the repo.
+2. **The `.mjs` scripts do not read `.env`** and default to `tienhock@localhost:5434`, the dev Docker
+   database. `set -a; . ./.env; set +a` first, sourcing the **whole** file: it also sets
+   `NODE_ENV=production`, which `db-pool.js` uses to enable SSL, and that is how the live server
+   connects. The deploy workflow writes this `.env`, so the password is already on the server.
+3. **Blocker 2 was already tripped before the window opened.** The GT-P9 code was merged to
+   `production` and auto-deployed at 10:19 that morning, hours before any migration ran, so the
+   deployed services were querying a `debtor_subledger_registry` that did not exist. Nothing broke
+   only because nobody opened a GT accounting page in between — `pm2 logs` showed no such error.
+   **Check the deployed commit before opening the window**, not just at step 9.
+
+All six `.sql` files were removed after the rollout per the project convention — recover at commit
+`050110d0`, and see [MIGRATIONS_LOG.md](../MIGRATIONS_LOG.md) "Removed 2 Aug 2026".
 
 #### GT-P13 — join existing receipts + rental/payment traceability (2 Aug 2026, code complete)
 
