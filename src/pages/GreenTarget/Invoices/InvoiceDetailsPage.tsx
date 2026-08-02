@@ -2462,7 +2462,7 @@ const InvoiceDetailsPage: React.FC = () => {
                         invoiceNumberValidation.isDuplicate ||
                         !editedInvoiceNumber.trim()
                       }
-                      className="p-1.5 rounded-md text-green-600 hover:bg-green-100 disabled:text-default-400 disabled:bg-transparent"
+                      className="p-1.5 rounded-md text-green-600 dark:text-green-500 hover:bg-green-100 dark:hover:bg-green-900/30 disabled:text-default-400 dark:disabled:text-gray-600 disabled:bg-transparent dark:disabled:bg-transparent"
                       title="Save"
                     >
                       <IconDeviceFloppy size={18} />
@@ -2470,7 +2470,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     <button
                       onClick={handleCancelInvoiceNumberEdit}
                       disabled={isUpdatingInvoiceNumber}
-                      className="p-1.5 rounded-md text-red-600 hover:bg-red-100 disabled:text-default-400"
+                      className="p-1.5 rounded-md text-red-600 dark:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 disabled:text-default-400 dark:disabled:text-gray-600"
                       title="Cancel"
                     >
                       <IconX size={18} />
@@ -2518,7 +2518,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   <button
                     onClick={handleSaveDateIssued}
                     disabled={isUpdatingDateIssued || !editedDateIssued}
-                    className="p-1.5 rounded-md text-green-600 hover:bg-green-100 disabled:text-default-400 disabled:bg-transparent"
+                    className="p-1.5 rounded-md text-green-600 dark:text-green-500 hover:bg-green-100 dark:hover:bg-green-900/30 disabled:text-default-400 dark:disabled:text-gray-600 disabled:bg-transparent dark:disabled:bg-transparent"
                     title="Save"
                   >
                     <IconDeviceFloppy size={18} />
@@ -2526,7 +2526,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   <button
                     onClick={handleCancelDateIssuedEdit}
                     disabled={isUpdatingDateIssued}
-                    className="p-1.5 rounded-md text-red-600 hover:bg-red-100 disabled:text-default-400"
+                    className="p-1.5 rounded-md text-red-600 dark:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 disabled:text-default-400 dark:disabled:text-gray-600"
                     title="Cancel"
                   >
                     <IconX size={18} />
@@ -2599,7 +2599,7 @@ const InvoiceDetailsPage: React.FC = () => {
                       !editedAmount ||
                       parseFloat(editedAmount) < 0
                     }
-                    className="p-1.5 rounded-md text-green-600 hover:bg-green-100 disabled:text-default-400 disabled:bg-transparent"
+                    className="p-1.5 rounded-md text-green-600 dark:text-green-500 hover:bg-green-100 dark:hover:bg-green-900/30 disabled:text-default-400 dark:disabled:text-gray-600 disabled:bg-transparent dark:disabled:bg-transparent"
                     title="Save"
                   >
                     <IconDeviceFloppy size={18} />
@@ -2607,7 +2607,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   <button
                     onClick={handleCancelAmountEdit}
                     disabled={isUpdatingAmount}
-                    className="p-1.5 rounded-md text-red-600 hover:bg-red-100 disabled:text-default-400"
+                    className="p-1.5 rounded-md text-red-600 dark:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 disabled:text-default-400 dark:disabled:text-gray-600"
                     title="Cancel"
                   >
                     <IconX size={18} />
@@ -3052,14 +3052,14 @@ const InvoiceDetailsPage: React.FC = () => {
                                   refValidation.isValidating ||
                                   refValidation.isDuplicate
                                 }
-                                className="p-1 rounded-md text-green-600 hover:bg-green-100 disabled:text-default-400 disabled:bg-transparent"
+                                className="p-1 rounded-md text-green-600 dark:text-green-500 hover:bg-green-100 dark:hover:bg-green-900/30 disabled:text-default-400 dark:disabled:text-gray-600 disabled:bg-transparent dark:disabled:bg-transparent"
                                 title="Save"
                               >
                                 <IconDeviceFloppy size={18} />
                               </button>
                               <button
                                 onClick={handleCancelEdit}
-                                className="p-1 rounded-md text-red-600 hover:bg-red-100"
+                                className="p-1 rounded-md text-red-600 dark:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30"
                                 title="Cancel"
                               >
                                 <IconX size={18} />

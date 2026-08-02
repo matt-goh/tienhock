@@ -73,6 +73,10 @@ export interface GreenTargetPayment {
   bank_account?: "PBB_1" | null;
   journal_entry_id?: number | null;
   journal_reference_no?: string | null;
+  // Pre-cutover receipts post no journal of their own — the collection is
+  // already inside the imported ledger, in the invoice's own '#/#' journal.
+  imported_journal_entry_id?: number | null;
+  imported_journal_reference?: string | null;
   receipt_id?: number;
   posting_date?: string | null;
   notes?: string | null;
@@ -127,6 +131,15 @@ export interface GreenTargetReceiptGroupAllocation {
   amount_paid: number;
   status: GreenTargetPayment["status"];
   rentals: GreenTargetReceiptAllocationRental[];
+  // Set only for pre-cutover allocations, whose collection sits in the
+  // invoice's imported '#/#' journal instead of a receipt-owned journal.
+  imported_journal: GreenTargetImportedJournalRef | null;
+}
+
+export interface GreenTargetImportedJournalRef {
+  journal_entry_id: number;
+  reference_no: string;
+  entry_date: string;
 }
 
 export interface GreenTargetReceiptGroupDetails {

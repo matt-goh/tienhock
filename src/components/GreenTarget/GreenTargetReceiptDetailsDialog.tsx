@@ -22,6 +22,7 @@ import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import { greenTargetApi } from "../../routes/greentarget/api";
 import type {
+  GreenTargetImportedJournalRef,
   GreenTargetReceiptAllocationRental,
   GreenTargetReceiptGroupAllocation,
   GreenTargetReceiptGroupDetails,
@@ -218,6 +219,35 @@ const GreenTargetReceiptDetailsDialog: React.FC<
         ): number => total + Number(allocation.amount_paid || 0),
         0
       ) ?? 0,
+    [details]
+  );
+
+  // A pre-cutover receipt owns no journal — each allocation instead points at
+  // the invoice's imported entry, where the counter-cash leg recorded the
+  // collection. De-duplicated because one entry can cover several invoices.
+  const importedJournals: GreenTargetImportedJournalRef[] = useMemo(
+    (): GreenTargetImportedJournalRef[] => {
+      if (!details || details.journal) return [];
+      const seenJournalIds: Set<number> = new Set<number>();
+      return details.allocations.reduce(
+        (
+          journals: GreenTargetImportedJournalRef[],
+          allocation: GreenTargetReceiptGroupAllocation
+        ): GreenTargetImportedJournalRef[] => {
+          const importedJournal: GreenTargetImportedJournalRef | null =
+            allocation.imported_journal ?? null;
+          if (
+            importedJournal &&
+            !seenJournalIds.has(importedJournal.journal_entry_id)
+          ) {
+            seenJournalIds.add(importedJournal.journal_entry_id);
+            journals.push(importedJournal);
+          }
+          return journals;
+        },
+        []
+      );
+    },
     [details]
   );
 
@@ -726,7 +756,9 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                           </div>
                           <div className="sm:col-span-2">
                             <dt className="text-xs text-default-500 dark:text-gray-400">
-                              Consolidated receipt journal
+                              {details.journal || importedJournals.length === 0
+                                ? "Consolidated receipt journal"
+                                : "Imported ledger journal"}
                             </dt>
                             <dd className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
                               {details.journal ? (
@@ -739,6 +771,26 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                                   <span>{details.journal.reference_no}</span>
                                   <IconExternalLink size={13} />
                                 </Link>
+                              ) : importedJournals.length > 0 ? (
+                                // Pre-cutover receipt: no journal of its own, the
+                                // collection sits in the invoice's imported entry.
+                                importedJournals.map(
+                                  (
+                                    importedJournal: GreenTargetImportedJournalRef
+                                  ): React.ReactNode => (
+                                    <Link
+                                      key={importedJournal.journal_entry_id}
+                                      to={`/greentarget/accounting/journal-entries/${importedJournal.journal_entry_id}`}
+                                      onClick={handleClose}
+                                      className="inline-flex items-center gap-1 font-medium text-sky-600 hover:underline dark:text-sky-400"
+                                      title="Collected inside the imported ledger, in this entry's counter-cash line"
+                                    >
+                                      <IconReceipt size={15} />
+                                      <span>{importedJournal.reference_no}</span>
+                                      <IconExternalLink size={13} />
+                                    </Link>
+                                  )
+                                )
                               ) : (
                                 <span className="text-default-500 dark:text-gray-400">
                                   {details.receipt.status === "pending"
