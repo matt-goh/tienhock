@@ -9,6 +9,21 @@ export interface PillSelectOption<T extends string> {
   disabled?: boolean;
 }
 
+// "sm" is the compact filter/table pill. "md" matches the 38px-tall bordered
+// form inputs it sits beside, so a pill row reads as a field of the same weight
+// rather than a lighter control floating next to one.
+export type PillSelectSize = "sm" | "md";
+
+const SIZE_CLASSNAMES: Record<PillSelectSize, string> = {
+  sm: "px-2.5 py-1 text-xs",
+  md: "px-3.5 py-[7px] text-sm leading-5",
+};
+
+const ROW_CLASSNAMES: Record<PillSelectSize, string> = {
+  sm: "gap-1.5",
+  md: "gap-2 min-h-[38px]",
+};
+
 interface PillSelectProps<T extends string> {
   value: T;
   onChange: (value: T) => void;
@@ -16,6 +31,7 @@ interface PillSelectProps<T extends string> {
   disabled?: boolean;
   ariaLabel?: string;
   className?: string;
+  size?: PillSelectSize;
 }
 
 /**
@@ -34,11 +50,12 @@ const PillSelect = <T extends string>({
   disabled = false,
   ariaLabel,
   className = "",
+  size = "sm",
 }: PillSelectProps<T>): React.ReactElement => (
   <div
     role="radiogroup"
     aria-label={ariaLabel}
-    className={`flex flex-wrap items-center gap-1.5 ${className}`}
+    className={`flex flex-wrap items-center ${ROW_CLASSNAMES[size]} ${className}`}
   >
     {options.map((option: PillSelectOption<T>): React.ReactNode => {
       const active: boolean = option.value === value;
@@ -54,7 +71,7 @@ const PillSelect = <T extends string>({
           onClick={(): void => {
             if (!active) onChange(option.value);
           }}
-          className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors select-none whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60 ${
+          className={`${SIZE_CLASSNAMES[size]} font-medium rounded-full border transition-colors select-none whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60 ${
             active
               ? "border-sky-500 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300"
               : "border-default-300 dark:border-gray-600 text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700"

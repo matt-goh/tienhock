@@ -518,7 +518,7 @@ const MaterialFormPage: React.FC = () => {
               options={categoryOptions}
               onChange={(value: string) => handleSelectChange("category", value)}
               ariaLabel="Category"
-              className="min-h-[38px]"
+              size="md"
             />
           </div>
 
@@ -534,7 +534,7 @@ const MaterialFormPage: React.FC = () => {
                 handleSelectChange("applies_to", value)
               }
               ariaLabel="Applies to"
-              className="min-h-[38px]"
+              size="md"
             />
           </div>
 
@@ -570,7 +570,7 @@ const MaterialFormPage: React.FC = () => {
                   handleSelectChange("is_active", value === "active")
                 }
                 ariaLabel="Status"
-                className="min-h-[38px]"
+                size="md"
               />
             </div>
           )}

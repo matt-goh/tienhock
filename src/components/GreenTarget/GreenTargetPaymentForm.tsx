@@ -515,6 +515,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                       options={PAYMENT_METHOD_OPTIONS}
                       disabled={isSubmitting || joinedReceipt !== null}
                       ariaLabel="Payment method"
+                    size="md"
                     />
                   </div>
                   {/* Cheque only: the number is how a cheque is matched to the

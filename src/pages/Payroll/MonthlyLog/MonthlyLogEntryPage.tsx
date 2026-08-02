@@ -1896,6 +1896,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                     }
                     options={LEAVE_TYPE_OPTIONS}
                     ariaLabel="Leave type"
+                  size="md"
                   />
                 </div>
 

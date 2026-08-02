@@ -38,6 +38,7 @@ import {
   FormListbox,
   SelectOption,
 } from "../../components/FormComponents";
+import PillSelect, { PillSelectOption } from "../../components/PillSelect";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import TimeNavigator, { type TimeRange } from "../../components/TimeNavigator";
@@ -90,8 +91,6 @@ const CHEQUE_NO_ENTRY_TYPES: JournalEntryType[] = ["C", "B"];
 const BANK_PAYMENT_CHEQUE_PREFILL = "PBE";
 const HEADER_FIELD_CLASSNAME: string =
   "h-[38px] w-full px-3 text-sm border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 rounded-lg focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:cursor-not-allowed";
-const HEADER_LISTBOX_CLASSNAME: string =
-  "[&>div>button]:h-[38px] [&>div>button]:bg-white dark:[&>div>button]:bg-gray-900/50 [&>div>button]:shadow-none";
 const HEADER_TIME_NAVIGATOR_TRIGGER_CLASSNAME: string =
   "w-full !h-[38px] justify-between !bg-white dark:!bg-gray-900/50 !font-normal disabled:!bg-gray-50 dark:disabled:!bg-gray-800";
 const ACCOUNT_CODE_PATTERN: RegExp = /^[A-Za-z0-9\-_.]+$/;
@@ -1425,13 +1424,26 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
     }
   };
 
-  // Build options
-  const entryTypeOptions: SelectOption[] = entryTypes
-    .filter((entryType): boolean => entryType.code !== LEGACY_IMPORT_ENTRY_TYPE)
-    .map((entryType): SelectOption => ({
-      id: entryType.code,
-      name: `${entryType.code} - ${entryType.name}`,
-    }));
+  // Build options. There are ~14 types (11 on Green Target), so the pills show
+  // the code only and carry the full name as a tooltip — "C - Cash Payment" on
+  // every pill would be several rows deep.
+  const entryTypeOptions: ReadonlyArray<PillSelectOption<JournalEntryType>> =
+    entryTypes
+      .filter(
+        (entryType): boolean => entryType.code !== LEGACY_IMPORT_ENTRY_TYPE
+      )
+      .map(
+        (entryType): PillSelectOption<JournalEntryType> => ({
+          value: entryType.code,
+          label: entryType.code,
+          title: entryType.name,
+        })
+      );
+
+  const selectedEntryTypeName: string =
+    entryTypes.find(
+      (entryType): boolean => entryType.code === formData.entry_type
+    )?.name ?? "";
 
   // Format amount for display
   const formatAmount = (value: string): string => {
@@ -1519,11 +1531,34 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
           <form onSubmit={handleSubmit} noValidate>
             {/* Entry Header - Horizontal Row */}
             <div className="px-6 py-4 border-b border-default-200 dark:border-gray-700 bg-default-50/50 dark:bg-gray-900/30">
+              {/* Type sits on its own full-width row: 14 pills do not fit in a
+                  quarter column, and the type drives the reference prefix and
+                  whether Cheque No appears, so it reads first. */}
+              <div className="mb-4">
+                {/* Larger than the grid labels below: this row spans the whole
+                    header and the resolved type name is the only place the
+                    code's meaning is spelled out. */}
+                <label className="block text-sm font-semibold text-default-700 dark:text-gray-300 uppercase tracking-wide mb-1.5">
+                  Type <span className="text-red-500">*</span>
+                  {selectedEntryTypeName && (
+                    <span className="ml-2 normal-case font-medium text-default-500 dark:text-gray-400">
+                      {selectedEntryTypeName}
+                    </span>
+                  )}
+                </label>
+                <PillSelect<JournalEntryType>
+                  value={formData.entry_type}
+                  onChange={handleEntryTypeChange}
+                  options={entryTypeOptions}
+                  disabled={isSaving}
+                  ariaLabel="Journal entry type"
+                  size="md"
+                />
+              </div>
+
               <div
-                className={`grid grid-cols-4 gap-4 ${
-                  showChequeNo
-                    ? "lg:grid-cols-5"
-                    : ""
+                className={`grid grid-cols-3 gap-4 ${
+                  showChequeNo ? "lg:grid-cols-4" : ""
                 }`}
               >
                 {/* Reference Number */}
@@ -1543,21 +1578,6 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                     placeholder="e.g., PBE001/06"
                     disabled={isSaving}
                     className={`${HEADER_FIELD_CLASSNAME} placeholder:text-gray-400 dark:placeholder:text-gray-500`}
-                  />
-                </div>
-
-                {/* Entry Type */}
-                <div>
-                  <label className="block text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wide mb-1.5">
-                    Type <span className="text-red-500">*</span>
-                  </label>
-                  <FormListbox
-                    name="entry_type"
-                    value={formData.entry_type}
-                    onChange={handleEntryTypeChange}
-                    options={entryTypeOptions}
-                    disabled={isSaving}
-                    className={HEADER_LISTBOX_CLASSNAME}
                   />
                 </div>
 

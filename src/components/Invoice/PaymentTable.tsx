@@ -931,6 +931,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                     options={BANK_ACCOUNT_OPTIONS}
                     disabled={confirmingPaymentId !== null}
                     ariaLabel="Deposit to"
+                  size="md"
                   />
                   <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
                     Choose the bank account for this older pending payment.

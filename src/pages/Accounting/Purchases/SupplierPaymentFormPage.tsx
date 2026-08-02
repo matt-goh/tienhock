@@ -517,7 +517,7 @@ const SupplierPaymentFormPage: React.FC = () => {
               options={PAYMENT_METHOD_OPTIONS}
               disabled={!canEdit}
               ariaLabel="Payment method"
-              className="min-h-[38px]"
+              size="md"
             />
           </div>
           {formData.payment_method !== "cash" && (
@@ -531,7 +531,7 @@ const SupplierPaymentFormPage: React.FC = () => {
                 options={BANK_ACCOUNT_OPTIONS}
                 disabled={!canEdit}
                 ariaLabel="Bank account"
-                className="min-h-[38px]"
+                size="md"
               />
             </div>
           )}

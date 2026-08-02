@@ -1043,6 +1043,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                       options={PAYMENT_METHOD_OPTIONS}
                       disabled={isSubmitting || bankingFieldsLocked}
                       ariaLabel="Payment method"
+                    size="md"
                     />
                   </div>
                   {groupPaymentMethod !== "cash" && (
@@ -1061,6 +1062,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                         options={BANK_ACCOUNT_OPTIONS}
                         disabled={isSubmitting || bankingFieldsLocked}
                         ariaLabel="Deposit to"
+                      size="md"
                       />
                     </div>
                   )}

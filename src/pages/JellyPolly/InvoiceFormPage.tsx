@@ -887,7 +887,7 @@ const InvoiceFormPage: React.FC = () => {
                       options={PAYMENT_METHOD_OPTIONS}
                       disabled={isSaving}
                       ariaLabel="Payment method"
-                      className="min-h-[38px]"
+                      size="md"
                     />
                   </div>
                   {(paymentMethod === "cheque" ||

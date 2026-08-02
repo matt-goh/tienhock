@@ -3113,7 +3113,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               }
               options={SHIFT_OPTIONS}
               ariaLabel="Shift"
-              className="min-h-[34px]"
+              size="md"
             />
           </div>
 
