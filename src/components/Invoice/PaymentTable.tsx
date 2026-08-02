@@ -59,6 +59,16 @@ const toDayRange = (value: string): TimeRange => {
 const toDayString = (value: string): string =>
   format(new Date(value), "yyyy-MM-dd");
 
+/**
+ * The visible reference a payment is grouped under. For a receipt-backed row
+ * this is the RECEIPT's own reference, not the payment row's: a grouped cash
+ * receipt writes `C{invoice}` onto each payment row (the legacy per-invoice
+ * ledger convention), so grouping on the row would split one receipt group into
+ * one row per invoice and hide a payment added to an existing group.
+ */
+const resolveGroupReference = (payment: Payment): string | null =>
+  payment.receipt_reference || payment.payment_reference || null;
+
 const formatPaymentMethodLabel = (
   paymentMethod: Payment["payment_method"]
 ): string =>
@@ -385,9 +395,10 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
       const bankAccount: string =
         payment.bank_account ||
         (payment.payment_method === "cash" ? "CASH" : "BANK_PBB");
-      const key: string = payment.payment_reference
+      const groupReference: string | null = resolveGroupReference(payment);
+      const key: string = groupReference
         ? [
-            payment.payment_reference,
+            groupReference,
             paymentDate,
             payment.payment_method,
             bankAccount,
@@ -501,9 +512,11 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                 const canManageGroup: boolean = Boolean(
                   onViewPaymentGroup && manageableReceiptId !== null
                 );
+                const groupReference: string | null =
+                  resolveGroupReference(groupTemplate);
                 const canAddToGroup: boolean = Boolean(
                   onAddPaymentToGroup &&
-                    groupTemplate.payment_reference &&
+                    groupReference &&
                     groupTemplate.payment_method !== "contra"
                 );
                 const totalAmount = paymentGroup.reduce(
@@ -529,7 +542,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                                   )
                                 }
                                 className="rounded p-0.5 text-gray-400 transition-colors hover:bg-sky-100 hover:text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:hover:bg-sky-900/50 dark:hover:text-sky-300"
-                                title={`Correct the date for all ${paymentGroup.length} payments under ${groupTemplate.payment_reference}`}
+                                title={`Correct the date for all ${paymentGroup.length} payments under ${groupReference}`}
                                 aria-label="Correct payment date"
                               >
                                 <IconCalendarEvent size={15} stroke={1.75} />
@@ -538,8 +551,8 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                           </div>
                         </td>
                         <td className="px-3 py-3 max-w-[150px]">
-                          <div className="truncate font-mono font-semibold text-gray-900 dark:text-gray-100" title={firstPayment.payment_reference || ''}>
-                            {firstPayment.payment_reference}
+                          <div className="truncate font-mono font-semibold text-gray-900 dark:text-gray-100" title={groupReference || ''}>
+                            {groupReference}
                           </div>
                           <span className="mt-1 inline-flex rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700 dark:bg-sky-900/50 dark:text-sky-300">
                             {paymentGroup.length} invoices
@@ -559,7 +572,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                                     onViewPaymentGroup(manageableReceiptId)
                                   }
                                   className="inline-flex items-center gap-1.5 rounded-md border border-sky-200 bg-white/70 px-2 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-100 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-1 dark:border-sky-800 dark:bg-gray-900/40 dark:text-sky-300 dark:hover:bg-sky-900/50 dark:focus:ring-offset-gray-900"
-                                  title={`Manage payment group ${groupTemplate.payment_reference}`}
+                                  title={`Manage payment group ${groupReference}`}
                                 >
                                   <IconSettings size={14} stroke={1.75} />
                                   <span>Manage Group</span>
@@ -587,7 +600,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                           <div className="flex flex-wrap justify-center gap-1.5">
                             {canAddToGroup &&
                               onAddPaymentToGroup &&
-                              groupTemplate.payment_reference && (
+                              groupReference && (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -596,7 +609,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                                   onClick={() =>
                                     onAddPaymentToGroup(groupTemplate)
                                   }
-                                  title={`Add another payment with reference ${groupTemplate.payment_reference}`}
+                                  title={`Add another payment with reference ${groupReference}`}
                                 >
                                   Add Payment
                                 </Button>

@@ -192,9 +192,12 @@ export default function (pool) {
   // --- GET /api/receipts/by-reference/:ref ---
   // Which ACTIVE receipts already carry this visible reference. Tien Hock's
   // display_reference is deliberately repeatable (the legacy import reuses one
-  // Journal No. across receipts), so this reports rather than forbids — but the
-  // payment form must be able to show the match before a second receipt is
-  // opened by accident. Registered before /:id so the path is not swallowed.
+  // Journal No. across receipts), so this reports rather than forbids. Re-using
+  // a reference nearly always means another payment belongs to a banking event
+  // already keyed, and the payment form turns this match into the group's
+  // received_date / payment_method / debit_account so the new receipt lands in
+  // the SAME payment group (see getReceiptGroup) rather than beside it.
+  // Registered before /:id so the path is not swallowed.
   router.get("/by-reference/:ref(*)", async (req, res) => {
     const reference = String(req.params.ref || "").trim();
     if (!reference) {
@@ -208,6 +211,7 @@ export default function (pool) {
                 r.received_date,
                 r.posting_date,
                 r.payment_method,
+                r.debit_account,
                 r.status,
                 r.origin,
                 r.total_amount,
