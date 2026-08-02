@@ -1,7 +1,14 @@
 // src/routes/greentarget/invoices.js
 import { Router } from "express";
 import GTEInvoiceApiClientFactory from "../../utils/greenTarget/einvoice/GTEInvoiceApiClientFactory.js";
-import { syncGTSalesJournalEntry } from "./accounting/sales-journal.js";
+import {
+  fetchGTInvoiceRevenueSplits,
+  normalizeGTRevenueSplits,
+  replaceGTInvoiceRevenueSplits,
+  resolveGTDebtorAssignment,
+  syncGTSalesJournalEntry,
+  toLocalAccountingDateString,
+} from "./accounting/sales-journal.js";
 import { assertGreenTargetAccountingDateUnlocked } from "./accounting/posting-lock.js";
 
 // Map to track pending invoices with their timeout handlers
@@ -267,28 +274,65 @@ export default function (pool, defaultConfig) {
   setTimeout(() => initializePendingInvoiceChecks(), 15000);
 
   // Generate a unique invoice number
-  async function generateInvoiceNumber(client, type) {
-    const year = new Date().getFullYear();
-    const sequenceName = "greentarget.regular_invoice_seq";
-
-    try {
-      const result = await client.query(
-        `SELECT nextval('${sequenceName}') as next_val`
+  async function generateInvoiceNumber(client, dateIssued, receivableAccountCode) {
+    const normalizedDate = String(dateIssued || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
+      throw Object.assign(
+        new Error("Invoice date must use yyyy-MM-dd before a number can be generated"),
+        { statusCode: 400 }
       );
-      const nextVal = result.rows[0].next_val;
-
-      if (type === "regular") {
-        return `${year}/${String(nextVal).padStart(5, "0")}`;
-      } else {
-        return `I${year}/${String(nextVal).padStart(4, "0")}`;
-      }
-    } catch (seqError) {
-      console.error(
-        `Error getting next value for sequence ${sequenceName}:`,
-        seqError
-      );
-      throw new Error("Failed to generate invoice number."); // Throw a more specific error
     }
+    const yearMatch = normalizedDate.match(/^(\d{4})-/);
+    const year = Number(yearMatch[1]);
+    const series = receivableAccountCode === "CD_SD" ? "counter" : "named";
+    const result = await client.query(
+      `INSERT INTO greentarget.invoice_number_sequences (
+         invoice_year, series, last_number
+       ) VALUES ($1, $2, 1)
+       ON CONFLICT (invoice_year, series)
+       DO UPDATE
+          SET last_number = greentarget.invoice_number_sequences.last_number + 1,
+              updated_at = CURRENT_TIMESTAMP
+       RETURNING last_number`,
+      [year, series]
+    );
+    const nextValue = Number(result.rows[0].last_number);
+    return series === "counter"
+      ? `${year}/${String(nextValue).padStart(5, "0")}`
+      : `I${year}/${String(nextValue).padStart(4, "0")}`;
+  }
+
+  /**
+   * Keep the automatic counter ahead when a user keys a valid legacy-series
+   * number manually. Free-form historical references remain allowed, but do
+   * not participate in either sequence.
+   *
+   * @param {import("pg").PoolClient} client
+   * @param {string} invoiceNumber
+   * @returns {Promise<void>}
+   */
+  async function advanceInvoiceNumberSequence(client, invoiceNumber) {
+    const counterMatch = invoiceNumber.match(/^(\d{4})\/(\d{5})$/);
+    const namedMatch = invoiceNumber.match(/^I(\d{4})\/(\d{4})$/);
+    const match = counterMatch || namedMatch;
+    if (!match) return;
+
+    const invoiceYear = Number(match[1]);
+    const series = namedMatch ? "named" : "counter";
+    const keyedNumber = Number(match[2]);
+    await client.query(
+      `INSERT INTO greentarget.invoice_number_sequences (
+         invoice_year, series, last_number
+       ) VALUES ($1, $2, $3)
+       ON CONFLICT (invoice_year, series)
+       DO UPDATE
+          SET last_number = GREATEST(
+                greentarget.invoice_number_sequences.last_number,
+                EXCLUDED.last_number
+              ),
+              updated_at = CURRENT_TIMESTAMP`,
+      [invoiceYear, series, keyedNumber]
+    );
   }
 
   // Get all invoices (with optional filters - ADDED status filter)
@@ -315,6 +359,32 @@ export default function (pool, defaultConfig) {
     try {
       const selectClause = `
         SELECT i.*,
+              COALESCE((
+                SELECT json_agg(
+                  json_build_object(
+                    'line_number', split.line_number,
+                    'account_code', split.account_code,
+                    'amount', split.amount
+                  ) ORDER BY split.line_number
+                )
+                FROM greentarget.invoice_revenue_splits split
+                WHERE split.invoice_id = i.invoice_id
+              ), '[]'::json) AS revenue_splits,
+              json_build_object(
+                'has_receipts', EXISTS (
+                  SELECT 1 FROM greentarget.payments dependency_payment
+                  WHERE dependency_payment.invoice_id = i.invoice_id
+                ),
+                'has_adjustments', EXISTS (
+                  SELECT 1 FROM greentarget.adjustment_documents dependency_adjustment
+                  WHERE dependency_adjustment.original_invoice_id = i.invoice_id
+                ),
+                'journal_manual_override', COALESCE((
+                  SELECT journal.manual_override
+                  FROM greentarget.journal_entries journal
+                  WHERE journal.id = i.journal_entry_id
+                ), false)
+              ) AS edit_dependencies,
               c.name as customer_name,
               c.phone_number as customer_phone_number,
               c.billing_address,
@@ -597,6 +667,17 @@ export default function (pool, defaultConfig) {
 
       const invoiceQuery = `
       SELECT i.*,
+            COALESCE((
+              SELECT json_agg(
+                json_build_object(
+                  'line_number', split.line_number,
+                  'account_code', split.account_code,
+                  'amount', split.amount
+                ) ORDER BY split.line_number
+              )
+              FROM greentarget.invoice_revenue_splits split
+              WHERE split.invoice_id = i.invoice_id
+            ), '[]'::json) AS revenue_splits,
             c.name as customer_name,
             c.phone_number as customer_phone_number,
               c.billing_address,
@@ -691,6 +772,32 @@ export default function (pool, defaultConfig) {
       // Calculate amount_paid correctly, excluding cancelled payments
       const invoiceQuery = `
               SELECT i.*,
+              COALESCE((
+                SELECT json_agg(
+                  json_build_object(
+                    'line_number', split.line_number,
+                    'account_code', split.account_code,
+                    'amount', split.amount
+                  ) ORDER BY split.line_number
+                )
+                FROM greentarget.invoice_revenue_splits split
+                WHERE split.invoice_id = i.invoice_id
+              ), '[]'::json) AS revenue_splits,
+              json_build_object(
+                'has_receipts', EXISTS (
+                  SELECT 1 FROM greentarget.payments dependency_payment
+                  WHERE dependency_payment.invoice_id = i.invoice_id
+                ),
+                'has_adjustments', EXISTS (
+                  SELECT 1 FROM greentarget.adjustment_documents dependency_adjustment
+                  WHERE dependency_adjustment.original_invoice_id = i.invoice_id
+                ),
+                'journal_manual_override', COALESCE((
+                  SELECT journal.manual_override
+                  FROM greentarget.journal_entries journal
+                  WHERE journal.id = i.journal_entry_id
+                ), false)
+              ) AS edit_dependencies,
               c.name as customer_name,
               c.phone_number as customer_phone_number,
               c.billing_address,
@@ -831,6 +938,9 @@ export default function (pool, defaultConfig) {
       tax_amount = 0, // Default tax to 0 if not provided
       date_issued,
       invoice_number, // Optional custom invoice number
+      debtor_account_code,
+      revenue_account_code,
+      revenue_splits,
     } = req.body;
 
     const client = await pool.connect();
@@ -864,6 +974,38 @@ export default function (pool, defaultConfig) {
       if (type === "regular") {
         await assertRentalLinksValid(client, customer_id, rental_ids);
       }
+      const total_amount = numAmountBeforeTax + numTaxAmount;
+      const debtorAssignment = await resolveGTDebtorAssignment(client, {
+        customer_id: Number(customer_id),
+        debtor_account_code,
+        date_issued,
+      });
+      const normalizedRevenueSplits = normalizeGTRevenueSplits(
+        revenue_splits === undefined
+          ? [
+              {
+                line_number: 1,
+                account_code: revenue_account_code,
+                amount: total_amount,
+              },
+            ]
+          : revenue_splits,
+        total_amount
+      );
+      const distinctRevenueAccounts = new Set(
+        normalizedRevenueSplits.map((split) => split.account_code)
+      );
+      const headerRevenueAccount =
+        distinctRevenueAccounts.size === 1
+          ? normalizedRevenueSplits[0].account_code
+          : null;
+      await client.query(
+        `UPDATE greentarget.customers
+            SET debtor_account_code = $1
+          WHERE customer_id = $2
+            AND debtor_account_code IS NULL`,
+        [debtorAssignment.debtorAccountCode, customer_id]
+      );
 
       // --- Logic ---
       let finalInvoiceNumber;
@@ -881,20 +1023,24 @@ export default function (pool, defaultConfig) {
         }
 
         finalInvoiceNumber = trimmedNumber;
+        await advanceInvoiceNumberSequence(client, trimmedNumber);
       } else {
         // Generate automatic invoice number
-        finalInvoiceNumber = await generateInvoiceNumber(client, type);
+        finalInvoiceNumber = await generateInvoiceNumber(
+          client,
+          date_issued,
+          debtorAssignment.receivableAccountCode
+        );
       }
-      
-      const total_amount = numAmountBeforeTax + numTaxAmount;
 
       const invoiceQuery = `
         INSERT INTO greentarget.invoices (
           invoice_number, type, customer_id,
           amount_before_tax, tax_amount, total_amount, date_issued,
-          balance_due
+          balance_due, debtor_account_code, receivable_account_code,
+          revenue_account_code
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING *;
       `;
 
@@ -907,10 +1053,19 @@ export default function (pool, defaultConfig) {
         total_amount.toFixed(2),
         date_issued,
         total_amount.toFixed(2), // Initial balance_due
+        debtorAssignment.debtorAccountCode,
+        debtorAssignment.receivableAccountCode,
+        headerRevenueAccount,
       ]);
 
       const createdInvoice = invoiceResult.rows[0];
       const invoiceId = createdInvoice.invoice_id;
+      await replaceGTInvoiceRevenueSplits(
+        client,
+        invoiceId,
+        normalizedRevenueSplits
+      );
+      createdInvoice.revenue_splits = normalizedRevenueSplits;
 
       // Insert rental associations in junction table
       if (type === "regular" && rental_ids && Array.isArray(rental_ids) && rental_ids.length > 0) {
@@ -951,7 +1106,8 @@ export default function (pool, defaultConfig) {
       // Send specific error messages back if validation failed
       res
         .status(
-          error.status ||
+          error.statusCode ||
+            error.status ||
             (error.message.includes("Missing required") ||
             error.message.includes("Invalid")
               ? 400
@@ -1007,6 +1163,9 @@ export default function (pool, defaultConfig) {
       amount_before_tax,
       tax_amount = 0,
       date_issued,
+      debtor_account_code,
+      revenue_account_code,
+      revenue_splits,
     } = req.body;
 
     const numericInvoiceId = parseInt(invoice_id, 10);
@@ -1021,13 +1180,22 @@ export default function (pool, defaultConfig) {
 
       // Check if invoice exists
       const invoiceCheck = await client.query(
-        "SELECT * FROM greentarget.invoices WHERE invoice_id = $1",
+        `SELECT *
+           FROM greentarget.invoices
+          WHERE invoice_id = $1
+          FOR UPDATE`,
         [numericInvoiceId]
       );
 
       if (invoiceCheck.rows.length === 0) {
         await client.query("ROLLBACK");
         return res.status(404).json({ message: "Invoice not found" });
+      }
+      if (invoiceCheck.rows[0].status === "cancelled") {
+        throw Object.assign(
+          new Error("A cancelled invoice cannot be edited"),
+          { statusCode: 409 }
+        );
       }
 
       // Input validation
@@ -1066,6 +1234,215 @@ export default function (pool, defaultConfig) {
           numericInvoiceId
         );
       }
+      const currentInvoice = invoiceCheck.rows[0];
+      const customerChanged =
+        Number(customer_id) !== Number(currentInvoice.customer_id);
+      const debtorAssignment = await resolveGTDebtorAssignment(client, {
+        invoice_id: numericInvoiceId,
+        customer_id: Number(customer_id),
+        debtor_account_code:
+          debtor_account_code !== undefined
+            ? debtor_account_code
+            : customerChanged
+            ? null
+            : currentInvoice.debtor_account_code,
+        date_issued,
+      });
+      const total_amount = numAmountBeforeTax + numTaxAmount;
+      const currentRevenueSplits = await fetchGTInvoiceRevenueSplits(
+        client,
+        numericInvoiceId
+      );
+      const fallbackCurrentSplits =
+        currentRevenueSplits.length > 0
+          ? currentRevenueSplits
+          : currentInvoice.revenue_account_code
+          ? [
+              {
+                line_number: 1,
+                account_code: currentInvoice.revenue_account_code,
+                amount: Number(currentInvoice.total_amount),
+              },
+            ]
+          : [];
+      const amountWillChange =
+        Math.round(total_amount * 100) !==
+        Math.round(Number(currentInvoice.total_amount) * 100);
+      const requestedRevenueSplits =
+        revenue_splits !== undefined
+          ? revenue_splits
+          : revenue_account_code !== undefined
+          ? [
+              {
+                line_number: 1,
+                account_code: revenue_account_code,
+                amount: total_amount,
+              },
+            ]
+          : amountWillChange && fallbackCurrentSplits.length === 1
+          ? [
+              {
+                line_number: 1,
+                account_code: fallbackCurrentSplits[0].account_code,
+                amount: total_amount,
+              },
+            ]
+          : fallbackCurrentSplits;
+      const existingLegacyPositions = new Set(
+        fallbackCurrentSplits
+          .map((split, index) =>
+            split.account_code === "WS_OTH4" ? index : null
+          )
+          .filter((index) => index !== null)
+      );
+      const requestedLegacyPositions = Array.isArray(requestedRevenueSplits)
+        ? requestedRevenueSplits
+            .map((split, index) =>
+              split?.account_code === "WS_OTH4" ? index : null
+            )
+            .filter((index) => index !== null)
+        : [];
+      if (
+        requestedLegacyPositions.some(
+          (index) => !existingLegacyPositions.has(index)
+        )
+      ) {
+        throw Object.assign(
+          new Error(
+            "WS_OTH4 is historical-only and cannot be added to an invoice"
+          ),
+          { statusCode: 400 }
+        );
+      }
+      const normalizedRevenueSplits = normalizeGTRevenueSplits(
+        requestedRevenueSplits,
+        total_amount,
+        { allowLegacyAccounts: requestedLegacyPositions.length > 0 }
+      );
+      const debtorChanged =
+        debtorAssignment.debtorAccountCode !== currentInvoice.debtor_account_code ||
+        debtorAssignment.receivableAccountCode !== currentInvoice.receivable_account_code;
+      const canonicalSplits = (splits) =>
+        JSON.stringify(
+          splits.map((split) => [
+            split.account_code,
+            Math.round(Number(split.amount) * 100),
+          ])
+        );
+      const revenueChanged =
+        canonicalSplits(normalizedRevenueSplits) !==
+        canonicalSplits(fallbackCurrentSplits);
+
+      const currentRentalsResult = await client.query(
+        `SELECT rental_id
+           FROM greentarget.invoice_rentals
+          WHERE invoice_id = $1
+          ORDER BY rental_id`,
+        [numericInvoiceId]
+      );
+      const currentRentalIds = currentRentalsResult.rows
+        .map((row) => Number(row.rental_id))
+        .sort((left, right) => left - right);
+      const nextRentalIds = [...rental_ids]
+        .map((rentalId) => Number(rentalId))
+        .sort((left, right) => left - right);
+      const rentalsChanged =
+        JSON.stringify(currentRentalIds) !== JSON.stringify(nextRentalIds);
+      const requestedInvoiceNumber =
+        typeof invoice_number === "string" && invoice_number.trim()
+          ? invoice_number.trim()
+          : currentInvoice.invoice_number;
+      const invoiceNumberChanged =
+        requestedInvoiceNumber !== currentInvoice.invoice_number;
+      const dateChanged =
+        String(date_issued) !==
+        toLocalAccountingDateString(currentInvoice.date_issued);
+      const amountChanged = amountWillChange;
+      const typeChanged = type !== currentInvoice.type;
+
+      const dependentDocumentResult = await client.query(
+        `SELECT
+           EXISTS (
+             SELECT 1 FROM greentarget.payments p
+             WHERE p.invoice_id = $1
+           ) AS has_receipts,
+           EXISTS (
+             SELECT 1 FROM greentarget.adjustment_documents adjustment
+             WHERE adjustment.original_invoice_id = $1
+               AND COALESCE(adjustment.is_consolidated, false) = false
+           ) AS has_adjustments,
+           COALESCE((
+             SELECT journal.manual_override
+               FROM greentarget.journal_entries journal
+              WHERE journal.id = $2
+           ), false) AS journal_manual_override,
+           COALESCE((
+             SELECT SUM(payment.amount_paid)
+               FROM greentarget.payments payment
+              WHERE payment.invoice_id = $1
+                AND COALESCE(payment.status, 'active') = 'active'
+           ), 0) AS paid_amount,
+           COALESCE((
+             SELECT SUM(
+               CASE adjustment.type
+                 WHEN 'credit_note' THEN -adjustment.total_amount
+                 WHEN 'debit_note' THEN adjustment.total_amount
+                 WHEN 'refund_note' THEN
+                   CASE WHEN adjustment.paired_with_id IS NOT NULL
+                        THEN adjustment.total_amount ELSE 0 END
+                 ELSE 0
+               END
+             )
+               FROM greentarget.adjustment_documents adjustment
+              WHERE adjustment.original_invoice_id = $1
+                AND adjustment.status = 'active'
+                AND COALESCE(adjustment.is_consolidated, false) = false
+           ), 0) AS adjustment_delta`,
+        [numericInvoiceId, currentInvoice.journal_entry_id]
+      );
+      const dependencies = dependentDocumentResult.rows[0];
+      const documentIdentityChanged =
+        invoiceNumberChanged || customerChanged || amountChanged || dateChanged ||
+        debtorChanged || rentalsChanged || typeChanged;
+      if (dependencies.has_receipts && documentIdentityChanged) {
+        throw Object.assign(
+          new Error(
+            "Invoice number, date, customer, amount, rentals, and debtor identity are locked because receipt history references this invoice, including cancelled receipts."
+          ),
+          { statusCode: 409 }
+        );
+      }
+      if (
+        dependencies.has_adjustments &&
+        (documentIdentityChanged || revenueChanged)
+      ) {
+        throw Object.assign(
+          new Error(
+            "Invoice accounting details are locked because adjustment-document history references this invoice, including cancelled documents."
+          ),
+          { statusCode: 409 }
+        );
+      }
+      if (
+        dependencies.journal_manual_override &&
+        (documentIdentityChanged || revenueChanged)
+      ) {
+        throw Object.assign(
+          new Error(
+            "This invoice journal was manually detached. Restore the journal link before changing accounting details."
+          ),
+          { statusCode: 409 }
+        );
+      }
+      const paidAmount = Number(dependencies.paid_amount);
+      if (Math.round(total_amount * 100) < Math.round(paidAmount * 100)) {
+        throw Object.assign(
+          new Error(
+            `Invoice total cannot be lower than active receipts of RM ${paidAmount.toFixed(2)}`
+          ),
+          { statusCode: 409 }
+        );
+      }
 
       // If invoice_number is provided, check for duplicates
       let finalInvoiceNumber = invoiceCheck.rows[0].invoice_number; // Keep existing if not provided
@@ -1088,11 +1465,28 @@ export default function (pool, defaultConfig) {
         }
 
         finalInvoiceNumber = trimmedNumber;
+        await advanceInvoiceNumberSequence(client, trimmedNumber);
       }
 
-      const total_amount = numAmountBeforeTax + numTaxAmount;
-
       // Update the invoice
+      const distinctRevenueAccounts = new Set(
+        normalizedRevenueSplits.map((split) => split.account_code)
+      );
+      const headerRevenueAccount =
+        distinctRevenueAccounts.size === 1
+          ? normalizedRevenueSplits[0].account_code
+          : null;
+      const balanceDue =
+        (Math.round(total_amount * 100) -
+          Math.round(paidAmount * 100) +
+          Math.round(Number(dependencies.adjustment_delta) * 100)) /
+        100;
+      const nextStatus =
+        balanceDue <= 0.005
+          ? "paid"
+          : currentInvoice.status === "overdue"
+          ? "overdue"
+          : "active";
       const updateQuery = `
         UPDATE greentarget.invoices 
         SET invoice_number = $1,
@@ -1102,12 +1496,11 @@ export default function (pool, defaultConfig) {
             tax_amount = $5,
             total_amount = $6,
             date_issued = $7,
-            balance_due = $6 - COALESCE(
-              (SELECT SUM(amount_paid) 
-               FROM greentarget.payments 
-               WHERE invoice_id = $8 AND (status IS NULL OR status = 'active')
-              ), 0
-            )
+            debtor_account_code = $9,
+            receivable_account_code = $10,
+            revenue_account_code = $11,
+            balance_due = $12,
+            status = $13
         WHERE invoice_id = $8
         RETURNING *;
       `;
@@ -1121,7 +1514,19 @@ export default function (pool, defaultConfig) {
         total_amount.toFixed(2),
         date_issued,
         numericInvoiceId,
+        debtorAssignment.debtorAccountCode,
+        debtorAssignment.receivableAccountCode,
+        headerRevenueAccount,
+        balanceDue.toFixed(2),
+        nextStatus,
       ]);
+
+      await replaceGTInvoiceRevenueSplits(
+        client,
+        numericInvoiceId,
+        normalizedRevenueSplits
+      );
+      updateResult.rows[0].revenue_splits = normalizedRevenueSplits;
 
       // Update rental associations in junction table
       if (type === "regular" && rental_ids && Array.isArray(rental_ids)) {
@@ -1150,7 +1555,7 @@ export default function (pool, defaultConfig) {
       // (editing a pre-cutover invoice is a locked-period mutation), then the
       // invoice-owned journal is re-synced (which locks the NEW date).
       assertGreenTargetAccountingDateUnlocked(
-        invoiceCheck.rows[0].date_issued,
+        currentInvoice.date_issued,
         `Invoice ${finalInvoiceNumber} edit`
       );
       await syncGTSalesJournalEntry(client, updateResult.rows[0], null);
@@ -1164,7 +1569,7 @@ export default function (pool, defaultConfig) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error(`Error updating Green Target invoice ${invoice_id}:`, error);
-      res.status(error.status || (error.message.includes("Missing required") ||
+      res.status(error.statusCode || error.status || (error.message.includes("Missing required") ||
         error.message.includes("Invalid") ||
         error.message.includes("already exists") ? 400 : 500)).json({
         message: error.message || "Error updating invoice",
@@ -1228,17 +1633,26 @@ export default function (pool, defaultConfig) {
         });
       }
 
-      // Check if there are any *active* payments for this invoice
+      // An invoice cannot be cancelled while any owning receipt is still
+      // active or awaiting cheque clearance. Cancel the whole receipt first
+      // so every allocation and the consolidated REC journal stay in sync.
       const paymentsCheck = await client.query(
-        "SELECT COUNT(*) FROM greentarget.payments WHERE invoice_id = $1 AND (status IS NULL OR status = 'active')",
+        `SELECT p.payment_id, p.receipt_id, p.status, r.display_reference
+           FROM greentarget.payments p
+           JOIN greentarget.receipts r ON r.id = p.receipt_id
+          WHERE p.invoice_id = $1
+            AND (p.status IS NULL OR p.status IN ('active', 'pending'))
+          ORDER BY p.payment_id`,
         [numericInvoiceId]
       );
 
-      if (parseInt(paymentsCheck.rows[0].count) > 0) {
-        await client.query("ROLLBACK"); // Release lock
-        throw new Error(
-          "Cannot cancel invoice: it has active payments. Cancel the payments first."
-        );
+      if (paymentsCheck.rows.length > 0) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({
+          message:
+            "Cannot cancel invoice: it has an active or pending Green Target receipt. Cancel the receipt first.",
+          receipts: paymentsCheck.rows,
+        });
       }
 
       // G7: the posting lock must fire BEFORE the MyInvois API side effect —
@@ -1392,28 +1806,26 @@ export default function (pool, defaultConfig) {
         });
       }
 
-      // Check if there are any payments for this invoice and get payment details
+      // Durable receipt allocations are accounting audit history. Never tear
+      // one payment out of its receipt (especially a multi-invoice receipt),
+      // because that would desynchronise the receipt total and REC journal.
       const paymentsCheck = await client.query(
-        `SELECT payment_id, amount_paid, payment_date, payment_method, status 
-         FROM greentarget.payments 
-         WHERE invoice_id = $1 
-         ORDER BY payment_date DESC`,
+        `SELECT p.payment_id, p.receipt_id, p.amount_paid, p.payment_date,
+                p.payment_method, p.status, r.display_reference
+           FROM greentarget.payments p
+           JOIN greentarget.receipts r ON r.id = p.receipt_id
+          WHERE p.invoice_id = $1
+          ORDER BY p.payment_date DESC`,
         [numericInvoiceId]
       );
 
-      // If force delete is requested, delete payments first
-      if (paymentsCheck.rows.length > 0 && req.query.force === 'true') {
-        // Delete all payments for this invoice
-        await client.query(
-          "DELETE FROM greentarget.payments WHERE invoice_id = $1",
-          [numericInvoiceId]
-        );
-      } else if (paymentsCheck.rows.length > 0) {
+      if (paymentsCheck.rows.length > 0) {
         await client.query("ROLLBACK");
-        return res.status(400).json({
-          message: "Cannot delete invoice: it has associated payments.",
+        return res.status(409).json({
+          message:
+            "Cannot delete invoice: it has Green Target receipt history. Keep the cancelled invoice and receipt as an audit trail; force delete is not available.",
           payments: paymentsCheck.rows,
-          canForceDelete: true
+          canForceDelete: false,
         });
       }
 

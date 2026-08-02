@@ -1,0 +1,255 @@
+// src/components/GreenTarget/GTReceiptJoinPanel.tsx
+//
+// Shared "this Green Target reference already exists" panel for the two
+// record-payment blocks (the invoice form and the rental page's Create Invoice
+// modal). A Green Target receipt is ONE banking event that may settle several
+// invoices, so a re-used reference is not necessarily a mistake — it usually
+// means the new payment belongs to a receipt that already exists.
+//
+// Joining is always opt-in: a typo that collides with a real RV would
+// otherwise post money into the wrong banking event, so the match is shown and
+// an explicit confirmation is required.
+import React, { useEffect, useRef, useState } from "react";
+import { format } from "date-fns";
+import { IconAlertTriangle, IconLink, IconLoader2 } from "@tabler/icons-react";
+import clsx from "clsx";
+import { greenTargetApi } from "../../routes/greentarget/api";
+import type {
+  GreenTargetReceiptByReferenceResponse,
+  GreenTargetReceiptJoinBlockReason,
+  GreenTargetReceiptJoinCandidate,
+} from "../../types/greenTargetTypes";
+import Checkbox from "../Checkbox";
+
+const LOOKUP_DEBOUNCE_MS = 400;
+
+const paymentMethodLabels: Record<string, string> = {
+  cash: "Cash",
+  cheque: "Cheque",
+  bank_transfer: "Bank Transfer",
+  online: "Online",
+};
+
+export interface GTReceiptJoinLookupState {
+  receipt: GreenTargetReceiptJoinCandidate | null;
+  joinable: boolean;
+  blockReason: GreenTargetReceiptJoinBlockReason | null;
+  isLooking: boolean;
+}
+
+const EMPTY_LOOKUP: GTReceiptJoinLookupState = {
+  receipt: null,
+  joinable: false,
+  blockReason: null,
+  isLooking: false,
+};
+
+/**
+ * Debounced lookup of the receipt a keyed Green Target reference belongs to.
+ * `invoiceId` is optional because both callers create the invoice after the
+ * reference is typed; when it is known the server also answers the
+ * "already allocated" rule.
+ */
+export const useGTReceiptJoinLookup = (
+  reference: string,
+  enabled: boolean,
+  invoiceId?: number
+): GTReceiptJoinLookupState => {
+  const [lookup, setLookup] = useState<GTReceiptJoinLookupState>(EMPTY_LOOKUP);
+  const requestIdRef = useRef<number>(0);
+
+  useEffect((): (() => void) => {
+    const normalizedReference: string = reference.trim();
+    const requestId: number = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+
+    if (!enabled || !normalizedReference) {
+      setLookup(EMPTY_LOOKUP);
+      return (): void => {
+        requestIdRef.current += 1;
+      };
+    }
+
+    // A confirmation belongs to one exact reference. Clear the old candidate
+    // immediately so it cannot appear to carry over while a new lookup runs.
+    setLookup({ ...EMPTY_LOOKUP, isLooking: true });
+
+    const timeoutId: ReturnType<typeof setTimeout> = setTimeout((): void => {
+      void greenTargetApi
+        .getReceiptByReference(normalizedReference, invoiceId)
+        .then((response: GreenTargetReceiptByReferenceResponse): void => {
+          if (requestIdRef.current !== requestId) return;
+          setLookup({
+            receipt: response.exists ? response.receipt : null,
+            joinable: response.joinable,
+            blockReason: response.block_reason,
+            isLooking: false,
+          });
+        })
+        .catch((error: unknown): void => {
+          if (requestIdRef.current !== requestId) return;
+          // A failed lookup must not block the form: the server still rejects a
+          // genuinely duplicate reference on save.
+          console.error("Error looking up the Green Target receipt:", error);
+          setLookup(EMPTY_LOOKUP);
+        });
+    }, LOOKUP_DEBOUNCE_MS);
+
+    return (): void => {
+      clearTimeout(timeoutId);
+      requestIdRef.current += 1;
+    };
+  }, [reference, enabled, invoiceId]);
+
+  return lookup;
+};
+
+const formatReceiptDate = (value: string | null): string => {
+  if (!value) return "-";
+  const date: Date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "-" : format(date, "dd/MM/yyyy");
+};
+
+const formatCurrency = (amount: number): string =>
+  `RM ${(Number.isFinite(Number(amount)) ? Number(amount) : 0).toFixed(2)}`;
+
+const describeBlockReason = (
+  blockReason: GreenTargetReceiptJoinBlockReason
+): string => {
+  if (blockReason === "cancelled") {
+    return "That receipt is cancelled, so nothing more can be added to it. Use a different reference number.";
+  }
+  if (blockReason === "manual_override") {
+    return "That receipt's journal was edited by hand, so it can no longer be rebuilt automatically. Use a different reference number.";
+  }
+  return "That receipt already has a payment for this invoice. Use a different reference number.";
+};
+
+interface GTReceiptJoinPanelProps {
+  lookup: GTReceiptJoinLookupState;
+  joinConfirmed: boolean;
+  onJoinConfirmedChange: (joinConfirmed: boolean) => void;
+  disabled?: boolean;
+  className?: string;
+}
+
+const GTReceiptJoinPanel: React.FC<GTReceiptJoinPanelProps> = ({
+  lookup,
+  joinConfirmed,
+  onJoinConfirmedChange,
+  disabled = false,
+  className,
+}) => {
+  if (lookup.isLooking && !lookup.receipt) {
+    return (
+      <div
+        className={clsx(
+          "flex items-center gap-2 text-xs text-default-500 dark:text-gray-400",
+          className
+        )}
+      >
+        <IconLoader2 size={14} className="animate-spin" />
+        Checking this reference number...
+      </div>
+    );
+  }
+
+  if (!lookup.receipt) return null;
+
+  const receipt: GreenTargetReceiptJoinCandidate = lookup.receipt;
+
+  if (!lookup.joinable) {
+    return (
+      <div
+        className={clsx(
+          "rounded-lg border border-rose-200 bg-rose-50 p-3 dark:border-rose-800 dark:bg-rose-900/20",
+          className
+        )}
+      >
+        <div className="flex items-start gap-2">
+          <IconAlertTriangle
+            size={16}
+            className="mt-0.5 shrink-0 text-rose-600 dark:text-rose-400"
+          />
+          <div className="text-sm text-rose-700 dark:text-rose-300">
+            <p className="font-medium">
+              Reference {receipt.display_reference} is already in use.
+            </p>
+            <p className="mt-1 text-xs">
+              {lookup.blockReason
+                ? describeBlockReason(lookup.blockReason)
+                : "That reference cannot take another payment."}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={clsx(
+        "rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20",
+        className
+      )}
+    >
+      <div className="flex items-start gap-2">
+        <IconLink
+          size={16}
+          className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400"
+        />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+            Receipt {receipt.display_reference} already exists.
+          </p>
+          <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-amber-800 dark:text-amber-200 sm:grid-cols-4">
+            <div>
+              <dt className="text-amber-600 dark:text-amber-400">Received</dt>
+              <dd className="font-medium">
+                {formatReceiptDate(receipt.received_date)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-amber-600 dark:text-amber-400">Method</dt>
+              <dd className="font-medium">
+                {paymentMethodLabels[receipt.payment_method] ||
+                  receipt.payment_method}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-amber-600 dark:text-amber-400">
+                Current total
+              </dt>
+              <dd className="font-medium">
+                {formatCurrency(receipt.total_amount)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-amber-600 dark:text-amber-400">Invoices</dt>
+              <dd className="font-medium">
+                {receipt.allocation_count}
+                {receipt.status === "pending" ? " (pending cheque)" : ""}
+              </dd>
+            </div>
+          </dl>
+          <div className="mt-3">
+            <Checkbox
+              checked={joinConfirmed}
+              onChange={onJoinConfirmedChange}
+              disabled={disabled}
+              label="Add this payment to that receipt"
+              size={18}
+            />
+          </div>
+          <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+            {receipt.status === "pending"
+              ? "This receipt is an unconfirmed cheque, so the new payment stays pending and the invoice balance is untouched until the receipt is confirmed."
+              : "The receipt's date, method and cheque / transaction reference apply to the whole receipt and are used as they are."}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default GTReceiptJoinPanel;

@@ -28,6 +28,7 @@ import {
   assertGreenTargetAccountingDateUnlocked,
   toLocalAccountingDateString,
 } from "./accounting/posting-lock.js";
+import { normalizeGTRevenueSplits } from "./accounting/sales-journal.js";
 
 const VALID_TYPES = ["credit_note", "debit_note", "refund_note"];
 const MONEY_TOLERANCE = 0.005;
@@ -303,6 +304,25 @@ export default function (pool, myInvoisGTConfig) {
         );
       }
     }
+
+    if (
+      (doc.type === "credit_note" || doc.type === "debit_note") &&
+      Array.isArray(doc.revenue_splits)
+    ) {
+      for (const split of doc.revenue_splits) {
+        await client.query(
+          `INSERT INTO greentarget.adjustment_revenue_splits (
+             adjustment_doc_id, line_number, account_code, amount
+           ) VALUES ($1, $2, $3, $4)`,
+          [
+            doc.id,
+            split.line_number,
+            split.account_code,
+            split.amount.toFixed(2),
+          ]
+        );
+      }
+    }
   }
 
   // Compute signed balance delta. CN reduces, DN increases. Paired RN restores
@@ -341,6 +361,14 @@ export default function (pool, myInvoisGTConfig) {
       [id]
     );
     doc.lines = linesResult.rows;
+    const revenueSplitsResult = await client.query(
+      `SELECT line_number, account_code, amount
+         FROM greentarget.adjustment_revenue_splits
+        WHERE adjustment_doc_id = $1
+        ORDER BY line_number`,
+      [id]
+    );
+    doc.revenue_splits = revenueSplitsResult.rows;
     return doc;
   }
 
@@ -925,6 +953,7 @@ export default function (pool, myInvoisGTConfig) {
       paired_credit_note_id,
       paired_refund,
       created_by,
+      revenue_splits,
     } = body;
 
     if (!VALID_TYPES.includes(type)) {
@@ -980,7 +1009,9 @@ export default function (pool, myInvoisGTConfig) {
       await client.query("BEGIN");
 
       const invQuery = await client.query(
-        `SELECT invoice_id, invoice_number, customer_id, balance_due, total_amount, status
+        `SELECT invoice_id, invoice_number, customer_id, date_issued,
+                debtor_account_code, receivable_account_code,
+                revenue_account_code, balance_due, total_amount, status
            FROM greentarget.invoices WHERE invoice_id = $1 FOR UPDATE`,
         [original_invoice_id]
       );
@@ -1149,6 +1180,18 @@ export default function (pool, myInvoisGTConfig) {
           ? determineBankAccount(refund_method, null)
           : null,
         lines,
+        revenue_splits:
+          type === "credit_note" || type === "debit_note"
+            ? revenue_splits === undefined
+              ? undefined
+              : normalizeGTRevenueSplits(revenue_splits, amt, {
+                  // WS_OTH4 is historical/display-only for new invoices, but an
+                  // adjustment must be able to inherit it from its source
+                  // invoice. adjustment-journal.js still rejects any account
+                  // that was not present on that original invoice.
+                  allowLegacyAccounts: true,
+                })
+            : undefined,
         created_by: created_by || req.user?.id || null,
       };
 

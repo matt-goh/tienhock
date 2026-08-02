@@ -74,6 +74,7 @@ export default function (pool) {
       location_id,
       tong_no,
       active_only,
+      no_invoice,
       search,
       start_date,
       end_date,
@@ -154,6 +155,18 @@ export default function (pool) {
         paramCounter++;
       }
 
+      if (no_invoice === "true") {
+        // Same rule the invoice form uses to decide a rental is still billable:
+        // a cancelled invoice does not count as invoiced.
+        whereClause += ` AND NOT EXISTS (
+          SELECT 1
+          FROM greentarget.invoice_rentals ir
+          JOIN greentarget.invoices i ON i.invoice_id = ir.invoice_id
+          WHERE ir.rental_id = r.rental_id
+            AND (i.status IS NULL OR i.status != 'cancelled')
+        )`;
+      }
+
       if (start_date) {
         whereClause += ` AND r.date_placed >= $${paramCounter}::date`;
         filterParams.push(start_date);
@@ -173,6 +186,7 @@ export default function (pool) {
         whereClause += ` AND (
           c.name ILIKE ${searchParam} OR
           l.address ILIKE ${searchParam} OR
+          l.site ILIKE ${searchParam} OR
           r.driver ILIKE ${searchParam} OR
           r.tong_no ILIKE ${searchParam} OR
           CAST(r.rental_id AS TEXT) ILIKE ${searchParam}
@@ -711,13 +725,17 @@ export default function (pool) {
       // Attach each invoice's payments (all statuses, newest first).
       if (invoices.length > 0) {
         const invoiceIds = invoices.map((invoice) => invoice.invoice_id);
+        // receipt_id and the header's posting date come along so the page can
+        // link each payment to the receipt that owns it.
         const paymentsQuery = `
-          SELECT payment_id, invoice_id, payment_date, amount_paid,
-                 payment_method, payment_reference, internal_reference,
-                 status, cancellation_date, cancellation_reason
-          FROM greentarget.payments
-          WHERE invoice_id = ANY($1)
-          ORDER BY payment_date DESC, payment_id DESC
+          SELECT p.payment_id, p.invoice_id, p.payment_date, p.amount_paid,
+                 p.payment_method, p.payment_reference, p.internal_reference,
+                 p.status, p.cancellation_date, p.cancellation_reason,
+                 p.receipt_id, r.posting_date
+          FROM greentarget.payments p
+          LEFT JOIN greentarget.receipts r ON r.id = p.receipt_id
+          WHERE p.invoice_id = ANY($1)
+          ORDER BY p.payment_date DESC, p.payment_id DESC
         `;
         const paymentsResult = await pool.query(paymentsQuery, [invoiceIds]);
 
@@ -764,7 +782,26 @@ export default function (pool) {
                   'invoice_number', i.invoice_number,
                   'status', i.status,
                   'amount', i.total_amount,
-                  'has_payments', EXISTS(SELECT 1 FROM greentarget.payments p WHERE p.invoice_id = i.invoice_id)
+                  'has_payments', EXISTS(SELECT 1 FROM greentarget.payments p WHERE p.invoice_id = i.invoice_id),
+                  'payments', (
+                    SELECT COALESCE(
+                             json_agg(
+                               json_build_object(
+                                 'payment_id', p.payment_id,
+                                 'payment_date', p.payment_date,
+                                 'amount_paid', p.amount_paid,
+                                 'payment_method', p.payment_method,
+                                 'internal_reference', p.internal_reference,
+                                 'status', p.status,
+                                 'receipt_id', p.receipt_id
+                               )
+                               ORDER BY p.payment_date DESC, p.payment_id DESC
+                             ),
+                             '[]'::json
+                           )
+                      FROM greentarget.payments p
+                     WHERE p.invoice_id = i.invoice_id
+                  )
                 ) FROM greentarget.invoices i
                 JOIN greentarget.invoice_rentals ir ON i.invoice_id = ir.invoice_id
                 WHERE ir.rental_id = r.rental_id

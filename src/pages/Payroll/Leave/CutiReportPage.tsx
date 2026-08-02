@@ -29,6 +29,8 @@ import {
   CutiReportData,
   CutiBatchReportData,
 } from "../../../utils/payroll/CutiReportPDF";
+import { usePersistedSearch } from "../../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
 
 // --- Types for API Data ---
@@ -108,7 +110,7 @@ const EmployeeCard: React.FC<EmployeeCardProps> = ({
 const CutiReportPage: React.FC = () => {
   const { staffs, loading: loadingStaffs } = useStaffsCache();
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = usePersistedSearch("cutiReportSearch");
   const [currentYear] = useState(new Date().getFullYear());
 
   // State for API data
@@ -171,6 +173,11 @@ const CutiReportPage: React.FC = () => {
       );
     });
   }, [dedupedStaffs, groupedStaffIdsByEmployeeId, searchQuery]);
+
+  useScrollRestoration(
+    "cuti-report",
+    !loadingStaffs && filteredEmployees.length > 0
+  );
 
   // Handle employee card click
   const handleEmployeeCardClick = (employee: Employee) => {

@@ -20,6 +20,7 @@ import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 import { format } from "date-fns";
 import { getJobConfig } from "../../../configs/payrollJobConfigs";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 
 interface DailyLogListPageProps {
   jobType: string;
@@ -104,6 +105,11 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
   });
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [logToDelete, setLogToDelete] = useState<WorkLog | null>(null);
+
+  useScrollRestoration(
+    `daily-log-list-${jobType}`,
+    !isLoading && workLogs.length > 0
+  );
 
   // Cache date range whenever it changes
   useEffect(() => {

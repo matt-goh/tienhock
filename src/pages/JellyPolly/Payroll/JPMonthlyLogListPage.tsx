@@ -17,9 +17,17 @@ import toast from "react-hot-toast";
 import StyledListbox from "../../../components/StyledListbox";
 import { getJPJobConfig } from "../../../configs/jpPayrollJobConfigs";
 import TimeNavigator from "../../../components/TimeNavigator";
+import { usePersistedFilters } from "../../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 
 interface JPMonthlyLogListPageProps {
   jobType: string;
+}
+
+interface MonthlyLogFilters {
+  year: number;
+  month: number | null;
+  status: string | null;
 }
 
 interface MonthlyWorkLog {
@@ -48,14 +56,31 @@ const JPMonthlyLogListPage: React.FC<JPMonthlyLogListPageProps> = ({ jobType }) 
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
 
-  const [filters, setFilters] = useState({
-    year: currentYear,
-    month: null as number | null,
-    status: null as string | null,
-  });
+  const [filters, setFilters] = usePersistedFilters<MonthlyLogFilters>(
+    `jpMonthlyLogList_${jobType}`,
+    () => ({
+      year: currentYear,
+      month: null,
+      status: null,
+    }),
+    (cached) =>
+      cached && typeof cached === "object" && typeof cached.year === "number"
+        ? {
+            year: cached.year,
+            month: typeof cached.month === "number" ? cached.month : null,
+            status: typeof cached.status === "string" ? cached.status : null,
+          }
+        : null
+  );
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [logToDelete, setLogToDelete] = useState<MonthlyWorkLog | null>(null);
+
+  useScrollRestoration(
+    `jp-monthly-log-list-${jobType}`,
+    !isLoading && workLogs.length > 0,
+    "#jp-monthly-log-list-scroll"
+  );
 
   // Range for the TimeNavigator: a whole year when no specific month is set
   // (month === null = "all months"), otherwise the selected month.
@@ -302,7 +327,10 @@ const JPMonthlyLogListPage: React.FC<JPMonthlyLogListPageProps> = ({ jobType }) 
         </div>
       ) : workLogs.length > 0 ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
-          <div className="max-h-[calc(100vh-220px)] overflow-y-auto">
+          <div
+            id="jp-monthly-log-list-scroll"
+            className="max-h-[calc(100vh-220px)] overflow-y-auto"
+          >
             <table className="min-w-full table-fixed">
               <thead className="bg-default-100 dark:bg-gray-800 sticky top-0 z-10">
                 <tr>

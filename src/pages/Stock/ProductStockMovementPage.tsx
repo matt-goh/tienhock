@@ -23,6 +23,11 @@ import MonthNavigator from "../../components/MonthNavigator";
 import clsx from "clsx";
 import { isOthProductionProduct } from "../../config/othProductionProducts";
 import ProductOrderModal from "../../components/Catalogue/ProductOrderModal";
+import {
+  usePersistedDate,
+  usePersistedFilters,
+} from "../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 
 const FAVORITES_STORAGE_KEY = "stock-product-favorites";
 
@@ -57,15 +62,42 @@ interface ProductStockMovementPageProps {
 const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
   productTypes,
 }) => {
+  // Tien Hock and Jelly Polly both render this page, so cache keys are scoped
+  // by product type — they must never share a product or month.
+  const storageScope: string = (productTypes ?? DEFAULT_PRODUCT_TYPES).join("+");
+
   // State
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(
-    null
+  const [selectedProductId, setSelectedProductId] = usePersistedFilters<
+    string | null
+  >(
+    `productStockMovement:${storageScope}:productId`,
+    () => null,
+    (cached) => (typeof cached === "string" ? cached : null)
   );
   const [showProductOrderModal, setShowProductOrderModal] = useState(false);
-  const [viewType, setViewType] = useState<ViewType>("month");
-  const [selectedMonth, setSelectedMonth] = useState<Date>(() => new Date());
-  const [customStartDate, setCustomStartDate] = useState<string>("");
-  const [customEndDate, setCustomEndDate] = useState<string>("");
+  const [viewType, setViewType] = usePersistedFilters<ViewType>(
+    `productStockMovement:${storageScope}:viewType`,
+    () => "month",
+    (cached) =>
+      cached === "month" || cached === "rolling" || cached === "custom"
+        ? cached
+        : null
+  );
+  const [selectedMonth, setSelectedMonth] = usePersistedDate(
+    `productStockMovement:${storageScope}:month`,
+    () => new Date()
+  );
+  // Custom range endpoints, kept as the yyyy-MM-dd strings the inputs use
+  const [customStartDate, setCustomStartDate] = usePersistedFilters<string>(
+    `productStockMovement:${storageScope}:customStart`,
+    () => "",
+    (cached) => (typeof cached === "string" ? cached : null)
+  );
+  const [customEndDate, setCustomEndDate] = usePersistedFilters<string>(
+    `productStockMovement:${storageScope}:customEnd`,
+    () => "",
+    (cached) => (typeof cached === "string" ? cached : null)
+  );
 
   // Data state
   const [movements, setMovements] = useState<StockMovement[]>([]);
@@ -78,6 +110,11 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
     StockMovementResponse["monthly_totals"] | null
   >(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  useScrollRestoration(
+    `product-stock-movement:${storageScope}`,
+    !isLoading && movements.length > 0
+  );
 
   // Opening balance edit state
   const [isEditingBalance, setIsEditingBalance] = useState(false);

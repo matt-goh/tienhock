@@ -11,11 +11,14 @@ import { greenTargetApi } from "../../routes/greentarget/api";
 import { GreenTargetPayment } from "../../types/greenTargetTypes";
 import Button from "../Button";
 import ConfirmationDialog from "../ConfirmationDialog";
+import GreenTargetReceiptDetailsDialog from "./GreenTargetReceiptDetailsDialog";
 
 interface GreenTargetPaymentTableProps {
   payments: GreenTargetPayment[];
   onViewPayment: (payment: GreenTargetPayment) => void;
-  onRefresh: () => void;
+  onRefresh: () => void | Promise<void>;
+  selectedReceiptId: number | null;
+  onSelectReceipt: (receiptId: number | null) => void;
 }
 
 interface ApiErrorShape {
@@ -35,6 +38,8 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
   payments,
   onViewPayment,
   onRefresh,
+  selectedReceiptId,
+  onSelectReceipt,
 }) => {
   const navigate = useNavigate();
   const [confirmingPaymentId, setConfirmingPaymentId] = useState<number | null>(
@@ -50,6 +55,9 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
   const [selectedPaymentGroup, setSelectedPaymentGroup] = useState<
     GreenTargetPayment[]
   >([]);
+  const [clearanceDate, setClearanceDate] = useState<string>(
+    format(new Date(), "yyyy-MM-dd")
+  );
 
   const formatCurrency = (amount: number | string): string => {
     const numericAmount: number = Number(amount);
@@ -68,20 +76,27 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
     if (!selectedPayment || confirmingPaymentId !== null) {
       return;
     }
+    if (!clearanceDate) {
+      toast.error("Bank clearance / posting date is required");
+      return;
+    }
 
     setConfirmingPaymentId(selectedPayment.payment_id);
     setShowConfirmDialog(false);
     const toastId: string = toast.loading("Confirming payment...");
 
     try {
-      await greenTargetApi.confirmPayment(selectedPayment.payment_id);
+      await greenTargetApi.confirmPayment(
+        selectedPayment.payment_id,
+        clearanceDate
+      );
       toast.success(
         selectedPaymentGroup.length > 1
           ? "Receipt confirmed successfully"
           : "Payment confirmed successfully",
         { id: toastId }
       );
-      onRefresh();
+      await onRefresh();
     } catch (error: unknown) {
       console.error("Error confirming payment:", error);
       toast.error(getApiErrorMessage(error, "Failed to confirm payment"), {
@@ -109,7 +124,7 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
           ? "Receipt cancelled successfully"
           : "Payment cancelled successfully"
       );
-      onRefresh();
+      await onRefresh();
     } catch (error: unknown) {
       console.error("Error cancelling payment:", error);
       toast.error(getApiErrorMessage(error, "Failed to cancel payment"));
@@ -124,8 +139,14 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
     payment: GreenTargetPayment,
     paymentGroup: GreenTargetPayment[] = [payment]
   ): void => {
+    const today: string = format(new Date(), "yyyy-MM-dd");
+    const receivedDate: string = format(
+      new Date(payment.payment_date),
+      "yyyy-MM-dd"
+    );
     setSelectedPayment(payment);
     setSelectedPaymentGroup(paymentGroup);
+    setClearanceDate(receivedDate > today ? receivedDate : today);
     setShowConfirmDialog(true);
   };
 
@@ -168,23 +189,8 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
       groups: Record<string, GreenTargetPayment[]>,
       payment: GreenTargetPayment
     ): Record<string, GreenTargetPayment[]> => {
-      const paymentDate: string = format(
-        new Date(payment.payment_date),
-        "yyyy-MM-dd"
-      );
-      const statusGroup: "active" | "pending" | "cancelled" =
-        payment.status === "pending"
-          ? "pending"
-          : payment.status === "cancelled"
-          ? "cancelled"
-          : "active";
-      const groupKey: string = payment.internal_reference
-        ? [
-            payment.internal_reference,
-            paymentDate,
-            payment.payment_method,
-            statusGroup,
-          ].join("::")
+      const groupKey: string = payment.receipt_id
+        ? `receipt_${payment.receipt_id}`
         : `single_${payment.payment_id}`;
 
       if (!groups[groupKey]) {
@@ -295,13 +301,25 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
       <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
     );
 
+  const receiptDetailsDialog: React.ReactNode = (
+    <GreenTargetReceiptDetailsDialog
+      receiptId={selectedReceiptId}
+      isOpen={selectedReceiptId !== null}
+      onClose={(): void => onSelectReceipt(null)}
+      onChanged={onRefresh}
+    />
+  );
+
   if (payments.length === 0) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <p className="text-gray-500 dark:text-gray-400">
-          No payments found for the selected filters.
-        </p>
-      </div>
+      <>
+        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <p className="text-gray-500 dark:text-gray-400">
+            No payments found for the selected filters.
+          </p>
+        </div>
+        {receiptDetailsDialog}
+      </>
     );
   }
 
@@ -377,12 +395,23 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
                             {formatDate(firstPayment.payment_date)}
                           </td>
                           <td className="max-w-[170px] px-3 py-3">
-                            <div
-                              className="truncate font-mono font-semibold text-gray-900 dark:text-gray-100"
-                              title={firstPayment.internal_reference || ""}
+                            <button
+                              type="button"
+                              onClick={(): void => {
+                                if (firstPayment.receipt_id) {
+                                  onSelectReceipt(firstPayment.receipt_id);
+                                }
+                              }}
+                              disabled={!firstPayment.receipt_id}
+                              className="block max-w-full truncate font-mono font-semibold text-sky-700 hover:underline disabled:cursor-default disabled:text-gray-900 disabled:no-underline dark:text-sky-300 dark:disabled:text-gray-100"
+                              title={
+                                firstPayment.receipt_id
+                                  ? "View the complete receipt group"
+                                  : firstPayment.internal_reference || ""
+                              }
                             >
-                              {firstPayment.internal_reference}
-                            </div>
+                              {firstPayment.internal_reference || "-"}
+                            </button>
                             <span className="mt-1 inline-flex rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700 dark:bg-sky-900/50 dark:text-sky-300">
                               {paymentGroup.length} invoices
                             </span>
@@ -409,8 +438,8 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
                           <td className="px-3 py-3">
                             {getStatusBadge(groupStatus)}
                           </td>
-                          <td className="px-3 py-3 text-sm text-gray-400 dark:text-gray-500">
-                            -
+                          <td className="whitespace-nowrap px-3 py-3">
+                            {renderJournalLink(firstPayment)}
                           </td>
                           <td className="px-3 py-3 text-right font-medium text-green-600 dark:text-green-400">
                             {formatCurrency(totalAmount)}
@@ -510,12 +539,23 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
                         {formatDate(firstPayment.payment_date)}
                       </td>
                       <td className="max-w-[170px] px-3 py-3">
-                        <span
-                          className="block truncate font-mono text-sm text-gray-600 dark:text-gray-400"
-                          title={firstPayment.internal_reference || ""}
+                        <button
+                          type="button"
+                          onClick={(): void => {
+                            if (firstPayment.receipt_id) {
+                              onSelectReceipt(firstPayment.receipt_id);
+                            }
+                          }}
+                          disabled={!firstPayment.receipt_id}
+                          className="block max-w-full truncate font-mono text-sm text-sky-700 hover:underline disabled:cursor-default disabled:text-gray-600 disabled:no-underline dark:text-sky-300 dark:disabled:text-gray-400"
+                          title={
+                            firstPayment.receipt_id
+                              ? "View the complete receipt group"
+                              : firstPayment.internal_reference || ""
+                          }
                         >
                           {firstPayment.internal_reference || "-"}
-                        </span>
+                        </button>
                       </td>
                       <td className="whitespace-nowrap px-3 py-3 font-mono text-sm text-gray-500 dark:text-gray-400">
                         {firstPayment.payment_reference || "-"}
@@ -598,8 +638,35 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
                   : "?"}
               </p>
               <p className="text-xs text-default-500 dark:text-gray-400">
-                Confirming updates all related invoice balances together.
+                Confirming updates all related invoice balances and creates
+                one consolidated PBB_1 receipt journal.
               </p>
+              <div>
+                <label
+                  htmlFor="gt-clearance-date"
+                  className="mb-1 block text-xs font-medium text-default-600 dark:text-gray-300"
+                >
+                  Bank clearance / posting date
+                </label>
+                <input
+                  id="gt-clearance-date"
+                  type="date"
+                  value={clearanceDate}
+                  min={
+                    selectedPayment.payment_date
+                      ? format(
+                          new Date(selectedPayment.payment_date),
+                          "yyyy-MM-dd"
+                        )
+                      : undefined
+                  }
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
+                    setClearanceDate(event.target.value)
+                  }
+                  required
+                  className="w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                />
+              </div>
             </div>
           }
           confirmButtonText={
@@ -648,6 +715,8 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
         }
         variant="danger"
       />
+
+      {receiptDetailsDialog}
     </>
   );
 };

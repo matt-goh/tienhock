@@ -14,6 +14,7 @@ import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import TimeNavigator, { TimeRange } from "../../../components/TimeNavigator";
 import { FormInput } from "../../../components/FormComponents";
+import { usePersistedNumber } from "../../../hooks/usePersistedFilters";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 
@@ -68,8 +69,18 @@ const downloadExportFiles = (files: ExportFile[]) => {
 
 const GTECarumanPage: React.FC = () => {
   const now = new Date();
-  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
+  const [selectedYear, setSelectedYear] = usePersistedNumber(
+    "gtECarumanYear",
+    2000,
+    2100,
+    () => now.getFullYear()
+  );
+  const [selectedMonth, setSelectedMonth] = usePersistedNumber(
+    "gtECarumanMonth",
+    1,
+    12,
+    () => now.getMonth() + 1
+  );
   const [preview, setPreview] = useState<Preview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingType, setLoadingType] = useState<string | null>(null);

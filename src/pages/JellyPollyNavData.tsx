@@ -42,6 +42,7 @@ import JPDailyLogEditPage from "./JellyPolly/Payroll/JPDailyLogEditPage";
 import JPDailyLogSalesmanEntryPage from "./JellyPolly/Payroll/JPDailyLogSalesmanEntryPage";
 import JPDailyLogSalesmanEditPage from "./JellyPolly/Payroll/JPDailyLogSalesmanEditPage";
 import JPDailyPlasticEntryPage from "./JellyPolly/Payroll/JPDailyPlasticEntryPage";
+import JPPackingCutiEntryPage from "./JellyPolly/Payroll/JPPackingCutiEntryPage";
 import JPBonusPage from "./JellyPolly/Payroll/JPBonusPage";
 import JPOthersAdvancePage from "./JellyPolly/Payroll/JPOthersAdvancePage";
 import JPOthersKerjaLuarOtPage from "./JellyPolly/Payroll/JPOthersKerjaLuarOtPage";
@@ -250,6 +251,14 @@ export const JellyPollyNavData: SidebarItem[] = [
         name: "Daily Machine Plastic",
         path: "/payroll/plastic-entry",
         component: JPDailyPlasticEntryPage,
+        group: "Daily Logs",
+        dropdownColumn: JP_PAYROLL_DROPDOWN_COLUMNS.dailyLogs.key,
+        dropdownColumnOrder: JP_PAYROLL_DROPDOWN_COLUMNS.dailyLogs.order,
+      },
+      {
+        name: "Packing Cuti",
+        path: "/payroll/packing-cuti",
+        component: JPPackingCutiEntryPage,
         group: "Daily Logs",
         dropdownColumn: JP_PAYROLL_DROPDOWN_COLUMNS.dailyLogs.key,
         dropdownColumnOrder: JP_PAYROLL_DROPDOWN_COLUMNS.dailyLogs.order,

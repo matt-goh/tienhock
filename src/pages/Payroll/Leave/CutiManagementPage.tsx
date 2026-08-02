@@ -3,12 +3,20 @@ import React from "react";
 import Tab from "../../../components/Tab";
 import CutiReportPage from "./CutiReportPage";
 import HolidayCalendarPage from "./HolidayCalendarPage";
+import { usePersistedNumber } from "../../../hooks/usePersistedFilters";
 
 const CutiManagementPage: React.FC = () => {
   const tabLabels = [
     "Cuti Report",
     "Holiday Calendar",
   ];
+
+  const [activeTab, setActiveTab] = usePersistedNumber(
+    "cutiManagementTab",
+    0,
+    tabLabels.length - 1,
+    () => 0
+  );
 
   return (
     <div className="space-y-4">
@@ -24,7 +32,12 @@ const CutiManagementPage: React.FC = () => {
       </div>
 
       <div>
-        <Tab labels={tabLabels} tabWidth="w-36">
+        <Tab
+          labels={tabLabels}
+          tabWidth="w-36"
+          defaultActiveTab={activeTab}
+          onTabChange={setActiveTab}
+        >
           <CutiReportPage />
           <HolidayCalendarPage />
         </Tab>

@@ -31,6 +31,8 @@ import {
 import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
 import { groupStaffsByName } from "../../../utils/payroll/groupStaffsByName";
 import GreenTargetLogo from "../../../utils/GreenTargetLogo.png";
+import { usePersistedFilters } from "../../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
 
 const GT_COMPANY = "GREEN TARGET SDN. BHD.";
@@ -197,10 +199,23 @@ const getPinjamStaffKey = (
 ): string => (staffName || staffId || "").trim().toUpperCase();
 
 const GTSalaryReportPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabType>("monthly");
-  const [annualView, setAnnualView] = useState<AnnualView>("summary");
+  const [activeTab, setActiveTab] = usePersistedFilters<TabType>(
+    "gtSalaryReportTab",
+    () => "monthly",
+    (cached) => (TABS.includes(cached as TabType) ? (cached as TabType) : null)
+  );
+  const [annualView, setAnnualView] = usePersistedFilters<AnnualView>(
+    "gtSalaryReportAnnualView",
+    () => "summary",
+    (cached) => (cached === "summary" || cached === "breakdown" ? cached : null)
+  );
   const [pinjamViewMode, setPinjamViewMode] =
-    useState<PinjamViewMode>("month_end");
+    usePersistedFilters<PinjamViewMode>(
+      "gtSalaryReportPinjamView",
+      () => "month_end",
+      (cached) =>
+        cached === "month_end" || cached === "mid_month" ? cached : null
+    );
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -209,13 +224,33 @@ const GTSalaryReportPage: React.FC = () => {
   const [cutiEmployees, setCutiEmployees] = useState<CutiBatchEmployee[]>([]);
   const [cutiSummary, setCutiSummary] = useState<any>(null);
 
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
+  const [currentYear, setCurrentYear] = usePersistedFilters<number>(
+    "gtSalaryReportYear",
+    () => new Date().getFullYear(),
+    (cached) => (typeof cached === "number" ? cached : null)
+  );
+  const [currentMonth, setCurrentMonth] = usePersistedFilters<number>(
+    "gtSalaryReportMonth",
+    () => new Date().getMonth() + 1,
+    (cached) =>
+      typeof cached === "number" && cached >= 1 && cached <= 12 ? cached : null
+  );
 
   const [monthly, setMonthly] = useState<Comprehensive | null>(null);
   const [pinjamSummary, setPinjamSummary] = useState<PinjamSummaryEntry[]>([]);
   const [annual, setAnnual] = useState<AnnualSummary | null>(null);
   const [breakdown, setBreakdown] = useState<AnnualBreakdown | null>(null);
+
+  // `isLoading` starts false, so the ready flag also waits for content —
+  // otherwise the restore fires against an empty page and clamps to 0.
+  useScrollRestoration(
+    "gt-salary-report",
+    !isLoading &&
+      (monthly !== null ||
+        annual !== null ||
+        breakdown !== null ||
+        cutiEmployees.length > 0)
+  );
 
   const monthRange = useMemo<TimeRange>(
     () => ({

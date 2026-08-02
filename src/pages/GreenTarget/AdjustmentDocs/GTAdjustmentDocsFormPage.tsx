@@ -6,7 +6,13 @@
 // freeform logic. Standalone Refund Notes are out of scope for GT — RN is
 // only ever issued via the CN form's paired-refund toggle or as a replacement
 // for an existing Credit Note (?type=refund&creditNoteId=...).
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   IconExternalLink,
@@ -31,11 +37,18 @@ import {
   multiplyMoney,
   sumMoney,
   roundMoney,
+  toCents,
 } from "../../../utils/moneyUtils";
 import {
   AdjustmentDocTypeBadge,
   AdjustmentDocStatusBadge,
 } from "../../../components/AdjustmentDocs/AdjustmentDocBadge";
+import GTRevenueSplitEditor from "../../../components/GreenTarget/GTRevenueSplitEditor";
+import type {
+  GreenTargetRevenueAccountCode,
+  GreenTargetRevenueSplit,
+  GreenTargetRevenueSplitAccountCode,
+} from "../../../types/greenTargetTypes";
 
 const API_BASE = "/greentarget/api/adjustment-docs";
 const UI_BASE = "/greentarget/adjustment-docs";
@@ -43,6 +56,12 @@ const INVOICES_API = "/greentarget/api/invoices";
 const INVOICE_UI_BASE = "/greentarget/invoices";
 
 const MONEY_TOLERANCE = 0.005;
+const SELECTABLE_REVENUE_ACCOUNT_CODES: ReadonlyArray<GreenTargetRevenueAccountCode> =
+  ["TGA", "TGB", "WS_OTH"];
+const REVENUE_SPLIT_ACCOUNT_CODES: ReadonlySet<string> = new Set([
+  ...SELECTABLE_REVENUE_ACCOUNT_CODES,
+  "WS_OTH4",
+]);
 
 const TYPE_LABEL: Record<AdjustmentDocType, string> = {
   credit_note: "Credit Note",
@@ -93,6 +112,8 @@ interface GTInvoice {
   einvoice_status?: string | null;
   uuid?: string | null;
   long_id?: string | null;
+  revenue_account_code?: GreenTargetRevenueSplitAccountCode | null;
+  revenue_splits?: GreenTargetRevenueSplit[];
   rental_details?: Array<{
     rental_id: number;
     tong_no?: string;
@@ -101,6 +122,75 @@ interface GTInvoice {
     location_address?: string | null;
   }>;
 }
+
+const isRevenueSplitAccountCode = (
+  value: unknown
+): value is GreenTargetRevenueSplitAccountCode =>
+  typeof value === "string" && REVENUE_SPLIT_ACCOUNT_CODES.has(value);
+
+const isSelectableRevenueAccountCode = (
+  value: GreenTargetRevenueSplitAccountCode
+): value is GreenTargetRevenueAccountCode => value !== "WS_OTH4";
+
+const normaliseInvoiceRevenueSplits = (
+  invoice: GTInvoice
+): GreenTargetRevenueSplit[] => {
+  const storedSplits: GreenTargetRevenueSplit[] = Array.isArray(
+    invoice.revenue_splits
+  )
+    ? invoice.revenue_splits
+        .map(
+          (
+            split: GreenTargetRevenueSplit,
+            index: number
+          ): GreenTargetRevenueSplit | null => {
+            const amount: number = Number(split.amount);
+            if (
+              !isRevenueSplitAccountCode(split.account_code) ||
+              !Number.isFinite(amount) ||
+              amount <= 0
+            ) {
+              return null;
+            }
+            return {
+              line_number: Number(split.line_number) || index + 1,
+              account_code: split.account_code,
+              amount: roundMoney(amount),
+            };
+          }
+        )
+        .filter(
+          (
+            split: GreenTargetRevenueSplit | null
+          ): split is GreenTargetRevenueSplit => split !== null
+        )
+        .sort(
+          (
+            left: GreenTargetRevenueSplit,
+            right: GreenTargetRevenueSplit
+          ): number => left.line_number - right.line_number
+        )
+        .map(
+          (
+            split: GreenTargetRevenueSplit,
+            index: number
+          ): GreenTargetRevenueSplit => ({
+            ...split,
+            line_number: index + 1,
+          })
+        )
+    : [];
+
+  if (storedSplits.length > 0) return storedSplits;
+  if (!isRevenueSplitAccountCode(invoice.revenue_account_code)) return [];
+  return [
+    {
+      line_number: 1,
+      account_code: invoice.revenue_account_code,
+      amount: roundMoney(Number(invoice.total_amount || 0)),
+    },
+  ];
+};
 
 interface GTPayment {
   payment_id: number;
@@ -172,6 +262,10 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
   const [reason, setReason] = useState("");
   const [lines, setLines] = useState<LineState[]>([]);
   const [hasLineUserEdits, setHasLineUserEdits] = useState<boolean>(false);
+  const [revenueSplits, setRevenueSplits] = useState<
+    GreenTargetRevenueSplit[]
+  >([]);
+  const partialRevenueAllocationContextRef = useRef<string>("");
 
   const [refundMethod, setRefundMethod] = useState<string>("cash");
   const [bankAccount, setBankAccount] = useState<string>("BANK_PBB");
@@ -289,6 +383,10 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
         }
         setInvoice(inv);
         setPayments(pays);
+        setRevenueSplits(
+          isCN || isDN ? normaliseInvoiceRevenueSplits(inv) : []
+        );
+        partialRevenueAllocationContextRef.current = "";
 
         const docsResp: any = await api.get(
           `${API_BASE}?original_invoice_id=${inv.invoice_id}&include_cancelled=false`
@@ -417,6 +515,118 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
     };
   }, [lines]);
 
+  const invoiceRevenueSplits: GreenTargetRevenueSplit[] = useMemo(
+    (): GreenTargetRevenueSplit[] =>
+      invoice ? normaliseInvoiceRevenueSplits(invoice) : [],
+    [invoice]
+  );
+  const originalRevenueAccountCodes: GreenTargetRevenueSplitAccountCode[] =
+    useMemo(
+      (): GreenTargetRevenueSplitAccountCode[] => [
+        ...new Set(
+          invoiceRevenueSplits.map(
+            (split: GreenTargetRevenueSplit): GreenTargetRevenueSplitAccountCode =>
+              split.account_code
+          )
+        ),
+      ],
+      [invoiceRevenueSplits]
+    );
+  const originalRevenueAccountSet: ReadonlySet<GreenTargetRevenueSplitAccountCode> =
+    useMemo(
+      (): ReadonlySet<GreenTargetRevenueSplitAccountCode> =>
+        new Set(originalRevenueAccountCodes),
+      [originalRevenueAccountCodes]
+    );
+  const selectableOriginalRevenueAccounts: GreenTargetRevenueAccountCode[] =
+    useMemo(
+      (): GreenTargetRevenueAccountCode[] =>
+        originalRevenueAccountCodes.filter(isSelectableRevenueAccountCode),
+      [originalRevenueAccountCodes]
+    );
+  const displayOnlyOriginalRevenueAccounts: GreenTargetRevenueSplitAccountCode[] =
+    useMemo(
+      (): GreenTargetRevenueSplitAccountCode[] =>
+        originalRevenueAccountCodes.filter(
+          (accountCode: GreenTargetRevenueSplitAccountCode): boolean =>
+            accountCode === "WS_OTH4"
+        ),
+      [originalRevenueAccountCodes]
+    );
+  const invoiceRevenueFingerprint: string = useMemo(
+    (): string =>
+      invoiceRevenueSplits
+        .map(
+          (split: GreenTargetRevenueSplit): string =>
+            `${split.line_number}:${split.account_code}:${toCents(split.amount)}`
+        )
+        .join("|"),
+    [invoiceRevenueSplits]
+  );
+  const isMixedRevenueInvoice: boolean =
+    originalRevenueAccountCodes.length > 1;
+  const isFullValueMixedAdjustment: boolean =
+    isMixedRevenueInvoice &&
+    Boolean(invoice) &&
+    toCents(totals.total_amount) === toCents(Number(invoice?.total_amount || 0));
+  const requiresManualRevenueAllocation: boolean =
+    (isCN || isDN) &&
+    isMixedRevenueInvoice &&
+    totals.total_amount > 0 &&
+    !isFullValueMixedAdjustment;
+
+  useEffect((): void => {
+    if (!requiresManualRevenueAllocation || !invoice) {
+      partialRevenueAllocationContextRef.current = "";
+      return;
+    }
+    const contextKey: string = `${invoice.invoice_id}:${invoiceRevenueFingerprint}`;
+    if (partialRevenueAllocationContextRef.current === contextKey) return;
+    partialRevenueAllocationContextRef.current = contextKey;
+    setRevenueSplits(
+      invoiceRevenueSplits.map(
+        (
+          split: GreenTargetRevenueSplit,
+          index: number
+        ): GreenTargetRevenueSplit => ({
+          line_number: index + 1,
+          account_code: split.account_code,
+          amount: 0,
+        })
+      )
+    );
+  }, [
+    invoice,
+    invoiceRevenueFingerprint,
+    invoiceRevenueSplits,
+    requiresManualRevenueAllocation,
+  ]);
+
+  const handleRevenueSplitsChange = useCallback(
+    (nextSplits: GreenTargetRevenueSplit[]): void => {
+      setRevenueSplits(nextSplits);
+    },
+    []
+  );
+
+  const getRevenueSplitsForSubmission = ():
+    | GreenTargetRevenueSplit[]
+    | undefined => {
+    if (!requiresManualRevenueAllocation) {
+      return undefined;
+    }
+    return revenueSplits.map(
+      (
+        split: GreenTargetRevenueSplit,
+        index: number
+      ): GreenTargetRevenueSplit => ({
+        line_number: index + 1,
+        account_code: split.account_code,
+        amount: roundMoney(Number(split.amount)),
+      })
+    );
+  };
+
   const pairedRefundAmount: number = isCN
     ? roundMoney(
         Math.max(
@@ -488,6 +698,60 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
     });
     if (totals.total_amount <= 0)
       errors.push("Document total must be greater than 0");
+
+    if (
+      requiresManualRevenueAllocation &&
+      totals.total_amount > 0
+    ) {
+      const adjustmentRevenueSplits:
+        | GreenTargetRevenueSplit[]
+        | undefined = getRevenueSplitsForSubmission();
+      if (!adjustmentRevenueSplits || adjustmentRevenueSplits.length === 0) {
+        errors.push("Add at least one revenue allocation");
+      } else {
+        let allocatedRevenueCents: number = 0;
+        adjustmentRevenueSplits.forEach(
+          (split: GreenTargetRevenueSplit, index: number): void => {
+            const amount: number = Number(split.amount);
+            const amountCents: number = toCents(amount);
+            if (!Number.isFinite(amount) || amountCents <= 0) {
+              errors.push(
+                `Revenue allocation ${index + 1}: amount must be greater than 0`
+              );
+            } else {
+              allocatedRevenueCents += amountCents;
+            }
+            if (!originalRevenueAccountSet.has(split.account_code)) {
+              errors.push(
+                `Revenue allocation ${index + 1}: ${split.account_code} was not used by the original invoice`
+              );
+            }
+          }
+        );
+
+        if (allocatedRevenueCents !== toCents(totals.total_amount)) {
+          errors.push(
+            `Revenue allocations must equal the document total exactly (allocated RM ${(
+              allocatedRevenueCents / 100
+            ).toFixed(2)}, document RM ${totals.total_amount.toFixed(2)})`
+          );
+        }
+
+        const originalLegacyRowCount: number = invoiceRevenueSplits.filter(
+          (split: GreenTargetRevenueSplit): boolean =>
+            split.account_code === "WS_OTH4"
+        ).length;
+        const adjustmentLegacyRowCount: number = adjustmentRevenueSplits.filter(
+          (split: GreenTargetRevenueSplit): boolean =>
+            split.account_code === "WS_OTH4"
+        ).length;
+        if (adjustmentLegacyRowCount > originalLegacyRowCount) {
+          errors.push(
+            "WS_OTH4 is an inherited legacy account and cannot be added as a new allocation row"
+          );
+        }
+      }
+    }
 
     if (isCN && invoice) {
       if (totals.total_amount > maxCreditNoteAmount + MONEY_TOLERANCE) {
@@ -588,6 +852,15 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
         tax_amount: totals.tax_amount,
         total_amount: totals.total_amount,
       };
+
+      if (isCN || isDN) {
+        const adjustmentRevenueSplits:
+          | GreenTargetRevenueSplit[]
+          | undefined = getRevenueSplitsForSubmission();
+        if (adjustmentRevenueSplits) {
+          payload.revenue_splits = adjustmentRevenueSplits;
+        }
+      }
 
       if (isRN) {
         payload.refund_method = refundMethod;
@@ -1029,6 +1302,87 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
             </table>
           </div>
         </div>
+
+        {(isCN || isDN) && (
+          <div className="p-4 border-b border-default-200 dark:border-gray-700">
+            <div className="mb-3">
+              <h2 className="text-lg font-semibold text-default-900 dark:text-gray-100">
+                Revenue Posting
+              </h2>
+              <p className="text-xs text-default-500 dark:text-gray-400">
+                The adjustment can only use revenue accounts carried by the
+                original invoice.
+              </p>
+            </div>
+
+            {originalRevenueAccountCodes.length === 0 ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+                The original invoice has no stored revenue split. Its existing
+                revenue posting will be resolved automatically when this
+                document is saved.
+              </div>
+            ) : originalRevenueAccountCodes.length === 1 ? (
+              <div className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-sm text-sky-800 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-300">
+                <span className="font-medium">
+                  Automatic: {originalRevenueAccountCodes[0]}
+                </span>
+                <span className="ml-2">
+                  The adjustment amount of RM {totals.total_amount.toFixed(2)}
+                  {" "}will post to the invoice's only revenue account.
+                </span>
+                {originalRevenueAccountCodes[0] === "WS_OTH4" && (
+                  <span className="mt-1 block text-xs">
+                    WS_OTH4 is retained only because it was inherited from the
+                    legacy invoice; it is not available for new allocations.
+                  </span>
+                )}
+              </div>
+            ) : totals.total_amount <= 0 ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+                Enter the adjustment line amounts first. A partial adjustment
+                must then be allocated across the original invoice's revenue
+                accounts.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div
+                  className={`rounded-lg border px-3 py-2 text-xs ${
+                    isFullValueMixedAdjustment
+                      ? "border-emerald-200 bg-emerald-50/70 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300"
+                      : "border-amber-200 bg-amber-50/70 text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300"
+                  }`}
+                >
+                  {isFullValueMixedAdjustment
+                    ? "This is a full-value adjustment, so the exact ordered allocation from the original invoice is inherited automatically."
+                    : "This is a partial adjustment. Enter a positive amount for every retained row and allocate the document total exactly. Duplicate account rows are allowed."}
+                  {displayOnlyOriginalRevenueAccounts.includes("WS_OTH4") && (
+                    <span className="mt-1 block">
+                      An inherited WS_OTH4 row is display-only. It may be
+                      retained or removed, but a new WS_OTH4 row cannot be
+                      created.
+                    </span>
+                  )}
+                </div>
+                <GTRevenueSplitEditor
+                  key={`${invoice.invoice_id}-${
+                    isFullValueMixedAdjustment ? "full" : "partial"
+                  }`}
+                  totalAmount={totals.total_amount}
+                  splits={
+                    isFullValueMixedAdjustment
+                      ? invoiceRevenueSplits
+                      : revenueSplits
+                  }
+                  onChange={handleRevenueSplitsChange}
+                  disabled={isSaving || isFullValueMixedAdjustment}
+                  allowedAccounts={selectableOriginalRevenueAccounts}
+                  displayOnlyAccounts={displayOnlyOriginalRevenueAccounts}
+                  totalLabel="Jumlah pelarasan"
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Refund details + Totals */}
         <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">

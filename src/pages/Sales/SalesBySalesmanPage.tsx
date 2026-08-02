@@ -22,6 +22,12 @@ import { FormCombobox } from "../../components/FormComponents";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import SalesSummarySelectionTooltip from "../../components/Sales/SalesSummarySelectionTooltip";
 import { SalesSummaryScope } from "../../utils/sales/SalesSummaryPDF";
+import {
+  reviveDate,
+  usePersistedFilters,
+  usePersistedMonth,
+} from "../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 
 // Define interfaces
 interface SalesmanData {
@@ -55,30 +61,29 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
   onTabChange,
   scope = "tienhock",
 }) => {
-  // Initialize dates
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const currentDate = new Date();
-  const currentMonth = currentDate.getMonth();
-  const currentYear = currentDate.getFullYear();
-
   // Month derived from the time selection; drives the monthSelectionChanged event.
-  const [selectedMonth, setSelectedMonth] = useState<Date>(
-    () => new Date(currentYear, currentMonth, 1)
+  const [selectedMonth, setSelectedMonth] = usePersistedMonth(
+    `salesBySalesmanMonth:${scope}`
   );
-  const [dateRange, setDateRange] = useState<DateRange>(() => {
-    // Create start date (today)
-    const startDate = new Date();
-    startDate.setHours(0, 0, 0, 0);
+  const [dateRange, setDateRange] = usePersistedFilters<DateRange>(
+    `salesBySalesmanRange:${scope}`,
+    () => {
+      // Create start date (today)
+      const startDate = new Date();
+      startDate.setHours(0, 0, 0, 0);
 
-    // Create end date (today)
-    const endDate = new Date();
-    endDate.setHours(23, 59, 59, 999);
+      // Create end date (today)
+      const endDate = new Date();
+      endDate.setHours(23, 59, 59, 999);
 
-    return { start: startDate, end: endDate };
-  });
+      return { start: startDate, end: endDate };
+    },
+    (cached) => {
+      const start = reviveDate(cached?.start);
+      const end = reviveDate(cached?.end);
+      return start && end ? { start, end } : null;
+    }
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [salesmanData, setSalesmanData] = useState<SalesmanData[]>([]);
   const [salesTrendData, setSalesTrendData] = useState<SalesTrendData[]>([]);
@@ -99,6 +104,11 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
   );
   const [salesmanQuery, setSalesmanQuery] = useState("");
   const [maxChartSalesmen] = useState(5); // Limit to prevent chart legend overcrowding
+
+  useScrollRestoration(
+    `sales-by-salesman:${scope}`,
+    !isLoading && salesmanData.length > 0
+  );
 
   useEffect(() => {
     // Dispatch month selection event when it changes

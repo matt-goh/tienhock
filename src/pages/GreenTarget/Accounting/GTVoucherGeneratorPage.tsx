@@ -14,6 +14,8 @@ import Button from "../../../components/Button";
 import MonthNavigator from "../../../components/MonthNavigator";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import ListboxSelect from "../../../components/ListboxSelect";
+import { usePersistedMonth } from "../../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import {
   IconFileInvoice,
   IconCheck,
@@ -77,10 +79,9 @@ const formatAmount = (n: number): string =>
 
 const GTVoucherGeneratorPage: React.FC = () => {
   const navigate = useNavigate();
-  const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
+  const [selectedMonth, setSelectedMonth] = usePersistedMonth(
+    "gtVoucherGeneratorMonth"
+  );
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [generating, setGenerating] = useState<boolean>(false);
@@ -88,6 +89,8 @@ const GTVoucherGeneratorPage: React.FC = () => {
   const [branches, setBranches] = useState<BranchMapping[]>([]);
   const [showBranches, setShowBranches] = useState<boolean>(false);
   const [savingBranch, setSavingBranch] = useState<string | null>(null);
+
+  useScrollRestoration("gt-voucher-generator", !loading && preview !== null);
 
   const year = selectedMonth.getFullYear();
   const month = selectedMonth.getMonth() + 1;

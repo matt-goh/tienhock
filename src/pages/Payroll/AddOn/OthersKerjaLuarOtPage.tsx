@@ -32,6 +32,12 @@ import AddOthersModal from "../../../components/Payroll/AddOthersModal";
 import EditOthersModal from "../../../components/Payroll/EditOthersModal";
 import { api } from "../../../routes/utils/api";
 import { OthersRecord } from "../../../types/types";
+import {
+  usePersistedSearch,
+  usePersistedUrlNumber,
+  usePersistedUrlSearch,
+} from "../../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
 
 const DISPLAY_LABEL = "Others (Kerja Luar OT)";
@@ -45,31 +51,6 @@ interface EmployeeGroup {
 }
 
 const OthersKerjaLuarOtPage: React.FC = () => {
-  const getInitialYear = (): number => {
-    const params = new URLSearchParams(window.location.search);
-    const yearParam = params.get("year");
-    if (yearParam) {
-      const year = parseInt(yearParam, 10);
-      if (!isNaN(year) && year >= 2000 && year <= 2100) return year;
-    }
-    return new Date().getFullYear();
-  };
-
-  const getInitialMonth = (): number => {
-    const params = new URLSearchParams(window.location.search);
-    const monthParam = params.get("month");
-    if (monthParam) {
-      const month = parseInt(monthParam, 10);
-      if (!isNaN(month) && month >= 1 && month <= 12) return month;
-    }
-    return new Date().getMonth() + 1;
-  };
-
-  const getInitialSearch = (): string => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("search") || "";
-  };
-
   const [records, setRecords] = useState<OthersRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -78,20 +59,44 @@ const OthersKerjaLuarOtPage: React.FC = () => {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  const [currentYear, setCurrentYear] = useState(getInitialYear);
-  const [currentMonth, setCurrentMonth] = useState(getInitialMonth);
+  // A URL param wins on mount, otherwise the last month used
+  const [currentYear, setCurrentYear] = usePersistedUrlNumber(
+    "othersKerjaLuarOtListYear",
+    "year",
+    2000,
+    2100,
+    () => new Date().getFullYear(),
+  );
+  const [currentMonth, setCurrentMonth] = usePersistedUrlNumber(
+    "othersKerjaLuarOtListMonth",
+    "month",
+    1,
+    12,
+    () => new Date().getMonth() + 1,
+  );
 
   // Filters
-  const [filterEmployee, setFilterEmployee] = useState<string>("");
-  const [filterPayCode, setFilterPayCode] = useState<string>("");
-  const [searchQuery, setSearchQuery] = useState<string>(getInitialSearch);
+  const [filterEmployee, setFilterEmployee] = usePersistedSearch(
+    "othersKerjaLuarOtListEmployee",
+  );
+  const [filterPayCode, setFilterPayCode] = usePersistedSearch(
+    "othersKerjaLuarOtListPayCode",
+  );
+  const [searchQuery, setSearchQuery] = usePersistedUrlSearch(
+    "othersKerjaLuarOtListSearch",
+  );
   const [employeeQuery, setEmployeeQuery] = useState<string>("");
   const [payCodeQuery, setPayCodeQuery] = useState<string>("");
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Group expansion
+  // Group expansion (reset to "all expanded" on every fetch, see below)
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(
     new Set(),
+  );
+
+  useScrollRestoration(
+    "others-kerja-luar-ot-list",
+    !isLoading && records.length > 0,
   );
 
   // Month range for the TimeNavigator (the page always targets one month).

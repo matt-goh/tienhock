@@ -49,6 +49,7 @@ import GTBalanceSheetPage from "./GreenTarget/Accounting/GTBalanceSheetPage";
 import GTAccountCodeListPage from "./GreenTarget/Accounting/GTAccountCodeListPage";
 import GTAccountCodeFormPage from "./GreenTarget/Accounting/GTAccountCodeFormPage";
 import GTVoucherGeneratorPage from "./GreenTarget/Accounting/GTVoucherGeneratorPage";
+import GTDebtorSubSchedulePage from "./GreenTarget/Accounting/GTDebtorSubSchedulePage";
 
 // Top-level order mirrors the other two companies (Tien Hock / Jelly Polly):
 // Accounting -> Payroll -> Sales -> operational/catalogue menus.
@@ -104,6 +105,13 @@ export const GreenTargetNavData: SidebarItem[] = [
         path: "/debtors",
         component: GreenTargetDebtorsReportPage,
         group: "Reports",
+        subItems: [
+          {
+            name: "CD/SD Child Schedule",
+            path: "/debtors/cd-sd",
+            component: GTDebtorSubSchedulePage,
+          },
+        ],
       },
       {
         name: "Trial Balance",

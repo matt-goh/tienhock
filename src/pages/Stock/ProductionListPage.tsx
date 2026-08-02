@@ -26,6 +26,14 @@ import {
 } from "../../types/types";
 import { getSpecialItemConfig } from "../../config/specialItems";
 import { OTH_PRODUCTION_IDS } from "../../config/othProductionProducts";
+import {
+  usePersistedDate,
+  usePersistedFilters,
+  usePersistedMonth,
+  usePersistedNumber,
+  usePersistedSearch,
+} from "../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
 
 type ViewMode = "day" | "month" | "year";
@@ -244,17 +252,54 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
     return index;
   }, [orderedProducts]);
 
-  const [viewMode, setViewMode] = useState<ViewMode>("month");
-  const [selectedDate, setSelectedDate] = useState<Date>(today);
-  const [selectedMonth, setSelectedMonth] = useState<Date>(
-    new Date(today.getFullYear(), today.getMonth(), 1)
+  // Six routes render this component (Mee / Bihun / Bundle / SBH & SMEE /
+  // Empty Bag / Jelly Polly), so every cache key is scoped to the instance —
+  // they must never share a month or search term.
+  const storageScope: string = [
+    apiBasePath,
+    (productTypes ?? ["all"]).join("+"),
+    (productIds ?? []).join("+"),
+  ].join(":");
+
+  const [viewMode, setViewMode] = usePersistedFilters<ViewMode>(
+    `productionList:${storageScope}:viewMode`,
+    () => "month",
+    (cached) =>
+      cached === "day" || cached === "month" || cached === "year"
+        ? cached
+        : null
   );
-  const [selectedYear, setSelectedYear] = useState<number>(today.getFullYear());
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [selectedDate, setSelectedDate] = usePersistedDate(
+    `productionList:${storageScope}:date`,
+    () => today
+  );
+  const [selectedMonth, setSelectedMonth] = usePersistedMonth(
+    `productionList:${storageScope}:month`
+  );
+  const [selectedYear, setSelectedYear] = usePersistedNumber(
+    `productionList:${storageScope}:year`,
+    2000,
+    2100,
+    () => today.getFullYear()
+  );
+  const [selectedProductId, setSelectedProductId] = usePersistedFilters<
+    string | null
+  >(
+    `productionList:${storageScope}:productId`,
+    () => null,
+    (cached) => (typeof cached === "string" ? cached : null)
+  );
+  const [searchTerm, setSearchTerm] = usePersistedSearch(
+    `productionList:${storageScope}:search`
+  );
   const [entries, setEntries] = useState<ProductionEntry[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+
+  useScrollRestoration(
+    `production-list:${storageScope}`,
+    !isLoading && entries.length > 0
+  );
   const [showProductOrderModal, setShowProductOrderModal] = useState(false);
   const [workerOrderByScope, setWorkerOrderByScope] = useState<
     Record<ProductionWorkerOrderScope, string[]>

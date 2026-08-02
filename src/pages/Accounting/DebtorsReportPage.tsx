@@ -157,6 +157,13 @@ export interface DebtorsReportPageConfig {
   companyName: string;
   statementCompanyInfo?: CompanyInfo;
   statementCompanyName?: string;
+  printGeneralStatement?: (params: {
+    month: number;
+    year: number;
+    hideZero: boolean;
+  }) => Promise<void>;
+  hideZeroLabel?: string;
+  hideZeroActiveLabel?: string;
   monthPickerPlacement?: "bottom-center" | "bottom-right" | "bottom-left-button";
 }
 
@@ -972,13 +979,21 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
       const month = selectedMonth.getMonth() + 1;
       const year = selectedMonth.getFullYear();
 
-      const statementData = await api.get(
-        config.generalStatementEndpoint(month, year)
-      );
+      if (config.printGeneralStatement) {
+        await config.printGeneralStatement({
+          month,
+          year,
+          hideZero: hideZeroBalances,
+        });
+      } else {
+        const statementData = await api.get(
+          config.generalStatementEndpoint(month, year)
+        );
 
-      await generateGeneralStatementPDF(statementData, "print", {
-        companyName: config.statementCompanyName || config.companyName,
-      });
+        await generateGeneralStatementPDF(statementData, "print", {
+          companyName: config.statementCompanyName || config.companyName,
+        });
+      }
       toast.dismiss(loadingToast);
       toast.success("Trade debtor list generated");
     } catch (error) {
@@ -1291,8 +1306,8 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                   }`}
                 >
                   {hideZeroBalances
-                    ? "Zero balances hidden"
-                    : "Hide zero balances"}
+                    ? config.hideZeroActiveLabel ?? "Zero balances hidden"
+                    : config.hideZeroLabel ?? "Hide zero balances"}
                 </button>
                 {refreshButton}
               </div>

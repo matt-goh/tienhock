@@ -23,6 +23,11 @@ import AddIncentiveModal from "../../../components/Payroll/AddIncentiveModal";
 import EditIncentiveModal from "../../../components/Payroll/EditIncentiveModal";
 import { useGTPayrollEmployees } from "../../../utils/greenTarget/useGTPayrollEmployees";
 import { api } from "../../../routes/utils/api";
+import {
+  usePersistedUrlNumber,
+  usePersistedUrlSearch,
+} from "../../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
 
 const DISPLAY_LABEL = "Others (Advance)";
@@ -41,31 +46,6 @@ interface Advance {
 }
 
 const GTOthersAdvancePage: React.FC = () => {
-  const getInitialYear = (): number => {
-    const params = new URLSearchParams(window.location.search);
-    const yearParam = params.get("year");
-    if (yearParam) {
-      const year = parseInt(yearParam, 10);
-      if (!isNaN(year) && year >= 2000 && year <= 2100) return year;
-    }
-    return new Date().getFullYear();
-  };
-
-  const getInitialMonth = (): number => {
-    const params = new URLSearchParams(window.location.search);
-    const monthParam = params.get("month");
-    if (monthParam) {
-      const month = parseInt(monthParam, 10);
-      if (!isNaN(month) && month >= 1 && month <= 12) return month;
-    }
-    return new Date().getMonth() + 1;
-  };
-
-  const getInitialSearch = (): string => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("search") || "";
-  };
-
   const { employees: gtEmployees } = useGTPayrollEmployees();
   const allowedEmployeeIds = useMemo(
     () => gtEmployees.map((e) => e.employee_id),
@@ -73,7 +53,9 @@ const GTOthersAdvancePage: React.FC = () => {
   );
 
   const [advances, setAdvances] = useState<Advance[]>([]);
-  const [searchQuery, setSearchQuery] = useState<string>(getInitialSearch);
+  const [searchQuery, setSearchQuery] = usePersistedUrlSearch(
+    "gtOthersAdvanceListSearch"
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -81,8 +63,26 @@ const GTOthersAdvancePage: React.FC = () => {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  const [currentYear, setCurrentYear] = useState(getInitialYear);
-  const [currentMonth, setCurrentMonth] = useState(getInitialMonth);
+  // A URL param wins on mount, otherwise the last month used
+  const [currentYear, setCurrentYear] = usePersistedUrlNumber(
+    "gtOthersAdvanceListYear",
+    "year",
+    2000,
+    2100,
+    () => new Date().getFullYear()
+  );
+  const [currentMonth, setCurrentMonth] = usePersistedUrlNumber(
+    "gtOthersAdvanceListMonth",
+    "month",
+    1,
+    12,
+    () => new Date().getMonth() + 1
+  );
+
+  useScrollRestoration(
+    "gt-others-advance-list",
+    !isLoading && advances.length > 0
+  );
 
   const monthRange = useMemo(
     () => ({

@@ -5,9 +5,17 @@ import React from "react";
 import Tab from "../../../components/Tab";
 import JPCutiReportPage from "./JPCutiReportPage";
 import HolidayCalendarPage from "../../Payroll/Leave/HolidayCalendarPage";
+import { usePersistedNumber } from "../../../hooks/usePersistedFilters";
 
 const JPCutiManagementPage: React.FC = () => {
   const tabLabels = ["Cuti Report", "Holiday Calendar"];
+
+  const [activeTab, setActiveTab] = usePersistedNumber(
+    "jpCutiManagementTab",
+    0,
+    tabLabels.length - 1,
+    () => 0
+  );
 
   return (
     <div className="space-y-4">
@@ -24,7 +32,12 @@ const JPCutiManagementPage: React.FC = () => {
       </div>
 
       <div>
-        <Tab labels={tabLabels} tabWidth="w-36">
+        <Tab
+          labels={tabLabels}
+          tabWidth="w-36"
+          defaultActiveTab={activeTab}
+          onTabChange={setActiveTab}
+        >
           <JPCutiReportPage />
           <HolidayCalendarPage />
         </Tab>

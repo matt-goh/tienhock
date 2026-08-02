@@ -7,6 +7,7 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import MonthNavigator from "../../components/MonthNavigator";
 import { useAccountCodesCache } from "../../utils/accounting/useAccountingCache";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 import {
   generatePayrollSummaryPDF,
   PayrollSummaryPDFData,
@@ -462,6 +463,8 @@ const VoucherGeneratorPage: React.FC = () => {
   const [printingSummary, setPrintingSummary] = useState(false);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [helpLanguage, setHelpLanguage] = useState<"ms" | "en">("ms");
+
+  useScrollRestoration("voucher-generator", !loading && previewData !== null);
 
   // Update URL params when month changes and remember it for next visit
   const handleMonthChange = (date: Date) => {

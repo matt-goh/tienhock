@@ -45,6 +45,8 @@ import {
   saveLastAccessedPayrollMonth,
   saveLastAccessedSalaryReportTab,
 } from "../../utils/payroll/payrollPageStorage";
+import { usePersistedFilters } from "../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
 
 // Cuti (leave) summary types for the Cuti tab
@@ -343,7 +345,13 @@ const SalaryReportPage: React.FC = () => {
   );
 
   // Sub-view mode for Employee tab
-  const [employeeViewMode, setEmployeeViewMode] = useState<'individual' | 'location'>('individual');
+  const [employeeViewMode, setEmployeeViewMode] = usePersistedFilters<
+    "individual" | "location"
+  >(
+    "salaryReportEmployeeView",
+    () => "individual",
+    (cached) => (cached === "individual" || cached === "location" ? cached : null)
+  );
 
   // Period type toggle (monthly/yearly) - initialize from URL params
   const [periodType, setPeriodType] = useState<'monthly' | 'yearly'>(() => {
@@ -361,7 +369,13 @@ const SalaryReportPage: React.FC = () => {
   const [isLoadingAnnual, setIsLoadingAnnual] = useState<boolean>(false);
 
   // Annual tab sub-view: 'summary' (totals) or 'breakdown' (per-employee monthly)
-  const [annualViewMode, setAnnualViewMode] = useState<'summary' | 'breakdown'>('summary');
+  const [annualViewMode, setAnnualViewMode] = usePersistedFilters<
+    "summary" | "breakdown"
+  >(
+    "salaryReportAnnualView",
+    () => "summary",
+    (cached) => (cached === "summary" || cached === "breakdown" ? cached : null)
+  );
   const [annualBreakdownData, setAnnualBreakdownData] = useState<AnnualBreakdownResponse | null>(null);
   const [isLoadingAnnualBreakdown, setIsLoadingAnnualBreakdown] = useState<boolean>(false);
 
@@ -405,6 +419,8 @@ const SalaryReportPage: React.FC = () => {
       ? tabIndex
       : readLastAccessedSalaryReportTab() ?? 0;
   }); // 0 = Employee, 1 = Location, 2 = Bank, 3 = Pinjam, 4 = Cuti, 5 = Annual
+
+  useScrollRestoration("salary-report", !isLoading && reportData !== null);
 
   // Update URL params when tab, year, month, or period changes
   useEffect(() => {

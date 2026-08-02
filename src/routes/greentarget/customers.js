@@ -1,5 +1,6 @@
 // src/routes/greentarget/customers.js
 import { Router } from "express";
+import { resolveGTDebtorAssignment } from "./accounting/sales-journal.js";
 
 export default function (pool) {
   const router = Router();
@@ -21,6 +22,7 @@ export default function (pool) {
         c.state,
         c.additional_info,
         c.billing_address,
+        c.debtor_account_code,
         COALESCE((
           SELECT json_agg(
             json_build_object(
@@ -64,6 +66,7 @@ export default function (pool) {
       state,
       additional_info,
       billing_address,
+      debtor_account_code,
     } = req.body;
 
     if (!name) {
@@ -71,6 +74,13 @@ export default function (pool) {
     }
 
     try {
+      const resolvedDebtorAccount = debtor_account_code
+        ? (
+            await resolveGTDebtorAssignment(pool, {
+            debtor_account_code,
+            })
+          ).debtorAccountCode
+        : null;
       const query = `
       INSERT INTO greentarget.customers (
         name, 
@@ -81,9 +91,10 @@ export default function (pool) {
         email, 
         state,
         additional_info,
-        billing_address
+        billing_address,
+        debtor_account_code
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
     `;
       const result = await pool.query(query, [
@@ -96,6 +107,7 @@ export default function (pool) {
         state || "12",
         additional_info || null, // Add this line
         billing_address || null,
+        resolvedDebtorAccount,
       ]);
 
       res.status(201).json({
@@ -104,8 +116,10 @@ export default function (pool) {
       });
     } catch (error) {
       console.error("Error creating Green Target customer:", error);
-      res.status(500).json({
-        message: "Error creating customer",
+      const statusCode = Number(error?.statusCode) || 500;
+      res.status(statusCode).json({
+        message:
+          statusCode < 500 ? error.message : "Error creating customer",
         error: error.message,
       });
     }
@@ -124,9 +138,22 @@ export default function (pool) {
       state,
       additional_info,
       billing_address,
+      debtor_account_code,
     } = req.body;
 
     try {
+      const shouldUpdateDebtorAccount = Object.prototype.hasOwnProperty.call(
+        req.body,
+        "debtor_account_code"
+      );
+      const resolvedDebtorAccount =
+        shouldUpdateDebtorAccount && debtor_account_code
+          ? (
+              await resolveGTDebtorAssignment(pool, {
+                debtor_account_code,
+              })
+            ).debtorAccountCode
+          : null;
       const query = `
       UPDATE greentarget.customers
       SET 
@@ -139,8 +166,12 @@ export default function (pool) {
         state = $7,
         additional_info = $8,
         billing_address = $9,
+        debtor_account_code = CASE
+          WHEN $10::boolean THEN $11::varchar
+          ELSE debtor_account_code
+        END,
         last_activity_date = CURRENT_DATE
-      WHERE customer_id = $10
+      WHERE customer_id = $12
       RETURNING *
     `;
       const result = await pool.query(query, [
@@ -153,6 +184,8 @@ export default function (pool) {
         state || "12",
         additional_info || null,
         billing_address || null,
+        shouldUpdateDebtorAccount,
+        resolvedDebtorAccount,
         id,
       ]);
 
@@ -166,8 +199,10 @@ export default function (pool) {
       });
     } catch (error) {
       console.error("Error updating Green Target customer:", error);
-      res.status(500).json({
-        message: "Error updating customer",
+      const statusCode = Number(error?.statusCode) || 500;
+      res.status(statusCode).json({
+        message:
+          statusCode < 500 ? error.message : "Error updating customer",
         error: error.message,
       });
     }

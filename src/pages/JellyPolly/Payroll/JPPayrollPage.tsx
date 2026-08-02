@@ -31,6 +31,7 @@ import {
   staffHoldsJPJob,
 } from "../../../configs/jpPayrollJobConfigs";
 import { getMonthName } from "../../../utils/payroll/payrollUtils";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 
 interface JPMonthlyPayroll {
   id: number;
@@ -112,6 +113,15 @@ const JPPayrollPage: React.FC = () => {
   const [expandedSections, setExpandedSections] = useState<
     Record<string, boolean>
   >({});
+
+  // Keyed by year-month so switching months doesn't restore a stale position
+  // from a different month (mirrors the Tien Hock and Green Target pages).
+  useScrollRestoration(
+    `jp-payroll-page:${selectedMonth.getFullYear()}-${
+      selectedMonth.getMonth() + 1
+    }`,
+    !isLoading && !!payroll
+  );
 
   const handleMonthChange = useCallback(
     (newMonth: Date): void => {

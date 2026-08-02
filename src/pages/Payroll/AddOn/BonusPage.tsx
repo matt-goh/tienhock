@@ -18,6 +18,11 @@ import TimeNavigator from "../../../components/TimeNavigator";
 import AddIncentiveModal from "../../../components/Payroll/AddIncentiveModal";
 import EditIncentiveModal from "../../../components/Payroll/EditIncentiveModal";
 import { api } from "../../../routes/utils/api";
+import {
+  usePersistedUrlNumber,
+  usePersistedUrlSearch,
+} from "../../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
 
 interface Bonus {
@@ -35,39 +40,10 @@ interface Bonus {
 }
 
 const BonusPage: React.FC = () => {
-  // Get initial values from URL params or defaults
-  const getInitialYear = (): number => {
-    const params = new URLSearchParams(window.location.search);
-    const yearParam = params.get("year");
-    if (yearParam) {
-      const year = parseInt(yearParam, 10);
-      if (!isNaN(year) && year >= 2000 && year <= 2100) {
-        return year;
-      }
-    }
-    return new Date().getFullYear();
-  };
-
-  const getInitialMonth = (): number => {
-    const params = new URLSearchParams(window.location.search);
-    const monthParam = params.get("month");
-    if (monthParam) {
-      const month = parseInt(monthParam, 10);
-      if (!isNaN(month) && month >= 1 && month <= 12) {
-        return month;
-      }
-    }
-    return new Date().getMonth() + 1;
-  };
-
-  const getInitialSearch = (): string => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("search") || "";
-  };
-
   // State
   const [bonuses, setBonuses] = useState<Bonus[]>([]);
-  const [searchQuery, setSearchQuery] = useState<string>(getInitialSearch);
+  const [searchQuery, setSearchQuery] =
+    usePersistedUrlSearch("bonusListSearch");
   const [isLoading, setIsLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -75,9 +51,21 @@ const BonusPage: React.FC = () => {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  // Filters - initialize from URL params
-  const [currentYear, setCurrentYear] = useState(getInitialYear);
-  const [currentMonth, setCurrentMonth] = useState(getInitialMonth);
+  // Filters - a URL param wins on mount, otherwise the last month used
+  const [currentYear, setCurrentYear] = usePersistedUrlNumber(
+    "bonusListYear",
+    "year",
+    2000,
+    2100,
+    () => new Date().getFullYear()
+  );
+  const [currentMonth, setCurrentMonth] = usePersistedUrlNumber(
+    "bonusListMonth",
+    "month",
+    1,
+    12,
+    () => new Date().getMonth() + 1
+  );
 
   // Month range for the TimeNavigator (the page always targets one month).
   const monthRange = useMemo(
@@ -92,6 +80,8 @@ const BonusPage: React.FC = () => {
     setCurrentYear(range.start.getFullYear());
     setCurrentMonth(range.start.getMonth() + 1);
   };
+
+  useScrollRestoration("bonus-list", !isLoading && bonuses.length > 0);
 
   // Update URL when year/month changes
   useEffect(() => {

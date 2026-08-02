@@ -34,6 +34,7 @@ import {
 import GTAdjustmentDocPDFHandler from "../../../utils/greenTarget/PDF/AdjustmentDocs/GTAdjustmentDocPDFHandler";
 import GTAdjustmentDocPrintOverlay from "../../../utils/greenTarget/PDF/AdjustmentDocs/GTAdjustmentDocPrintOverlay";
 import { formatAdjustmentDocId } from "../../../utils/adjustments/formatDocId";
+import type { GreenTargetRevenueSplit } from "../../../types/greenTargetTypes";
 
 const API_BASE = "/greentarget/api/adjustment-docs";
 const UI_BASE = "/greentarget/adjustment-docs";
@@ -74,6 +75,7 @@ interface GTAdjDoc {
     total: number | null;
     issubtotal: boolean;
   }>;
+  revenue_splits?: GreenTargetRevenueSplit[];
 }
 
 const formatCurrency = (amount: number): string =>
@@ -694,6 +696,62 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
             </table>
           </div>
         </div>
+
+        {Array.isArray(doc.revenue_splits) &&
+          doc.revenue_splits.length > 0 && (
+            <div className="p-4 border-b border-default-200 dark:border-gray-700">
+              <div className="mb-2">
+                <h3 className="text-sm font-semibold text-default-900 dark:text-gray-100">
+                  Revenue Posting
+                </h3>
+                <p className="text-xs text-default-500 dark:text-gray-400">
+                  Saved ordered allocation used by this adjustment journal.
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-default-200 rounded-lg border border-default-200 dark:divide-gray-700 dark:border-gray-700">
+                  <thead className="bg-default-50 dark:bg-gray-900/50">
+                    <tr>
+                      <th className="w-16 px-3 py-2 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-300">
+                        #
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-300">
+                        Revenue Account
+                      </th>
+                      <th className="px-3 py-2 text-right text-xs font-medium uppercase text-default-500 dark:text-gray-300">
+                        Amount
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-default-100 bg-white dark:divide-gray-700 dark:bg-gray-800">
+                    {doc.revenue_splits.map(
+                      (
+                        split: GreenTargetRevenueSplit,
+                        index: number
+                      ): React.ReactNode => (
+                        <tr key={`${split.line_number}-${index}`}>
+                          <td className="px-3 py-2 text-sm tabular-nums text-default-500 dark:text-gray-400">
+                            {split.line_number || index + 1}
+                          </td>
+                          <td className="px-3 py-2 text-sm font-medium text-default-800 dark:text-gray-100">
+                            {split.account_code}
+                            {split.account_code === "WS_OTH4" && (
+                              <span className="ml-2 text-xs font-normal text-default-500 dark:text-gray-400">
+                                inherited legacy account
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-right text-sm font-medium tabular-nums text-default-900 dark:text-gray-100">
+                            {formatCurrency(Number(split.amount || 0))}
+                          </td>
+                        </tr>
+                      )
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
         {/* Totals + e-invoice */}
         <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">

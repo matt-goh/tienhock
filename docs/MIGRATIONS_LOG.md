@@ -30,6 +30,36 @@ requires separate approval).
 
 ---
 
+## Removed 30 Jul 2026 (fourth batch) — 1 file (Estimated report JAGUNG stock fixes + June Add Backs)
+
+Applied to **dev and production** on 2026-07-30, then removed per the project convention. The file
+existed at commit **`eaaaa45c`** — recover with
+`git show eaaaa45c:dev/migrations/2026-07-30_estimated_report_jagung_stock_fixes.sql`.
+
+Verified after both runs: `material_stock_entries` id `294` = 196 × 70.2500 = 13,769.00 and id `141`
+= 409 × 54.0000 = 22,086.00; `estimated_report_inputs` holds the two June 2026 rows stamped
+`created_by = estimated_report_2026-07-30_fix`; BIHUN JAGUNG totals May **33,209.00** / June
+**22,086.00**. A rerun reports `FIX-1 ALREADY FINAL` / `FIX-2 ALREADY FINAL` and re-passes both
+postflights (confirmed on dev).
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-07-30_estimated_report_jagung_stock_fixes.sql` | June 2026 Estimated P&L corrections. **FIX-1/FIX-2:** the BIHUN JAGUNG (Tepung Jagung, material 27/`B3`) physical stock counts were keyed with one-digit typos — May `KK RICE + TRANSPORT` 276 → **196** bags (19,389.00 → **13,769.00**) and June `HOMCO` 399 → **409** bags (21,546.00 → **22,086.00**) — confirmed by the boss's handwritten counts on the legacy print and by four independent arithmetic checks (closing total 414,685.86, opening total 486,311.65, unit-cost JAGUNG usage 28,403.00). Only `adjustment_quantity`/`adjustment_value`/`updated_at` change; unit costs, SODIUM rows and every other material are untouched. **FIX-3:** keyed the boss's handwritten June Add Backs into `estimated_report_inputs` (MEE 9,658.83 / BIHUN 6,662.66) with `ON CONFLICT DO NOTHING` plus a guard that aborts rather than overwrite a different user-keyed value. No journal is posted and no GL account moves — the Estimated report derives everything at read time. Guarded, idempotent, fail-closed: each fix accepts **only** the exact old state or the exact final state (full identity fingerprint on year/month/product line/material/variant/unit cost/quantity/custom fields, plus material+variant existence and a single logical row), and a report-level postflight asserts both monthly JAGUNG totals. SERIALIZABLE, `lock_timeout 5s`, one transaction. Narrative: [Account/ESTIMATED_REPORT_HANDOVER.md](Account/ESTIMATED_REPORT_HANDOVER.md) §9.5; changelog entry shipped 2026-07-30. | dev ✓, prod ✓ (both 2026-07-30) |
+
+> **Why this needed two attempts:** the first production run was pasted into an *interactive* `psql`
+> session. The file opens with the meta-command `\set ON_ERROR_STOP on`, and psql's backslash-command
+> argument parser hit the unbalanced apostrophes in the header comments ("boss's…"), swallowing the
+> entire remaining file as one argument and failing with
+> `unrecognized value "on--Thisisraninprod…" for "ON_ERROR_STOP": Boolean expected`. **Nothing
+> executed** — no `BEGIN`, no `COMMIT`, and the target rows kept their 2026-07-21 `updated_at`, so the
+> database was never touched. The successful run used
+> `sudo -u postgres psql -d tienhock_prod -v ON_ERROR_STOP=1 -f /tmp/jagung.sql` after copying the
+> file out of `~/tienhock-app/dev/migrations/` to `/tmp` (the `postgres` user cannot read the app
+> directory — the same `chmod a+rX` snag as the GT G8 rollout). **Never paste a migration into
+> interactive psql; always run it from a file with `-f`.**
+
+---
+
 ## Removed 30 Jul 2026 (third batch) — 2 files (GT customer billing address + PBB1 removal)
 
 Applied to **dev and production** on 2026-07-30 (prod runs by the user), then removed per the project

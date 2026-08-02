@@ -17,6 +17,8 @@ import { format } from "date-fns";
 import HolidayFormModal from "../../../components/Payroll/HolidayFormModal";
 import { useHolidayCache } from "../../../utils/payroll/useHolidayCache";
 import ImportHolidaysModal from "../../../components/Payroll/ImportHolidaysModal";
+import { usePersistedNumber } from "../../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 
 interface Holiday {
   id: number;
@@ -27,7 +29,12 @@ interface Holiday {
 }
 
 const HolidayCalendarPage: React.FC = () => {
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = usePersistedNumber(
+    "holidayCalendarYear",
+    2000,
+    2100,
+    () => new Date().getFullYear()
+  );
   const [loading] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [holidayToDelete, setHolidayToDelete] = useState<Holiday | null>(null);
@@ -48,6 +55,8 @@ const HolidayCalendarPage: React.FC = () => {
   const cutiUmumCount: number = React.useMemo(() => {
     return holidays.filter((holiday) => holiday.is_cuti_umum).length;
   }, [holidays]);
+
+  useScrollRestoration("holiday-calendar", holidays.length > 0);
 
   const handleYearChange = (direction: "prev" | "next") => {
     setSelectedYear((year) => (direction === "prev" ? year - 1 : year + 1));

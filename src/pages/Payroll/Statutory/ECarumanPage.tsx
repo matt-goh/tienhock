@@ -12,6 +12,7 @@ import {
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import TimeNavigator from "../../../components/TimeNavigator";
+import { usePersistedMonth } from "../../../hooks/usePersistedFilters";
 import { api } from "../../../routes/utils/api";
 import MissingEPFNumberDialog, {
   MissingEPFEmployee,
@@ -148,10 +149,7 @@ const formatIC = (ic: string): string => {
 
 const ECarumanPage: React.FC = () => {
   // Use Date object for month navigation
-  const [selectedDate, setSelectedDate] = useState<Date>(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
+  const [selectedDate, setSelectedDate] = usePersistedMonth("eCarumanMonth");
 
   // Derived values for API calls
   const selectedMonth: number = selectedDate.getMonth() + 1;

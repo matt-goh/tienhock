@@ -22,6 +22,8 @@ import {
   generatePinjamPDF,
   PinjamPDFData,
 } from "../../../utils/payroll/PinjamPDF";
+import { usePersistedNumber } from "../../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
 
 interface PinjamRecord {
@@ -116,11 +118,22 @@ const GTPinjamListPage: React.FC = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Filters
-  const [currentYear, setCurrentYear] = useState(
+  const [currentYear, setCurrentYear] = usePersistedNumber(
+    "gtPinjamListYear",
+    2000,
+    2100,
     () => getDefaultPinjamMonth().year
   );
-  const [currentMonth, setCurrentMonth] = useState(
+  const [currentMonth, setCurrentMonth] = usePersistedNumber(
+    "gtPinjamListMonth",
+    1,
+    12,
     () => getDefaultPinjamMonth().month
+  );
+
+  useScrollRestoration(
+    "gt-pinjam-list",
+    !isLoading && pinjamRecords.length > 0
   );
 
   // Month range for the TimeNavigator (the page always targets one month).

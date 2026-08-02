@@ -31,6 +31,11 @@ import {
   IconExternalLink,
 } from "@tabler/icons-react";
 import clsx from "clsx";
+import {
+  usePersistedFilters,
+  usePersistedSearch,
+} from "../../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 
 interface PickupDestination {
   id: number;
@@ -102,7 +107,11 @@ const getPrimaryOperatorOptions = (conditionField: string): OperatorOption[] =>
 
 const PayrollRulesPage: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<TabType>("rules");
+  const [activeTab, setActiveTab] = usePersistedFilters<TabType>(
+    "gtPayrollRulesTab",
+    () => "rules",
+    (cached) => (cached === "rules" || cached === "settings" ? cached : null)
+  );
   const [isLoading, setIsLoading] = useState(true);
 
   // Data states
@@ -149,7 +158,11 @@ const PayrollRulesPage: React.FC = () => {
   });
 
   const [isSaving, setIsSaving] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = usePersistedSearch(
+    "gtPayrollRulesSearch"
+  );
+
+  useScrollRestoration("gt-payroll-rules", !isLoading);
 
   useEffect(() => {
     fetchAllData();

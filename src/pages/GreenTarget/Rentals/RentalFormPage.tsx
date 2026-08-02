@@ -58,12 +58,22 @@ interface Dumpster {
   has_future_rental?: boolean;
   next_rental?: { date: string; customer: string; rental_id: number };
 }
+interface InvoicePayment {
+  payment_id: number;
+  payment_date: string;
+  amount_paid: number | string;
+  payment_method: "cash" | "cheque" | "bank_transfer" | "online";
+  internal_reference: string | null;
+  status: "active" | "pending" | "cancelled" | null;
+  receipt_id: number | null;
+}
 interface InvoiceInfo {
   invoice_id: number;
   invoice_number: string;
   status: string;
   amount?: number;
   has_payments?: boolean;
+  payments?: InvoicePayment[];
 }
 
 interface PickupDestination {
