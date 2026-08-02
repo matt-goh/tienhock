@@ -33,7 +33,9 @@ import GTInvoiceAccountFields, {
   GTInvoiceAccountFieldsHandle,
 } from "../../../components/GreenTarget/GTInvoiceAccountFields";
 import GTReceiptJoinPanel, {
+  type GTReceiptJoinConfirmation,
   type GTReceiptJoinLookupState,
+  useGTReceiptJoinConfirmation,
   useGTReceiptJoinLookup,
 } from "../../../components/GreenTarget/GTReceiptJoinPanel";
 import { formatLocationDisplay } from "../../../utils/greenTarget/formatLocationDisplay";
@@ -257,20 +259,15 @@ const RentalDetailsPage: React.FC = () => {
   const [paymentInternalReference, setPaymentInternalReference] =
     useState<string>("");
   const [paymentReference, setPaymentReference] = useState<string>("");
-  const [paymentJoinReceiptId, setPaymentJoinReceiptId] = useState<
-    number | null
-  >(null);
   const paymentReceiptLookup: GTReceiptJoinLookupState =
     useGTReceiptJoinLookup(
       paymentInternalReference,
       isInvoiceModalOpen && recordPayment
     );
+  const paymentReceiptJoin: GTReceiptJoinConfirmation =
+    useGTReceiptJoinConfirmation(paymentReceiptLookup);
   const confirmedPaymentReceipt: GreenTargetReceiptJoinCandidate | null =
-    !paymentReceiptLookup.isLooking &&
-    paymentReceiptLookup.joinable &&
-    paymentReceiptLookup.receipt?.receipt_id === paymentJoinReceiptId
-      ? paymentReceiptLookup.receipt
-      : null;
+    paymentReceiptJoin.confirmedReceipt;
   const effectivePaymentMethod: GreenTargetPayment["payment_method"] =
     confirmedPaymentReceipt?.payment_method || paymentMethod;
 
@@ -406,21 +403,10 @@ const RentalDetailsPage: React.FC = () => {
     );
   };
 
-  const handlePaymentJoinConfirmedChange = (joinConfirmed: boolean): void => {
-    setPaymentJoinReceiptId(
-      joinConfirmed &&
-        paymentReceiptLookup.joinable &&
-        paymentReceiptLookup.receipt
-        ? paymentReceiptLookup.receipt.receipt_id
-        : null
-    );
-  };
-
   const handlePaymentInternalReferenceChange = (
     event: React.ChangeEvent<HTMLInputElement>
   ): void => {
     setPaymentInternalReference(event.target.value);
-    setPaymentJoinReceiptId(null);
   };
 
   const handleCreateInvoice = async (): Promise<void> => {
@@ -1485,9 +1471,9 @@ const RentalDetailsPage: React.FC = () => {
                       </div>
                       <GTReceiptJoinPanel
                         lookup={paymentReceiptLookup}
-                        joinConfirmed={Boolean(confirmedPaymentReceipt)}
+                        joinConfirmed={paymentReceiptJoin.joinConfirmed}
                         onJoinConfirmedChange={
-                          handlePaymentJoinConfirmedChange
+                          paymentReceiptJoin.setJoinConfirmed
                         }
                         disabled={
                           isCreatingInvoice || paymentReceiptLookup.isLooking

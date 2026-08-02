@@ -38,7 +38,9 @@ import GTInvoiceAccountFields, {
   GTInvoiceAccountFieldsHandle,
 } from "../../../components/GreenTarget/GTInvoiceAccountFields";
 import GTReceiptJoinPanel, {
+  type GTReceiptJoinConfirmation,
   type GTReceiptJoinLookupState,
+  useGTReceiptJoinConfirmation,
   useGTReceiptJoinLookup,
 } from "../../../components/GreenTarget/GTReceiptJoinPanel";
 import { formatLocationDisplay } from "../../../utils/greenTarget/formatLocationDisplay";
@@ -194,8 +196,6 @@ const InvoiceFormPage: React.FC = () => {
   const [paymentInternalReference, setPaymentInternalReference] =
     useState<string>("");
   const [paymentReference, setPaymentReference] = useState("");
-  const [paymentReceiptJoinConfirmed, setPaymentReceiptJoinConfirmed] =
-    useState<boolean>(false);
   const [submitAsEinvoice, setSubmitAsEinvoice] = useState(false);
   const [showSubmissionResultsModal, setShowSubmissionResultsModal] =
     useState(false);
@@ -206,10 +206,10 @@ const InvoiceFormPage: React.FC = () => {
     paymentInternalReference,
     !isEditMode && isPaid
   );
+  const paymentReceiptJoin: GTReceiptJoinConfirmation =
+    useGTReceiptJoinConfirmation(paymentReceiptLookup);
   const joinedPaymentReceipt: GreenTargetReceiptJoinCandidate | null =
-    paymentReceiptJoinConfirmed && paymentReceiptLookup.joinable
-      ? paymentReceiptLookup.receipt
-      : null;
+    paymentReceiptJoin.confirmedReceipt;
   const effectivePaymentMethod: GreenTargetPayment["payment_method"] =
     joinedPaymentReceipt?.payment_method || paymentMethod;
 
@@ -1967,8 +1967,8 @@ const InvoiceFormPage: React.FC = () => {
               </div>
               <GTReceiptJoinPanel
                 lookup={paymentReceiptLookup}
-                joinConfirmed={paymentReceiptJoinConfirmed}
-                onJoinConfirmedChange={setPaymentReceiptJoinConfirmed}
+                joinConfirmed={paymentReceiptJoin.joinConfirmed}
+                onJoinConfirmedChange={paymentReceiptJoin.setJoinConfirmed}
                 disabled={isSaving}
                 className="mt-4"
               />
