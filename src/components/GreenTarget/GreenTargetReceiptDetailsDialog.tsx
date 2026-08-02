@@ -21,6 +21,7 @@ import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import { greenTargetApi } from "../../routes/greentarget/api";
 import type {
+  GreenTargetReceiptAllocationRental,
   GreenTargetReceiptGroupAllocation,
   GreenTargetReceiptGroupDetails,
   GreenTargetReceiptStatus,
@@ -700,6 +701,30 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                                           {allocation.invoice_number ||
                                             allocation.invoice_id}
                                         </Link>
+                                        {allocation.rentals.length > 0 && (
+                                          <div className="mt-1 flex flex-col items-start gap-1">
+                                            {allocation.rentals.map(
+                                              (
+                                                rental: GreenTargetReceiptAllocationRental
+                                              ): React.ReactNode => (
+                                                <Link
+                                                  key={rental.rental_id}
+                                                  to={`/greentarget/rentals/${rental.rental_id}`}
+                                                  onClick={handleClose}
+                                                  className="inline-flex max-w-full items-center gap-1 truncate text-xs text-emerald-600 hover:underline dark:text-emerald-400"
+                                                  title={
+                                                    rental.location_site ||
+                                                    rental.location_address ||
+                                                    `Rental ${rental.rental_id}`
+                                                  }
+                                                >
+                                                  <IconExternalLink size={12} />
+                                                  Tong {rental.tong_no}
+                                                </Link>
+                                              )
+                                            )}
+                                          </div>
+                                        )}
                                       </td>
                                       <td className="px-4 py-2.5 text-default-800 dark:text-gray-100">
                                         <p>{allocation.customer_name}</p>

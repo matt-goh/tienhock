@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-02",
+    ms: "Green Target: semasa merekod bayaran daripada borang invois atau Butiran Sewaan, nombor rujukan Green Target yang sudah digunakan kini boleh disambungkan kepada resit sedia ada selepas anda mengesahkannya. Tarikh, kaedah dan rujukan cek/transaksi resit itu dikekalkan, dan satu resit boleh meliputi beberapa invois. Baris bayaran pada halaman sewaan kini membuka terus butiran resit, manakala butiran resit menunjukkan sewaan yang dijelaskan oleh setiap bayaran.",
+    en: "Green Target: when recording a payment from the invoice form or Rental Details, a Green Target reference that is already in use can now be joined to its existing receipt after you confirm it. The receipt's date, method and cheque/transaction reference stay unchanged, and one receipt can cover several invoices. Payment rows on rental pages now open the receipt details directly, while each receipt allocation shows the rentals it settles.",
+  },
+  {
+    date: "2026-08-02",
     ms: "Green Target: semasa mencipta invois untuk pelanggan yang belum mempunyai identiti penghutang, kotak \"Cipta identiti CD/SD baharu\" kini ditanda secara automatik dan kod identiti dicadangkan terus daripada nama pelanggan supaya anda hanya perlu mengesahkan atau mengubahnya. Sistem memberitahu serta-merta jika kod tersebut sudah digunakan oleh pelanggan lain, dan identiti hanya dicipta apabila invois disimpan — jika anda menutup tetingkap tanpa menyimpan, tiada nama baharu ditinggalkan dalam jadual penghutang. Buang tanda pada kotak itu untuk memilih identiti sedia ada seperti biasa. Tetingkap Cipta Invois di halaman Penyewaan juga dilebarkan.",
     en: "Green Target: when creating an invoice for a customer that has no debtor identity yet, the \"Create a new CD/SD identity\" box is now ticked automatically and the identity code is suggested from the customer's name, so you only confirm or edit it. You are told straight away if that code already belongs to another customer, and the identity is only created when the invoice is saved — closing the window without saving leaves no new name in the Trade Debtors schedule. Untick the box to pick an existing identity as before. The Create Invoice window on the Rental page is also wider.",
   },

@@ -37,6 +37,10 @@ import GTInvoiceAccountFields, {
   GT_DEFAULT_REVENUE_ACCOUNT,
   GTInvoiceAccountFieldsHandle,
 } from "../../../components/GreenTarget/GTInvoiceAccountFields";
+import GTReceiptJoinPanel, {
+  type GTReceiptJoinLookupState,
+  useGTReceiptJoinLookup,
+} from "../../../components/GreenTarget/GTReceiptJoinPanel";
 import { formatLocationDisplay } from "../../../utils/greenTarget/formatLocationDisplay";
 import { toCents } from "../../../utils/moneyUtils";
 import SubmissionResultsModal from "../../../components/Invoice/SubmissionResultsModal";
@@ -44,6 +48,8 @@ import { EInvoiceSubmissionResult } from "../../../types/types";
 import type {
   CreateGreenTargetPaymentInput,
   GreenTargetPayment,
+  GreenTargetPaymentMutationResponse,
+  GreenTargetReceiptJoinCandidate,
   GreenTargetRevenueSplit,
 } from "../../../types/greenTargetTypes";
 
@@ -188,12 +194,24 @@ const InvoiceFormPage: React.FC = () => {
   const [paymentInternalReference, setPaymentInternalReference] =
     useState<string>("");
   const [paymentReference, setPaymentReference] = useState("");
+  const [paymentReceiptJoinConfirmed, setPaymentReceiptJoinConfirmed] =
+    useState<boolean>(false);
   const [submitAsEinvoice, setSubmitAsEinvoice] = useState(false);
   const [showSubmissionResultsModal, setShowSubmissionResultsModal] =
     useState(false);
   const [submissionResults, setSubmissionResults] =
     useState<EInvoiceSubmissionResult | null>(null);
   const [isSubmittingEInvoice, setIsSubmittingEInvoice] = useState(false);
+  const paymentReceiptLookup: GTReceiptJoinLookupState = useGTReceiptJoinLookup(
+    paymentInternalReference,
+    !isEditMode && isPaid
+  );
+  const joinedPaymentReceipt: GreenTargetReceiptJoinCandidate | null =
+    paymentReceiptJoinConfirmed && paymentReceiptLookup.joinable
+      ? paymentReceiptLookup.receipt
+      : null;
+  const effectivePaymentMethod: GreenTargetPayment["payment_method"] =
+    joinedPaymentReceipt?.payment_method || paymentMethod;
 
   // Invoice number validation state
   const [invoiceNumberValidation, setInvoiceNumberValidation] = useState<{
@@ -765,6 +783,12 @@ const InvoiceFormPage: React.FC = () => {
       setPaymentReference("");
     }
   };
+  const handlePaymentInternalReferenceChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ): void => {
+    setPaymentInternalReference(event.target.value);
+    setPaymentReceiptJoinConfirmed(false);
+  };
   const handleBackClick = () => {
     if (isFormChanged) setShowBackConfirmation(true);
     else goBack();
@@ -835,29 +859,56 @@ const InvoiceFormPage: React.FC = () => {
         return false;
       }
     }
-    if (isPaid && !paymentMethod) {
-      toast.error("Select payment method.");
+    if (isPaid && paymentReceiptLookup.isLooking) {
+      toast.error("Wait for the Green Target reference check to finish.");
       return false;
     }
-    if (isPaid && !paymentDate) {
-      toast.error("Enter the payment received date.");
+    if (isPaid && paymentReceiptLookup.receipt && !joinedPaymentReceipt) {
+      toast.error(
+        paymentReceiptLookup.joinable
+          ? "Confirm that this payment belongs to the existing receipt."
+          : "This Green Target reference cannot accept another payment."
+      );
       return false;
     }
-    if (isPaid && formData.date_issued && paymentDate < formData.date_issued) {
-      toast.error("Payment received date cannot be before the invoice date.");
-      return false;
-    }
-    if (isPaid && !paymentInternalReference.trim()) {
-      toast.error("Enter the Green Target reference number.");
-      return false;
-    }
-    if (isPaid && paymentInternalReference.trim().length > 50) {
-      toast.error("Green Target reference number cannot exceed 50 characters.");
-      return false;
-    }
-    if (isPaid && paymentReference.trim().length > 50) {
-      toast.error("Cheque / transaction reference cannot exceed 50 characters.");
-      return false;
+    if (isPaid && joinedPaymentReceipt) {
+      const inheritedReceivedDate: string = toLocalDateInputValue(
+        joinedPaymentReceipt.received_date
+      );
+      if (
+        !inheritedReceivedDate ||
+        (formData.date_issued && inheritedReceivedDate < formData.date_issued)
+      ) {
+        toast.error(
+          "The existing receipt date cannot be before the invoice date."
+        );
+        return false;
+      }
+    } else if (isPaid) {
+      if (!paymentMethod) {
+        toast.error("Select payment method.");
+        return false;
+      }
+      if (!paymentDate) {
+        toast.error("Enter the payment received date.");
+        return false;
+      }
+      if (formData.date_issued && paymentDate < formData.date_issued) {
+        toast.error("Payment received date cannot be before the invoice date.");
+        return false;
+      }
+      if (!paymentInternalReference.trim()) {
+        toast.error("Enter the Green Target reference number.");
+        return false;
+      }
+      if (paymentInternalReference.trim().length > 50) {
+        toast.error("Green Target reference number cannot exceed 50 characters.");
+        return false;
+      }
+      if (paymentReference.trim().length > 50) {
+        toast.error("Cheque / transaction reference cannot exceed 50 characters.");
+        return false;
+      }
     }
     return true;
   };
@@ -867,7 +918,7 @@ const InvoiceFormPage: React.FC = () => {
     setIsSaving(true);
     const totalAmount = formData.amount_before_tax + formData.tax_amount;
     try {
-      if (isPaid) {
+      if (isPaid && !joinedPaymentReceipt) {
         const referenceAvailability =
           await greenTargetApi.checkInternalPaymentRef(
             paymentInternalReference.trim()
@@ -1026,16 +1077,32 @@ const InvoiceFormPage: React.FC = () => {
           if (isPaid && navId) {
             const pTid = toast.loading("Recording payment...");
             try {
+              const inheritedReceivedDate: string = joinedPaymentReceipt
+                ? toLocalDateInputValue(joinedPaymentReceipt.received_date)
+                : paymentDate;
               const pData: CreateGreenTargetPaymentInput = {
                 invoice_id: navId,
-                payment_date: paymentDate,
+                payment_date: inheritedReceivedDate,
                 amount_paid: totalAmount,
-                payment_method: paymentMethod,
-                payment_reference: paymentReference.trim() || null,
-                internal_reference: paymentInternalReference.trim(),
+                payment_method: effectivePaymentMethod,
+                payment_reference: joinedPaymentReceipt
+                  ? joinedPaymentReceipt.payment_reference
+                  : paymentReference.trim() || null,
+                internal_reference:
+                  joinedPaymentReceipt?.display_reference ||
+                  paymentInternalReference.trim(),
+                ...(joinedPaymentReceipt
+                  ? { receipt_id: joinedPaymentReceipt.receipt_id }
+                  : {}),
               };
-              await greenTargetApi.createPayment(pData);
-              toast.success("Payment recorded", { id: pTid });
+              const paymentResponse: GreenTargetPaymentMutationResponse =
+                await greenTargetApi.createPayment(pData);
+              toast.success(
+                paymentResponse.receipt?.joined
+                  ? `Payment added to receipt ${paymentResponse.receipt.display_reference}`
+                  : "Payment recorded",
+                { id: pTid }
+              );
             } catch (pErr) {
               console.error("Payment err:", pErr);
               toast.error("Invoice created, payment failed.", { id: pTid });
@@ -1674,7 +1741,10 @@ const InvoiceFormPage: React.FC = () => {
                   <div className="flex items-center h-[42px]">
                     <button
                       type="button"
-                      onClick={() => setIsPaid(!isPaid)}
+                      onClick={() => {
+                        setIsPaid(!isPaid);
+                        setPaymentReceiptJoinConfirmed(false);
+                      }}
                       className="flex items-center cursor-pointer group p-1"
                     >
                       {isPaid ? (
@@ -1704,7 +1774,7 @@ const InvoiceFormPage: React.FC = () => {
               <h2 className="text-lg font-medium mb-4 dark:text-gray-100">
                 Payment Info
               </h2>
-              {paymentMethod === "cheque" && (
+              {!joinedPaymentReceipt && paymentMethod === "cheque" && (
                 <p className="mb-4 text-sm text-default-500 dark:text-gray-400">
                   Cheque payments remain pending until they are confirmed.
                 </p>
@@ -1721,14 +1791,23 @@ const InvoiceFormPage: React.FC = () => {
                     type="date"
                     id="payment_date_paid"
                     name="payment_date_paid"
-                    value={paymentDate}
+                    value={
+                      joinedPaymentReceipt
+                        ? toLocalDateInputValue(
+                            joinedPaymentReceipt.received_date
+                          )
+                        : paymentDate
+                    }
                     onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
                       setPaymentDate(event.target.value)
                     }
+                    readOnly={joinedPaymentReceipt !== null}
                     required
                     className={clsx(
                       "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
-                      "bg-white dark:bg-gray-700",
+                      joinedPaymentReceipt
+                        ? "bg-gray-100 dark:bg-gray-800 cursor-default"
+                        : "bg-white dark:bg-gray-700",
                       "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                     )}
                   />
@@ -1745,9 +1824,7 @@ const InvoiceFormPage: React.FC = () => {
                     id="internal_reference_paid"
                     name="internal_reference_paid"
                     value={paymentInternalReference}
-                    onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
-                      setPaymentInternalReference(event.target.value)
-                    }
+                    onChange={handlePaymentInternalReferenceChange}
                     placeholder="e.g. RV26/06/62"
                     maxLength={50}
                     required
@@ -1765,86 +1842,101 @@ const InvoiceFormPage: React.FC = () => {
                   >
                     Method <span className="text-red-500">*</span>
                   </label>
-                  <Listbox
-                    value={paymentMethod}
-                    onChange={handlePaymentMethodChange}
-                    name="payment_method_paid"
-                  >
-                    <div className="relative">
-                      <HeadlessListboxButton
-                        id="pm-paid"
-                        className={clsx(
-                          "relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-10 text-left shadow-sm",
-                          "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
-                        )}
-                      >
-                        <span className="block truncate">
-                          {getOptionName(paymentMethodOptions, paymentMethod) ||
-                            "Select"}
-                        </span>
-                        <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                          <IconChevronDown
-                            size={20}
-                            className="text-gray-400"
-                          />
-                        </span>
-                      </HeadlessListboxButton>
-                      <Transition
-                        as={Fragment}
-                        leave="transition ease-in duration-100"
-                        leaveFrom="opacity-100"
-                        leaveTo="opacity-0"
-                      >
-                        <ListboxOptions
+                  {joinedPaymentReceipt ? (
+                    <input
+                      type="text"
+                      id="pm-paid"
+                      value={
+                        getOptionName(
+                          paymentMethodOptions,
+                          joinedPaymentReceipt.payment_method
+                        ) || joinedPaymentReceipt.payment_method
+                      }
+                      readOnly
+                      className="block w-full cursor-default rounded-lg border border-default-300 bg-gray-100 px-3 py-2 shadow-sm dark:border-gray-600 dark:bg-gray-800 sm:text-sm"
+                    />
+                  ) : (
+                    <Listbox
+                      value={paymentMethod}
+                      onChange={handlePaymentMethodChange}
+                      name="payment_method_paid"
+                    >
+                      <div className="relative">
+                        <HeadlessListboxButton
+                          id="pm-paid"
                           className={clsx(
-                            "absolute z-20 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
-                            "bottom-full mb-1"
+                            "relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-10 text-left shadow-sm",
+                            "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                           )}
                         >
-                          {paymentMethodOptions.map((o) => (
-                            <ListboxOption
-                              key={o.id}
-                              className={({ active }) =>
-                                clsx(
-                                  "relative cursor-default select-none py-2 pl-3 pr-10",
-                                  active
-                                    ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-100"
-                                    : "text-gray-900 dark:text-gray-100"
-                                )
-                              }
-                              value={o.id.toString()}
-                            >
-                              {({ selected }) => (
-                                <>
-                                  <span
-                                    className={clsx(
-                                      "block truncate",
-                                      selected ? "font-medium" : "font-normal"
-                                    )}
-                                  >
-                                    {o.name}
-                                  </span>
-                                  {selected && (
-                                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600 dark:text-sky-400">
-                                      <IconCheck size={20} />
+                          <span className="block truncate">
+                            {getOptionName(paymentMethodOptions, paymentMethod) ||
+                              "Select"}
+                          </span>
+                          <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                            <IconChevronDown
+                              size={20}
+                              className="text-gray-400"
+                            />
+                          </span>
+                        </HeadlessListboxButton>
+                        <Transition
+                          as={Fragment}
+                          leave="transition ease-in duration-100"
+                          leaveFrom="opacity-100"
+                          leaveTo="opacity-0"
+                        >
+                          <ListboxOptions
+                            className={clsx(
+                              "absolute z-20 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
+                              "bottom-full mb-1"
+                            )}
+                          >
+                            {paymentMethodOptions.map((o) => (
+                              <ListboxOption
+                                key={o.id}
+                                className={({ active }) =>
+                                  clsx(
+                                    "relative cursor-default select-none py-2 pl-3 pr-10",
+                                    active
+                                      ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-100"
+                                      : "text-gray-900 dark:text-gray-100"
+                                  )
+                                }
+                                value={o.id.toString()}
+                              >
+                                {({ selected }) => (
+                                  <>
+                                    <span
+                                      className={clsx(
+                                        "block truncate",
+                                        selected ? "font-medium" : "font-normal"
+                                      )}
+                                    >
+                                      {o.name}
                                     </span>
-                                  )}
-                                </>
-                              )}
-                            </ListboxOption>
-                          ))}
-                        </ListboxOptions>
-                      </Transition>
-                    </div>
-                  </Listbox>
+                                    {selected && (
+                                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600 dark:text-sky-400">
+                                        <IconCheck size={20} />
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </ListboxOption>
+                            ))}
+                          </ListboxOptions>
+                        </Transition>
+                      </div>
+                    </Listbox>
+                  )}
                 </div>
-                {paymentMethod !== "cash" && (
+                {effectivePaymentMethod !== "cash" && (
                   <div className="space-y-2">
                     <label
                       htmlFor="payment_reference"
                       className="block text-sm font-medium text-default-700 dark:text-gray-200"
                     >
-                      {paymentMethod === "cheque"
+                      {effectivePaymentMethod === "cheque"
                         ? "Cheque No. (Optional)"
                         : "Transaction Reference (Optional)"}
                     </label>
@@ -1852,20 +1944,34 @@ const InvoiceFormPage: React.FC = () => {
                       type="text"
                       id="payment_reference"
                       name="payment_reference"
-                      value={paymentReference}
+                      value={
+                        joinedPaymentReceipt
+                          ? joinedPaymentReceipt.payment_reference || ""
+                          : paymentReference
+                      }
                       maxLength={50}
                       onChange={(
                         event: React.ChangeEvent<HTMLInputElement>
                       ): void => setPaymentReference(event.target.value)}
+                      readOnly={joinedPaymentReceipt !== null}
                       className={clsx(
                         "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
-                        "bg-white dark:bg-gray-700",
+                        joinedPaymentReceipt
+                          ? "bg-gray-100 dark:bg-gray-800 cursor-default"
+                          : "bg-white dark:bg-gray-700",
                         "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                       )}
                     />
                   </div>
                 )}
               </div>
+              <GTReceiptJoinPanel
+                lookup={paymentReceiptLookup}
+                joinConfirmed={paymentReceiptJoinConfirmed}
+                onJoinConfirmedChange={setPaymentReceiptJoinConfirmed}
+                disabled={isSaving}
+                className="mt-4"
+              />
             </div>
           )}
 

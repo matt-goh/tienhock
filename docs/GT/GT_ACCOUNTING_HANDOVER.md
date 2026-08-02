@@ -1796,6 +1796,7 @@ its actual bank-clearance/posting date.
 | GT-P6 — invoice-entry UX + dead-path removal | ✅ complete (31 Jul 2026) | Code only, no migration. Removed the dead per-payment journal exports, corrected `debtor-map.json`, and shared one accounting block across both invoice-creation screens. |
 | GT-P7 — restore the legacy debtor model | ✅ complete (31 Jul 2026) | Code only. A customer with no named account posts to `CD_SD`, exactly as all 1,011 legacy counter invoices did. Nothing is keyed, nothing is auto-created. Unblocks all 42 defaultless customers and the 25 open pre-cutover invoices. |
 | GT-P8 — ERP-vs-ledger reconciliation | ✅ applied to dev (31 Jul 2026) | Legacy ledger is the source of truth. 13 exact-name account links written and 24 stale ERP invoices (RM5,270) closed by non-posting historical receipts; 1 genuine RM230 bill kept open. No journal posted or changed. |
+| GT-P13 — receipt joining + rental traceability | ✅ implemented in code (2 Aug 2026) | Invoice and rental entry can explicitly add a payment allocation to an existing durable receipt; receipt and rental links now work in both directions. No schema change. |
 | GT-P5 — production rollout | ⏳ pending, runbook corrected | The original ordering is **superseded**. Use [GT-P5 v2](#gt-p5-v2--corrected-production-rollout-runbook-2-aug-2026) at the end of this file: nine steps, proven end to end on a dev database freshly imported from production. Blocked on one decision — the debtor identity for any GT invoice issued since that dump. |
 
 #### Complete legacy journal-family inventory
@@ -2526,6 +2527,58 @@ from production rather than assuming they carried over.
 - The receipt fixture does not cover cheque confirmation, concurrent requests, duplicate-reference
   rejection or a real fixture commit. Those paths are structurally covered by the receipt service but
   remain explicit test limitations, not known posting defects.
+
+#### GT-P13 — join existing receipts + rental/payment traceability (2 Aug 2026, code complete)
+
+Recording a full payment while creating an invoice — either on the invoice form or from Rental
+Details — can now add that invoice as a new allocation of an existing durable receipt. Reference
+matching is case-insensitive after trimming, but a match never joins silently: the screen shows the
+receipt and requires an explicit confirmation. The original receipt remains the single banking event:
+
+1. Its received date, payment method and cheque/transaction reference are inherited unchanged by the
+   new allocation; the client cannot replace them while joining.
+2. Its status is inherited. A posted receipt settles the new invoice and rebuilds its one consolidated
+   `REC` journal; a pending cheque creates a pending allocation, changes no invoice/customer balance
+   and posts no journal until the receipt is confirmed.
+3. `receipts.total_amount` is increased before `syncGTReceiptJournalEntry` runs, and the locked,
+   refreshed header is passed to the rebuild so the journal's aggregate `PBB_1` debit continues to
+   equal all allocation credits.
+4. Cancelled receipts remain reserved and cannot be joined.
+5. A receipt whose journal has `manual_override` cannot be joined, because that journal is deliberately
+   excluded from automatic rebuilds. The join holds that journal row lock through the mutation so a
+   concurrent manual edit cannot slip between this decision and the rebuild.
+6. One receipt cannot contain two live allocations for the same invoice.
+7. The receipt's original `origin` is not recomputed. Posting-lock, invoice-date and posted-sales-
+   journal checks use the inherited receipt date, including the refusal to attach a July invoice to a
+   pre-cutover receipt.
+8. Receipt references match case-insensitively after trimming, consistent with receipt creation and
+   the existing availability check.
+9. Changing the keyed reference clears any prior confirmation; a user must confirm the exact matched
+   receipt currently shown. The server also compares that expected reference with the locked header,
+   so a receipt renamed after lookup is rejected rather than silently joined.
+
+The shared payment-reference advisory lock is acquired before receipt, journal and invoice row locks,
+so concurrent joins serialize with ordinary receipt creation. The joining invoice and every invoice
+already allocated to the target receipt are locked in invoice-id order, matching receipt confirmation
+and cancellation and avoiding cross-receipt lock cycles.
+
+Traceability is derived from the existing relationships, with no denormalised rental field and no
+schema change: `receipt → payment allocation → invoice → invoice_rentals → rental`. Payment links on
+Rental Details and Rental Edit open `/greentarget/payments?receipt=<id>`; that URL opens the durable
+receipt dialog, and each allocation there links back to every rental covered by its invoice. Cancelled
+payment rows remain visible and linkable as audit history.
+
+**Files:** `src/routes/greentarget/payments.js`, `src/routes/greentarget/rentals.js`,
+`src/routes/greentarget/api.ts`, `src/types/greenTargetTypes.ts`,
+`src/components/GreenTarget/GTReceiptJoinPanel.tsx`,
+`src/components/GreenTarget/GreenTargetPaymentTable.tsx`,
+`src/components/GreenTarget/GreenTargetReceiptDetailsDialog.tsx`,
+`src/components/GreenTarget/AssociatedInvoiceDisplay.tsx`,
+`src/pages/GreenTarget/Invoices/InvoiceFormPage.tsx`,
+`src/pages/GreenTarget/Payments/GreenTargetPaymentPage.tsx`,
+`src/pages/GreenTarget/Rentals/RentalDetailsPage.tsx`, and
+`src/pages/GreenTarget/Rentals/RentalFormPage.tsx`. The 13 handover scenarios remain for manual
+verification; no build, TypeScript, lint or database mutation was run during this implementation.
 
 ---
 

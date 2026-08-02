@@ -17,6 +17,8 @@ interface GreenTargetPaymentTableProps {
   payments: GreenTargetPayment[];
   onViewPayment: (payment: GreenTargetPayment) => void;
   onRefresh: () => void | Promise<void>;
+  selectedReceiptId: number | null;
+  onSelectReceipt: (receiptId: number | null) => void;
 }
 
 interface ApiErrorShape {
@@ -36,6 +38,8 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
   payments,
   onViewPayment,
   onRefresh,
+  selectedReceiptId,
+  onSelectReceipt,
 }) => {
   const navigate = useNavigate();
   const [confirmingPaymentId, setConfirmingPaymentId] = useState<number | null>(
@@ -51,9 +55,6 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
   const [selectedPaymentGroup, setSelectedPaymentGroup] = useState<
     GreenTargetPayment[]
   >([]);
-  const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(
-    null
-  );
   const [clearanceDate, setClearanceDate] = useState<string>(
     format(new Date(), "yyyy-MM-dd")
   );
@@ -304,7 +305,7 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
     <GreenTargetReceiptDetailsDialog
       receiptId={selectedReceiptId}
       isOpen={selectedReceiptId !== null}
-      onClose={(): void => setSelectedReceiptId(null)}
+      onClose={(): void => onSelectReceipt(null)}
       onChanged={onRefresh}
     />
   );
@@ -398,7 +399,7 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
                               type="button"
                               onClick={(): void => {
                                 if (firstPayment.receipt_id) {
-                                  setSelectedReceiptId(firstPayment.receipt_id);
+                                  onSelectReceipt(firstPayment.receipt_id);
                                 }
                               }}
                               disabled={!firstPayment.receipt_id}
@@ -542,7 +543,7 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
                           type="button"
                           onClick={(): void => {
                             if (firstPayment.receipt_id) {
-                              setSelectedReceiptId(firstPayment.receipt_id);
+                              onSelectReceipt(firstPayment.receipt_id);
                             }
                           }}
                           disabled={!firstPayment.receipt_id}
