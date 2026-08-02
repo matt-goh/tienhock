@@ -336,7 +336,6 @@ const RentalDetailsPage: React.FC = () => {
     setPaymentMethod("cash");
     setPaymentInternalReference("");
     setPaymentReference("");
-    setPaymentJoinReceiptId(null);
     setIsLoadingCustomerRentals(true);
     // Preselect the customer's saved logical debtor identity when available;
     // the shared accounting block still displays where it posts in the GL.
@@ -1293,7 +1292,6 @@ const RentalDetailsPage: React.FC = () => {
                         setRecordPayment(
                           (current: boolean): boolean => !current
                         );
-                        setPaymentJoinReceiptId(null);
                       }}
                       className="flex items-center cursor-pointer group p-1"
                     >
