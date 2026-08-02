@@ -9,7 +9,8 @@ import {
   GreenTargetPayment,
 } from "../../types/greenTargetTypes";
 import Button from "../Button";
-import { FormInput, FormListbox } from "../FormComponents";
+import { FormInput } from "../FormComponents";
+import PillSelect, { PillSelectOption } from "../PillSelect";
 import TimeNavigator, { type TimeRange } from "../TimeNavigator";
 import GreenTargetInvoiceSelectionTable from "./GreenTargetInvoiceSelectionTable";
 import GTReceiptJoinPanel, {
@@ -18,6 +19,13 @@ import GTReceiptJoinPanel, {
   useGTReceiptJoinConfirmation,
   useGTReceiptJoinLookup,
 } from "./GTReceiptJoinPanel";
+
+const PAYMENT_METHOD_OPTIONS: ReadonlyArray<PillSelectOption<string>> = [
+  { value: "cash", label: "Cash" },
+  { value: "cheque", label: "Cheque" },
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "online", label: "Online" },
+];
 
 interface GreenTargetPaymentFormProps {
   payment: GreenTargetPayment | null;
@@ -144,13 +152,6 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
   const joinedReceipt = paymentReceiptJoin.confirmedReceipt;
   const effectivePaymentMethod: GreenTargetPayment["payment_method"] =
     joinedReceipt ? joinedReceipt.payment_method : formData.payment_method;
-
-  const paymentMethodOptions: { id: string; name: string }[] = [
-    { id: "cash", name: "Cash" },
-    { id: "cheque", name: "Cheque" },
-    { id: "bank_transfer", name: "Bank Transfer" },
-    { id: "online", name: "Online" },
-  ];
 
   const fetchUnpaidInvoices = useCallback(async (): Promise<void> => {
     const requestId: number = invoiceRequestIdRef.current + 1;
@@ -489,27 +490,33 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                     onJoinConfirmedChange={paymentReceiptJoin.setJoinConfirmed}
                     disabled={isSubmitting}
                   />
-                  <FormListbox
-                    name="payment_method"
-                    label="Payment Method"
-                    value={effectivePaymentMethod}
-                    onChange={(value: string): void =>
-                      setFormData(
-                        (currentFormData: PaymentFormData): PaymentFormData => ({
-                          ...currentFormData,
-                          payment_method:
-                            value as GreenTargetPayment["payment_method"],
-                          // Only a cheque carries a reference now.
-                          payment_reference:
-                            value === "cheque"
-                              ? currentFormData.payment_reference
-                              : "",
-                        })
-                      )
-                    }
-                    options={paymentMethodOptions}
-                    disabled={isSubmitting || joinedReceipt !== null}
-                  />
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                      Payment Method
+                    </label>
+                    <PillSelect<string>
+                      value={effectivePaymentMethod}
+                      onChange={(value: string): void =>
+                        setFormData(
+                          (
+                            currentFormData: PaymentFormData
+                          ): PaymentFormData => ({
+                            ...currentFormData,
+                            payment_method:
+                              value as GreenTargetPayment["payment_method"],
+                            // Only a cheque carries a reference now.
+                            payment_reference:
+                              value === "cheque"
+                                ? currentFormData.payment_reference
+                                : "",
+                          })
+                        )
+                      }
+                      options={PAYMENT_METHOD_OPTIONS}
+                      disabled={isSubmitting || joinedReceipt !== null}
+                      ariaLabel="Payment method"
+                    />
+                  </div>
                   {/* Cheque only: the number is how a cheque is matched to the
                       bank statement when it clears. Online and bank transfers
                       are identified by their RV number — no incoming payment in

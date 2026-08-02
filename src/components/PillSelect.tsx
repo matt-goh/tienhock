@@ -22,6 +22,10 @@ interface PillSelectProps<T extends string> {
  * Single-select pill row, styled like the Journal Entries filter pills but
  * behaving as a radio group: exactly one option is selected at a time and a
  * pill can never be toggled back off.
+ *
+ * A `value` that matches no option renders with nothing highlighted. That is
+ * the neutral state the daily-log "SET ALL" leave control relies on, where the
+ * pseudo-value "mixed" means the selected workers do not share one type.
  */
 const PillSelect = <T extends string>({
   value,

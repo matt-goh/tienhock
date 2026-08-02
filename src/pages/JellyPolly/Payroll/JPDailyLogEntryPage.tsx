@@ -5,7 +5,6 @@ import React, {
   useMemo,
   useCallback,
   useRef,
-  Fragment,
 } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../../../components/Button";
@@ -36,14 +35,7 @@ import {
   calculateActivityAmount,
   calculateActivitiesAmounts,
 } from "../../../utils/payroll/calculateActivityAmount";
-import {
-  Listbox,
-  ListboxButton,
-  ListboxOption,
-  ListboxOptions,
-  Transition,
-} from "@headlessui/react";
-import { IconChevronDown, IconCheck, IconRefresh } from "@tabler/icons-react";
+import { IconRefresh } from "@tabler/icons-react";
 import { useUnsavedChanges } from "../../../hooks/useUnsavedChanges";
 import SafeLink from "../../../components/SafeLink";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
@@ -109,10 +101,7 @@ interface LeaveEntry {
   customAmount?: string;
 }
 
-interface LeaveOption {
-  id: LeaveType;
-  name: string;
-}
+type LeaveOption = PillSelectOption<LeaveType>;
 
 interface LeaveBalance {
   cuti_tahunan_total: number;
@@ -758,13 +747,13 @@ const JPDailyLogEntryPage: React.FC<JPDailyLogEntryPageProps> = ({
 
   const leaveOptions = useMemo<LeaveOption[]>(() => {
     const options: LeaveOption[] = [
-      { id: "cuti_sakit", name: "Cuti Sakit" },
-      { id: "cuti_tahunan", name: "Cuti Tahunan" },
-      { id: "cuti_rawatan", name: "Cuti Rawatan" },
+      { value: "cuti_sakit", label: "Cuti Sakit" },
+      { value: "cuti_tahunan", label: "Cuti Tahunan" },
+      { value: "cuti_rawatan", label: "Cuti Rawatan" },
     ];
 
     if (formData.dayType === "Umum") {
-      return [{ id: "cuti_umum", name: "Cuti Umum" }, ...options];
+      return [{ value: "cuti_umum", label: "Cuti Umum" }, ...options];
     }
 
     return options;
@@ -3484,85 +3473,23 @@ const JPDailyLogEntryPage: React.FC<JPDailyLogEntryPageProps> = ({
                       scope="col"
                       className="px-6 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                     >
-                      <div className="flex items-center gap-2">
-                        <span>SET ALL</span>
-                        <Listbox
+                      <div className="flex items-center gap-2 normal-case">
+                        <span className="uppercase">SET ALL</span>
+                        {/* "mixed" matches no option, so no pill is highlighted
+                            when the selected workers have different types —
+                            that is the neutral state this control needs. */}
+                        <PillSelect<BulkLeaveTypeValue>
                           value={bulkLeaveTypeValue}
-                          onChange={(value) => {
+                          onChange={(value: BulkLeaveTypeValue) => {
                             void handleBulkLeaveTypeChange(value as LeaveType);
                           }}
+                          options={leaveOptions}
                           disabled={
                             selectedLeaveEmployeesForBulk.length === 0 ||
                             isSaving
                           }
-                        >
-                          <div className="relative w-40 normal-case">
-                            <ListboxButton
-                              className={`relative w-full pl-3 pr-8 py-1.5 text-left rounded-md border text-xs font-medium ${
-                                selectedLeaveEmployeesForBulk.length === 0 ||
-                                isSaving
-                                  ? "bg-default-100 dark:bg-gray-700 text-default-400 dark:text-gray-500 cursor-not-allowed border-default-200 dark:border-gray-600"
-                                  : "bg-white dark:bg-gray-900/50 text-default-700 dark:text-gray-200 border-default-300 dark:border-gray-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500"
-                              }`}
-                            >
-                              <span className="block truncate">
-                                {leaveOptions.find(
-                                  (option) => option.id === bulkLeaveTypeValue
-                                )?.name || "Set selected"}
-                              </span>
-                              <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                                <IconChevronDown
-                                  className="w-4 h-4 text-default-400 dark:text-gray-500"
-                                  aria-hidden="true"
-                                />
-                              </span>
-                            </ListboxButton>
-                            <Transition
-                              as={Fragment}
-                              leave="transition ease-in duration-100"
-                              leaveFrom="opacity-100"
-                              leaveTo="opacity-0"
-                            >
-                              <ListboxOptions className="absolute z-50 w-full py-1 mt-1 overflow-auto text-sm bg-white dark:bg-gray-800 rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none">
-                                {leaveOptions.map((option) => (
-                                  <ListboxOption
-                                    key={option.id}
-                                    value={option.id}
-                                    className={({ active }) =>
-                                      `${
-                                        active
-                                          ? "bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200"
-                                          : "text-default-700 dark:text-gray-200"
-                                      } cursor-pointer select-none relative py-2 pl-3 pr-8`
-                                    }
-                                  >
-                                    {({ selected }) => (
-                                      <>
-                                        <span
-                                          className={`${
-                                            selected
-                                              ? "font-medium"
-                                              : "font-normal"
-                                          } block truncate`}
-                                        >
-                                          {option.name}
-                                        </span>
-                                        {selected && (
-                                          <span className="absolute inset-y-0 right-0 flex items-center pr-2 text-amber-600 dark:text-amber-400">
-                                            <IconCheck
-                                              className="w-4 h-4"
-                                              aria-hidden="true"
-                                            />
-                                          </span>
-                                        )}
-                                      </>
-                                    )}
-                                  </ListboxOption>
-                                ))}
-                              </ListboxOptions>
-                            </Transition>
-                          </div>
-                        </Listbox>
+                          ariaLabel="Set leave type for the selected employees"
+                        />
                       </div>
                     </th>
                     <th
@@ -3674,95 +3601,19 @@ const JPDailyLogEntryPage: React.FC<JPDailyLogEntryPageProps> = ({
                           </div>
                         </td>
                         <td className="px-6 py-2 whitespace-nowrap">
-                          <div className="w-full max-w-[180px]">
-                            <Listbox
+                          {/* The row toggles selection on click, so the pills
+                              must not bubble (the old ListboxButton did the
+                              same). */}
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <PillSelect<LeaveType>
                               value={currentLeaveType}
-                              onChange={(value) =>
-                                handleLeaveTypeChange(
-                                  employee.id,
-                                  value as LeaveType
-                                )
+                              onChange={(value: LeaveType) =>
+                                handleLeaveTypeChange(employee.id, value)
                               }
+                              options={leaveOptions}
                               disabled={!isSelected || isSaving}
-                            >
-                              <div className="relative">
-                                <ListboxButton
-                                  onClick={(e) => e.stopPropagation()}
-                                  className={`relative w-full pl-3 pr-8 py-2 text-left rounded-md border ${
-                                    !isSelected || isSaving
-                                      ? "bg-default-100 dark:bg-gray-700 text-default-400 dark:text-gray-500 cursor-not-allowed border-default-200 dark:border-gray-600"
-                                      : "bg-white dark:bg-gray-900/50 text-default-700 dark:text-gray-200 border-default-300 dark:border-gray-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                  }`}
-                                >
-                                  <span className="block truncate text-sm">
-                                    {leaveOptions.find(
-                                      (option) => option.id === currentLeaveType
-                                    )?.name ||
-                                      (formData.dayType === "Umum"
-                                        ? "Cuti Umum"
-                                        : "Cuti Sakit")}
-                                  </span>
-                                  <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                                    <IconChevronDown
-                                      className="w-4 h-4 text-default-400 dark:text-gray-500"
-                                      aria-hidden="true"
-                                    />
-                                  </span>
-                                </ListboxButton>
-                                <Transition
-                                  as={Fragment}
-                                  leave="transition ease-in duration-100"
-                                  leaveFrom="opacity-100"
-                                  leaveTo="opacity-0"
-                                >
-                                  <ListboxOptions
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="absolute z-50 w-full py-1 bottom-full mb-1 overflow-auto text-sm bg-white dark:bg-gray-800 rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none">
-                                    {leaveOptions.map((option) => (
-                                      <ListboxOption
-                                        key={option.id}
-                                        value={option.id}
-                                        className={({ active }) =>
-                                          `${
-                                            active
-                                              ? "bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200"
-                                              : "text-default-700 dark:text-gray-200"
-                                          } cursor-pointer select-none relative py-2 pl-3 pr-8`
-                                        }
-                                      >
-                                        {({ selected, active }) => (
-                                          <>
-                                            <span
-                                              className={`${
-                                                selected
-                                                  ? "font-medium"
-                                                  : "font-normal"
-                                              } block truncate`}
-                                            >
-                                              {option.name}
-                                            </span>
-                                            {selected ? (
-                                              <span
-                                                className={`absolute inset-y-0 right-0 flex items-center pr-2 ${
-                                                  active
-                                                    ? "text-amber-600"
-                                                    : "text-amber-500"
-                                                }`}
-                                              >
-                                                <IconCheck
-                                                  className="w-4 h-4"
-                                                  aria-hidden="true"
-                                                />
-                                              </span>
-                                            ) : null}
-                                          </>
-                                        )}
-                                      </ListboxOption>
-                                    ))}
-                                  </ListboxOptions>
-                                </Transition>
-                              </div>
-                            </Listbox>
+                              ariaLabel={`Leave type for ${employee.name}`}
+                            />
                           </div>
                         </td>
                         <td className="w-36 px-6 py-2 whitespace-nowrap text-right">
