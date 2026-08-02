@@ -671,9 +671,15 @@ console.log("\n-- 6. phase boundaries ------------------------------------------
   );
   check(ilr === "4903", "greentarget.import_legacy_rows holds the 4,903 G4 staging rows", `found ${ilr}`);
 
-  const thAc = scalar("SELECT count(*) FROM public.account_codes");
+  // public.account_codes grows with ordinary Tien Hock keying (debtorSync adds
+  // a DEBTOR child per new customer), so this is a floor, not an equality.
+  const thAc = Number(scalar("SELECT count(*) FROM public.account_codes"));
   const thNotes = scalar("SELECT count(*) FROM public.financial_statement_notes");
-  check(thAc === "2827", "public.account_codes unmoved at 2,827", `found ${thAc}`);
+  check(
+    thAc >= 2827,
+    "public.account_codes never shrinks below the 2,827 G8 floor",
+    `found ${thAc}`
+  );
   check(thNotes === "33", "public.financial_statement_notes unmoved at 33", `found ${thNotes}`);
   // TH's ledger is live and grows with ordinary Tien Hock keying, so this is a
   // floor, not an equality (see verify-import.mjs section 6).

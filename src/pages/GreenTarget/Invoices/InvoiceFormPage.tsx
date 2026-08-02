@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
   Fragment,
 } from "react";
 import { format } from "date-fns";
@@ -34,6 +35,7 @@ import clsx from "clsx";
 import { SelectOption } from "../../../components/FormComponents";
 import GTInvoiceAccountFields, {
   GT_DEFAULT_REVENUE_ACCOUNT,
+  GTInvoiceAccountFieldsHandle,
 } from "../../../components/GreenTarget/GTInvoiceAccountFields";
 import { formatLocationDisplay } from "../../../utils/greenTarget/formatLocationDisplay";
 import { toCents } from "../../../utils/moneyUtils";
@@ -154,6 +156,7 @@ const InvoiceFormPage: React.FC = () => {
     ],
   });
   const [initialFormData, setInitialFormData] = useState<Invoice | null>(null); // For change detection
+  const accountFieldsRef = useRef<GTInvoiceAccountFieldsHandle | null>(null);
 
   // Reference Data State
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -793,10 +796,6 @@ const InvoiceFormPage: React.FC = () => {
       toast.error("Select a rental to set the customer");
       return false;
     }
-    if (!formData.debtor_account_code.trim()) {
-      toast.error("Select or create a Trade Debtor identity");
-      return false;
-    }
     const invoiceTotalCents: number = toCents(
       Number(formData.amount_before_tax || 0) + Number(formData.tax_amount || 0)
     );
@@ -878,6 +877,22 @@ const InvoiceFormPage: React.FC = () => {
           return;
         }
       }
+      // A staged CD/SD identity is only written once the invoice is actually
+      // being saved, so an abandoned form never leaves an unused debtor name.
+      let debtorAccountCode: string;
+      try {
+        debtorAccountCode = accountFieldsRef.current
+          ? await accountFieldsRef.current.ensureDebtorIdentity()
+          : formData.debtor_account_code.trim();
+      } catch (identityError: unknown) {
+        toast.error(
+          identityError instanceof Error
+            ? identityError.message
+            : "Gagal menyediakan identiti penghutang."
+        );
+        return;
+      }
+
       const invData: Omit<Invoice, "invoice_id"> & {
         total_amount: number;
         invoice_id?: number;
@@ -890,7 +905,7 @@ const InvoiceFormPage: React.FC = () => {
         total_amount: Number(totalAmount),
         date_issued: formData.date_issued,
         invoice_number: formData.invoice_number?.trim() || undefined,
-        debtor_account_code: formData.debtor_account_code,
+        debtor_account_code: debtorAccountCode,
         revenue_splits: formData.revenue_splits,
       };
       if (isEditMode && formData.invoice_id)
@@ -1288,9 +1303,9 @@ const InvoiceFormPage: React.FC = () => {
                     </div>
                     {formData.customer_id > 0 && (
                       <p className="text-xs text-default-500 dark:text-gray-400">
-                        Showing only {selectedCustomer?.name || "this customer"}
-                        's remaining rentals. Use "Change customer" above to
-                        browse every customer again.
+                        {`Showing only ${
+                          selectedCustomer?.name || "this customer"
+                        }'s rentals. Use "Change customer" above to browse every customer again.`}
                       </p>
                     )}
                   </>
@@ -1304,6 +1319,8 @@ const InvoiceFormPage: React.FC = () => {
                   <div className="p-4 border border-default-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-center">
                     {appliedRentalQuery
                       ? "No rentals match your search"
+                      : formData.customer_id > 0
+                      ? "No rentals are waiting to be invoiced for this customer"
                       : "No rentals are waiting to be invoiced"}
                   </div>
                 ) : (
@@ -1545,6 +1562,7 @@ const InvoiceFormPage: React.FC = () => {
 
           <div className="mt-6">
             <GTInvoiceAccountFields
+              ref={accountFieldsRef}
               customerId={formData.customer_id || null}
               customerName={selectedCustomer?.name || null}
               customerDefaultCode={selectedCustomer?.debtor_account_code || null}

@@ -1,5 +1,11 @@
 // src/pages/GreenTarget/Rentals/RentalDetailsPage.tsx
-import React, { Fragment, useCallback, useEffect, useState } from "react";
+import React, {
+  Fragment,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { format } from "date-fns";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
@@ -23,6 +29,7 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import GTInvoiceAccountFields, {
   GT_DEFAULT_REVENUE_ACCOUNT,
+  GTInvoiceAccountFieldsHandle,
 } from "../../../components/GreenTarget/GTInvoiceAccountFields";
 import { formatLocationDisplay } from "../../../utils/greenTarget/formatLocationDisplay";
 import { toCents } from "../../../utils/moneyUtils";
@@ -213,6 +220,7 @@ const RentalDetailsPage: React.FC = () => {
     },
   ]);
   const [invoiceDebtorAccount, setInvoiceDebtorAccount] = useState<string>("");
+  const accountFieldsRef = useRef<GTInvoiceAccountFieldsHandle | null>(null);
   // The customer's saved default, loaded when the modal opens. Null means the
   // customer has never been given one, which is the only case that needs a
   // human decision here.
@@ -381,10 +389,6 @@ const RentalDetailsPage: React.FC = () => {
       toast.error("Date issued is required.");
       return;
     }
-    if (!invoiceDebtorAccount.trim()) {
-      toast.error("Select or create a Trade Debtor identity.");
-      return;
-    }
     const hasInvalidRevenueSplit: boolean =
       invoiceRevenueSplits.length === 0 ||
       invoiceRevenueSplits.some(
@@ -413,6 +417,22 @@ const RentalDetailsPage: React.FC = () => {
 
     setIsCreatingInvoice(true);
     try {
+      // A staged CD/SD identity is only written once the invoice is actually
+      // being saved, so an abandoned modal never leaves an unused debtor name.
+      let debtorAccountCode: string;
+      try {
+        debtorAccountCode = accountFieldsRef.current
+          ? await accountFieldsRef.current.ensureDebtorIdentity()
+          : invoiceDebtorAccount.trim();
+      } catch (identityError: unknown) {
+        toast.error(
+          identityError instanceof Error
+            ? identityError.message
+            : "Gagal menyediakan identiti penghutang."
+        );
+        return;
+      }
+
       const response = await greenTargetApi.createInvoice({
         type: "regular",
         customer_id: rental.customer_id,
@@ -421,7 +441,7 @@ const RentalDetailsPage: React.FC = () => {
         tax_amount: 0,
         total_amount: amount,
         date_issued: dateIssued,
-        debtor_account_code: invoiceDebtorAccount,
+        debtor_account_code: debtorAccountCode,
         revenue_splits: invoiceRevenueSplits,
       });
       toast.success(`Invoice ${response.invoice.invoice_number} created`);
@@ -1002,7 +1022,7 @@ const RentalDetailsPage: React.FC = () => {
                 leaveFrom="opacity-100 scale-100"
                 leaveTo="opacity-0 scale-95"
               >
-                <Dialog.Panel className="w-full max-w-lg transform rounded-lg bg-white dark:bg-gray-800 p-6 shadow-xl transition-all">
+                <Dialog.Panel className="w-full max-w-3xl transform rounded-lg bg-white dark:bg-gray-800 p-6 shadow-xl transition-all">
                   <div className="flex items-center justify-between mb-4">
                     <Dialog.Title className="text-lg font-semibold text-default-900 dark:text-gray-100">
                       Create Invoice
@@ -1133,6 +1153,7 @@ const RentalDetailsPage: React.FC = () => {
 
                   <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50/60 p-3 dark:border-sky-900 dark:bg-sky-950/20">
                     <GTInvoiceAccountFields
+                      ref={accountFieldsRef}
                       variant="plain"
                       customerId={rental.customer_id}
                       customerName={rental.customer_name}

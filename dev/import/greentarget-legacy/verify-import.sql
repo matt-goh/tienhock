@@ -758,10 +758,14 @@ BEGIN
          (SELECT COUNT(*) FROM public.financial_statement_notes)
     INTO v_th_accounts, v_th_journals, v_th_lines, v_th_anchors, v_th_notes;
 
-  IF (v_th_accounts, v_th_journals, v_th_notes)
-     IS DISTINCT FROM (2827::bigint, 8238::bigint, 33::bigint) THEN
+  -- account_codes and journal_entries are LIVE Tien Hock tables: debtorSync
+  -- adds a DEBTOR child per new customer and ordinary keying adds journals
+  -- every day, so both are floors. Only the note catalogue is structural.
+  IF v_th_accounts < 2827::bigint
+     OR v_th_journals < 8238::bigint
+     OR v_th_notes IS DISTINCT FROM 33::bigint THEN
     RAISE EXCEPTION
-      'Tien Hock moved: account_codes %, journal_entries %, notes % (expected 2827 / 8238 / 33)',
+      'Tien Hock moved: account_codes %, journal_entries %, notes % (expected >= 2827 / >= 8238 / = 33)',
       v_th_accounts, v_th_journals, v_th_notes;
   END IF;
 

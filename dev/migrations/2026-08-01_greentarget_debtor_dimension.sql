@@ -76,6 +76,72 @@ SELECT *
   FROM greentarget.account_opening_balances
  WHERE as_of_date < DATE '2026-07-01';
 
+-- July trade-debtor money is measured from the live dataset, never pinned to
+-- constants. This migration moves child postings onto the CD_SD control and
+-- consolidates their 1-Jul anchors into one control anchor, so both aggregates
+-- below must come out IDENTICAL afterwards no matter how many July documents
+-- the company has issued. The universe is every TD account, because the
+-- rewrite is precisely what moves an amount from a child to its control.
+CREATE TEMP TABLE gt_debtor_dimension_july_money_baseline ON COMMIT DROP AS
+WITH trade_debtor AS (
+  SELECT code
+    FROM greentarget.account_codes
+   WHERE ledger_type = 'TD'
+), july_movement AS (
+  SELECT COALESCE(SUM(line.debit_amount - line.credit_amount), 0)::numeric
+           AS amount
+    FROM greentarget.journal_entry_lines line
+    JOIN greentarget.journal_entries journal
+      ON journal.id = line.journal_entry_id
+    JOIN trade_debtor ON trade_debtor.code = line.account_code
+   WHERE journal.status = 'posted'
+     AND journal.entry_date >= DATE '2026-07-01'
+     AND journal.entry_date <  DATE '2026-08-01'
+), pbb_movement AS (
+  SELECT COALESCE(SUM(line.debit_amount - line.credit_amount), 0)::numeric
+           AS amount
+    FROM greentarget.journal_entry_lines line
+    JOIN greentarget.journal_entries journal
+      ON journal.id = line.journal_entry_id
+   WHERE journal.status = 'posted'
+     AND journal.entry_date >= DATE '2026-07-01'
+     AND journal.entry_date <  DATE '2026-08-01'
+     AND line.account_code = 'PBB_1'
+), latest_anchor AS (
+  SELECT debtor.code, anchor.as_of_date, COALESCE(anchor.amount, 0) AS amount
+    FROM trade_debtor debtor
+    LEFT JOIN LATERAL (
+      SELECT opening.as_of_date, opening.amount
+        FROM greentarget.account_opening_balances opening
+       WHERE opening.account_code = debtor.code
+         AND opening.as_of_date <= DATE '2026-07-31'
+       ORDER BY opening.as_of_date DESC
+       LIMIT 1
+    ) anchor ON true
+), movement AS (
+  SELECT anchor.code,
+         COALESCE(SUM(
+           CASE WHEN journal.id IS NOT NULL
+                THEN line.debit_amount - line.credit_amount
+                ELSE 0
+           END
+         ), 0) AS amount
+    FROM latest_anchor anchor
+    LEFT JOIN greentarget.journal_entry_lines line
+      ON line.account_code = anchor.code
+    LEFT JOIN greentarget.journal_entries journal
+      ON journal.id = line.journal_entry_id
+     AND journal.status = 'posted'
+     AND journal.entry_date >= COALESCE(anchor.as_of_date, DATE '2026-01-01')
+     AND journal.entry_date <= DATE '2026-07-31'
+   GROUP BY anchor.code
+)
+SELECT (SELECT amount FROM july_movement) AS td_movement,
+       (SELECT amount FROM pbb_movement)  AS pbb_movement,
+       (SELECT COALESCE(SUM(anchor.amount + movement.amount), 0)
+          FROM latest_anchor anchor
+          JOIN movement ON movement.code = anchor.code) AS td_close;
+
 -- The evidence set is immutable: 746 printed identities plus one residual
 -- metadata row. The residual is NOT a customer/debtor registry identity.
 DO $snapshot_guard$
@@ -1283,33 +1349,53 @@ $structural_tail_guard$;
 
 DO $july_money_guard$
 DECLARE
-  v_cd_sd_movement numeric;
-  v_named_movement numeric;
+  v_before gt_debtor_dimension_july_money_baseline%ROWTYPE;
   v_td_movement numeric;
   v_pbb_movement numeric;
-  v_cd_sd_close numeric;
   v_td_close numeric;
+  v_cd_sd_movement numeric;
+  v_cd_sd_close numeric;
+  v_cd_sd_anchor numeric;
 BEGIN
-  SELECT COALESCE(SUM(line.debit_amount - line.credit_amount), 0)
-    INTO v_cd_sd_movement
-    FROM greentarget.journal_entry_lines line
-    JOIN greentarget.journal_entries journal ON journal.id = line.journal_entry_id
-   WHERE journal.status = 'posted'
-     AND journal.entry_date >= DATE '2026-07-01'
-     AND journal.entry_date < DATE '2026-08-01'
-     AND line.account_code = 'CD_SD';
+  SELECT * INTO v_before FROM gt_debtor_dimension_july_money_baseline;
 
-  SELECT COALESCE(SUM(line.debit_amount - line.credit_amount), 0)
-    INTO v_named_movement
-    FROM greentarget.journal_entry_lines line
-    JOIN greentarget.journal_entries journal ON journal.id = line.journal_entry_id
-    JOIN greentarget.account_codes account ON account.code = line.account_code
-   WHERE journal.status = 'posted'
-     AND journal.entry_date >= DATE '2026-07-01'
-     AND journal.entry_date < DATE '2026-08-01'
-     AND account.parent_code = 'DEBTOR'
-     AND account.ledger_type = 'TD'
-     AND account.code <> 'CD_SD';
+  WITH trade_debtor AS (
+    SELECT code
+      FROM greentarget.account_codes
+     WHERE ledger_type = 'TD'
+  ), latest_anchor AS (
+    SELECT debtor.code, anchor.as_of_date, COALESCE(anchor.amount, 0) AS amount
+      FROM trade_debtor debtor
+      LEFT JOIN LATERAL (
+        SELECT opening.as_of_date, opening.amount
+          FROM greentarget.account_opening_balances opening
+         WHERE opening.account_code = debtor.code
+           AND opening.as_of_date <= DATE '2026-07-31'
+         ORDER BY opening.as_of_date DESC
+         LIMIT 1
+      ) anchor ON true
+  ), movement AS (
+    SELECT anchor.code,
+           COALESCE(SUM(
+             CASE WHEN journal.id IS NOT NULL
+                  THEN line.debit_amount - line.credit_amount
+                  ELSE 0
+             END
+           ), 0) AS amount
+      FROM latest_anchor anchor
+      LEFT JOIN greentarget.journal_entry_lines line
+        ON line.account_code = anchor.code
+      LEFT JOIN greentarget.journal_entries journal
+        ON journal.id = line.journal_entry_id
+       AND journal.status = 'posted'
+       AND journal.entry_date >= COALESCE(anchor.as_of_date, DATE '2026-01-01')
+       AND journal.entry_date <= DATE '2026-07-31'
+     GROUP BY anchor.code
+  )
+  SELECT COALESCE(SUM(anchor.amount + movement.amount), 0)
+    INTO v_td_close
+    FROM latest_anchor anchor
+    JOIN movement ON movement.code = anchor.code;
 
   SELECT COALESCE(SUM(line.debit_amount - line.credit_amount), 0)
     INTO v_td_movement
@@ -1319,7 +1405,6 @@ BEGIN
    WHERE journal.status = 'posted'
      AND journal.entry_date >= DATE '2026-07-01'
      AND journal.entry_date < DATE '2026-08-01'
-     AND account.parent_code = 'DEBTOR'
      AND account.ledger_type = 'TD';
 
   SELECT COALESCE(SUM(line.debit_amount - line.credit_amount), 0)
@@ -1331,67 +1416,52 @@ BEGIN
      AND journal.entry_date < DATE '2026-08-01'
      AND line.account_code = 'PBB_1';
 
-  v_cd_sd_close := 65705.40 + v_cd_sd_movement;
-
-  WITH direct_debtors AS (
-    SELECT code
-      FROM greentarget.account_codes
-     WHERE parent_code = 'DEBTOR'
-       AND ledger_type = 'TD'
-  ), latest_anchor AS (
-    SELECT debtor.code,
-           anchor.as_of_date,
-           COALESCE(anchor.amount, 0) AS amount
-      FROM direct_debtors debtor
-      LEFT JOIN LATERAL (
-        SELECT opening.as_of_date, opening.amount
-          FROM greentarget.account_opening_balances opening
-         WHERE opening.account_code = debtor.code
-           AND opening.as_of_date <= DATE '2026-07-31'
-         ORDER BY opening.as_of_date DESC
-         LIMIT 1
-      ) anchor ON true
-  ), movement AS (
-    SELECT debtor.code,
-           COALESCE(SUM(
-             CASE WHEN journal.id IS NOT NULL
-                  THEN line.debit_amount - line.credit_amount
-                  ELSE 0
-             END
-           ), 0) AS amount
-      FROM direct_debtors debtor
-      LEFT JOIN latest_anchor anchor ON anchor.code = debtor.code
-      LEFT JOIN greentarget.journal_entry_lines line
-        ON line.account_code = debtor.code
-      LEFT JOIN greentarget.journal_entries journal
-        ON journal.id = line.journal_entry_id
-       AND journal.status = 'posted'
-       AND journal.entry_date >= COALESCE(anchor.as_of_date, DATE '2026-01-01')
-       AND journal.entry_date <= DATE '2026-07-31'
-     GROUP BY debtor.code
-  )
-  SELECT COALESCE(SUM(anchor.amount + movement.amount), 0)
-    INTO v_td_close
-    FROM latest_anchor anchor
-    JOIN movement ON movement.code = anchor.code;
-
-  IF (v_cd_sd_movement, v_named_movement, v_td_movement,
-      v_pbb_movement, v_cd_sd_close, v_td_close)
+  -- Not one cent may move because identities were separated from the GL.
+  IF (v_td_movement, v_pbb_movement, v_td_close)
        IS DISTINCT FROM
-      (1710.00::numeric, 410.00::numeric, 2120.00::numeric,
-       730.00::numeric, 67415.40::numeric, 158902.22::numeric) THEN
+     (v_before.td_movement, v_before.pbb_movement, v_before.td_close) THEN
     RAISE EXCEPTION
-      'GT debtor-dimension July money failed: CD_SD move %, named move %, TD move %, PBB_1 move %, CD_SD close %, TD close %',
-      v_cd_sd_movement, v_named_movement, v_td_movement,
-      v_pbb_movement, v_cd_sd_close, v_td_close;
+      'GT debtor-dimension July money moved: TD movement % -> %, PBB_1 movement % -> %, TD close % -> %',
+      v_before.td_movement, v_td_movement,
+      v_before.pbb_movement, v_pbb_movement,
+      v_before.td_close, v_td_close;
   END IF;
+
+  -- The consolidated control anchor is evidenced, not dataset-derived: the
+  -- RM63,845.40 named sub-schedule plus the RM1,860.00 printed residual.
+  SELECT amount
+    INTO v_cd_sd_anchor
+    FROM greentarget.account_opening_balances
+   WHERE account_code = 'CD_SD'
+     AND as_of_date = DATE '2026-07-01';
+
+  IF v_cd_sd_anchor IS DISTINCT FROM 65705.40::numeric THEN
+    RAISE EXCEPTION
+      'GT debtor-dimension CD_SD 2026-07-01 control anchor is %, expected 65705.40',
+      v_cd_sd_anchor;
+  END IF;
+
+  SELECT COALESCE(SUM(line.debit_amount - line.credit_amount), 0)
+    INTO v_cd_sd_movement
+    FROM greentarget.journal_entry_lines line
+    JOIN greentarget.journal_entries journal ON journal.id = line.journal_entry_id
+   WHERE journal.status = 'posted'
+     AND journal.entry_date >= DATE '2026-07-01'
+     AND journal.entry_date < DATE '2026-08-01'
+     AND line.account_code = 'CD_SD';
+
+  v_cd_sd_close := v_cd_sd_anchor + v_cd_sd_movement;
+
+  RAISE NOTICE
+    'GT debtor-dimension July money unchanged: TD movement %, of which CD_SD %, PBB_1 movement %, CD_SD close %, TD close %.',
+    v_td_movement, v_cd_sd_movement, v_pbb_movement, v_cd_sd_close, v_td_close;
 END
 $july_money_guard$;
 
 DO $final_notice$
 BEGIN
   RAISE NOTICE
-    'GT debtor dimension ready: 780 logical identities (779 selectable), 752 GL child shells retired, CD_SD 2026-07-01 control anchor RM65,705.40, July CD_SD movement RM1,710.00, July total TD movement RM2,120.00.';
+    'GT debtor dimension ready: 780 logical identities (779 selectable), 752 GL child shells retired, CD_SD 2026-07-01 control anchor RM65,705.40, July trade-debtor money unchanged.';
 END
 $final_notice$;
 

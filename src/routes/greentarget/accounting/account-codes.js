@@ -218,7 +218,7 @@ export default function createGreenTargetAccountCodesRouter(pool) {
     ) {
       return res.status(400).json({
         message:
-          "Enter a valid CD/SD code using letters, numbers, spaces, hyphens, underscores, or periods",
+          "Masukkan kod CD/SD yang sah menggunakan huruf, nombor, ruang, sengkang, garis bawah atau titik",
       });
     }
     if (
@@ -226,12 +226,12 @@ export default function createGreenTargetAccountCodesRouter(pool) {
       normalizedDescription.length > MAX_DESCRIPTION_LENGTH
     ) {
       return res.status(400).json({
-        message: `Description is required and cannot exceed ${MAX_DESCRIPTION_LENGTH} characters`,
+        message: `Nama identiti diperlukan dan tidak boleh melebihi ${MAX_DESCRIPTION_LENGTH} aksara`,
       });
     }
     if (!effectiveFrom) {
       return res.status(400).json({
-        message: "Effective date is required in yyyy-MM-dd format",
+        message: "Tarikh berkuat kuasa diperlukan dalam format yyyy-MM-dd",
       });
     }
 
@@ -252,7 +252,7 @@ export default function createGreenTargetAccountCodesRouter(pool) {
       if (duplicate.rows.length > 0) {
         await client.query("ROLLBACK");
         return res.status(409).json({
-          message: `Debtor identity '${normalizedCode}' already exists`,
+          message: `Identiti penghutang '${normalizedCode}' sudah wujud`,
         });
       }
 
@@ -293,8 +293,8 @@ export default function createGreenTargetAccountCodesRouter(pool) {
       res.status(status).json({
         message:
           status === 409
-            ? `Debtor identity '${normalizedCode}' already exists`
-            : "Error creating Green Target debtor identity",
+            ? `Identiti penghutang '${normalizedCode}' sudah wujud`
+            : "Ralat semasa mencipta identiti penghutang",
         error: error.message,
       });
     } finally {

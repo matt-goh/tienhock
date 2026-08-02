@@ -565,11 +565,19 @@ console.log("\n-- 5. provenance and print order --------------------------------
 
 console.log("\n-- 6. Tien Hock isolation ------------------------------------------");
 {
-  // TH's structural tables are stable, so they are still asserted exactly: they
-  // are what a mis-scoped GT clone would actually corrupt.
-  const thAccounts = scalar("SELECT count(*) FROM public.account_codes");
+  // TH's note catalogue is genuinely structural, so it is still asserted
+  // exactly: it is what a mis-scoped GT clone would actually corrupt.
+  // public.account_codes is NOT structural - debtorSync creates one DEBTOR
+  // child per new Tien Hock customer, so an equality baseline here only
+  // measures how long ago it was written. The isolation invariant is that GT
+  // work never REMOVES a TH account.
+  const thAccounts = Number(scalar("SELECT count(*) FROM public.account_codes"));
   const thNotes = scalar("SELECT count(*) FROM public.financial_statement_notes");
-  check(thAccounts === "2827", "public.account_codes unmoved at 2,827", `found ${thAccounts}`);
+  check(
+    thAccounts >= 2827,
+    "public.account_codes never shrinks below the 2,827 G8 floor",
+    `found ${thAccounts}`
+  );
   check(thNotes === "33", "public.financial_statement_notes unmoved at 33", `found ${thNotes}`);
 
   // TH's ledger is LIVE: ordinary Tien Hock keying grows it every day, so an
