@@ -14,6 +14,7 @@ import type {
   GreenTargetPaymentBatchResponse,
   GreenTargetPaymentMutationResponse,
   GreenTargetPaymentReferenceAvailability,
+  GreenTargetReceiptByReferenceResponse,
   GreenTargetReceiptGroupDetails,
   UpdateGreenTargetPaymentReferencesInput,
 } from "../../types/greenTargetTypes";
@@ -275,6 +276,18 @@ export const greenTargetApi = {
     api.get<GreenTargetReceiptGroupDetails>(
       `/greentarget/api/payments/receipts/${receiptId}/group`
     ),
+  // Find the receipt that already owns a GT reference so the caller can offer
+  // an explicit join. An invoice id also checks the existing-allocation rule.
+  getReceiptByReference: (
+    reference: string,
+    invoiceId?: number
+  ): Promise<GreenTargetReceiptByReferenceResponse> => {
+    const invoiceQuery: string =
+      invoiceId === undefined ? "" : `?invoice_id=${invoiceId}`;
+    return api.get<GreenTargetReceiptByReferenceResponse>(
+      `/greentarget/api/payments/receipts/by-reference/${encodeURIComponent(reference)}${invoiceQuery}`
+    );
+  },
   checkInternalPaymentRef: (
     ref: string,
     excludePaymentId?: number

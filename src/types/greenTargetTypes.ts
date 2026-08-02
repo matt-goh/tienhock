@@ -107,6 +107,17 @@ export interface GreenTargetReceiptGroupJournal {
   status: string;
 }
 
+// A payment's rentals are derived through its invoice (invoice_rentals), never
+// stored on the payment: one invoice can cover several rentals.
+export interface GreenTargetReceiptAllocationRental {
+  rental_id: number;
+  tong_no: string;
+  date_placed: string;
+  date_picked: string | null;
+  location_site: string | null;
+  location_address: string | null;
+}
+
 export interface GreenTargetReceiptGroupAllocation {
   payment_id: number;
   invoice_id: number;
@@ -115,6 +126,7 @@ export interface GreenTargetReceiptGroupAllocation {
   customer_name: string;
   amount_paid: number;
   status: GreenTargetPayment["status"];
+  rentals: GreenTargetReceiptAllocationRental[];
 }
 
 export interface GreenTargetReceiptGroupDetails {
@@ -136,6 +148,10 @@ export interface CreateGreenTargetPaymentInput {
   payment_method: GreenTargetPayment["payment_method"];
   payment_reference: string | null;
   internal_reference: string;
+  // Join an existing receipt header instead of opening a new one. The header
+  // owns the banking event, so the date, method and cheque/transaction
+  // reference sent alongside are ignored by the server.
+  receipt_id?: number;
 }
 
 export interface CreateGreenTargetPaymentBatchInput {
@@ -156,6 +172,41 @@ export interface GreenTargetPaymentMutationResponse {
   message: string;
   payment: GreenTargetPayment;
   payments?: GreenTargetPayment[];
+  receipt?: {
+    receipt_id: number;
+    display_reference: string;
+    received_date: string;
+    payment_method: GreenTargetPayment["payment_method"];
+    payment_reference: string | null;
+    status: GreenTargetReceiptStatus;
+    total_amount: number;
+    joined: boolean;
+  };
+}
+
+export type GreenTargetReceiptJoinBlockReason =
+  | "cancelled"
+  | "manual_override"
+  | "invoice_already_allocated";
+
+export interface GreenTargetReceiptJoinCandidate {
+  receipt_id: number;
+  display_reference: string;
+  received_date: string;
+  posting_date: string | null;
+  payment_method: GreenTargetPayment["payment_method"];
+  payment_reference: string | null;
+  status: GreenTargetReceiptStatus;
+  origin: "erp" | "legacy_operational";
+  total_amount: number;
+  allocation_count: number;
+}
+
+export interface GreenTargetReceiptByReferenceResponse {
+  exists: boolean;
+  receipt: GreenTargetReceiptJoinCandidate | null;
+  joinable: boolean;
+  block_reason: GreenTargetReceiptJoinBlockReason | null;
 }
 
 export interface GreenTargetPaymentBatchResponse {

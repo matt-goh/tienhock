@@ -2,9 +2,9 @@
 
 Date: 2026-08-02
 
-Status: **planning only — nothing in this document is implemented.** No code, schema, or migration
-was written for it. Investigation of the current code is complete and is recorded in §2 with exact
-file anchors, so implementation can start without re-deriving anything.
+Status: **implemented in the working tree; manual scenario testing remains.** See **§12 Completion
+checkpoint** for the final state. §2 records the original investigation and §11 records the
+intermediate backend-only checkpoint; where either contradicts §12, §12 is current.
 
 Scope: Green Target invoices, rentals, payments, and the durable `greentarget.receipts` header.
 
@@ -364,3 +364,158 @@ Presentation (B, C):
 - Unifying the two record-payment form layouts (§A3).
 - Tien Hock receipts. TH has its own `receipts` / `receipt_allocations` model with different rules
   (`CH_REV1`/`CH_REV2`, excess allocations, overpayment application); none of this applies there.
+
+## 11. Implementation checkpoint — 2 August 2026
+
+Work stopped at a deliberate checkpoint: **every backend change is written; no frontend page has
+been wired yet.** Nothing has been run, type-checked or tested (project rule 10 — the user tests
+manually). No schema change was needed, exactly as C2 predicted, so there is no migration and no
+`CLAUDE.md` / `AGENTS.md` schema edit to make.
+
+The decisions taken before coding: link target = **receipt-addressable route**
+(`/greentarget/payments?receipt=:id`, rule L1's recommended option), and scope = **all three
+workstreams**.
+
+### 11a. Done — backend (complete for A, B and C)
+
+`src/routes/greentarget/payments.js`
+
+- Three new module-level helpers, placed directly above `fetchPaymentGroupForUpdate`:
+  - `fetchReceiptJournal(queryable, receipt)` — resolves a header's journal in the **same order the
+    journal service uses** (backlink first, then the source-owned posted journal). Kept in step with
+    `syncGTReceiptJournalEntry` on purpose; if that resolution ever changes, change both.
+  - `resolveReceiptJoinBlockReason(queryable, receipt, invoiceId)` — the single implementation of
+    J4/J5/J6. Returns `null` | `"cancelled"` | `"manual_override"` | `"invoice_already_allocated"`.
+  - `describeReceiptJoinBlock(blockReason, receipt)` — the user-facing sentence for each reason.
+- **`GET /receipts/by-reference/:ref(*)`** (A1), registered immediately *before*
+  `/receipts/:receiptId/group` so a reference can never be read as a receipt id. Accepts the
+  optional `?invoice_id=`. Returns the §A1 shape exactly.
+- **Join mode on `POST /`** (A2), fully per §A2 and J1-J9. With no `receipt_id` the behaviour is
+  unchanged.
+- **Receipt group read model** (C1) — each allocation now carries `rentals`, from a `json_agg`
+  subquery over `invoice_rentals` → `rentals` → `locations`. The statement keeps its one-row-per-
+  allocation shape, so the existing response mapper was not disturbed.
+
+`src/routes/greentarget/rentals.js`
+
+- `GET /:rental_id/details` — the payments `SELECT` is now aliased (`p`), `LEFT JOIN`s
+  `greentarget.receipts r`, and returns `p.receipt_id` and `r.posting_date` (B2).
+- `GET /:rental_id` — `invoice_info` gained a `payments` array (`payment_id`, `payment_date`,
+  `amount_paid`, `payment_method`, `internal_reference`, `status`, `receipt_id`) via `json_agg`.
+  `has_payments` is kept so nothing that reads it breaks. This is what B4 needs; no new endpoint.
+
+### 11b. Done — frontend plumbing (A3), but not yet consumed
+
+- `src/types/greenTargetTypes.ts` — `GreenTargetReceiptAllocationRental` +
+  `GreenTargetReceiptGroupAllocation.rentals`; `CreateGreenTargetPaymentInput.receipt_id?`;
+  `GreenTargetPaymentMutationResponse.receipt?` (includes `joined: boolean`);
+  `GreenTargetReceiptJoinBlockReason`, `GreenTargetReceiptJoinCandidate`,
+  `GreenTargetReceiptByReferenceResponse`.
+- `src/routes/greentarget/api.ts` — `getReceiptByReference(ref, invoiceId?)`.
+- **`src/components/GreenTarget/GTReceiptJoinPanel.tsx` (new, untracked)** — exports
+  `useGTReceiptJoinLookup(reference, enabled, invoiceId?)` (400 ms debounce, request-id guarded, and
+  a failed lookup falls back to "no match" rather than blocking the form — the server still rejects
+  a genuine duplicate on save) and the default panel component with props
+  `{ lookup, joinConfirmed, onJoinConfirmedChange, disabled?, className? }`. It renders the matched
+  receipt, the opt-in confirmation (J9, via the shared `src/components/Checkbox.tsx` — its props
+  were verified against this usage), and the specific block reason when `joinable` is false.
+
+### 11c. Left to do
+
+1. **A4 — `InvoiceFormPage.tsx`.** Feed `paymentInternalReference` into the hook (enabled when
+   `!isEditMode && isPaid`; no `invoiceId` — the invoice does not exist yet). Render the panel in
+   the Payment Info block. When a join is confirmed: show date / method / cheque reference read-only
+   from the receipt (J1) and pass `receipt_id` to `createPayment`. **Skip in join mode** the
+   pre-flight `checkInternalPaymentRef` at
+   [InvoiceFormPage.tsx:870-879](../../src/pages/GreenTarget/Invoices/InvoiceFormPage.tsx#L870-L879)
+   *and* the `validateForm` payment-date / reference-length rules at
+   [838-861](../../src/pages/GreenTarget/Invoices/InvoiceFormPage.tsx#L838-L861) — otherwise the
+   form blocks the exact case being added. Suggested replacement check while joining: the receipt's
+   `received_date` must not be before `formData.date_issued` (the server enforces this anyway, but
+   the failure there is non-fatal and would surface as "Invoice created, payment failed"). Keep that
+   non-fatal path.
+2. **A5 — `RentalDetailsPage.tsx`.** Same wiring inside the Create Invoice modal, and reset the join
+   state in `openInvoiceModal` alongside the other payment fields. This page has no pre-flight
+   reference check today, so it also gains one incidentally.
+3. **B1 — receipt-addressable route.** `GreenTargetPaymentPage` reads a `receipt` query param
+   (`useSearchParams`) and opens `GreenTargetReceiptDetailsDialog` for it. The dialog currently
+   lives in `GreenTargetPaymentTable`, which owns `selectedReceiptId` — lift that to the page and
+   pass it down as controlled props (`selectedReceiptId` + `onSelectReceipt`); the table is used by
+   that page only, so the props can be required. Keep the URL and the dialog in sync both ways.
+4. **B3 — rental payment links.** Add `receipt_id` (and `posting_date` if wanted) to the
+   `RentalPayment` interface at
+   [RentalDetailsPage.tsx:63](../../src/pages/GreenTarget/Rentals/RentalDetailsPage.tsx#L63) and
+   make the reference cell at
+   [809-811](../../src/pages/GreenTarget/Rentals/RentalDetailsPage.tsx#L809-L811) a link to
+   `/greentarget/payments?receipt=<id>`. Keep the existing dimming for cancelled rows (L2). The data
+   is already being returned.
+5. **B4 — `AssociatedInvoiceDisplay.tsx` + `RentalFormPage.tsx`.** Add `payments?: […]` to both
+   `InvoiceInfo` interfaces (the component's own, and the duplicate at
+   [RentalFormPage.tsx:61-67](../../src/pages/GreenTarget/Rentals/RentalFormPage.tsx#L61-L67)) and
+   replace the bare "This invoice has payment records" line at
+   [AssociatedInvoiceDisplay.tsx:148-155](../../src/components/GreenTarget/AssociatedInvoiceDisplay.tsx#L148-L155)
+   with the actual payments, each linking to its receipt. The component is used **only** by
+   `RentalFormPage`; keep the no-data rendering untouched. The data is already being returned.
+6. **C2 — receipt dialog.** Render `allocation.rentals` under each allocation in
+   `GreenTargetReceiptDetailsDialog.tsx`, each linking to `/greentarget/rentals/:rental_id` (and
+   calling the existing `handleClose` on click, as the invoice links already do). The data is
+   already being returned.
+7. **Changelog** (§9, rule 16) — still required; not written.
+8. **`GT_ACCOUNTING_HANDOVER.md` §10** — add the GT-P entry recording J1-J9; not written.
+9. **Testing** — none of §8's 13 cases has been run. Cases 2 (pending cheque), 4 (`manual_override`)
+   and 6 (pre-cutover date inherited) are the ones that matter most.
+
+### 11d. Decisions taken while implementing (refinements to §4/§5)
+
+- **D1 — `?invoice_id=` is unused by the two current callers.** Both create the invoice *after* the
+  reference is keyed, so J6 cannot be answered up front from either screen and is enforced only at
+  `POST` time. The parameter is implemented anyway for a future caller that already has an invoice
+  (e.g. `InvoiceDetailsPage`).
+- **D2 — validation order in `POST /` moved.** Method / date / reference normalisation now happens
+  *after* the advisory lock, because join mode must read the header before it knows those values.
+  The non-join path is behaviourally identical; only the order in which two invalid inputs would be
+  reported can differ.
+- **D3 — the insert and the receipt creation now use `normalizedPaymentMethod`,** not the raw
+  `payment_method` from the body, so a joined allocation cannot carry a method that disagrees with
+  its header.
+- **D4 — the "already has a pending payment" check is scoped with
+  `receipt_id IS DISTINCT FROM $2`.** `$2` is `NULL` in the non-join path, which preserves the old
+  behaviour exactly; in join mode only pending payments on *other* receipts block.
+- **D5 — `POST /` now returns a `receipt` summary on both paths** (with `joined: boolean`), so the
+  UI can confirm *which* receipt was joined and link to it.
+- **D6 — rentals are `[]`, never `null`,** when an invoice covers none.
+
+## 12. Completion checkpoint — 2 August 2026
+
+All implementation and housekeeping items in §11c are complete in the working tree:
+
+- `InvoiceFormPage.tsx` and `RentalDetailsPage.tsx` use the shared lookup/panel, require an explicit
+  confirmation, render inherited receipt banking fields read-only, validate the inherited date
+  before creating the invoice, skip the old duplicate-reference rejection only for a confirmed join,
+  and send `receipt_id` to the payment mutation.
+- `/greentarget/payments?receipt=<id>` controls the receipt dialog. The Payments page owns that state,
+  preserves unrelated query parameters, removes an invalid receipt parameter, and keeps dialog open/
+  close actions synchronized with the URL.
+- Rental Details and Rental Edit show real payment rows linked to their receipts. Cancelled rows stay
+  visible and dimmed. The receipt dialog derives and links every rental covered by each allocation.
+- The user-facing changelog and `GT_ACCOUNTING_HANDOVER.md` GT-P13 entry are written. No schema changed,
+  so there is still no migration or `AGENTS.md` / `CLAUDE.md` schema edit.
+
+The final review added four safeguards beyond the intermediate §11 checkpoint:
+
+1. The join transaction locks the resolved receipt journal while checking `manual_override`, closing
+   the race where a concurrent hand edit could otherwise make the journal rebuild return early after
+   operational balances had moved.
+2. `internal_reference` is the expected receipt identity in join mode. After the advisory lock and
+   receipt row lock, the server verifies that the header still matches it case-insensitively after
+   trimming. A receipt renamed after the UI lookup is rejected and must be checked/confirmed again.
+3. The joining invoice and all invoices already in the target receipt are locked together in
+   deterministic invoice-id order, matching confirmation/cancellation and preventing cross-receipt
+   invoice-lock deadlocks.
+4. Express already decodes route parameters. Both GT reference lookup routes now use `req.params.ref`
+   directly, so literal percent sequences are not decoded twice or turned into a 500 response.
+
+Focused verification completed: `node --check` passes for the two changed backend route files and
+`git diff --check` passes. Per repository rule 10, no build, TypeScript check, lint command or test
+suite was run. The 13 scenarios in §8 remain the manual acceptance checklist, especially pending
+cheque joining, `manual_override`, inherited pre-cutover dates, concurrent joins and cancellation.

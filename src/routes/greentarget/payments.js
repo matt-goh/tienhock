@@ -271,6 +271,102 @@ const assertPostCutoverInvoicesHavePostedSalesJournals = async (
 };
 
 /**
+ * Resolve the journal a receipt header owns, using the same order the receipt
+ * journal service uses: the backlink first, then the source-owned posted
+ * journal. Kept in step with `syncGTReceiptJournalEntry`.
+ *
+ * @param {import("pg").PoolClient|import("pg").Pool} queryable
+ * @param {Record<string, unknown>} receipt
+ * @param {boolean} [lockJournal]
+ * @returns {Promise<Record<string, unknown>|null>}
+ */
+const fetchReceiptJournal = async (queryable, receipt, lockJournal = false) => {
+  const lockClause = lockJournal ? " FOR UPDATE" : "";
+  if (receipt.journal_entry_id) {
+    const backlinkResult = await queryable.query(
+      `SELECT id, status, manual_override
+         FROM greentarget.journal_entries
+        WHERE id = $1${lockClause}`,
+      [Number(receipt.journal_entry_id)]
+    );
+    if (backlinkResult.rows.length > 0) {
+      return backlinkResult.rows[0];
+    }
+  }
+  const bySourceResult = await queryable.query(
+    `SELECT id, status, manual_override
+       FROM greentarget.journal_entries
+      WHERE source_type = 'receipt'
+        AND source_id = $1
+        AND status = 'posted'
+      LIMIT 1${lockClause}`,
+    [String(receipt.id)]
+  );
+  return bySourceResult.rows[0] || null;
+};
+
+/**
+ * Decide whether one more invoice allocation may join an existing receipt
+ * header (handover rules J4, J5 and J6). Shared by the by-reference lookup and
+ * the join path of POST / so the UI never reimplements the rules.
+ *
+ * A receipt whose journal was hand-edited (`manual_override`) is refused
+ * because the journal service deliberately stops rebuilding it: joining would
+ * move money operationally while leaving the ledger untouched.
+ *
+ * @param {import("pg").PoolClient|import("pg").Pool} queryable
+ * @param {Record<string, unknown>} receipt
+ * @param {number|null} invoiceId
+ * @param {boolean} [lockJournal]
+ * @returns {Promise<null|"cancelled"|"manual_override"|"invoice_already_allocated">}
+ */
+const resolveReceiptJoinBlockReason = async (
+  queryable,
+  receipt,
+  invoiceId,
+  lockJournal = false
+) => {
+  if (receipt.status === "cancelled") {
+    return "cancelled";
+  }
+  const journal = await fetchReceiptJournal(queryable, receipt, lockJournal);
+  if (journal?.manual_override) {
+    return "manual_override";
+  }
+  if (invoiceId) {
+    const allocatedResult = await queryable.query(
+      `SELECT payment_id
+         FROM greentarget.payments
+        WHERE receipt_id = $1
+          AND invoice_id = $2
+          AND COALESCE(status, 'active') <> 'cancelled'
+        LIMIT 1`,
+      [Number(receipt.id), invoiceId]
+    );
+    if (allocatedResult.rows.length > 0) {
+      return "invoice_already_allocated";
+    }
+  }
+  return null;
+};
+
+/**
+ * @param {"cancelled"|"manual_override"|"invoice_already_allocated"} blockReason
+ * @param {Record<string, unknown>} receipt
+ * @returns {string}
+ */
+const describeReceiptJoinBlock = (blockReason, receipt) => {
+  const receiptLabel = receipt.display_reference || receipt.id;
+  if (blockReason === "cancelled") {
+    return `Receipt "${receiptLabel}" is cancelled, so no further payment can be added to it.`;
+  }
+  if (blockReason === "manual_override") {
+    return `Receipt "${receiptLabel}" has a hand-edited journal, so it can no longer be rebuilt automatically. Record this payment under its own reference.`;
+  }
+  return `Receipt "${receiptLabel}" already has a payment for this invoice.`;
+};
+
+/**
  * Lock the durable receipt header and every allocation belonging to it.
  *
  * @param {import("pg").PoolClient} client
@@ -384,6 +480,89 @@ export default function (pool) {
     }
   });
 
+  // Look one durable receipt up by its user-keyed GT reference so the invoice
+  // and rental screens can offer to JOIN it instead of failing on a duplicate.
+  // Registered before /receipts/:receiptId/group so a reference can never be
+  // read as a receipt id. `joinable` resolves J4/J5 (and J6 when an invoice is
+  // supplied) server-side.
+  router.get("/receipts/by-reference/:ref(*)", async (req, res) => {
+    try {
+      const internalReference = normalizePaymentReference(
+        req.params.ref,
+        "Green Target reference number"
+      );
+      if (!internalReference) {
+        throw createPaymentError(
+          400,
+          "Green Target reference number is required"
+        );
+      }
+
+      /** @type {number|null} */
+      let invoiceId = null;
+      if (req.query.invoice_id !== undefined && req.query.invoice_id !== "") {
+        invoiceId = Number(req.query.invoice_id);
+        if (!Number.isInteger(invoiceId) || invoiceId <= 0) {
+          throw createPaymentError(400, "Invalid invoice id");
+        }
+      }
+
+      const receiptResult = await pool.query(
+        `SELECT r.*,
+                (SELECT COUNT(*)
+                   FROM greentarget.payments p
+                  WHERE p.receipt_id = r.id
+                    AND COALESCE(p.status, 'active') <> 'cancelled')
+                  AS allocation_count
+           FROM greentarget.receipts r
+          WHERE UPPER(TRIM(r.display_reference)) = UPPER($1)
+          LIMIT 1`,
+        [internalReference]
+      );
+      if (receiptResult.rows.length === 0) {
+        return res.json({
+          exists: false,
+          receipt: null,
+          joinable: false,
+          block_reason: null,
+        });
+      }
+
+      const receipt = receiptResult.rows[0];
+      const blockReason = await resolveReceiptJoinBlockReason(
+        pool,
+        receipt,
+        invoiceId
+      );
+
+      res.json({
+        exists: true,
+        receipt: {
+          receipt_id: Number(receipt.id),
+          display_reference: receipt.display_reference,
+          received_date: receipt.received_date,
+          posting_date: receipt.posting_date,
+          payment_method: receipt.payment_method,
+          payment_reference: receipt.payment_reference,
+          status: receipt.status,
+          origin: receipt.origin,
+          total_amount: Number(receipt.total_amount),
+          allocation_count: Number(receipt.allocation_count),
+        },
+        joinable: blockReason === null,
+        block_reason: blockReason,
+      });
+    } catch (error) {
+      console.error("Error looking up Green Target receipt by reference:", error);
+      const statusCode = Number(error?.statusCode) || 500;
+      res.status(statusCode).json({
+        message:
+          statusCode < 500 ? error.message : "Error looking up the receipt",
+        error: error.message,
+      });
+    }
+  });
+
   // Receipt-first read model for the GT payment list/details dialog. Keep this
   // named route before all /:payment_id mutation routes so "receipts" can
   // never be interpreted as a payment id if a read-by-id route is added.
@@ -420,7 +599,30 @@ export default function (pool) {
                 i.customer_id,
                 c.name AS customer_name,
                 p.amount_paid,
-                p.status AS payment_status
+                p.status AS payment_status,
+                -- A payment's rentals are always DERIVED through its invoice
+                -- (invoice_rentals), never denormalised onto the payment. Kept
+                -- as a subquery so the statement stays one row per allocation.
+                (SELECT COALESCE(
+                          json_agg(
+                            json_build_object(
+                              'rental_id', rn.rental_id,
+                              'tong_no', rn.tong_no,
+                              'date_placed', rn.date_placed,
+                              'date_picked', rn.date_picked,
+                              'location_site', loc.site,
+                              'location_address', loc.address
+                            )
+                            ORDER BY rn.date_placed DESC, rn.rental_id DESC
+                          ),
+                          '[]'::json
+                        )
+                   FROM greentarget.invoice_rentals ir
+                   JOIN greentarget.rentals rn
+                     ON rn.rental_id = ir.rental_id
+                   LEFT JOIN greentarget.locations loc
+                     ON loc.location_id = rn.location_id
+                  WHERE ir.invoice_id = p.invoice_id) AS invoice_rentals
            FROM greentarget.receipts r
            LEFT JOIN greentarget.journal_entries je
              ON je.id = r.journal_entry_id
@@ -447,7 +649,8 @@ export default function (pool) {
        *   customer_id: number,
        *   customer_name: string,
        *   amount_paid: number,
-       *   status: string
+       *   status: string,
+       *   rentals: Array<Record<string, unknown>>
        * }>} */
       const allocations = groupResult.rows
         .filter((allocation) => allocation.payment_id !== null)
@@ -459,6 +662,7 @@ export default function (pool) {
           customer_name: allocation.customer_name,
           amount_paid: Number(allocation.amount_paid),
           status: allocation.payment_status || "active",
+          rentals: allocation.invoice_rentals || [],
         }));
 
       res.json({
@@ -806,7 +1010,8 @@ export default function (pool) {
     }
   });
 
-  // Create a new payment
+  // Create a new payment. Pass `receipt_id` to JOIN an existing receipt header
+  // instead of opening a new one; without it the behaviour is unchanged.
   router.post("/", async (req, res) => {
     const {
       invoice_id,
@@ -815,6 +1020,7 @@ export default function (pool) {
       payment_method,
       payment_reference,
       internal_reference,
+      receipt_id,
     } = req.body || {};
 
     const client = await pool.connect();
@@ -822,14 +1028,25 @@ export default function (pool) {
     try {
       await client.query("BEGIN");
 
-      // Check if required fields are provided
+      const joinReceiptId =
+        receipt_id === undefined || receipt_id === null || receipt_id === ""
+          ? null
+          : Number(receipt_id);
+      if (
+        joinReceiptId !== null &&
+        (!Number.isInteger(joinReceiptId) || joinReceiptId <= 0)
+      ) {
+        throw createPaymentError(400, "Invalid receipt id");
+      }
+
+      // Joining inherits the header's banking fields, but the submitted GT
+      // reference remains required as the identity the user confirmed.
       if (
         !invoice_id ||
-        !payment_date ||
         amount_paid === undefined ||
         amount_paid === null ||
-        !payment_method ||
-        !internal_reference
+        !internal_reference ||
+        (joinReceiptId === null && (!payment_date || !payment_method))
       ) {
         throw createPaymentError(
           400,
@@ -841,65 +1058,147 @@ export default function (pool) {
         amount_paid,
         "Payment amount"
       );
-      const normalizedPaymentReference = normalizePaymentReference(
-        payment_reference,
-        "Cheque / transaction reference"
+
+      // Serialize the user-keyed GT reference before taking invoice locks so
+      // every payment mutation — new receipt or join — uses one lock order.
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [PAYMENT_REFERENCE_LOCK_KEY]
       );
-      const normalizedInternalReference = normalizePaymentReference(
+
+      const expectedInternalReference = normalizePaymentReference(
         internal_reference,
         "Green Target reference number"
       );
-      if (!normalizedInternalReference) {
+      if (!expectedInternalReference) {
         throw createPaymentError(
           400,
           "Green Target reference number is required"
         );
       }
+
+      /** @type {Record<string, unknown>|null} */
+      let joinedReceipt = null;
       /** @type {string} */
       let normalizedPaymentDate;
-      try {
-        normalizedPaymentDate = toLocalAccountingDateString(payment_date);
-      } catch {
-        throw createPaymentError(400, "Payment received date is invalid");
-      }
-      if (!PAYMENT_METHODS.has(payment_method)) {
-        throw createPaymentError(400, "Invalid payment method");
-      }
+      /** @type {string} */
+      let normalizedPaymentMethod;
+      /** @type {string} */
+      let normalizedPaymentReference;
+      /** @type {string} */
+      let normalizedInternalReference;
 
-      await client.query(
-        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-        [PAYMENT_REFERENCE_LOCK_KEY]
-      );
-      const internalReferenceCheck = await client.query(
-        `SELECT id
-          FROM greentarget.receipts
-          WHERE UPPER(TRIM(display_reference)) = UPPER($1)
-          LIMIT 1`,
-        [normalizedInternalReference]
-      );
-      if (internalReferenceCheck.rows.length > 0) {
-        throw createPaymentError(
-          409,
-          `Green Target reference number "${normalizedInternalReference}" is already in use. Refresh and try again.`
+      if (joinReceiptId !== null) {
+        const joinTargetResult = await client.query(
+          `SELECT r.*,
+                  UPPER(TRIM(r.display_reference)) = UPPER($2)
+                    AS reference_matches
+             FROM greentarget.receipts r
+            WHERE r.id = $1
+            FOR UPDATE`,
+          [joinReceiptId, expectedInternalReference]
         );
+        if (joinTargetResult.rows.length === 0) {
+          throw createPaymentError(404, "Receipt not found");
+        }
+        joinedReceipt = joinTargetResult.rows[0];
+        if (!joinedReceipt.reference_matches) {
+          throw createPaymentError(
+            409,
+            "This receipt reference was changed after it was checked. Check the reference and confirm the receipt again."
+          );
+        }
+        const joinBlockReason = await resolveReceiptJoinBlockReason(
+          client,
+          joinedReceipt,
+          Number(invoice_id),
+          true
+        );
+        if (joinBlockReason) {
+          throw createPaymentError(
+            409,
+            describeReceiptJoinBlock(joinBlockReason, joinedReceipt)
+          );
+        }
+
+        // A receipt is ONE banking event: the allocation adopts the header's
+        // date, method and cheque/transaction reference, and the client's
+        // values for those fields are deliberately ignored.
+        normalizedPaymentDate = toLocalAccountingDateString(
+          joinedReceipt.received_date
+        );
+        normalizedPaymentMethod = String(joinedReceipt.payment_method);
+        normalizedPaymentReference = String(
+          joinedReceipt.payment_reference || ""
+        );
+        normalizedInternalReference = String(
+          joinedReceipt.display_reference || ""
+        ).trim();
+      } else {
+        normalizedPaymentReference = normalizePaymentReference(
+          payment_reference,
+          "Cheque / transaction reference"
+        );
+        normalizedInternalReference = expectedInternalReference;
+        try {
+          normalizedPaymentDate = toLocalAccountingDateString(payment_date);
+        } catch {
+          throw createPaymentError(400, "Payment received date is invalid");
+        }
+        if (!PAYMENT_METHODS.has(payment_method)) {
+          throw createPaymentError(400, "Invalid payment method");
+        }
+        normalizedPaymentMethod = payment_method;
+
+        const internalReferenceCheck = await client.query(
+          `SELECT id
+            FROM greentarget.receipts
+            WHERE UPPER(TRIM(display_reference)) = UPPER($1)
+            LIMIT 1`,
+          [normalizedInternalReference]
+        );
+        if (internalReferenceCheck.rows.length > 0) {
+          throw createPaymentError(
+            409,
+            `Green Target reference number "${normalizedInternalReference}" is already in use. Refresh and try again.`
+          );
+        }
       }
 
-      // Get invoice details
+      // Lock the joining invoice AND every invoice already allocated to this
+      // receipt in deterministic invoice-id order. Receipt cancellation and
+      // confirmation use the same order, preventing cross-receipt deadlocks
+      // when invoices have legitimate allocations in more than one receipt.
       const invoiceQuery = `
         SELECT i.*, c.customer_id
         FROM greentarget.invoices i
         JOIN greentarget.customers c ON i.customer_id = c.customer_id
         WHERE i.invoice_id = $1
+           OR (
+             $2::integer IS NOT NULL
+             AND EXISTS (
+               SELECT 1
+                 FROM greentarget.payments existing_payment
+                WHERE existing_payment.receipt_id = $2
+                  AND existing_payment.invoice_id = i.invoice_id
+             )
+           )
+        ORDER BY i.invoice_id
         FOR UPDATE OF i
       `;
 
-      const invoiceResult = await client.query(invoiceQuery, [invoice_id]);
+      const invoiceResult = await client.query(invoiceQuery, [
+        invoice_id,
+        joinReceiptId,
+      ]);
 
-      if (invoiceResult.rows.length === 0) {
+      const invoice = invoiceResult.rows.find(
+        (row) => Number(row.invoice_id) === Number(invoice_id)
+      );
+      if (!invoice) {
         throw createPaymentError(404, `Invoice with ID ${invoice_id} not found`);
       }
 
-      const invoice = invoiceResult.rows[0];
       assertPaymentMutationDateAllowed(
         [invoice],
         normalizedPaymentDate,
@@ -945,13 +1244,16 @@ export default function (pool) {
         }
       }
 
+      // Adding a second invoice to a pending cheque receipt is legitimate, so
+      // only a pending payment on ANOTHER receipt blocks this one.
       const pendingPaymentResult = await client.query(
         `SELECT payment_id
            FROM greentarget.payments
           WHERE invoice_id = $1
             AND status = 'pending'
+            AND ($2::integer IS NULL OR receipt_id IS DISTINCT FROM $2)
           LIMIT 1`,
-        [invoice_id]
+        [invoice_id, joinReceiptId]
       );
       if (pendingPaymentResult.rows.length > 0) {
         throw createPaymentError(
@@ -960,34 +1262,45 @@ export default function (pool) {
         );
       }
 
-      // Determine initial status based on payment method
-      const initialStatus = payment_method === "cheque" ? "pending" : "active";
-      const receiptStatus = initialStatus === "pending" ? "pending" : "posted";
-      const receiptOrigin =
-        normalizedPaymentDate < GREEN_TARGET_ACCOUNTING_OPEN_DATE
-          ? "legacy_operational"
-          : "erp";
-      const receiptResult = await client.query(
-        `INSERT INTO greentarget.receipts (
-           display_reference, received_date, posting_date, payment_method,
-           payment_reference, bank_account, status, origin, total_amount,
-           created_by, updated_by
-         )
-         VALUES ($1, $2, $3, $4, $5, 'PBB_1', $6, $7, $8, $9, $9)
-         RETURNING *`,
-        [
-          normalizedInternalReference,
-          normalizedPaymentDate,
-          receiptStatus === "posted" ? normalizedPaymentDate : null,
-          payment_method,
-          normalizedPaymentReference || null,
-          receiptStatus,
-          receiptOrigin,
-          paymentAmount,
-          req.staffId || null,
-        ]
-      );
-      const receipt = receiptResult.rows[0];
+      // The receipt header owns the status, so a joined allocation inherits it
+      // and stays pending — leaving the invoice balance alone — until the whole
+      // cheque receipt is confirmed.
+      const initialStatus = joinedReceipt
+        ? joinedReceipt.status === "pending"
+          ? "pending"
+          : "active"
+        : normalizedPaymentMethod === "cheque"
+        ? "pending"
+        : "active";
+      let receipt = joinedReceipt;
+      if (!receipt) {
+        const receiptStatus = initialStatus === "pending" ? "pending" : "posted";
+        const receiptOrigin =
+          normalizedPaymentDate < GREEN_TARGET_ACCOUNTING_OPEN_DATE
+            ? "legacy_operational"
+            : "erp";
+        const receiptResult = await client.query(
+          `INSERT INTO greentarget.receipts (
+             display_reference, received_date, posting_date, payment_method,
+             payment_reference, bank_account, status, origin, total_amount,
+             created_by, updated_by
+           )
+           VALUES ($1, $2, $3, $4, $5, 'PBB_1', $6, $7, $8, $9, $9)
+           RETURNING *`,
+          [
+            normalizedInternalReference,
+            normalizedPaymentDate,
+            receiptStatus === "posted" ? normalizedPaymentDate : null,
+            normalizedPaymentMethod,
+            normalizedPaymentReference || null,
+            receiptStatus,
+            receiptOrigin,
+            paymentAmount,
+            req.staffId || null,
+          ]
+        );
+        receipt = receiptResult.rows[0];
+      }
 
       // Create the payment
       const paymentQuery = `
@@ -1010,7 +1323,7 @@ export default function (pool) {
         invoice_id,
         normalizedPaymentDate,
         paymentAmount,
-        payment_method,
+        normalizedPaymentMethod,
         normalizedPaymentReference || null,
         normalizedInternalReference || null,
         initialStatus,
@@ -1049,6 +1362,22 @@ export default function (pool) {
         );
       }
 
+      if (joinedReceipt) {
+        // The journal service asserts that the allocations equal the header
+        // total, so the header must be increased BEFORE the sync and the
+        // refreshed row is what gets passed to it.
+        const joinedReceiptResult = await client.query(
+          `UPDATE greentarget.receipts
+              SET total_amount = total_amount + $1,
+                  updated_at = CURRENT_TIMESTAMP,
+                  updated_by = $2
+            WHERE id = $3
+            RETURNING *`,
+          [paymentAmount, req.staffId || null, receipt.id]
+        );
+        receipt = joinedReceiptResult.rows[0];
+      }
+
       await syncGTReceiptJournalEntry(
         client,
         receipt,
@@ -1067,11 +1396,22 @@ export default function (pool) {
       await client.query("COMMIT");
 
       res.status(201).json({
-        message:
-          initialStatus === "pending"
-            ? "Payment created successfully (pending confirmation)"
-            : "Payment created successfully",
+        message: joinedReceipt
+          ? `Payment added to receipt ${receipt.display_reference}`
+          : initialStatus === "pending"
+          ? "Payment created successfully (pending confirmation)"
+          : "Payment created successfully",
         payment: refreshedPaymentResult.rows[0],
+        receipt: {
+          receipt_id: Number(receipt.id),
+          display_reference: receipt.display_reference,
+          received_date: receipt.received_date,
+          payment_method: receipt.payment_method,
+          payment_reference: receipt.payment_reference,
+          status: receipt.status,
+          total_amount: Number(receipt.total_amount),
+          joined: joinedReceipt !== null,
+        },
       });
     } catch (error) {
       await client.query("ROLLBACK");
@@ -1093,7 +1433,7 @@ export default function (pool) {
 
     try {
       const internalReference = normalizePaymentReference(
-        decodeURIComponent(req.params.ref),
+        req.params.ref,
         "Green Target reference number"
       );
       if (!internalReference) {
