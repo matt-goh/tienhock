@@ -17,7 +17,7 @@ import {
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import Checkbox from "../../../components/Checkbox";
-import { FormListbox } from "../../../components/FormComponents";
+import PillSelect from "../../../components/PillSelect";
 import { api } from "../../../routes/utils/api";
 
 // Parse a yyyy-MM-dd string into a local-timezone Date (never via toISOString).
@@ -148,6 +148,16 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
       ),
     [dayType]
   );
+
+  // Pills have no blank state, so a selection dropped by the filter above must
+  // fall back to a still-valid type instead of leaving nothing highlighted.
+  useEffect((): void => {
+    if (
+      !leaveTypeOptions.some((leaveType) => leaveType.value === formLeaveType)
+    ) {
+      setFormLeaveType(leaveTypeOptions[0].value);
+    }
+  }, [leaveTypeOptions, formLeaveType]);
 
   const loadLeave = useCallback(async (): Promise<void> => {
     try {
@@ -559,7 +569,7 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
               </h3>
             </div>
             <div className="px-5 py-4 space-y-4">
-              <div className="grid grid-cols-3 gap-3 items-start">
+              <div className="grid grid-cols-2 gap-3 items-start">
                 <div>
                   <label className="block text-xs font-medium text-default-500 dark:text-gray-400 mb-1">
                     Date
@@ -579,23 +589,6 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-default-500 dark:text-gray-400 mb-1">
-                    Type
-                  </label>
-                  <FormListbox
-                    name="leaveType"
-                    value={formLeaveType}
-                    onChange={(value) => {
-                      setFormLeaveType(value as JPLeaveType);
-                      setSelections({});
-                    }}
-                    options={leaveTypeOptions.map((leaveType) => ({
-                      id: leaveType.value,
-                      name: leaveType.label,
-                    }))}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-default-500 dark:text-gray-400 mb-1">
                     Amount (RM)
                   </label>
                   <input
@@ -610,6 +603,20 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
                     step="0.01"
                   />
                 </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-default-500 dark:text-gray-400 mb-1">
+                  Type
+                </label>
+                <PillSelect<JPLeaveType>
+                  value={formLeaveType}
+                  onChange={(value: JPLeaveType) => {
+                    setFormLeaveType(value);
+                    setSelections({});
+                  }}
+                  options={leaveTypeOptions}
+                  ariaLabel="Leave type"
+                />
               </div>
               <p className="-mt-2 text-xs text-default-400 dark:text-gray-500">
                 Leave is recorded for the day currently selected on the page.

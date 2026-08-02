@@ -45,7 +45,20 @@ Props: `value`, `onChange`, `options`, `disabled?`, `ariaLabel?`, `className?`.
 | `src/pages/Payroll/Leave/PackingCutiEntryPage.tsx` | Bulk leave type (~L483) and per-worker leave type in the table (~L615). |
 | `src/pages/JellyPolly/Payroll/JPPackingCutiEntryPage.tsx` | Same two (L481, L613). The per-row `anchor="bottom start"` portal workaround was removed — pills cannot be clipped by the table's scroll container. |
 
-Changelog entry added under `2026-08-02` in `src/components/ChangelogModal.tsx`.
+**Phase 1 (2026-08-02)** — §3.1 leave type (except `DailyLogEntryPage`) + §3.2 shift:
+
+| File | What changed |
+| --- | --- |
+| `src/pages/GreenTarget/Payroll/GTLeaveSection.tsx` | Add Leave modal type field → `GT_LEAVE_TYPES` pills. The modal's `grid-cols-3` was cut to `grid-cols-2` (Date + Amount) and Type moved to its own full-width row below — at one third of a `max-w-lg` modal the 4 pills stacked vertically. |
+| `src/pages/JellyPolly/Payroll/JPLeaveSection.tsx` | Same field and same modal re-layout, over the `dayType`-filtered `leaveTypeOptions`. Added a `useEffect` that resets `formLeaveType` when the filter drops the current value (gotcha 4) — the dropdown showed a blank, pills would show nothing selected. |
+| `src/pages/Payroll/DailyLog/DailyLogEntryPage.tsx` | Shift (L3112) → `SHIFT_OPTIONS` pills. `FormListbox` rendered its own label, so the label markup was copied from the adjacent Date field; the `w-32` wrapper was dropped (too narrow for two pills). |
+| `src/pages/JellyPolly/Payroll/JPDailyLogEntryPage.tsx` | Same shift field (L3128). |
+
+`FormListbox` is no longer imported in any of those four files.
+
+Changelog entries added under `2026-08-02` in `src/components/ChangelogModal.tsx` — the
+pill rollout has one entry covering every converted screen; **extend that entry in later
+phases instead of adding a new one per phase**.
 
 ---
 
@@ -72,18 +85,13 @@ checked and rejected by the criteria above.
 
 Counts marked ✔ were read from the source; the rest are noted as "verify".
 
-### 3.1 Leave type — same field, other pages
+### 3.1 Leave type — remaining page (deferred, do last)
 
 | File | Line | Notes |
 | --- | --- | --- |
-| `src/pages/GreenTarget/Payroll/GTLeaveSection.tsx` | 641 | `GT_LEAVE_TYPES` (4 ✔, defined L42). |
-| `src/pages/JellyPolly/Payroll/JPLeaveSection.tsx` | 584 | `JP_LEAVE_TYPES` (4 ✔, L32) filtered to 3 unless `dayType === "Umum"`. Option list is dynamic — make sure `value` stays valid when the filter drops the current selection. |
 | `src/pages/Payroll/DailyLog/DailyLogEntryPage.tsx` | 3466 (bulk), 3674 (per-row) | `leaveOptions` (3, +`cuti_umum` on Umum days ✔, L740). **Caveat:** these are raw Headless `Listbox`es, not `FormListbox`, and the bulk value can be the pseudo-value `"mixed"` (`bulkLeaveTypeValue`, L758) when the selected workers differ. `PillSelect` has no neutral state — either add `"mixed"` as a `disabled` option or extend the component to accept `value: T \| null`. Do this one last. |
 
-### 3.2 Shift (2 options ✔)
-
-- `src/pages/Payroll/DailyLog/DailyLogEntryPage.tsx:3112` — Day Shift / Night Shift.
-- `src/pages/JellyPolly/Payroll/JPDailyLogEntryPage.tsx:3128` — same.
+~~### 3.2 Shift~~ — done in Phase 1.
 
 ### 3.3 Payment method (4 ✔: Cash / Cheque / Bank Transfer / Online) and Bank Account / "Deposit To" (2–3 ✔)
 
@@ -179,6 +187,15 @@ per field — decide before starting.
 4. **Dynamic option lists.** If options are filtered by another field (JP leave types
    by `dayType`), make sure the current `value` is still present or reset it —
    a dropdown showed a blank placeholder, pills will just show nothing selected.
+5. **Width.** A dropdown fits any column; a pill row does not. Check the container
+   the control sits in — both leave modals needed their `grid-cols-3` cut to
+   `grid-cols-2` with the pills on their own full-width row, and both Shift fields
+   needed a fixed `w-32` wrapper removed. Budget roughly `8 × label chars + 26px`
+   per pill plus a `6px` gap.
+6. **`FormListbox` renders its own `label`.** `PillSelect` does not — when replacing
+   one that used the `label` prop, add the `<label>` markup, copying the classes from
+   a neighbouring field so the sizes match (`text-sm` on form rows, `text-xs` in the
+   compact modals).
 
 ---
 

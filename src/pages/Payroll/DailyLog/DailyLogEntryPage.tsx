@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../../../components/Button";
-import { FormListbox } from "../../../components/FormComponents";
+import PillSelect, { PillSelectOption } from "../../../components/PillSelect";
 import { Employee } from "../../../types/types";
 import BackButton from "../../../components/BackButton";
 import { useSmartBack } from "../../../hooks/useSmartBack";
@@ -47,6 +47,11 @@ import { useUnsavedChanges } from "../../../hooks/useUnsavedChanges";
 import SafeLink from "../../../components/SafeLink";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import TimeNavigator, { type TimeRange } from "../../../components/TimeNavigator";
+
+const SHIFT_OPTIONS: ReadonlyArray<PillSelectOption<string>> = [
+  { value: "1", label: "Day Shift" },
+  { value: "2", label: "Night Shift" },
+];
 
 interface EmployeeWithHours extends Employee {
   rowKey?: string; // Unique key for each row
@@ -3108,17 +3113,18 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           </span>
 
           {/* Shift Field */}
-          <div className="w-32">
-            <FormListbox
-              name="shift"
-              label="Shift"
+          <div>
+            <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
+              Shift
+            </label>
+            <PillSelect
               value={formData.shift}
-              onChange={(value) => setFormData({ ...formData, shift: value })}
-              options={[
-                { id: "1", name: "Day Shift" },
-                { id: "2", name: "Night Shift" },
-              ]}
-              required
+              onChange={(value: string) =>
+                setFormData({ ...formData, shift: value })
+              }
+              options={SHIFT_OPTIONS}
+              ariaLabel="Shift"
+              className="min-h-[34px]"
             />
           </div>
 

@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-02",
+    ms: "Pilihan pendek pada skrin kemasukan kini dipaparkan sebagai butang bulat, bukan senarai lungsur — semua pilihan kelihatan serentak dan hanya perlu satu klik. Kini digunakan untuk jenis cuti pada halaman Packing Cuti (Tien Hock dan Jelly Polly), bahagian Cuti Green Target dan Jelly Polly, serta pilihan Shift pada halaman Log Harian Tien Hock dan Jelly Polly.",
+    en: "Short choices on entry screens are now shown as round buttons instead of a dropdown — every option is visible at once and takes a single click. This now applies to the leave type on the Packing Cuti pages (Tien Hock and Jelly Polly), the Green Target and Jelly Polly Leave sections, and the Shift choice on the Tien Hock and Jelly Polly Daily Log pages.",
+  },
+  {
+    date: "2026-08-02",
     ms: "Green Target: medan \"Transaction ID\" / \"Transaction Reference\" dibuang daripada semua skrin merekod bayaran. Bayaran online dan pindahan bank dikenali melalui nombor RV masing-masing, dan medan itu hampir tidak pernah diisi. Medan \"Cheque No.\" kekal untuk bayaran cek, kerana nombor cek itulah yang memadankan cek dengan penyata bank semasa ia dijelaskan. Nombor rujukan yang telah direkodkan sebelum ini masih dipaparkan seperti biasa pada senarai bayaran, tetingkap resit dan penyata pelanggan.",
     en: "Green Target: the \"Transaction ID\" / \"Transaction Reference\" field has been removed from every record-payment screen. Online payments and bank transfers are identified by their RV number, and the field was almost never filled in. The \"Cheque No.\" field stays for cheque payments, because the cheque number is what matches a cheque to the bank statement when it clears. References recorded previously are still shown as before on the payment list, the receipt window and customer statements.",
   },
