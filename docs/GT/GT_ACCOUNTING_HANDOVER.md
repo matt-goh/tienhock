@@ -2677,10 +2677,24 @@ already allocated to the target receipt are locked in invoice-id order, matching
 and cancellation and avoiding cross-receipt lock cycles.
 
 Traceability is derived from the existing relationships, with no denormalised rental field and no
-schema change: `receipt → payment allocation → invoice → invoice_rentals → rental`. Payment links on
-Rental Details and Rental Edit open `/greentarget/payments?receipt=<id>`; that URL opens the durable
-receipt dialog, and each allocation there links back to every rental covered by its invoice. Cancelled
-payment rows remain visible and linkable as audit history.
+schema change: `receipt → payment allocation → invoice → invoice_rentals → rental`. A Green Target
+reference number on Invoice Details, Rental Details and Rental Edit opens `GreenTargetReceiptDetailsDialog`
+**in place**, matching how Tien Hock's `InvoiceDetailsPage` opens `ReceiptDetailsDialog`; each allocation
+there links back to every rental covered by its invoice. Navigating to
+`/greentarget/payments?receipt=<id>` instead was rejected (2026-08-02): it leaves the page the user is
+reading, and on Rental Edit it would abandon unsaved form edits. The Payments page still accepts that
+query parameter, exactly as TH's `/sales/payments?receipt=<id>` does, so a deep link remains possible.
+Rental Edit refreshes only its invoice block after a receipt change, updating both the form and its
+change-detection snapshot so the refresh cannot make an untouched form look dirty. Cancelled payment
+rows remain visible and linkable as audit history.
+
+`GreenTargetReceiptDetailsDialog` was also restyled (2026-08-02) to TH's `ReceiptDetailsDialog`
+layout: `max-w-3xl` flex-column panel with a fixed header and footer and only the middle scrolling,
+TH's banner/stat-grid/definition-list/allocation-list structure, and TH's transition timings and
+button sizing. GT keeps every field TH has no equivalent for — posting/clearance date, `PBB_1` bank
+account, receipt origin, per-allocation status, the editable GT reference, and the rental chips under
+each invoice — and keeps the emerald header badge and rental chips as its own accent. Presentation
+only: no data, endpoint or behaviour changed, so this carries no changelog entry (CLAUDE.md rule 16).
 
 **Files:** `src/routes/greentarget/payments.js`, `src/routes/greentarget/rentals.js`,
 `src/routes/greentarget/api.ts`, `src/types/greenTargetTypes.ts`,
@@ -2689,6 +2703,7 @@ payment rows remain visible and linkable as audit history.
 `src/components/GreenTarget/GreenTargetReceiptDetailsDialog.tsx`,
 `src/components/GreenTarget/AssociatedInvoiceDisplay.tsx`,
 `src/pages/GreenTarget/Invoices/InvoiceFormPage.tsx`,
+`src/pages/GreenTarget/Invoices/InvoiceDetailsPage.tsx`,
 `src/pages/GreenTarget/Payments/GreenTargetPaymentPage.tsx`,
 `src/pages/GreenTarget/Rentals/RentalDetailsPage.tsx`, and
 `src/pages/GreenTarget/Rentals/RentalFormPage.tsx`. The 13 handover scenarios remain for manual
