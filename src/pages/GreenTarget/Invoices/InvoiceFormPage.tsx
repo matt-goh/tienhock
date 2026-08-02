@@ -779,7 +779,7 @@ const InvoiceFormPage: React.FC = () => {
     const nextPaymentMethod =
       methodIdString as GreenTargetPayment["payment_method"];
     setPaymentMethod(nextPaymentMethod);
-    if (nextPaymentMethod === "cash") {
+    if (nextPaymentMethod !== "cheque") {
       setPaymentReference("");
     }
   };
@@ -787,7 +787,6 @@ const InvoiceFormPage: React.FC = () => {
     event: React.ChangeEvent<HTMLInputElement>
   ): void => {
     setPaymentInternalReference(event.target.value);
-    setPaymentReceiptJoinConfirmed(false);
   };
   const handleBackClick = () => {
     if (isFormChanged) setShowBackConfirmation(true);
@@ -906,7 +905,7 @@ const InvoiceFormPage: React.FC = () => {
         return false;
       }
       if (paymentReference.trim().length > 50) {
-        toast.error("Cheque / transaction reference cannot exceed 50 characters.");
+        toast.error("Cheque number cannot exceed 50 characters.");
         return false;
       }
     }
@@ -1087,7 +1086,9 @@ const InvoiceFormPage: React.FC = () => {
                 payment_method: effectivePaymentMethod,
                 payment_reference: joinedPaymentReceipt
                   ? joinedPaymentReceipt.payment_reference
-                  : paymentReference.trim() || null,
+                  : effectivePaymentMethod === "cheque"
+                  ? paymentReference.trim() || null
+                  : null,
                 internal_reference:
                   joinedPaymentReceipt?.display_reference ||
                   paymentInternalReference.trim(),
@@ -1743,7 +1744,6 @@ const InvoiceFormPage: React.FC = () => {
                       type="button"
                       onClick={() => {
                         setIsPaid(!isPaid);
-                        setPaymentReceiptJoinConfirmed(false);
                       }}
                       className="flex items-center cursor-pointer group p-1"
                     >
@@ -1930,15 +1930,17 @@ const InvoiceFormPage: React.FC = () => {
                     </Listbox>
                   )}
                 </div>
-                {effectivePaymentMethod !== "cash" && (
+                {/* Cheque only: the number is how a cheque is matched to the
+                    bank statement when it clears. Online and bank transfers are
+                    identified by their RV number — no incoming payment in the
+                    Jan-Jun legacy ledger carries a transaction id. */}
+                {effectivePaymentMethod === "cheque" && (
                   <div className="space-y-2">
                     <label
                       htmlFor="payment_reference"
                       className="block text-sm font-medium text-default-700 dark:text-gray-200"
                     >
-                      {effectivePaymentMethod === "cheque"
-                        ? "Cheque No. (Optional)"
-                        : "Transaction Reference (Optional)"}
+                      Cheque No. (Optional)
                     </label>
                     <input
                       type="text"

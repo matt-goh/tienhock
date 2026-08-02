@@ -1174,7 +1174,8 @@ const InvoiceDetailsPage: React.FC = () => {
     setPaymentFormData((prev: PaymentFormData): PaymentFormData => ({
       ...prev,
       payment_method: value as GreenTargetPayment["payment_method"],
-      payment_reference: value === "cash" ? "" : prev.payment_reference,
+      // Only a cheque carries a reference now.
+      payment_reference: value === "cheque" ? prev.payment_reference : "",
     }));
   };
 
@@ -1228,7 +1229,7 @@ const InvoiceDetailsPage: React.FC = () => {
       return false;
     }
     if (paymentFormData.payment_reference.trim().length > 50) {
-      toast.error("Cheque / transaction reference cannot exceed 50 characters");
+      toast.error("Cheque number cannot exceed 50 characters");
       return false;
     }
 
@@ -1261,7 +1262,9 @@ const InvoiceDetailsPage: React.FC = () => {
           : paymentFormData.payment_method,
         payment_reference: joinedPaymentReceipt
           ? joinedPaymentReceipt.payment_reference || null
-          : paymentFormData.payment_reference.trim() || null,
+          : effectivePaymentMethod === "cheque"
+          ? paymentFormData.payment_reference.trim() || null
+          : null,
         internal_reference: paymentFormData.internal_reference.trim(),
         ...(joinedPaymentReceipt
           ? { receipt_id: joinedPaymentReceipt.receipt_id }
@@ -2451,20 +2454,17 @@ const InvoiceDetailsPage: React.FC = () => {
                 </Listbox>
               </div>
 
-              {/* Conditional Reference Input */}
-              {(effectivePaymentMethod === "cheque" ||
-                effectivePaymentMethod === "bank_transfer" ||
-                effectivePaymentMethod === "online") && (
+              {/* Cheque only: the number is how a cheque is matched to the bank
+                  statement when it clears. Online and bank transfers are
+                  identified by their RV number — no incoming payment in the
+                  Jan-Jun legacy ledger carries a transaction id. */}
+              {effectivePaymentMethod === "cheque" && (
                 <div className="space-y-2">
                   <label
                     htmlFor="payment_reference"
                     className="block text-sm font-medium text-default-700 dark:text-gray-200"
                   >
-                    {effectivePaymentMethod === "cheque"
-                      ? "Cheque Number"
-                      : effectivePaymentMethod === "online"
-                      ? "Transaction ID"
-                      : "Transaction Reference"}
+                    Cheque Number
                   </label>
                   <input
                     type="text"

@@ -237,7 +237,9 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
         payment_method: effectivePaymentMethod,
         payment_reference: joinedReceipt
           ? joinedReceipt.payment_reference || null
-          : paymentReference || null,
+          : effectivePaymentMethod === "cheque"
+          ? paymentReference || null
+          : null,
         internal_reference: formData.internal_reference.trim(),
         allocations: selectedInvoices.map(
           ({ invoice, amountToPay }: InvoicePaymentAllocation) => ({
@@ -319,7 +321,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
       return;
     }
     if (formData.payment_reference.trim().length > 50) {
-      toast.error("Cheque / transaction reference cannot exceed 50 characters");
+      toast.error("Cheque number cannot exceed 50 characters");
       return;
     }
     if (paymentReceiptLookup.isLooking) {
@@ -497,31 +499,26 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                           ...currentFormData,
                           payment_method:
                             value as GreenTargetPayment["payment_method"],
+                          // Only a cheque carries a reference now.
                           payment_reference:
-                            value === "cash"
-                              ? ""
-                              : currentFormData.payment_reference,
+                            value === "cheque"
+                              ? currentFormData.payment_reference
+                              : "",
                         })
                       )
                     }
                     options={paymentMethodOptions}
                     disabled={isSubmitting || joinedReceipt !== null}
                   />
-                  {effectivePaymentMethod !== "cash" && (
+                  {/* Cheque only: the number is how a cheque is matched to the
+                      bank statement when it clears. Online and bank transfers
+                      are identified by their RV number — no incoming payment in
+                      the Jan-Jun legacy ledger carries a transaction id. */}
+                  {effectivePaymentMethod === "cheque" && (
                     <FormInput
                       name="payment_reference"
-                      label={
-                        effectivePaymentMethod === "cheque"
-                          ? "Cheque No. (Optional)"
-                          : "Transaction Reference (Optional)"
-                      }
-                      placeholder={
-                        effectivePaymentMethod === "cheque"
-                          ? "Cheque number"
-                          : effectivePaymentMethod === "online"
-                          ? "Transaction ID"
-                          : "Transaction reference"
-                      }
+                      label="Cheque No. (Optional)"
+                      placeholder="Cheque number"
                       value={
                         joinedReceipt
                           ? joinedReceipt.payment_reference || ""
