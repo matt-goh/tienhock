@@ -280,26 +280,53 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
     </div>
   );
 
+  // A pre-cutover receipt owns no journal: its money is already inside the
+  // imported Jan-Jun ledger, in the CD_SD counter-cash leg of the invoice's
+  // own '#/#' journal. Link there so cash collections are traceable too.
   const renderJournalLink = (
     payment: GreenTargetPayment
-  ): React.ReactNode =>
-    payment.journal_entry_id ? (
+  ): React.ReactNode => {
+    const journalEntryId: number | null =
+      payment.journal_entry_id ?? payment.imported_journal_entry_id ?? null;
+
+    if (!journalEntryId) {
+      return (
+        <span
+          className="text-xs text-gray-400 dark:text-gray-500"
+          title="This collection predates the imported ledger, so it sits inside the opening balances rather than a journal entry."
+        >
+          -
+        </span>
+      );
+    }
+
+    const isImported: boolean = !payment.journal_entry_id;
+
+    return (
       <button
         type="button"
         onClick={(): void =>
-          navigate(
-            `/greentarget/accounting/journal-entries/${payment.journal_entry_id}`
-          )
+          navigate(`/greentarget/accounting/journal-entries/${journalEntryId}`)
         }
         className="inline-flex items-center gap-1 text-xs text-sky-600 hover:text-sky-800 hover:underline dark:text-sky-400 dark:hover:text-sky-300"
-        title="View journal entry"
+        title={
+          isImported
+            ? `Collected in the imported ledger, inside entry ${
+                payment.imported_journal_reference ?? journalEntryId
+              } — click to view it`
+            : "View journal entry"
+        }
       >
         <IconReceipt size={14} />
         <span>View Journal</span>
+        {isImported && (
+          <span className="rounded-full bg-amber-100 px-1.5 py-px text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+            Imported
+          </span>
+        )}
       </button>
-    ) : (
-      <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
     );
+  };
 
   const receiptDetailsDialog: React.ReactNode = (
     <GreenTargetReceiptDetailsDialog

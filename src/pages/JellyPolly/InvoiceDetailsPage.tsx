@@ -17,6 +17,7 @@ import TimeNavigator, {
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import SubmissionResultsModal from "../../components/Invoice/SubmissionResultsModal";
 import { FormInput, FormListbox } from "../../components/FormComponents";
+import PillSelect, { PillSelectOption } from "../../components/PillSelect";
 import {
   getInvoiceDetailsBundle,
   cancelInvoice,
@@ -71,6 +72,19 @@ import {
   isZeroValueBill,
 } from "../../utils/invoice/invoiceDisplayStatus";
 import type { InvoiceDisplayStatus } from "../../utils/invoice/invoiceDisplayStatus";
+
+const PAYMENT_METHOD_OPTIONS: ReadonlyArray<PillSelectOption<string>> = [
+  { value: "cash", label: "Cash" },
+  { value: "cheque", label: "Cheque" },
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "online", label: "Online" },
+];
+
+const PAYMENT_TYPE_OPTIONS: ReadonlyArray<PillSelectOption<"CASH" | "INVOICE">> =
+  [
+    { value: "CASH", label: "Cash" },
+    { value: "INVOICE", label: "Invoice" },
+  ];
 
 // --- Helper: Read-only Line Items Table ---
 const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
@@ -1480,12 +1494,6 @@ const InvoiceDetailsPage: React.FC = () => {
   const isEligibleForEinvoiceByDate = isInvoiceDateEligibleForEinvoice(
     invoiceData.createddate
   );
-  const paymentMethodOptions = [
-    { id: "cash", name: "Cash" },
-    { id: "cheque", name: "Cheque" },
-    { id: "bank_transfer", name: "Bank Transfer" },
-    { id: "online", name: "Online" },
-  ];
 
   const customerNamesForPDF: Record<string, string> =
     invoiceData.customerid && invoiceData.customerName
@@ -1749,13 +1757,19 @@ const InvoiceDetailsPage: React.FC = () => {
                   max={invoiceData.balance_due}
                   disabled={isProcessingPayment}
                 />
-                <FormListbox
-                  name="payment_method"
-                  label="Payment Method"
-                  value={paymentFormData.payment_method}
-                  onChange={handlePaymentMethodChange}
-                  options={paymentMethodOptions}
-                />
+                {/* Spans two columns so the four pills never wrap */}
+                <div className="space-y-2 lg:col-span-2">
+                  <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                    Payment Method
+                  </label>
+                  <PillSelect<string>
+                    value={paymentFormData.payment_method}
+                    onChange={handlePaymentMethodChange}
+                    options={PAYMENT_METHOD_OPTIONS}
+                    ariaLabel="Payment method"
+                  size="md"
+                  />
+                </div>
                 {(paymentFormData.payment_method === "cheque" ||
                   paymentFormData.payment_method === "bank_transfer" ||
                   paymentFormData.payment_method === "online") && (
@@ -2739,20 +2753,19 @@ const InvoiceDetailsPage: React.FC = () => {
                 </button>
               </div>
 
-              <div className="mb-4">
-                <FormListbox
-                  name="paymenttype"
-                  label="Select Payment Type"
+              <div className="mb-4 space-y-2">
+                <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                  Select Payment Type
+                </label>
+                <PillSelect<"CASH" | "INVOICE">
                   value={selectedPaymentType}
-                  onChange={(value) =>
-                    setSelectedPaymentType(value as "CASH" | "INVOICE")
+                  onChange={(value: "CASH" | "INVOICE") =>
+                    setSelectedPaymentType(value)
                   }
-                  options={[
-                    { id: "CASH", name: "Cash" },
-                    { id: "INVOICE", name: "Invoice" },
-                  ]}
-                  placeholder="Select payment type..."
+                  options={PAYMENT_TYPE_OPTIONS}
                   disabled={isUpdatingPaymentType}
+                  ariaLabel="Payment type"
+                size="md"
                 />
               </div>
 

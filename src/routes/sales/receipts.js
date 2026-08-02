@@ -189,6 +189,63 @@ export default function (pool) {
     }
   });
 
+  // --- GET /api/receipts/by-reference/:ref ---
+  // Which ACTIVE receipts already carry this visible reference. Tien Hock's
+  // display_reference is deliberately repeatable (the legacy import reuses one
+  // Journal No. across receipts), so this reports rather than forbids. Re-using
+  // a reference nearly always means another payment belongs to a banking event
+  // already keyed, and the payment form turns this match into the group's
+  // received_date / payment_method / debit_account so the new receipt lands in
+  // the SAME payment group (see getReceiptGroup) rather than beside it.
+  // Registered before /:id so the path is not swallowed.
+  router.get("/by-reference/:ref(*)", async (req, res) => {
+    const reference = String(req.params.ref || "").trim();
+    if (!reference) {
+      return res.json({ reference: "", count: 0, receipts: [] });
+    }
+
+    try {
+      const result = await pool.query(
+        `SELECT r.id,
+                r.display_reference,
+                r.received_date,
+                r.posting_date,
+                r.payment_method,
+                r.debit_account,
+                r.status,
+                r.origin,
+                r.total_amount,
+                COALESCE(je.manual_override, false) AS manual_override,
+                (SELECT COUNT(*)
+                   FROM receipt_allocations ra
+                  WHERE ra.receipt_id = r.id) AS allocation_count
+           FROM receipts r
+           LEFT JOIN journal_entries je ON je.id = r.journal_entry_id
+          WHERE UPPER(TRIM(r.display_reference)) = UPPER($1)
+            AND r.status <> 'cancelled'
+          ORDER BY r.received_date DESC, r.id DESC
+          LIMIT 10`,
+        [reference]
+      );
+
+      res.json({
+        reference,
+        count: result.rows.length,
+        receipts: result.rows.map((row) => ({
+          ...row,
+          total_amount: Number(row.total_amount),
+          allocation_count: Number(row.allocation_count),
+        })),
+      });
+    } catch (error) {
+      console.error("Error checking receipt reference:", error);
+      res.status(500).json({
+        message: "Error checking receipt reference",
+        error: error.message,
+      });
+    }
+  });
+
   // --- GET /api/receipts/:id ---
   router.get("/:id", async (req, res) => {
     try {

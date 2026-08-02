@@ -539,12 +539,9 @@ const CustomerTransactionsTab: React.FC<CustomerTransactionsTabProps> = ({
   const canExport = showingCurrent && filteredRows.length > 0;
 
   return (
-    <div className="space-y-5 mt-5">
-      {/* Header: filter + export */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-base font-medium text-default-700 dark:text-gray-200">
-          Transaction History
-        </h3>
+    <div className="space-y-5">
+      {/* Header: filter + export. The section title is owned by the host page. */}
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <div className="flex flex-wrap items-center gap-2">
           {statusOptions.map((status) => {
             const active = selectedStatuses.includes(status.value);

@@ -27,7 +27,7 @@ import {
 import Button from "../../../components/Button";
 import Checkbox from "../../../components/Checkbox";
 import TimeNavigator, { TimeRange } from "../../../components/TimeNavigator";
-import { FormListbox } from "../../../components/FormComponents";
+import PillSelect from "../../../components/PillSelect";
 import { api } from "../../../routes/utils/api";
 
 // Parse a yyyy-MM-dd string into a local-timezone Date (never via toISOString).
@@ -598,7 +598,7 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
                 </h3>
               </div>
               <div className="px-5 py-4 space-y-4">
-                <div className="grid grid-cols-3 gap-3 items-start">
+                <div className="grid grid-cols-2 gap-3 items-start">
                   <div>
                     <label className="block text-xs font-medium text-default-500 dark:text-gray-400 mb-1">
                       Date
@@ -636,23 +636,6 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-default-500 dark:text-gray-400 mb-1">
-                      Type
-                    </label>
-                    <FormListbox
-                      name="leaveType"
-                      value={formLeaveType}
-                      onChange={(v) => {
-                        setFormLeaveType(v as GTLeaveType);
-                        setSelections({});
-                      }}
-                      options={GT_LEAVE_TYPES.map((t) => ({
-                        id: t.value,
-                        name: t.label,
-                      }))}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-default-500 dark:text-gray-400 mb-1">
                       Amount (RM)
                     </label>
                     <input
@@ -665,6 +648,21 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
                       step="0.01"
                     />
                   </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-default-500 dark:text-gray-400 mb-1">
+                    Type
+                  </label>
+                  <PillSelect<GTLeaveType>
+                    value={formLeaveType}
+                    onChange={(value: GTLeaveType) => {
+                      setFormLeaveType(value);
+                      setSelections({});
+                    }}
+                    options={GT_LEAVE_TYPES}
+                    ariaLabel="Leave type"
+                  size="md"
+                  />
                 </div>
                 {mode === "daily" && (
                   <p className="-mt-2 text-xs text-default-400 dark:text-gray-500">

@@ -57,7 +57,14 @@ import { generateGTPDFFilename } from "../../../utils/greenTarget/PDF/generateGT
 import { pdf, Document } from "@react-pdf/renderer";
 import { generateQRDataUrl } from "../../../utils/invoice/einvoice/generateQRCode";
 import GTInvoiceAdjustmentDocsSection from "../../../components/AdjustmentDocs/GTInvoiceAdjustmentDocsSection";
+import GTReceiptJoinPanel, {
+  type GTReceiptJoinConfirmation,
+  type GTReceiptJoinLookupState,
+  useGTReceiptJoinConfirmation,
+  useGTReceiptJoinLookup,
+} from "../../../components/GreenTarget/GTReceiptJoinPanel";
 import { formatLocationDisplay } from "../../../utils/greenTarget/formatLocationDisplay";
+import GreenTargetReceiptDetailsDialog from "../../../components/GreenTarget/GreenTargetReceiptDetailsDialog";
 import type {
   CreateGreenTargetPaymentInput,
   GreenTargetPayment,
@@ -66,6 +73,7 @@ import type {
 interface Payment {
   payment_id: number;
   invoice_id: number;
+  receipt_id?: number | null;
   payment_date: string;
   amount_paid: number;
   payment_method: string;
@@ -100,6 +108,14 @@ const toLocalDateString = (value: string): string => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return format(date, "yyyy-MM-dd");
+};
+
+// A receipt's stored date is a timestamp, so it must go through date-fns
+// rather than an ISO substring, which would land on the previous day in KL.
+const toLocalDateInputValue = (value: string | null): string => {
+  if (!value) return "";
+  const parsed: Date = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? "" : format(parsed, "yyyy-MM-dd");
 };
 
 const getPaymentDateRange = (value: string): TimeRange => {
@@ -236,6 +252,9 @@ const InvoiceDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [invoice, setInvoice] = useState<InvoiceGT | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const location = useLocation();
@@ -250,6 +269,18 @@ const InvoiceDetailsPage: React.FC = () => {
     internal_reference: "",
   });
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  // Re-using a Green Target reference here means this invoice is being settled
+  // by a receipt that already exists, so the same offer-to-join flow as the
+  // invoice form applies. The invoice id also answers the "that receipt
+  // already pays this invoice" rule.
+  const paymentReceiptLookup: GTReceiptJoinLookupState = useGTReceiptJoinLookup(
+    paymentFormData.internal_reference,
+    showPaymentForm,
+    invoice?.invoice_id
+  );
+  const paymentReceiptJoin: GTReceiptJoinConfirmation =
+    useGTReceiptJoinConfirmation(paymentReceiptLookup);
+  const joinedPaymentReceipt = paymentReceiptJoin.confirmedReceipt;
   const [isCancelPaymentDialogOpen, setIsCancelPaymentDialogOpen] =
     useState(false);
   const [paymentToCancel, setPaymentToCancel] = useState<Payment | null>(null);
@@ -1143,12 +1174,25 @@ const InvoiceDetailsPage: React.FC = () => {
     setPaymentFormData((prev: PaymentFormData): PaymentFormData => ({
       ...prev,
       payment_method: value as GreenTargetPayment["payment_method"],
-      payment_reference: value === "cash" ? "" : prev.payment_reference,
+      // Only a cheque carries a reference now.
+      payment_reference: value === "cheque" ? prev.payment_reference : "",
     }));
   };
 
   const validatePaymentForm = (): boolean => {
-    if (!paymentFormData.payment_date) {
+    if (paymentReceiptLookup.isLooking) {
+      toast.error("Wait for the Green Target reference check to finish.");
+      return false;
+    }
+    if (paymentReceiptLookup.receipt && !joinedPaymentReceipt) {
+      toast.error(
+        paymentReceiptLookup.joinable
+          ? "Confirm that this payment belongs to the existing receipt."
+          : "This Green Target reference cannot accept another payment."
+      );
+      return false;
+    }
+    if (!paymentFormData.payment_date && !joinedPaymentReceipt) {
       toast.error("Payment date is required");
       return false;
     }
@@ -1185,7 +1229,7 @@ const InvoiceDetailsPage: React.FC = () => {
       return false;
     }
     if (paymentFormData.payment_reference.trim().length > 50) {
-      toast.error("Cheque / transaction reference cannot exceed 50 characters");
+      toast.error("Cheque number cannot exceed 50 characters");
       return false;
     }
 
@@ -1204,13 +1248,27 @@ const InvoiceDetailsPage: React.FC = () => {
     setIsProcessingPayment(true);
 
     try {
+      // A joined receipt owns the banking event: its date, method and cheque /
+      // transaction reference are sent back as they are and the server ignores
+      // them in favour of the header anyway.
       const paymentData: CreateGreenTargetPaymentInput = {
         invoice_id: invoice.invoice_id,
         amount_paid: paymentFormData.amount_paid,
-        payment_date: paymentFormData.payment_date,
-        payment_method: paymentFormData.payment_method,
-        payment_reference: paymentFormData.payment_reference.trim() || null,
+        payment_date: joinedPaymentReceipt
+          ? toLocalDateInputValue(joinedPaymentReceipt.received_date)
+          : paymentFormData.payment_date,
+        payment_method: joinedPaymentReceipt
+          ? joinedPaymentReceipt.payment_method
+          : paymentFormData.payment_method,
+        payment_reference: joinedPaymentReceipt
+          ? joinedPaymentReceipt.payment_reference || null
+          : effectivePaymentMethod === "cheque"
+          ? paymentFormData.payment_reference.trim() || null
+          : null,
         internal_reference: paymentFormData.internal_reference.trim(),
+        ...(joinedPaymentReceipt
+          ? { receipt_id: joinedPaymentReceipt.receipt_id }
+          : {}),
       };
 
       await greenTargetApi.createPayment(paymentData);
@@ -1830,9 +1888,14 @@ const InvoiceDetailsPage: React.FC = () => {
     );
   }
 
-  // Find the selected payment method option for display
+  // Find the selected payment method option for display. A joined receipt owns
+  // the method, so the form shows the receipt's rather than the keyed one.
+  const effectivePaymentMethod: GreenTargetPayment["payment_method"] =
+    joinedPaymentReceipt
+      ? joinedPaymentReceipt.payment_method
+      : paymentFormData.payment_method;
   const selectedPaymentMethod = paymentMethodOptions.find(
-    (option) => option.id === paymentFormData.payment_method
+    (option) => option.id === effectivePaymentMethod
   );
   const paymentMethodDisplayValue = selectedPaymentMethod
     ? selectedPaymentMethod.name
@@ -2226,16 +2289,30 @@ const InvoiceDetailsPage: React.FC = () => {
                   Date Received
                 </label>
                 <TimeNavigator
-                  range={getPaymentDateRange(paymentFormData.payment_date)}
+                  range={getPaymentDateRange(
+                    joinedPaymentReceipt
+                      ? toLocalDateInputValue(
+                          joinedPaymentReceipt.received_date
+                        )
+                      : paymentFormData.payment_date
+                  )}
                   onChange={handlePaymentDateChange}
                   modes={["day"]}
                   presets={false}
                   showArrows={false}
                   allowFuture
-                  disabled={isProcessingPayment}
+                  disabled={
+                    isProcessingPayment || joinedPaymentReceipt !== null
+                  }
                   className="flex w-full"
                   triggerClassName="min-w-0 flex-1 justify-between"
                 />
+                {joinedPaymentReceipt && (
+                  <p className="text-xs text-default-500 dark:text-gray-400">
+                    Taken from receipt{" "}
+                    {joinedPaymentReceipt.display_reference}.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -2301,9 +2378,12 @@ const InvoiceDetailsPage: React.FC = () => {
                   Payment Method
                 </label>
                 <Listbox
-                  value={paymentFormData.payment_method}
+                  value={effectivePaymentMethod}
                   onChange={handlePaymentMethodChange} // Use dedicated handler
                   name="payment_method"
+                  disabled={
+                    isProcessingPayment || joinedPaymentReceipt !== null
+                  }
                 >
                   <div className="relative">
                     <HeadlessListboxButton
@@ -2374,31 +2454,36 @@ const InvoiceDetailsPage: React.FC = () => {
                 </Listbox>
               </div>
 
-              {/* Conditional Reference Input */}
-              {(paymentFormData.payment_method === "cheque" ||
-                paymentFormData.payment_method === "bank_transfer" ||
-                paymentFormData.payment_method === "online") && (
+              {/* Cheque only: the number is how a cheque is matched to the bank
+                  statement when it clears. Online and bank transfers are
+                  identified by their RV number — no incoming payment in the
+                  Jan-Jun legacy ledger carries a transaction id. */}
+              {effectivePaymentMethod === "cheque" && (
                 <div className="space-y-2">
                   <label
                     htmlFor="payment_reference"
                     className="block text-sm font-medium text-default-700 dark:text-gray-200"
                   >
-                    {paymentFormData.payment_method === "cheque"
-                      ? "Cheque Number"
-                      : paymentFormData.payment_method === "online"
-                      ? "Transaction ID"
-                      : "Transaction Reference"}
+                    Cheque Number
                   </label>
                   <input
                     type="text"
                     id="payment_reference"
                     name="payment_reference"
-                    value={paymentFormData.payment_reference}
+                    value={
+                      joinedPaymentReceipt
+                        ? joinedPaymentReceipt.payment_reference || ""
+                        : paymentFormData.payment_reference
+                    }
                     onChange={handlePaymentFormChange}
+                    readOnly={joinedPaymentReceipt !== null}
                     maxLength={50}
                     className={clsx(
                       // Use clsx for consistency
                       "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
+                      joinedPaymentReceipt
+                        ? "bg-gray-100 dark:bg-gray-800 cursor-default"
+                        : "",
                       "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                     )}
                   />
@@ -2406,12 +2491,25 @@ const InvoiceDetailsPage: React.FC = () => {
               )}
             </div>
 
+            <GTReceiptJoinPanel
+              lookup={paymentReceiptLookup}
+              joinConfirmed={paymentReceiptJoin.joinConfirmed}
+              onJoinConfirmedChange={paymentReceiptJoin.setJoinConfirmed}
+              disabled={isProcessingPayment}
+              className="mt-4"
+            />
+
             <div className="mt-6 flex justify-end">
               <Button
                 type="submit"
                 variant="filled"
                 color="sky"
-                disabled={isProcessingPayment}
+                disabled={
+                  isProcessingPayment ||
+                  paymentReceiptLookup.isLooking ||
+                  (paymentReceiptLookup.receipt !== null &&
+                    joinedPaymentReceipt === null)
+                }
               >
                 {isProcessingPayment ? "Processing..." : "Process Payment"}
               </Button>
@@ -2457,7 +2555,7 @@ const InvoiceDetailsPage: React.FC = () => {
                         invoiceNumberValidation.isDuplicate ||
                         !editedInvoiceNumber.trim()
                       }
-                      className="p-1.5 rounded-md text-green-600 hover:bg-green-100 disabled:text-default-400 disabled:bg-transparent"
+                      className="p-1.5 rounded-md text-green-600 dark:text-green-500 hover:bg-green-100 dark:hover:bg-green-900/30 disabled:text-default-400 dark:disabled:text-gray-600 disabled:bg-transparent dark:disabled:bg-transparent"
                       title="Save"
                     >
                       <IconDeviceFloppy size={18} />
@@ -2465,7 +2563,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     <button
                       onClick={handleCancelInvoiceNumberEdit}
                       disabled={isUpdatingInvoiceNumber}
-                      className="p-1.5 rounded-md text-red-600 hover:bg-red-100 disabled:text-default-400"
+                      className="p-1.5 rounded-md text-red-600 dark:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 disabled:text-default-400 dark:disabled:text-gray-600"
                       title="Cancel"
                     >
                       <IconX size={18} />
@@ -2513,7 +2611,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   <button
                     onClick={handleSaveDateIssued}
                     disabled={isUpdatingDateIssued || !editedDateIssued}
-                    className="p-1.5 rounded-md text-green-600 hover:bg-green-100 disabled:text-default-400 disabled:bg-transparent"
+                    className="p-1.5 rounded-md text-green-600 dark:text-green-500 hover:bg-green-100 dark:hover:bg-green-900/30 disabled:text-default-400 dark:disabled:text-gray-600 disabled:bg-transparent dark:disabled:bg-transparent"
                     title="Save"
                   >
                     <IconDeviceFloppy size={18} />
@@ -2521,7 +2619,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   <button
                     onClick={handleCancelDateIssuedEdit}
                     disabled={isUpdatingDateIssued}
-                    className="p-1.5 rounded-md text-red-600 hover:bg-red-100 disabled:text-default-400"
+                    className="p-1.5 rounded-md text-red-600 dark:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 disabled:text-default-400 dark:disabled:text-gray-600"
                     title="Cancel"
                   >
                     <IconX size={18} />
@@ -2594,7 +2692,7 @@ const InvoiceDetailsPage: React.FC = () => {
                       !editedAmount ||
                       parseFloat(editedAmount) < 0
                     }
-                    className="p-1.5 rounded-md text-green-600 hover:bg-green-100 disabled:text-default-400 disabled:bg-transparent"
+                    className="p-1.5 rounded-md text-green-600 dark:text-green-500 hover:bg-green-100 dark:hover:bg-green-900/30 disabled:text-default-400 dark:disabled:text-gray-600 disabled:bg-transparent dark:disabled:bg-transparent"
                     title="Save"
                   >
                     <IconDeviceFloppy size={18} />
@@ -2602,7 +2700,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   <button
                     onClick={handleCancelAmountEdit}
                     disabled={isUpdatingAmount}
-                    className="p-1.5 rounded-md text-red-600 hover:bg-red-100 disabled:text-default-400"
+                    className="p-1.5 rounded-md text-red-600 dark:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 disabled:text-default-400 dark:disabled:text-gray-600"
                     title="Cancel"
                   >
                     <IconX size={18} />
@@ -3047,14 +3145,14 @@ const InvoiceDetailsPage: React.FC = () => {
                                   refValidation.isValidating ||
                                   refValidation.isDuplicate
                                 }
-                                className="p-1 rounded-md text-green-600 hover:bg-green-100 disabled:text-default-400 disabled:bg-transparent"
+                                className="p-1 rounded-md text-green-600 dark:text-green-500 hover:bg-green-100 dark:hover:bg-green-900/30 disabled:text-default-400 dark:disabled:text-gray-600 disabled:bg-transparent dark:disabled:bg-transparent"
                                 title="Save"
                               >
                                 <IconDeviceFloppy size={18} />
                               </button>
                               <button
                                 onClick={handleCancelEdit}
-                                className="p-1 rounded-md text-red-600 hover:bg-red-100"
+                                className="p-1 rounded-md text-red-600 dark:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30"
                                 title="Cancel"
                               >
                                 <IconX size={18} />
@@ -3068,7 +3166,24 @@ const InvoiceDetailsPage: React.FC = () => {
                           </div>
                         ) : (
                           <div className="flex items-center space-x-2">
-                            <span>{payment.internal_reference || "-"}</span>
+                            {payment.receipt_id ? (
+                              <button
+                                type="button"
+                                onClick={(): void =>
+                                  setSelectedReceiptId(
+                                    payment.receipt_id ?? null
+                                  )
+                                }
+                                className="text-sky-600 hover:underline dark:text-sky-400"
+                                title={`View receipt ${
+                                  payment.internal_reference || ""
+                                } and every invoice it settles`}
+                              >
+                                {payment.internal_reference || "View receipt"}
+                              </button>
+                            ) : (
+                              <span>{payment.internal_reference || "-"}</span>
+                            )}
                             {payment.status !== "cancelled" && (
                               <button
                                 onClick={() => handleEditInternalRef(payment)}
@@ -3450,6 +3565,17 @@ const InvoiceDetailsPage: React.FC = () => {
           isSyncingCancellation ? "Processing..." : "Cancel e-Invoice & Update"
         }
         variant="danger"
+      />
+
+      {/* One receipt can settle several invoices, so the reference opens the
+          whole receipt here rather than navigating away from this invoice. */}
+      <GreenTargetReceiptDetailsDialog
+        receiptId={selectedReceiptId}
+        isOpen={selectedReceiptId !== null}
+        onClose={(): void => setSelectedReceiptId(null)}
+        onChanged={async (): Promise<void> => {
+          if (id) await fetchInvoiceDetails(parseInt(id));
+        }}
       />
 
       {/* PDF Handlers (Rendered conditionally) */}

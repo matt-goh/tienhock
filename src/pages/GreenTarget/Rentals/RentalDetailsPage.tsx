@@ -7,7 +7,7 @@ import React, {
   useState,
 } from "react";
 import { format } from "date-fns";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   IconChevronDown,
   IconFileInvoice,
@@ -25,6 +25,7 @@ import toast from "react-hot-toast";
 import BackButton from "../../../components/BackButton";
 import Button from "../../../components/Button";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
+import GreenTargetReceiptDetailsDialog from "../../../components/GreenTarget/GreenTargetReceiptDetailsDialog";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import GTInvoiceAccountFields, {
@@ -32,7 +33,9 @@ import GTInvoiceAccountFields, {
   GTInvoiceAccountFieldsHandle,
 } from "../../../components/GreenTarget/GTInvoiceAccountFields";
 import GTReceiptJoinPanel, {
+  type GTReceiptJoinConfirmation,
   type GTReceiptJoinLookupState,
+  useGTReceiptJoinConfirmation,
   useGTReceiptJoinLookup,
 } from "../../../components/GreenTarget/GTReceiptJoinPanel";
 import { formatLocationDisplay } from "../../../utils/greenTarget/formatLocationDisplay";
@@ -196,6 +199,9 @@ const RentalDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
 
   const [rental, setRental] = useState<RentalDetails | null>(null);
+  const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(
+    null
+  );
   const [invoices, setInvoices] = useState<LinkedInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -253,20 +259,15 @@ const RentalDetailsPage: React.FC = () => {
   const [paymentInternalReference, setPaymentInternalReference] =
     useState<string>("");
   const [paymentReference, setPaymentReference] = useState<string>("");
-  const [paymentJoinReceiptId, setPaymentJoinReceiptId] = useState<
-    number | null
-  >(null);
   const paymentReceiptLookup: GTReceiptJoinLookupState =
     useGTReceiptJoinLookup(
       paymentInternalReference,
       isInvoiceModalOpen && recordPayment
     );
+  const paymentReceiptJoin: GTReceiptJoinConfirmation =
+    useGTReceiptJoinConfirmation(paymentReceiptLookup);
   const confirmedPaymentReceipt: GreenTargetReceiptJoinCandidate | null =
-    !paymentReceiptLookup.isLooking &&
-    paymentReceiptLookup.joinable &&
-    paymentReceiptLookup.receipt?.receipt_id === paymentJoinReceiptId
-      ? paymentReceiptLookup.receipt
-      : null;
+    paymentReceiptJoin.confirmedReceipt;
   const effectivePaymentMethod: GreenTargetPayment["payment_method"] =
     confirmedPaymentReceipt?.payment_method || paymentMethod;
 
@@ -402,21 +403,10 @@ const RentalDetailsPage: React.FC = () => {
     );
   };
 
-  const handlePaymentJoinConfirmedChange = (joinConfirmed: boolean): void => {
-    setPaymentJoinReceiptId(
-      joinConfirmed &&
-        paymentReceiptLookup.joinable &&
-        paymentReceiptLookup.receipt
-        ? paymentReceiptLookup.receipt.receipt_id
-        : null
-    );
-  };
-
   const handlePaymentInternalReferenceChange = (
     event: React.ChangeEvent<HTMLInputElement>
   ): void => {
     setPaymentInternalReference(event.target.value);
-    setPaymentJoinReceiptId(null);
   };
 
   const handleCreateInvoice = async (): Promise<void> => {
@@ -540,9 +530,9 @@ const RentalDetailsPage: React.FC = () => {
               payment_method: effectivePaymentMethod,
               payment_reference: confirmedPaymentReceipt
                 ? confirmedPaymentReceipt.payment_reference
-                : paymentMethod === "cash"
-                ? null
-                : paymentReference.trim() || null,
+                : paymentMethod === "cheque"
+                ? paymentReference.trim() || null
+                : null,
               internal_reference:
                 confirmedPaymentReceipt?.display_reference ||
                 paymentInternalReference.trim(),
@@ -904,13 +894,21 @@ const RentalDetailsPage: React.FC = () => {
                                 </td>
                                 <td className="py-1.5 pr-3 text-default-600 dark:text-gray-400">
                                   {payment.receipt_id ? (
-                                    <Link
-                                      to={`/greentarget/payments?receipt=${payment.receipt_id}`}
+                                    <button
+                                      type="button"
+                                      onClick={(): void =>
+                                        setSelectedReceiptId(
+                                          payment.receipt_id
+                                        )
+                                      }
                                       className="text-sky-600 hover:underline dark:text-sky-400"
+                                      title={`View receipt ${
+                                        payment.internal_reference || ""
+                                      } and every invoice it settles`}
                                     >
                                       {payment.internal_reference ||
                                         "View receipt"}
-                                    </Link>
+                                    </button>
                                   ) : (
                                     payment.internal_reference || "-"
                                   )}
@@ -940,6 +938,15 @@ const RentalDetailsPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* One receipt can settle several invoices, so the reference opens the
+          whole receipt here rather than navigating away from this rental. */}
+      <GreenTargetReceiptDetailsDialog
+        receiptId={selectedReceiptId}
+        isOpen={selectedReceiptId !== null}
+        onClose={(): void => setSelectedReceiptId(null)}
+        onChanged={fetchDetails}
+      />
 
       {/* Delete confirmation */}
       <ConfirmationDialog
@@ -1348,7 +1355,7 @@ const RentalDetailsPage: React.FC = () => {
                               method: GreenTargetPayment["payment_method"]
                             ): void => {
                               setPaymentMethod(method);
-                              if (method === "cash") setPaymentReference("");
+                              if (method !== "cheque") setPaymentReference("");
                             }}
                             disabled={Boolean(confirmedPaymentReceipt)}
                           >
@@ -1443,12 +1450,10 @@ const RentalDetailsPage: React.FC = () => {
                               className="w-full rounded-lg border border-default-300 bg-default-100 px-3 py-2 text-default-700 dark:border-gray-600 dark:bg-gray-900/70 dark:text-gray-300"
                             />
                           </div>
-                        ) : paymentMethod !== "cash" ? (
+                        ) : paymentMethod === "cheque" ? (
                           <div>
                             <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-2">
-                              {paymentMethod === "cheque"
-                                ? "Cheque No."
-                                : "Transaction Ref."}
+                              Cheque No.
                             </label>
                             <input
                               type="text"
@@ -1464,9 +1469,9 @@ const RentalDetailsPage: React.FC = () => {
                       </div>
                       <GTReceiptJoinPanel
                         lookup={paymentReceiptLookup}
-                        joinConfirmed={Boolean(confirmedPaymentReceipt)}
+                        joinConfirmed={paymentReceiptJoin.joinConfirmed}
                         onJoinConfirmedChange={
-                          handlePaymentJoinConfirmedChange
+                          paymentReceiptJoin.setJoinConfirmed
                         }
                         disabled={
                           isCreatingInvoice || paymentReceiptLookup.isLooking

@@ -1,7 +1,8 @@
 // src/components/Invoice/InvoiceHeader.tsx
-import React from "react";
+import React, { useMemo } from "react";
 import { ExtendedInvoiceData, Customer } from "../../types/types"; // Use updated types
-import { FormInput, FormListbox } from "../FormComponents"; // Reusable components
+import { FormInput } from "../FormComponents"; // Reusable components
+import PillSelect, { PillSelectOption } from "../PillSelect";
 import { CustomerCombobox } from "./CustomerCombobox"; // Reusable component
 import {
   formatDateForInput,
@@ -13,6 +14,14 @@ interface SelectOption {
   id: string;
   name: string;
 }
+
+// "I"/"C" are the invoice-number prefixes; they map to INVOICE/CASH.
+type InvoiceTypeCode = "I" | "C";
+
+const INVOICE_TYPE_OPTIONS: ReadonlyArray<PillSelectOption<InvoiceTypeCode>> = [
+  { value: "I", label: "Invoice" },
+  { value: "C", label: "Cash" },
+];
 
 interface InvoiceHeaderProps {
   invoice: ExtendedInvoiceData;
@@ -73,6 +82,17 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
     onInputChange("createddate", newDate.getTime().toString());
   };
 
+  const salesmanOptions: ReadonlyArray<PillSelectOption<string>> = useMemo(
+    (): ReadonlyArray<PillSelectOption<string>> =>
+      salesmen.map(
+        (salesman): PillSelectOption<string> => ({
+          value: salesman.id,
+          label: salesman.name || salesman.id,
+        })
+      ),
+    [salesmen]
+  );
+
   // --- Prepare props for CustomerCombobox ---
   // Map full customer list to SelectOption format
   const customerOptionsForCombobox: SelectOption[] = customers.map((c) => ({
@@ -123,25 +143,25 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
         </div>
 
         {/* Type */}
-        <FormListbox
-          name="type"
-          label="Type"
-          // Find the name corresponding to the current paymenttype ID
-          value={invoice.paymenttype === "CASH" ? "C" : "I"} // Pass the ID value
-          onChange={(value) => {
-            const newType = value === "C" ? "CASH" : "INVOICE";
-            onInputChange("paymenttype", newType);
-            if (invoice.id) {
-              onInputChange("id", invoice.id);
-            }
-          }}
-          options={[
-            // Ensure options have id/name matching FormListbox expectations
-            { id: "I", name: "Invoice" },
-            { id: "C", name: "Cash" },
-          ]}
-          disabled={readOnly} // Use readOnly
-        />
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+            Type
+          </label>
+          <PillSelect<InvoiceTypeCode>
+            value={invoice.paymenttype === "CASH" ? "C" : "I"}
+            onChange={(value: InvoiceTypeCode) => {
+              const newType = value === "C" ? "CASH" : "INVOICE";
+              onInputChange("paymenttype", newType);
+              if (invoice.id) {
+                onInputChange("id", invoice.id);
+              }
+            }}
+            options={INVOICE_TYPE_OPTIONS}
+            disabled={readOnly} // Use readOnly
+            ariaLabel="Invoice type"
+            size="md"
+          />
+        </div>
 
         {/* Date */}
         <FormInput
@@ -171,19 +191,25 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
 
       {/* Column 2 */}
       <div className="space-y-3">
-        {/* Salesman */}
-        <FormListbox
-          name="salesman"
-          label="Salesman"
-          value={invoice.salespersonid || ""} // Pass the ID value
-          onChange={(selectedId) => {
-            // The FormListbox onChange now correctly passes the ID back
-            onInputChange("salespersonid", selectedId || ""); // Store the ID
-          }}
-          options={salesmen} // Pass array of { id, name }
-          disabled={readOnly} // Use readOnly
-          placeholder="Select Salesman..."
-        />
+        {/* Salesman. The picker only ever lists active staff holding the
+            SALESMAN job (4 of them today) and shows their short id, so the
+            whole set fits in one pill row. An empty salespersonid matches no
+            pill, which is the old "Select Salesman..." placeholder state. */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+            Salesman
+          </label>
+          <PillSelect<string>
+            value={invoice.salespersonid || ""}
+            onChange={(selectedId: string) => {
+              onInputChange("salespersonid", selectedId);
+            }}
+            options={salesmanOptions}
+            disabled={readOnly} // Use readOnly
+            ariaLabel="Salesman"
+            size="md"
+          />
+        </div>
 
         {/* Customer */}
         <CustomerCombobox

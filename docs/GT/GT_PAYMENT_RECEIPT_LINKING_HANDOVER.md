@@ -178,12 +178,17 @@ These are the non-obvious calls. Implementers should not quietly change them.
 
 **Linking (B)**
 
-- **L1 — decide the link target first.** There is no per-payment route today (§2f). Recommended:
-  add a receipt-addressable route (e.g. `/greentarget/payments?receipt=:id`) that the Payments page
-  reads on mount to open `GreenTargetReceiptDetailsDialog` automatically. This is the smallest
-  change that gives every payment row a real destination, and it also gives A's "joined into
-  receipt X" confirmation somewhere to point. The alternative — linking to the invoice details page
-  — is cheaper but does not show the sibling allocations, which is the whole point of C.
+- **L1 — SUPERSEDED 2026-08-02. A reference opens the receipt dialog IN PLACE.** This rule
+  originally recommended a receipt-addressable route (`/greentarget/payments?receipt=:id`) that the
+  Payments page reads on mount, and that is what was built first. It is wrong for these screens:
+  Tien Hock — the system being matched — makes the reference a `<button>` that sets
+  `selectedReceiptId` and renders `ReceiptDetailsDialog` on the page the user is already reading
+  ([InvoiceDetailsPage.tsx:2542-2550](../../src/pages/Invoice/InvoiceDetailsPage.tsx#L2542-L2550)).
+  Navigating away loses the reader's place, and on Rental **Edit** it would abandon unsaved form
+  edits. GT now does the same, using the existing `GreenTargetReceiptDetailsDialog`.
+  The `?receipt=` parameter on the Payments page is **kept** — TH has the identical deep link at
+  `/sales/payments?receipt=<id>` for a journal's "View Source" button — it simply is not what the
+  payment rows use.
 - **L2 — cancelled payments still link.** They are part of the audit trail; keep the existing
   dimmed styling.
 
@@ -493,11 +498,28 @@ All implementation and housekeeping items in §11c are complete in the working t
   confirmation, render inherited receipt banking fields read-only, validate the inherited date
   before creating the invoice, skip the old duplicate-reference rejection only for a confirmed join,
   and send `receipt_id` to the payment mutation.
-- `/greentarget/payments?receipt=<id>` controls the receipt dialog. The Payments page owns that state,
-  preserves unrelated query parameters, removes an invalid receipt parameter, and keeps dialog open/
-  close actions synchronized with the URL.
+- `/greentarget/payments?receipt=<id>` controls the receipt dialog on the Payments page. That page owns
+  the state, preserves unrelated query parameters, removes an invalid receipt parameter, and keeps
+  dialog open/close actions synchronized with the URL. It remains available as a deep link, but is no
+  longer what a payment row's reference does — see the revised L1 below.
 - Rental Details and Rental Edit show real payment rows linked to their receipts. Cancelled rows stay
   visible and dimmed. The receipt dialog derives and links every rental covered by each allocation.
+
+**Revision, same day (L1 superseded).** Payment references first navigated to
+`/greentarget/payments?receipt=<id>`. They now open `GreenTargetReceiptDetailsDialog` **in place**,
+matching Tien Hock, on three screens:
+
+- `InvoiceDetailsPage.tsx` (GT) — the reference was previously **plain text with no link at all**,
+  which was the real gap versus TH; it is now a button, alongside the existing inline-edit pencil.
+- `RentalDetailsPage.tsx` — `Link` replaced by a button; its now-unused `Link` import was removed.
+- `AssociatedInvoiceDisplay.tsx` — being presentational, it takes an optional `onViewReceipt`
+  callback (mirroring its existing `onViewInvoice`) and `RentalFormPage.tsx` owns the dialog. With no
+  callback supplied the reference degrades to plain text, so no other caller can break.
+
+`RentalFormPage`'s `onChanged` deliberately does **not** re-run the form fetch: that would discard
+unsaved edits. It re-reads the rental and updates only `invoice_info`, in **both** `formData` and
+`initialFormData`, because change detection there is a `JSON.stringify` comparison of the whole form
+and touching only `formData` would make an untouched form look dirty.
 - The user-facing changelog and `GT_ACCOUNTING_HANDOVER.md` GT-P13 entry are written. No schema changed,
   so there is still no migration or `AGENTS.md` / `CLAUDE.md` schema edit.
 

@@ -21,7 +21,9 @@ import {
   getContextLinkedPayCodes,
   staffHoldsJPJob,
 } from "../../../configs/jpPayrollJobConfigs";
-import StyledListbox from "../../../components/StyledListbox";
+import PillSelect, {
+  PillSelectOption,
+} from "../../../components/PillSelect";
 import TimeNavigator from "../../../components/TimeNavigator";
 import { Link } from "react-router-dom";
 import ManageActivitiesModal, {
@@ -86,6 +88,14 @@ type EmployeeHourField =
   | "umumOvertimeHours";
 
 type LeaveType = "cuti_sakit" | "cuti_tahunan" | "cuti_umum" | "cuti_rawatan";
+
+const LEAVE_TYPE_OPTIONS: ReadonlyArray<PillSelectOption<LeaveType>> = [
+  { value: "cuti_sakit", label: "Sick Leave" },
+  { value: "cuti_tahunan", label: "Annual Leave" },
+  { value: "cuti_umum", label: "Public Holiday" },
+  { value: "cuti_rawatan", label: "Hospital Leave" },
+];
+
 const DEFAULT_LEAVE_AMOUNT: number = 65;
 const DEFAULT_LEAVE_AMOUNT_INPUT: string = String(DEFAULT_LEAVE_AMOUNT);
 
@@ -1795,8 +1805,9 @@ const JPMonthlyLogEntryPage: React.FC<JPMonthlyLogEntryPageProps> = ({
                   Pick a date and leave type, then select one or more employees.
                 </p>
 
-                {/* Date + Type + Amount row */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+                {/* Date + Amount row (Leave Type gets its own row below — a
+                    third of this modal stacks the four pills vertically) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                   <div>
                     <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
                       Date
@@ -1815,27 +1826,6 @@ const JPMonthlyLogEntryPage: React.FC<JPMonthlyLogEntryPageProps> = ({
                         className="w-full h-full pl-10 pr-3 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent text-default-900 dark:text-gray-100 text-left focus:outline-none focus:border-default-500 dark:focus:border-gray-500"
                       />
                     </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-                      Leave Type
-                    </label>
-                    <StyledListbox
-                      value={leaveFormData.leaveType}
-                      onChange={(value) =>
-                        setLeaveFormData({
-                          ...leaveFormData,
-                          leaveType: value as LeaveType,
-                        })
-                      }
-                      options={[
-                        { id: "cuti_sakit", name: "Sick Leave" },
-                        { id: "cuti_tahunan", name: "Annual Leave" },
-                        { id: "cuti_umum", name: "Public Holiday" },
-                        { id: "cuti_rawatan", name: "Hospital Leave" },
-                      ]}
-                      rounded="lg"
-                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
@@ -1861,6 +1851,24 @@ const JPMonthlyLogEntryPage: React.FC<JPMonthlyLogEntryPageProps> = ({
                       />
                     </div>
                   </div>
+                </div>
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
+                    Leave Type
+                  </label>
+                  <PillSelect<LeaveType>
+                    value={leaveFormData.leaveType}
+                    onChange={(value: LeaveType) =>
+                      setLeaveFormData({
+                        ...leaveFormData,
+                        leaveType: value,
+                      })
+                    }
+                    options={LEAVE_TYPE_OPTIONS}
+                    ariaLabel="Leave type"
+                  size="md"
+                  />
                 </div>
 
                 {leaveFormData.leaveDate &&

@@ -8,12 +8,23 @@ import {
   TransitionChild,
 } from "@headlessui/react";
 import Button from "../Button";
-import { FormInput, FormListbox } from "../FormComponents";
+import { FormInput } from "../FormComponents";
+import PillSelect, { PillSelectOption } from "../PillSelect";
 import {
   updateMidMonthPayroll,
   MidMonthPayroll,
 } from "../../utils/payroll/midMonthPayrollUtils";
 import toast from "react-hot-toast";
+
+type MidMonthPaymentMethod = "Cash" | "Bank" | "Cheque";
+
+const PAYMENT_METHOD_OPTIONS: ReadonlyArray<
+  PillSelectOption<MidMonthPaymentMethod>
+> = [
+  { value: "Cash", label: "Cash" },
+  { value: "Bank", label: "Bank" },
+  { value: "Cheque", label: "Cheque" },
+];
 
 interface EditMidMonthPayrollModalProps {
   isOpen: boolean;
@@ -29,16 +40,9 @@ const EditMidMonthPayrollModal: React.FC<EditMidMonthPayrollModalProps> = ({
   payroll,
 }) => {
   const [amount, setAmount] = useState<number>(0);
-  const [paymentMethod, setPaymentMethod] = useState<
-    "Cash" | "Bank" | "Cheque"
-  >("Cash");
+  const [paymentMethod, setPaymentMethod] =
+    useState<MidMonthPaymentMethod>("Cash");
   const [isUpdating, setIsUpdating] = useState(false);
-
-  const paymentMethodOptions = [
-    { id: "Cash", name: "Cash" },
-    { id: "Bank", name: "Bank" },
-    { id: "Cheque", name: "Cheque" },
-  ];
 
   // Reset form when payroll changes
   useEffect(() => {
@@ -143,16 +147,18 @@ const EditMidMonthPayrollModal: React.FC<EditMidMonthPayrollModalProps> = ({
                   />
 
                   {/* Payment Method */}
-                  <div>
-                    <FormListbox
-                      name="paymentMethod"
-                      label="Select payment method"
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                      Select payment method
+                    </label>
+                    <PillSelect<MidMonthPaymentMethod>
                       value={paymentMethod}
-                      onChange={(value) =>
-                        setPaymentMethod(value as "Cash" | "Bank" | "Cheque")
+                      onChange={(value: MidMonthPaymentMethod) =>
+                        setPaymentMethod(value)
                       }
-                      options={paymentMethodOptions}
-                      className="w-full"
+                      options={PAYMENT_METHOD_OPTIONS}
+                      ariaLabel="Payment method"
+                      size="md"
                     />
                   </div>
 

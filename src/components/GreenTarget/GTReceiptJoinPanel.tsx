@@ -6,9 +6,10 @@
 // invoices, so a re-used reference is not necessarily a mistake — it usually
 // means the new payment belongs to a receipt that already exists.
 //
-// Joining is always opt-in: a typo that collides with a real RV would
-// otherwise post money into the wrong banking event, so the match is shown and
-// an explicit confirmation is required.
+// Joining is offered pre-ticked because a re-used reference almost always IS
+// the same banking event, but the match is always shown in full: a typo that
+// collides with a real RV would post money into the wrong receipt, so the user
+// can see what they are joining and untick to keep the payment separate.
 import React, { useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { IconAlertTriangle, IconLink, IconLoader2 } from "@tabler/icons-react";
@@ -102,6 +103,65 @@ export const useGTReceiptJoinLookup = (
   }, [reference, enabled, invoiceId]);
 
   return lookup;
+};
+
+export interface GTReceiptJoinConfirmation {
+  /** Whether the checkbox is ticked for the receipt currently on offer. */
+  joinConfirmed: boolean;
+  /** The receipt this payment will join, or null when it creates its own. */
+  confirmedReceipt: GreenTargetReceiptJoinCandidate | null;
+  setJoinConfirmed: (joinConfirmed: boolean) => void;
+}
+
+/**
+ * Owns the join decision for one record-payment block. Re-using a reference is
+ * nearly always deliberate -- the user is keying the second invoice of a
+ * banking event that already exists -- so a joinable receipt is confirmed by
+ * DEFAULT and the user unticks to force a separate receipt instead.
+ *
+ * The confirmation is stored as a receipt id, not a boolean, so it can never
+ * carry over to a different receipt: type a new reference and the decision is
+ * made afresh. Unticking sticks, because the auto-confirm fires once per
+ * receipt on offer.
+ */
+export const useGTReceiptJoinConfirmation = (
+  lookup: GTReceiptJoinLookupState
+): GTReceiptJoinConfirmation => {
+  const [confirmedReceiptId, setConfirmedReceiptId] = useState<number | null>(
+    null
+  );
+  const offeredReceiptIdRef = useRef<number | null>(null);
+
+  const joinableReceipt: GreenTargetReceiptJoinCandidate | null =
+    !lookup.isLooking && lookup.joinable && lookup.receipt
+      ? lookup.receipt
+      : null;
+
+  useEffect((): void => {
+    const receiptId: number | null = joinableReceipt?.receipt_id ?? null;
+    if (receiptId === null) {
+      offeredReceiptIdRef.current = null;
+      setConfirmedReceiptId(null);
+      return;
+    }
+    if (offeredReceiptIdRef.current === receiptId) return;
+    offeredReceiptIdRef.current = receiptId;
+    setConfirmedReceiptId(receiptId);
+  }, [joinableReceipt]);
+
+  const confirmedReceipt: GreenTargetReceiptJoinCandidate | null =
+    joinableReceipt && joinableReceipt.receipt_id === confirmedReceiptId
+      ? joinableReceipt
+      : null;
+
+  return {
+    joinConfirmed: confirmedReceipt !== null,
+    confirmedReceipt,
+    setJoinConfirmed: (joinConfirmed: boolean): void =>
+      setConfirmedReceiptId(
+        joinConfirmed ? joinableReceipt?.receipt_id ?? null : null
+      ),
+  };
 };
 
 const formatReceiptDate = (value: string | null): string => {
@@ -246,6 +306,13 @@ const GTReceiptJoinPanel: React.FC<GTReceiptJoinPanelProps> = ({
               ? "This receipt is an unconfirmed cheque, so the new payment stays pending and the invoice balance is untouched until the receipt is confirmed."
               : "The receipt's date, method and cheque / transaction reference apply to the whole receipt and are used as they are."}
           </p>
+          {!joinConfirmed && (
+            <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+              Leave this unticked only if it is a different payment that happens
+              to share the reference — you will then need a reference number
+              that is not already in use.
+            </p>
+          )}
         </div>
       </div>
     </div>

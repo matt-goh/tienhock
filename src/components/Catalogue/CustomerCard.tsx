@@ -11,7 +11,7 @@ import {
   IconCheck,
   IconBuildingStore,
   IconBuildingSkyscraper,
-  IconCreditCard,
+  IconPencil,
   IconHistory,
 } from "@tabler/icons-react";
 
@@ -43,10 +43,10 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
     onDeleteClick(customer);
   };
 
-  const handleCreditClick = (e: React.MouseEvent) => {
+  const handleEditClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    navigate(`/catalogue/customer/${customer.id}?tab=credit`);
+    navigate(`/catalogue/customer/${customer.id}/edit`);
   };
 
   const handleTransactionsClick = (e: React.MouseEvent) => {
@@ -89,11 +89,11 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
             }`}
           >
             <button
-              onClick={handleCreditClick}
-              className="p-1.5 rounded-full bg-white dark:bg-gray-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/50 text-default-500 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors duration-150 shadow-sm"
-              title="Credit & Pricing"
+              onClick={handleEditClick}
+              className="p-1.5 rounded-full bg-white dark:bg-gray-700 hover:bg-sky-50 dark:hover:bg-sky-900/50 text-default-500 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors duration-150 shadow-sm"
+              title="Edit customer"
             >
-              <IconCreditCard size={16} stroke={1.5} />
+              <IconPencil size={16} stroke={1.5} />
             </button>
             <button
               onClick={handleTransactionsClick}

@@ -203,6 +203,52 @@ export default function (pool) {
     }
   });
 
+  // --- GET /reference-usage/:ref ---
+  // Which ACTIVE payments already carry this reference, so the payment form can
+  // warn while the user types instead of only rejecting on save. Optional
+  // ?exclude_invoice_id keeps the same-invoice case (a hard error on create) out
+  // of the cross-invoice warning.
+  router.get("/reference-usage/:ref(*)", async (req, res) => {
+    const reference = String(req.params.ref || "").trim();
+    const excludeInvoiceId =
+      typeof req.query.exclude_invoice_id === "string" &&
+      req.query.exclude_invoice_id.trim()
+        ? req.query.exclude_invoice_id.trim()
+        : null;
+
+    if (!reference) {
+      return res.json({ reference: "", count: 0, payments: [] });
+    }
+
+    try {
+      const result = await pool.query(
+        `SELECT p.payment_id, p.invoice_id, p.payment_date, p.amount_paid,
+                p.payment_method, p.payment_reference, p.status,
+                i.customerid
+           FROM jellypolly.payments p
+           LEFT JOIN jellypolly.invoices i ON i.id = p.invoice_id
+          WHERE UPPER(TRIM(p.payment_reference)) = UPPER($1)
+            AND ($2::varchar IS NULL OR p.invoice_id <> $2)
+            AND (p.status IS NULL OR p.status <> 'cancelled')
+          ORDER BY p.payment_date DESC, p.payment_id DESC
+          LIMIT 20`,
+        [reference, excludeInvoiceId]
+      );
+
+      res.json({
+        reference,
+        count: result.rows.length,
+        payments: result.rows,
+      });
+    } catch (error) {
+      console.error("Error checking Jelly Polly reference usage:", error);
+      res.status(500).json({
+        message: "Error checking payment reference",
+        error: error.message,
+      });
+    }
+  });
+
   // --- POST /api/payments (Create Payment) ---
   router.post("/", async (req, res) => {
     const {
@@ -212,6 +258,9 @@ export default function (pool) {
       payment_method, // Required: 'cash', 'cheque', 'bank_transfer', 'online'
       payment_reference, // Optional: Cheque no, transaction ID, etc.
       notes, // Optional: Any notes about the payment
+      // Set once the user has seen which other invoices already use this
+      // reference and confirmed it is the same transfer.
+      confirm_duplicate_reference,
       // internal_reference is NOT expected from frontend for standard payments
     } = req.body;
 
@@ -231,16 +280,49 @@ export default function (pool) {
     // Check for duplicate payment reference for the same invoice
     if (payment_reference && payment_reference.trim()) {
       const duplicateCheck = await pool.query(
-        `SELECT payment_id FROM jellypolly.payments 
-         WHERE invoice_id = $1 AND payment_reference = $2 
+        `SELECT payment_id FROM jellypolly.payments
+         WHERE invoice_id = $1 AND payment_reference = $2
          AND (status IS NULL OR status != 'cancelled')`,
         [invoice_id, payment_reference.trim()]
       );
-      
+
       if (duplicateCheck.rows.length > 0) {
         return res.status(400).json({
           message: `Payment reference "${payment_reference}" already exists for this invoice. Please use a unique reference.`,
         });
+      }
+
+      // The same reference on ANOTHER invoice is legitimate — one transfer can
+      // settle several invoices — but it is also how a mis-keyed reference
+      // hides, and Jelly Polly has no receipt header to group them under. So it
+      // is reported and requires an explicit confirmation instead of a silent
+      // pass, which is all the same-invoice check used to allow.
+      if (!confirm_duplicate_reference) {
+        const otherInvoiceUsage = await pool.query(
+          `SELECT p.payment_id, p.invoice_id, p.payment_date, p.amount_paid,
+                  p.payment_method, p.status
+             FROM jellypolly.payments p
+            WHERE UPPER(TRIM(p.payment_reference)) = UPPER($1)
+              AND p.invoice_id <> $2
+              AND (p.status IS NULL OR p.status <> 'cancelled')
+            ORDER BY p.payment_date DESC, p.payment_id DESC
+            LIMIT 20`,
+          [payment_reference.trim(), invoice_id]
+        );
+
+        if (otherInvoiceUsage.rows.length > 0) {
+          return res.status(409).json({
+            code: "DUPLICATE_PAYMENT_REFERENCE",
+            requires_confirmation: true,
+            message: `Reference "${payment_reference.trim()}" is already used by ${
+              otherInvoiceUsage.rows.length === 1
+                ? "another payment"
+                : `${otherInvoiceUsage.rows.length} other payments`
+            }. Confirm that this is the same transfer, or use a different reference.`,
+            reference: payment_reference.trim(),
+            payments: otherInvoiceUsage.rows,
+          });
+        }
       }
     }
 

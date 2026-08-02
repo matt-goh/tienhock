@@ -8,6 +8,7 @@ import {
   TransitionChild,
 } from "@headlessui/react";
 import {
+  IconAlertTriangle,
   IconBan,
   IconCircleCheck,
   IconExternalLink,
@@ -21,6 +22,7 @@ import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import { greenTargetApi } from "../../routes/greentarget/api";
 import type {
+  GreenTargetImportedJournalRef,
   GreenTargetReceiptAllocationRental,
   GreenTargetReceiptGroupAllocation,
   GreenTargetReceiptGroupDetails,
@@ -28,7 +30,6 @@ import type {
 } from "../../types/greenTargetTypes";
 import Button from "../Button";
 import ConfirmationDialog from "../ConfirmationDialog";
-import LoadingSpinner from "../LoadingSpinner";
 
 type ReceiptMutation = "reference" | "confirm" | "cancel";
 
@@ -84,6 +85,28 @@ const getStatusLabel = (status: GreenTargetReceiptStatus): string => {
 };
 
 const getStatusClassName = (status: GreenTargetReceiptStatus): string => {
+  if (status === "pending") {
+    return "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300";
+  }
+  if (status === "cancelled") {
+    return "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300";
+  }
+  return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300";
+};
+
+// An allocation carries its own status only while it disagrees with the header
+// (a cancelled row kept for audit), so it is badged per row, not per receipt.
+const getAllocationStatusLabel = (
+  status: GreenTargetReceiptGroupAllocation["status"]
+): string => {
+  if (status === "pending") return "Pending";
+  if (status === "cancelled") return "Cancelled";
+  return "Settled";
+};
+
+const getAllocationStatusClassName = (
+  status: GreenTargetReceiptGroupAllocation["status"]
+): string => {
   if (status === "pending") {
     return "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300";
   }
@@ -196,6 +219,35 @@ const GreenTargetReceiptDetailsDialog: React.FC<
         ): number => total + Number(allocation.amount_paid || 0),
         0
       ) ?? 0,
+    [details]
+  );
+
+  // A pre-cutover receipt owns no journal — each allocation instead points at
+  // the invoice's imported entry, where the counter-cash leg recorded the
+  // collection. De-duplicated because one entry can cover several invoices.
+  const importedJournals: GreenTargetImportedJournalRef[] = useMemo(
+    (): GreenTargetImportedJournalRef[] => {
+      if (!details || details.journal) return [];
+      const seenJournalIds: Set<number> = new Set<number>();
+      return details.allocations.reduce(
+        (
+          journals: GreenTargetImportedJournalRef[],
+          allocation: GreenTargetReceiptGroupAllocation
+        ): GreenTargetImportedJournalRef[] => {
+          const importedJournal: GreenTargetImportedJournalRef | null =
+            allocation.imported_journal ?? null;
+          if (
+            importedJournal &&
+            !seenJournalIds.has(importedJournal.journal_entry_id)
+          ) {
+            seenJournalIds.add(importedJournal.journal_entry_id);
+            journals.push(importedJournal);
+          }
+          return journals;
+        },
+        []
+      );
+    },
     [details]
   );
 
@@ -379,10 +431,10 @@ const GreenTargetReceiptDetailsDialog: React.FC<
         <Dialog as="div" className="relative z-50" onClose={handleClose}>
           <TransitionChild
             as={Fragment}
-            enter="ease-out duration-200"
+            enter="ease-out duration-300"
             enterFrom="opacity-0"
             enterTo="opacity-100"
-            leave="ease-in duration-150"
+            leave="ease-in duration-200"
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
@@ -393,29 +445,31 @@ const GreenTargetReceiptDetailsDialog: React.FC<
             <div className="flex min-h-full items-center justify-center p-4 text-center">
               <TransitionChild
                 as={Fragment}
-                enter="ease-out duration-200"
+                enter="ease-out duration-300"
                 enterFrom="opacity-0 scale-95"
                 enterTo="opacity-100 scale-100"
-                leave="ease-in duration-150"
+                leave="ease-in duration-200"
                 leaveFrom="opacity-100 scale-100"
                 leaveTo="opacity-0 scale-95"
               >
-                <DialogPanel className="w-full max-w-4xl overflow-hidden rounded-2xl border border-default-200 bg-white text-left align-middle shadow-xl dark:border-gray-700 dark:bg-gray-800">
-                  <div className="flex items-start justify-between border-b border-default-200 px-5 py-4 dark:border-gray-700">
-                    <div className="flex items-start gap-3">
-                      <div className="rounded-lg bg-emerald-100 p-2 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                        <IconReceipt size={22} />
-                      </div>
-                      <div>
-                        <DialogTitle className="text-lg font-semibold text-default-900 dark:text-gray-100">
-                          Green Target Receipt Details
+                <DialogPanel className="my-auto flex max-h-[calc(100vh-3rem)] w-full max-w-3xl transform flex-col overflow-hidden rounded-2xl border border-default-200 bg-white text-left align-middle shadow-xl ring-1 ring-black/5 transition-all dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/40 dark:ring-white/10">
+                  <div className="flex items-start justify-between gap-3 border-b border-default-200 bg-default-50 px-5 py-4 dark:border-gray-700 dark:bg-gray-900/60">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300">
+                        <IconReceipt size={20} />
+                      </span>
+                      <div className="min-w-0">
+                        <DialogTitle
+                          as="h3"
+                          className="break-all text-base font-semibold text-default-800 dark:text-gray-100"
+                        >
+                          {details?.receipt.display_reference
+                            ? `Receipt ${details.receipt.display_reference}`
+                            : "Receipt Details"}
                         </DialogTitle>
-                        <p className="mt-0.5 text-xs text-default-500 dark:text-gray-400">
-                          {details
-                            ? `Receipt #${details.receipt.receipt_id} owns ${details.allocations.length} invoice allocation${
-                                details.allocations.length === 1 ? "" : "s"
-                              }.`
-                            : "One receipt owns every allocation shown here."}
+                        <p className="text-xs text-default-500 dark:text-gray-400">
+                          See every invoice paid under this Green Target
+                          reference.
                         </p>
                       </div>
                     </div>
@@ -423,29 +477,38 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                       type="button"
                       onClick={handleClose}
                       disabled={isBusy}
-                      className="rounded-lg p-1.5 text-default-400 transition-colors hover:bg-default-100 hover:text-default-700 disabled:opacity-50 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                      className="rounded-lg p-1 text-default-400 transition-colors hover:bg-default-100 hover:text-default-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-200"
                       aria-label="Close receipt details"
                     >
-                      <IconX size={20} />
+                      <IconX size={18} />
                     </button>
                   </div>
 
-                  <div className="max-h-[75vh] overflow-y-auto p-5">
+                  <div className="flex-1 overflow-y-auto px-5 py-5">
                     {loading ? (
-                      <div className="flex h-64 items-center justify-center">
-                        <LoadingSpinner />
+                      <div className="flex min-h-52 flex-col items-center justify-center gap-3 text-default-500 dark:text-gray-400">
+                        <span className="h-8 w-8 animate-spin rounded-full border-2 border-default-200 border-t-sky-500 dark:border-gray-600 dark:border-t-sky-400" />
+                        <p className="text-sm">Loading receipt...</p>
                       </div>
                     ) : loadError ? (
-                      <div className="py-12 text-center">
-                        <p className="font-medium text-rose-600 dark:text-rose-400">
-                          {loadError}
-                        </p>
+                      <div className="flex min-h-52 flex-col items-center justify-center gap-3 text-center">
+                        <IconAlertTriangle
+                          size={32}
+                          className="text-amber-500 dark:text-amber-400"
+                        />
+                        <div>
+                          <p className="font-medium text-default-800 dark:text-gray-100">
+                            Receipt could not be loaded
+                          </p>
+                          <p className="mt-1 max-w-md text-sm text-default-500 dark:text-gray-400">
+                            {loadError}
+                          </p>
+                        </div>
                         <Button
                           type="button"
                           size="sm"
-                          variant="outline"
+                          color="sky"
                           icon={IconRefresh}
-                          className="mt-4"
                           onClick={(): void => {
                             if (receiptId === null) return;
                             const requestId: number =
@@ -492,23 +555,107 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                         </Button>
                       </div>
                     ) : details ? (
-                      <div className="space-y-4">
-                        <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-800 dark:bg-emerald-900/20">
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
-                                Green Target Reference No.
+                      <div className="space-y-5">
+                        {details.allocations.length > 1 &&
+                          details.receipt.status !== "cancelled" && (
+                            <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-800/70 dark:bg-amber-900/20 dark:text-amber-100">
+                              <IconAlertTriangle
+                                size={20}
+                                className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400"
+                              />
+                              <div>
+                                <p className="text-sm font-semibold">
+                                  This receipt covers more than one invoice
+                                </p>
+                                <p className="mt-1 text-sm leading-5">
+                                  To keep every invoice correct, the reference,
+                                  confirmation and cancellation apply to all of
+                                  the invoices below together.
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                        {details.receipt.status === "cancelled" && (
+                          <div className="flex gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-900 dark:border-rose-800/70 dark:bg-rose-900/20 dark:text-rose-100">
+                            <IconBan
+                              size={20}
+                              className="mt-0.5 shrink-0 text-rose-600 dark:text-rose-400"
+                            />
+                            <div>
+                              <p className="text-sm font-semibold">
+                                This receipt has already been cancelled
                               </p>
+                              <p className="mt-1 text-sm leading-5">
+                                Every invoice allocation below was reversed
+                                together.
+                              </p>
+                              {details.receipt.cancellation_reason && (
+                                <p className="mt-1 text-xs opacity-80">
+                                  Reason: {details.receipt.cancellation_reason}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                          <div className="rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
+                            <p className="text-xs text-default-500 dark:text-gray-400">
+                              Status
+                            </p>
+                            <span
+                              className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getStatusClassName(
+                                details.receipt.status
+                              )}`}
+                            >
+                              {getStatusLabel(details.receipt.status)}
+                            </span>
+                          </div>
+                          <div className="rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
+                            <p className="text-xs text-default-500 dark:text-gray-400">
+                              Total received
+                            </p>
+                            <p className="mt-1 text-sm font-semibold text-default-800 dark:text-gray-100">
+                              {formatCurrency(details.receipt.total_amount)}
+                            </p>
+                          </div>
+                          <div className="rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
+                            <p className="text-xs text-default-500 dark:text-gray-400">
+                              Received date
+                            </p>
+                            <p className="mt-1 text-sm font-medium text-default-800 dark:text-gray-100">
+                              {formatReceiptDate(details.receipt.received_date)}
+                            </p>
+                          </div>
+                          <div className="rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
+                            <p className="text-xs text-default-500 dark:text-gray-400">
+                              Method
+                            </p>
+                            <p className="mt-1 text-sm font-medium text-default-800 dark:text-gray-100">
+                              {formatPaymentMethod(
+                                details.receipt.payment_method
+                              )}
+                            </p>
+                          </div>
+                        </div>
+
+                        <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+                          <div className="sm:col-span-2">
+                            <dt className="text-xs text-default-500 dark:text-gray-400">
+                              Green Target reference no.
+                            </dt>
+                            <dd className="mt-1 text-default-800 dark:text-gray-100">
                               {editingReference ? (
                                 <form
-                                  className="mt-2 flex flex-wrap items-start gap-2"
+                                  className="space-y-2"
                                   onSubmit={(
                                     event: React.FormEvent<HTMLFormElement>
                                   ): void => {
                                     void handleSaveReference(event);
                                   }}
                                 >
-                                  <div className="min-w-[240px] flex-1">
+                                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                                     <input
                                       type="text"
                                       value={referenceValue}
@@ -521,298 +668,316 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                                         setReferenceError(null);
                                       }}
                                       disabled={isBusy}
-                                      className="w-full rounded-lg border border-emerald-300 bg-white px-3 py-2 font-mono text-sm text-default-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-emerald-700 dark:bg-gray-800 dark:text-gray-100"
+                                      className="h-9 min-w-0 flex-1 rounded-lg border border-default-300 bg-white px-3 font-mono text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                                      aria-label="New Green Target reference number"
                                     />
-                                    {referenceError && (
-                                      <p className="mt-1 text-xs text-rose-600 dark:text-rose-400">
-                                        {referenceError}
-                                      </p>
-                                    )}
+                                    <div className="flex gap-2">
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={(): void => {
+                                          setEditingReference(false);
+                                          setReferenceError(null);
+                                        }}
+                                        disabled={isBusy}
+                                        className="flex-1 sm:flex-none"
+                                      >
+                                        Cancel
+                                      </Button>
+                                      <Button
+                                        type="submit"
+                                        size="sm"
+                                        color="sky"
+                                        disabled={isBusy}
+                                        className="flex-1 sm:flex-none"
+                                      >
+                                        {mutation === "reference"
+                                          ? "Saving..."
+                                          : "Save Reference"}
+                                      </Button>
+                                    </div>
                                   </div>
-                                  <Button
-                                    type="submit"
-                                    size="sm"
-                                    color="teal"
-                                    disabled={isBusy}
-                                  >
-                                    Save
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={(): void => {
-                                      setEditingReference(false);
-                                      setReferenceError(null);
-                                    }}
-                                    disabled={isBusy}
-                                  >
-                                    Cancel
-                                  </Button>
+                                  <p className="text-xs text-default-500 dark:text-gray-400">
+                                    This updates every invoice under this
+                                    receipt. Amounts and payment status will not
+                                    change.
+                                  </p>
+                                  {referenceError && (
+                                    <p className="text-xs text-rose-600 dark:text-rose-300">
+                                      {referenceError}
+                                    </p>
+                                  )}
                                 </form>
                               ) : (
-                                <div className="mt-1 flex items-center gap-2">
-                                  <p className="truncate font-mono text-lg font-semibold text-emerald-900 dark:text-emerald-100">
-                                    {details.receipt.display_reference}
-                                  </p>
+                                <div className="inline-flex max-w-full items-center gap-2">
+                                  <span className="min-w-0 break-all font-mono leading-7">
+                                    {details.receipt.display_reference || "-"}
+                                  </span>
                                   {details.receipt.status !== "cancelled" && (
                                     <button
                                       type="button"
                                       onClick={handleStartReferenceEdit}
                                       disabled={isBusy}
-                                      className="rounded-md p-1 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 dark:text-emerald-300 dark:hover:bg-emerald-900/50"
+                                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-sky-600 hover:bg-sky-50 hover:text-sky-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-sky-400 dark:hover:bg-sky-900/30 dark:hover:text-sky-300"
                                       title="Edit the reference for this whole receipt"
                                       aria-label="Edit Green Target receipt reference"
                                     >
-                                      <IconPencil size={16} />
+                                      <IconPencil size={14} />
                                     </button>
                                   )}
                                 </div>
                               )}
-                            </div>
-                            <div className="text-right">
-                              <span
-                                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusClassName(
-                                  details.receipt.status
-                                )}`}
-                              >
-                                {getStatusLabel(details.receipt.status)}
-                              </span>
-                              <p className="mt-2 text-xl font-semibold text-default-900 dark:text-gray-100">
-                                {formatCurrency(details.receipt.total_amount)}
-                              </p>
-                            </div>
+                            </dd>
                           </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                          <div className="rounded-lg border border-default-200 p-3 dark:border-gray-700">
-                            <p className="text-xs text-default-500 dark:text-gray-400">
-                              Date received
-                            </p>
-                            <p className="mt-1 font-medium text-default-900 dark:text-gray-100">
-                              {formatReceiptDate(details.receipt.received_date)}
-                            </p>
-                          </div>
-                          <div className="rounded-lg border border-default-200 p-3 dark:border-gray-700">
-                            <p className="text-xs text-default-500 dark:text-gray-400">
+                          <div>
+                            <dt className="text-xs text-default-500 dark:text-gray-400">
                               Posting / clearance date
-                            </p>
-                            <p className="mt-1 font-medium text-default-900 dark:text-gray-100">
+                            </dt>
+                            <dd className="mt-0.5 text-default-800 dark:text-gray-100">
                               {formatReceiptDate(details.receipt.posting_date)}
-                            </p>
+                            </dd>
                           </div>
-                          <div className="rounded-lg border border-default-200 p-3 dark:border-gray-700">
-                            <p className="text-xs text-default-500 dark:text-gray-400">
-                              Payment method
-                            </p>
-                            <p className="mt-1 font-medium text-default-900 dark:text-gray-100">
-                              {formatPaymentMethod(details.receipt.payment_method)}
-                            </p>
-                          </div>
-                          <div className="rounded-lg border border-default-200 p-3 dark:border-gray-700">
-                            <p className="text-xs text-default-500 dark:text-gray-400">
+                          <div>
+                            <dt className="text-xs text-default-500 dark:text-gray-400">
                               Bank account
-                            </p>
-                            <p className="mt-1 font-mono font-medium text-default-900 dark:text-gray-100">
+                            </dt>
+                            <dd className="mt-0.5 font-mono text-default-800 dark:text-gray-100">
                               {details.receipt.bank_account}
-                            </p>
+                            </dd>
                           </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                          <div className="rounded-lg border border-default-200 p-3 dark:border-gray-700">
-                            <p className="text-xs text-default-500 dark:text-gray-400">
+                          <div className="sm:col-span-2">
+                            <dt className="text-xs text-default-500 dark:text-gray-400">
                               Cheque / transaction reference
-                            </p>
-                            <p className="mt-1 break-all font-mono font-medium text-default-900 dark:text-gray-100">
+                            </dt>
+                            <dd className="mt-0.5 break-all font-mono text-default-800 dark:text-gray-100">
                               {details.receipt.payment_reference || "-"}
-                            </p>
+                            </dd>
                           </div>
-                          <div className="rounded-lg border border-default-200 p-3 dark:border-gray-700">
-                            <p className="text-xs text-default-500 dark:text-gray-400">
-                              Consolidated receipt journal
-                            </p>
-                            {details.journal ? (
-                              <Link
-                                to={`/greentarget/accounting/journal-entries/${details.journal.journal_entry_id}`}
-                                onClick={handleClose}
-                                className="mt-1 inline-flex items-center gap-1 font-mono font-medium text-sky-600 hover:underline dark:text-sky-400"
-                              >
-                                {details.journal.reference_no}
-                                <IconExternalLink size={14} />
-                              </Link>
-                            ) : (
-                              <p className="mt-1 font-medium text-default-500 dark:text-gray-400">
-                                {details.receipt.status === "pending"
-                                  ? "Created after cheque clearance"
-                                  : "No journal"}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="overflow-hidden rounded-xl border border-default-200 dark:border-gray-700">
-                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-default-200 bg-default-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/50">
-                            <div>
-                              <h3 className="font-medium text-default-900 dark:text-gray-100">
-                                Receipt allocations
-                              </h3>
-                              <p className="text-xs text-default-500 dark:text-gray-400">
-                                Editing, confirming or cancelling applies to every
-                                invoice below.
-                              </p>
-                            </div>
-                            <p className="font-medium text-default-900 dark:text-gray-100">
-                              {formatCurrency(allocationTotal)} allocated
-                            </p>
-                          </div>
-                          <div className="overflow-x-auto">
-                            <table className="w-full min-w-[650px] text-sm">
-                              <thead className="bg-default-50 dark:bg-gray-900/30">
-                                <tr>
-                                  <th className="px-4 py-2 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                                    Invoice
-                                  </th>
-                                  <th className="px-4 py-2 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                                    Customer
-                                  </th>
-                                  <th className="px-4 py-2 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                                    Status
-                                  </th>
-                                  <th className="px-4 py-2 text-right text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                                    Amount
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-default-200 dark:divide-gray-700">
-                                {details.allocations.map(
+                          <div className="sm:col-span-2">
+                            <dt className="text-xs text-default-500 dark:text-gray-400">
+                              {details.journal || importedJournals.length === 0
+                                ? "Consolidated receipt journal"
+                                : "Imported ledger journal"}
+                            </dt>
+                            <dd className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                              {details.journal ? (
+                                <Link
+                                  to={`/greentarget/accounting/journal-entries/${details.journal.journal_entry_id}`}
+                                  onClick={handleClose}
+                                  className="inline-flex items-center gap-1 font-medium text-sky-600 hover:underline dark:text-sky-400"
+                                >
+                                  <IconReceipt size={15} />
+                                  <span>{details.journal.reference_no}</span>
+                                  <IconExternalLink size={13} />
+                                </Link>
+                              ) : importedJournals.length > 0 ? (
+                                // Pre-cutover receipt: no journal of its own, the
+                                // collection sits in the invoice's imported entry.
+                                importedJournals.map(
                                   (
-                                    allocation: GreenTargetReceiptGroupAllocation
+                                    importedJournal: GreenTargetImportedJournalRef
                                   ): React.ReactNode => (
-                                    <tr key={allocation.payment_id}>
-                                      <td className="px-4 py-2.5">
+                                    <Link
+                                      key={importedJournal.journal_entry_id}
+                                      to={`/greentarget/accounting/journal-entries/${importedJournal.journal_entry_id}`}
+                                      onClick={handleClose}
+                                      className="inline-flex items-center gap-1 font-medium text-sky-600 hover:underline dark:text-sky-400"
+                                      title="Collected inside the imported ledger, in this entry's counter-cash line"
+                                    >
+                                      <IconReceipt size={15} />
+                                      <span>{importedJournal.reference_no}</span>
+                                      <IconExternalLink size={13} />
+                                    </Link>
+                                  )
+                                )
+                              ) : (
+                                <span className="text-default-500 dark:text-gray-400">
+                                  {details.receipt.status === "pending"
+                                    ? "Created after the cheque clears"
+                                    : "None"}
+                                </span>
+                              )}
+                            </dd>
+                          </div>
+                        </dl>
+
+                        <div>
+                          <div className="mb-2 flex items-center justify-between gap-3">
+                            <h4 className="text-sm font-semibold text-default-800 dark:text-gray-100">
+                              Invoices in this receipt
+                            </h4>
+                            <span className="text-xs text-default-500 dark:text-gray-400">
+                              {details.allocations.length}{" "}
+                              {details.allocations.length === 1
+                                ? "invoice"
+                                : "invoices"}
+                              {" · "}
+                              {formatCurrency(allocationTotal)}
+                            </span>
+                          </div>
+                          <ul className="divide-y divide-default-200 overflow-hidden rounded-xl border border-default-200 dark:divide-gray-700 dark:border-gray-700">
+                            {details.allocations.map(
+                              (
+                                allocation: GreenTargetReceiptGroupAllocation
+                              ): React.ReactNode => (
+                                <li
+                                  key={allocation.payment_id}
+                                  className="px-4 py-3"
+                                >
+                                  <div className="flex items-center justify-between gap-4">
+                                    <div className="flex min-w-0 items-center gap-3">
+                                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sky-50 text-sky-600 dark:bg-sky-900/30 dark:text-sky-300">
+                                        <IconFileInvoice size={17} />
+                                      </span>
+                                      <div className="min-w-0">
                                         <Link
                                           to={`/greentarget/invoices/${allocation.invoice_id}`}
                                           onClick={handleClose}
-                                          className="inline-flex items-center gap-1 font-mono font-medium text-sky-600 hover:underline dark:text-sky-400"
+                                          className="inline-flex items-center gap-1 truncate text-sm font-medium text-sky-600 hover:underline dark:text-sky-400"
                                         >
-                                          <IconFileInvoice size={15} />
                                           {allocation.invoice_number ||
                                             allocation.invoice_id}
+                                          <IconExternalLink
+                                            size={13}
+                                            className="shrink-0"
+                                          />
                                         </Link>
-                                        {allocation.rentals.length > 0 && (
-                                          <div className="mt-1 flex flex-col items-start gap-1">
-                                            {allocation.rentals.map(
-                                              (
-                                                rental: GreenTargetReceiptAllocationRental
-                                              ): React.ReactNode => (
-                                                <Link
-                                                  key={rental.rental_id}
-                                                  to={`/greentarget/rentals/${rental.rental_id}`}
-                                                  onClick={handleClose}
-                                                  className="inline-flex max-w-full items-center gap-1 truncate text-xs text-emerald-600 hover:underline dark:text-emerald-400"
-                                                  title={
-                                                    rental.location_site ||
-                                                    rental.location_address ||
-                                                    `Rental ${rental.rental_id}`
-                                                  }
-                                                >
-                                                  <IconExternalLink size={12} />
-                                                  Tong {rental.tong_no}
-                                                </Link>
-                                              )
-                                            )}
-                                          </div>
-                                        )}
-                                      </td>
-                                      <td className="px-4 py-2.5 text-default-800 dark:text-gray-100">
-                                        <p>{allocation.customer_name}</p>
-                                        <p className="text-xs text-default-400 dark:text-gray-500">
-                                          Customer #{allocation.customer_id}
+                                        <p className="truncate text-xs text-default-500 dark:text-gray-400">
+                                          {allocation.customer_name} · Customer{" "}
+                                          {allocation.customer_id}
                                         </p>
-                                      </td>
-                                      <td className="px-4 py-2.5 capitalize text-default-600 dark:text-gray-300">
-                                        {allocation.status === "active"
-                                          ? "Settled"
-                                          : allocation.status || "Settled"}
-                                      </td>
-                                      <td className="whitespace-nowrap px-4 py-2.5 text-right font-medium text-default-900 dark:text-gray-100">
+                                      </div>
+                                    </div>
+                                    <div className="flex shrink-0 items-center gap-2.5">
+                                      {allocation.status &&
+                                        allocation.status !== "active" && (
+                                          <span
+                                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getAllocationStatusClassName(
+                                              allocation.status
+                                            )}`}
+                                          >
+                                            {getAllocationStatusLabel(
+                                              allocation.status
+                                            )}
+                                          </span>
+                                        )}
+                                      <span className="text-sm font-semibold text-default-800 dark:text-gray-100">
                                         {formatCurrency(allocation.amount_paid)}
-                                      </td>
-                                    </tr>
-                                  )
-                                )}
-                                {details.allocations.length === 0 && (
-                                  <tr>
-                                    <td
-                                      colSpan={4}
-                                      className="px-4 py-8 text-center text-default-500 dark:text-gray-400"
-                                    >
-                                      This receipt has no payment allocations.
-                                    </td>
-                                  </tr>
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
+                                      </span>
+                                    </div>
+                                  </div>
+                                  {allocation.rentals.length > 0 && (
+                                    <div className="mt-2 flex flex-wrap gap-1.5 pl-11">
+                                      {allocation.rentals.map(
+                                        (
+                                          rental: GreenTargetReceiptAllocationRental
+                                        ): React.ReactNode => (
+                                          <Link
+                                            key={rental.rental_id}
+                                            to={`/greentarget/rentals/${rental.rental_id}`}
+                                            onClick={handleClose}
+                                            className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-900/50"
+                                            title={
+                                              rental.location_site ||
+                                              rental.location_address ||
+                                              `Rental ${rental.rental_id}`
+                                            }
+                                          >
+                                            Tong {rental.tong_no}
+                                          </Link>
+                                        )
+                                      )}
+                                    </div>
+                                  )}
+                                </li>
+                              )
+                            )}
+                            {details.allocations.length === 0 && (
+                              <li className="px-4 py-8 text-center text-sm text-default-500 dark:text-gray-400">
+                                This receipt has no payment allocations.
+                              </li>
+                            )}
+                          </ul>
                         </div>
-
-                        {details.receipt.status === "cancelled" &&
-                          details.receipt.cancellation_reason && (
-                            <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300">
-                              Cancellation reason: {details.receipt.cancellation_reason}
-                            </div>
-                          )}
                       </div>
-                    ) : null}
+                    ) : (
+                      <div className="flex min-h-52 items-center justify-center text-sm text-default-500 dark:text-gray-400">
+                        Select a receipt to view its details.
+                      </div>
+                    )}
                   </div>
 
-                  {details && !loading && !loadError && (
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-default-200 bg-default-50 px-5 py-3 dark:border-gray-700 dark:bg-gray-900/50">
-                      <p className="text-xs text-default-500 dark:text-gray-400">
-                        {details.receipt.origin === "legacy_operational"
-                          ? "Legacy operational receipt"
-                          : "ERP receipt"}
-                      </p>
-                      <div className="flex flex-wrap items-center justify-end gap-2">
+                  <div className="flex flex-col gap-3 border-t border-default-200 px-5 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-gray-700">
+                    <p className="text-xs text-default-500 dark:text-gray-400">
+                      {details?.receipt.status === "cancelled"
+                        ? "This receipt can no longer be changed."
+                        : details?.receipt.status === "pending"
+                        ? "Confirming applies every invoice in this receipt together."
+                        : details && details.allocations.length > 1
+                        ? "Cancelling reverses every invoice shown above."
+                        : "Cancelling reverses this payment."}
+                      {details && (
+                        <span className="opacity-80">
+                          {details.receipt.origin === "legacy_operational"
+                            ? " Legacy operational receipt."
+                            : " ERP receipt."}
+                        </span>
+                      )}
+                    </p>
+                    <div className="flex w-full shrink-0 flex-wrap gap-2 sm:w-auto">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleClose}
+                        disabled={isBusy}
+                        className="flex-1 sm:flex-none"
+                      >
+                        Close
+                      </Button>
+                      {details?.receipt.status === "pending" && (
                         <Button
                           type="button"
                           size="sm"
-                          variant="outline"
-                          onClick={handleClose}
-                          disabled={isBusy}
+                          color="sky"
+                          variant="filled"
+                          icon={IconCircleCheck}
+                          onClick={(): void => setShowConfirmDialog(true)}
+                          disabled={
+                            loading ||
+                            isBusy ||
+                            representativePaymentId === null
+                          }
+                          className="flex-1 sm:flex-none"
                         >
-                          Close
+                          {mutation === "confirm"
+                            ? "Confirming..."
+                            : "Confirm Receipt"}
                         </Button>
-                        {details.receipt.status === "pending" && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            color="teal"
-                            icon={IconCircleCheck}
-                            onClick={(): void => setShowConfirmDialog(true)}
-                            disabled={isBusy || representativePaymentId === null}
-                          >
-                            Confirm Receipt
-                          </Button>
-                        )}
-                        {details.receipt.status !== "cancelled" && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            color="rose"
-                            icon={IconBan}
-                            onClick={(): void => setShowCancelDialog(true)}
-                            disabled={isBusy || representativePaymentId === null}
-                          >
-                            Cancel Receipt
-                          </Button>
-                        )}
-                      </div>
+                      )}
+                      <Button
+                        type="button"
+                        size="sm"
+                        color="rose"
+                        variant="filled"
+                        icon={IconBan}
+                        onClick={(): void => setShowCancelDialog(true)}
+                        disabled={
+                          !details ||
+                          details.receipt.status === "cancelled" ||
+                          loading ||
+                          isBusy ||
+                          representativePaymentId === null
+                        }
+                        className="flex-1 sm:flex-none"
+                      >
+                        {mutation === "cancel"
+                          ? "Cancelling..."
+                          : "Cancel Receipt"}
+                      </Button>
                     </div>
-                  )}
+                  </div>
                 </DialogPanel>
               </TransitionChild>
             </div>
@@ -828,16 +993,20 @@ const GreenTargetReceiptDetailsDialog: React.FC<
         message={
           <div className="space-y-3">
             <p>
-              Confirm all {details?.allocations.length ?? 0} allocations under
-              reference {details?.receipt.display_reference || "this receipt"}.
-              One consolidated PBB_1 journal will use the clearance date below.
+              Every invoice under reference{" "}
+              {details?.receipt.display_reference || "this receipt"} will be
+              confirmed together.
+            </p>
+            <p>
+              The related invoice balances will be updated and one consolidated
+              PBB_1 journal will be created using the clearance date below.
             </p>
             <div>
               <label
                 htmlFor="gt-receipt-clearance-date"
-                className="mb-1 block text-xs font-medium text-default-700 dark:text-gray-300"
+                className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300"
               >
-                Actual bank clearance / posting date
+                Cheque Clearance Date
               </label>
               <input
                 id="gt-receipt-clearance-date"
@@ -848,8 +1017,13 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                   setClearanceDate(event.target.value)
                 }
                 required
-                className="w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                disabled={isBusy}
+                className="h-9 w-full rounded-lg border border-default-300 bg-white px-3 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
               />
+              <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
+                Use the date the bank statement shows the cheque as cleared.
+                This date controls the bank and account-ledger reports.
+              </p>
             </div>
           </div>
         }
@@ -869,17 +1043,39 @@ const GreenTargetReceiptDetailsDialog: React.FC<
         message={
           <div className="space-y-3">
             <p>
-              This will cancel reference {details?.receipt.display_reference || "-"}
-              {" "}and all {details?.allocations.length ?? 0} invoice allocations
-              together.
+              Reference {details?.receipt.display_reference || "this receipt"}{" "}
+              covers{" "}
+              {details?.allocations.length === 1
+                ? "one invoice"
+                : `${details?.allocations.length ?? 0} invoices`}
+              . Cancelling reverses every one of them together; you cannot
+              cancel only one.
             </p>
-            <p className="font-medium text-rose-600 dark:text-rose-300">
-              You cannot cancel only one allocation from this receipt.
-            </p>
+            {details && details.allocations.length > 0 && (
+              <ul className="space-y-1.5 rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
+                {details.allocations.map(
+                  (
+                    allocation: GreenTargetReceiptGroupAllocation
+                  ): React.ReactNode => (
+                    <li
+                      key={allocation.payment_id}
+                      className="flex items-center justify-between gap-3"
+                    >
+                      <span className="min-w-0 truncate font-medium text-default-700 dark:text-gray-200">
+                        {allocation.invoice_number || allocation.invoice_id}
+                      </span>
+                      <span className="whitespace-nowrap font-medium text-default-700 dark:text-gray-200">
+                        {formatCurrency(allocation.amount_paid)}
+                      </span>
+                    </li>
+                  )
+                )}
+              </ul>
+            )}
             <div>
               <label
                 htmlFor="gt-receipt-cancellation-reason"
-                className="mb-1 block text-xs font-medium text-default-700 dark:text-gray-300"
+                className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300"
               >
                 Cancellation reason (optional)
               </label>
@@ -891,7 +1087,7 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                 ): void => setCancelReason(event.target.value)}
                 rows={3}
                 disabled={isBusy}
-                className="w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                className="w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
               />
             </div>
           </div>

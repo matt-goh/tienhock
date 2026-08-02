@@ -8,7 +8,8 @@ import {
   TransitionChild,
 } from "@headlessui/react";
 import Button from "../Button";
-import { FormCombobox, FormInput, FormListbox } from "../FormComponents";
+import { FormCombobox, FormInput } from "../FormComponents";
+import PillSelect, { PillSelectOption } from "../PillSelect";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import {
   createMidMonthPayroll,
@@ -16,6 +17,16 @@ import {
   getMonthName,
 } from "../../utils/payroll/midMonthPayrollUtils";
 import toast from "react-hot-toast";
+
+type MidMonthPaymentMethod = "Cash" | "Bank" | "Cheque";
+
+const PAYMENT_METHOD_OPTIONS: ReadonlyArray<
+  PillSelectOption<MidMonthPaymentMethod>
+> = [
+  { value: "Cash", label: "Cash" },
+  { value: "Bank", label: "Bank" },
+  { value: "Cheque", label: "Cheque" },
+];
 
 interface AddMidMonthPayrollModalProps {
   isOpen: boolean;
@@ -36,17 +47,10 @@ const AddMidMonthPayrollModal: React.FC<AddMidMonthPayrollModalProps> = ({
   const { staffs } = useStaffsCache();
   const [employeeId, setEmployeeId] = useState<string>("");
   const [amount, setAmount] = useState<number>(defaultAmount);
-  const [paymentMethod, setPaymentMethod] = useState<
-    "Cash" | "Bank" | "Cheque"
-  >("Cash");
+  const [paymentMethod, setPaymentMethod] =
+    useState<MidMonthPaymentMethod>("Cash");
   const [isCreating, setIsCreating] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-
-  const paymentMethodOptions = [
-    { id: "Cash", name: "Cash" },
-    { id: "Bank", name: "Bank" },
-    { id: "Cheque", name: "Cheque" },
-  ];
 
   // Employee options for combobox
   const employeeOptions = useMemo(
@@ -199,15 +203,18 @@ const AddMidMonthPayrollModal: React.FC<AddMidMonthPayrollModalProps> = ({
                   </div>
 
                   {/* Payment Method */}
-                  <div>
-                    <FormListbox
-                      name="paymentMethod"
-                      label="Payment Method"
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                      Payment Method
+                    </label>
+                    <PillSelect<MidMonthPaymentMethod>
                       value={paymentMethod}
-                      onChange={(value) =>
-                        setPaymentMethod(value as "Cash" | "Bank" | "Cheque")
+                      onChange={(value: MidMonthPaymentMethod) =>
+                        setPaymentMethod(value)
                       }
-                      options={paymentMethodOptions}
+                      options={PAYMENT_METHOD_OPTIONS}
+                      ariaLabel="Payment method"
+                      size="md"
                     />
                   </div>
                 </div>

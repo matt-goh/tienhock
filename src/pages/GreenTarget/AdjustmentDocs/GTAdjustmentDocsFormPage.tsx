@@ -27,7 +27,10 @@ import BackButton from "../../../components/BackButton";
 import { useSmartBack } from "../../../hooks/useSmartBack";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
-import { FormInput, FormListbox } from "../../../components/FormComponents";
+import { FormInput } from "../../../components/FormComponents";
+import PillSelect, {
+  PillSelectOption,
+} from "../../../components/PillSelect";
 import { api } from "../../../routes/utils/api";
 import { formatAdjustmentDocId } from "../../../utils/adjustments/formatDocId";
 import toast from "react-hot-toast";
@@ -69,16 +72,16 @@ const TYPE_LABEL: Record<AdjustmentDocType, string> = {
   refund_note: "Refund Note",
 };
 
-const PAYMENT_METHOD_OPTIONS = [
-  { id: "cash", name: "Cash" },
-  { id: "cheque", name: "Cheque" },
-  { id: "bank_transfer", name: "Bank Transfer" },
-  { id: "online", name: "Online" },
+const PAYMENT_METHOD_OPTIONS: ReadonlyArray<PillSelectOption<string>> = [
+  { value: "cash", label: "Cash" },
+  { value: "cheque", label: "Cheque" },
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "online", label: "Online" },
 ];
 
-const BANK_ACCOUNT_OPTIONS = [
-  { id: "BANK_PBB", name: "Public Bank Berhad" },
-  { id: "BANK_ABB", name: "Alliance Bank Berhad" },
+const BANK_ACCOUNT_OPTIONS: ReadonlyArray<PillSelectOption<string>> = [
+  { value: "BANK_PBB", label: "Public Bank Berhad" },
+  { value: "BANK_ABB", label: "Alliance Bank Berhad" },
 ];
 
 const parseType = (s: string | null): AdjustmentDocType | null => {
@@ -1436,23 +1439,33 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
                 <div className="text-sm font-medium text-indigo-800 dark:text-indigo-300">
                   {isRN ? "Refund details" : "Paired refund details"}
                 </div>
-                <FormListbox
-                  name="refundMethod"
-                  label="Refund Method"
-                  value={refundMethod}
-                  onChange={(v) => setRefundMethod(String(v))}
-                  options={PAYMENT_METHOD_OPTIONS}
-                  disabled={isSaving}
-                />
-                {refundMethod !== "cash" && (
-                  <FormListbox
-                    name="bankAccount"
-                    label="Bank Account"
-                    value={bankAccount}
-                    onChange={(v) => setBankAccount(String(v))}
-                    options={BANK_ACCOUNT_OPTIONS}
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                    Refund Method
+                  </label>
+                  <PillSelect<string>
+                    value={refundMethod}
+                    onChange={(value: string) => setRefundMethod(value)}
+                    options={PAYMENT_METHOD_OPTIONS}
                     disabled={isSaving}
+                    ariaLabel="Refund method"
+                  size="md"
                   />
+                </div>
+                {refundMethod !== "cash" && (
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                      Bank Account
+                    </label>
+                    <PillSelect<string>
+                      value={bankAccount}
+                      onChange={(value: string) => setBankAccount(value)}
+                      options={BANK_ACCOUNT_OPTIONS}
+                      disabled={isSaving}
+                      ariaLabel="Bank account"
+                    size="md"
+                    />
+                  </div>
                 )}
                 {(refundMethod === "cheque" ||
                   refundMethod === "bank_transfer" ||

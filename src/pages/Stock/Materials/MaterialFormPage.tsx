@@ -7,11 +7,10 @@ import { Material, MaterialCategory, MaterialAppliesTo, MaterialVariant } from "
 import BackButton from "../../../components/BackButton";
 import { useSmartBack } from "../../../hooks/useSmartBack";
 import Button from "../../../components/Button";
-import {
-  FormInput,
-  FormListbox,
-  SelectOption,
-} from "../../../components/FormComponents";
+import { FormInput } from "../../../components/FormComponents";
+import PillSelect, {
+  PillSelectOption,
+} from "../../../components/PillSelect";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import {
@@ -58,17 +57,22 @@ interface HardDeleteResponse {
 }
 
 // Category options
-const categoryOptions: SelectOption[] = [
-  { id: "ingredient", name: "Ingredient" },
-  { id: "raw_material", name: "Raw Material" },
-  { id: "packing_material", name: "Packing Material" },
+const categoryOptions: ReadonlyArray<PillSelectOption<string>> = [
+  { value: "ingredient", label: "Ingredient" },
+  { value: "raw_material", label: "Raw Material" },
+  { value: "packing_material", label: "Packing Material" },
 ];
 
 // Applies to options
-const appliesToOptions: SelectOption[] = [
-  { id: "both", name: "Both (MEE & BIHUN)" },
-  { id: "mee", name: "MEE Only" },
-  { id: "bihun", name: "BIHUN Only" },
+const appliesToOptions: ReadonlyArray<PillSelectOption<string>> = [
+  { value: "both", label: "Both (MEE & BIHUN)" },
+  { value: "mee", label: "MEE Only" },
+  { value: "bihun", label: "BIHUN Only" },
+];
+
+const statusOptions: ReadonlyArray<PillSelectOption<string>> = [
+  { value: "active", label: "Active" },
+  { value: "inactive", label: "Inactive" },
 ];
 
 const MaterialFormPage: React.FC = () => {
@@ -505,24 +509,34 @@ const MaterialFormPage: React.FC = () => {
           />
 
           {/* Category */}
-          <FormListbox
-            name="category"
-            label="Category"
-            value={formData.category}
-            options={categoryOptions}
-            onChange={(value) => handleSelectChange("category", value)}
-            required
-          />
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+              Category <span className="text-red-500">*</span>
+            </label>
+            <PillSelect<string>
+              value={formData.category}
+              options={categoryOptions}
+              onChange={(value: string) => handleSelectChange("category", value)}
+              ariaLabel="Category"
+              size="md"
+            />
+          </div>
 
           {/* Applies To */}
-          <FormListbox
-            name="applies_to"
-            label="Applies To"
-            value={formData.applies_to}
-            options={appliesToOptions}
-            onChange={(value) => handleSelectChange("applies_to", value)}
-            required
-          />
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+              Applies To <span className="text-red-500">*</span>
+            </label>
+            <PillSelect<string>
+              value={formData.applies_to}
+              options={appliesToOptions}
+              onChange={(value: string) =>
+                handleSelectChange("applies_to", value)
+              }
+              ariaLabel="Applies to"
+              size="md"
+            />
+          </div>
 
           {/* Default Unit Cost */}
           <FormInput
@@ -545,16 +559,20 @@ const MaterialFormPage: React.FC = () => {
 
           {/* Active Status (only in edit mode) */}
           {isEditMode && (
-            <FormListbox
-              name="is_active"
-              label="Status"
-              value={formData.is_active ? "active" : "inactive"}
-              options={[
-                { id: "active", name: "Active" },
-                { id: "inactive", name: "Inactive" },
-              ]}
-              onChange={(value) => handleSelectChange("is_active", value === "active")}
-            />
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                Status
+              </label>
+              <PillSelect<string>
+                value={formData.is_active ? "active" : "inactive"}
+                options={statusOptions}
+                onChange={(value: string) =>
+                  handleSelectChange("is_active", value === "active")
+                }
+                ariaLabel="Status"
+                size="md"
+              />
+            </div>
           )}
         </div>
       </div>
@@ -640,14 +658,19 @@ const MaterialFormPage: React.FC = () => {
                         />
                       </td>
                       <td className="px-3 py-2">
-                        <select
-                          value={editingVariant.is_active ? "active" : "inactive"}
-                          onChange={(e) => handleVariantInputChange("is_active", e.target.value === "active")}
-                          className="w-full px-2 py-1 text-xs border border-default-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                        >
-                          <option value="active">Active</option>
-                          <option value="inactive">Inactive</option>
-                        </select>
+                        <PillSelect<string>
+                          value={
+                            editingVariant.is_active ? "active" : "inactive"
+                          }
+                          options={statusOptions}
+                          onChange={(value: string) =>
+                            handleVariantInputChange(
+                              "is_active",
+                              value === "active"
+                            )
+                          }
+                          ariaLabel="Variant status"
+                        />
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex items-center justify-center gap-1">
