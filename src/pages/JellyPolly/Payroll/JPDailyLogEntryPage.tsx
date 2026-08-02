@@ -3129,7 +3129,7 @@ const JPDailyLogEntryPage: React.FC<JPDailyLogEntryPageProps> = ({
               }
               options={SHIFT_OPTIONS}
               ariaLabel="Shift"
-              className="min-h-[34px]"
+              size="md"
             />
           </div>
 

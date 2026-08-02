@@ -241,7 +241,7 @@ const SupplierPaymentInlineSection: React.FC<SupplierPaymentInlineSectionProps> 
                 options={PAYMENT_METHOD_OPTIONS}
                 disabled={disabled}
                 ariaLabel="Payment method"
-                className="min-h-[38px]"
+                size="md"
               />
             </div>
             {draft.payment_method !== "cash" && (
@@ -257,7 +257,7 @@ const SupplierPaymentInlineSection: React.FC<SupplierPaymentInlineSectionProps> 
                   options={BANK_ACCOUNT_OPTIONS}
                   disabled={disabled}
                   ariaLabel="Bank account"
-                  className="min-h-[38px]"
+                  size="md"
                 />
               </div>
             )}

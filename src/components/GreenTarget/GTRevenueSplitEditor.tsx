@@ -320,7 +320,7 @@ const GTRevenueSplitEditor: React.FC<GTRevenueSplitEditorProps> = ({
                     ]}
                     disabled={disabled || isDisplayOnlyAccount}
                     ariaLabel={`Akaun hasil bagi baris ${index + 1}`}
-                    className="min-h-[38px]"
+                    size="md"
                   />
                 </div>
 

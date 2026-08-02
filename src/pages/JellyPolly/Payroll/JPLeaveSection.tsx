@@ -616,6 +616,7 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
                   }}
                   options={leaveTypeOptions}
                   ariaLabel="Leave type"
+                size="md"
                 />
               </div>
               <p className="-mt-2 text-xs text-default-400 dark:text-gray-500">

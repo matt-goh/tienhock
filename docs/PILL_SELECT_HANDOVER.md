@@ -1,9 +1,11 @@
 # Handover — Replacing dropdowns with pill selectors (`PillSelect`)
 
 **Date:** 2026-08-02
-**Status:** Tier 1 complete (Phases 1-4). Every leave-type and payment-method selector
-across Tien Hock, Green Target and Jelly Polly is now a pill row. **Tier 2 (§4) is the
-only backlog left.**
+**Status:** Tier 1 complete (Phases 1-4), plus two user-picked high-traffic fields in
+Phase 5 (invoice Salesman, journal entry Type). Every leave-type and payment-method
+selector across Tien Hock, Green Target and Jelly Polly is now a pill row.
+**The rest of Tier 2 (§4) is the only backlog left, and is low value — treat it as
+opt-in rather than a queue to work through.**
 
 ---
 
@@ -30,13 +32,30 @@ const OPTIONS: ReadonlyArray<PillSelectOption<LeaveType>> = [
   options={OPTIONS}
   disabled={isSaving}
   ariaLabel="Leave type"
-  className="min-h-[38px]"   // optional; helps align with adjacent inputs
+  size="md"                  // see the size rule below
 />;
 ```
 
-Props: `value`, `onChange`, `options`, `disabled?`, `ariaLabel?`, `className?`.
+Props: `value`, `onChange`, `options`, `disabled?`, `ariaLabel?`, `className?`, `size?`.
 `title` renders as a hover tooltip (used for abbreviations like `TGA`); a per-option
 `disabled` keeps an inherited-but-unselectable value visible.
+
+#### `size` — pick this before anything else
+
+| size | Style | Use for |
+| --- | --- | --- |
+| `sm` (default) | `px-2.5 py-1 text-xs`, `gap-1.5` | Data tables, per-row cells, bulk toolbars above a table, filter bars. |
+| `md` | `px-3.5 py-[7px] text-sm`, `gap-2`, `min-h-[38px]` | **Any labelled field in a form**, i.e. anything sitting beside a bordered `FormInput` / `TimeNavigator` / `FormCombobox`. |
+
+`md` exists because the first pass shipped everything at `sm`: a 26px row of `text-xs`
+pills next to 38px `text-sm` inputs reads as a lighter, different class of control and
+the form looks broken (reported on the New Invoice header, 2026-08-02). `md` matches the
+38px input height exactly, so the two columns of a form grid line up again.
+
+The split today is **37 `md` / 13 `sm`**, and the 13 are all genuinely compact: the
+daily-log and Packing Cuti leave tables (bulk + per-row) and the Material variant row.
+`size="md"` supersedes the old `className="min-h-[38px]"` alignment hack — the row class
+carries that height now, so do not pass both.
 
 ### Done so far
 
@@ -101,10 +120,20 @@ the old "Set selected" placeholder, which existed only because a dropdown cannot
 Dead after this pass, and removed from all four daily-log files: the `@headlessui/react`
 `Listbox*`/`Transition` imports, `Fragment`, `IconChevronDown` and `IconCheck`.
 
-Deliberately left as-is in these files: the Salesman `FormListbox` in both InvoiceDetails
-pages and in `InvoiceHeader` (master data), and the `disabled` prop on any control that
-did not already have one — several of these had a `disabled` gap next to their siblings,
-but adding it would be a behaviour change, not a control swap.
+**Phase 5 (2026-08-02)** — two high-traffic fields the user asked for by name, both
+previously in §5 "explicitly rejected". Both rejections were wrong for a *measured*
+reason, recorded here so they are not re-rejected:
+
+| File | What changed |
+| --- | --- |
+| `src/components/Invoice/InvoiceHeader.tsx` | Salesman. **Rejected as "master data", but the list is 4 rows.** `/api/staffs?salesmenOnly=true` selects `s.id` ONLY, filtered to unresigned staff whose `job` JSONB contains `SALESMAN` — 4 today (`AHLUNG`, `JICKSON_S`, `KILANG`, `PATRIK`), and the label falls back to the id because `name` is never selected. Short ids, one pill row. An empty `salespersonid` matches no pill, which reproduces the old `"Select Salesman..."` placeholder. This one component serves **both** the TH and JP New Invoice forms, which pass an identically-shaped `salesmen` prop — so the single edit covers "JP too". |
+| `src/pages/Accounting/JournalEntryPage.tsx` | Entry Type. **Rejected as a "long list", and it is: 14 selectable types (TH) / 11 (GT)** after `IMP` is filtered out. Made to fit by (a) labelling each pill with the CODE only and putting the full name in `title`, the `TGA`/`TGB` pattern — a 1-4 char pill is ~34-60px, so 14 pills ≈ 710px; and (b) moving the field out of the header grid onto its **own full-width row**, since a quarter column would stack them 3 deep. The remaining grid drops `grid-cols-4`→`grid-cols-3` (`lg:grid-cols-5`→`lg:grid-cols-4` when Cheque No shows). Because the code alone is cryptic, the selected type's full name is rendered beside the "Type" label. Type now reads first, which also matches cause and effect — it drives the reference prefix and whether Cheque No appears. GT inherits all of this through `<JournalEntryPage company="greentarget" />`. |
+
+Deliberately left as-is: the Salesman `FormListbox` in both InvoiceDetails pages (that is
+a *change-salesman* modal, not the entry form), `JournalEntryPage`'s `ledger_type` (still
+a long list with no short code), and the `disabled` prop on any control that did not
+already have one — several had a `disabled` gap next to their siblings, but adding it
+would be a behaviour change, not a control swap.
 
 Changelog entries added under `2026-08-02` in `src/components/ChangelogModal.tsx` — the
 pill rollout has one entry covering every converted screen; **extend that entry in later
@@ -181,7 +210,7 @@ per field — decide before starting.
 
 ---
 
-## 6. Gotchas (1-6 first pass, 7-9 Phases 2-3, 10-11 Phase 4)
+## 6. Gotchas (1-6 first pass, 7-9 Phases 2-3, 10-11 Phase 4, 12-13 Phase 5)
 
 1. **Row-click tables.** `PackingCutiEntryPage`/`JPPackingCutiEntryPage` toggle row
    selection on click and skip interactive targets via `isInteractiveClickTarget`,
@@ -190,8 +219,9 @@ per field — decide before starting.
 2. **Disabled state.** When the whole control is disabled every pill renders at
    `opacity-60`, including unselected ones — a disabled dropdown used to show only the
    chosen value. Acceptable so far, but check it on read-only screens.
-3. **Alignment.** In grid/flex rows next to inputs, pass `className="min-h-[38px]"` so
-   the pill row lines up with a 38px-tall input.
+3. **Alignment.** ~~Pass `className="min-h-[38px]"`.~~ **Superseded:** use `size="md"`,
+   which sets the height *and* the `text-sm` type scale. Height alone was not enough —
+   see the size table in §1.
 4. **Dynamic option lists.** If options are filtered by another field (JP leave types
    by `dayType`), make sure the current `value` is still present or reset it —
    a dropdown showed a blank placeholder, pills will just show nothing selected.
@@ -239,6 +269,13 @@ per field — decide before starting.
     nothing highlighted — use it for "mixed"/indeterminate bulk controls instead of
     inventing a placeholder option. Gotcha 4 still applies in the opposite direction:
     where a blank is *not* wanted, reset the value.
+12. **Count the options before rejecting a list as "master data".** Salesman looked
+    like a staff picker and is 4 rows; entry type looked enumerable and is 14. Check
+    the query, not the field's name.
+13. **Long lists can still work if the option has a short code.** Label the pill with
+    the code, put the full name in `title`, and — because a bare code is cryptic —
+    echo the selected option's full name next to the field label. A 14-pill row needs
+    full page width; do not leave it in a grid column.
 
 ---
 

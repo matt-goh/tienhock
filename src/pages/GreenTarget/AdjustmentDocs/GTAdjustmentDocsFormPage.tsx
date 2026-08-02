@@ -1449,6 +1449,7 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
                     options={PAYMENT_METHOD_OPTIONS}
                     disabled={isSaving}
                     ariaLabel="Refund method"
+                  size="md"
                   />
                 </div>
                 {refundMethod !== "cash" && (
@@ -1462,6 +1463,7 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
                       options={BANK_ACCOUNT_OPTIONS}
                       disabled={isSaving}
                       ariaLabel="Bank account"
+                    size="md"
                     />
                   </div>
                 )}

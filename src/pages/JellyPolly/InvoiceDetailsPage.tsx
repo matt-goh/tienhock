@@ -1767,6 +1767,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     onChange={handlePaymentMethodChange}
                     options={PAYMENT_METHOD_OPTIONS}
                     ariaLabel="Payment method"
+                  size="md"
                   />
                 </div>
                 {(paymentFormData.payment_method === "cheque" ||
@@ -2764,6 +2765,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   options={PAYMENT_TYPE_OPTIONS}
                   disabled={isUpdatingPaymentType}
                   ariaLabel="Payment type"
+                size="md"
                 />
               </div>
 

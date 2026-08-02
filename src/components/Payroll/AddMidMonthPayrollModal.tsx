@@ -214,7 +214,7 @@ const AddMidMonthPayrollModal: React.FC<AddMidMonthPayrollModalProps> = ({
                       }
                       options={PAYMENT_METHOD_OPTIONS}
                       ariaLabel="Payment method"
-                      className="min-h-[38px]"
+                      size="md"
                     />
                   </div>
                 </div>

@@ -2219,6 +2219,7 @@ const InvoiceDetailsPage: React.FC = () => {
                       options={PAYMENT_METHOD_OPTIONS}
                       disabled={isProcessingPayment}
                       ariaLabel="Payment method"
+                    size="md"
                     />
                   </div>
 
@@ -2233,6 +2234,7 @@ const InvoiceDetailsPage: React.FC = () => {
                         options={BANK_ACCOUNT_OPTIONS}
                         disabled={isProcessingPayment}
                         ariaLabel="Deposit to"
+                      size="md"
                       />
                     </div>
                   ) : (
@@ -2919,6 +2921,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     options={BANK_ACCOUNT_OPTIONS}
                     disabled={isConfirmingPayment}
                     ariaLabel="Deposit to"
+                  size="md"
                   />
                   <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
                     Choose the bank account for this older pending payment.
@@ -3326,6 +3329,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 options={PAYMENT_TYPE_OPTIONS}
                 disabled={isUpdatingPaymentType}
                 ariaLabel="Payment type"
+              size="md"
               />
             </div>
 

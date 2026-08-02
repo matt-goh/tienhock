@@ -661,6 +661,7 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
                     }}
                     options={GT_LEAVE_TYPES}
                     ariaLabel="Leave type"
+                  size="md"
                   />
                 </div>
                 {mode === "daily" && (
