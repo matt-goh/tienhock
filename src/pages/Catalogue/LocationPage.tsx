@@ -20,6 +20,8 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import LocationModal from "../../components/Catalogue/LocationModal";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
+import { usePersistedSearch } from "../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 
 interface JobMapping {
   job_id: string;
@@ -60,12 +62,14 @@ const LocationPage: React.FC = () => {
   const { jobs } = useJobsCache();
   const { staffs } = useStaffsCache();
 
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = usePersistedSearch("locationListSearch");
 
   // Track expanded employee lists per location
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(
     new Set()
   );
+
+  useScrollRestoration("location-list", !isLoading && locations.length > 0);
 
   // Modal states
   const [showModal, setShowModal] = useState(false);

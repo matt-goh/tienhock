@@ -24,6 +24,12 @@ import Button from "../../components/Button";
 import SalesSummarySelectionTooltip from "../../components/Sales/SalesSummarySelectionTooltip";
 import HoverTooltip from "../../components/HoverTooltip";
 import { SalesSummaryScope } from "../../utils/sales/SalesSummaryPDF";
+import {
+  reviveDate,
+  usePersistedFilters,
+  usePersistedMonth,
+} from "../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 
 interface ProductSalesData {
   id: string;
@@ -65,14 +71,6 @@ interface SalesByProductsPageProps {
   scope?: SalesSummaryScope;
 }
 
-const today = new Date();
-today.setHours(0, 0, 0, 0);
-const tomorrow = new Date(today);
-tomorrow.setDate(tomorrow.getDate() + 1);
-const currentDate = new Date();
-const currentMonth = currentDate.getMonth();
-const currentYear = currentDate.getFullYear();
-
 const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
   activeTab,
   onTabChange,
@@ -80,21 +78,29 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
 }) => {
   const isJp = scope === "jp";
   // Month derived from the time selection; drives the monthSelectionChanged event.
-  const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
-    return new Date(currentYear, currentMonth, 1);
-  });
+  const [selectedMonth, setSelectedMonth] = usePersistedMonth(
+    `salesByProductsMonth:${scope}`
+  );
   const [isGeneratingChart, setIsGeneratingChart] = useState(false);
-  const [dateRange, setDateRange] = useState<DateRange>(() => {
-    // Create start date (today)
-    const startDate = new Date();
-    startDate.setHours(0, 0, 0, 0);
+  const [dateRange, setDateRange] = usePersistedFilters<DateRange>(
+    `salesByProductsRange:${scope}`,
+    () => {
+      // Create start date (today)
+      const startDate = new Date();
+      startDate.setHours(0, 0, 0, 0);
 
-    // Create end date (today)
-    const endDate = new Date();
-    endDate.setHours(23, 59, 59, 999);
+      // Create end date (today)
+      const endDate = new Date();
+      endDate.setHours(23, 59, 59, 999);
 
-    return { start: startDate, end: endDate };
-  });
+      return { start: startDate, end: endDate };
+    },
+    (cached) => {
+      const start = reviveDate(cached?.start);
+      const end = reviveDate(cached?.end);
+      return start && end ? { start, end } : null;
+    }
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [salesData, setSalesData] = useState<ProductSalesData[]>([]);
   const [salesmanProductsData, setSalesmanProductsData] = useState<SalesmanProductSales[]>([]);
@@ -118,6 +124,11 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
   );
   const [productQuery, setProductQuery] = useState("");
   const [maxChartProducts] = useState(5); // Limit to prevent chart legend overcrowding
+
+  useScrollRestoration(
+    `sales-by-products:${scope}`,
+    !isLoading && salesData.length > 0
+  );
 
   // Dynamic category colors based on product types
   const categoryColors = useMemo(() => {

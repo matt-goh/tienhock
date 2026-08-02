@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React from "react";
 import SalesByProductsPage from "./SalesByProductsPage";
 import SalesBySalesmanPage from "./SalesBySalesmanPage";
 import { SalesSummaryScope } from "../../utils/sales/SalesSummaryPDF";
+import { usePersistedNumber } from "../../hooks/usePersistedFilters";
 
 interface SalesSummaryPageProps {
   scope?: SalesSummaryScope;
@@ -10,7 +11,14 @@ interface SalesSummaryPageProps {
 const SalesSummaryPage: React.FC<SalesSummaryPageProps> = ({
   scope = "tienhock",
 }) => {
-  const [activeTab, setActiveTab] = useState(0);
+  // Tien Hock and Jelly Polly render this page from the same component, so the
+  // selected tab is cached per scope.
+  const [activeTab, setActiveTab] = usePersistedNumber(
+    `salesSummaryTab:${scope}`,
+    0,
+    1,
+    () => 0
+  );
 
   return (
     <div className="space-y-3">

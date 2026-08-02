@@ -29,6 +29,11 @@ import {
   PinjamPDFData,
   PinjamEmployee,
 } from "../../../utils/payroll/PinjamPDF";
+import {
+  usePersistedUrlNumber,
+  usePersistedUrlSearch,
+} from "../../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 
 interface PinjamRecord {
   id: number;
@@ -97,30 +102,6 @@ const getDefaultPinjamMonth = (
   return { year: d.getFullYear(), month: d.getMonth() + 1 };
 };
 
-const getInitialPinjamPeriod = (): { year: number; month: number } => {
-  const fallbackPeriod = getDefaultPinjamMonth();
-  const params = new URLSearchParams(window.location.search);
-  const year = Number(params.get("year"));
-  const month = Number(params.get("month"));
-
-  if (
-    Number.isInteger(year) &&
-    year >= 2000 &&
-    year <= 2100 &&
-    Number.isInteger(month) &&
-    month >= 1 &&
-    month <= 12
-  ) {
-    return { year, month };
-  }
-
-  return fallbackPeriod;
-};
-
-const getInitialSearchQuery = (): string => {
-  const params = new URLSearchParams(window.location.search);
-  return params.get("search")?.trim() || "";
-};
 
 const getPinjamActivityTime = (
   record: Pick<PinjamRecord, "created_at" | "updated_at">
@@ -154,17 +135,29 @@ const PinjamListPage: React.FC = () => {
   );
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
-  // Filters
-  const [currentYear, setCurrentYear] = useState<number>(
-    () => getInitialPinjamPeriod().year
+  // Filters - a URL param wins on mount, otherwise the last values used
+  const [currentYear, setCurrentYear] = usePersistedUrlNumber(
+    "pinjamListYear",
+    "year",
+    2000,
+    2100,
+    () => getDefaultPinjamMonth().year
   );
-  const [currentMonth, setCurrentMonth] = useState<number>(
-    () => getInitialPinjamPeriod().month
+  const [currentMonth, setCurrentMonth] = usePersistedUrlNumber(
+    "pinjamListMonth",
+    "month",
+    1,
+    12,
+    () => getDefaultPinjamMonth().month
   );
-  const [searchQuery, setSearchQuery] = useState<string>(
-    getInitialSearchQuery
-  );
+  const [searchQuery, setSearchQuery] =
+    usePersistedUrlSearch("pinjamListSearch");
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  useScrollRestoration(
+    "pinjam-list",
+    !isLoading && pinjamRecords.length > 0
+  );
 
   // Month range for the TimeNavigator (the page always targets one month).
   const monthRange = useMemo(

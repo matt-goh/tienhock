@@ -23,6 +23,8 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import Button from "../../../components/Button";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import LocationModal from "../../../components/Catalogue/LocationModal";
+import { usePersistedSearch } from "../../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 
 const JP_API_BASE = "/jellypolly/api";
 
@@ -65,12 +67,16 @@ const JPLocationPage: React.FC = () => {
   const { jobs } = useJPJobsCache();
   const { staffs } = useJPStaffsCache();
 
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = usePersistedSearch(
+    "jpLocationListSearch"
+  );
 
   // Track expanded employee lists per location
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(
     new Set()
   );
+
+  useScrollRestoration("jp-location-list", !isLoading && locations.length > 0);
 
   // Modal states
   const [showModal, setShowModal] = useState(false);

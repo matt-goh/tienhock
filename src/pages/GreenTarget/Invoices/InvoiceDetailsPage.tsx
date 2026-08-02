@@ -259,6 +259,9 @@ const InvoiceDetailsPage: React.FC = () => {
   const [paymentToConfirm, setPaymentToConfirm] = useState<Payment | null>(
     null
   );
+  const [paymentClearanceDate, setPaymentClearanceDate] = useState<string>(
+    format(new Date(), "yyyy-MM-dd")
+  );
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
   const [isCancelInvoiceDialogOpen, setIsCancelInvoiceDialogOpen] =
     useState(false);
@@ -517,19 +520,19 @@ const InvoiceDetailsPage: React.FC = () => {
     validateInvoiceNumber,
   ]);
 
-  const handleEditInternalRef = (payment: Payment) => {
+  const handleEditInternalRef = (payment: Payment): void => {
     setEditingPaymentId(payment.payment_id);
     setEditedRefValue(payment.internal_reference || "");
     setRefValidation({ isValidating: false, isDuplicate: false, message: "" });
   };
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = (): void => {
     setEditingPaymentId(null);
     setEditedRefValue("");
     setRefValidation({ isValidating: false, isDuplicate: false, message: "" });
   };
 
-  const handleSaveInternalRef = async (paymentId: number) => {
+  const handleSaveInternalRef = async (paymentId: number): Promise<void> => {
     const normalizedReference = editedRefValue.trim();
     if (!normalizedReference) {
       toast.error("Green Target reference number is required.");
@@ -546,16 +549,28 @@ const InvoiceDetailsPage: React.FC = () => {
 
     setIsUpdatingPayment(true);
     try {
+      const originalPayment: Payment | undefined = payments.find(
+        (payment: Payment): boolean => payment.payment_id === paymentId
+      );
+      const expectedReference: string = String(
+        originalPayment?.internal_reference || ""
+      ).trim();
       await greenTargetApi.updatePayment(paymentId, {
         internal_reference: normalizedReference,
+        ...(expectedReference
+          ? { expected_internal_reference: expectedReference }
+          : {}),
       });
       toast.success("Green Target reference updated for the full receipt.");
       handleCancelEdit(); // Exit edit mode
-      if (id) fetchInvoiceDetails(parseInt(id)); // Refresh data
+      if (id) await fetchInvoiceDetails(parseInt(id)); // Refresh data
     } catch (error: any) {
       console.error("Failed to update payment:", error);
       const errorMessage =
-        error?.response?.data?.message || "Failed to update reference.";
+        error?.data?.message ||
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to update reference.";
       toast.error(errorMessage);
     } finally {
       setIsUpdatingPayment(false);
@@ -1201,7 +1216,7 @@ const InvoiceDetailsPage: React.FC = () => {
       await greenTargetApi.createPayment(paymentData);
 
       toast.success("Payment processed successfully");
-      fetchInvoiceDetails(invoice.invoice_id); // Refresh details
+      await fetchInvoiceDetails(invoice.invoice_id); // Refresh details
       setShowPaymentForm(false); // Close form
       // Optionally reset form fields
       setPaymentFormData({
@@ -1223,7 +1238,7 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   };
 
-  const handleCancelPayment = async () => {
+  const handleCancelPayment = async (): Promise<void> => {
     if (!paymentToCancel || !invoice) return;
 
     setIsCancellingPayment(true);
@@ -1234,7 +1249,7 @@ const InvoiceDetailsPage: React.FC = () => {
       toast.success("Receipt cancelled successfully");
 
       // Refresh the invoice details to update balances
-      fetchInvoiceDetails(invoice.invoice_id);
+      await fetchInvoiceDetails(invoice.invoice_id);
     } catch (error: any) {
       console.error("Error cancelling payment:", error);
       toast.error(
@@ -1250,27 +1265,40 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   };
 
-  const handleConfirmPaymentClick = (payment: Payment) => {
+  const handleConfirmPaymentClick = (payment: Payment): void => {
     if (payment.status !== "pending") {
       toast.error("Only pending payments can be confirmed");
       return;
     }
 
+    const today: string = format(new Date(), "yyyy-MM-dd");
+    const receivedDate: string = format(
+      new Date(payment.payment_date),
+      "yyyy-MM-dd"
+    );
     setPaymentToConfirm(payment);
+    setPaymentClearanceDate(receivedDate > today ? receivedDate : today);
     setShowConfirmPaymentDialog(true);
   };
 
-  const handleConfirmPayment = async () => {
+  const handleConfirmPayment = async (): Promise<void> => {
     if (!paymentToConfirm || !invoice) return;
+    if (!paymentClearanceDate) {
+      toast.error("Bank clearance / posting date is required");
+      return;
+    }
 
     setIsConfirmingPayment(true);
     try {
-      await greenTargetApi.confirmPayment(paymentToConfirm.payment_id);
+      await greenTargetApi.confirmPayment(
+        paymentToConfirm.payment_id,
+        paymentClearanceDate
+      );
 
       toast.success("Receipt confirmed successfully");
 
       // Refresh the invoice details to update balances
-      fetchInvoiceDetails(invoice.invoice_id);
+      await fetchInvoiceDetails(invoice.invoice_id);
     } catch (error) {
       console.error("Error confirming payment:", error);
       toast.error(
@@ -1280,6 +1308,7 @@ const InvoiceDetailsPage: React.FC = () => {
       setIsConfirmingPayment(false);
       setShowConfirmPaymentDialog(false);
       setPaymentToConfirm(null);
+      setPaymentClearanceDate(format(new Date(), "yyyy-MM-dd"));
     }
   };
 
@@ -3317,6 +3346,7 @@ const InvoiceDetailsPage: React.FC = () => {
           isCancellingPayment ? "Cancelling..." : "Cancel Receipt"
         }
         variant="danger"
+        isConfirming={isCancellingPayment}
       />
       <ConfirmationDialog
         isOpen={isCancelInvoiceDialogOpen}
@@ -3337,16 +3367,54 @@ const InvoiceDetailsPage: React.FC = () => {
       />
       <ConfirmationDialog
         isOpen={showConfirmPaymentDialog}
-        onClose={() => setShowConfirmPaymentDialog(false)}
+        onClose={() => {
+          setShowConfirmPaymentDialog(false);
+          setPaymentToConfirm(null);
+          setPaymentClearanceDate(format(new Date(), "yyyy-MM-dd"));
+        }}
         onConfirm={handleConfirmPayment}
         title="Confirm Receipt"
-        message={`Are you sure you want to confirm receipt ${
-          paymentToConfirm?.internal_reference || "for this payment"
-        }? All pending allocations under this Green Target reference will be confirmed and their invoice balances updated.`}
+        message={
+          <div className="space-y-3">
+            <p>
+              Confirm receipt {paymentToConfirm?.internal_reference || "for this payment"}?
+              All pending allocations under this Green Target reference will
+              be confirmed together.
+            </p>
+            <div>
+              <label
+                htmlFor="gt-invoice-clearance-date"
+                className="mb-1 block text-xs font-medium text-default-600 dark:text-gray-300"
+              >
+                Bank clearance / posting date
+              </label>
+              <input
+                id="gt-invoice-clearance-date"
+                type="date"
+                value={paymentClearanceDate}
+                min={
+                  paymentToConfirm?.payment_date
+                    ? format(
+                        new Date(paymentToConfirm.payment_date),
+                        "yyyy-MM-dd"
+                      )
+                    : undefined
+                }
+                onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
+                  setPaymentClearanceDate(event.target.value)
+                }
+                required
+                disabled={isConfirmingPayment}
+                className="w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+              />
+            </div>
+          </div>
+        }
         confirmButtonText={
           isConfirmingPayment ? "Confirming..." : "Confirm Receipt"
         }
         variant="default"
+        isConfirming={isConfirmingPayment}
       />
       <ConfirmationDialog
         isOpen={isDeleteInvoiceDialogOpen}

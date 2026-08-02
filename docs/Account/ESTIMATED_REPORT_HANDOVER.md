@@ -16,7 +16,8 @@ figures are the true physical counts (the keyed May/June counts were one-digit
 typos), a guarded migration corrected both rows and keyed the June Add Backs, the
 fixture/verifier were re-based onto the corrected profile, and the verifier is green
 (415 exact / 57 deltas / 0 failures). PU_MSD 540.00 final decision: no journal, ever —
-the boss absorbs it in the Add Back input.** Production still needs the migration.
+the boss absorbs it in the Add Back input.** The migration is applied to dev **and
+production** (both 2026-07-30).
 
 This doc tracks the implementation of the boss-only "Estimated P&L & Unit Cost" report
 (legacy names: "MEE/BIHUN ESTIMATED" + "ESTIMATED/COST"). It is updated at every phase
@@ -456,7 +457,7 @@ RM53 on OIL6389, the missing RM40 parked on CA_WA; Rosa re-pointed it in product
   boss's handwritten corrections — previously filed as an "alternate scenario" — were
   the true figures all along. Applied
   `dev/migrations/2026-07-30_estimated_report_jagung_stock_fixes.sql` to dev
-  (guarded, idempotent; **production pending**), keyed the June Add Backs (MEE
+  (guarded, idempotent; **also applied to production the same day**), keyed the June Add Backs (MEE
   9,658.83 / BIHUN 6,662.66), re-based the fixture and verifier onto the corrected
   profile, and re-ran green: **415 exact / 57 deltas / 0 failures**. CS JAGUNG
   22,086.00, OS JAGUNG 33,209.00, unit-cost JAGUNG usage 28,403.00, CS total
@@ -1213,8 +1214,10 @@ print itself had been generated from the same mis-keyed data (its struck totals
 why the *printed* profile used to be the parity target).
 
 Corrected by the guarded, idempotent migration
-`dev/migrations/2026-07-30_estimated_report_jagung_stock_fixes.sql` (applied to dev;
-**production pending**):
+`dev/migrations/2026-07-30_estimated_report_jagung_stock_fixes.sql` (applied to **dev and
+production**, both 2026-07-30; the `.sql` was removed after the prod run — recover with
+`git show eaaaa45c:dev/migrations/2026-07-30_estimated_report_jagung_stock_fixes.sql`,
+see [MIGRATIONS_LOG.md](../MIGRATIONS_LOG.md)):
 
 | Row | Was | Now | Evidence |
 |---|---:|---:|---|

@@ -1,16 +1,28 @@
 // src/pages/Payroll/ContributionRatesPage.tsx
 import React from "react";
-import { useSearchParams } from "react-router-dom";
 import Tab from "../../../components/Tab";
 import EPFRatesTab from "../../../components/Payroll/ContributionRates/EPFRatesTab";
 import SOCSORatesTab from "../../../components/Payroll/ContributionRates/SOCSORatesTab";
 import SIPRatesTab from "../../../components/Payroll/ContributionRates/SIPRatesTab";
 import IncomeTaxRatesTab from "../../../components/Payroll/ContributionRates/IncomeTaxRatesTab";
+import { usePersistedUrlNumber } from "../../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
+import { useContributionRatesCache } from "../../../utils/payroll/useContributionRatesCache";
 
 const ContributionRatesPage: React.FC = () => {
-  const [searchParams] = useSearchParams();
-  const tabParam = searchParams.get("tab");
-  const defaultTab = tabParam ? parseInt(tabParam, 10) : 0;
+  // A ?tab= param wins on mount, otherwise the last tab used
+  const [activeTab, setActiveTab] = usePersistedUrlNumber(
+    "contributionRatesTab",
+    "tab",
+    0,
+    3,
+    () => 0
+  );
+
+  // Reads the shared 24h rates cache purely to know when the tables have
+  // rendered, so the scroll restore isn't clamped against an empty page.
+  const { isLoading } = useContributionRatesCache();
+  useScrollRestoration("contribution-rates", !isLoading);
 
   return (
     <div className="space-y-4">
@@ -18,7 +30,8 @@ const ContributionRatesPage: React.FC = () => {
         <Tab
           labels={["EPF Rates", "SOCSO Rates", "SIP Rates", "Income Tax Rates"]}
           tabWidth="w-40"
-          defaultActiveTab={defaultTab}
+          defaultActiveTab={activeTab}
+          onTabChange={setActiveTab}
         >
           <EPFRatesTab />
           <SOCSORatesTab />

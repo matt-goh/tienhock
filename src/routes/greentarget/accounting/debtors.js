@@ -6,11 +6,9 @@
 //
 // Mounted at /greentarget/api/debtors (src/routes/index.js).
 //
-// GT has no open-item subledger (no invoices/payments tables for sales): its
-// debtor ledger is a RUNNING-BALANCE ledger imported from the legacy system.
-// The 28 trade debtors are the TD children of the DEBTOR control account.
-// Every figure below is therefore derived from greentarget.journal_entry_lines
-// anchored on greentarget.account_opening_balances (all anchors 2026-01-01):
+// GT debtor reports remain GL-backed. The 28 legacy page-1 balances are direct
+// TD controls under DEBTOR. CD_SD remains one GL control, while its named
+// sundry-debtor identity is carried separately on each receivable journal line.
 //
 //   * GET /                  — one pseudo-salesman group ("Trade Debtors") with
 //                              one pseudo-customer per TD child. B/F row for the
@@ -34,6 +32,7 @@ import {
   getMonthPeriod,
   validateYearMonth,
 } from "./report-engine.js";
+import { buildGreenTargetLegacyDebtorList } from "./trade-debtor-list.js";
 
 /** Every GT opening anchor sits on this date; the imported ledger starts here. */
 const LEGACY_LEDGER_START = "2026-01-01";
@@ -41,6 +40,9 @@ const LEGACY_LEDGER_START = "2026-01-01";
 /** Default reporting month: the last imported month (Jun 2026). */
 const DEFAULT_YEAR = 2026;
 const DEFAULT_MONTH = 6;
+
+/** CD_SD identity-level posting starts from this date onward. */
+const DEBTOR_SUBLEDGER_CUTOVER = "2026-07-01";
 
 /** Round to whole cents (same convention as report-engine.js). */
 const money = (value) => Math.round((Number(value) || 0) * 100) / 100;
@@ -55,6 +57,70 @@ const num = (value) => {
 const cents = (value) => Math.round(num(value) * 100);
 
 const pad2 = (n) => String(n).padStart(2, "0");
+
+/** @param {string} startStr Local yyyy-MM-dd month start. */
+const useDescendantAggregation = (startStr) =>
+  startStr >= DEBTOR_SUBLEDGER_CUTOVER;
+
+/**
+ * FIFO-age signed monthly net buckets into the four report buckets.
+ * @param {Map<string, number>} monthlyCents Keyed by yyyy-MM.
+ * @param {number} periodYear
+ * @param {number} periodMonth
+ */
+const ageMonthlyCents = (monthlyCents, periodYear, periodMonth) => {
+  /** @type {Array<{ key: string, amountCents: number }>} */
+  const buckets = [];
+  const monthKeys = [...monthlyCents.keys()].sort();
+
+  for (const key of monthKeys) {
+    let net = monthlyCents.get(key) || 0;
+    if (net > 0) {
+      for (const bucket of buckets) {
+        if (net <= 0) break;
+        if (bucket.amountCents >= 0) continue;
+        const used = Math.min(-bucket.amountCents, net);
+        bucket.amountCents += used;
+        net -= used;
+      }
+      if (net > 0) buckets.push({ key, amountCents: net });
+    } else if (net < 0) {
+      let remaining = -net;
+      for (const bucket of buckets) {
+        if (remaining <= 0) break;
+        if (bucket.amountCents <= 0) continue;
+        const used = Math.min(bucket.amountCents, remaining);
+        bucket.amountCents -= used;
+        remaining -= used;
+      }
+      if (remaining > 0) buckets.push({ key, amountCents: -remaining });
+    }
+  }
+
+  const ageOf = (key) => {
+    const [year, month] = key.split("-").map(Number);
+    return (periodYear - year) * 12 + (periodMonth - month);
+  };
+  let current = 0;
+  let oneMonth = 0;
+  let twoMonths = 0;
+  let threePlus = 0;
+  for (const bucket of buckets) {
+    if (bucket.amountCents === 0) continue;
+    const age = ageOf(bucket.key);
+    if (age <= 0) current += bucket.amountCents;
+    else if (age === 1) oneMonth += bucket.amountCents;
+    else if (age === 2) twoMonths += bucket.amountCents;
+    else threePlus += bucket.amountCents;
+  }
+
+  return {
+    current_month: money(current / 100),
+    one_month: money(oneMonth / 100),
+    two_months: money(twoMonths / 100),
+    three_months_plus: money(threePlus / 100),
+  };
+};
 
 /** "YYYY-MM-DD" (a to_char string, never a Date) -> "DD/MM/YYYY". */
 const toDisplayDate = (ymd) =>
@@ -84,48 +150,82 @@ export default function createGreenTargetDebtorsRouter(pool) {
   };
 
   /**
-   * All 28 TD children with their opening balance at startStr (anchor rule:
+   * All direct TD children with their opening balance at startStr (anchor rule:
    * latest anchor on/before startStr plus posted movement from the anchor to
    * startStr). Ordered by the printed Trial Balance order (sort_order).
    */
-  const fetchChildrenWithOpenings = async (startStr) => {
+  const fetchChildrenWithOpenings = async (
+    startStr,
+    includeDescendants
+  ) => {
     const result = await pool.query(
-      `WITH children AS (
+      `WITH RECURSIVE children AS (
          SELECT code, description, sort_order
            FROM greentarget.account_codes
           WHERE parent_code = 'DEBTOR'
             AND ledger_type = 'TD'
             AND is_active = true
        ),
+       account_scope AS (
+         SELECT ch.code AS root_code, ch.code AS account_code
+           FROM children ch
+         UNION
+         SELECT scope.root_code, ac.code
+           FROM account_scope scope
+           JOIN greentarget.account_codes ac
+             ON ac.parent_code = scope.account_code
+          WHERE $2::boolean
+            AND ac.ledger_type = 'TD'
+            AND ac.is_active = true
+       ),
        anchors AS (
-         SELECT DISTINCT ON (aob.account_code)
-                aob.account_code, aob.amount, aob.as_of_date
-           FROM greentarget.account_opening_balances aob
-           JOIN children ch ON ch.code = aob.account_code
+         SELECT DISTINCT ON (scope.root_code, scope.account_code)
+                scope.root_code,
+                scope.account_code,
+                aob.amount,
+                aob.as_of_date
+           FROM account_scope scope
+           JOIN greentarget.account_opening_balances aob
+             ON aob.account_code = scope.account_code
           WHERE aob.as_of_date <= $1::date
-          ORDER BY aob.account_code, aob.as_of_date DESC
+          ORDER BY scope.root_code, scope.account_code, aob.as_of_date DESC
        ),
        pre AS (
-         SELECT jel.account_code,
+         SELECT scope.root_code,
+                scope.account_code,
                 SUM(jel.debit_amount - jel.credit_amount) AS movement
-           FROM greentarget.journal_entry_lines jel
+           FROM account_scope scope
+           JOIN greentarget.journal_entry_lines jel
+             ON jel.account_code = scope.account_code
            JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
-           JOIN children ch ON ch.code = jel.account_code
-           LEFT JOIN anchors a ON a.account_code = jel.account_code
+           LEFT JOIN anchors a
+             ON a.root_code = scope.root_code
+            AND a.account_code = scope.account_code
           WHERE je.status = 'posted'
             AND je.entry_date < $1::date
             AND (a.as_of_date IS NULL OR je.entry_date >= a.as_of_date)
-          GROUP BY jel.account_code
+          GROUP BY scope.root_code, scope.account_code
+       ),
+       balances AS (
+         SELECT scope.root_code,
+                SUM(COALESCE(a.amount, 0) + COALESCE(p.movement, 0)) AS opening
+           FROM account_scope scope
+           LEFT JOIN anchors a
+             ON a.root_code = scope.root_code
+            AND a.account_code = scope.account_code
+           LEFT JOIN pre p
+             ON p.root_code = scope.root_code
+            AND p.account_code = scope.account_code
+          GROUP BY scope.root_code
        )
        SELECT ch.code,
               ch.description,
               ch.sort_order,
-              (COALESCE(a.amount, 0) + COALESCE(p.movement, 0))::numeric(14,2) AS opening
+              COALESCE(b.opening, 0)::numeric(14,2) AS opening
          FROM children ch
-         LEFT JOIN anchors a ON a.account_code = ch.code
-         LEFT JOIN pre p ON p.account_code = ch.code
+         LEFT JOIN balances b ON b.root_code = ch.code
         ORDER BY ch.sort_order ASC, ch.code ASC`,
-      [startStr]
+      [startStr, includeDescendants]
     );
     return result.rows;
   };
@@ -134,37 +234,61 @@ export default function createGreenTargetDebtorsRouter(pool) {
    * Posted TD-child ledger lines inside [startStr, endStr], in GT ledger order
    * (posting_sequence, then display_order — never a bare date sort).
    */
-  const fetchMonthLines = async (startStr, endStr) => {
+  const fetchMonthLines = async (
+    startStr,
+    endStr,
+    includeDescendants
+  ) => {
     const result = await pool.query(
-      `SELECT jel.account_code,
+      `WITH RECURSIVE children AS (
+         SELECT code
+           FROM greentarget.account_codes
+          WHERE parent_code = 'DEBTOR'
+            AND ledger_type = 'TD'
+            AND is_active = true
+       ),
+       account_scope AS (
+         SELECT ch.code AS root_code, ch.code AS account_code
+           FROM children ch
+         UNION
+         SELECT scope.root_code, ac.code
+           FROM account_scope scope
+           JOIN greentarget.account_codes ac
+             ON ac.parent_code = scope.account_code
+          WHERE $3::boolean
+            AND ac.ledger_type = 'TD'
+            AND ac.is_active = true
+       )
+       SELECT scope.root_code AS account_code,
               jel.id AS line_id,
               COALESCE(jel.display_reference, je.display_reference, je.reference_no) AS ref,
               to_char(je.entry_date, 'YYYY-MM-DD') AS entry_date,
               jel.debit_amount,
               jel.credit_amount
-         FROM greentarget.journal_entry_lines jel
+         FROM account_scope scope
+         JOIN greentarget.journal_entry_lines jel
+           ON jel.account_code = scope.account_code
          JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
-         JOIN greentarget.account_codes ac ON ac.code = jel.account_code
         WHERE je.status = 'posted'
-          AND ac.parent_code = 'DEBTOR'
           AND je.entry_date >= $1::date
           AND je.entry_date <= $2::date
           AND (jel.debit_amount > 0 OR jel.credit_amount > 0)
-        ORDER BY jel.account_code,
+        ORDER BY scope.root_code,
                  je.posting_sequence ASC NULLS LAST,
                  je.entry_date ASC,
                  je.id ASC,
                  jel.display_order ASC NULLS LAST,
                  jel.line_number ASC,
                  jel.id ASC`,
-      [startStr, endStr]
+      [startStr, endStr, includeDescendants]
     );
     return result.rows;
   };
 
   /**
-   * Monthly FIFO aging for every TD child as at the period end, rolled forward
-   * from the exact 2026-01-01 opening anchors. Each month's net movement is a
+   * Monthly FIFO aging for every direct TD child as at the period end, rolled
+   * forward from each scoped account's latest applicable anchor. Each month's
+   * net movement is a
    * signed bucket: positive nets first offset carried credit buckets, negative
    * nets consume positive buckets oldest-first, any excess crediting the
    * current month. Buckets always sum to the child's ledger close.
@@ -172,128 +296,175 @@ export default function createGreenTargetDebtorsRouter(pool) {
    * Returns a Map of account code ->
    * { current_month, one_month, two_months, three_months_plus } (RM, 2dp).
    */
-  const computeFifoAging = async (endStr, periodYear, periodMonth) => {
-    const [childrenResult, anchorResult, monthlyResult] = await Promise.all([
+  const computeFifoAging = async (
+    endStr,
+    periodYear,
+    periodMonth,
+    includeDescendants
+  ) => {
+    const [anchorResult, monthlyResult] = await Promise.all([
       pool.query(
-        `SELECT code
-           FROM greentarget.account_codes
-          WHERE parent_code = 'DEBTOR' AND ledger_type = 'TD' AND is_active = true`
+        `WITH RECURSIVE children AS (
+           SELECT code
+             FROM greentarget.account_codes
+            WHERE parent_code = 'DEBTOR'
+              AND ledger_type = 'TD'
+              AND is_active = true
+         ),
+         account_scope AS (
+           SELECT ch.code AS root_code, ch.code AS account_code
+             FROM children ch
+           UNION
+           SELECT scope.root_code, ac.code
+             FROM account_scope scope
+             JOIN greentarget.account_codes ac
+               ON ac.parent_code = scope.account_code
+            WHERE $2::boolean
+              AND ac.ledger_type = 'TD'
+              AND ac.is_active = true
+         )
+         SELECT scope.root_code,
+                scope.account_code,
+                to_char(anchor.as_of_date, 'YYYY-MM') AS anchor_month,
+                anchor.amount
+           FROM account_scope scope
+           LEFT JOIN LATERAL (
+             SELECT aob.as_of_date, aob.amount
+               FROM greentarget.account_opening_balances aob
+              WHERE aob.account_code = scope.account_code
+                AND aob.as_of_date <= $1::date
+              ORDER BY aob.as_of_date DESC
+              LIMIT 1
+           ) anchor ON true`,
+        [endStr, includeDescendants]
       ),
       pool.query(
-        `SELECT aob.account_code, SUM(aob.amount) AS amount
-           FROM greentarget.account_opening_balances aob
-           JOIN greentarget.account_codes ac ON ac.code = aob.account_code
-          WHERE ac.parent_code = 'DEBTOR'
-            AND aob.as_of_date = $1::date
-          GROUP BY aob.account_code`,
-        [LEGACY_LEDGER_START]
-      ),
-      pool.query(
-        `SELECT jel.account_code,
+        `WITH RECURSIVE children AS (
+           SELECT code
+             FROM greentarget.account_codes
+            WHERE parent_code = 'DEBTOR'
+              AND ledger_type = 'TD'
+              AND is_active = true
+         ),
+         account_scope AS (
+           SELECT ch.code AS root_code, ch.code AS account_code
+             FROM children ch
+           UNION
+           SELECT scope.root_code, ac.code
+             FROM account_scope scope
+             JOIN greentarget.account_codes ac
+               ON ac.parent_code = scope.account_code
+            WHERE $2::boolean
+              AND ac.ledger_type = 'TD'
+              AND ac.is_active = true
+         ),
+         anchored_scope AS (
+           SELECT scope.root_code,
+                  scope.account_code,
+                  anchor.as_of_date
+             FROM account_scope scope
+             LEFT JOIN LATERAL (
+               SELECT aob.as_of_date
+                 FROM greentarget.account_opening_balances aob
+                WHERE aob.account_code = scope.account_code
+                  AND aob.as_of_date <= $1::date
+                ORDER BY aob.as_of_date DESC
+                LIMIT 1
+             ) anchor ON true
+         )
+         SELECT scope.root_code,
                 EXTRACT(YEAR FROM je.entry_date)::integer AS y,
                 EXTRACT(MONTH FROM je.entry_date)::integer AS m,
                 SUM(jel.debit_amount - jel.credit_amount) AS net
-           FROM greentarget.journal_entry_lines jel
+           FROM anchored_scope scope
+           JOIN greentarget.journal_entry_lines jel
+             ON jel.account_code = scope.account_code
            JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
-           JOIN greentarget.account_codes ac ON ac.code = jel.account_code
           WHERE je.status = 'posted'
-            AND ac.parent_code = 'DEBTOR'
-            AND je.entry_date >= $1::date
-            AND je.entry_date <= $2::date
-          GROUP BY jel.account_code,
+            AND je.entry_date >= COALESCE(scope.as_of_date, $3::date)
+            AND je.entry_date <= $1::date
+          GROUP BY scope.root_code,
                    EXTRACT(YEAR FROM je.entry_date),
                    EXTRACT(MONTH FROM je.entry_date)`,
-        [LEGACY_LEDGER_START, endStr]
+        [endStr, includeDescendants, LEGACY_LEDGER_START]
       ),
     ]);
 
-    const anchorCentsByCode = new Map(
-      anchorResult.rows.map((row) => [row.account_code, cents(row.amount)])
-    );
     const monthlyByCode = new Map();
-    for (const row of monthlyResult.rows) {
-      let months = monthlyByCode.get(row.account_code);
+    for (const row of anchorResult.rows) {
+      let months = monthlyByCode.get(row.root_code);
       if (!months) {
         months = new Map();
-        monthlyByCode.set(row.account_code, months);
+        monthlyByCode.set(row.root_code, months);
       }
-      months.set(`${row.y}-${pad2(row.m)}`, cents(row.net));
+      if (row.anchor_month) {
+        months.set(
+          row.anchor_month,
+          (months.get(row.anchor_month) || 0) + cents(row.amount)
+        );
+      }
     }
-
-    const monthKeys = [];
-    for (
-      let y = 2026, m = 1;
-      y < periodYear || (y === periodYear && m <= periodMonth);
-
-    ) {
-      monthKeys.push(`${y}-${pad2(m)}`);
-      m += 1;
-      if (m === 13) {
-        y += 1;
-        m = 1;
+    for (const row of monthlyResult.rows) {
+      let months = monthlyByCode.get(row.root_code);
+      if (!months) {
+        months = new Map();
+        monthlyByCode.set(row.root_code, months);
       }
+      const key = `${row.y}-${pad2(row.m)}`;
+      months.set(key, (months.get(key) || 0) + cents(row.net));
     }
 
     const agingByCode = new Map();
-    for (const child of childrenResult.rows) {
-      const buckets = [];
-      const anchorCents = anchorCentsByCode.get(child.code) || 0;
-      if (anchorCents !== 0) {
-        buckets.push({ key: "2026-01", amountCents: anchorCents });
-      }
-      const months = monthlyByCode.get(child.code) || new Map();
-      for (const key of monthKeys) {
-        let net = months.get(key) || 0;
-        if (net > 0) {
-          // New charges first settle carried credit buckets, oldest first.
-          for (const bucket of buckets) {
-            if (net <= 0) break;
-            if (bucket.amountCents >= 0) continue;
-            const used = Math.min(-bucket.amountCents, net);
-            bucket.amountCents += used;
-            net -= used;
-          }
-          if (net > 0) buckets.push({ key, amountCents: net });
-        } else if (net < 0) {
-          // Money received consumes positive buckets oldest-first; any excess
-          // credits the current month.
-          let remaining = -net;
-          for (const bucket of buckets) {
-            if (remaining <= 0) break;
-            if (bucket.amountCents <= 0) continue;
-            const used = Math.min(bucket.amountCents, remaining);
-            bucket.amountCents -= used;
-            remaining -= used;
-          }
-          if (remaining > 0) buckets.push({ key, amountCents: -remaining });
-        }
-      }
-
-      const ageOf = (key) => {
-        const [y, m] = key.split("-").map(Number);
-        return (periodYear - y) * 12 + (periodMonth - m);
-      };
-      let current = 0;
-      let oneMonth = 0;
-      let twoMonths = 0;
-      let threePlus = 0;
-      for (const bucket of buckets) {
-        if (bucket.amountCents === 0) continue;
-        const age = ageOf(bucket.key);
-        if (age <= 0) current += bucket.amountCents;
-        else if (age === 1) oneMonth += bucket.amountCents;
-        else if (age === 2) twoMonths += bucket.amountCents;
-        else threePlus += bucket.amountCents;
-      }
-
-      agingByCode.set(child.code, {
-        current_month: money(current / 100),
-        one_month: money(oneMonth / 100),
-        two_months: money(twoMonths / 100),
-        three_months_plus: money(threePlus / 100),
-      });
+    for (const [code, months] of monthlyByCode) {
+      agingByCode.set(code, ageMonthlyCents(months, periodYear, periodMonth));
     }
     return agingByCode;
+  };
+
+  /** FIFO aging for one exact TD account, including a nested CD_SD child. */
+  const computeAccountFifoAging = async (
+    accountCode,
+    endStr,
+    periodYear,
+    periodMonth
+  ) => {
+    const anchorResult = await pool.query(
+      `SELECT to_char(aob.as_of_date, 'YYYY-MM-DD') AS anchor_date,
+              to_char(aob.as_of_date, 'YYYY-MM') AS anchor_month,
+              aob.amount
+         FROM greentarget.account_opening_balances aob
+        WHERE aob.account_code = $1
+          AND aob.as_of_date <= $2::date
+        ORDER BY aob.as_of_date DESC
+        LIMIT 1`,
+      [accountCode, endStr]
+    );
+    const anchor = anchorResult.rows[0] || null;
+    const movementStart = anchor?.anchor_date || LEGACY_LEDGER_START;
+    const monthlyResult = await pool.query(
+      `SELECT EXTRACT(YEAR FROM je.entry_date)::integer AS y,
+              EXTRACT(MONTH FROM je.entry_date)::integer AS m,
+              SUM(jel.debit_amount - jel.credit_amount) AS net
+         FROM greentarget.journal_entry_lines jel
+         JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
+        WHERE je.status = 'posted'
+          AND jel.account_code = $1
+          AND je.entry_date >= $2::date
+          AND je.entry_date <= $3::date
+        GROUP BY EXTRACT(YEAR FROM je.entry_date),
+                 EXTRACT(MONTH FROM je.entry_date)`,
+      [accountCode, movementStart, endStr]
+    );
+
+    const months = new Map();
+    if (anchor) {
+      months.set(anchor.anchor_month, cents(anchor.amount));
+    }
+    for (const row of monthlyResult.rows) {
+      const key = `${row.y}-${pad2(row.m)}`;
+      months.set(key, (months.get(key) || 0) + cents(row.net));
+    }
+    return ageMonthlyCents(months, periodYear, periodMonth);
   };
 
   // GET / - Debtors report for one month: one pseudo-salesman group holding one
@@ -306,9 +477,10 @@ export default function createGreenTargetDebtorsRouter(pool) {
 
     try {
       const { startStr, endStr } = getMonthPeriod(year, month);
+      const includeDescendants = useDescendantAggregation(startStr);
       const [children, monthLines] = await Promise.all([
-        fetchChildrenWithOpenings(startStr),
-        fetchMonthLines(startStr, endStr),
+        fetchChildrenWithOpenings(startStr, includeDescendants),
+        fetchMonthLines(startStr, endStr, includeDescendants),
       ]);
 
       const linesByCode = new Map();
@@ -424,6 +596,102 @@ export default function createGreenTargetDebtorsRouter(pool) {
     }
   });
 
+  // GET /legacy-list - One official legacy-style report payload: direct Trade
+  // Debtors for page 1 and the independently-tagged CD_SD subledger thereafter.
+  router.get("/legacy-list", async (req, res) => {
+    const period = resolvePeriod(req.query, res);
+    if (!period) return;
+    const { year, month } = period;
+    const { startStr } = getMonthPeriod(year, month);
+    if (startStr < "2026-06-01") {
+      return res.status(400).json({
+        message: "The legacy Trade Debtor List is available from June 2026 onward",
+      });
+    }
+
+    try {
+      const report = await buildGreenTargetLegacyDebtorList(pool, {
+        year,
+        month,
+        hideZero: req.query.hideZero === "1",
+      });
+      res.json(report);
+    } catch (error) {
+      console.error("Error fetching Green Target legacy debtor list:", error);
+      res.status(500).json({
+        message: "Error fetching Green Target legacy debtor list",
+        error: error.message,
+      });
+    }
+  });
+
+  // GET /sub-schedule/CD_SD - Searchable/paginated view of the same official
+  // CD_SD report section. Totals always remain the full GL control totals.
+  router.get("/sub-schedule/CD_SD", async (req, res) => {
+    const period = resolvePeriod(req.query, res);
+    if (!period) return;
+    const { year, month } = period;
+    const { startStr } = getMonthPeriod(year, month);
+    if (startStr < "2026-06-01") {
+      return res.status(400).json({
+        message: "CD_SD sub-schedule is available from June 2026 onward",
+      });
+    }
+
+    try {
+      const includeZero = req.query.includeZero === "1";
+      const hideZero = req.query.hideZero === "1" || !includeZero;
+      const report = await buildGreenTargetLegacyDebtorList(pool, {
+        year,
+        month,
+        hideZero,
+      });
+      let rows = report.cd_sd.rows;
+
+      const search = String(req.query.search || "").trim().toLowerCase();
+      if (search) {
+        rows = rows.filter(
+          (row) =>
+            row.account_no.toLowerCase().includes(search) ||
+            row.particular.toLowerCase().includes(search)
+        );
+      }
+
+      const totalAccounts = rows.length;
+      const limit = Math.min(
+        1000,
+        Math.max(1, parseInt(req.query.limit, 10) || 200)
+      );
+      const totalPages = Math.max(1, Math.ceil(totalAccounts / limit));
+      const page = Math.min(
+        totalPages,
+        Math.max(1, parseInt(req.query.page, 10) || 1)
+      );
+      rows = rows.slice((page - 1) * limit, page * limit);
+
+      res.json({
+        statement_date: report.statement_date,
+        statement_month: report.statement_month,
+        statement_year: report.statement_year,
+        rows,
+        totals: report.cd_sd.control_totals,
+        visible_totals: report.cd_sd.visible_totals,
+        reconciliation_residual: report.cd_sd.reconciliation_residual,
+        total_accounts: totalAccounts,
+        full_population: report.cd_sd.full_population,
+        page,
+        limit,
+        total_pages: totalPages,
+      });
+    } catch (error) {
+      console.error("Error fetching Green Target CD_SD sub-schedule:", error);
+      res.status(500).json({
+        message: "Error fetching Green Target CD_SD sub-schedule",
+        error: error.message,
+      });
+    }
+  });
+
   // GET /statement/:customerId - One debtor's monthly statement, built from
   // the account ledger. customerId is a TD child account code.
   router.get("/statement/:customerId", async (req, res) => {
@@ -436,10 +704,37 @@ export default function createGreenTargetDebtorsRouter(pool) {
       const { startStr, endStr } = getMonthPeriod(year, month);
       const lastDay = Number(endStr.slice(8, 10));
 
-      const ledger = await buildAccountLedger(pool, customerId, startStr, endStr);
-      if (ledger.account.parent_code !== "DEBTOR") {
+      const accountResult = await pool.query(
+        `WITH RECURSIVE lineage AS (
+           SELECT code, parent_code, ledger_type, is_active
+             FROM greentarget.account_codes
+            WHERE code = $1
+           UNION
+           SELECT parent.code,
+                  parent.parent_code,
+                  parent.ledger_type,
+                  parent.is_active
+             FROM greentarget.account_codes parent
+             JOIN lineage child ON parent.code = child.parent_code
+         )
+         SELECT EXISTS (
+                  SELECT 1
+                    FROM lineage
+                   WHERE code = $1
+                     AND ledger_type = 'TD'
+                     AND is_active = true
+                ) AS is_active_td,
+                EXISTS (
+                  SELECT 1 FROM lineage WHERE code = 'DEBTOR'
+                ) AS is_debtor_descendant`,
+        [customerId]
+      );
+      const accountCheck = accountResult.rows[0];
+      if (!accountCheck?.is_active_td || !accountCheck.is_debtor_descendant) {
         return res.status(404).json({ message: "Debtor account not found" });
       }
+
+      const ledger = await buildAccountLedger(pool, customerId, startStr, endStr);
 
       const transactions = ledger.transactions
         .filter((tx) => tx.debit > 0 || tx.credit > 0)
@@ -452,13 +747,12 @@ export default function createGreenTargetDebtorsRouter(pool) {
           running_balance: tx.balance,
         }));
 
-      const agingByCode = await computeFifoAging(endStr, year, month);
-      const aging = agingByCode.get(customerId) || {
-        current_month: 0,
-        one_month: 0,
-        two_months: 0,
-        three_months_plus: 0,
-      };
+      const aging = await computeAccountFifoAging(
+        customerId,
+        endStr,
+        year,
+        month
+      );
 
       res.json({
         customer: {
@@ -506,25 +800,51 @@ export default function createGreenTargetDebtorsRouter(pool) {
         second: "2-digit",
         hour12: false,
       });
+      const includeDescendants = useDescendantAggregation(startStr);
 
       const result = await pool.query(
-        `WITH children AS (
+        `WITH RECURSIVE children AS (
            SELECT code, description, sort_order
              FROM greentarget.account_codes
             WHERE parent_code = 'DEBTOR'
               AND ledger_type = 'TD'
               AND is_active = true
          ),
+         account_scope AS (
+           SELECT ch.code AS root_code, ch.code AS account_code
+             FROM children ch
+           UNION
+           SELECT scope.root_code, ac.code
+             FROM account_scope scope
+             JOIN greentarget.account_codes ac
+               ON ac.parent_code = scope.account_code
+            WHERE $3::boolean
+              AND ac.ledger_type = 'TD'
+              AND ac.is_active = true
+         ),
          anchors AS (
-           SELECT DISTINCT ON (aob.account_code)
-                  aob.account_code, aob.amount, aob.as_of_date
-             FROM greentarget.account_opening_balances aob
-             JOIN children ch ON ch.code = aob.account_code
+           SELECT DISTINCT ON (scope.root_code, scope.account_code)
+                  scope.root_code,
+                  scope.account_code,
+                  aob.amount,
+                  aob.as_of_date
+             FROM account_scope scope
+             JOIN greentarget.account_opening_balances aob
+               ON aob.account_code = scope.account_code
             WHERE aob.as_of_date <= $1::date
-            ORDER BY aob.account_code, aob.as_of_date DESC
+            ORDER BY scope.root_code, scope.account_code, aob.as_of_date DESC
+         ),
+         anchor_totals AS (
+           SELECT scope.root_code,
+                  SUM(COALESCE(a.amount, 0)) AS amount
+             FROM account_scope scope
+             LEFT JOIN anchors a
+               ON a.root_code = scope.root_code
+              AND a.account_code = scope.account_code
+            GROUP BY scope.root_code
          ),
          movement AS (
-           SELECT jel.account_code,
+           SELECT scope.root_code,
                   SUM(CASE WHEN je.entry_date < $1::date
                             AND (a.as_of_date IS NULL OR je.entry_date >= a.as_of_date)
                            THEN jel.debit_amount - jel.credit_amount ELSE 0 END) AS pre_movement,
@@ -534,12 +854,15 @@ export default function createGreenTargetDebtorsRouter(pool) {
                            THEN jel.credit_amount ELSE 0 END) AS payment,
                   SUM(CASE WHEN je.entry_date >= $1::date AND je.entry_date <= $2::date
                            THEN jel.debit_amount - jel.credit_amount ELSE 0 END) AS period_net
-             FROM greentarget.journal_entry_lines jel
+             FROM account_scope scope
+             JOIN greentarget.journal_entry_lines jel
+               ON jel.account_code = scope.account_code
              JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
-             JOIN children ch ON ch.code = jel.account_code
-             LEFT JOIN anchors a ON a.account_code = jel.account_code
+             LEFT JOIN anchors a
+               ON a.root_code = scope.root_code
+              AND a.account_code = scope.account_code
             WHERE je.status = 'posted' AND je.entry_date <= $2::date
-            GROUP BY jel.account_code
+            GROUP BY scope.root_code
          )
          SELECT ch.code,
                 ch.description,
@@ -549,13 +872,18 @@ export default function createGreenTargetDebtorsRouter(pool) {
                 (COALESCE(a.amount, 0) + COALESCE(m.pre_movement, 0)
                  + COALESCE(m.period_net, 0))::numeric(14,2) AS total_due
            FROM children ch
-           LEFT JOIN anchors a ON a.account_code = ch.code
-           LEFT JOIN movement m ON m.account_code = ch.code
+           LEFT JOIN anchor_totals a ON a.root_code = ch.code
+           LEFT JOIN movement m ON m.root_code = ch.code
           ORDER BY ch.sort_order ASC, ch.code ASC`,
-        [startStr, endStr]
+        [startStr, endStr, includeDescendants]
       );
 
-      const agingByCode = await computeFifoAging(endStr, year, month);
+      const agingByCode = await computeFifoAging(
+        endStr,
+        year,
+        month,
+        includeDescendants
+      );
 
       // Totals aggregate the FULL population, including zero-close debtors
       // (same legacy behaviour as TH).
@@ -602,13 +930,27 @@ export default function createGreenTargetDebtorsRouter(pool) {
         return customer;
       });
 
-      // The printed body lists only nonzero closes; includeZero=1 (the
-      // interactive By Customer view) returns the full population with
-      // server-side search, zero-balance filter and pagination.
+      // A row is hidden only when every printed amount is zero, so a debtor
+      // with in-month activity remains visible even when it closes at zero.
+      // includeZero=1 lets the interactive view request the full population.
+      /**
+       * @param {{
+       *   bal_bf: number,
+       *   current_invoices: number,
+       *   payment: number,
+       *   total_due: number
+       * }} customer
+       * @returns {boolean}
+       */
+      const hasAnyPrintedAmount = (customer) =>
+        Math.abs(customer.bal_bf) > 0.005 ||
+        Math.abs(customer.current_invoices) > 0.005 ||
+        Math.abs(customer.payment) > 0.005 ||
+        Math.abs(customer.total_due) > 0.005;
       let customers =
         req.query.includeZero === "1"
           ? allCustomers
-          : allCustomers.filter((c) => Math.abs(c.total_due) > 0.005);
+          : allCustomers.filter(hasAnyPrintedAmount);
 
       let totalCustomers = customers.length;
       let page = 1;
@@ -622,7 +964,7 @@ export default function createGreenTargetDebtorsRouter(pool) {
           );
         }
         if (req.query.hideZero === "1") {
-          customers = customers.filter((c) => Math.abs(c.total_due) > 0.005);
+          customers = customers.filter(hasAnyPrintedAmount);
         }
         totalCustomers = customers.length;
         if (req.query.page || req.query.limit) {
