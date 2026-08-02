@@ -2337,6 +2337,50 @@ fixture does not cover cheque confirmation, concurrent requests, duplicate-refer
 real fixture commit. Those paths remain covered structurally by the receipt service but are explicit
 test limitations, not known posting defects.
 
+#### Replay corrections to the GT-P5 runbook (2 Aug 2026, measured on a full dev rebuild)
+
+Dev was refreshed from a production dump, so the whole 30-Jul → 1-Aug sequence was replayed from the
+pre-GT-P1 state. Three defects in the runbook above were found and are corrected here. **Read this
+before running GT-P5 against production.**
+
+1. **`2026-07-31_greentarget_erp_ledger_reconciliation.sql` is missing from the numbered steps.** It
+   must run **between** step 2 (`cd_sd_subledger`) and step 3 (`july_debtor_decisions`): it supplies
+   the 13 exact-name customer links, and without them `july_debtor_decisions` aborts with
+   `invoice still on the CD_SD control` for every July invoice whose customer has no default.
+2. **Steps 4 and 5 must run against pre-GT-P9 code.** The shipped services
+   (`sales-journal.js`, `payment-journal.js`, `account-codes.js`) now resolve every debtor through
+   `greentarget.debtor_subledger_registry`, but that table is created by
+   `2026-08-01_greentarget_debtor_dimension.sql`, which in turn requires the 752 GL child shells and
+   the post-backfill journal state. The circle is broken exactly as the original dev history did it —
+   run the journal steps on the pre-P9 tree, then restore HEAD:
+
+   ```bash
+   git checkout de09f185 -- src/routes/greentarget dev/import/greentarget-legacy
+   node dev/import/greentarget-legacy/backfill-july-automatic-journals.mjs --apply-safe
+   # ... erp_ledger_reconciliation.sql, july_debtor_decisions.sql ...
+   node dev/import/greentarget-legacy/apply-july-lifecycle-decisions.mjs --apply
+   node dev/import/greentarget-legacy/backfill-july-automatic-journals.mjs --apply
+   git checkout HEAD -- src/routes/greentarget dev/import/greentarget-legacy
+   ```
+
+   The correct full order is: parity → cd_sd_subledger → *(pre-P9 code)* backfill `--apply-safe` →
+   erp_ledger_reconciliation → july_debtor_decisions → lifecycle `--apply` → backfill `--apply` →
+   *(HEAD code)* debtor_dimension → invoice_revenue_splits → the four verifiers.
+3. **Two dataset pins were replaced by real invariants**, because both would have failed production:
+   - `debtor_dimension`'s July-money guard pinned six RM constants from the old dev dataset. It now
+     captures TD movement, `PBB_1` movement and TD close **before** the rewrite and asserts they are
+     identical **after**, plus the evidenced RM65,705.40 control anchor. The dev replay carried one
+     extra live July invoice (347 `2026/01131`, FOREGAL, RM200) and the old constants rejected it.
+   - `verify-import.mjs` / `verify-chart.mjs` / `verify-import.sql` pinned
+     `public.account_codes = 2,827`. That table is **not** structural — `debtorSync` adds a `DEBTOR`
+     child per new Tien Hock customer — so it is now a floor, matching the existing
+     `public.journal_entries` treatment. `public.financial_statement_notes` stays an equality.
+
+Post-replay dev state: 780 registry identities (779 selectable), 752 shells retired, all live July
+documents own a posted journal, and all four suites are green — **66 + 59 + 35 + 21 gates**, with
+`verify-import.mjs` still comparing all 2,844 printed per-account figures. Both 1-Aug migrations were
+re-run as clean idempotent no-ops.
+
 ---
 
 *Update this file with a per-phase execution record as phases complete. Entry point for all

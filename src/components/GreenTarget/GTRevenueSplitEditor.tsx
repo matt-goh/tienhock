@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useMemo, useRef } from "react";
 import { IconPlus, IconTrash } from "@tabler/icons-react";
 import Button from "../Button";
+import PillSelect, { PillSelectOption } from "../PillSelect";
 import { toCents, toDollars } from "../../utils/moneyUtils";
 import type {
   GreenTargetRevenueAccountCode,
@@ -12,19 +13,19 @@ const REVENUE_ACCOUNTS: ReadonlyArray<{
   code: GreenTargetRevenueAccountCode;
   label: string;
 }> = [
-  { code: "TGA", label: "TGA - Tong A / general rental income" },
-  { code: "TGB", label: "TGB - Tong B rental income" },
-  { code: "WS_OTH", label: "WS_OTH - Other sales" },
+  { code: "TGA", label: "TGA - Sewa tong A / hasil sewa am" },
+  { code: "TGB", label: "TGB - Hasil sewa tong B" },
+  { code: "WS_OTH", label: "WS_OTH - Jualan lain" },
 ];
 
 const REVENUE_ACCOUNT_LABELS: Record<
   GreenTargetRevenueSplitAccountCode,
   string
 > = {
-  TGA: "TGA - Tong A / general rental income",
-  TGB: "TGB - Tong B rental income",
-  WS_OTH: "WS_OTH - Other sales",
-  WS_OTH4: "WS_OTH4 - Inherited legacy other sales",
+  TGA: "TGA - Sewa tong A / hasil sewa am",
+  TGB: "TGB - Hasil sewa tong B",
+  WS_OTH: "WS_OTH - Jualan lain",
+  WS_OTH4: "WS_OTH4 - Jualan lain (rekod lama)",
 };
 
 const safeCents = (amount: number): number =>
@@ -75,7 +76,7 @@ const GTRevenueSplitEditor: React.FC<GTRevenueSplitEditorProps> = ({
   className = "",
   allowedAccounts,
   displayOnlyAccounts = [],
-  totalLabel = "Invoice total",
+  totalLabel = "Jumlah invois",
 }) => {
   const editorId: string = useId();
   const selectableRevenueAccounts: ReadonlyArray<{
@@ -246,11 +247,11 @@ const GTRevenueSplitEditor: React.FC<GTRevenueSplitEditorProps> = ({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-sm font-medium text-default-800 dark:text-gray-100">
-            Revenue allocation
+            Agihan hasil
           </p>
           <p className="text-xs text-default-500 dark:text-gray-400">
-            Add separate lines when one invoice belongs to more than one
-            revenue account.
+            Tambah baris berasingan apabila satu invois melibatkan lebih
+            daripada satu akaun hasil.
           </p>
         </div>
         <Button
@@ -263,7 +264,7 @@ const GTRevenueSplitEditor: React.FC<GTRevenueSplitEditorProps> = ({
           onClick={addSplit}
           disabled={disabled || !defaultSelectableAccount}
         >
-          Add split
+          Tambah baris
         </Button>
       </div>
 
@@ -282,42 +283,45 @@ const GTRevenueSplitEditor: React.FC<GTRevenueSplitEditorProps> = ({
                 className="grid grid-cols-[minmax(0,1fr)_minmax(8rem,0.6fr)_2rem] items-end gap-2"
               >
                 <div className="space-y-1">
-                  <label
-                    htmlFor={`${editorId}-account-${index}`}
-                    className="block text-xs font-medium text-default-600 dark:text-gray-300"
-                  >
-                    Account {index + 1}
-                  </label>
-                  <select
-                    id={`${editorId}-account-${index}`}
+                  <span className="block text-xs font-medium text-default-600 dark:text-gray-300">
+                    Akaun {index + 1}
+                  </span>
+                  <PillSelect<GreenTargetRevenueSplitAccountCode>
                     value={split.account_code}
-                    onChange={(
-                      event: React.ChangeEvent<HTMLSelectElement>
-                    ): void =>
+                    onChange={(accountCode): void =>
                       updateAccount(
                         index,
-                        event.target.value as GreenTargetRevenueAccountCode
+                        accountCode as GreenTargetRevenueAccountCode
                       )
                     }
+                    options={[
+                      // An inherited account that can no longer be chosen (e.g.
+                      // WS_OTH4) stays visible as a selected, unselectable pill.
+                      ...(hasSelectableCurrentAccount
+                        ? []
+                        : [
+                            {
+                              value: split.account_code,
+                              label: split.account_code,
+                              title: REVENUE_ACCOUNT_LABELS[split.account_code],
+                              disabled: true,
+                            },
+                          ]),
+                      ...selectableRevenueAccounts.map(
+                        (account: {
+                          code: GreenTargetRevenueAccountCode;
+                          label: string;
+                        }): PillSelectOption<GreenTargetRevenueSplitAccountCode> => ({
+                          value: account.code,
+                          label: account.code,
+                          title: account.label,
+                        })
+                      ),
+                    ]}
                     disabled={disabled || isDisplayOnlyAccount}
-                    className="block w-full rounded-lg border border-default-300 bg-white px-2.5 py-2 text-sm text-default-800 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-                  >
-                    {!hasSelectableCurrentAccount && (
-                      <option value={split.account_code} disabled>
-                        {REVENUE_ACCOUNT_LABELS[split.account_code]}
-                      </option>
-                    )}
-                    {selectableRevenueAccounts.map(
-                      (account: {
-                        code: GreenTargetRevenueAccountCode;
-                        label: string;
-                      }): React.ReactNode => (
-                        <option key={account.code} value={account.code}>
-                          {account.label}
-                        </option>
-                      )
-                    )}
-                  </select>
+                    ariaLabel={`Akaun hasil bagi baris ${index + 1}`}
+                    className="min-h-[38px]"
+                  />
                 </div>
 
                 <div className="space-y-1">
@@ -325,7 +329,7 @@ const GTRevenueSplitEditor: React.FC<GTRevenueSplitEditorProps> = ({
                     htmlFor={`${editorId}-amount-${index}`}
                     className="block text-xs font-medium text-default-600 dark:text-gray-300"
                   >
-                    Amount
+                    Amaun
                   </label>
                   <div className="relative">
                     <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-xs text-default-500 dark:text-gray-400">
@@ -357,11 +361,11 @@ const GTRevenueSplitEditor: React.FC<GTRevenueSplitEditorProps> = ({
                   type="button"
                   onClick={(): void => removeSplit(index)}
                   disabled={disabled || splits.length <= 1}
-                  aria-label={`Remove revenue split ${index + 1}`}
+                  aria-label={`Buang baris hasil ${index + 1}`}
                   title={
                     splits.length <= 1
-                      ? "At least one revenue split is required"
-                      : "Remove revenue split"
+                      ? "Sekurang-kurangnya satu baris hasil diperlukan"
+                      : "Buang baris hasil"
                   }
                   className="inline-flex h-9 w-8 items-center justify-center rounded-lg text-default-400 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-30 dark:text-gray-500 dark:hover:bg-rose-900/20 dark:hover:text-rose-300"
                 >
@@ -376,7 +380,7 @@ const GTRevenueSplitEditor: React.FC<GTRevenueSplitEditorProps> = ({
       <div className="mt-3 grid grid-cols-3 gap-2 rounded-lg bg-default-50 px-3 py-2 text-xs dark:bg-gray-900/40">
         <div>
           <span className="block text-default-500 dark:text-gray-400">
-            Allocated
+            Telah diagih
           </span>
           <span className="font-medium tabular-nums text-default-800 dark:text-gray-100">
             {formatCents(allocatedCents)}
@@ -392,7 +396,7 @@ const GTRevenueSplitEditor: React.FC<GTRevenueSplitEditorProps> = ({
         </div>
         <div>
           <span className="block text-default-500 dark:text-gray-400">
-            Remaining
+            Baki
           </span>
           <span className={`font-semibold tabular-nums ${balanceClasses}`}>
             {formatCents(remainingCents)}
@@ -403,10 +407,10 @@ const GTRevenueSplitEditor: React.FC<GTRevenueSplitEditorProps> = ({
       {!isBalanced && (
         <p className={`mt-2 text-xs ${balanceClasses}`} role="status">
           {hasEmptyAmount
-            ? "Enter an amount greater than RM 0.00 for every revenue line."
+            ? "Masukkan amaun melebihi RM 0.00 bagi setiap baris hasil."
             : remainingCents < 0
-            ? "Revenue allocation exceeds the invoice total."
-            : "Allocate the remaining invoice amount before saving."}
+            ? "Agihan hasil melebihi jumlah yang perlu diagih."
+            : "Agihkan baki jumlah tersebut sebelum menyimpan."}
         </p>
       )}
     </div>

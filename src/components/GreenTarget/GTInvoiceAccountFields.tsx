@@ -1,19 +1,13 @@
 import React, {
-  Fragment,
+  forwardRef,
+  useCallback,
   useEffect,
+  useImperativeHandle,
   useMemo,
+  useRef,
   useState,
 } from "react";
-import {
-  Dialog,
-  DialogPanel,
-  DialogTitle,
-  Transition,
-  TransitionChild,
-} from "@headlessui/react";
-import { IconPlus, IconX } from "@tabler/icons-react";
-import toast from "react-hot-toast";
-import Button from "../Button";
+import Checkbox from "../Checkbox";
 import { FormCombobox, SelectOption } from "../FormComponents";
 import { api } from "../../routes/utils/api";
 import type {
@@ -30,14 +24,34 @@ export const GT_DEFAULT_REVENUE_ACCOUNT: GTRevenueAccountCode = "TGA";
 const DEBTOR_SUBLEDGER_ENDPOINT =
   "/greentarget/api/account-codes/debtor-subledger";
 const DEBTOR_SEARCH_LIMIT = 50;
+const IDENTITY_CODE_PREFIX = "CD-";
+const MAX_IDENTITY_CODE_LENGTH = 50;
+
+/**
+ * The keyed convention for a new counter customer is `CD-` plus the first word
+ * of its name (CD-MS, CD-DCH, CD-ENRICH, CD-ZEXIE). It is only a starting
+ * point: the field stays editable and the code is checked for a collision
+ * before the invoice is saved.
+ */
+export const deriveGTIdentityCode = (
+  customerName: string | null | undefined
+): string => {
+  const words = String(customerName || "")
+    .toUpperCase()
+    .split(/[^A-Z0-9]+/)
+    .filter((word: string): boolean => word.length > 0);
+  if (words.length === 0) return "";
+  const stem = words[0].length > 1 ? words[0] : words.join("");
+  return `${IDENTITY_CODE_PREFIX}${stem}`.slice(0, MAX_IDENTITY_CODE_LENGTH);
+};
 
 const identityLabel = (
   identity: GreenTargetDebtorSubledgerIdentity
 ): string =>
-  `${identity.code} - ${identity.description} (posts to ${identity.control_account_code})`;
+  `${identity.code} - ${identity.description} (masuk ke ${identity.control_account_code})`;
 
 const errorMessage = (error: unknown): string => {
-  if (!error || typeof error !== "object") return "Unknown error";
+  if (!error || typeof error !== "object") return "Ralat tidak diketahui";
   const candidate = error as {
     message?: string;
     data?: { message?: string; error?: string };
@@ -49,7 +63,7 @@ const errorMessage = (error: unknown): string => {
     candidate.data?.message ||
     candidate.data?.error ||
     candidate.message ||
-    "Unknown error"
+    "Ralat tidak diketahui"
   );
 };
 
@@ -62,6 +76,26 @@ const mergeIdentities = (
   });
   return Array.from(byCode.values());
 };
+
+type CodeAvailability =
+  | { state: "idle" }
+  | { state: "checking" }
+  | { state: "available" }
+  | { state: "taken"; takenBy: string };
+
+/**
+ * Imperative surface the invoice screens use at save time. A staged identity is
+ * written only when the user actually submits the invoice, so abandoning the
+ * form never leaves an unused name in the Trade Debtors sub-schedule.
+ */
+export interface GTInvoiceAccountFieldsHandle {
+  /**
+   * Creates the staged CD/SD identity when one is pending and resolves to the
+   * debtor code the invoice must be saved with. Rejects with a user-facing
+   * message when the identity cannot be resolved or created.
+   */
+  ensureDebtorIdentity: () => Promise<string>;
+}
 
 interface GTInvoiceAccountFieldsProps {
   customerId: number | null;
@@ -80,22 +114,28 @@ interface GTInvoiceAccountFieldsProps {
   variant?: "panel" | "plain";
 }
 
-const GTInvoiceAccountFields: React.FC<GTInvoiceAccountFieldsProps> = ({
-  customerId,
-  customerName = null,
-  customerDefaultCode,
-  debtorAccountCode,
-  onDebtorChange,
-  dateIssued,
-  invoiceTotal,
-  revenueSplits,
-  onRevenueSplitsChange,
-  disabled = false,
-  debtorDisabled = false,
-  revenueDisabled = false,
-  customerDefaultLoading = false,
-  variant = "panel",
-}) => {
+const GTInvoiceAccountFields = forwardRef<
+  GTInvoiceAccountFieldsHandle,
+  GTInvoiceAccountFieldsProps
+>(function GTInvoiceAccountFields(
+  {
+    customerId,
+    customerName = null,
+    customerDefaultCode,
+    debtorAccountCode,
+    onDebtorChange,
+    dateIssued,
+    invoiceTotal,
+    revenueSplits,
+    onRevenueSplitsChange,
+    disabled = false,
+    debtorDisabled = false,
+    revenueDisabled = false,
+    customerDefaultLoading = false,
+    variant = "panel",
+  }: GTInvoiceAccountFieldsProps,
+  ref: React.ForwardedRef<GTInvoiceAccountFieldsHandle>
+) {
   const [debtorQuery, setDebtorQuery] = useState<string>("");
   const [searchResults, setSearchResults] = useState<
     GreenTargetDebtorSubledgerIdentity[]
@@ -107,17 +147,59 @@ const GTInvoiceAccountFields: React.FC<GTInvoiceAccountFieldsProps> = ({
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [searchFailed, setSearchFailed] = useState<boolean>(false);
 
-  const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false);
+  // A new identity is staged in the form and only written on save.
+  const [isCreatingNewIdentity, setIsCreatingNewIdentity] =
+    useState<boolean>(false);
   const [newCode, setNewCode] = useState<string>("");
   const [newDescription, setNewDescription] = useState<string>("");
+  const [codeAvailability, setCodeAvailability] = useState<CodeAvailability>({
+    state: "idle",
+  });
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState<boolean>(false);
+
+  const identityLocked: boolean =
+    disabled || debtorDisabled || customerDefaultLoading;
 
   useEffect((): void => {
     if (!debtorAccountCode && customerDefaultCode) {
       onDebtorChange(customerDefaultCode);
     }
   }, [customerDefaultCode, debtorAccountCode, onDebtorChange]);
+
+  // Decide once per customer whether this invoice needs a new identity. A
+  // customer that already has a saved default never gets the creation form.
+  const initialisedKeyRef = useRef<string | null>(null);
+  useEffect((): void => {
+    if (customerDefaultLoading) return;
+    const key = `${customerId ?? ""}|${customerDefaultCode ?? ""}`;
+    if (initialisedKeyRef.current === key) return;
+    initialisedKeyRef.current = key;
+
+    const hasIdentity: boolean =
+      Boolean(String(customerDefaultCode || "").trim()) ||
+      Boolean(String(debtorAccountCode || "").trim());
+    setIsCreatingNewIdentity(
+      Boolean(customerId) && !hasIdentity && !debtorDisabled
+    );
+    setNewCode(deriveGTIdentityCode(customerName));
+    setNewDescription(String(customerName || "").trim());
+    setCreateError(null);
+  }, [
+    customerDefaultCode,
+    customerDefaultLoading,
+    customerId,
+    customerName,
+    debtorAccountCode,
+    debtorDisabled,
+  ]);
+
+  // A resolved identity always wins over a staged one: an invoice being edited
+  // can load its saved debtor code after its customer id, and the customer's
+  // default arrives asynchronously.
+  useEffect((): void => {
+    if (String(debtorAccountCode || "").trim()) setIsCreatingNewIdentity(false);
+  }, [debtorAccountCode]);
 
   useEffect((): (() => void) => {
     let isCurrent = true;
@@ -185,7 +267,10 @@ const GTInvoiceAccountFields: React.FC<GTInvoiceAccountFieldsProps> = ({
         setSelectedIdentity(exactIdentity);
         setSelectedIdentityUnavailable(exactIdentity === null);
       } catch (selectedError: unknown) {
-        console.error("Failed to load selected GT debtor identity:", selectedError);
+        console.error(
+          "Failed to load selected GT debtor identity:",
+          selectedError
+        );
         if (isCurrent) {
           setSelectedIdentity(null);
           setSelectedIdentityUnavailable(false);
@@ -198,6 +283,49 @@ const GTInvoiceAccountFields: React.FC<GTInvoiceAccountFieldsProps> = ({
       isCurrent = false;
     };
   }, [dateIssued, debtorAccountCode]);
+
+  // Advisory collision check on the prefilled code. The server still rejects a
+  // duplicate, but the user should see it before pressing save.
+  useEffect((): (() => void) => {
+    const code = newCode.trim().toUpperCase();
+    if (!isCreatingNewIdentity || !code) {
+      setCodeAvailability({ state: "idle" });
+      return (): void => undefined;
+    }
+
+    let isCurrent = true;
+    setCodeAvailability({ state: "checking" });
+    const timer = window.setTimeout((): void => {
+      const checkCode = async (): Promise<void> => {
+        try {
+          const params = new URLSearchParams({ search: code, limit: "20" });
+          const rows = await api.get<GreenTargetDebtorSubledgerIdentity[]>(
+            `${DEBTOR_SUBLEDGER_ENDPOINT}?${params.toString()}`
+          );
+          if (!isCurrent) return;
+          const clash =
+            rows.find(
+              (row: GreenTargetDebtorSubledgerIdentity): boolean =>
+                row.code.toUpperCase() === code
+            ) || null;
+          setCodeAvailability(
+            clash
+              ? { state: "taken", takenBy: clash.description }
+              : { state: "available" }
+          );
+        } catch (checkError: unknown) {
+          console.error("Failed to check GT identity code:", checkError);
+          if (isCurrent) setCodeAvailability({ state: "idle" });
+        }
+      };
+      void checkCode();
+    }, 300);
+
+    return (): void => {
+      isCurrent = false;
+      window.clearTimeout(timer);
+    };
+  }, [isCreatingNewIdentity, newCode]);
 
   const identities: GreenTargetDebtorSubledgerIdentity[] = useMemo(
     (): GreenTargetDebtorSubledgerIdentity[] =>
@@ -220,37 +348,52 @@ const GTInvoiceAccountFields: React.FC<GTInvoiceAccountFieldsProps> = ({
     );
     if (
       debtorAccountCode &&
-      !options.some((option: SelectOption): boolean => option.id === debtorAccountCode)
+      !options.some(
+        (option: SelectOption): boolean => option.id === debtorAccountCode
+      )
     ) {
       options.unshift({
         id: debtorAccountCode,
-        name: `${debtorAccountCode} - selected identity`,
+        name: `${debtorAccountCode} - identiti dipilih`,
       });
     }
     return options;
   }, [debtorAccountCode, identities]);
 
-  const openCreateIdentity = (): void => {
-    setNewCode("");
-    setNewDescription(customerName?.trim() || "");
+  const toggleCreateIdentity = (checked: boolean): void => {
+    setIsCreatingNewIdentity(checked);
     setCreateError(null);
-    setIsCreateOpen(true);
+    if (checked) {
+      onDebtorChange("");
+      if (!newCode.trim()) setNewCode(deriveGTIdentityCode(customerName));
+      if (!newDescription.trim()) {
+        setNewDescription(String(customerName || "").trim());
+      }
+    }
   };
 
-  const closeCreateIdentity = (): void => {
-    if (!isCreating) setIsCreateOpen(false);
-  };
+  const ensureDebtorIdentity = useCallback(async (): Promise<string> => {
+    if (!isCreatingNewIdentity) {
+      const existingCode = String(debtorAccountCode || "").trim();
+      if (!existingCode) {
+        throw new Error(
+          "Pilih identiti penghutang untuk invois ini, atau tandakan Cipta identiti CD/SD baharu."
+        );
+      }
+      return existingCode;
+    }
 
-  const createIdentity = async (): Promise<void> => {
-    const code = newCode.trim();
+    const code = newCode.trim().toUpperCase();
     const description = newDescription.trim();
     if (!code || !description) {
-      setCreateError("Code and description are required.");
-      return;
+      const message = "Kod dan nama identiti diperlukan.";
+      setCreateError(message);
+      throw new Error(message);
     }
     if (!dateIssued) {
-      setCreateError("Select the invoice date before creating an identity.");
-      return;
+      const message = "Pilih tarikh invois sebelum mencipta identiti.";
+      setCreateError(message);
+      throw new Error(message);
     }
 
     setIsCreating(true);
@@ -269,95 +412,176 @@ const GTInvoiceAccountFields: React.FC<GTInvoiceAccountFieldsProps> = ({
       setSearchResults((current: GreenTargetDebtorSubledgerIdentity[]) =>
         mergeIdentities([identity, ...current])
       );
+      setIsCreatingNewIdentity(false);
       onDebtorChange(identity.code);
-      setDebtorQuery("");
-      setIsCreateOpen(false);
-      toast.success(`CD/SD identity ${identity.code} created`);
+      return identity.code;
     } catch (creationError: unknown) {
       const message = errorMessage(creationError);
       setCreateError(message);
+      throw new Error(message);
     } finally {
       setIsCreating(false);
     }
-  };
+  }, [
+    dateIssued,
+    debtorAccountCode,
+    isCreatingNewIdentity,
+    newCode,
+    newDescription,
+    onDebtorChange,
+  ]);
+
+  useImperativeHandle(
+    ref,
+    (): GTInvoiceAccountFieldsHandle => ({ ensureDebtorIdentity }),
+    [ensureDebtorIdentity]
+  );
 
   const selectedControlAccount = selectedIdentity?.control_account_code || null;
   const selectionUnavailable =
     selectedIdentityUnavailable ||
     (selectedIdentity !== null && !selectedIdentity.is_selectable);
 
+  const previewCode: string = newCode.trim().toUpperCase();
+
   const body: React.ReactNode = (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-        <FormCombobox
-          name="debtor_account_code"
-          label="Trade Debtor Identity"
-          value={debtorAccountCode || undefined}
-          onChange={(selected: string | string[] | null): void => {
-            onDebtorChange(typeof selected === "string" ? selected : "");
-            setDebtorQuery("");
-          }}
-          options={identityOptions}
-          query={debtorQuery}
-          setQuery={setDebtorQuery}
-          placeholder={
-            isSearching
-              ? "Searching debtor identities..."
-              : "Search debtor code or customer name..."
-          }
-          disabled={disabled || debtorDisabled || customerDefaultLoading}
-          required
-          mode="single"
-          maxVisibleOptions={DEBTOR_SEARCH_LIMIT}
+      <div>
+        <span className="block text-sm font-medium text-default-700 dark:text-gray-200">
+          Identiti Penghutang <span className="text-rose-500">*</span>
+        </span>
+        <Checkbox
+          checked={isCreatingNewIdentity}
+          onChange={toggleCreateIdentity}
+          disabled={identityLocked || isCreating || !customerId}
+          size={18}
+          className="mt-2"
+          label="Cipta identiti CD/SD baharu untuk pelanggan ini"
         />
-        <Button
-          type="button"
-          variant="outline"
-          color="sky"
-          size="sm"
-          icon={IconPlus}
-          iconSize={15}
-          onClick={openCreateIdentity}
-          disabled={
-            disabled || debtorDisabled || customerDefaultLoading || !customerId || !dateIssued
-          }
-          className="mb-0.5 whitespace-nowrap"
-        >
-          Create CD/SD Identity
-        </Button>
       </div>
 
-      <div className="min-h-5 text-xs">
-        {customerDefaultLoading ? (
-          <span className="text-default-500 dark:text-gray-400">
-            Loading the customer's default identity...
-          </span>
-        ) : debtorAccountCode ? (
-          <span
-            className={
-              selectionUnavailable
-                ? "text-rose-700 dark:text-rose-300"
-                : "text-default-600 dark:text-gray-300"
+      {isCreatingNewIdentity ? (
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
+            <div>
+              <label
+                htmlFor="gt-new-debtor-code"
+                className="block text-xs font-medium text-default-600 dark:text-gray-300"
+              >
+                Kod Identiti
+              </label>
+              <input
+                id="gt-new-debtor-code"
+                type="text"
+                value={newCode}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
+                  setNewCode(event.target.value.toUpperCase())
+                }
+                maxLength={MAX_IDENTITY_CODE_LENGTH}
+                disabled={identityLocked || isCreating}
+                placeholder="cth. CD-PELANGGANBAHARU"
+                className="mt-1 block w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="gt-new-debtor-description"
+                className="block text-xs font-medium text-default-600 dark:text-gray-300"
+              >
+                Nama dalam jadual penghutang (Trade Debtors)
+              </label>
+              <input
+                id="gt-new-debtor-description"
+                type="text"
+                value={newDescription}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
+                  setNewDescription(event.target.value)
+                }
+                maxLength={255}
+                disabled={identityLocked || isCreating}
+                className="mt-1 block w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100"
+              />
+            </div>
+          </div>
+
+          <div className="min-h-5 text-xs">
+            {codeAvailability.state === "taken" ? (
+              <span className="text-rose-700 dark:text-rose-300">
+                {previewCode} sudah digunakan oleh {codeAvailability.takenBy}.
+                Sila ubah kod sebelum menyimpan.
+              </span>
+            ) : (
+              <span className="text-default-600 dark:text-gray-300">
+                {previewCode || "Identiti ini"} akan dicipta semasa menyimpan,
+                berkuat kuasa {dateIssued || "tarikh invois"}, dan masuk ke
+                CD_SD dalam lejar am.
+                {codeAvailability.state === "available" && " Kod ini kosong."}
+              </span>
+            )}
+          </div>
+
+          {createError && (
+            <p className="text-sm text-rose-700 dark:text-rose-300">
+              {createError}
+            </p>
+          )}
+        </div>
+      ) : (
+        <div>
+          <FormCombobox
+            name="debtor_account_code"
+            label=""
+            value={debtorAccountCode || undefined}
+            onChange={(selected: string | string[] | null): void => {
+              onDebtorChange(typeof selected === "string" ? selected : "");
+              setDebtorQuery("");
+            }}
+            options={identityOptions}
+            query={debtorQuery}
+            setQuery={setDebtorQuery}
+            placeholder={
+              isSearching
+                ? "Mencari identiti penghutang..."
+                : "Cari kod penghutang atau nama pelanggan..."
             }
-          >
-            {selectionUnavailable
-              ? `${debtorAccountCode} is not selectable for the invoice date.`
-              : selectedControlAccount
-              ? `${debtorAccountCode} posts to ${selectedControlAccount} in the general ledger.`
-              : `Resolving where ${debtorAccountCode} posts in the general ledger...`}
-          </span>
-        ) : (
-          <span className="text-amber-700 dark:text-amber-300">
-            Select or create the customer identity that must appear in the
-            Trade Debtors sub-schedule.
-          </span>
-        )}
-        {searchFailed && (
-          <span className="ml-2 text-rose-700 dark:text-rose-300">
-            Identity search could not be loaded.
-          </span>
-        )}
-      </div>
+            disabled={identityLocked}
+            mode="single"
+            maxVisibleOptions={DEBTOR_SEARCH_LIMIT}
+          />
+
+          <div className="min-h-5 text-xs">
+            {customerDefaultLoading ? (
+              <span className="text-default-500 dark:text-gray-400">
+                Memuatkan identiti lalai pelanggan...
+              </span>
+            ) : debtorAccountCode ? (
+              <span
+                className={
+                  selectionUnavailable
+                    ? "text-rose-700 dark:text-rose-300"
+                    : "text-default-600 dark:text-gray-300"
+                }
+              >
+                {selectionUnavailable
+                  ? `${debtorAccountCode} tidak boleh dipilih untuk tarikh invois ini.`
+                  : selectedControlAccount
+                  ? `${debtorAccountCode} masuk ke ${selectedControlAccount} dalam lejar am.`
+                  : `Menentukan ke mana ${debtorAccountCode} masuk dalam lejar am...`}
+              </span>
+            ) : (
+              <span className="text-amber-700 dark:text-amber-300">
+                Pilih identiti pelanggan yang perlu dipaparkan dalam jadual
+                penghutang (Trade Debtors).
+              </span>
+            )}
+            {searchFailed && (
+              <span className="ml-2 text-rose-700 dark:text-rose-300">
+                Carian identiti tidak dapat dimuatkan.
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       <GTRevenueSplitEditor
         totalAmount={invoiceTotal}
@@ -368,175 +592,22 @@ const GTInvoiceAccountFields: React.FC<GTInvoiceAccountFieldsProps> = ({
     </div>
   );
 
+  if (variant === "plain") return <>{body}</>;
+
   return (
-    <>
-      {variant === "plain" ? (
-        body
-      ) : (
-        <div className="rounded-lg border border-sky-200 bg-sky-50/60 p-4 dark:border-sky-900 dark:bg-sky-950/20">
-          <div className="mb-3">
-            <h2 className="text-sm font-semibold text-default-800 dark:text-gray-100">
-              Accounting
-            </h2>
-            <p className="text-xs text-default-500 dark:text-gray-400">
-              Choose the Trade Debtors identity and allocate the invoice total
-              to its revenue journal lines.
-            </p>
-          </div>
-          {body}
-        </div>
-      )}
-
-      <Transition appear show={isCreateOpen} as={Fragment}>
-        <Dialog as="div" className="relative z-[70]" onClose={closeCreateIdentity}>
-          <TransitionChild
-            as={Fragment}
-            enter="ease-out duration-200"
-            enterFrom="opacity-0"
-            enterTo="opacity-100"
-            leave="ease-in duration-150"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
-            <div className="fixed inset-0 bg-black/40" />
-          </TransitionChild>
-
-          <div className="fixed inset-0 overflow-y-auto">
-            <div className="flex min-h-full items-center justify-center p-4">
-              <TransitionChild
-                as={Fragment}
-                enter="ease-out duration-200"
-                enterFrom="opacity-0 scale-95"
-                enterTo="opacity-100 scale-100"
-                leave="ease-in duration-150"
-                leaveFrom="opacity-100 scale-100"
-                leaveTo="opacity-0 scale-95"
-              >
-                <DialogPanel
-                  className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl dark:bg-gray-800"
-                  onKeyDown={(event: React.KeyboardEvent<HTMLDivElement>): void => {
-                    if (
-                      event.key === "Enter" &&
-                      !isCreating &&
-                      newCode.trim() &&
-                      newDescription.trim()
-                    ) {
-                      event.preventDefault();
-                      void createIdentity();
-                    }
-                  }}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <DialogTitle className="text-base font-semibold text-default-900 dark:text-gray-100">
-                        Create CD/SD Identity
-                      </DialogTitle>
-                      <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
-                        This name will appear in the Trade Debtors sub-schedule
-                        and will post to the CD_SD control account.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={closeCreateIdentity}
-                      disabled={isCreating}
-                      aria-label="Close create identity dialog"
-                      className="rounded-lg p-1 text-default-400 hover:bg-default-100 hover:text-default-700 disabled:opacity-50 dark:hover:bg-gray-700 dark:hover:text-gray-200"
-                    >
-                      <IconX size={18} />
-                    </button>
-                  </div>
-
-                  <div className="mt-4 space-y-4">
-                    <div>
-                      <label
-                        htmlFor="gt-new-debtor-code"
-                        className="block text-sm font-medium text-default-700 dark:text-gray-200"
-                      >
-                        Identity Code <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        id="gt-new-debtor-code"
-                        type="text"
-                        value={newCode}
-                        onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
-                          setNewCode(event.target.value.toUpperCase())
-                        }
-                        maxLength={50}
-                        disabled={isCreating}
-                        placeholder="e.g. CD-NEWCUSTOMER"
-                        className="mt-1 block w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="gt-new-debtor-description"
-                        className="block text-sm font-medium text-default-700 dark:text-gray-200"
-                      >
-                        Customer / Identity Name{" "}
-                        <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        id="gt-new-debtor-description"
-                        type="text"
-                        value={newDescription}
-                        onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
-                          setNewDescription(event.target.value)
-                        }
-                        maxLength={255}
-                        disabled={isCreating}
-                        className="mt-1 block w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-                      />
-                    </div>
-
-                    <div className="rounded-lg bg-default-50 px-3 py-2 text-xs dark:bg-gray-900/40">
-                      <span className="text-default-500 dark:text-gray-400">
-                        Effective from
-                      </span>
-                      <span className="ml-2 font-medium text-default-800 dark:text-gray-100">
-                        {dateIssued || "Select the invoice date first"}
-                      </span>
-                    </div>
-
-                    {createError && (
-                      <p className="text-sm text-rose-700 dark:text-rose-300">
-                        {createError}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="mt-5 flex justify-end gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={closeCreateIdentity}
-                      disabled={isCreating}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="filled"
-                      color="sky"
-                      size="sm"
-                      onClick={(): void => {
-                        void createIdentity();
-                      }}
-                      disabled={isCreating || !newCode.trim() || !newDescription.trim()}
-                    >
-                      {isCreating ? "Creating..." : "Create and Select"}
-                    </Button>
-                  </div>
-                </DialogPanel>
-              </TransitionChild>
-            </div>
-          </div>
-        </Dialog>
-      </Transition>
-    </>
+    <div className="rounded-lg border border-sky-200 bg-sky-50/60 p-4 dark:border-sky-900 dark:bg-sky-950/20">
+      <div className="mb-3">
+        <h2 className="text-sm font-semibold text-default-800 dark:text-gray-100">
+          Perakaunan
+        </h2>
+        <p className="text-xs text-default-500 dark:text-gray-400">
+          Pilih identiti penghutang dan agihkan jumlah invois kepada baris
+          jurnal hasilnya.
+        </p>
+      </div>
+      {body}
+    </div>
   );
-};
+});
 
 export default GTInvoiceAccountFields;

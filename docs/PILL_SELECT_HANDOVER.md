@@ -182,12 +182,25 @@ per field — decide before starting.
 
 ---
 
-## 7. Related open item (same area, different task)
+## 7. Related — Bahasa Melayu translation (done 2026-08-02)
 
-`src/components/GreenTarget/GTInvoiceAccountFields.tsx` was translated to **Bahasa
-Melayu** on 2026-08-02. The revenue allocation box rendered inside that same panel
-comes from `GTRevenueSplitEditor.tsx` and is **still English** ("Revenue allocation",
-"Add split", "Account 1", "Amount", "Allocated / Invoice total / Remaining", and the
-balance warnings). Translating it also affects the GT Credit/Debit Note form, which
-passes `totalLabel="Adjustment total"`. Awaiting the user's decision — ask before
-doing it.
+Translated on the user's instruction:
+
+- `src/components/GreenTarget/GTInvoiceAccountFields.tsx` — whole panel.
+- `src/components/GreenTarget/GTRevenueSplitEditor.tsx` — whole box, including the
+  `TGA`/`TGB`/`WS_OTH` tooltip descriptions and the default `totalLabel`
+  ("Jumlah invois").
+- `src/pages/GreenTarget/AdjustmentDocs/GTAdjustmentDocsFormPage.tsx:1380` —
+  `totalLabel="Jumlah pelarasan"`.
+- `src/routes/greentarget/accounting/account-codes.js` — the **`POST
+  /debtor-subledger`** validation / duplicate / failure messages (the only consumer is
+  the "Cipta Identiti CD/SD" dialog).
+
+**Known mixed-language state:** the GT Credit/Debit Note form
+(`GTAdjustmentDocsFormPage.tsx`) is otherwise English, so its revenue allocation box is
+now BM inside an English page — see the explanatory paragraph at L1345-1364, which was
+deliberately left alone. If that page is translated later, start there. The rest of the
+GT invoice form outside the Accounting panel is also still English.
+
+`console.error` logs and the `error: error.message` field (raw PostgreSQL text) stay
+English by design; the frontend prefers `message`, so users see the BM string.

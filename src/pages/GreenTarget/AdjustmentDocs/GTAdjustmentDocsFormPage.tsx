@@ -1377,7 +1377,7 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
                   disabled={isSaving || isFullValueMixedAdjustment}
                   allowedAccounts={selectableOriginalRevenueAccounts}
                   displayOnlyAccounts={displayOnlyOriginalRevenueAccounts}
-                  totalLabel="Adjustment total"
+                  totalLabel="Jumlah pelarasan"
                 />
               </div>
             )}
