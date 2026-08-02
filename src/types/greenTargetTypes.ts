@@ -173,6 +173,10 @@ export interface CreateGreenTargetPaymentBatchInput {
   payment_reference: string | null;
   internal_reference: string;
   allocations: GreenTargetPaymentAllocationInput[];
+  // Join an existing receipt header instead of opening a new one. The header
+  // owns the banking event, so the date, method and cheque/transaction
+  // reference sent alongside are ignored by the server.
+  receipt_id?: number;
 }
 
 export interface UpdateGreenTargetPaymentReferencesInput {

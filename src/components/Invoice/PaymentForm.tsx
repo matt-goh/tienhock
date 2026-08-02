@@ -1,7 +1,12 @@
 // src/components/Invoice/PaymentForm.tsx
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { format } from "date-fns";
-import { IconX, IconTrash } from "@tabler/icons-react";
+import {
+  IconAlertTriangle,
+  IconLoader2,
+  IconTrash,
+  IconX,
+} from "@tabler/icons-react";
 import Button from "../../components/Button";
 import Checkbox from "../../components/Checkbox";
 import { FormInput, FormListbox } from "../../components/FormComponents";
@@ -56,6 +61,34 @@ interface PaymentFormData {
 
 interface PaymentCreationResult {
   isOverpayment?: boolean;
+}
+
+interface PaymentReferenceUsageRow {
+  payment_id: number;
+  invoice_id: string;
+  payment_date: string;
+  amount_paid: number | string;
+  payment_method: string;
+  customerid?: string | null;
+}
+
+interface ReceiptReferenceUsageRow {
+  id: number;
+  display_reference: string;
+  received_date: string;
+  payment_method: string;
+  status: string;
+  total_amount: number;
+  allocation_count: number;
+}
+
+interface PaymentReferenceUsage {
+  reference: string;
+  count: number;
+  // Tien Hock groups payments under a receipt; Jelly Polly has stand-alone
+  // payment rows. Exactly one of these is populated.
+  payments?: PaymentReferenceUsageRow[];
+  receipts?: ReceiptReferenceUsageRow[];
 }
 
 interface ReceiptPaymentAllocation {
@@ -219,7 +252,17 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   >(null);
   const [importedReconciliation, setImportedReconciliation] =
     useState<ImportedPaymentReconciliationState | null>(null);
+  // Jelly Polly has no receipt header to group payments under, so a re-used
+  // reference cannot be "joined" to anything. It is reported with the payments
+  // already carrying it and must be confirmed before saving.
+  const [referenceUsage, setReferenceUsage] =
+    useState<PaymentReferenceUsage | null>(null);
+  const [isCheckingReference, setIsCheckingReference] =
+    useState<boolean>(false);
+  const [confirmedDuplicateReference, setConfirmedDuplicateReference] =
+    useState<string | null>(null);
   const invoiceRequestIdRef = useRef<number>(0);
+  const referenceRequestIdRef = useRef<number>(0);
 
   const [formData, setFormData] = useState<PaymentFormData>(() => ({
     payment_date: getInitialPaymentDate(initialValues?.payment_date),
@@ -296,6 +339,66 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       }
     }
   }, [apiEndpoint, invoiceDateRange, invoicesEndpoint]);
+
+  // Debounced "is this reference already in use?" check. Tien Hock looks at
+  // receipts (its reference is repeatable, so a match is reported, never
+  // forbidden) and Jelly Polly at payments on other invoices; both must be
+  // acknowledged before saving so a mis-keyed reference cannot pass silently.
+  useEffect((): (() => void) => {
+    const reference: string = formData.payment_reference.trim();
+    const requestId: number = referenceRequestIdRef.current + 1;
+    referenceRequestIdRef.current = requestId;
+
+    // A reference group is an existing group the user deliberately opened this
+    // form from, so its reference is expected to match and is not a warning.
+    if (referenceGroup) {
+      setReferenceUsage(null);
+      setIsCheckingReference(false);
+      return (): void => undefined;
+    }
+
+    if (!reference) {
+      setReferenceUsage(null);
+      setIsCheckingReference(false);
+      return (): void => undefined;
+    }
+
+    setIsCheckingReference(true);
+    const usageEndpoint: string = useGroupedReceipt
+      ? `/api/receipts/by-reference/${encodeURIComponent(reference)}`
+      : `${apiEndpoint}/reference-usage/${encodeURIComponent(reference)}`;
+    const timeoutId: number = window.setTimeout((): void => {
+      void api
+        .get<PaymentReferenceUsage>(usageEndpoint)
+        .then((usage: PaymentReferenceUsage): void => {
+          if (referenceRequestIdRef.current !== requestId) return;
+          setReferenceUsage(usage && usage.count > 0 ? usage : null);
+        })
+        .catch((error: unknown): void => {
+          // A failed check must not block recording a payment: the server still
+          // rejects a same-invoice duplicate on save.
+          console.error("Error checking the payment reference:", error);
+          if (referenceRequestIdRef.current !== requestId) return;
+          setReferenceUsage(null);
+        })
+        .finally((): void => {
+          if (referenceRequestIdRef.current === requestId) {
+            setIsCheckingReference(false);
+          }
+        });
+    }, 400);
+
+    return (): void => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [apiEndpoint, formData.payment_reference, referenceGroup, useGroupedReceipt]);
+
+  // The confirmation is stored as the reference it was given for, so editing
+  // the reference always requires a fresh decision.
+  const trimmedPaymentReference: string = formData.payment_reference.trim();
+  const isDuplicateReferenceConfirmed: boolean =
+    confirmedDuplicateReference !== null &&
+    confirmedDuplicateReference === trimmedPaymentReference;
 
   // Fetch unpaid invoices
   useEffect(() => {
@@ -506,6 +609,17 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       return;
     }
 
+    if (isCheckingReference) {
+      toast.error("Wait for the payment reference check to finish");
+      return;
+    }
+    if (referenceUsage && !isDuplicateReferenceConfirmed) {
+      toast.error(
+        "Confirm that this reference really is the same transfer, or use a different one"
+      );
+      return;
+    }
+
     // Check for ALL overpayments
     const overpaymentInvoices = selectedInvoices.filter(
       ({ invoice, amountToPay }) => amountToPay > invoice.balance_due
@@ -607,6 +721,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             payment_reference: paymentReference || undefined,
             bank_account: formData.payment_method === 'cash' ? 'CASH' : formData.bank_account,
             notes: notes || undefined,
+            // The user has seen which other invoices carry this reference and
+            // confirmed it is the same transfer.
+            confirm_duplicate_reference: isDuplicateReferenceConfirmed
+              ? true
+              : undefined,
           });
           results.push(result);
         }
@@ -908,6 +1027,90 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                     disabled={isSubmitting || Boolean(referenceGroup)}
                     required={selectedInvoices.length > 1}
                   />
+                  {isCheckingReference && (
+                    <div className="flex items-center gap-2 text-xs text-default-500 dark:text-gray-400">
+                      <IconLoader2 size={14} className="animate-spin" />
+                      Checking this reference number...
+                    </div>
+                  )}
+                  {referenceUsage && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
+                      <div className="flex items-start gap-2">
+                        <IconAlertTriangle
+                          size={16}
+                          className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                            Reference {referenceUsage.reference} is already used
+                            by {referenceUsage.count}{" "}
+                            {useGroupedReceipt ? "receipt" : "payment"}
+                            {referenceUsage.count === 1 ? "" : "s"}.
+                          </p>
+                          <ul className="mt-2 space-y-1 text-xs text-amber-800 dark:text-amber-200">
+                            {(referenceUsage.receipts || []).map(
+                              (
+                                usage: ReceiptReferenceUsageRow
+                              ): React.ReactNode => (
+                                <li key={usage.id}>
+                                  {formatCurrency(usage.total_amount)} on{" "}
+                                  {format(
+                                    new Date(usage.received_date),
+                                    "dd/MM/yyyy"
+                                  )}{" "}
+                                  — {usage.allocation_count} invoice
+                                  {usage.allocation_count === 1 ? "" : "s"}
+                                  {usage.status === "pending"
+                                    ? " (pending cheque)"
+                                    : ""}
+                                </li>
+                              )
+                            )}
+                            {(referenceUsage.payments || []).map(
+                              (
+                                usage: PaymentReferenceUsageRow
+                              ): React.ReactNode => (
+                                <li key={usage.payment_id}>
+                                  Invoice {usage.invoice_id}
+                                  {usage.customerid
+                                    ? ` (${usage.customerid})`
+                                    : ""}{" "}
+                                  — {formatCurrency(Number(usage.amount_paid))}{" "}
+                                  on{" "}
+                                  {format(
+                                    new Date(usage.payment_date),
+                                    "dd/MM/yyyy"
+                                  )}
+                                </li>
+                              )
+                            )}
+                          </ul>
+                          <div className="mt-3">
+                            <Checkbox
+                              checked={isDuplicateReferenceConfirmed}
+                              onChange={(checked: boolean): void =>
+                                setConfirmedDuplicateReference(
+                                  checked ? trimmedPaymentReference : null
+                                )
+                              }
+                              disabled={isSubmitting}
+                              size={18}
+                              label={
+                                useGroupedReceipt
+                                  ? "This is a separate banking event — record another receipt under the same reference"
+                                  : "This is the same transfer — record it under the same reference"
+                              }
+                            />
+                          </div>
+                          <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                            {useGroupedReceipt
+                              ? "Adding these invoices to the existing receipt is not available yet, so this creates a second receipt that shares the reference."
+                              : "Each invoice keeps its own payment record; they are only linked by this reference."}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <FormInput
                     name="notes"
                     label="Notes (Optional)"
@@ -1277,7 +1480,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
               <Button
                 type="submit"
                 color="sky"
-                disabled={isSubmitting || selectedInvoices.length === 0}
+                disabled={
+                  isSubmitting ||
+                  selectedInvoices.length === 0 ||
+                  isCheckingReference ||
+                  (referenceUsage !== null && !isDuplicateReferenceConfirmed)
+                }
               >
                 {isSubmitting ? "Processing..." : "Record Payment"}
               </Button>

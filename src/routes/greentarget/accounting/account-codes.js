@@ -195,6 +195,77 @@ export default function createGreenTargetAccountCodesRouter(pool) {
     }
   });
 
+  // GET /debtor-subledger/availability?code=CD-X - Exact-match collision check
+  // for an identity the invoice form is staging. The search endpoint above
+  // cannot answer this: it filters is_active/is_selectable, never looks at
+  // account_codes, and its ILIKE window can crowd the exact match out. This
+  // mirrors the POST's rules exactly - same format validation, same UNION over
+  // both tables with no status filter - so what the user is told while typing
+  // is what the save will do. Advisory only; POST remains the enforcement.
+  router.get("/debtor-subledger/availability", async (req, res) => {
+    const normalizedCode =
+      typeof req.query.code === "string" ? req.query.code.trim().toUpperCase() : "";
+
+    if (!normalizedCode) {
+      return res.status(400).json({ message: "Kod identiti diperlukan" });
+    }
+    if (
+      normalizedCode.length > MAX_ACCOUNT_CODE_LENGTH ||
+      !ACCOUNT_CODE_PATTERN.test(normalizedCode) ||
+      RESERVED_ACCOUNT_CODES.has(normalizedCode)
+    ) {
+      return res.json({
+        code: normalizedCode,
+        available: false,
+        reason: "invalid",
+        message:
+          "Masukkan kod CD/SD yang sah menggunakan huruf, nombor, ruang, sengkang, garis bawah atau titik",
+      });
+    }
+
+    try {
+      // The registry is ranked first so the clash is reported with the name the
+      // user actually sees in the Trade Debtors schedule.
+      const result = await pool.query(
+        `SELECT description, source
+           FROM (
+             SELECT description, 'identity'::text AS source, 0 AS rank
+               FROM greentarget.debtor_subledger_registry
+              WHERE UPPER(BTRIM(code)) = $1
+             UNION ALL
+             SELECT description, 'account'::text AS source, 1 AS rank
+               FROM greentarget.account_codes
+              WHERE UPPER(BTRIM(code)) = $1
+           ) AS matches
+          ORDER BY rank
+          LIMIT 1`,
+        [normalizedCode]
+      );
+
+      if (result.rows.length === 0) {
+        return res.json({ code: normalizedCode, available: true });
+      }
+
+      const clash = result.rows[0];
+      res.json({
+        code: normalizedCode,
+        available: false,
+        reason: "taken",
+        taken_by: clash.description,
+        source: clash.source,
+      });
+    } catch (error) {
+      console.error(
+        "Error checking Green Target debtor identity availability:",
+        error
+      );
+      res.status(500).json({
+        message: "Ralat semasa menyemak kod identiti penghutang",
+        error: error.message,
+      });
+    }
+  });
+
   router.post("/debtor-subledger", async (req, res) => {
     const body =
       req.body && typeof req.body === "object" && !Array.isArray(req.body)

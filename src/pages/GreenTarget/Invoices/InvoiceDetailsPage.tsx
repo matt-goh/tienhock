@@ -57,6 +57,12 @@ import { generateGTPDFFilename } from "../../../utils/greenTarget/PDF/generateGT
 import { pdf, Document } from "@react-pdf/renderer";
 import { generateQRDataUrl } from "../../../utils/invoice/einvoice/generateQRCode";
 import GTInvoiceAdjustmentDocsSection from "../../../components/AdjustmentDocs/GTInvoiceAdjustmentDocsSection";
+import GTReceiptJoinPanel, {
+  type GTReceiptJoinConfirmation,
+  type GTReceiptJoinLookupState,
+  useGTReceiptJoinConfirmation,
+  useGTReceiptJoinLookup,
+} from "../../../components/GreenTarget/GTReceiptJoinPanel";
 import { formatLocationDisplay } from "../../../utils/greenTarget/formatLocationDisplay";
 import GreenTargetReceiptDetailsDialog from "../../../components/GreenTarget/GreenTargetReceiptDetailsDialog";
 import type {
@@ -102,6 +108,14 @@ const toLocalDateString = (value: string): string => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return format(date, "yyyy-MM-dd");
+};
+
+// A receipt's stored date is a timestamp, so it must go through date-fns
+// rather than an ISO substring, which would land on the previous day in KL.
+const toLocalDateInputValue = (value: string | null): string => {
+  if (!value) return "";
+  const parsed: Date = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? "" : format(parsed, "yyyy-MM-dd");
 };
 
 const getPaymentDateRange = (value: string): TimeRange => {
@@ -255,6 +269,18 @@ const InvoiceDetailsPage: React.FC = () => {
     internal_reference: "",
   });
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  // Re-using a Green Target reference here means this invoice is being settled
+  // by a receipt that already exists, so the same offer-to-join flow as the
+  // invoice form applies. The invoice id also answers the "that receipt
+  // already pays this invoice" rule.
+  const paymentReceiptLookup: GTReceiptJoinLookupState = useGTReceiptJoinLookup(
+    paymentFormData.internal_reference,
+    showPaymentForm,
+    invoice?.invoice_id
+  );
+  const paymentReceiptJoin: GTReceiptJoinConfirmation =
+    useGTReceiptJoinConfirmation(paymentReceiptLookup);
+  const joinedPaymentReceipt = paymentReceiptJoin.confirmedReceipt;
   const [isCancelPaymentDialogOpen, setIsCancelPaymentDialogOpen] =
     useState(false);
   const [paymentToCancel, setPaymentToCancel] = useState<Payment | null>(null);
@@ -1153,7 +1179,19 @@ const InvoiceDetailsPage: React.FC = () => {
   };
 
   const validatePaymentForm = (): boolean => {
-    if (!paymentFormData.payment_date) {
+    if (paymentReceiptLookup.isLooking) {
+      toast.error("Wait for the Green Target reference check to finish.");
+      return false;
+    }
+    if (paymentReceiptLookup.receipt && !joinedPaymentReceipt) {
+      toast.error(
+        paymentReceiptLookup.joinable
+          ? "Confirm that this payment belongs to the existing receipt."
+          : "This Green Target reference cannot accept another payment."
+      );
+      return false;
+    }
+    if (!paymentFormData.payment_date && !joinedPaymentReceipt) {
       toast.error("Payment date is required");
       return false;
     }
@@ -1209,13 +1247,25 @@ const InvoiceDetailsPage: React.FC = () => {
     setIsProcessingPayment(true);
 
     try {
+      // A joined receipt owns the banking event: its date, method and cheque /
+      // transaction reference are sent back as they are and the server ignores
+      // them in favour of the header anyway.
       const paymentData: CreateGreenTargetPaymentInput = {
         invoice_id: invoice.invoice_id,
         amount_paid: paymentFormData.amount_paid,
-        payment_date: paymentFormData.payment_date,
-        payment_method: paymentFormData.payment_method,
-        payment_reference: paymentFormData.payment_reference.trim() || null,
+        payment_date: joinedPaymentReceipt
+          ? toLocalDateInputValue(joinedPaymentReceipt.received_date)
+          : paymentFormData.payment_date,
+        payment_method: joinedPaymentReceipt
+          ? joinedPaymentReceipt.payment_method
+          : paymentFormData.payment_method,
+        payment_reference: joinedPaymentReceipt
+          ? joinedPaymentReceipt.payment_reference || null
+          : paymentFormData.payment_reference.trim() || null,
         internal_reference: paymentFormData.internal_reference.trim(),
+        ...(joinedPaymentReceipt
+          ? { receipt_id: joinedPaymentReceipt.receipt_id }
+          : {}),
       };
 
       await greenTargetApi.createPayment(paymentData);
@@ -1835,9 +1885,14 @@ const InvoiceDetailsPage: React.FC = () => {
     );
   }
 
-  // Find the selected payment method option for display
+  // Find the selected payment method option for display. A joined receipt owns
+  // the method, so the form shows the receipt's rather than the keyed one.
+  const effectivePaymentMethod: GreenTargetPayment["payment_method"] =
+    joinedPaymentReceipt
+      ? joinedPaymentReceipt.payment_method
+      : paymentFormData.payment_method;
   const selectedPaymentMethod = paymentMethodOptions.find(
-    (option) => option.id === paymentFormData.payment_method
+    (option) => option.id === effectivePaymentMethod
   );
   const paymentMethodDisplayValue = selectedPaymentMethod
     ? selectedPaymentMethod.name
@@ -2231,16 +2286,30 @@ const InvoiceDetailsPage: React.FC = () => {
                   Date Received
                 </label>
                 <TimeNavigator
-                  range={getPaymentDateRange(paymentFormData.payment_date)}
+                  range={getPaymentDateRange(
+                    joinedPaymentReceipt
+                      ? toLocalDateInputValue(
+                          joinedPaymentReceipt.received_date
+                        )
+                      : paymentFormData.payment_date
+                  )}
                   onChange={handlePaymentDateChange}
                   modes={["day"]}
                   presets={false}
                   showArrows={false}
                   allowFuture
-                  disabled={isProcessingPayment}
+                  disabled={
+                    isProcessingPayment || joinedPaymentReceipt !== null
+                  }
                   className="flex w-full"
                   triggerClassName="min-w-0 flex-1 justify-between"
                 />
+                {joinedPaymentReceipt && (
+                  <p className="text-xs text-default-500 dark:text-gray-400">
+                    Taken from receipt{" "}
+                    {joinedPaymentReceipt.display_reference}.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -2306,9 +2375,12 @@ const InvoiceDetailsPage: React.FC = () => {
                   Payment Method
                 </label>
                 <Listbox
-                  value={paymentFormData.payment_method}
+                  value={effectivePaymentMethod}
                   onChange={handlePaymentMethodChange} // Use dedicated handler
                   name="payment_method"
+                  disabled={
+                    isProcessingPayment || joinedPaymentReceipt !== null
+                  }
                 >
                   <div className="relative">
                     <HeadlessListboxButton
@@ -2380,17 +2452,17 @@ const InvoiceDetailsPage: React.FC = () => {
               </div>
 
               {/* Conditional Reference Input */}
-              {(paymentFormData.payment_method === "cheque" ||
-                paymentFormData.payment_method === "bank_transfer" ||
-                paymentFormData.payment_method === "online") && (
+              {(effectivePaymentMethod === "cheque" ||
+                effectivePaymentMethod === "bank_transfer" ||
+                effectivePaymentMethod === "online") && (
                 <div className="space-y-2">
                   <label
                     htmlFor="payment_reference"
                     className="block text-sm font-medium text-default-700 dark:text-gray-200"
                   >
-                    {paymentFormData.payment_method === "cheque"
+                    {effectivePaymentMethod === "cheque"
                       ? "Cheque Number"
-                      : paymentFormData.payment_method === "online"
+                      : effectivePaymentMethod === "online"
                       ? "Transaction ID"
                       : "Transaction Reference"}
                   </label>
@@ -2398,12 +2470,20 @@ const InvoiceDetailsPage: React.FC = () => {
                     type="text"
                     id="payment_reference"
                     name="payment_reference"
-                    value={paymentFormData.payment_reference}
+                    value={
+                      joinedPaymentReceipt
+                        ? joinedPaymentReceipt.payment_reference || ""
+                        : paymentFormData.payment_reference
+                    }
                     onChange={handlePaymentFormChange}
+                    readOnly={joinedPaymentReceipt !== null}
                     maxLength={50}
                     className={clsx(
                       // Use clsx for consistency
                       "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
+                      joinedPaymentReceipt
+                        ? "bg-gray-100 dark:bg-gray-800 cursor-default"
+                        : "",
                       "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                     )}
                   />
@@ -2411,12 +2491,25 @@ const InvoiceDetailsPage: React.FC = () => {
               )}
             </div>
 
+            <GTReceiptJoinPanel
+              lookup={paymentReceiptLookup}
+              joinConfirmed={paymentReceiptJoin.joinConfirmed}
+              onJoinConfirmedChange={paymentReceiptJoin.setJoinConfirmed}
+              disabled={isProcessingPayment}
+              className="mt-4"
+            />
+
             <div className="mt-6 flex justify-end">
               <Button
                 type="submit"
                 variant="filled"
                 color="sky"
-                disabled={isProcessingPayment}
+                disabled={
+                  isProcessingPayment ||
+                  paymentReceiptLookup.isLooking ||
+                  (paymentReceiptLookup.receipt !== null &&
+                    joinedPaymentReceipt === null)
+                }
               >
                 {isProcessingPayment ? "Processing..." : "Process Payment"}
               </Button>
