@@ -530,9 +530,9 @@ const RentalDetailsPage: React.FC = () => {
               payment_method: effectivePaymentMethod,
               payment_reference: confirmedPaymentReceipt
                 ? confirmedPaymentReceipt.payment_reference
-                : paymentMethod === "cash"
-                ? null
-                : paymentReference.trim() || null,
+                : paymentMethod === "cheque"
+                ? paymentReference.trim() || null
+                : null,
               internal_reference:
                 confirmedPaymentReceipt?.display_reference ||
                 paymentInternalReference.trim(),
@@ -1355,7 +1355,7 @@ const RentalDetailsPage: React.FC = () => {
                               method: GreenTargetPayment["payment_method"]
                             ): void => {
                               setPaymentMethod(method);
-                              if (method === "cash") setPaymentReference("");
+                              if (method !== "cheque") setPaymentReference("");
                             }}
                             disabled={Boolean(confirmedPaymentReceipt)}
                           >
@@ -1450,12 +1450,10 @@ const RentalDetailsPage: React.FC = () => {
                               className="w-full rounded-lg border border-default-300 bg-default-100 px-3 py-2 text-default-700 dark:border-gray-600 dark:bg-gray-900/70 dark:text-gray-300"
                             />
                           </div>
-                        ) : paymentMethod !== "cash" ? (
+                        ) : paymentMethod === "cheque" ? (
                           <div>
                             <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-2">
-                              {paymentMethod === "cheque"
-                                ? "Cheque No."
-                                : "Transaction Ref."}
+                              Cheque No.
                             </label>
                             <input
                               type="text"
