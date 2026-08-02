@@ -220,7 +220,12 @@ const PaymentPage: React.FC = () => {
       );
       return;
     }
-    if (!payment.payment_reference) {
+    // The receipt's own reference is the group identity. A grouped cash receipt
+    // writes `C{invoice}` onto each payment row, so reusing the row's reference
+    // would open the form with one invoice's reference instead of the group's.
+    const groupReference: string | null =
+      payment.receipt_reference || payment.payment_reference || null;
+    if (!groupReference) {
       toast.error("This payment group does not have a reference to reuse.");
       return;
     }
@@ -229,7 +234,7 @@ const PaymentPage: React.FC = () => {
     setPaymentFormInitialValues({
       payment_date: payment.payment_date,
       payment_method: payment.payment_method,
-      payment_reference: payment.payment_reference,
+      payment_reference: groupReference,
       bank_account: payment.bank_account,
     });
     setShowPaymentForm(true);
