@@ -35,6 +35,17 @@ export const JP_JOB_ID_TO_TYPE = {
 
 const toCents = (value) => Math.round((parseFloat(value) || 0) * 100);
 
+/**
+ * Units actually keyed on a work-log activity (hours or produced units).
+ * Distinguishes a real entry from the quantity 1 the item builders fall back to
+ * for Fixed pay codes, so an activity that recorded nothing can be skipped.
+ * @param {{hours_applied?: string|number|null, units_produced?: string|number|null}} activity
+ * @returns {number}
+ */
+const recordedActivityUnits = (activity) =>
+  (parseFloat(activity.units_produced) || 0) +
+  (parseFloat(activity.hours_applied) || 0);
+
 const monthDateRange = (year, month) => {
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
   const lastDay = new Date(year, month, 0).getDate();
@@ -389,6 +400,15 @@ export const reprocessJPEmployees = async (
         // Monthly work log activities (Office / Maintenance)
         for (const activity of monthlyByCanonical.get(canonicalId) || []) {
           if (!activity.pay_code_id) continue;
+          const monthlyAmount =
+            Math.round((parseFloat(activity.calculated_amount) || 0) * 100) / 100;
+          // Nothing keyed and nothing earned — a pay code that was only ticked on
+          // the work log (e.g. the 0-rate CUTI codes). The quantity fallback below
+          // is 1 for Fixed pay codes, so without this the activity is stored and
+          // printed as an empty 0.00 payslip row.
+          if (monthlyAmount === 0 && recordedActivityUnits(activity) === 0) {
+            continue;
+          }
           const quantity =
             activity.rate_unit === "Hour"
               ? parseFloat(activity.hours_applied) || 0
@@ -403,7 +423,7 @@ export const reprocessJPEmployees = async (
             rate_unit: activity.rate_unit || "Fixed",
             quantity,
             foc_units: 0,
-            amount: Math.round((parseFloat(activity.calculated_amount) || 0) * 100) / 100,
+            amount: monthlyAmount,
             job_type: JP_JOB_ID_TO_TYPE[activity.job_id] || activity.job_id,
             source_employee_id: activity.employee_id,
             source_date: null,
@@ -415,6 +435,16 @@ export const reprocessJPEmployees = async (
         // Daily work log activities (Salesman / machines / plastic)
         for (const activity of dailyByCanonical.get(canonicalId) || []) {
           if (!activity.pay_code_id) continue;
+          const dailyAmount =
+            Math.round((parseFloat(activity.calculated_amount) || 0) * 100) / 100;
+          const dailyFocUnits = parseFloat(activity.foc_units) || 0;
+          if (
+            dailyAmount === 0 &&
+            dailyFocUnits === 0 &&
+            recordedActivityUnits(activity) === 0
+          ) {
+            continue;
+          }
           const quantity =
             activity.units_produced != null
               ? parseFloat(activity.units_produced) || 0
@@ -426,8 +456,8 @@ export const reprocessJPEmployees = async (
             rate: parseFloat(activity.rate_used) || 0,
             rate_unit: activity.rate_unit || "Fixed",
             quantity,
-            foc_units: parseFloat(activity.foc_units) || 0,
-            amount: Math.round((parseFloat(activity.calculated_amount) || 0) * 100) / 100,
+            foc_units: dailyFocUnits,
+            amount: dailyAmount,
             job_type: activity.section || JP_JOB_ID_TO_TYPE[activity.job_id] || null,
             source_employee_id: activity.employee_id,
             source_date: activity.log_date,
