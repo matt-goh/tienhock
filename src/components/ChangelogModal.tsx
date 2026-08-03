@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-03",
+    ms: "Slip gaji tidak lagi memaparkan baris kosong RM0.00 seperti \"CUTI SAKIT\", \"CUTI TAHUNAN\" dan \"CUTI UMUM\" apabila kod gaji itu hanya ditanda dalam rekod kerja tetapi tiada bayaran. Cuti yang benar-benar dibayar masih dipaparkan seperti biasa di bahagian Cuti. Berkuat kuasa untuk Tien Hock, Jelly Polly dan Green Target; jumlah gaji tidak berubah.",
+    en: "Pay slips no longer print empty RM0.00 lines such as \"CUTI SAKIT\", \"CUTI TAHUNAN\" and \"CUTI UMUM\" when the pay code was only ticked on the work log but paid nothing. Leave that is actually paid still shows as usual in the Cuti section. Applies to Tien Hock, Jelly Polly and Green Target; no pay amounts change.",
+  },
+  {
+    date: "2026-08-03",
     ms: "Slip gaji, Laporan Gaji dan laporan Gaji Pertengahan Bulan Green Target dan Jelly Polly kini memaparkan nama penuh syarikat di bahagian atas: \"GREEN TARGET WASTE TREATMENT IND. SDN. BHD.\" (sebelum ini \"GREEN TARGET SDN. BHD.\") dan \"JELLY-POLLY FOOD INDUSTRIES\" (sebelum ini \"JELLY POLLY\"). Dokumen Tien Hock tidak berubah.",
     en: "Green Target and Jelly Polly pay slips, Salary Reports and Mid-Month Payroll reports now show the full company name at the top: \"GREEN TARGET WASTE TREATMENT IND. SDN. BHD.\" (previously \"GREEN TARGET SDN. BHD.\") and \"JELLY-POLLY FOOD INDUSTRIES\" (previously \"JELLY POLLY\"). Tien Hock documents are unchanged.",
   },
