@@ -352,6 +352,7 @@ export default function (pool) {
               'rate_unit', pc.rate_unit,
               'rate_used', mwla.rate_used,
               'hours_applied', mwla.hours_applied,
+              'units_produced', mwla.units_produced,
               'calculated_amount', mwla.calculated_amount
             )) as activities
           FROM greentarget.monthly_work_logs mwl
@@ -521,6 +522,15 @@ export default function (pool) {
           workLogsByEmployee[key] = { items: [] };
         }
         (log.activities || []).filter((a) => a.pay_code_id).forEach((activity) => {
+          const amount = parseFloat(activity.calculated_amount) || 0;
+          // Units actually keyed on the activity — the qty fallback below is 1 for
+          // every non-Hour pay code, so without this an activity that recorded
+          // nothing and earned nothing (e.g. a 0-rate CUTI code merely ticked on
+          // the log) would be stored and printed as an empty 0.00 payslip row.
+          const recordedUnits =
+            (parseFloat(activity.units_produced) || 0) +
+            (parseFloat(activity.hours_applied) || 0);
+          if (amount === 0 && recordedUnits === 0) return;
           const qty =
             activity.rate_unit === "Hour"
               ? parseFloat(activity.hours_applied) || 0
@@ -532,7 +542,7 @@ export default function (pool) {
             rate: parseFloat(activity.rate_used) || 0,
             rate_unit: activity.rate_unit || "Fixed",
             quantity: qty,
-            amount: parseFloat(activity.calculated_amount) || 0,
+            amount,
             work_log_id: log.id,
             work_log_type: "monthly",
           });
