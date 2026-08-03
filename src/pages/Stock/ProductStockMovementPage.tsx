@@ -18,8 +18,11 @@ import {
   IconX,
   IconStarFilled,
   IconArrowsSort,
+  IconPrinter,
 } from "@tabler/icons-react";
 import MonthNavigator from "../../components/MonthNavigator";
+import Button from "../../components/Button";
+import { generateStockCardPDF } from "../../utils/stock/StockCardPDF";
 import clsx from "clsx";
 import { isOthProductionProduct } from "../../config/othProductionProducts";
 import ProductOrderModal from "../../components/Catalogue/ProductOrderModal";
@@ -109,7 +112,9 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
   const [monthlyTotals, setMonthlyTotals] = useState<
     StockMovementResponse["monthly_totals"] | null
   >(null);
+  const [productDescription, setProductDescription] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   useScrollRestoration(
     `product-stock-movement:${storageScope}`,
@@ -264,11 +269,13 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
       setInitialBalance(response.initial_balance || 0);
       setInitialBalanceDate(response.initial_balance_date || null);
       setMonthlyTotals(response.monthly_totals || null);
+      setProductDescription(response.product_description || "");
     } catch (error) {
       console.error("Error fetching stock movements:", error);
       toast.error("Failed to load stock movements");
       setMovements([]);
       setMonthlyTotals(null);
+      setProductDescription("");
     } finally {
       setIsLoading(false);
     }
@@ -338,14 +345,61 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
     }
   };
 
+  // Print the legacy-style Stock Card for the selected product and period.
+  const canPrintStockCard: boolean =
+    !!selectedProductId && !!monthlyTotals && movements.length > 0;
+
+  const handlePrintStockCard = async (): Promise<void> => {
+    if (!selectedProductId || !monthlyTotals || movements.length === 0) return;
+
+    setIsPrinting(true);
+    try {
+      const month: string = String(selectedMonth.getMonth() + 1).padStart(
+        2,
+        "0"
+      );
+      const periodLabel: string =
+        viewType === "month"
+          ? `For the month of ${month}/${selectedMonth.getFullYear()}`
+          : `For the period ${formatDisplayDate(
+              dateRange.start
+            )} - ${formatDisplayDate(dateRange.end)}`;
+
+      await generateStockCardPDF({
+        productId: selectedProductId,
+        productDescription,
+        periodLabel,
+        showDayNumberOnly: viewType === "month",
+        movements,
+        totals: monthlyTotals,
+        closingBalance: movements[movements.length - 1]?.cf ?? 0,
+      });
+    } catch (error) {
+      console.error("Error printing stock card:", error);
+      toast.error("Gagal menjana PDF kad stok");
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-default-900 dark:text-gray-100">Stock Movement</h1>
-        <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
-          View daily stock movements and balances
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-default-900 dark:text-gray-100">Stock Movement</h1>
+          <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
+            View daily stock movements and balances
+          </p>
+        </div>
+        <Button
+          onClick={handlePrintStockCard}
+          disabled={!canPrintStockCard || isLoading || isPrinting}
+          icon={IconPrinter}
+          variant="outline"
+        >
+          {isPrinting ? "Preparing..." : "Print Stock Card"}
+        </Button>
       </div>
 
       {/* Controls */}
