@@ -160,8 +160,9 @@ export default function (pool) {
       let itemsByEp = {};
       let deductionsByEp = {};
       let midMonthByEmployee = {};
+      let leaveByEmployee = {};
       if (epIds.length > 0) {
-        const [itemsResult, deductionsResult, midMonthResult] = await Promise.all([
+        const [itemsResult, deductionsResult, midMonthResult, leaveResult] = await Promise.all([
           pool.query(
             `SELECT pi.id, pi.employee_payroll_id, pi.pay_code_id, pi.description,
                     pi.rate, pi.rate_unit, pi.quantity, pi.amount, pi.is_manual,
@@ -191,6 +192,21 @@ export default function (pool) {
              GROUP BY employee_id`,
             [payrollResult.rows[0].year, payrollResult.rows[0].month]
           ),
+          // Approved leave for the month. It is already folded into gross by the
+          // processor, so the batch payslips need it to print the Cuti block —
+          // without it the leave pay silently hides inside Jumlah Gaji Kasar.
+          pool.query(
+            `SELECT id, employee_id,
+                    to_char(leave_date, 'YYYY-MM-DD') AS leave_date,
+                    leave_type, days_taken,
+                    CAST(amount_paid AS NUMERIC(10,2)) AS amount_paid, status
+             FROM greentarget.leave_records
+             WHERE EXTRACT(YEAR FROM leave_date) = $1
+               AND EXTRACT(MONTH FROM leave_date) = $2
+               AND status = 'approved'
+             ORDER BY leave_date`,
+            [payrollResult.rows[0].year, payrollResult.rows[0].month]
+          ),
         ]);
         for (const item of itemsResult.rows) {
           (itemsByEp[item.employee_payroll_id] ||= []).push({
@@ -212,6 +228,13 @@ export default function (pool) {
         for (const midMonth of midMonthResult.rows) {
           midMonthByEmployee[midMonth.employee_id] = parseFloat(midMonth.amount);
         }
+        for (const leave of leaveResult.rows) {
+          (leaveByEmployee[leave.employee_id] ||= []).push({
+            ...leave,
+            days_taken: parseFloat(leave.days_taken),
+            amount_paid: parseFloat(leave.amount_paid),
+          });
+        }
       }
 
       const employeePayrolls = employeePayrollsResult.rows.map((ep) => {
@@ -228,6 +251,7 @@ export default function (pool) {
           setelah_digenapkan: setelahDigenapkan,
           items: itemsByEp[ep.id] || [],
           deductions: deductionsByEp[ep.id] || [],
+          leave_records: leaveByEmployee[ep.employee_id] || [],
         };
       });
 
