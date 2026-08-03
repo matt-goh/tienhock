@@ -34,7 +34,7 @@ import { usePersistedFilters } from "../../../hooks/usePersistedFilters";
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
 
-const JP_COMPANY = "JELLY POLLY";
+const JP_COMPANY = "JELLY-POLLY FOOD INDUSTRIES";
 
 // Tabs whose data all comes from the single monthly salary-report endpoint.
 const MONTHLY_TABS = ["employee", "monthly", "bank", "pinjam"] as const;

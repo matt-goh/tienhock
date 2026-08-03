@@ -35,7 +35,7 @@ import { usePersistedFilters } from "../../../hooks/usePersistedFilters";
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
 
-const GT_COMPANY = "GREEN TARGET SDN. BHD.";
+const GT_COMPANY = "GREEN TARGET WASTE TREATMENT IND. SDN. BHD.";
 
 // Tabs whose data all comes from the single monthly salary-report endpoint.
 const MONTHLY_TABS = ["employee", "monthly", "bank", "pinjam"] as const;

@@ -465,7 +465,7 @@ const JPPayrollDetailsPage: React.FC = () => {
             payroll={pdfPayroll}
             staffDetails={staffDetails}
             midMonthPayroll={midMonthForPdf}
-            companyName="JELLY POLLY"
+            companyName="JELLY-POLLY FOOD INDUSTRIES"
             buttonText="Pay Slip"
             variant="filled"
             color="sky"
@@ -476,7 +476,7 @@ const JPPayrollDetailsPage: React.FC = () => {
             payroll={pdfPayroll}
             staffDetails={staffDetails}
             midMonthPayroll={midMonthForPdf}
-            companyName="JELLY POLLY"
+            companyName="JELLY-POLLY FOOD INDUSTRIES"
             buttonText="PDF"
             variant="default"
             color="sky"
