@@ -9,11 +9,21 @@ import {
   IconChevronsUp,
   IconEdit,
   IconPackage,
+  IconPrinter,
   IconSearch,
   IconX,
 } from "@tabler/icons-react";
 import clsx from "clsx";
 import TimeNavigator from "../../components/TimeNavigator";
+import Button from "../../components/Button";
+import {
+  generateProductionSummaryPDF,
+  ProductionSummaryRow,
+} from "../../utils/stock/ProductionSummaryPDF";
+import {
+  TIENHOCK_INFO,
+  JELLYPOLLY_INFO,
+} from "../../utils/invoice/einvoice/companyInfo";
 import ProductSelector from "../../components/Stock/ProductSelector";
 import ProductOrderModal from "../../components/Catalogue/ProductOrderModal";
 import { api } from "../../routes/utils/api";
@@ -301,6 +311,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
     !isLoading && entries.length > 0
   );
   const [showProductOrderModal, setShowProductOrderModal] = useState(false);
+  const [isPrintingSummary, setIsPrintingSummary] = useState<boolean>(false);
   const [workerOrderByScope, setWorkerOrderByScope] = useState<
     Record<ProductionWorkerOrderScope, string[]>
   >({ BH_PACKING: [], MEE_PACKING: [], JP_PRODUCTION: [] });
@@ -690,6 +701,106 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
     setSearchTerm("");
   };
 
+  // Monthly production summary print: one sheet for THIS page's product scope,
+  // covering the whole selected period. It deliberately ignores the product
+  // selector and search box so the printed sheet is always the full scope.
+  const summaryRows: ProductionSummaryRow[] = useMemo(() => {
+    const totalsByProduct: Map<string, ProductionSummaryRow> = new Map();
+
+    entries.forEach((entry: ProductionEntry): void => {
+      const existing: ProductionSummaryRow | undefined = totalsByProduct.get(
+        entry.product_id
+      );
+      // bags_packed is numeric(10,2), so it arrives from pg as a string.
+      const quantity: number = Number(entry.bags_packed) || 0;
+      if (existing) {
+        existing.quantity += quantity;
+        return;
+      }
+      totalsByProduct.set(entry.product_id, {
+        productId: entry.product_id,
+        description: entry.product_description || "",
+        quantity,
+      });
+    });
+
+    return Array.from(totalsByProduct.values()).sort(
+      (a: ProductionSummaryRow, b: ProductionSummaryRow): number => {
+        const aIndex: number =
+          productOrderIndex.get(a.productId) ?? Number.MAX_SAFE_INTEGER;
+        const bIndex: number =
+          productOrderIndex.get(b.productId) ?? Number.MAX_SAFE_INTEGER;
+        if (aIndex !== bIndex) return aIndex - bIndex;
+        return a.productId.localeCompare(b.productId);
+      }
+    );
+  }, [entries, productOrderIndex]);
+
+  const summaryTotal: number = useMemo(
+    () =>
+      summaryRows.reduce(
+        (total: number, row: ProductionSummaryRow): number =>
+          total + row.quantity,
+        0
+      ),
+    [summaryRows]
+  );
+
+  // "Bags" for packing products, "Pcs" for OTH stock; mixed scopes fall back
+  // to a neutral heading rather than mislabelling one of the units.
+  const summaryUnitLabel: string = useMemo(() => {
+    const units: Set<string> = new Set(
+      entries.map((entry: ProductionEntry): string => getUnitLabel(entry))
+    );
+    if (units.size !== 1) return "Quantity";
+    const [unit] = Array.from(units);
+    return unit.charAt(0).toUpperCase() + unit.slice(1);
+  }, [entries]);
+
+  const handlePrintSummary = async (): Promise<void> => {
+    setIsPrintingSummary(true);
+    try {
+      // "Mee Production Records" -> "Mee"; the default title yields "".
+      const scopeLabel: string = title
+        .replace(/\s*Production Records$/i, "")
+        .trim();
+      const reportTitle: string = (
+        viewMode === "month"
+          ? `Summary Monthly ${scopeLabel} Production`
+          : `Summary ${scopeLabel} Production`
+      ).replace(/\s{2,}/g, " ");
+
+      const periodLabel: string =
+        viewMode === "day"
+          ? `As at (${formatDateLocal(dateRange.start)
+              .split("-")
+              .reverse()
+              .join("/")})`
+          : viewMode === "year"
+          ? `As at (${selectedYear})`
+          : `As at (${String(selectedMonth.getMonth() + 1).padStart(
+              2,
+              "0"
+            )}/${selectedMonth.getFullYear()})`;
+
+      await generateProductionSummaryPDF({
+        companyName: apiBasePath.startsWith("/jellypolly")
+          ? JELLYPOLLY_INFO.name
+          : TIENHOCK_INFO.name,
+        reportTitle,
+        periodLabel,
+        unitLabel: summaryUnitLabel,
+        rows: summaryRows,
+        total: summaryTotal,
+      });
+    } catch (error) {
+      console.error("Error printing production summary:", error);
+      toast.error("Failed to generate production summary PDF");
+    } finally {
+      setIsPrintingSummary(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-default-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
@@ -721,6 +832,17 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
               presets={false}
               size="sm"
             />
+            <Button
+              onClick={handlePrintSummary}
+              disabled={
+                isLoading || isPrintingSummary || summaryRows.length === 0
+              }
+              icon={IconPrinter}
+              variant="outline"
+              size="sm"
+            >
+              {isPrintingSummary ? "Preparing..." : "Print Summary"}
+            </Button>
           </div>
         </div>
 

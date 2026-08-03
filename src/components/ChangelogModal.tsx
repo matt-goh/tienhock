@@ -20,6 +20,16 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-03",
+    ms: "Halaman Stock Movement kini mempunyai butang \"Print Stock Card\" untuk mencetak kad stok produk yang dipilih bagi bulan atau tempoh yang dipaparkan, dengan lajur B/F, PRODUCTION, ADJ/IN, RETURN, SOLD/OUT, DEFECT, FOC dan C/F serta baris jumlah — sama seperti kad stok yang dicetak sebelum ini. Lajur ADJ/IN dan DEFECT ialah nilai ADJ+ dan ADJ- yang dikunci masuk di halaman Stock Adjustments, manakala RETURN ialah kuantiti pulangan pada invois.",
+    en: "The Stock Movement page now has a \"Print Stock Card\" button that prints the selected product's stock card for the month or period on screen, with B/F, PRODUCTION, ADJ/IN, RETURN, SOLD/OUT, DEFECT, FOC and C/F columns plus a totals row — the same as the stock card printed before. The ADJ/IN and DEFECT columns are the ADJ+ and ADJ- amounts keyed on the Stock Adjustments page, and RETURN is the returned quantity on invoices.",
+  },
+  {
+    date: "2026-08-03",
+    ms: "Setiap halaman Production Records (Mee, Bihun, Bundle, SBH & SMEE, Empty Bag dan Jelly Polly) kini mempunyai butang \"Print Summary\" untuk mencetak ringkasan pengeluaran bulanan bagi halaman tersebut: satu baris bagi setiap produk berserta jumlah keseluruhan. Cetakan sentiasa meliputi semua produk halaman itu untuk tempoh yang dipilih, walaupun penapis produk atau kotak carian sedang digunakan.",
+    en: "Every Production Records page (Mee, Bihun, Bundle, SBH & SMEE, Empty Bag and Jelly Polly) now has a \"Print Summary\" button that prints that page's monthly production summary: one row per product with a grand total. The printout always covers all of that page's products for the selected period, even when the product filter or search box is in use.",
+  },
+  {
+    date: "2026-08-03",
     ms: "Slip gaji Green Target kini memaparkan bayaran cuti sebagai barisnya sendiri (contoh \"Cuti Tahunan - 1 Hari\") berserta \"Jumlah Cuti\", sama seperti Tien Hock dan Jelly Polly. Sebelum ini jumlah cuti hanya tersembunyi di dalam Jumlah Gaji Kasar apabila slip dicetak secara pukal dari halaman Payroll, jadi slip tidak boleh dikira semula. Halaman butiran gaji Green Target juga menambah jadual \"Leave Pay\" yang menyenaraikan setiap tarikh, jenis cuti, bilangan hari dan amaun. Tiada amaun gaji berubah.",
     en: "Green Target pay slips now show leave pay as its own line (e.g. \"Cuti Tahunan - 1 Hari\") with a \"Jumlah Cuti\" total, the same as Tien Hock and Jelly Polly. Previously the leave amount was only hidden inside Jumlah Gaji Kasar when slips were printed in bulk from the Payroll page, so the slip could not be added up. The Green Target payroll details page also gains a \"Leave Pay\" table listing each date, leave type, days and amount. No pay amounts change.",
   },
