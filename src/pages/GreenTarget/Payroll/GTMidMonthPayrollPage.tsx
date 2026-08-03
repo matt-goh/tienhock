@@ -52,7 +52,7 @@ import type {
 import GreenTargetLogo from "../../../utils/GreenTargetLogo.png";
 import toast from "react-hot-toast";
 
-const GT_COMPANY_NAME = "GREEN TARGET SDN. BHD.";
+const GT_COMPANY_NAME = "GREEN TARGET WASTE TREATMENT IND. SDN. BHD.";
 
 type MidMonthSubview = "summary" | "pinjam";
 

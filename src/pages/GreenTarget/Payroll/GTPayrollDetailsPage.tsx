@@ -588,7 +588,7 @@ const GTPayrollDetailsPage: React.FC = () => {
             payroll={pdfPayroll}
             staffDetails={staffDetails}
             midMonthPayroll={midMonthForPdf}
-            companyName="GREEN TARGET SDN. BHD."
+            companyName="GREEN TARGET WASTE TREATMENT IND. SDN. BHD."
             buttonText="Pay Slip"
             variant="filled"
             color="sky"
@@ -598,7 +598,7 @@ const GTPayrollDetailsPage: React.FC = () => {
             payroll={pdfPayroll}
             staffDetails={staffDetails}
             midMonthPayroll={midMonthForPdf}
-            companyName="GREEN TARGET SDN. BHD."
+            companyName="GREEN TARGET WASTE TREATMENT IND. SDN. BHD."
             buttonText="PDF"
             variant="default"
             color="sky"
