@@ -55,7 +55,7 @@ import {
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
 
-const JP_COMPANY_NAME = "JELLY POLLY";
+const JP_COMPANY_NAME = "JELLY-POLLY FOOD INDUSTRIES";
 
 type MidMonthSubview = "summary" | "pinjam";
 

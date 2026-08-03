@@ -995,7 +995,7 @@ const GTPayrollPage: React.FC = () => {
                 payrolls={selectedBatchPayrolls}
                 midMonthPayrollsMap={midMonthPayrollsMap}
                 disabled={midMonthLoadError}
-                companyName="GREEN TARGET SDN. BHD."
+                companyName="GREEN TARGET WASTE TREATMENT IND. SDN. BHD."
                 size="sm"
                 variant="outline"
                 color="sky"
@@ -1008,7 +1008,7 @@ const GTPayrollPage: React.FC = () => {
                   payrolls={batchPayrolls}
                   midMonthPayrollsMap={midMonthPayrollsMap}
                   disabled={midMonthLoadError}
-                  companyName="GREEN TARGET SDN. BHD."
+                  companyName="GREEN TARGET WASTE TREATMENT IND. SDN. BHD."
                   size="sm"
                   buttonLabel="Payslips"
                 />
