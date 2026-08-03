@@ -20,6 +20,16 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-03",
+    ms: "Slip gaji Green Target kini memaparkan bayaran cuti sebagai barisnya sendiri (contoh \"Cuti Tahunan - 1 Hari\") berserta \"Jumlah Cuti\", sama seperti Tien Hock dan Jelly Polly. Sebelum ini jumlah cuti hanya tersembunyi di dalam Jumlah Gaji Kasar apabila slip dicetak secara pukal dari halaman Payroll, jadi slip tidak boleh dikira semula. Halaman butiran gaji Green Target juga menambah jadual \"Leave Pay\" yang menyenaraikan setiap tarikh, jenis cuti, bilangan hari dan amaun. Tiada amaun gaji berubah.",
+    en: "Green Target pay slips now show leave pay as its own line (e.g. \"Cuti Tahunan - 1 Hari\") with a \"Jumlah Cuti\" total, the same as Tien Hock and Jelly Polly. Previously the leave amount was only hidden inside Jumlah Gaji Kasar when slips were printed in bulk from the Payroll page, so the slip could not be added up. The Green Target payroll details page also gains a \"Leave Pay\" table listing each date, leave type, days and amount. No pay amounts change.",
+  },
+  {
+    date: "2026-08-03",
+    ms: "Slip gaji tidak lagi memaparkan baris kosong RM0.00 seperti \"CUTI SAKIT\", \"CUTI TAHUNAN\" dan \"CUTI UMUM\" apabila kod gaji itu hanya ditanda dalam rekod kerja tetapi tiada bayaran. Cuti yang benar-benar dibayar masih dipaparkan seperti biasa di bahagian Cuti. Berkuat kuasa untuk Tien Hock, Jelly Polly dan Green Target; jumlah gaji tidak berubah.",
+    en: "Pay slips no longer print empty RM0.00 lines such as \"CUTI SAKIT\", \"CUTI TAHUNAN\" and \"CUTI UMUM\" when the pay code was only ticked on the work log but paid nothing. Leave that is actually paid still shows as usual in the Cuti section. Applies to Tien Hock, Jelly Polly and Green Target; no pay amounts change.",
+  },
+  {
+    date: "2026-08-03",
     ms: "Slip gaji, Laporan Gaji dan laporan Gaji Pertengahan Bulan Green Target dan Jelly Polly kini memaparkan nama penuh syarikat di bahagian atas: \"GREEN TARGET WASTE TREATMENT IND. SDN. BHD.\" (sebelum ini \"GREEN TARGET SDN. BHD.\") dan \"JELLY-POLLY FOOD INDUSTRIES\" (sebelum ini \"JELLY POLLY\"). Dokumen Tien Hock tidak berubah.",
     en: "Green Target and Jelly Polly pay slips, Salary Reports and Mid-Month Payroll reports now show the full company name at the top: \"GREEN TARGET WASTE TREATMENT IND. SDN. BHD.\" (previously \"GREEN TARGET SDN. BHD.\") and \"JELLY-POLLY FOOD INDUSTRIES\" (previously \"JELLY POLLY\"). Tien Hock documents are unchanged.",
   },

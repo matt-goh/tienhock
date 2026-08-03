@@ -34,6 +34,7 @@ import {
   buildGTPayslipPayroll,
   type GTPayslipDeduction,
   type GTPayslipItem,
+  type GTPayslipLeaveRecord,
 } from "../../../utils/greenTarget/buildGTPayslipPayroll";
 import type { MidMonthPayroll } from "../../../utils/payroll/midMonthPayrollUtils";
 import { getMonthName } from "../../../utils/payroll/payrollUtils";
@@ -66,6 +67,10 @@ interface GTEmployeePayroll {
   setelah_digenapkan?: number | string | null;
   items?: GTPayslipItem[];
   deductions?: GTPayslipDeduction[];
+  // Approved leave for the month — already inside gross_pay, and needed here so
+  // the batch payslips print the Cuti block (the print manager never re-fetches
+  // GT payrolls, so whatever this page holds is what gets printed).
+  leave_records?: GTPayslipLeaveRecord[];
 }
 
 interface GTPayrollEmployee {
