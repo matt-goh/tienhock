@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-03",
+    ms: "Laporan Gaji Jelly Polly dan Green Target kini mempunyai butang \"Export\" dan \"Export Link\" pada bahagian Bank, sama seperti Tien Hock. \"Export\" memuat turun fail teks bayaran gaji bank (format PBB) bagi pekerja yang dibayar melalui bank untuk bulan yang dipaparkan, manakala \"Export Link\" menyalin pautan untuk digunakan dengan Excel Power Query.",
+    en: "The Jelly Polly and Green Target Salary Reports now have \"Export\" and \"Export Link\" buttons on the Bank tab, just like Tien Hock. \"Export\" downloads the bank salary payment text file (PBB format) for bank-paid employees in the month on screen, while \"Export Link\" copies a link for use with Excel Power Query.",
+  },
+  {
+    date: "2026-08-03",
     ms: "Halaman Stock Movement kini mempunyai butang \"Print Stock Card\" untuk mencetak kad stok produk yang dipilih bagi bulan atau tempoh yang dipaparkan, dengan lajur B/F, PRODUCTION, ADJ/IN, RETURN, SOLD/OUT, DEFECT, FOC dan C/F serta baris jumlah — sama seperti kad stok yang dicetak sebelum ini. Lajur ADJ/IN dan DEFECT ialah nilai ADJ+ dan ADJ- yang dikunci masuk di halaman Stock Adjustments, manakala RETURN ialah kuantiti pulangan pada invois.",
     en: "The Stock Movement page now has a \"Print Stock Card\" button that prints the selected product's stock card for the month or period on screen, with B/F, PRODUCTION, ADJ/IN, RETURN, SOLD/OUT, DEFECT, FOC and C/F columns plus a totals row — the same as the stock card printed before. The ADJ/IN and DEFECT columns are the ADJ+ and ADJ- amounts keyed on the Stock Adjustments page, and RETURN is the returned quantity on invoices.",
   },
