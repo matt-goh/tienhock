@@ -1,6 +1,7 @@
 // src/components/BackButton.tsx
 import React from "react";
 import { IconChevronLeft } from "@tabler/icons-react";
+import { useTranslation } from "react-i18next";
 import { useSmartBack } from "../hooks/useSmartBack";
 
 interface BackButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -17,9 +18,10 @@ const BackButton: React.FC<BackButtonProps> = ({
   onClick,
   fallbackPath,
   className = "",
-  children = "Back",
+  children,
   ...props
 }) => {
+  const { t } = useTranslation("common");
   const goBack = useSmartBack(fallbackPath);
   const baseClasses =
     "flex items-center font-medium rounded-full text-default-600/90 dark:text-gray-300 hover:text-default-900 dark:hover:text-gray-100 hover:font-semibold";
@@ -44,7 +46,7 @@ const BackButton: React.FC<BackButtonProps> = ({
       {...props}
     >
       <IconChevronLeft className="mr-1 hover:font-semibold" size={20} />
-      {children}
+      {children ?? t("back")}
     </button>
   );
 };

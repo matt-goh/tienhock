@@ -1,5 +1,6 @@
 // src/components/StatusIndicator.tsx
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { IconPlug } from "@tabler/icons-react";
 
 interface StatusIndicatorProps {
@@ -11,13 +12,15 @@ export const StatusIndicator: React.FC<StatusIndicatorProps> = ({
   success,
   type = 'connection'
 }) => {
+  const { t } = useTranslation("common");
+
   const getText = () => {
     switch (type) {
       case 'verification':
-        return success ? "Verified" : "Unverified";
+        return success ? t("Verified") : t("Unverified");
       case 'connection':
       default:
-        return success ? "Connected" : "Disconnected";
+        return success ? t("Connected") : t("Disconnected");
     }
   };
 

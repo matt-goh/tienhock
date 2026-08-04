@@ -51,6 +51,10 @@ void i18n
     defaultNS: "common",
     fallbackLng: "en",
     // English source text is the key; a missing translation renders the key itself.
+    // Because keys are whole English sentences they contain "." and ":", which
+    // i18next would otherwise read as nested-path / namespace separators.
+    keySeparator: false,
+    nsSeparator: false,
     returnEmptyString: false,
     interpolation: {
       escapeValue: false, // React already escapes

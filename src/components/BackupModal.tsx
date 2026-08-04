@@ -21,6 +21,7 @@ import toast from "react-hot-toast";
 import ConfirmationDialog from "./ConfirmationDialog";
 import { sessionService } from "../services/SessionService";
 import { useLocation, useNavigate } from "react-router-dom";
+import { Trans, useTranslation } from "react-i18next";
 
 // Use Vite's built-in MODE for frontend environment detection
 const NODE_ENV = import.meta.env.MODE;
@@ -51,6 +52,7 @@ type RestorePollResult = "pending" | "terminal" | "retry";
 const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { t } = useTranslation("common");
   const defaultBackUpName = `backup_${DB_NAME}`;
   const [backups, setBackups] = useState<Backup[]>([]);
   const [loading, setLoading] = useState(false);
@@ -131,12 +133,12 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
     } catch (error: any) {
       console.error("Failed to fetch backups:", error);
       if (!error.message?.includes("maintenance")) {
-        setError("Failed to fetch backups. Please try refreshing.");
+        setError(t("Failed to fetch backups. Please try refreshing."));
       }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const stopRestoreStatusPolling = useCallback((): void => {
     statusPollGenerationRef.current += 1;
@@ -171,10 +173,10 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
           await new Promise<void>((resolve) => setTimeout(resolve, 1000));
           toast.success(
             status.phase === "RECOVERED"
-              ? "Database recovery completed!"
+              ? t("Database recovery completed!")
               : completedOperation === "sql"
-              ? "Database replaced successfully!"
-              : "Database restored successfully!"
+              ? t("Database replaced successfully!")
+              : t("Database restored successfully!")
           );
           if (status.message) {
             toast.error(status.message, { duration: 10000 });
@@ -201,8 +203,10 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
           const failureMessage: string =
             status.message ||
             (failedOperation === "sql"
-              ? "Database replacement failed. The existing database was not replaced."
-              : "Database restore failed.");
+              ? t(
+                  "Database replacement failed. The existing database was not replaced."
+                )
+              : t("Database restore failed."));
           setRestorePhase(null);
           setRestoring(false);
           setUploading(false);
@@ -215,8 +219,9 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
 
         if (status.status === "IDLE") {
           stopRestoreStatusPolling();
-          const failureMessage: string =
-            "The server restarted before the database operation finished. The current database was not confirmed as replaced.";
+          const failureMessage: string = t(
+            "The server restarted before the database operation finished. The current database was not confirmed as replaced."
+          );
           setRestorePhase(null);
           setRestoring(false);
           setUploading(false);
@@ -241,7 +246,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
         return "retry";
       }
     },
-    [onClose, stopRestoreStatusPolling]
+    [onClose, stopRestoreStatusPolling, t]
   );
 
   const startRestoreStatusPolling = useCallback(
@@ -290,14 +295,14 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
       setLoading(true);
       setError(null);
       await api.post("/api/backup/create", { name: backupName || undefined });
-      toast.success("Backup created successfully!");
+      toast.success(t("Backup created successfully!"));
       setBackupName("");
       setShowBackupNameInput(false);
       await fetchBackups();
     } catch (error) {
       console.error("Backup creation failed:", error);
-      setError("Failed to create backup. Please try again.");
-      toast.error("Failed to create backup. Please try again.");
+      setError(t("Failed to create backup. Please try again."));
+      toast.error(t("Failed to create backup. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -311,12 +316,12 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
       setError(null);
       setShowDeleteConfirmDialog(false);
       await api.post("/api/backup/delete", { filename: backupToDelete });
-      toast.success("Backup deleted successfully!");
+      toast.success(t("Backup deleted successfully!"));
       await fetchBackups();
     } catch (error) {
       console.error("Failed to delete backup:", error);
-      setError("Failed to delete backup. Please try again.");
-      toast.error("Failed to delete backup. Please try again.");
+      setError(t("Failed to delete backup. Please try again."));
+      toast.error(t("Failed to delete backup. Please try again."));
     } finally {
       setLoading(false);
       setBackupToDelete(null);
@@ -338,8 +343,10 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
       console.error("Restore failed:", error);
       stopRestoreStatusPolling();
       activeRestoreOperationRef.current = null;
-      setError("Database restore failed. Please try again in a few moments.");
-      toast.error("Failed to restore backup. Please try again.");
+      setError(
+        t("Database restore failed. Please try again in a few moments.")
+      );
+      toast.error(t("Failed to restore backup. Please try again."));
       setRestoring(false);
     }
   };
@@ -375,7 +382,9 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
       // Check if response is ok before trying to get blob
       if (!response.ok) {
         // Try to get error message from JSON response
-        let message = `Download failed with status: ${response.status}`;
+        let message = t("Download failed with status: {{status}}", {
+          status: response.status,
+        });
         try {
           const errorData = await response.json();
           message = errorData.message || errorData.error || message;
@@ -424,13 +433,19 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      toast.success("Backup downloaded successfully!");
+      toast.success(t("Backup downloaded successfully!"));
     } catch (error: any) {
       if (abortController.signal.aborted) {
-        toast.error("Download was cancelled or timed out. Please try again.");
+        toast.error(
+          t("Download was cancelled or timed out. Please try again.")
+        );
       } else {
         console.error("Download failed:", error);
-        toast.error(`Failed to download backup: ${error.message}`);
+        toast.error(
+          t("Failed to download backup: {{message}}", {
+            message: error.message,
+          })
+        );
       }
     } finally {
       clearTimeout(timeoutId);
@@ -479,7 +494,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
       stopRestoreStatusPolling();
       activeRestoreOperationRef.current = null;
       const failureMessage: string =
-        error?.message || "Failed to replace database from SQL.";
+        error?.message || t("Failed to replace database from SQL.");
       setError(failureMessage);
       toast.error(failureMessage);
       setUploading(false);
@@ -539,13 +554,13 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
 
     if (lockedLocationRef.current !== currentLocationPath) {
       if (!navigationToastShownRef.current) {
-        toast.error("Please wait until the backup operation finishes.");
+        toast.error(t("Please wait until the backup operation finishes."));
         navigationToastShownRef.current = true;
       }
 
       navigate(lockedLocationRef.current, { replace: true });
     }
-  }, [currentLocationPath, isBlockingOperation, navigate]);
+  }, [currentLocationPath, isBlockingOperation, navigate, t]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -616,17 +631,17 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                     as="h3"
                     className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                   >
-                    Database Backups
+                    {t("Database Backups")}
                   </DialogTitle>
                   <div className="flex items-center space-x-2">
                     {restorePhase === "COOLDOWN" && (
                       <div className="flex items-center px-2 py-1 text-sm rounded-full bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300">
                         <IconClock size={16} className="mr-1" />
-                        <span>Finalizing...</span>
+                        <span>{t("Finalizing...")}</span>
                       </div>
                     )}
                     <span className="px-2 py-1 text-sm rounded-full bg-default-100 dark:bg-gray-700 text-default-700 dark:text-gray-200">
-                      {NODE_ENV === "development" ? "Development" : NODE_ENV}
+                      {NODE_ENV === "development" ? t("Development") : NODE_ENV}
                     </span>
                   </div>
                 </div>
@@ -661,7 +676,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                             disabled={isBusy}
                             icon={IconDatabasePlus}
                           >
-                            Create New Backup
+                            {t("Create New Backup")}
                           </Button>
                           {isSqlReplacementAvailable && (
                             <Button
@@ -670,7 +685,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                               variant="outline"
                               icon={IconUpload}
                             >
-                              Replace Database from SQL
+                              {t("Replace Database from SQL")}
                             </Button>
                           )}
                         </>
@@ -688,7 +703,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                             onClick={handleCreateBackup}
                             disabled={isBusy}
                           >
-                            Create
+                            {t("create")}
                           </Button>
                           <Button
                             onClick={() => {
@@ -698,7 +713,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                             variant="outline"
                             disabled={isBusy}
                           >
-                            Cancel
+                            {t("cancel")}
                           </Button>
                         </div>
                       )}
@@ -709,7 +724,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                       variant="outline"
                       icon={IconRefresh}
                     >
-                      Refresh
+                      {t("Refresh")}
                     </Button>
                   </div>
                 </div>
@@ -733,16 +748,16 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                         <thead>
                           <tr>
                             <th className="px-6 py-3 text-left font-medium text-default-500 dark:text-gray-400">
-                              Filename
+                              {t("Filename")}
                             </th>
                             <th className="px-6 py-3 text-left font-medium text-default-500 dark:text-gray-400">
-                              Created
+                              {t("Created")}
                             </th>
                             <th className="px-6 py-3 text-left font-medium text-default-500 dark:text-gray-400">
-                              Size
+                              {t("Size")}
                             </th>
                             <th className="px-6 py-3 text-left font-medium text-default-500 dark:text-gray-400">
-                              Actions
+                              {t("actions")}
                             </th>
                           </tr>
                         </thead>
@@ -774,7 +789,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                                 colSpan={4}
                                 className="px-6 py-3 text-center text-default-500 dark:text-gray-400"
                               >
-                                No backups found
+                                {t("No backups found")}
                               </td>
                             </tr>
                           ) : (
@@ -806,15 +821,15 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                                           <LoadingSpinner size="sm" hideText />
                                           <span className="text-sm text-default-500 dark:text-gray-400">
                                             {restorePhase === "COOLDOWN"
-                                              ? "Finalizing..."
-                                              : "Restoring..."}
+                                              ? t("Finalizing...")
+                                              : t("Restoring...")}
                                           </span>
                                         </div>
                                       ) : downloadingBackup === backup.filename ? (
                                         <div className="flex items-center space-x-2">
                                           <LoadingSpinner size="sm" hideText />
                                           <span className="text-sm text-default-500 dark:text-gray-400">
-                                            Downloading...
+                                            {t("Downloading...")}
                                           </span>
                                         </div>
                                       ) : (
@@ -830,7 +845,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                                             variant="outline"
                                             size="sm"
                                           >
-                                            Restore
+                                            {t("Restore")}
                                           </Button>
                                           <Button
                                             onClick={() =>
@@ -841,7 +856,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                                             size="sm"
                                             color="sky"
                                           >
-                                            Download
+                                            {t("download")}
                                           </Button>
                                           <Button
                                             onClick={() => {
@@ -855,7 +870,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                                             size="sm"
                                             color="rose"
                                           >
-                                            Delete
+                                            {t("delete")}
                                           </Button>
                                         </>
                                       )}
@@ -877,43 +892,54 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                       <div className="space-y-2">
                         <h3 className="text-lg font-medium text-default-900 dark:text-gray-100">
                           {downloading
-                            ? "Downloading Backup"
+                            ? t("Downloading Backup")
                             : uploading
-                            ? "Replacing Database"
-                            : "Restoring Database"}
+                            ? t("Replacing Database")
+                            : t("Restoring Database")}
                         </h3>
                         <p className="text-default-600 dark:text-gray-300">
                           {downloading
                             ? downloadedBytes !== null
-                              ? `Downloading SQL backup... ${(
-                                  downloadedBytes /
-                                  (1024 * 1024)
-                                ).toFixed(1)} MB received`
-                              : "Preparing the SQL backup download..."
+                              ? t(
+                                  "Downloading SQL backup... {{received}} MB received",
+                                  {
+                                    received: (
+                                      downloadedBytes /
+                                      (1024 * 1024)
+                                    ).toFixed(1),
+                                  }
+                                )
+                              : t("Preparing the SQL backup download...")
                             : restorePhase === "INITIALIZATION"
-                            ? "Preparing database replacement..."
+                            ? t("Preparing database replacement...")
                             : restorePhase === "DATABASE_VALIDATION"
-                            ? "Validating the SQL backup in a temporary database..."
+                            ? t(
+                                "Validating the SQL backup in a temporary database..."
+                              )
                             : restorePhase === "DATABASE_REPLACE"
-                            ? "Replacing the current database..."
+                            ? t("Replacing the current database...")
                             : restorePhase === "CLEANUP"
-                            ? "Removing the previous database..."
+                            ? t("Removing the previous database...")
                             : restorePhase === "DATABASE_RESTORE"
                             ? uploading
-                              ? "Loading the selected SQL backup..."
-                              : "Restoring database from backup..."
+                              ? t("Loading the selected SQL backup...")
+                              : t("Restoring database from backup...")
                             : restorePhase === "SESSION_RESTORE"
-                            ? "Restoring active sessions..."
+                            ? t("Restoring active sessions...")
                             : restorePhase === "COOLDOWN"
-                            ? "Finalizing restore process..."
+                            ? t("Finalizing restore process...")
                             : uploading
-                            ? "Please wait while the database is being replaced"
-                            : "Please wait while the database is being restored"}
+                            ? t("Please wait while the database is being replaced")
+                            : t(
+                                "Please wait while the database is being restored"
+                              )}
                         </p>
                         <p className="text-sm text-default-500 dark:text-gray-400">
                           {downloading
-                            ? "Large backups can take several minutes. Closing this window cancels the download."
-                            : "Please keep this window open until it finishes."}
+                            ? t(
+                                "Large backups can take several minutes. Closing this window cancels the download."
+                              )
+                            : t("Please keep this window open until it finishes.")}
                         </p>
                       </div>
                     </div>
@@ -932,9 +958,11 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
           setSelectedBackup(null);
         }}
         onConfirm={handleRestore}
-        title="Confirm Database Restore"
-        message="Please ensure all users have saved their work before proceeding. Are you sure you want to restore this backup?"
-        confirmButtonText="Yes, Restore Database"
+        title={t("Confirm Database Restore")}
+        message={t(
+          "Please ensure all users have saved their work before proceeding. Are you sure you want to restore this backup?"
+        )}
+        confirmButtonText={t("Yes, Restore Database")}
         variant="default"
       />
 
@@ -942,27 +970,33 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
         isOpen={isSqlReplacementAvailable && showSqlReplaceConfirmDialog}
         onClose={closeSqlReplaceConfirmation}
         onConfirm={handleReplaceDatabaseFromSql}
-        title="Replace Entire Database?"
+        title={t("Replace Entire Database?")}
         message={
           <div className="space-y-3">
             <p>
-              This validates the selected SQL backup first, then permanently
-              replaces all current data in <strong>{DB_NAME}</strong>.
+              <Trans
+                t={t}
+                i18nKey="This validates the selected SQL backup first, then permanently replaces all current data in <strong>{{db}}</strong>."
+                values={{ db: DB_NAME }}
+                components={{ strong: <strong /> }}
+              />
             </p>
             <p className="break-all rounded-lg bg-default-100 px-3 py-2 font-medium text-default-700 dark:bg-gray-700 dark:text-gray-200">
               {sqlFileToReplaceFrom?.name}
             </p>
             <p>
-              Data that is not in this backup will be deleted. Make sure all
-              users have saved their work before continuing.
+              {t(
+                "Data that is not in this backup will be deleted. Make sure all users have saved their work before continuing."
+              )}
             </p>
             <p>
-              Only continue with a trusted PostgreSQL backup from your own
-              production system; database dumps contain executable definitions.
+              {t(
+                "Only continue with a trusted PostgreSQL backup from your own production system; database dumps contain executable definitions."
+              )}
             </p>
           </div>
         }
-        confirmButtonText="Yes, Replace Database"
+        confirmButtonText={t("Yes, Replace Database")}
         variant="danger"
       />
 
@@ -973,9 +1007,11 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
           setBackupToDelete(null);
         }}
         onConfirm={handleDelete}
-        title="Confirm Backup Deletion"
-        message="Are you sure you want to delete this backup? This action cannot be undone."
-        confirmButtonText="Yes, Delete Backup"
+        title={t("Confirm Backup Deletion")}
+        message={t(
+          "Are you sure you want to delete this backup? This action cannot be undone."
+        )}
+        confirmButtonText={t("Yes, Delete Backup")}
         variant="danger"
       />
     </>

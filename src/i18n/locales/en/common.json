@@ -40,6 +40,8 @@
   "type": "Type",
   "from": "From",
   "to": "To",
+  "day": "Day",
+  "range": "Range",
   "month": "Month",
   "year": "Year",
   "customer": "Customer",

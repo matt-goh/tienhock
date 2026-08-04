@@ -1,6 +1,6 @@
 # I18N (Multi-Language) Rollout Handover
 
-**Status:** Phase 0 (infrastructure + pilot) **DONE 2026-08-04** — ready for Opus batches (start at B1).
+**Status:** Phase 0 **DONE 2026-08-04**. B1 (`common`, shared top-level components) **DONE 2026-08-04** — next batch is **B2**.
 **Created:** 2026-08-04
 **Owner of this document:** update it after EVERY phase/batch. It is the single source of truth for what is done and what is next.
 
@@ -236,6 +236,8 @@ Keep statutory acronyms untranslated (EPF, SOCSO, SIP, PCB, KWSP, PERKESO). Mala
 - **Server-side error messages** (Express responses surfaced via `err.response.data.message` in toasts) — currently English. Option: map known server message prefixes client-side in `misc.json`. Deferred; revisit after UI batches.
 - **date-fns month/day names** — if any picker renders month names in English (`DateNavigator`, `MonthNavigator`), decide per-language month names when B1 hits them; numeric formats stay.
 - **Plural cases** — record any encountered here:
+  - None yet. B1 deliberately avoided the i18next `count` option (which activates plural key resolution) for `Load more... ({{hidden}} more)` — the variable is named `hidden`, so the single flat key resolves.
+- **date-fns month/day names** — RESOLVED in B1 for the picker grids only: `MonthNavigator`/`TimeNavigator` keep their raw English `MONTH_LABELS`/`WEEKDAY_LABELS` arrays as React keys and translate only at render (`{t(monthLabel)}`), so `common` now carries `Jan`…`Dec` and `Mo`…`Su`. The **trigger/display** strings still come from `toLocaleDateString("en-MY", …)` and remain English in every language, per §4's "date formats stay as-is". Revisit only if the user asks for localized long month names.
 
 ---
 
@@ -244,6 +246,7 @@ Keep statutory acronyms untranslated (EPF, SOCSO, SIP, PCB, KWSP, PERKESO). Mala
 | Date | Batch | Files converted | Keys added (ms/zh-Hans) | Skipped | Notes |
 |---|---|---|---|---|---|
 | 2026-08-04 | Phase 0 | `src/i18n/**`, `src/index.tsx`, `Navbar*.tsx` (5), `NavbarUserMenu.tsx`, `HomePage.tsx`, `ChangelogModal.tsx`, `dev/i18n-report.mjs`, `AGENTS.md` rule 20 | common 48 + nav 155 + home 19 (each language) | — | Switcher live in user menu; sidebar/home translated; `npm run i18n:report` green; `tsc --noEmit` clean |
+| 2026-08-04 | B1 (`common`) | 13 of 22: `BackButton`, `BackupModal`, `ConfirmationDialog`, `ContributionListbox`, `DateNavigator`, `DateRangePicker`, `FormComponents`, `ListboxSelect`, `LoadingSpinner`, `MonthNavigator`, `StatusIndicator`, `StyledListbox`, `TimeNavigator` | common +115 (ms + zh-Hans each); `en/common.json` +2 semantic keys (`day`, `range`) | `Button`, `Checkbox`, `PillSelect`, `Tab`, `SafeLink`, `HoverTooltip`, `ToolTip`, `CompanySwitcher` (no own literals — all text arrives via props/DB); `ChangelogModal` (done in Phase 0) | Also fixed i18n init (see B1 notes). `npm run i18n:report` green; `tsc --noEmit` clean. No changelog entry — Phase 0's entry already announces staged page-by-page coverage |
 
 ### Phase 0 implementation notes (for batch workers)
 
@@ -251,4 +254,14 @@ Keep statutory acronyms untranslated (EPF, SOCSO, SIP, PCB, KWSP, PERKESO). Mala
 - `ChangelogModal` follows the app language on open (zh → English entries; the corpus stays ms/en per §8) but keeps its own BM/ENG toggle.
 - Several files (e.g. `NavbarUserMenu.tsx`, `NavbarMenu.tsx`, `NavbarDropdown.tsx`) have **mixed CRLF/LF line endings**; single-line edits match reliably, multi-line blocks across CRLF regions may not — keep edits small or check with `cat -A`.
 - The language switcher is in `NavbarUserMenu.tsx` (3-button segmented row). Detection: localStorage → browser locale; `zh-*` → `zh-Hans`, unmatched → `ms` (`resolveLanguage` in `src/i18n/index.ts`).
+### B1 implementation notes (read before B2)
+
+- **`src/i18n/index.ts` now sets `keySeparator: false` and `nsSeparator: false`.** This is a required correction to Phase 0, not a preference: with i18next's defaults, `.` is a nested-path separator and `:` is a namespace separator, so English-as-key sentences like `"Nothing found."` or `"Download failed with status: {{status}}"` were being parsed as paths/namespaces instead of looked up flat. All locale files are flat, so nothing else changes. **Every later batch depends on this** — sentence keys with punctuation are the norm from here on.
+- **Default prop values that were display strings** (`placeholder = "Select..."`, `placeholder = "Search..."`, `placeholder = "All dates"`, `children = "Back"`) were changed to optional props resolved at the render site (`placeholder ?? t("Select...")`). Callers are unaffected; the string can no longer be baked in before the hook runs.
+- **Short high-frequency words use the §3 semantic keys** (`t("cancel")`, `t("confirm")`, `t("create")`, `t("delete")`, `t("download")`, `t("actions")`, `t("back")`, `t("to")`) — these resolve in English through `en/common.json`. Only use a semantic key that already exists in `en/common.json`; anything else must be English-as-key or English renders the raw key. `day` and `range` were added for `TimeNavigator`'s granularity tabs.
+- **One deliberate English text change:** `DateRangePicker`'s separator between the two date inputs was the lowercase word `to` and now renders `t("to")` → "To" / "Hingga" / "至".
+- **`BackupModal` uses `<Trans>` once** for the "…replaces all current data in **{db}**." sentence, to keep the `<strong>` around the database name without splitting the sentence (§3 forbids concatenating fragments). Pattern: `i18nKey` carries `<strong>{{db}}</strong>`, `components={{ strong: <strong /> }}`. Reuse this whenever a sentence has inline markup.
+- **`t` added to `useCallback`/`useEffect` dependency arrays** in `BackupModal` (`fetchBackups`, `checkRestoreStatus`, the navigation-lock effect). `t` changes identity on language switch, which is what makes an open modal re-render in the new language.
+- Skipped files are skipped because they own no literals — if a later batch adds one, the file has to be converted then.
+
 - Manual smoke test passed? → **pending user verification** (dev server: switch language in user menu, confirm navbar + sidebar + HomePage re-render in all 3 languages, confirm a `zh-CN` browser profile defaults to 简体中文 and an unmatched locale defaults to Bahasa Melayu).
