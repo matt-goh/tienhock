@@ -21,6 +21,21 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-04",
+    ms: "Laporan gaji tahunan (mengikut nama dan mengikut lokasi) kini menggabungkan pekerja yang mempunyai lebih daripada satu ID kakitangan kepada satu baris sahaja — contohnya JASSON_ROLL dan JASSON_PM kini dipaparkan sebagai satu baris JASSON JIEM dengan jumlah yang dicampurkan.",
+    en: "The yearly salary report (by name and by location) now combines workers who have more than one staff ID into a single row — e.g. JASSON_ROLL and JASSON_PM now appear as one JASSON JIEM row with the amounts added together.",
+  },
+  {
+    date: "2026-08-04",
+    ms: "Laporan Gaji: tab \"Location\" kini tersedia untuk Green Target dan diperbaiki untuk Jelly Polly, sama seperti Tien Hock. Ia memaparkan satu baris jumlah keseluruhan bagi setiap bahagian kerja (contohnya Director's Remuneration, Office, Pengangkutan Habuk) beserta jumlah besar — sebelum ini tab Green Target dihimpunkan mengikut jenis pekerjaan (Office/Driver), manakala tab Jelly Polly menyenaraikan setiap pekerja satu persatu tanpa ringkasan jumlah setiap bahagian. Cetakan PDF tab ini turut menggunakan susun atur ringkasan yang sama.",
+    en: "Salary Report: the \"Location\" tab is now available for Green Target and improved for Jelly Polly, just like Tien Hock. It shows one lump-sum totals row per work section (e.g. Director's Remuneration, Office, Pengangkutan Habuk) plus a grand total — previously the Green Target tab was grouped by job type (Office/Driver), while the Jelly Polly tab listed every employee individually without per-section totals. The tab's PDF printout uses the same summary layout.",
+  },
+  {
+    date: "2026-08-04",
+    ms: "Pembaikan Penjana Baucar (Voucher Generator): jumlah baucar JVSL (gaji pekerja) sebelum ini kurang daripada Ringkasan Payroll apabila Jurujual mempunyai bayaran C/I/O — contohnya Julai 2026 terkurang RM251.37. Jumlah baucar kini sepadan tepat dengan baris JV-WORKERS pada Ringkasan Payroll. Jika baucar bulan ini sudah dijana, sila batalkan dan jana semula.",
+    en: "Voucher Generator fix: the JVSL (workers salary) voucher total previously fell short of the Payroll Summary whenever the Salesman had C/I/O pay — July 2026 was short by exactly RM251.37. The voucher total now matches the JV-WORKERS row of the Payroll Summary exactly. If this month's voucher was already generated, please cancel and regenerate it.",
+  },
+  {
+    date: "2026-08-04",
     ms: "Sistem kini menyokong tiga bahasa: English, Bahasa Melayu dan 简体中文. Bahasa lalai mengikut tetapan bahasa peranti anda, dan anda boleh menukarnya bila-bila masa melalui menu pengguna di penjuru atas kanan (baris \"Bahasa\"). Buat masa ini bar navigasi, menu dan halaman utama telah diterjemahkan; halaman lain akan menyusul secara berperingkat.",
     en: "The system now supports three languages: English, Bahasa Melayu and 简体中文. The default language follows your device's language setting, and you can change it anytime from the user menu at the top right (the \"Language\" row). For now the navigation bar, menus and home page are translated; other pages will follow in stages.",
   },

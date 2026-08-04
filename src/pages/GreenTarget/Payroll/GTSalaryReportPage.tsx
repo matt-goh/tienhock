@@ -53,14 +53,12 @@ const GT_COMPANY = "GREEN TARGET WASTE TREATMENT IND. SDN. BHD.";
 
 // Tabs whose data all comes from the single monthly salary-report endpoint.
 const MONTHLY_TABS = ["employee", "monthly", "bank", "pinjam"] as const;
-const LOCATION_MAP: Record<string, string> = {
-  OFFICE: "Office",
-  DRIVER: "Driver Lori Habuk",
-};
-const LOCATION_ORDER = [
-  { type: "location" as const, id: "OFFICE" },
-  { type: "location" as const, id: "DRIVER" },
-];
+
+// Build the PDF's locationOrder from a location_map (codes sorted ascending).
+const buildLocationOrder = (map: Record<string, string>) =>
+  Object.keys(map)
+    .sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0))
+    .map((id) => ({ type: "location" as const, id }));
 
 interface Totals {
   gaji: number;
@@ -98,6 +96,7 @@ interface Comprehensive {
   month: number;
   locations: LocationData[];
   grand_totals: Totals;
+  location_map: Record<string, string>;
   // Employee / Bank / Pinjam tabs are served by the same monthly endpoint.
   employees: EmpRow[];
   employees_grand_totals: Totals;
@@ -125,6 +124,7 @@ interface AnnualSummary {
   monthly: { month: number; totals: Totals }[];
   locations: { location: string; totals: Totals }[];
   grand_totals: Totals;
+  location_map: Record<string, string>;
 }
 interface AnnualBreakdown {
   year: number;
@@ -188,10 +188,10 @@ const TABS: TabType[] = [
   "annual",
 ];
 
-// GT has no locations, so its equivalent of TH's Location tab groups by job.
+// GT groups by the shared staff Location field, so its Location tab mirrors TH's.
 const TAB_LABELS: Record<TabType, string> = {
   employee: "Employee",
-  monthly: "Job",
+  monthly: "Location",
   bank: "Bank",
   pinjam: "Pinjam",
   cuti: "Cuti",
@@ -262,6 +262,7 @@ const GTSalaryReportPage: React.FC = () => {
   const [pinjamSummary, setPinjamSummary] = useState<PinjamSummaryEntry[]>([]);
   const [annual, setAnnual] = useState<AnnualSummary | null>(null);
   const [breakdown, setBreakdown] = useState<AnnualBreakdown | null>(null);
+  const [locationMap, setLocationMap] = useState<Record<string, string>>({});
 
   // `isLoading` starts false, so the ready flag also waits for content —
   // otherwise the restore fires against an empty page and clamps to 0.
@@ -330,6 +331,7 @@ const GTSalaryReportPage: React.FC = () => {
             }),
         ]);
         setMonthly(res);
+        if (res?.location_map) setLocationMap(res.location_map);
         setPinjamSummary(
           Array.isArray(pinjamResponse)
             ? (pinjamResponse as PinjamSummaryEntry[])
@@ -348,6 +350,7 @@ const GTSalaryReportPage: React.FC = () => {
           `/greentarget/api/salary-report/annual?year=${currentYear}`
         );
         setAnnual(res);
+        if (res?.location_map) setLocationMap(res.location_map);
       } else {
         const res = await api.get(
           `/greentarget/api/salary-report/annual-breakdown?year=${currentYear}`
@@ -768,8 +771,8 @@ const GTSalaryReportPage: React.FC = () => {
             month: currentMonth,
             employees: monthly.employees as any,
             grandTotals: monthly.employees_grand_totals as any,
-            locationMap: LOCATION_MAP,
-            locationOrder: LOCATION_ORDER,
+            locationMap: locationMap,
+            locationOrder: buildLocationOrder(locationMap),
             companyName: GT_COMPANY,
           },
           action
@@ -832,14 +835,14 @@ const GTSalaryReportPage: React.FC = () => {
         }
         await generateSalaryReportPDF(
           {
-            reportType: "employee-grouped",
+            reportType: "location",
             periodType: "monthly",
             year: currentYear,
             month: currentMonth,
             comprehensiveData: monthly as any,
             grandTotals: monthly.grand_totals as any,
-            locationMap: LOCATION_MAP,
-            locationOrder: LOCATION_ORDER,
+            locationMap: locationMap,
+            locationOrder: buildLocationOrder(locationMap),
             companyName: GT_COMPANY,
           },
           action
@@ -855,10 +858,9 @@ const GTSalaryReportPage: React.FC = () => {
             periodType: "yearly",
             year: currentYear,
             annualData: annual as any,
-            locationMap: LOCATION_MAP,
-            locationOrder: LOCATION_ORDER,
+            locationMap: locationMap,
+            locationOrder: buildLocationOrder(locationMap),
             companyName: GT_COMPANY,
-            showLocationCodes: false,
           },
           action
         );
@@ -873,10 +875,9 @@ const GTSalaryReportPage: React.FC = () => {
             periodType: "yearly",
             year: currentYear,
             annualBreakdownData: breakdown as any,
-            locationMap: LOCATION_MAP,
-            locationOrder: LOCATION_ORDER,
+            locationMap: locationMap,
+            locationOrder: buildLocationOrder(locationMap),
             companyName: GT_COMPANY,
-            showLocationCodes: false,
           },
           action
         );
@@ -1403,53 +1404,29 @@ const GTSalaryReportPage: React.FC = () => {
             ) : (
               <table className="w-full table-fixed">
                 {renderTableColGroup()}
-                {renderSalaryHeader("NAMA PEKERJA")}
+                {renderSalaryHeader("BAHAGIAN KERJA")}
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                  {monthly.locations.map((loc) => (
-                    <React.Fragment key={loc.location}>
-                      <tr className="bg-sky-50 dark:bg-sky-900/20">
-                        <td
-                          colSpan={TABLE_COLUMN_COUNT}
-                          className="px-4 py-2 text-sm font-semibold text-sky-800 dark:text-sky-300 border-y border-default-200 dark:border-gray-700"
-                        >
-                          {loc.location} -{" "}
-                          {(LOCATION_MAP[loc.location] || loc.location).toUpperCase()}
-                        </td>
-                      </tr>
-                      {loc.employees.map((emp, index: number) => (
-                        <tr
-                          key={emp.employee_payroll_id}
-                          className={
-                            index % 2 === 0
-                              ? "bg-white dark:bg-gray-800"
-                              : "bg-default-25 dark:bg-gray-750"
-                          }
-                        >
-                          <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 text-center">
-                            {index + 1}
-                          </td>
-                          <td className={bodyNameCellClass}>
-                            <span
-                              className="block truncate"
-                              title={`${emp.staff_id.toUpperCase()} - ${emp.staff_name.toUpperCase()}`}
-                            >
-                              {emp.staff_id.toUpperCase()} -{" "}
-                              {emp.staff_name.toUpperCase()}
-                            </span>
-                          </td>
-                          {renderAmountCells(emp)}
-                        </tr>
-                      ))}
-                      <tr>
-                        <td
-                          colSpan={2}
-                          className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600"
-                        >
-                          SUBTOTAL
-                        </td>
-                        {renderAmountCells(loc.totals, true)}
-                      </tr>
-                    </React.Fragment>
+                  {monthly.locations.map((loc, index: number) => (
+                    <tr
+                      key={loc.location}
+                      className={
+                        index % 2 === 0
+                          ? "bg-white dark:bg-gray-800"
+                          : "bg-default-25 dark:bg-gray-750"
+                      }
+                    >
+                      <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 text-center">
+                        {loc.location}
+                      </td>
+                      <td className={bodyNameCellClass}>
+                        <span className="block truncate">
+                          {(
+                            locationMap[loc.location] || loc.location
+                          ).toUpperCase()}
+                        </span>
+                      </td>
+                      {renderAmountCells(loc.totals)}
+                    </tr>
                   ))}
                 </tbody>
                 <tfoot className="sticky bottom-0 z-20">
@@ -1505,7 +1482,7 @@ const GTSalaryReportPage: React.FC = () => {
                         colSpan={2}
                         className="px-3 py-2 text-xs font-semibold text-sky-800 dark:text-sky-300 text-left"
                       >
-                        {LOCATION_MAP[loc.location] || loc.location} (YEAR)
+                        {locationMap[loc.location] || loc.location} (YEAR)
                       </td>
                       {renderAmountCells(loc.totals, true)}
                     </tr>
@@ -1544,7 +1521,7 @@ const GTSalaryReportPage: React.FC = () => {
                           colSpan={TABLE_COLUMN_COUNT}
                           className="px-4 py-2 text-sm font-semibold text-sky-800 dark:text-sky-300 border-y border-default-200 dark:border-gray-700"
                         >
-                          {(LOCATION_MAP[loc.location] || loc.location).toUpperCase()}
+                          {(locationMap[loc.location] || loc.location).toUpperCase()}
                         </td>
                       </tr>
                       {loc.employees.map((emp) => (
@@ -1592,7 +1569,7 @@ const GTSalaryReportPage: React.FC = () => {
                           colSpan={2}
                           className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600"
                         >
-                          {LOCATION_MAP[loc.location] || loc.location} Total
+                          {locationMap[loc.location] || loc.location} Total
                         </td>
                         {renderAmountCells(loc.totals, true)}
                       </tr>
