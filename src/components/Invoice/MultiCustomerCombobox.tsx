@@ -8,6 +8,7 @@ import {
 } from "@headlessui/react";
 import { IconChevronDown, IconCheck, IconArrowDown } from "@tabler/icons-react";
 import { useState, useEffect, Fragment } from "react";
+import { useTranslation } from "react-i18next";
 import clsx from "clsx";
 
 interface SelectOption {
@@ -41,9 +42,10 @@ export const MultiCustomerCombobox: React.FC<ComboboxProps> = ({
   onLoadMore,
   hasMore,
   isLoading,
-  placeholder = "Search or select customers...",
+  placeholder,
   disabled = false,
 }) => {
+  const { t } = useTranslation("invoice");
   // Track all options we've seen to ensure we can display selected items
   const [seenOptions, setSeenOptions] = useState<Record<string, SelectOption>>(
     {}
@@ -127,13 +129,13 @@ export const MultiCustomerCombobox: React.FC<ComboboxProps> = ({
               onChange={(event) => setQuery(event.target.value)}
               displayValue={() =>
                 selectedOptions.length > 0
-                  ? `${selectedOptions.length} selected`
+                  ? t("{{total}} selected", { total: selectedOptions.length })
                   : ""
               }
               placeholder={
                 selectedOptions.length > 0
-                  ? `${selectedOptions.length} selected`
-                  : placeholder
+                  ? t("{{total}} selected", { total: selectedOptions.length })
+                  : placeholder ?? t("Search or select customers...")
               }
               disabled={disabled}
             />
@@ -155,12 +157,12 @@ export const MultiCustomerCombobox: React.FC<ComboboxProps> = ({
             <ComboboxOptions className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none sm:text-sm">
               {isLoading && query !== "" && (
                 <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
-                  Loading...
+                  {t("Loading...", { ns: "common" })}
                 </div>
               )}
               {!isLoading && filteredOptions.length === 0 && query !== "" ? (
                 <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
-                  Nothing found.
+                  {t("Nothing found.", { ns: "common" })}
                 </div>
               ) : (
                 filteredOptions.map((option) => (
@@ -205,7 +207,7 @@ export const MultiCustomerCombobox: React.FC<ComboboxProps> = ({
                     disabled={isLoading}
                   >
                     <IconArrowDown size={16} className="mr-1.5" />
-                    <span>Load More Customers</span>
+                    <span>{t("Load More Customers")}</span>
                   </button>
                 </div>
               )}

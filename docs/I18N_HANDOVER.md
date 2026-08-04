@@ -1,6 +1,6 @@
 # I18N (Multi-Language) Rollout Handover
 
-**Status:** Phase 0 **DONE 2026-08-04**. B1 (`common`, shared top-level components) **DONE 2026-08-04** — next batch is **B2**.
+**Status:** Phase 0 **DONE 2026-08-04**. B1 (`common`) **DONE 2026-08-04**. B3 (`invoice`) **PART 1 of 2 DONE 2026-08-04** — 16 of 23 files converted; see §9. Next: **B3 part 2** (the 7 remaining Invoice files, listed in the Batch Log), then **B2**.
 **Created:** 2026-08-04
 **Owner of this document:** update it after EVERY phase/batch. It is the single source of truth for what is done and what is next.
 
@@ -246,6 +246,7 @@ Keep statutory acronyms untranslated (EPF, SOCSO, SIP, PCB, KWSP, PERKESO). Mala
 | Date | Batch | Files converted | Keys added (ms/zh-Hans) | Skipped | Notes |
 |---|---|---|---|---|---|
 | 2026-08-04 | Phase 0 | `src/i18n/**`, `src/index.tsx`, `Navbar*.tsx` (5), `NavbarUserMenu.tsx`, `HomePage.tsx`, `ChangelogModal.tsx`, `dev/i18n-report.mjs`, `AGENTS.md` rule 20 | common 48 + nav 155 + home 19 (each language) | — | Switcher live in user menu; sidebar/home translated; `npm run i18n:report` green; `tsc --noEmit` clean |
+| 2026-08-04 | B3 part 1 (`invoice`) | 16 of 23: `InvoiceGrid`, `PaymentCancellationErrorDialog`, `Pagination`, `ConsolidatedInfoTooltip`, `InvoiceTotals`, `CustomerCombobox`, `LinkedPaymentsTooltip`, `InvoiceSelectionTable`, `MultiCustomerCombobox`, `InvoiceHeader`, `InvoiceCard`, `LineItemsTable`, `InvoiceDailyPrintMenu`, `SubmissionResultsModal`, `InvoiceFilterMenu`, `ReceiptDetailsDialog` | new `invoice` namespace: 220 keys (ms + zh-Hans each) | **Still to do (B3 part 2):** `PaymentTable` (1,117 lines), `ConsolidatedInvoiceModal` (1,615), `PaymentForm` (1,770), `ConsolidatedInvoiceDetailsPage` (748), `InvoiceFormPage` (994), `InvoiceListPage` (2,038), `InvoiceDetailsPage` (3,742) | No PDF files exist under these globs, so §4.1 excluded nothing. `npm run i18n:report` green; `tsc --noEmit` clean. Every touched file is fully converted — none left half-done |
 | 2026-08-04 | B1 (`common`) | 13 of 22: `BackButton`, `BackupModal`, `ConfirmationDialog`, `ContributionListbox`, `DateNavigator`, `DateRangePicker`, `FormComponents`, `ListboxSelect`, `LoadingSpinner`, `MonthNavigator`, `StatusIndicator`, `StyledListbox`, `TimeNavigator` | common +115 (ms + zh-Hans each); `en/common.json` +2 semantic keys (`day`, `range`) | `Button`, `Checkbox`, `PillSelect`, `Tab`, `SafeLink`, `HoverTooltip`, `ToolTip`, `CompanySwitcher` (no own literals — all text arrives via props/DB); `ChangelogModal` (done in Phase 0) | Also fixed i18n init (see B1 notes). `npm run i18n:report` green; `tsc --noEmit` clean. No changelog entry — Phase 0's entry already announces staged page-by-page coverage |
 
 ### Phase 0 implementation notes (for batch workers)
@@ -254,6 +255,17 @@ Keep statutory acronyms untranslated (EPF, SOCSO, SIP, PCB, KWSP, PERKESO). Mala
 - `ChangelogModal` follows the app language on open (zh → English entries; the corpus stays ms/en per §8) but keeps its own BM/ENG toggle.
 - Several files (e.g. `NavbarUserMenu.tsx`, `NavbarMenu.tsx`, `NavbarDropdown.tsx`) have **mixed CRLF/LF line endings**; single-line edits match reliably, multi-line blocks across CRLF regions may not — keep edits small or check with `cat -A`.
 - The language switcher is in `NavbarUserMenu.tsx` (3-button segmented row). Detection: localStorage → browser locale; `zh-*` → `zh-Hans`, unmatched → `ms` (`resolveLanguage` in `src/i18n/index.ts`).
+### B3 implementation notes (read before B3 part 2)
+
+- **Namespace registered:** `invoice` is wired into `src/i18n/index.ts` for `ms` and `zh-Hans`. Part 2 only adds keys — no init changes needed.
+- **Cross-namespace lookups use the options form**, never a colon: `t("cancel", { ns: "common" })`. `nsSeparator` is `false` (B1 note), so `t("common:cancel")` would be treated as a literal key and silently render the raw string.
+- **Status labels are translated at the render sink only.** `InvoiceCard` compares `invoiceStatusStyle.label === "Unpaid" | "Overdue"` to decide whether the badge opens the payment form, and `SubmissionResultsModal`/`ReceiptDetailsDialog` branch on raw server statuses. The helpers (`getInvoiceDisplayStatusLabel` in `src/utils/invoice/invoiceDisplayStatus.ts`, and the local `getStatusLabel`/`getDocInfo`) still return **English**; only `{t(label)}` in JSX is translated. Do not "tidy" this by translating inside the helpers — it would break the click behaviour.
+- **Dropdown/filter options:** in `InvoiceFilterMenu` every `id` (`"paid"`, `"Unpaid"`, `"Cash"`, `"null"`, …) is the raw filter/API value and is untouched; only `name` is wrapped. Same rule in `InvoiceHeader`, where the `"I"`/`"C"` pill values stay raw and the options moved into a `useMemo` so the labels can be translated.
+- **Module-level helpers that build display text** (`ReceiptDetailsDialog`'s `getAllocationTitle`, `getStatusLabel`, `formatReceiptDate`) now take `t: TFunction` as their last parameter — they sit outside the component and cannot call the hook.
+- **Phrase-level interpolation** is used for the cancellation/confirmation sentences in `ReceiptDetailsDialog` (`{{scope}}` is itself a translated noun phrase). This is the documented escape hatch when a sentence has too many shapes for one key; it is still never word-level concatenation (§3).
+- **Manual plurals** (no i18next `count`): `("{{total}} more issue)"/"issues"`, `"{{total}} payment"/"payments"`, `"Cheque number"/"numbers"`, `"Journal entry"/"entries"`, `"{{total}} payment amount"/"amounts"`. Interpolation variables are deliberately **not** named `count`, which would activate plural-key resolution and miss the flat key.
+- **Not translated on purpose:** `item.description = "LESS AMOUNT"` in `LineItemsTable` (persisted invoice line data, §4.2), the `invoiceStatus` API query string in `InvoiceDailyPrintMenu`, and all salesman/customer/product names.
+
 ### B1 implementation notes (read before B2)
 
 - **`src/i18n/index.ts` now sets `keySeparator: false` and `nsSeparator: false`.** This is a required correction to Phase 0, not a preference: with i18next's defaults, `.` is a nested-path separator and `:` is a namespace separator, so English-as-key sentences like `"Nothing found."` or `"Download failed with status: {{status}}"` were being parsed as paths/namespaces instead of looked up flat. All locale files are flat, so nothing else changes. **Every later batch depends on this** — sentence keys with punctuation are the norm from here on.

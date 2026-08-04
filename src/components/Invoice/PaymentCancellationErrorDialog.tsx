@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import type { PaymentCancellationErrorData } from "../../types/types";
 import Button from "../Button";
 import ConfirmationDialog from "../ConfirmationDialog";
@@ -13,6 +14,7 @@ interface PaymentCancellationErrorDialogProps {
 const PaymentCancellationErrorDialog: React.FC<
   PaymentCancellationErrorDialogProps
 > = ({ error, onClose, onViewPaymentGroup, onViewJournal }) => {
+  const { t } = useTranslation("invoice");
   const receiptId: number | undefined = error?.receipt_id;
   const journalEntryId: number | null | undefined =
     error?.receipt_journal_id;
@@ -22,11 +24,11 @@ const PaymentCancellationErrorDialog: React.FC<
       isOpen={error !== null}
       onClose={onClose}
       onConfirm={onClose}
-      title={error?.message || "This payment could not be cancelled."}
+      title={error?.message || t("This payment could not be cancelled.")}
       message={
         <div className="space-y-4">
           <p>
-            {error?.detail || "Please review the payment and try again."}
+            {error?.detail || t("Please review the payment and try again.")}
           </p>
           {(receiptId || journalEntryId) && (
             <div className="flex flex-wrap gap-2">
@@ -38,8 +40,10 @@ const PaymentCancellationErrorDialog: React.FC<
                   onClick={() => onViewPaymentGroup(receiptId)}
                 >
                   {error?.receipt_reference
-                    ? `View Payment Group ${error.receipt_reference}`
-                    : "View Related Payments"}
+                    ? t("View Payment Group {{reference}}", {
+                        reference: error.receipt_reference,
+                      })
+                    : t("View Related Payments")}
                 </Button>
               )}
               {journalEntryId && (
@@ -50,17 +54,18 @@ const PaymentCancellationErrorDialog: React.FC<
                   color="default"
                   onClick={() => onViewJournal(journalEntryId)}
                 >
-                  View Journal
                   {error?.receipt_journal_reference_no
-                    ? ` ${error.receipt_journal_reference_no}`
-                    : ""}
+                    ? t("View Journal {{reference}}", {
+                        reference: error.receipt_journal_reference_no,
+                      })
+                    : t("View Journal")}
                 </Button>
               )}
             </div>
           )}
         </div>
       }
-      confirmButtonText="Close"
+      confirmButtonText={t("close", { ns: "common" })}
       variant="default"
       hideCancelButton
     />
