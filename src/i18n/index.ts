@@ -7,9 +7,11 @@ import enCommon from "./locales/en/common.json";
 import msCommon from "./locales/ms/common.json";
 import msNav from "./locales/ms/nav.json";
 import msHome from "./locales/ms/home.json";
+import msInvoice from "./locales/ms/invoice.json";
 import zhHansCommon from "./locales/zh-Hans/common.json";
 import zhHansNav from "./locales/zh-Hans/nav.json";
 import zhHansHome from "./locales/zh-Hans/home.json";
+import zhHansInvoice from "./locales/zh-Hans/invoice.json";
 
 export const SUPPORTED_LANGUAGES = ["en", "ms", "zh-Hans"] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
@@ -45,8 +47,13 @@ void i18n
   .init({
     resources: {
       en: { common: enCommon },
-      ms: { common: msCommon, nav: msNav, home: msHome },
-      "zh-Hans": { common: zhHansCommon, nav: zhHansNav, home: zhHansHome },
+      ms: { common: msCommon, nav: msNav, home: msHome, invoice: msInvoice },
+      "zh-Hans": {
+        common: zhHansCommon,
+        nav: zhHansNav,
+        home: zhHansHome,
+        invoice: zhHansInvoice,
+      },
     },
     defaultNS: "common",
     fallbackLng: "en",
