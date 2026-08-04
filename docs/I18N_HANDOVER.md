@@ -1,6 +1,6 @@
 # I18N (Multi-Language) Rollout Handover
 
-**Status:** Phase 0 (infrastructure) planned — not yet implemented.
+**Status:** Phase 0 (infrastructure + pilot) **DONE 2026-08-04** — ready for Opus batches (start at B1).
 **Created:** 2026-08-04
 **Owner of this document:** update it after EVERY phase/batch. It is the single source of truth for what is done and what is next.
 
@@ -142,6 +142,13 @@ One batch ≈ one module below. Run them in the listed order (most-used first). 
 7. Report: files converted, keys added per language, files skipped (with reason), any strings you were unsure how to translate (list them, don't guess silently).
 8. Append one line per finished batch to the Batch Log (§9) in this handover.
 
+**Functional safety (the whole point of this rollout — a translated UI must never change behaviour):**
+
+9. `t()` belongs ONLY at the final display sink: JSX text, JSX attributes (`placeholder`/`title`/`aria-label`), toast/dialog arguments. NEVER inside comparisons (`===`, `!==`, `.includes()`), `filter`/`find`/`sort` predicates, `switch` cases, Map/Set/object keys, `localStorage`/`sessionStorage` reads/writes, URL/route construction, API request bodies or params, regex/parsing, or SQL. If you are unsure whether a string is double-duty (displayed AND used in logic), treat it as logic and leave it raw.
+10. Dropdown/listbox options that map a label to a value: translate the LABEL only; the underlying `value` stays the raw English/original string.
+11. Never translate anything persisted (DB rows, cached bookmarks, saved filters) or sent to the server — the pilot proves the pattern: bookmarks store English names, only the render is wrapped.
+12. Self-check before finishing a batch: `grep` your diff for every `t(` that is NOT inside JSX or a toast/dialog call and justify each one; then in the UI switch language once and re-run the page's search/filter to confirm results are unchanged.
+
 | Batch | Namespace | Scope (globs) | Approx files |
 |---|---|---|---|
 | B1 | `common` | `src/components/*.tsx` (top level only: Button, ConfirmationDialog, FormComponents, Listbox*, DateNavigator, DateRangePicker, MonthNavigator, Tab, PillSelect, LoadingSpinner, BackButton, Checkbox, StyledListbox, ToolTip, HoverTooltip, StatusIndicator, BackupModal, SafeLink, CompanySwitcher, ContributionListbox, TimeNavigator) | 22 |
@@ -236,4 +243,12 @@ Keep statutory acronyms untranslated (EPF, SOCSO, SIP, PCB, KWSP, PERKESO). Mala
 
 | Date | Batch | Files converted | Keys added (ms/zh-Hans) | Skipped | Notes |
 |---|---|---|---|---|---|
-| — | Phase 0 | — | — | — | Not started |
+| 2026-08-04 | Phase 0 | `src/i18n/**`, `src/index.tsx`, `Navbar*.tsx` (5), `NavbarUserMenu.tsx`, `HomePage.tsx`, `ChangelogModal.tsx`, `dev/i18n-report.mjs`, `AGENTS.md` rule 20 | common 48 + nav 155 + home 19 (each language) | — | Switcher live in user menu; sidebar/home translated; `npm run i18n:report` green; `tsc --noEmit` clean |
+
+### Phase 0 implementation notes (for batch workers)
+
+- **Sidebar labels are translated at render time** — `TienHockNavData.tsx` / `GreenTargetNavData.tsx` / `JellyPollyNavData.tsx` were NOT modified. Navbar components call `t(item.name, { ns: "nav" })`; the English name is the key. Same for dropdown `group` labels, popover options and bookmark names (bookmark identity stays English — stored bookmarks keep working).
+- `ChangelogModal` follows the app language on open (zh → English entries; the corpus stays ms/en per §8) but keeps its own BM/ENG toggle.
+- Several files (e.g. `NavbarUserMenu.tsx`, `NavbarMenu.tsx`, `NavbarDropdown.tsx`) have **mixed CRLF/LF line endings**; single-line edits match reliably, multi-line blocks across CRLF regions may not — keep edits small or check with `cat -A`.
+- The language switcher is in `NavbarUserMenu.tsx` (3-button segmented row). Detection: localStorage → browser locale; `zh-*` → `zh-Hans`, unmatched → `ms` (`resolveLanguage` in `src/i18n/index.ts`).
+- Manual smoke test passed? → **pending user verification** (dev server: switch language in user menu, confirm navbar + sidebar + HomePage re-render in all 3 languages, confirm a `zh-CN` browser profile defaults to 简体中文 and an unmatched locale defaults to Bahasa Melayu).

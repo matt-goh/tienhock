@@ -8,6 +8,7 @@ import {
   TransitionChild,
 } from "@headlessui/react";
 import Button from "./Button";
+import i18n from "../i18n";
 
 type Language = "ms" | "en";
 
@@ -18,6 +19,11 @@ type ChangelogEntry = {
 };
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
+  {
+    date: "2026-08-04",
+    ms: "Sistem kini menyokong tiga bahasa: English, Bahasa Melayu dan 简体中文. Bahasa lalai mengikut tetapan bahasa peranti anda, dan anda boleh menukarnya bila-bila masa melalui menu pengguna di penjuru atas kanan (baris \"Bahasa\"). Buat masa ini bar navigasi, menu dan halaman utama telah diterjemahkan; halaman lain akan menyusul secara berperingkat.",
+    en: "The system now supports three languages: English, Bahasa Melayu and 简体中文. The default language follows your device's language setting, and you can change it anytime from the user menu at the top right (the \"Language\" row). For now the navigation bar, menus and home page are translated; other pages will follow in stages.",
+  },
   {
     date: "2026-08-03",
     ms: "Perlindungan akaun Tien Hock diperketatkan. Jenis bayaran invois (Tunai/Invois) dan butiran barang invois tidak lagi boleh diubah pada invois yang sudah dibatalkan, atau pada invois yang mempunyai Nota Kredit/Debit aktif — sebelum ini perubahan sedemikian boleh menghidupkan semula invois yang dibatalkan atau menjadikan bakinya tidak sepadan dengan nota berkenaan. Menukar jenis bayaran kini meminta pengesahan terlebih dahulu, dan semua ikon pensil edit disorokkan pada invois yang dibatalkan. Jika perubahan barang invois membatalkan bayaran cek yang belum dijelaskan, sistem kini memaklumkan anda. Selain itu, catatan jurnal yang dimiliki oleh sesuatu dokumen (invois, bayaran, bank-in) tidak lagi boleh dibatalkan terus dari halaman Jurnal — batalkan dokumen sumbernya supaya baki dan jurnal kekal sepadan — dan menyimpan perubahan pada jurnal sedemikian kini memaparkan amaran bahawa ia akan terpisah daripada dokumen sumbernya.",
@@ -991,7 +997,10 @@ const ChangelogModal: React.FC<ChangelogModalProps> = ({ isOpen, onClose }) => {
 
   useEffect(() => {
     if (isOpen) {
-      setLanguage("ms");
+      // Follow the app language; changelog entries only exist in ms/en,
+      // so 简体中文 falls back to English (docs/I18N_HANDOVER.md §8).
+      const appLanguage = i18n.resolvedLanguage || i18n.language;
+      setLanguage(appLanguage === "en" || appLanguage === "zh-Hans" ? "en" : "ms");
     }
   }, [isOpen]);
 
