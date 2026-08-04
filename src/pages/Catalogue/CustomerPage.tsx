@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Customer } from "../../types/types";
 import {
@@ -10,6 +10,7 @@ import {
   IconChevronDown,
   IconBuildingStore,
   IconRefresh,
+  IconBuildingSkyscraper,
 } from "@tabler/icons-react";
 import { toast } from "react-hot-toast";
 import CustomerCard from "../../components/Catalogue/CustomerCard";
@@ -38,13 +39,20 @@ const ITEMS_PER_PAGE = 20;
 const FILTERS_STORAGE_KEY = "customerList";
 const SCROLL_RESTORATION_KEY = "customer-list";
 
+// Branch filter sentinels. Anything else is a literal branch group name.
+const ALL_BRANCHES = "All Branches";
+const IN_BRANCH_GROUP = "In a Branch Group";
+const NO_BRANCH_GROUP = "No Branch Group";
+
 interface CustomerListFilters {
   selectedSalesman: string;
+  selectedBranchGroup: string;
   page: number;
 }
 
 const getDefaultFilters = (): CustomerListFilters => ({
   selectedSalesman: "All Salesmen",
+  selectedBranchGroup: ALL_BRANCHES,
   page: 1,
 });
 
@@ -53,6 +61,10 @@ const reviveFilters = (cached: any): CustomerListFilters => ({
     typeof cached?.selectedSalesman === "string"
       ? cached.selectedSalesman
       : "All Salesmen",
+  selectedBranchGroup:
+    typeof cached?.selectedBranchGroup === "string"
+      ? cached.selectedBranchGroup
+      : ALL_BRANCHES,
   page: typeof cached?.page === "number" && cached.page >= 1 ? cached.page : 1,
 });
 
@@ -72,10 +84,13 @@ const CustomerPage: React.FC = () => {
   );
   const currentPage: number = filters.page;
   const selectedSalesman: string = filters.selectedSalesman;
+  const selectedBranchGroup: string = filters.selectedBranchGroup;
   const setCurrentPage = (page: number): void =>
     setFilters((prev) => ({ ...prev, page }));
   const setSelectedSalesman = (salesman: string): void =>
     setFilters((prev) => ({ ...prev, selectedSalesman: salesman }));
+  const setSelectedBranchGroup = (group: string): void =>
+    setFilters((prev) => ({ ...prev, selectedBranchGroup: group }));
   const [salesmen, setSalesmen] = useState<string[]>(["All Salesmen"]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(
@@ -83,7 +98,41 @@ const CustomerPage: React.FC = () => {
   );
   const { salesmen: salesmenData } = useSalesmanCache();
   const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
+  // Set when the modal is opened from a card so it lands on that group.
+  const [branchModalCustomerId, setBranchModalCustomerId] = useState<
+    string | undefined
+  >(undefined);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const branchGroupNames = useMemo(() => {
+    const names = new Set<string>();
+    customers.forEach((customer) => {
+      if (customer.branchInfo?.isInBranchGroup && customer.branchInfo.groupName) {
+        names.add(customer.branchInfo.groupName);
+      }
+    });
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [customers]);
+
+  const branchFilterOptions = useMemo(
+    () => [ALL_BRANCHES, IN_BRANCH_GROUP, NO_BRANCH_GROUP, ...branchGroupNames],
+    [branchGroupNames]
+  );
+
+  const openBranchModal = (customerId?: string): void => {
+    setBranchModalCustomerId(customerId);
+    setIsBranchModalOpen(true);
+  };
+
+  // A persisted filter can point at a group that has since been deleted or
+  // renamed, which would silently show an empty list.
+  useEffect(() => {
+    if (customers.length === 0) return;
+    if (!branchFilterOptions.includes(selectedBranchGroup)) {
+      setSelectedBranchGroup(ALL_BRANCHES);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customers.length, branchFilterOptions, selectedBranchGroup]);
 
   // Focus the search box once the page has finished loading (the input isn't
   // mounted yet while the loading spinner is shown).
@@ -132,6 +181,7 @@ const CustomerPage: React.FC = () => {
         customer.id,
         customer.id_number,
         customer.phone_number,
+        customer.branchInfo?.groupName,
       ].map((field) => field?.toLowerCase() || "");
 
       const matchesSearch = searchFields.some((field) =>
@@ -142,9 +192,16 @@ const CustomerPage: React.FC = () => {
         selectedSalesman === "All Salesmen" ||
         customer.salesman === selectedSalesman;
 
-      return matchesSearch && matchesSalesman;
+      const isGrouped = Boolean(customer.branchInfo?.isInBranchGroup);
+      const matchesBranchGroup =
+        selectedBranchGroup === ALL_BRANCHES ||
+        (selectedBranchGroup === IN_BRANCH_GROUP && isGrouped) ||
+        (selectedBranchGroup === NO_BRANCH_GROUP && !isGrouped) ||
+        customer.branchInfo?.groupName === selectedBranchGroup;
+
+      return matchesSearch && matchesSalesman && matchesBranchGroup;
     });
-  }, [customers, searchTerm, selectedSalesman]);
+  }, [customers, searchTerm, selectedSalesman, selectedBranchGroup]);
 
   const totalPages = Math.ceil(filteredCustomers.length / ITEMS_PER_PAGE);
 
@@ -155,7 +212,7 @@ const CustomerPage: React.FC = () => {
 
   // Reset to page 1 when a filter actually changes. The ref-guard skips the
   // initial mount so the page number restored from the cache survives.
-  const filterSignature: string = `${searchTerm}|${selectedSalesman}`;
+  const filterSignature: string = `${searchTerm}|${selectedSalesman}|${selectedBranchGroup}`;
   const prevFilterSignatureRef = useRef<string | null>(null);
   useEffect(() => {
     if (
@@ -175,12 +232,19 @@ const CustomerPage: React.FC = () => {
     setCurrentPage(page);
   };
 
-  const renderSalesmanListbox = () => (
+  const renderFilterListbox = (
+    value: string,
+    onChange: (next: string) => void,
+    options: string[],
+    widthClass: string = "w-48"
+  ) => (
     <div className="flex items-center">
-      <Listbox value={selectedSalesman} onChange={setSelectedSalesman}>
+      <Listbox value={value} onChange={onChange}>
         <div className="relative">
-          <ListboxButton className="w-48 rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent text-default-900 dark:text-gray-100 py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 dark:focus:border-gray-500">
-            <span className="block truncate pl-2">{selectedSalesman}</span>
+          <ListboxButton
+            className={`${widthClass} rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent text-default-900 dark:text-gray-100 py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 dark:focus:border-gray-500`}
+          >
+            <span className="block truncate pl-2">{value}</span>
             <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
               <IconChevronDown
                 className="h-5 w-5 text-default-400 dark:text-gray-400"
@@ -188,10 +252,10 @@ const CustomerPage: React.FC = () => {
               />
             </span>
           </ListboxButton>
-          <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
-            {salesmen.map((salesman) => (
+          <ListboxOptions className="absolute z-10 w-max min-w-full max-w-[22rem] right-0 p-1 mt-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+            {options.map((option) => (
               <ListboxOption
-                key={salesman}
+                key={option}
                 className={({ active }) =>
                   `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
                     active
@@ -199,7 +263,7 @@ const CustomerPage: React.FC = () => {
                       : "text-default-900 dark:text-gray-100"
                   }`
                 }
-                value={salesman}
+                value={option}
               >
                 {({ selected }) => (
                   <>
@@ -208,7 +272,7 @@ const CustomerPage: React.FC = () => {
                         selected ? "font-medium" : "font-normal"
                       }`}
                     >
-                      {salesman}
+                      {option}
                     </span>
                     {selected && (
                       <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600 dark:text-gray-300">
@@ -367,7 +431,17 @@ const CustomerPage: React.FC = () => {
               </button>
             )}
           </div>
-          {renderSalesmanListbox()}
+          {renderFilterListbox(
+            selectedSalesman,
+            setSelectedSalesman,
+            salesmen
+          )}
+          {renderFilterListbox(
+            selectedBranchGroup,
+            setSelectedBranchGroup,
+            branchFilterOptions,
+            "w-44"
+          )}
           <Button
             onClick={async () => {
               try {
@@ -383,8 +457,13 @@ const CustomerPage: React.FC = () => {
           >
             Refresh
           </Button>
-          <Button onClick={() => setIsBranchModalOpen(true)} variant="outline">
-            Branch
+          <Button
+            onClick={() => openBranchModal()}
+            variant="outline"
+            icon={IconBuildingSkyscraper}
+            title="Manage branch groups"
+          >
+            Branches{branchGroupNames.length > 0 && ` (${branchGroupNames.length})`}
           </Button>
           <Button
             onClick={() => navigate("/catalogue/customer/new")}
@@ -408,6 +487,7 @@ const CustomerPage: React.FC = () => {
               customer={customer}
               onDeleteClick={handleDeleteClick}
               branchInfo={customer.branchInfo}
+              onManageBranchesClick={(c) => openBranchModal(c.id)}
             />
           ))}
         </div>
@@ -444,6 +524,7 @@ const CustomerPage: React.FC = () => {
       <BranchLinkageModal
         isOpen={isBranchModalOpen}
         onClose={() => setIsBranchModalOpen(false)}
+        initialCustomerId={branchModalCustomerId}
       />
     </div>
   );
