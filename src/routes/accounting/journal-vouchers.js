@@ -367,7 +367,11 @@ export default function (pool) {
           ? round2(dept.locs.reduce((s, loc) => s + (jellyByLocation[loc] || 0), 0))
           : 0;
         const jellyAcct = m.commission_jelly || null;
-        const othersAmt = round2(t.comm);
+        // The comm (C/I/O) column is carved out ONLY for departments with a dedicated
+        // "Others" line (Ikut Lori → `others` mapping). For Salesman the legacy model
+        // keeps comm inside the 50/50 split — carving it without an others line would
+        // drop it from the voucher entirely (Jul 2026: JVSL short by exactly 251.37).
+        const othersAmt = dept.othersLine ? round2(t.comm) : 0;
         // Anchor to actual gross_pay (gaji_kasar), NOT the salary report's re-rounded
         // GAJI/COMM/CUTI columns — those can drift a few cents from real gross. The
         // 50/50 base is the residual gross after carving OT (own lines), jelly and

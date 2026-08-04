@@ -1204,6 +1204,11 @@ export default function (pool) {
             -- Use the most recent job_type for location mapping
             (ARRAY_AGG(ep.job_type ORDER BY mp.month DESC))[1] as job_type,
             (ARRAY_AGG(ep.section ORDER BY mp.month DESC))[1] as section,
+            -- Multi-ID consolidation: latest payroll month + HEAD linkage per
+            -- sibling ID, used by employee_base_data to merge same-name staff.
+            MAX(mp.month) as last_month,
+            MAX(NULLIF(s.head_staff_id, '')) as head_id,
+            BOOL_OR(NULLIF(s.head_staff_id, '') IS NOT NULL) as has_head,
             -- Use Head's job location if head_staff_id is set, otherwise use direct job location
             COALESCE(
               (ARRAY_AGG(head_jlm.location_code ORDER BY mp.month DESC))[1],
@@ -1265,29 +1270,35 @@ export default function (pool) {
             'reporting' as location_source
           FROM employee_payroll_base epb
         ),
-        -- Exactly one row per employee (the single reporting location above).
+        -- Exactly one row per PERSON: sibling staff IDs that share a staffs.name
+        -- (multi-ID workers) consolidate into a single yearly row, mirroring how
+        -- payroll processing stores one combined row per name per month (the
+        -- primary sibling ID can differ between months). The representative
+        -- staff id / location follow the HEAD when a sibling is linked to one
+        -- (that row's resolved location IS the head's location), else the
+        -- sibling with the latest payroll month.
         employee_base_data AS (
-          SELECT DISTINCT ON (employee_id)
-            employee_id,
-            staff_id,
+          SELECT
+            COALESCE(MAX(head_id), (ARRAY_AGG(employee_id ORDER BY has_head DESC, last_month DESC, staff_id))[1]) as employee_id,
+            COALESCE(MAX(head_id), (ARRAY_AGG(staff_id ORDER BY has_head DESC, last_month DESC, staff_id))[1]) as staff_id,
             staff_name,
-            ic_no,
-            bank_account_number,
-            payment_preference,
-            location_code,
-            gross_pay,
-            net_pay,
-            total_digenapkan,
-            total_setelah_digenapkan,
-            job_type,
-            section,
-            location_source
+            (ARRAY_AGG(ic_no ORDER BY has_head DESC, last_month DESC, staff_id))[1] as ic_no,
+            (ARRAY_AGG(bank_account_number ORDER BY has_head DESC, last_month DESC, staff_id))[1] as bank_account_number,
+            (ARRAY_AGG(payment_preference ORDER BY has_head DESC, last_month DESC, staff_id))[1] as payment_preference,
+            (ARRAY_AGG(location_code ORDER BY has_head DESC, last_month DESC, staff_id))[1] as location_code,
+            SUM(gross_pay) as gross_pay,
+            SUM(net_pay) as net_pay,
+            SUM(total_digenapkan) as total_digenapkan,
+            SUM(total_setelah_digenapkan) as total_setelah_digenapkan,
+            (ARRAY_AGG(job_type ORDER BY has_head DESC, last_month DESC, staff_id))[1] as job_type,
+            (ARRAY_AGG(section ORDER BY has_head DESC, last_month DESC, staff_id))[1] as section,
+            (ARRAY_AGG(location_source ORDER BY has_head DESC, last_month DESC, staff_id))[1] as location_source
           FROM employee_all_locations
-          ORDER BY employee_id, location_code
+          GROUP BY staff_name
         ),
         payroll_items_data AS (
           SELECT
-            ep.employee_id,
+            s.name as staff_name,
             pi.pay_code_id,
             CASE
               WHEN lower(btrim(coalesce(pi.description, ''))) = 'cuti tahunan' THEN 'cuti tahunan'
@@ -1311,6 +1322,8 @@ export default function (pool) {
             COALESCE(pi.rate_unit, pc.rate_unit) as rate_unit
           FROM employee_payrolls ep
           JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+          -- Join staffs so sibling IDs sharing one name consolidate per person.
+          JOIN staffs s ON ep.employee_id = s.id
           JOIN payroll_items pi ON ep.id = pi.employee_payroll_id
           LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
           WHERE mp.year = $1
@@ -1328,7 +1341,7 @@ export default function (pool) {
               )
             )
           GROUP BY
-            ep.employee_id,
+            s.name,
             mp.month,
             pi.pay_code_id,
             pi.rate,
@@ -1342,15 +1355,16 @@ export default function (pool) {
         ),
         deductions_data AS (
           SELECT
-            ep.employee_id,
+            s.name as staff_name,
             pd.deduction_type,
             SUM(pd.employee_amount) as employee_amount,
             SUM(pd.employer_amount) as employer_amount
           FROM employee_payrolls ep
           JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+          JOIN staffs s ON ep.employee_id = s.id
           JOIN payroll_deductions pd ON ep.id = pd.employee_payroll_id
           WHERE mp.year = $1
-          GROUP BY ep.employee_id, pd.deduction_type
+          GROUP BY s.name, pd.deduction_type
         ),
         -- Mid-month aggregated by NAME so advances recorded under any sibling ID
         -- (multi-ID staff) roll up to the person, mirroring pinjam and the combined payroll.
@@ -1360,16 +1374,6 @@ export default function (pool) {
           JOIN staffs s ON mmp.employee_id = s.id
           WHERE mmp.year = $1
           GROUP BY s.name
-        ),
-        mid_month_rep AS (
-          SELECT staff_name, MIN(employee_id) AS employee_id
-          FROM (SELECT DISTINCT employee_id, staff_name FROM employee_base_data) d
-          GROUP BY staff_name
-        ),
-        mid_month_data AS (
-          SELECT mmr.employee_id, mmbn.mid_month_amount
-          FROM mid_month_rep mmr
-          JOIN mid_month_by_name mmbn ON mmbn.staff_name = mmr.staff_name
         ),
         commission_data AS (
           SELECT
@@ -1425,19 +1429,6 @@ export default function (pool) {
           WHERE pr.year = $1
           AND pr.pinjam_type = 'monthly'
           GROUP BY s.name
-        ),
-        -- Pick one representative payroll ID per name (one that actually has a
-        -- report row) so the name-aggregated pinjam is attributed exactly once
-        -- across the year's sibling-ID rows (avoids double counting).
-        pinjam_rep AS (
-          SELECT staff_name, MIN(employee_id) AS employee_id
-          FROM (SELECT DISTINCT employee_id, staff_name FROM employee_base_data) d
-          GROUP BY staff_name
-        ),
-        pinjam_yearly_data AS (
-          SELECT pr.employee_id, pbn.total_pinjam, pbn.pinjam_details
-          FROM pinjam_rep pr
-          JOIN pinjam_by_name pbn ON pbn.staff_name = pr.staff_name
         )
         SELECT
           ebd.*,
@@ -1450,18 +1441,18 @@ export default function (pool) {
           -- all workers; other allowances/incentives remain C/I/O. Kerja-Luar matched by name.
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
-             WHERE pid.employee_id = ebd.employee_id
+             WHERE pid.staff_name = ebd.staff_name
                AND (pid.report_column = 'GAJI' OR (pid.report_column IS NULL
                AND COALESCE(pid.pay_type, 'Tambahan') <> 'Overtime'
                AND (pid.pay_code_id IS NULL OR pid.pay_code_id NOT IN ('BONUS', 'IXT', 'ADD_COMM', 'T-SALESMAN', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA'))
                AND lower(btrim(coalesce(pid.description, ''))) <> 'cuti tahunan'
                AND (
                  pid.pay_code_id IN ('FULL', 'HADIR_MEETING')
-                 OR (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                 OR (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.staff_name = ebd.staff_name AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(pid.rate_unit, 'Hour') IN ('Hour', 'Day', 'Fixed'))
-                 OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                 OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.staff_name = ebd.staff_name AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(pid.pay_type, 'Tambahan') = 'Base')
-                 OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                 OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.staff_name = ebd.staff_name AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND pid.pay_code_id LIKE 'FULL!_%' ESCAPE '!')
                )))), 0
           ) + COALESCE(
@@ -1473,16 +1464,16 @@ export default function (pool) {
                AND od.desc_key <> 'cuti tahunan'
                AND (
                  od.pay_code_id IN ('FULL', 'HADIR_MEETING')
-                 OR (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                 OR (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.staff_name = ebd.staff_name AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(od.rate_unit, 'Hour') IN ('Hour', 'Day', 'Fixed'))
-                 OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                 OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.staff_name = ebd.staff_name AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND od.pay_type = 'Base')
                )))), 0
           ) as gaji_pay,
           -- OT column = overtime from payroll items only (excl. Cuti-Tahunan)
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
-             WHERE pid.employee_id = ebd.employee_id
+             WHERE pid.staff_name = ebd.staff_name
                AND (pid.report_column = 'OT' OR (pid.report_column IS NULL
                AND COALESCE(pid.pay_type, 'Tambahan') = 'Overtime'
                AND lower(btrim(coalesce(pid.description, ''))) <> 'cuti tahunan'))), 0
@@ -1501,16 +1492,16 @@ export default function (pool) {
           -- and FULL/HADIR_MEETING (always GAJI).
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
-             WHERE pid.employee_id = ebd.employee_id
+             WHERE pid.staff_name = ebd.staff_name
                AND (pid.report_column = 'CIO' OR (pid.report_column IS NULL
                AND COALESCE(pid.pay_type, 'Tambahan') <> 'Overtime'
                AND (pid.pay_code_id IS NULL OR pid.pay_code_id NOT IN ('BONUS', 'FULL', 'HADIR_MEETING'))
                AND lower(btrim(coalesce(pid.description, ''))) <> 'cuti tahunan'
                AND (
                  pid.pay_code_id IN ('IXT', 'ADD_COMM', 'T-SALESMAN', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA')
-                 OR (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                 OR (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.staff_name = ebd.staff_name AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(pid.rate_unit, 'Hour') NOT IN ('Hour', 'Day', 'Fixed'))
-                 OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                 OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.staff_name = ebd.staff_name AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(pid.pay_type, 'Tambahan') <> 'Base'
                    AND (pid.pay_code_id IS NULL OR pid.pay_code_id NOT LIKE 'FULL!_%' ESCAPE '!'))
                )))), 0
@@ -1523,16 +1514,16 @@ export default function (pool) {
                AND od.desc_key <> 'cuti tahunan'
                AND (
                  od.pay_code_id IN ('IXT', 'ADD_COMM', 'T-SALESMAN', 'IKUT_BX', 'JAGA_GATE', 'BH_JG_FORKLIFT', 'BH_SUSUN', 'T_KERJA')
-                 OR (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                 OR (EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.staff_name = ebd.staff_name AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND COALESCE(od.rate_unit, 'Hour') NOT IN ('Hour', 'Day', 'Fixed'))
-                 OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.employee_id = ebd.employee_id AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
+                 OR (NOT EXISTS (SELECT 1 FROM payroll_items_data pidh WHERE pidh.staff_name = ebd.staff_name AND COALESCE(pidh.pay_type, 'Tambahan') = 'Base' AND COALESCE(pidh.rate_unit, 'Hour') IN ('Hour', 'Day'))
                    AND od.pay_type <> 'Base')
                )))), 0
           ) as piece_insentif_pay,
           -- Cuti Tahunan recorded via payroll items / Kerja-Luar (by name) -> shown under CUTI
           COALESCE(
             (SELECT SUM(amount) FROM payroll_items_data pid
-             WHERE pid.employee_id = ebd.employee_id
+             WHERE pid.staff_name = ebd.staff_name
                AND (pid.report_column = 'CUTI' OR (pid.report_column IS NULL
                AND lower(btrim(coalesce(pid.description, ''))) = 'cuti tahunan'))), 0
           ) + COALESCE(
@@ -1544,31 +1535,31 @@ export default function (pool) {
           -- Aggregate deductions
           COALESCE(
             (SELECT SUM(employee_amount) FROM deductions_data dd
-             WHERE dd.employee_id = ebd.employee_id AND dd.deduction_type = 'epf'), 0
+             WHERE dd.staff_name = ebd.staff_name AND dd.deduction_type = 'epf'), 0
           ) as epf_employee,
           COALESCE(
             (SELECT SUM(employer_amount) FROM deductions_data dd
-             WHERE dd.employee_id = ebd.employee_id AND dd.deduction_type = 'epf'), 0
+             WHERE dd.staff_name = ebd.staff_name AND dd.deduction_type = 'epf'), 0
           ) as epf_employer,
           COALESCE(
             (SELECT SUM(employee_amount) FROM deductions_data dd
-             WHERE dd.employee_id = ebd.employee_id AND dd.deduction_type = 'socso'), 0
+             WHERE dd.staff_name = ebd.staff_name AND dd.deduction_type = 'socso'), 0
           ) as socso_employee,
           COALESCE(
             (SELECT SUM(employer_amount) FROM deductions_data dd
-             WHERE dd.employee_id = ebd.employee_id AND dd.deduction_type = 'socso'), 0
+             WHERE dd.staff_name = ebd.staff_name AND dd.deduction_type = 'socso'), 0
           ) as socso_employer,
           COALESCE(
             (SELECT SUM(employee_amount) FROM deductions_data dd
-             WHERE dd.employee_id = ebd.employee_id AND dd.deduction_type = 'sip'), 0
+             WHERE dd.staff_name = ebd.staff_name AND dd.deduction_type = 'sip'), 0
           ) as sip_employee,
           COALESCE(
             (SELECT SUM(employer_amount) FROM deductions_data dd
-             WHERE dd.employee_id = ebd.employee_id AND dd.deduction_type = 'sip'), 0
+             WHERE dd.staff_name = ebd.staff_name AND dd.deduction_type = 'sip'), 0
           ) as sip_employer,
           COALESCE(
             (SELECT SUM(employee_amount) FROM deductions_data dd
-             WHERE dd.employee_id = ebd.employee_id AND dd.deduction_type = 'income_tax'), 0
+             WHERE dd.staff_name = ebd.staff_name AND dd.deduction_type = 'income_tax'), 0
           ) as income_tax,
           -- Commission/incentive at a location (C/I/O), excl. Cuti-Tahunan (loc 23 or desc); by name across siblings
           COALESCE(
@@ -1595,7 +1586,7 @@ export default function (pool) {
             ) +
             COALESCE(
               (SELECT SUM(amount) FROM payroll_items_data pid
-               WHERE pid.employee_id = ebd.employee_id
+               WHERE pid.staff_name = ebd.staff_name
                  AND (pid.report_column = 'BONUS' OR (pid.report_column IS NULL
                  AND pid.pay_code_id = 'BONUS'))), 0
             ) +
@@ -1615,8 +1606,8 @@ export default function (pool) {
              WHERE ld.employee_id IN (SELECT id FROM staffs WHERE name = ebd.staff_name)), 0
           ) as leave_total
         FROM employee_base_data ebd
-        LEFT JOIN mid_month_data mmd ON ebd.employee_id = mmd.employee_id
-        LEFT JOIN pinjam_yearly_data pmd ON ebd.employee_id = pmd.employee_id
+        LEFT JOIN mid_month_by_name mmd ON mmd.staff_name = ebd.staff_name
+        LEFT JOIN pinjam_by_name pmd ON pmd.staff_name = ebd.staff_name
         ORDER BY ebd.staff_name
       `;
 
@@ -1815,17 +1806,20 @@ export default function (pool) {
       `;
       const commissionResult = await pool.query(commissionQuery, [yearInt]);
 
-      // Get mid-month data for commission location employees
+      // Get mid-month data for commission location employees.
+      // Aggregated by NAME so advances recorded under any sibling ID (multi-ID
+      // staff) roll up to the person, mirroring the main query.
       const midMonthQuery = `
-        SELECT employee_id, COALESCE(SUM(amount), 0) as mid_month_amount
-        FROM mid_month_payrolls
-        WHERE year = $1
-        GROUP BY employee_id
+        SELECT s.name as staff_name, COALESCE(SUM(mmp.amount), 0) as mid_month_amount
+        FROM mid_month_payrolls mmp
+        JOIN staffs s ON mmp.employee_id = s.id
+        WHERE mmp.year = $1
+        GROUP BY s.name
       `;
       const midMonthResult = await pool.query(midMonthQuery, [yearInt]);
       const midMonthMap = new Map();
       midMonthResult.rows.forEach((row) => {
-        midMonthMap.set(row.employee_id, parseFloat(row.mid_month_amount || 0));
+        midMonthMap.set(row.staff_name, parseFloat(row.mid_month_amount || 0));
       });
 
       // Track commission-only employees
@@ -1847,7 +1841,7 @@ export default function (pool) {
         // Cuti Tahunan (loc 23) is report-only for commission-only employees: it was
         // paid already, so it does not offset the mid-month advance or go to the bank.
         const midMonthAmount =
-          locCode === "23" ? 0 : midMonthMap.get(row.employee_id) || 0;
+          locCode === "23" ? 0 : midMonthMap.get(row.staff_name) || 0;
         // Location 23 = Cuti Tahunan: route the amount to the Cuti column, not COMM.
         const commField = locCode === "23" ? "cuti" : "comm";
 
@@ -1863,7 +1857,7 @@ export default function (pool) {
 
         if (locationData[locCode]) {
           const existingEmployee = locationData[locCode].employees.find(
-            (e) => e.staff_id === row.employee_id,
+            (e) => e.staff_name === row.staff_name,
           );
 
           if (!existingEmployee) {
@@ -1872,7 +1866,7 @@ export default function (pool) {
             const digenapkan = setelahDigenapkan - jumlah;
             const bankIncome = locCode === "23" ? 0 : commAmount;
             const bankMidMonthAmount =
-              bankIncome > 0 ? midMonthMap.get(row.employee_id) || 0 : 0;
+              bankIncome > 0 ? midMonthMap.get(row.staff_name) || 0 : 0;
             const bankSetelahDigenapkan =
               bankIncome > 0
                 ? Math.ceil(bankIncome - bankMidMonthAmount)
@@ -1924,11 +1918,11 @@ export default function (pool) {
 
             if (!hasRegularPayroll) {
               const existingCommOnly = commissionOnlyEmployees.find(
-                (e) => e.staff_id === row.employee_id,
+                (e) => e.staff_name === row.staff_name,
               );
               if (!existingCommOnly) {
                 commissionOnlyEmployees.push(commissionEmployeeData);
-                commissionOnlyBankIncome.set(row.employee_id, bankIncome);
+                commissionOnlyBankIncome.set(row.staff_name, bankIncome);
                 grandTotals[commField] += commAmount;
                 grandTotals.gaji_kasar += commAmount;
                 grandTotals.gaji_bersih += commAmount;
@@ -1953,11 +1947,11 @@ export default function (pool) {
                   existingCommOnly.setelah_digenapkan -
                   existingCommOnly.jumlah;
                 const bankIncome =
-                  (commissionOnlyBankIncome.get(row.employee_id) || 0) +
+                  (commissionOnlyBankIncome.get(row.staff_name) || 0) +
                   (locCode === "23" ? 0 : commAmount);
                 const bankMidMonthAmount =
-                  bankIncome > 0 ? midMonthMap.get(row.employee_id) || 0 : 0;
-                commissionOnlyBankIncome.set(row.employee_id, bankIncome);
+                  bankIncome > 0 ? midMonthMap.get(row.staff_name) || 0 : 0;
+                commissionOnlyBankIncome.set(row.staff_name, bankIncome);
                 existingCommOnly.gaji_genap =
                   bankIncome > 0
                     ? Math.ceil(bankIncome - bankMidMonthAmount)
@@ -1998,18 +1992,21 @@ export default function (pool) {
       //
       // Per-employee rounding (Employee tab rows): sum each month's per-employee
       // SETELAH DIGENAPKAN, then re-derive DIGENAPKAN against the annual jumlah.
+      // Keyed by NAME: the monthly rows carry that month's primary sibling ID,
+      // which can differ from the yearly row's representative ID (multi-ID staff
+      // are consolidated by name above).
       const monthlyRoundingByStaff = new Map();
       for (const rep of monthlyReports) {
         for (const e of rep.employees) {
           monthlyRoundingByStaff.set(
-            e.staff_id,
-            (monthlyRoundingByStaff.get(e.staff_id) || 0) +
+            e.staff_name,
+            (monthlyRoundingByStaff.get(e.staff_name) || 0) +
               (e.setelah_digenapkan || 0),
           );
         }
       }
       const applyMonthlyRounding = (emp) => {
-        const summed = monthlyRoundingByStaff.get(emp.staff_id);
+        const summed = monthlyRoundingByStaff.get(emp.staff_name);
         if (summed == null) return; // keep annual-ceil fallback if no monthly rows
         emp.setelah_digenapkan = summed;
         emp.digenapkan = summed - emp.jumlah;

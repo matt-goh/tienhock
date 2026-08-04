@@ -25,6 +25,31 @@ export default function (pool) {
     try {
       await client.query("BEGIN");
 
+      // A customer may only belong to one branch group: the customer list
+      // resolves a single group per customer, so a second membership would
+      // silently hide one of the groups.
+      const alreadyGroupedQuery = `
+        SELECT cbm.customer_id, cbg.group_name
+        FROM customer_branch_mappings cbm
+        JOIN customer_branch_groups cbg ON cbm.group_id = cbg.id
+        WHERE cbm.customer_id = ANY($1)
+      `;
+
+      const alreadyGrouped = await client.query(alreadyGroupedQuery, [
+        branches.map((b) => b.customer_id),
+      ]);
+
+      if (alreadyGrouped.rows.length > 0) {
+        const conflicts = alreadyGrouped.rows
+          .map((r) => `${r.customer_id} (${r.group_name})`)
+          .join(", ");
+        const error = new Error(
+          `These customers already belong to a branch group: ${conflicts}`
+        );
+        error.statusCode = 409;
+        throw error;
+      }
+
       // Create the group
       const createGroupQuery = `
         INSERT INTO customer_branch_groups (group_name)
@@ -103,8 +128,10 @@ export default function (pool) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Error creating branch group:", error);
-      res.status(500).json({
-        message: "Error creating branch group",
+      res.status(error.statusCode || 500).json({
+        message: error.statusCode
+          ? error.message
+          : "Error creating branch group",
         error: error.message,
       });
     } finally {
@@ -138,6 +165,31 @@ export default function (pool) {
 
       if (groupResult.rows.length === 0) {
         throw new Error(`Branch group with ID ${groupId} not found`);
+      }
+
+      // Reject customers that already belong to a DIFFERENT group (see the
+      // one-group-per-customer note on the create endpoint).
+      const otherGroupQuery = `
+        SELECT cbm.customer_id, cbg.group_name
+        FROM customer_branch_mappings cbm
+        JOIN customer_branch_groups cbg ON cbm.group_id = cbg.id
+        WHERE cbm.customer_id = ANY($1) AND cbm.group_id != $2
+      `;
+
+      const otherGroupResult = await client.query(otherGroupQuery, [
+        customer_ids,
+        groupId,
+      ]);
+
+      if (otherGroupResult.rows.length > 0) {
+        const conflicts = otherGroupResult.rows
+          .map((r) => `${r.customer_id} (${r.group_name})`)
+          .join(", ");
+        const error = new Error(
+          `These customers already belong to another branch group: ${conflicts}`
+        );
+        error.statusCode = 409;
+        throw error;
       }
 
       // Find the main branch for this group to get e-Invoice info
@@ -259,8 +311,10 @@ export default function (pool) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Error adding customers to branch group:", error);
-      res.status(500).json({
-        message: "Error adding customers to branch group",
+      res.status(error.statusCode || 500).json({
+        message: error.statusCode
+          ? error.message
+          : "Error adding customers to branch group",
         error: error.message,
       });
     } finally {
@@ -311,6 +365,40 @@ export default function (pool) {
       `;
 
       await client.query(setMainQuery, [groupId, customerId]);
+
+      // Propagate the NEW main branch's e-Invoice details to the rest of the
+      // group. Without this the group keeps serving the previous main
+      // branch's details to every customer added later.
+      const newMainQuery = `
+        SELECT tin_number, id_number, id_type, phone_number
+        FROM customers
+        WHERE id = $1
+      `;
+
+      const newMainResult = await client.query(newMainQuery, [customerId]);
+
+      if (newMainResult.rows.length > 0) {
+        const { tin_number, id_number, id_type, phone_number } =
+          newMainResult.rows[0];
+
+        const propagateQuery = `
+          UPDATE customers
+          SET tin_number = $1, id_number = $2, id_type = $3, phone_number = $4
+          WHERE id IN (
+            SELECT customer_id FROM customer_branch_mappings
+            WHERE group_id = $5 AND customer_id != $6
+          )
+        `;
+
+        await client.query(propagateQuery, [
+          tin_number,
+          id_number,
+          id_type,
+          phone_number,
+          groupId,
+          customerId,
+        ]);
+      }
 
       await client.query("COMMIT");
 
@@ -372,12 +460,17 @@ export default function (pool) {
       const totalBranches = parseInt(countResult.rows[0].count);
 
       if (isMainBranch && totalBranches > 1) {
-        // If removing the main branch, assign a new one
+        // If removing the main branch, assign a new one. PostgreSQL has no
+        // LIMIT on UPDATE, so the single target row is picked in a subquery.
         const newMainQuery = `
           UPDATE customer_branch_mappings
           SET is_main_branch = true
-          WHERE group_id = $1 AND customer_id != $2
-          LIMIT 1
+          WHERE id = (
+            SELECT id FROM customer_branch_mappings
+            WHERE group_id = $1 AND customer_id != $2
+            ORDER BY id
+            LIMIT 1
+          )
         `;
 
         await client.query(newMainQuery, [groupId, customerId]);

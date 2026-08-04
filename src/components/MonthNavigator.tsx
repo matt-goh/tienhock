@@ -5,6 +5,7 @@ import {
   IconChevronRight,
   IconChevronsRight,
 } from "@tabler/icons-react";
+import { useTranslation } from "react-i18next";
 import clsx from "clsx";
 
 const MONTH_LABELS = [
@@ -66,6 +67,8 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
   minDate,
   pickerPlacement = "bottom-center",
 }) => {
+  const { t } = useTranslation("common");
+
   // Check if current month is the current calendar month
   const isCurrentMonth = useMemo(() => {
     const now = new Date();
@@ -258,8 +261,8 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
               ? "cursor-not-allowed text-default-300 dark:text-gray-600"
               : "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-800"
           )}
-          title="Previous month"
-          aria-label="Previous month"
+          title={t("Previous month")}
+          aria-label={t("Previous month")}
         >
           <IconChevronLeft size={iconSize} />
         </button>
@@ -273,8 +276,8 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
               displayClasses,
               "w-full bg-default-50 dark:bg-gray-900/50 hover:bg-sky-50 dark:hover:bg-sky-900/30 hover:border-sky-300 dark:hover:border-sky-700 hover:text-sky-700 dark:hover:text-sky-300 cursor-pointer"
             )}
-            title="Click to select a month"
-            aria-label="Select a month"
+            title={t("Click to select a month")}
+            aria-label={t("Select a month")}
             aria-haspopup="true"
             aria-expanded={isPickerOpen}
           >
@@ -302,7 +305,7 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
                       ? "cursor-not-allowed text-default-300 dark:text-gray-600"
                       : "text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700"
                   )}
-                  aria-label="Previous year"
+                  aria-label={t("Previous year")}
                 >
                   <IconChevronLeft size={18} />
                 </button>
@@ -319,7 +322,7 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
                       ? "cursor-not-allowed text-default-300 dark:text-gray-600"
                       : "text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700"
                   )}
-                  aria-label="Next year"
+                  aria-label={t("Next year")}
                 >
                   <IconChevronRight size={18} />
                 </button>
@@ -347,7 +350,7 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
                           : "text-default-700 dark:text-gray-200 hover:bg-sky-50 dark:hover:bg-sky-900/30"
                       )}
                     >
-                      {monthLabel}
+                      {t(monthLabel)}
                     </button>
                   );
                 })}
@@ -366,8 +369,8 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
               ? "cursor-not-allowed text-default-300 dark:text-gray-600"
               : "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-800"
           )}
-          title="Next month"
-          aria-label="Next month"
+          title={t("Next month")}
+          aria-label={t("Next month")}
         >
           <IconChevronRight size={iconSize} />
         </button>
@@ -377,8 +380,8 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
           <button
             onClick={goToCurrentMonth}
             disabled={isCurrentMonth}
-            title="Go to current month"
-            aria-label="Go to current month"
+            title={t("Go to current month")}
+            aria-label={t("Go to current month")}
             className={clsx(
               buttonClasses,
               isCurrentMonth

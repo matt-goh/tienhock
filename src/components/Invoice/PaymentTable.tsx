@@ -49,9 +49,22 @@ interface PaymentTableProps {
   paymentApiEndpoint?: string;
 }
 
-const createTodayClearanceRange = (): TimeRange => {
-  const today: Date = new Date();
-  return { start: today, end: today };
+// Default the clearance date to today, or to the payment's (received) date
+// when the cheque was post-dated — the server rejects a clearance earlier than
+// the received date. yyyy-MM-dd strings are compared, never Date objects
+// (AGENTS.md rule 17).
+const createClearanceRange = (receivedDate?: string | null): TimeRange => {
+  const today: string = format(new Date(), "yyyy-MM-dd");
+  let day: string = today;
+  if (receivedDate) {
+    const received: Date = new Date(receivedDate);
+    if (!Number.isNaN(received.getTime())) {
+      const receivedDay: string = format(received, "yyyy-MM-dd");
+      if (receivedDay > today) day = receivedDay;
+    }
+  }
+  const date: Date = new Date(`${day}T00:00:00`);
+  return { start: date, end: date };
 };
 
 // API date values arrive as timestamps or UTC-midnight `date` columns; go
@@ -102,14 +115,14 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [selectedBankAccount, setSelectedBankAccount] = useState<string>("BANK_PBB"); // Default to Public Bank
-  const [clearanceDateRange, setClearanceDateRange] = useState<TimeRange>(
-    createTodayClearanceRange
+  const [clearanceDateRange, setClearanceDateRange] = useState<TimeRange>(() =>
+    createClearanceRange()
   );
   const [loadingVoucherId, setLoadingVoucherId] = useState<number | null>(null);
   const [showDateDialog, setShowDateDialog] = useState<boolean>(false);
   const [dateEditPayment, setDateEditPayment] = useState<Payment | null>(null);
-  const [paymentDateRange, setPaymentDateRange] = useState<TimeRange>(
-    createTodayClearanceRange
+  const [paymentDateRange, setPaymentDateRange] = useState<TimeRange>(() =>
+    createClearanceRange()
   );
   const [accountingDateRange, setAccountingDateRange] =
     useState<TimeRange | null>(null);
@@ -172,7 +185,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
       setConfirmingPaymentId(null);
       setSelectedPayment(null);
       setSelectedBankAccount("BANK_PBB"); // Reset to default
-      setClearanceDateRange(createTodayClearanceRange());
+      setClearanceDateRange(createClearanceRange());
     }
   };
 
@@ -448,6 +461,10 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
   const selectedConfirmationIsReceiptBacked: boolean = Boolean(
     selectedPayment?.receipt_id
   );
+  // The bank cannot clear a cheque before the payment was received.
+  const clearanceMinDate: Date | undefined = selectedPayment?.payment_date
+    ? new Date(selectedPayment.payment_date)
+    : undefined;
   if (payments.length === 0) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center">
@@ -695,7 +712,9 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                                   onClick={() => {
                                     setSelectedPayment(payment);
                                     setSelectedBankAccount(payment.bank_account || "BANK_PBB");
-                                    setClearanceDateRange(createTodayClearanceRange());
+                                    setClearanceDateRange(
+                                      createClearanceRange(payment.payment_date)
+                                    );
                                     setShowConfirmDialog(true);
                                   }}
                                   disabled={
@@ -829,7 +848,9 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                               onClick={() => {
                                 setSelectedPayment(payment);
                                 setSelectedBankAccount(payment.bank_account || "BANK_PBB");
-                                setClearanceDateRange(createTodayClearanceRange());
+                                setClearanceDateRange(
+                                  createClearanceRange(payment.payment_date)
+                                );
                                 setShowConfirmDialog(true);
                               }}
                               disabled={
@@ -873,7 +894,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
             setShowConfirmDialog(false);
             setSelectedPayment(null);
             setSelectedBankAccount("BANK_PBB");
-            setClearanceDateRange(createTodayClearanceRange());
+            setClearanceDateRange(createClearanceRange());
           }}
           onConfirm={() => void handleConfirmPayment()}
           title={
@@ -954,6 +975,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                     showArrows={false}
                     size="sm"
                     disabled={confirmingPaymentId !== null}
+                    minDate={clearanceMinDate}
                     className="w-full"
                     triggerClassName="w-full justify-between"
                   />

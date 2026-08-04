@@ -500,12 +500,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     ).then((entries) => {
       if (cancelled) return;
       setOverpaymentBalances(Object.fromEntries(entries));
-      // Default: apply each customer's available excess in full; the user can
-      // lower or zero it. Capped against the selected settle total at submit.
+      // Default: do NOT apply any held excess — applying it is a deliberate
+      // opt-in (the user ticks the box, which pre-fills the full amount).
+      // Capped against the selected settle total at submit.
       setApplyAmounts((current) => {
         const next = { ...current };
-        for (const [customerId, available] of entries) {
-          if (!(customerId in next)) next[customerId] = available;
+        for (const [customerId] of entries) {
+          if (!(customerId in next)) next[customerId] = 0;
         }
         return next;
       });

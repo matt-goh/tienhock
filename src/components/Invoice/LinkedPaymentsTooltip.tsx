@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../LoadingSpinner";
 
@@ -38,6 +39,7 @@ const LinkedPaymentsTooltip: React.FC<LinkedPaymentsTooltipProps> = ({
   const iconRef = useRef<HTMLSpanElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const navigate = useNavigate();
+  const { t } = useTranslation("invoice");
 
   const otherLinkedPayments = linkedPayments.filter(
     (p) => p.invoice_id !== currentInvoiceId
@@ -143,15 +145,19 @@ const LinkedPaymentsTooltip: React.FC<LinkedPaymentsTooltipProps> = ({
               <div className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2 flex justify-between items-center">
                 <span
                   className="truncate"
-                  title={`Linked Payments: ${paymentReference}`}
+                  title={t("Linked Payments: {{reference}}", {
+                    reference: paymentReference,
+                  })}
                 >
-                  Linked Payments
+                  {t("Linked Payments")}
                 </span>
                 <span
                   className="text-xs text-default-500 dark:text-gray-400 truncate"
-                  title={`Total: ${totalCount} other invoices`}
+                  title={t("Total: {{total}} other invoices", {
+                    total: totalCount,
+                  })}
                 >
-                  ({totalCount} other invoices)
+                  {t("({{total}} other invoices)", { total: totalCount })}
                 </span>
               </div>
               <div className="border-t border-default-200 dark:border-gray-700"></div>
@@ -168,7 +174,9 @@ const LinkedPaymentsTooltip: React.FC<LinkedPaymentsTooltipProps> = ({
                     <div
                       key={paymentInfo.payment_id}
                       className="py-2 px-2 bg-sky-50 dark:bg-sky-900/20 rounded border border-sky-200 dark:border-sky-800 cursor-pointer hover:bg-sky-100 transition-colors duration-200"
-                      title={`View invoice ${paymentInfo.invoice_id}`}
+                      title={t("View invoice {{id}}", {
+                        id: paymentInfo.invoice_id,
+                      })}
                       onClick={() =>
                         navigate(`/sales/invoice/${paymentInfo.invoice_id}`)
                       }
@@ -176,7 +184,9 @@ const LinkedPaymentsTooltip: React.FC<LinkedPaymentsTooltipProps> = ({
                       <div className="flex justify-between items-start">
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-sm truncate">
-                            Invoice: {paymentInfo.invoice_id}
+                            {t("Invoice: {{id}}", {
+                              id: paymentInfo.invoice_id,
+                            })}
                           </div>
                           <div className="text-xs text-default-500 dark:text-gray-400 truncate">
                             {paymentInfo.customer_name}
@@ -193,7 +203,7 @@ const LinkedPaymentsTooltip: React.FC<LinkedPaymentsTooltipProps> = ({
                 </div>
               ) : (
                 <div className="text-center text-default-500 dark:text-gray-400 text-sm py-4">
-                  No linked invoices found for this payment reference.
+                  {t("No linked invoices found for this payment reference.")}
                 </div>
               )}
             </div>

@@ -20,6 +20,7 @@ import {
   parseDatabaseTimestamp,
 } from "../../utils/invoice/dateUtils";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useCompany } from "../../contexts/CompanyContext";
 import {
   getInvoiceDisplayStatus,
@@ -289,6 +290,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
   const ConsolidatedIcon = consolidatedStatusInfo?.icon;
   const { activeCompany } = useCompany();
   const navigate = useNavigate();
+  const { t } = useTranslation("invoice");
   const amountAdjustmentSummary: InvoiceAmountAdjustmentSummary =
     getAmountAdjustmentSummary(invoice);
 
@@ -443,7 +445,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
             }
           }}
         >
-          {invoiceStatusStyle.label}
+          {t(invoiceStatusStyle.label)}
         </span>
         {/* E-Invoice Status */}
         {eInvoiceStatusInfo &&
@@ -455,18 +457,22 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
               className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-opacity-10 ${eInvoiceStatusInfo.color} hover:underline`}
-              title={`e-Invoice: ${eInvoiceStatusInfo.text}`}
+              title={t("e-Invoice: {{status}}", {
+                status: t(eInvoiceStatusInfo.text),
+              })}
             >
               <EInvoiceIcon size={14} className="mr-1" />
-              {eInvoiceStatusInfo.label}
+              {t(eInvoiceStatusInfo.label)}
             </a>
           ) : (
             <span
               className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-opacity-10 ${eInvoiceStatusInfo.color}`}
-              title={`e-Invoice: ${eInvoiceStatusInfo.text}`}
+              title={t("e-Invoice: {{status}}", {
+                status: t(eInvoiceStatusInfo.text),
+              })}
             >
               <EInvoiceIcon size={14} className="mr-1" />
-              {eInvoiceStatusInfo.label}
+              {t(eInvoiceStatusInfo.label)}
             </span>
           ))}
         {/* Consolidated Status - add this */}
@@ -477,10 +483,12 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${consolidatedStatusInfo.color} hover:underline`}
-            title={`Part of consolidated invoice ${consolidatedStatusInfo.info.id}`}
+            title={t("Part of consolidated invoice {{id}}", {
+              id: consolidatedStatusInfo.info.id,
+            })}
           >
             <ConsolidatedIcon size={14} className="mr-1" />
-            Consolidated
+            {t("Consolidated")}
           </a>
         )}
       </div>

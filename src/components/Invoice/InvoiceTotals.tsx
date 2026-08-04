@@ -1,5 +1,6 @@
 // src/components/Invoice/InvoiceTotals.tsx
 import React, { ChangeEvent } from "react";
+import { useTranslation } from "react-i18next";
 import type { AdjustmentDocument } from "../../types/types";
 import { formatAdjustmentDocDisplayId } from "../../utils/adjustments/formatDocId";
 
@@ -29,6 +30,7 @@ const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
   readOnly = false,
   adjustments = [],
 }) => {
+  const { t } = useTranslation("invoice");
   const handleRoundingInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     const parsedValue = value === "" ? 0 : parseFloat(value);
@@ -67,7 +69,7 @@ const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
       <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 w-full max-w-xs text-sm">
         {/* Subtotal Row */}
         <label className="text-gray-600 dark:text-gray-400 text-right self-center">
-          Subtotal:
+          {t("Subtotal:")}
         </label>
         <div className="flex items-center justify-end">
           <span className="mr-2 text-gray-800 dark:text-gray-200 font-medium">RM</span>
@@ -78,7 +80,7 @@ const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
 
         {/* Tax Row */}
         <label className="text-gray-600 dark:text-gray-400 text-right self-center">
-          Total Tax:
+          {t("Total Tax:")}
         </label>
         <div className="flex items-center justify-end">
           <span className="mr-2 text-gray-800 dark:text-gray-200 font-medium">RM</span>
@@ -92,7 +94,7 @@ const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
           htmlFor="rounding-input"
           className="text-gray-600 dark:text-gray-400 text-right self-center"
         >
-          Rounding:
+          {t("Rounding:")}
         </label>
         <div className="flex items-center justify-end">
           <span className="mr-2 text-gray-800 dark:text-gray-200 font-medium">RM</span>
@@ -120,7 +122,7 @@ const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
 
         {/* Grand Total Row */}
         <label className="font-semibold text-base text-gray-900 dark:text-gray-100 text-right self-center">
-          Total Payable:
+          {t("Total Payable:")}
         </label>
         <div className="flex items-center justify-end">
           <span className="mr-2 font-semibold text-base text-gray-900 dark:text-gray-100">RM</span>
@@ -137,7 +139,7 @@ const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
               return (
                 <React.Fragment key={doc.id}>
                   <label className="text-gray-600 dark:text-gray-400 text-right self-center">
-                    {isDebit ? "Debit Note" : "Credit Note"}{" "}
+                    {isDebit ? t("Debit Note") : t("Credit Note")}{" "}
                     {formatAdjustmentDocDisplayId(doc)}:
                   </label>
                   <div className="flex items-center justify-end">
@@ -166,7 +168,7 @@ const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
 
             <div className="col-span-2 border-t border-gray-300 dark:border-gray-600 mt-1 mb-1"></div>
             <label className="font-semibold text-base text-gray-900 dark:text-gray-100 text-right self-center">
-              Adjusted Total:
+              {t("Adjusted Total:")}
             </label>
             <div className="flex items-center justify-end">
               <span className="mr-2 font-semibold text-base text-gray-900 dark:text-gray-100">

@@ -11,10 +11,12 @@ import NavbarBookmarks from "./NavbarBookmarks";
 import NavbarUserMenu from "./NavbarUserMenu";
 import NavbarMobileMenu from "./NavbarMobileMenu";
 import CompanySwitcher from "../CompanySwitcher";
+import { useTranslation } from "react-i18next";
 
 export default function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const { t } = useTranslation("nav");
   const { activeCompany } = useCompany();
   const {
     bookmarks,
@@ -51,7 +53,7 @@ export default function Navbar() {
             <button
               onClick={() => setIsMobileMenuOpen(true)}
               className="lg:hidden p-2 rounded-lg hover:bg-default-100 dark:hover:bg-gray-700 transition-colors"
-              aria-label="Open menu"
+              aria-label={t("Open menu")}
             >
               <IconMenu2 size={24} className="text-default-700 dark:text-gray-200" />
             </button>

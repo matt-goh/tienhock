@@ -563,7 +563,14 @@ export default function (pool) {
             pay_code_id: activity.pay_code_id,
             description: activity.description || "",
             pay_type: activity.pay_type || "Tambahan",
-            rate: parseFloat(activity.rate_used) || 0,
+            // A keyed Fixed activity stores its direct amount in units_produced
+            // (see calculateActivityAmount), so on the quantity-1 payslip row the
+            // rate IS that amount — not the catalogue rate (e.g. a director's
+            // RM1,700 keyed against the shared RM3,500 BULAN_BM override).
+            rate:
+              activity.rate_unit === "Fixed"
+                ? amount
+                : parseFloat(activity.rate_used) || 0,
             rate_unit: activity.rate_unit || "Fixed",
             quantity: qty,
             amount,

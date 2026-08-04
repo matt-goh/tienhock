@@ -19,6 +19,8 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import Button from "../Button";
@@ -28,9 +30,21 @@ import TimeNavigator, { type TimeRange } from "../TimeNavigator";
 type PaymentGroupStatus = "pending" | "posted" | "mixed" | "cancelled";
 type ReceiptAllocationType = "invoice" | "excess" | "account";
 
-const createTodayClearanceRange = (): TimeRange => {
-  const today: Date = new Date();
-  return { start: today, end: today };
+// Default the clearance date to today, or to the received date when the cheque
+// was post-dated — the server rejects a clearance earlier than the received
+// date. yyyy-MM-dd strings are compared, never Date objects (AGENTS.md rule 17).
+const createClearanceRange = (receivedDate?: string | null): TimeRange => {
+  const today: string = format(new Date(), "yyyy-MM-dd");
+  let day: string = today;
+  if (receivedDate) {
+    const received: Date = new Date(receivedDate);
+    if (!Number.isNaN(received.getTime())) {
+      const receivedDay: string = format(received, "yyyy-MM-dd");
+      if (receivedDay > today) day = receivedDay;
+    }
+  }
+  const date: Date = new Date(`${day}T00:00:00`);
+  return { start: date, end: date };
 };
 
 interface ReceiptAllocation {
@@ -108,9 +122,9 @@ const formatCurrency = (amount: number | string): string => {
   });
 };
 
-const formatReceiptDate = (value: string | null): string => {
+const formatReceiptDate = (value: string | null, t: TFunction): string => {
   if (!value) {
-    return "Not yet";
+    return t("Not yet");
   }
 
   const date: Date = new Date(value);
@@ -130,22 +144,29 @@ const getErrorMessage = (error: unknown, fallback: string): string => {
   return error instanceof Error && error.message ? error.message : fallback;
 };
 
-const getAllocationTitle = (allocation: ReceiptAllocation): string => {
+const getAllocationTitle = (
+  allocation: ReceiptAllocation,
+  t: TFunction
+): string => {
   if (allocation.allocation_type === "invoice") {
     return allocation.invoice_id
-      ? `Invoice ${allocation.invoice_id}`
-      : "Invoice payment";
+      ? t("Invoice {{id}}", { id: allocation.invoice_id })
+      : t("Invoice payment");
   }
 
   if (allocation.allocation_type === "excess") {
     return allocation.customer_id
-      ? `Extra payment kept for customer ${allocation.customer_id}`
-      : "Extra customer payment";
+      ? t("Extra payment kept for customer {{id}}", {
+          id: allocation.customer_id,
+        })
+      : t("Extra customer payment");
   }
 
   return allocation.external_reference
-    ? `Payment for ${allocation.external_reference}`
-    : "Payment to account";
+    ? t("Payment for {{reference}}", {
+        reference: allocation.external_reference,
+      })
+    : t("Payment to account");
 };
 
 const getStatusStyles = (status: PaymentGroupStatus): string => {
@@ -164,20 +185,20 @@ const getStatusStyles = (status: PaymentGroupStatus): string => {
   return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300";
 };
 
-const getStatusLabel = (status: PaymentGroupStatus): string => {
+const getStatusLabel = (status: PaymentGroupStatus, t: TFunction): string => {
   if (status === "cancelled") {
-    return "Cancelled";
+    return t("Cancelled");
   }
 
   if (status === "pending") {
-    return "Pending";
+    return t("Pending");
   }
 
   if (status === "mixed") {
-    return "Partly confirmed";
+    return t("Partly confirmed");
   }
 
-  return "Paid";
+  return t("Paid");
 };
 
 const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
@@ -188,6 +209,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
   onCancelled,
   onReferenceUpdated,
 }) => {
+  const { t } = useTranslation("invoice");
   const [paymentGroup, setPaymentGroup] =
     useState<PaymentGroupDetails | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -198,8 +220,8 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
     useState<boolean>(false);
   const [isConfirmConfirmationOpen, setIsConfirmConfirmationOpen] =
     useState<boolean>(false);
-  const [clearanceDateRange, setClearanceDateRange] = useState<TimeRange>(
-    createTodayClearanceRange
+  const [clearanceDateRange, setClearanceDateRange] = useState<TimeRange>(() =>
+    createClearanceRange()
   );
   const [isEditingReference, setIsEditingReference] =
     useState<boolean>(false);
@@ -219,6 +241,12 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
 
   const nonInvoiceAllocationCount: number =
     (paymentGroup?.allocations.length ?? 0) - invoiceAllocations.length;
+  // The bank cannot clear a cheque before it was received.
+  const clearanceMinDate: Date | undefined = useMemo((): Date | undefined => {
+    if (!paymentGroup?.received_date) return undefined;
+    const received: Date = new Date(paymentGroup.received_date);
+    return Number.isNaN(received.getTime()) ? undefined : received;
+  }, [paymentGroup]);
   const canEditReference: boolean = Boolean(
     paymentGroup &&
       paymentGroup.status !== "cancelled" &&
@@ -248,12 +276,15 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
       console.error("Error loading payment group:", error);
       setPaymentGroup(null);
       setLoadError(
-        getErrorMessage(error, "We could not load this payment group. Please try again.")
+        getErrorMessage(
+          error,
+          t("We could not load this payment group. Please try again.")
+        )
       );
     } finally {
       setIsLoading(false);
     }
-  }, [isOpen, receiptId]);
+  }, [isOpen, receiptId, t]);
 
   useEffect((): (() => void) => {
     let isCurrentRequest: boolean = true;
@@ -280,7 +311,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
           setLoadError(
             getErrorMessage(
               error,
-              "We could not load this payment group. Please try again."
+              t("We could not load this payment group. Please try again.")
             )
           );
         }
@@ -296,13 +327,13 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
     return (): void => {
       isCurrentRequest = false;
     };
-  }, [isOpen, receiptId]);
+  }, [isOpen, receiptId, t]);
 
   useEffect((): void => {
     if (!isOpen) {
       setIsCancelConfirmationOpen(false);
       setIsConfirmConfirmationOpen(false);
-      setClearanceDateRange(createTodayClearanceRange());
+      setClearanceDateRange(createClearanceRange());
       setIsCancelling(false);
       setIsConfirming(false);
       setIsEditingReference(false);
@@ -316,14 +347,14 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
     setIsEditingReference(false);
     setReferenceValue("");
     setReferenceError(null);
-    setClearanceDateRange(createTodayClearanceRange());
+    setClearanceDateRange(createClearanceRange());
   }, [receiptId]);
 
   const handleClose = (): void => {
     if (!isCancelling && !isConfirming && !isSavingReference) {
       setIsCancelConfirmationOpen(false);
       setIsConfirmConfirmationOpen(false);
-      setClearanceDateRange(createTodayClearanceRange());
+      setClearanceDateRange(createClearanceRange());
       onClose();
     }
   };
@@ -356,7 +387,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
     }
     const nextReference: string = referenceValue.trim();
     if (!nextReference) {
-      setReferenceError("Enter a payment reference.");
+      setReferenceError(t("Enter a payment reference."));
       return;
     }
     if (nextReference === paymentGroup.display_reference) {
@@ -386,13 +417,17 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
       );
       setIsEditingReference(false);
       setReferenceValue("");
-      toast.success("Payment reference updated for all payments in this group.");
+      toast.success(
+        t("Payment reference updated for all payments in this group.")
+      );
     } catch (error: unknown) {
       console.error("Error updating receipt reference:", error);
       setReferenceError(
         getErrorMessage(
           error,
-          "We couldn't update this payment reference. No payment details were changed."
+          t(
+            "We couldn't update this payment reference. No payment details were changed."
+          )
         )
       );
       setIsSavingReference(false);
@@ -434,15 +469,17 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
       setPaymentGroup(response.payment_group);
       toast.success(
         response.confirmed_payment_count === 1
-          ? "The pending payment was confirmed."
-          : `${response.confirmed_payment_count} pending payments were confirmed together.`
+          ? t("The pending payment was confirmed.")
+          : t("{{total}} pending payments were confirmed together.", {
+              total: response.confirmed_payment_count,
+            })
       );
     } catch (error: unknown) {
       console.error("Error confirming payment group:", error);
       toast.error(
         getErrorMessage(
           error,
-          "We could not confirm this payment group. No payments were changed."
+          t("We could not confirm this payment group. No payments were changed.")
         )
       );
       setIsConfirming(false);
@@ -455,7 +492,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
       console.error("Error refreshing payments after group confirmation:", error);
     } finally {
       setIsConfirming(false);
-      setClearanceDateRange(createTodayClearanceRange());
+      setClearanceDateRange(createClearanceRange());
     }
   };
 
@@ -482,13 +519,13 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
         (currentGroup: PaymentGroupDetails | null): PaymentGroupDetails | null =>
           currentGroup ? { ...currentGroup, status: "cancelled" } : currentGroup
       );
-      toast.success("The payment group and all its payments were cancelled.");
+      toast.success(t("The payment group and all its payments were cancelled."));
     } catch (error: unknown) {
       console.error("Error cancelling payment group:", error);
       toast.error(
         getErrorMessage(
           error,
-          "We could not cancel this payment group. No payments were changed."
+          t("We could not cancel this payment group. No payments were changed.")
         )
       );
       setIsCancelling(false);
@@ -505,30 +542,42 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
     }
   };
 
+  // Each fragment below is a complete translatable noun phrase, never a
+  // word-level concatenation (docs/I18N_HANDOVER.md §3).
   const affectedInvoiceText: string =
     invoiceAllocations.length === 1
-      ? `invoice ${invoiceAllocations[0].invoice_id}`
-      : `${invoiceAllocations.length} invoices`;
+      ? t("invoice {{id}}", { id: invoiceAllocations[0].invoice_id })
+      : t("{{total}} invoices", { total: invoiceAllocations.length });
 
   const cancellationScopeText: string =
     invoiceAllocations.length > 0
-      ? `${affectedInvoiceText}${
-          nonInvoiceAllocationCount > 0
-            ? ` and ${nonInvoiceAllocationCount} other payment ${
-                nonInvoiceAllocationCount === 1 ? "amount" : "amounts"
-              }`
-            : ""
-        }`
-      : `${paymentGroup?.allocations.length ?? 0} payment ${
-          paymentGroup?.allocations.length === 1 ? "amount" : "amounts"
-        }`;
+      ? nonInvoiceAllocationCount > 0
+        ? nonInvoiceAllocationCount === 1
+          ? t("{{scope}} and {{total}} other payment amount", {
+              scope: affectedInvoiceText,
+              total: nonInvoiceAllocationCount,
+            })
+          : t("{{scope}} and {{total}} other payment amounts", {
+              scope: affectedInvoiceText,
+              total: nonInvoiceAllocationCount,
+            })
+        : affectedInvoiceText
+      : paymentGroup?.allocations.length === 1
+      ? t("{{total}} payment amount", { total: 1 })
+      : t("{{total}} payment amounts", {
+          total: paymentGroup?.allocations.length ?? 0,
+        });
 
   const cancellationConfirmationMessage: React.ReactNode = (
     <div className="space-y-3">
       <p>
-        Payment reference {paymentGroup?.display_reference || "this group"} covers{" "}
-        {cancellationScopeText}. Cancelling this group will reverse every payment
-        below together; you cannot cancel only one of them.
+        {t(
+          "Payment reference {{reference}} covers {{scope}}. Cancelling this group will reverse every payment below together; you cannot cancel only one of them.",
+          {
+            reference: paymentGroup?.display_reference || t("this group"),
+            scope: cancellationScopeText,
+          }
+        )}
       </p>
       {paymentGroup && paymentGroup.allocations.length > 0 && (
         <ul className="space-y-1.5 rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
@@ -544,11 +593,11 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                     onClick={handleClose}
                     className="font-medium text-sky-600 hover:underline dark:text-sky-400"
                   >
-                    Invoice {allocation.invoice_id}
+                    {t("Invoice {{id}}", { id: allocation.invoice_id })}
                   </Link>
                 ) : (
                   <span className="font-medium text-default-700 dark:text-gray-200">
-                    {getAllocationTitle(allocation)}
+                    {getAllocationTitle(allocation, t)}
                   </span>
                 )}
                 <span className="whitespace-nowrap font-medium text-default-700 dark:text-gray-200">
@@ -560,7 +609,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
         </ul>
       )}
       <p className="font-medium text-rose-600 dark:text-rose-300">
-        This cannot be undone.
+        {t("This cannot be undone.")}
       </p>
     </div>
   );
@@ -568,17 +617,19 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
   const groupConfirmationMessage: React.ReactNode = (
     <div className="space-y-3">
       <p>
-        Every payment still marked Pending under reference{" "}
-        {paymentGroup?.display_reference || "this group"} will be confirmed
-        together. Payments already confirmed will not be changed.
+        {t(
+          "Every payment still marked Pending under reference {{reference}} will be confirmed together. Payments already confirmed will not be changed.",
+          { reference: paymentGroup?.display_reference || t("this group") }
+        )}
       </p>
       <p>
-        The related invoice balances will be updated and their journal entries
-        will be created using the payment details already recorded.
+        {t(
+          "The related invoice balances will be updated and their journal entries will be created using the payment details already recorded."
+        )}
       </p>
       <div>
         <label className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300">
-          Cheque Clearance Date
+          {t("Cheque Clearance Date")}
         </label>
         <TimeNavigator
           range={clearanceDateRange}
@@ -588,12 +639,14 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
           showArrows={false}
           size="sm"
           disabled={isConfirming}
+          minDate={clearanceMinDate}
           className="w-full"
           triggerClassName="w-full justify-between"
         />
         <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
-          Use the date the bank statement shows the cheque as cleared. This
-          date controls the bank and account-ledger reports.
+          {t(
+            "Use the date the bank statement shows the cheque as cleared. This date controls the bank and account-ledger reports."
+          )}
         </p>
       </div>
     </div>
@@ -638,11 +691,13 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                           className="break-all text-base font-semibold text-default-800 dark:text-gray-100"
                         >
                           {paymentGroup?.display_reference
-                            ? `Payment Group ${paymentGroup.display_reference}`
-                            : "Payment Group Details"}
+                            ? t("Payment Group {{reference}}", {
+                                reference: paymentGroup.display_reference,
+                              })
+                            : t("Payment Group Details")}
                         </DialogTitle>
                         <p className="text-xs text-default-500 dark:text-gray-400">
-                          See every invoice paid under this reference.
+                          {t("See every invoice paid under this reference.")}
                         </p>
                       </div>
                     </div>
@@ -651,7 +706,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                       onClick={handleClose}
                       disabled={isCancelling || isConfirming || isSavingReference}
                       className="rounded-lg p-1 text-default-400 transition-colors hover:bg-default-100 hover:text-default-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-200"
-                      aria-label="Close payment group details"
+                      aria-label={t("Close payment group details")}
                     >
                       <IconX size={18} />
                     </button>
@@ -661,7 +716,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                     {isLoading ? (
                       <div className="flex min-h-52 flex-col items-center justify-center gap-3 text-default-500 dark:text-gray-400">
                         <span className="h-8 w-8 animate-spin rounded-full border-2 border-default-200 border-t-sky-500 dark:border-gray-600 dark:border-t-sky-400" />
-                        <p className="text-sm">Loading payment group...</p>
+                        <p className="text-sm">{t("Loading payment group...")}</p>
                       </div>
                     ) : loadError ? (
                       <div className="flex min-h-52 flex-col items-center justify-center gap-3 text-center">
@@ -671,7 +726,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                         />
                         <div>
                           <p className="font-medium text-default-800 dark:text-gray-100">
-                            Payment group could not be loaded
+                            {t("Payment group could not be loaded")}
                           </p>
                           <p className="mt-1 max-w-md text-sm text-default-500 dark:text-gray-400">
                             {loadError}
@@ -684,7 +739,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                           icon={IconRefresh}
                           onClick={() => void loadPaymentGroup()}
                         >
-                          Try Again
+                          {t("Try Again")}
                         </Button>
                       </div>
                     ) : paymentGroup ? (
@@ -698,12 +753,12 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                             />
                             <div>
                               <p className="text-sm font-semibold">
-                                This reference includes more than one payment
+                                {t("This reference includes more than one payment")}
                               </p>
                               <p className="mt-1 text-sm leading-5">
-                                To keep every invoice correct, pending payments are
-                                confirmed together and payments must also be
-                                cancelled as a group.
+                                {t(
+                                  "To keep every invoice correct, pending payments are confirmed together and payments must also be cancelled as a group."
+                                )}
                               </p>
                             </div>
                           </div>
@@ -717,15 +772,21 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                             />
                             <div>
                               <p className="text-sm font-semibold">
-                                This payment group has already been cancelled
+                                {t("This payment group has already been cancelled")}
                               </p>
                               <p className="mt-1 text-sm leading-5">
-                                All payments belonging to this group were reversed
-                                together.
+                                {t(
+                                  "All payments belonging to this group were reversed together."
+                                )}
                               </p>
                               {paymentGroup.cancellation_reasons.length > 0 && (
                                 <p className="mt-1 text-xs opacity-80">
-                                  Reason: {paymentGroup.cancellation_reasons.join("; ")}
+                                  {t("Reason: {{reason}}", {
+                                    reason:
+                                      paymentGroup.cancellation_reasons.join(
+                                        "; "
+                                      ),
+                                  })}
                                 </p>
                               )}
                             </div>
@@ -734,38 +795,40 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
 
                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                           <div className="rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
-                            <p className="text-xs text-default-500 dark:text-gray-400">Status</p>
+                            <p className="text-xs text-default-500 dark:text-gray-400">{t("status", { ns: "common" })}</p>
                             <span
                               className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getStatusStyles(
                                 paymentGroup.status
                               )}`}
                             >
-                              {getStatusLabel(paymentGroup.status)}
+                              {getStatusLabel(paymentGroup.status, t)}
                             </span>
                           </div>
                           <div className="rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
-                            <p className="text-xs text-default-500 dark:text-gray-400">Total received</p>
+                            <p className="text-xs text-default-500 dark:text-gray-400">{t("Total received")}</p>
                             <p className="mt-1 text-sm font-semibold text-default-800 dark:text-gray-100">
                               {formatCurrency(paymentGroup.total_amount)}
                             </p>
                           </div>
                           <div className="rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
-                            <p className="text-xs text-default-500 dark:text-gray-400">Received date</p>
+                            <p className="text-xs text-default-500 dark:text-gray-400">{t("Received date")}</p>
                             <p className="mt-1 text-sm font-medium text-default-800 dark:text-gray-100">
-                              {formatReceiptDate(paymentGroup.received_date)}
+                              {formatReceiptDate(paymentGroup.received_date, t)}
                             </p>
                           </div>
                           <div className="rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
-                            <p className="text-xs text-default-500 dark:text-gray-400">Method</p>
+                            <p className="text-xs text-default-500 dark:text-gray-400">{t("Method")}</p>
                             <p className="mt-1 text-sm font-medium text-default-800 dark:text-gray-100">
-                              {formatPaymentMethod(paymentGroup.payment_method)}
+                              {t(
+                                formatPaymentMethod(paymentGroup.payment_method)
+                              )}
                             </p>
                           </div>
                         </div>
 
                         <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
                           <div className="sm:col-span-2">
-                            <dt className="text-xs text-default-500 dark:text-gray-400">Payment reference</dt>
+                            <dt className="text-xs text-default-500 dark:text-gray-400">{t("Payment reference")}</dt>
                             <dd className="mt-1 text-default-800 dark:text-gray-100">
                               {isEditingReference ? (
                                 <form
@@ -786,7 +849,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                                       autoFocus
                                       disabled={isSavingReference || isConfirming}
                                       className="h-9 min-w-0 flex-1 rounded-lg border border-default-300 bg-white px-3 font-mono text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-                                      aria-label="New payment reference"
+                                      aria-label={t("New payment reference")}
                                     />
                                     <div className="flex gap-2">
                                       <Button
@@ -797,7 +860,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                                         disabled={isSavingReference || isConfirming}
                                         className="flex-1 sm:flex-none"
                                       >
-                                        Cancel
+                                        {t("cancel", { ns: "common" })}
                                       </Button>
                                       <Button
                                         type="submit"
@@ -807,15 +870,15 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                                         className="flex-1 sm:flex-none"
                                       >
                                         {isSavingReference
-                                          ? "Saving..."
-                                          : "Save Reference"}
+                                          ? t("Saving...")
+                                          : t("Save Reference")}
                                       </Button>
                                     </div>
                                   </div>
                                   <p className="text-xs text-default-500 dark:text-gray-400">
-                                    This updates every payment in the same
-                                    reference group. Amounts and payment status
-                                    will not change.
+                                    {t(
+                                      "This updates every payment in the same reference group. Amounts and payment status will not change."
+                                    )}
                                   </p>
                                   {referenceError && (
                                     <p className="text-xs text-rose-600 dark:text-rose-300">
@@ -850,8 +913,8 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                             <div>
                               <dt className="text-xs text-default-500 dark:text-gray-400">
                                 {paymentGroup.cheque_references.length === 1
-                                  ? "Cheque number"
-                                  : "Cheque numbers"}
+                                  ? t("Cheque number")
+                                  : t("Cheque numbers")}
                               </dt>
                               <dd className="mt-0.5 font-mono text-default-800 dark:text-gray-100">
                                 {paymentGroup.cheque_references.join(", ")}
@@ -861,8 +924,8 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                           <div className="sm:col-span-2">
                             <dt className="text-xs text-default-500 dark:text-gray-400">
                               {paymentGroup.journals.length === 1
-                                ? "Journal entry"
-                                : "Journal entries"}
+                                ? t("Journal entry")
+                                : t("Journal entries")}
                             </dt>
                             <dd className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
                               {paymentGroup.journals.length > 0 ? (
@@ -874,17 +937,19 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                                       className="inline-flex items-center gap-1 font-medium text-sky-600 hover:underline dark:text-sky-400"
                                     >
                                       <IconReceipt size={15} />
-                                      <span>View Journal</span>
+                                      <span>{t("View Journal")}</span>
                                       <IconExternalLink size={13} />
                                     </Link>
                                   )
                                 )
                               ) : paymentGroup.status === "pending" ? (
                                 <span className="text-default-500 dark:text-gray-400">
-                                  Not created yet while these payments are pending
+                                  {t(
+                                    "Not created yet while these payments are pending"
+                                  )}
                                 </span>
                               ) : (
-                                <span className="text-default-500 dark:text-gray-400">None</span>
+                                <span className="text-default-500 dark:text-gray-400">{t("None")}</span>
                               )}
                             </dd>
                           </div>
@@ -893,13 +958,14 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                         <div>
                           <div className="mb-2 flex items-center justify-between gap-3">
                             <h4 className="text-sm font-semibold text-default-800 dark:text-gray-100">
-                              Payments in this group
+                              {t("Payments in this group")}
                             </h4>
                             <span className="text-xs text-default-500 dark:text-gray-400">
-                              {paymentGroup.allocations.length}{" "}
                               {paymentGroup.allocations.length === 1
-                                ? "payment"
-                                : "payments"}
+                                ? t("{{total}} payment", { total: 1 })
+                                : t("{{total}} payments", {
+                                    total: paymentGroup.allocations.length,
+                                  })}
                             </span>
                           </div>
                           <ul className="divide-y divide-default-200 overflow-hidden rounded-xl border border-default-200 dark:divide-gray-700 dark:border-gray-700">
@@ -920,17 +986,21 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                                           onClick={handleClose}
                                           className="inline-flex items-center gap-1 truncate text-sm font-medium text-sky-600 hover:underline dark:text-sky-400"
                                         >
-                                          Invoice {allocation.invoice_id}
+                                          {t("Invoice {{id}}", {
+                                            id: allocation.invoice_id,
+                                          })}
                                           <IconExternalLink size={13} className="shrink-0" />
                                         </Link>
                                       ) : (
                                         <p className="truncate text-sm font-medium text-default-800 dark:text-gray-100">
-                                          {getAllocationTitle(allocation)}
+                                          {getAllocationTitle(allocation, t)}
                                         </p>
                                       )}
                                       {allocation.customer_id && (
                                         <p className="truncate text-xs text-default-500 dark:text-gray-400">
-                                          Customer {allocation.customer_id}
+                                          {t("Customer {{id}}", {
+                                            id: allocation.customer_id,
+                                          })}
                                         </p>
                                       )}
                                     </div>
@@ -946,7 +1016,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                       </div>
                     ) : (
                       <div className="flex min-h-52 items-center justify-center text-sm text-default-500 dark:text-gray-400">
-                        Select a payment group to view its details.
+                        {t("Select a payment group to view its details.")}
                       </div>
                     )}
                   </div>
@@ -954,13 +1024,15 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                   <div className="flex flex-col gap-3 border-t border-default-200 px-5 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-gray-700">
                     <p className="text-xs text-default-500 dark:text-gray-400">
                       {paymentGroup?.status === "cancelled"
-                        ? "This payment group can no longer be changed."
+                        ? t("This payment group can no longer be changed.")
                         : canConfirmGroup
-                        ? "Confirming applies every pending payment in this group together."
+                        ? t(
+                            "Confirming applies every pending payment in this group together."
+                          )
                         : paymentGroup?.allocations.length &&
                           paymentGroup.allocations.length > 1
-                        ? "Cancelling reverses every payment shown above."
-                        : "Cancelling reverses this payment."}
+                        ? t("Cancelling reverses every payment shown above.")
+                        : t("Cancelling reverses this payment.")}
                     </p>
                     <div className="flex w-full shrink-0 flex-wrap gap-2 sm:w-auto">
                       <Button
@@ -971,7 +1043,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                         disabled={isCancelling || isConfirming || isSavingReference}
                         className="flex-1 sm:flex-none"
                       >
-                        Close
+                        {t("close", { ns: "common" })}
                       </Button>
                       {canConfirmGroup && (
                         <Button
@@ -981,7 +1053,9 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                           size="sm"
                           icon={IconCircleCheck}
                           onClick={() => {
-                            setClearanceDateRange(createTodayClearanceRange());
+                            setClearanceDateRange(
+                              createClearanceRange(paymentGroup?.received_date)
+                            );
                             setIsConfirmConfirmationOpen(true);
                           }}
                           className="flex-1 sm:flex-none"
@@ -993,8 +1067,8 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                           }
                         >
                           {isConfirming
-                            ? "Confirming..."
-                            : "Confirm Payment Group"}
+                            ? t("Confirming...")
+                            : t("Confirm Payment Group")}
                         </Button>
                       )}
                       <Button
@@ -1014,7 +1088,9 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                           isSavingReference
                         }
                       >
-                        {isCancelling ? "Cancelling..." : "Cancel Payment Group"}
+                        {isCancelling
+                          ? t("Cancelling...")
+                          : t("Cancel Payment Group")}
                       </Button>
                     </div>
                   </div>
@@ -1029,14 +1105,14 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
         isOpen={isConfirmConfirmationOpen}
         onClose={() => {
           setIsConfirmConfirmationOpen(false);
-          setClearanceDateRange(createTodayClearanceRange());
+          setClearanceDateRange(createClearanceRange());
         }}
         onConfirm={() => void handleConfirmPaymentGroup()}
-        title={`Confirm payment group ${
-          paymentGroup?.display_reference || ""
-        }?`}
+        title={t("Confirm payment group {{reference}}?", {
+          reference: paymentGroup?.display_reference || "",
+        })}
         message={groupConfirmationMessage}
-        confirmButtonText="Confirm All Pending Payments"
+        confirmButtonText={t("Confirm All Pending Payments")}
         variant="success"
         allowContentOverflow
       />
@@ -1045,11 +1121,11 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
         isOpen={isCancelConfirmationOpen}
         onClose={() => setIsCancelConfirmationOpen(false)}
         onConfirm={() => void handleCancelPaymentGroup()}
-        title={`Cancel payment group ${
-          paymentGroup?.display_reference || ""
-        }?`}
+        title={t("Cancel payment group {{reference}}?", {
+          reference: paymentGroup?.display_reference || "",
+        })}
         message={cancellationConfirmationMessage}
-        confirmButtonText="Cancel Payment Group"
+        confirmButtonText={t("Cancel Payment Group")}
         variant="danger"
       />
     </>

@@ -1,5 +1,6 @@
 // src/components/ConfirmationDialog.tsx
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogPanel,
@@ -27,12 +28,14 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   onConfirm,
   title,
   message,
-  confirmButtonText = "Confirm",
+  confirmButtonText,
   variant = "danger",
   hideCancelButton = false,
   allowContentOverflow = false,
   isConfirming = false,
 }) => {
+  const { t } = useTranslation("common");
+
   // Define button styles based on variant
   const buttonStyles = {
     danger: "text-white bg-rose-500 hover:bg-rose-600 active:bg-rose-700",
@@ -102,7 +105,7 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
                     onClick={onClose}
                     disabled={isConfirming}
                   >
-                    Cancel
+                    {t("cancel")}
                   </button>
                 )}
                 <button
@@ -111,7 +114,7 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
                   onClick={onConfirm}
                   disabled={isConfirming}
                 >
-                  {confirmButtonText}
+                  {confirmButtonText ?? t("confirm")}
                 </button>
               </div>
             </DialogPanel>

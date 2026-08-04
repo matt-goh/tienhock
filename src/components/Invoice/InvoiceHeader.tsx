@@ -1,5 +1,6 @@
 // src/components/Invoice/InvoiceHeader.tsx
 import React, { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { ExtendedInvoiceData, Customer } from "../../types/types"; // Use updated types
 import { FormInput } from "../FormComponents"; // Reusable components
 import PillSelect, { PillSelectOption } from "../PillSelect";
@@ -17,11 +18,6 @@ interface SelectOption {
 
 // "I"/"C" are the invoice-number prefixes; they map to INVOICE/CASH.
 type InvoiceTypeCode = "I" | "C";
-
-const INVOICE_TYPE_OPTIONS: ReadonlyArray<PillSelectOption<InvoiceTypeCode>> = [
-  { value: "I", label: "Invoice" },
-  { value: "C", label: "Cash" },
-];
 
 interface InvoiceHeaderProps {
   invoice: ExtendedInvoiceData;
@@ -56,6 +52,18 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
   isFetchingCustomers,
   readOnly = false,
 }) => {
+  const { t } = useTranslation("invoice");
+
+  // Only the pill LABELS are translated; the "I"/"C" values stay raw.
+  const invoiceTypeOptions: ReadonlyArray<PillSelectOption<InvoiceTypeCode>> =
+    useMemo(
+      (): ReadonlyArray<PillSelectOption<InvoiceTypeCode>> => [
+        { value: "I", label: t("Invoice") },
+        { value: "C", label: t("Cash") },
+      ],
+      [t]
+    );
+
   const handleDateTimeChange = (field: "date" | "time", value: string) => {
     const currentTimestamp = parseInt(
       invoice.createddate || Date.now().toString()
@@ -127,7 +135,7 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
         <div className="relative">
           <FormInput
             name="invoiceno"
-            label="Invoice No"
+            label={t("Invoice No")}
             value={`${invoice.paymenttype === "CASH" ? "C" : "I"}${
               invoice.id || ""
             }`}
@@ -138,14 +146,14 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
               onInputChange("id", numericPart);
             }}
             disabled={!isNewInvoice || readOnly} // Use readOnly
-            placeholder="Enter Invoice Number"
+            placeholder={t("Enter Invoice Number")}
           />
         </div>
 
         {/* Type */}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-            Type
+            {t("type", { ns: "common" })}
           </label>
           <PillSelect<InvoiceTypeCode>
             value={invoice.paymenttype === "CASH" ? "C" : "I"}
@@ -156,9 +164,9 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
                 onInputChange("id", invoice.id);
               }
             }}
-            options={INVOICE_TYPE_OPTIONS}
+            options={invoiceTypeOptions}
             disabled={readOnly} // Use readOnly
-            ariaLabel="Invoice type"
+            ariaLabel={t("Invoice type")}
             size="md"
           />
         </div>
@@ -166,7 +174,7 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
         {/* Date */}
         <FormInput
           name="date"
-          label="Date"
+          label={t("date", { ns: "common" })}
           type="date"
           value={formatDateForInput(invoice.createddate)}
           onChange={(e) => handleDateTimeChange("date", e.target.value)}
@@ -176,7 +184,7 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
         {/* Time */}
         <FormInput
           name="time"
-          label="Time"
+          label={t("Time")}
           type="time"
           value={
             parseDatabaseTimestamp(invoice.createddate).formattedTime?.slice(
@@ -197,7 +205,7 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
             pill, which is the old "Select Salesman..." placeholder state. */}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-            Salesman
+            {t("Salesman")}
           </label>
           <PillSelect<string>
             value={invoice.salespersonid || ""}
@@ -206,7 +214,7 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
             }}
             options={salesmanOptions}
             disabled={readOnly} // Use readOnly
-            ariaLabel="Salesman"
+            ariaLabel={t("Salesman")}
             size="md"
           />
         </div>
@@ -214,7 +222,7 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
         {/* Customer */}
         <CustomerCombobox
           name="customer"
-          label="Customer"
+          label={t("customer", { ns: "common" })}
           value={selectedOptionForCombobox} // Pass SelectOption | null
           onChange={handleComboboxChange} // Use updated handler
           options={customerOptionsForCombobox} // Pass mapped options
@@ -228,7 +236,7 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
         {/* Customer ID (Read Only) */}
         <FormInput
           name="customerId"
-          label="Customer ID"
+          label={t("Customer ID")}
           value={invoice.customerid || ""}
           disabled // Always disabled
         />

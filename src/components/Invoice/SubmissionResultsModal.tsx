@@ -1,5 +1,6 @@
 // src/components/Invoice/SubmissionResultsModal.tsx
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
   IconX,
   IconCheck,
@@ -68,6 +69,8 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
   results,
   isLoading = false,
 }) => {
+  const { t } = useTranslation("invoice");
+
   if (!isOpen) return null;
 
   // --- Safely calculate statistics ---
@@ -233,13 +236,13 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-default-200 dark:border-gray-700">
           <h2 className="text-lg font-semibold text-default-900 dark:text-gray-100">
-            e-Invoice Submission
+            {t("e-Invoice Submission")}
           </h2>
           {!isLoading && (
             <button
               onClick={onClose}
               className="text-default-500 hover:text-default-800 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 rounded-full p-1 transition-all"
-              aria-label="Close modal"
+              aria-label={t("Close modal")}
             >
               <IconX size={22} />
             </button>
@@ -252,10 +255,10 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="h-10 w-10 border-4 border-t-sky-500 border-sky-100 dark:border-sky-900 rounded-full animate-spin mb-5"></div>
               <p className="text-default-700 dark:text-gray-200 text-lg font-medium">
-                Processing Submission
+                {t("Processing Submission")}
               </p>
               <p className="text-default-500 dark:text-gray-400 text-sm">
-                Please wait a moment...
+                {t("Please wait a moment...")}
               </p>
             </div>
           ) : results ? ( // Only need results to exist now
@@ -272,8 +275,10 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                   <h3
                     className={`text-base font-semibold ${themeClasses[themeColor]?.title ?? themeClasses.default.title}`}
                   >
-                    {results.overallStatus ||
-                      (isOverallSuccess ? "Success" : "Failed")}
+                    {t(
+                      results.overallStatus ||
+                        (isOverallSuccess ? "Success" : "Failed")
+                    )}
                   </h3>
                   {results.message && (
                     <p className={`text-sm mt-1 ${themeClasses[themeColor]?.message ?? themeClasses.default.message}`}>
@@ -282,7 +287,9 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                   )}
                   {results.submissionUid && (
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-mono">
-                      Submission UID: {results.submissionUid}
+                      {t("Submission UID: {{uid}}", {
+                        uid: results.submissionUid,
+                      })}
                     </p>
                   )}
                 </div>
@@ -294,7 +301,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                   <div className="bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden">
                     <div className="px-4 py-3 border-b border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-700/50">
                       <h3 className="text-base font-semibold text-default-700 dark:text-gray-200">
-                        Pending Invoice Status Updates
+                        {t("Pending Invoice Status Updates")}
                       </h3>
                     </div>
                     <div className="divide-y divide-default-200 dark:divide-gray-700 max-h-[calc(90vh-300px)] overflow-y-auto">
@@ -322,12 +329,14 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                                   <p
                                     className={`text-sm font-medium ${statusInfo.color} flex-shrink-0`}
                                   >
-                                    Updated to {statusInfo.text}
+                                    {t("Updated to {{status}}", {
+                                      status: t(statusInfo.text),
+                                    })}
                                   </p>
                                 </div>
                                 {item.longId && (
                                   <p className="text-xs text-default-500 dark:text-gray-400 mt-0.5 font-mono truncate">
-                                    Long ID: {item.longId}
+                                    {t("Long ID: {{id}}", { id: item.longId })}
                                   </p>
                                 )}
                               </div>
@@ -354,11 +363,13 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                                   #{item.id}
                                 </p>
                                 <p className="text-sm font-medium text-rose-600 dark:text-rose-400 flex-shrink-0">
-                                  Update Check Failed
+                                  {t("Update Check Failed")}
                                 </p>
                               </div>
                               <p className="text-xs text-rose-700 dark:text-rose-300 mt-0.5 truncate">
-                                Error: {item.error}
+                                {t("Error: {{message}}", {
+                                  message: item.error,
+                                })}
                               </p>
                             </div>
                           </div>
@@ -373,7 +384,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                     {stats.totalDocuments > 0 && (
                       <div>
                         <h3 className="text-base font-medium text-default-600 dark:text-gray-300 mb-3">
-                          Document Summary
+                          {t("Document Summary")}
                         </h3>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                           <div className="bg-default-100 dark:bg-gray-700 p-3 rounded-lg border border-default-200 dark:border-gray-600 text-center">
@@ -381,7 +392,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                               {stats.totalDocuments}
                             </div>
                             <div className="text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wide mt-1">
-                              Total
+                              {t("total", { ns: "common" })}
                             </div>
                           </div>
                           <div className="bg-emerald-50 dark:bg-emerald-900/30 p-3 rounded-lg border border-emerald-200 dark:border-emerald-700 text-center">
@@ -389,7 +400,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                               {stats.valid}
                             </div>
                             <div className="text-xs font-medium text-emerald-600 dark:text-emerald-500 uppercase tracking-wide mt-1">
-                              Valid
+                              {t("Valid")}
                             </div>
                           </div>
                           <div className="bg-sky-50 dark:bg-sky-900/30 p-3 rounded-lg border border-sky-200 dark:border-sky-700 text-center">
@@ -397,7 +408,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                               {stats.pending}
                             </div>
                             <div className="text-xs font-medium text-sky-600 dark:text-sky-500 uppercase tracking-wide mt-1">
-                              Pending
+                              {t("Pending")}
                             </div>
                           </div>
                           <div className="bg-rose-50 dark:bg-rose-900/30 p-3 rounded-lg border border-rose-200 dark:border-rose-700 text-center">
@@ -405,7 +416,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                               {stats.rejected}
                             </div>
                             <div className="text-xs font-medium text-rose-600 dark:text-rose-500 uppercase tracking-wide mt-1">
-                              Rejected
+                              {t("Rejected")}
                             </div>
                           </div>
                         </div>
@@ -417,7 +428,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                       <div className="bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden">
                         <div className="px-4 py-3 border-b border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-700/50">
                           <h3 className="text-base font-semibold text-default-700 dark:text-gray-200">
-                            Document Details
+                            {t("Document Details")}
                           </h3>
                         </div>
                         <div className="divide-y divide-default-200 dark:divide-gray-700 max-h-[calc(90vh-450px)] overflow-y-auto">
@@ -445,17 +456,21 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                                       <p
                                         className={`text-sm font-medium ${statusColorClass} flex-shrink-0`}
                                       >
-                                        {statusText}
+                                        {t(statusText)}
                                       </p>
                                     </div>
                                     {doc.uuid && (
                                       <p className="text-xs text-default-500 dark:text-gray-400 mt-0.5 font-mono truncate">
-                                        UUID: {doc.uuid}
+                                        {t("UUID: {{uuid}}", {
+                                          uuid: doc.uuid,
+                                        })}
                                       </p>
                                     )}
                                     {doc.longId && (
                                       <p className="text-xs text-default-500 dark:text-gray-400 mt-0.5 font-mono truncate">
-                                        Long ID: {doc.longId}
+                                        {t("Long ID: {{id}}", {
+                                          id: doc.longId,
+                                        })}
                                       </p>
                                     )}
                                   </div>
@@ -482,12 +497,12 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                                       #{doc.internalId}
                                     </p>
                                     <p className="text-sm font-medium text-rose-600 dark:text-rose-400 flex-shrink-0">
-                                      Rejected
+                                      {t("Rejected")}
                                     </p>
                                   </div>
                                   <p className="text-sm text-rose-700 dark:text-rose-300 mt-1 font-medium">
                                     {doc.error?.message ||
-                                      "Rejection reason not specified"}
+                                      t("Rejection reason not specified")}
                                   </p>
                                   {doc.error?.details &&
                                     doc.error.details.length > 0 && (
@@ -506,12 +521,17 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                                           ))}
                                         {doc.error.details.length > 5 && (
                                           <p className="text-xs text-default-500 dark:text-gray-400 italic mt-1">
-                                            ({doc.error.details.length - 5} more
-                                            issue
                                             {doc.error.details.length - 5 > 1
-                                              ? "s"
-                                              : ""}
-                                            )
+                                              ? t("({{total}} more issues)", {
+                                                  total:
+                                                    doc.error.details.length -
+                                                    5,
+                                                })
+                                              : t("({{total}} more issue)", {
+                                                  total:
+                                                    doc.error.details.length -
+                                                    5,
+                                                })}
                                           </p>
                                         )}
                                       </div>
@@ -524,7 +544,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                       </div>
                     ) : (
                       <div className="text-center py-6 text-default-500 dark:text-gray-400">
-                        No documents were found in the submission results.
+                        {t("No documents were found in the submission results.")}
                       </div>
                     )}
                   </>
@@ -535,9 +555,9 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
             // Fallback for null results and not loading
             <div className="flex flex-col items-center justify-center py-16 text-center text-default-500 dark:text-gray-400">
               <IconAlertTriangle size={32} className="mb-3 text-amber-500 dark:text-amber-400" />
-              <p className="text-lg font-medium">No Results Available</p>
+              <p className="text-lg font-medium">{t("No Results Available")}</p>
               <p className="text-sm">
-                Could not retrieve or process submission results.
+                {t("Could not retrieve or process submission results.")}
               </p>
             </div>
           )}
@@ -547,7 +567,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
         {!isLoading && (
           <div className="p-4 border-t border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800">
             <Button onClick={onClose} className="w-full justify-center py-2.5">
-              Done
+              {t("Done")}
             </Button>
           </div>
         )}

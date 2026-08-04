@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 interface ConsolidatedInfoTooltipProps {
   invoices: string[];
@@ -20,6 +21,7 @@ const ConsolidatedInfoTooltip: React.FC<ConsolidatedInfoTooltipProps> = ({
   const iconRef = useRef<HTMLSpanElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const navigate = useNavigate();
+  const { t } = useTranslation("invoice");
 
   useEffect(() => {
     if (isVisible && iconRef.current) {
@@ -86,9 +88,9 @@ const ConsolidatedInfoTooltip: React.FC<ConsolidatedInfoTooltipProps> = ({
             onMouseLeave={handleMouseLeave}
           >
             <div className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2 flex justify-between items-center">
-              <span>Consolidated Invoices</span>
+              <span>{t("Consolidated Invoices")}</span>
               <span className="text-xs text-default-500 dark:text-gray-400">
-                ({invoices.length} invoices)
+                {t("({{total}} invoices)", { total: invoices.length })}
               </span>
             </div>
 
@@ -101,7 +103,7 @@ const ConsolidatedInfoTooltip: React.FC<ConsolidatedInfoTooltipProps> = ({
                       ? "cursor-pointer hover:bg-default-100"
                       : ""
                   } transition-colors duration-200`}
-                  title={`Invoice #${invoice}`}
+                  title={t("Invoice #{{id}}", { id: invoice })}
                   onClick={() => {
                     if (!disableNavigation) {
                       navigate(`${invoice}`);

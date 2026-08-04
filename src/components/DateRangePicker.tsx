@@ -1,5 +1,6 @@
 // src/components/DateRangePicker.tsx
 import React, { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import clsx from "clsx";
 
 interface DateRange {
@@ -21,6 +22,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
   className,
   size = "md",
 }) => {
+  const { t } = useTranslation("common");
   const [isDateRangeFocused, setIsDateRangeFocused] = useState(false);
   const endDateInputRef = useRef<HTMLInputElement>(null);
 
@@ -137,7 +139,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
         onBlur={() => setIsDateRangeFocused(false)}
         className={inputClasses}
       />
-      <span className="text-default-400 dark:text-gray-400 text-sm">to</span>
+      <span className="text-default-400 dark:text-gray-400 text-sm">{t("to")}</span>
       <input
         ref={endDateInputRef}
         type="date"

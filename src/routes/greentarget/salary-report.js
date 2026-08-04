@@ -1,12 +1,15 @@
 // src/routes/greentarget/salary-report.js
-// Green Target Salary Report (Phase 5). GT has no locations, so the report
-// groups by job type (OFFICE / DRIVER) instead of location, and the per-employee
-// column buckets are computed in JS from the stored payroll (employee_payrolls +
-// payroll_items + payroll_deductions + mid-month). Leave pay lives in the GT
-// leave ledger (folded into gross_pay) and is surfaced in the Cuti column.
+// Green Target Salary Report (Phase 5). The report groups by the shared
+// public.staffs.location JSONB field (first entry; names from public.locations),
+// falling back to "02" (Office) when unset — the same convention as TH. The
+// per-employee column buckets are computed in JS from the stored payroll
+// (employee_payrolls + payroll_items + payroll_deductions + mid-month). Leave
+// pay lives in the GT leave ledger (folded into gross_pay) and is surfaced in
+// the Cuti column.
 //
 // Output shapes match what the shared TH PDF generator
-// (src/utils/payroll/SalaryReportPDF.tsx) consumes, with `location` = job group.
+// (src/utils/payroll/SalaryReportPDF.tsx) consumes, with `location` = the
+// shared location code.
 import { Router } from "express";
 
 const TOTAL_KEYS = [
@@ -30,10 +33,20 @@ const TOTAL_KEYS = [
   "setelah_digenapkan",
 ];
 
-const GROUP_ORDER = ["OFFICE", "DRIVER"];
-const groupRank = (g) => {
-  const i = GROUP_ORDER.indexOf(g);
-  return i === -1 ? 99 : i;
+// Locations sort numerically by code; non-numeric codes go last (same as JP).
+const locationRank = (code) => {
+  const n = parseInt(code, 10);
+  return Number.isNaN(n) ? 999 : n;
+};
+
+// Staff without a location fall back to Office (same convention as TH).
+const DEFAULT_LOCATION = "02";
+
+const firstLocationCode = (location) => {
+  if (Array.isArray(location) && location.length > 0 && location[0]) {
+    return String(location[0]);
+  }
+  return DEFAULT_LOCATION;
 };
 
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
@@ -153,7 +166,7 @@ export default function (pool) {
     const eps = await pool.query(
       `SELECT ep.id, ep.monthly_payroll_id, ep.employee_id, ep.job_type,
               ep.gross_pay, ep.net_pay, ep.digenapkan, ep.setelah_digenapkan,
-              s.name as employee_name,
+              s.name as employee_name, s.location,
               s.ic_no, s.bank_account_number, s.payment_preference
        FROM greentarget.employee_payrolls ep
        LEFT JOIN public.staffs s ON ep.employee_id = s.id
@@ -263,6 +276,7 @@ export default function (pool) {
       return {
         month,
         job_type: ep.job_type || "OTHER",
+        location_code: firstLocationCode(ep.location),
         employee_id: ep.employee_id,
         employee_name: ep.employee_name || ep.employee_id,
         ep_id: ep.id,
@@ -278,9 +292,19 @@ export default function (pool) {
     });
   };
 
+  // Location id -> name map from the shared TH location catalogue.
+  const loadLocationMap = async () => {
+    const r = await pool.query("SELECT id, name FROM public.locations");
+    const map = {};
+    r.rows.forEach((l) => {
+      map[l.id] = l.name;
+    });
+    return map;
+  };
+
   /**
    * GET /greentarget/api/salary-report?year&month
-   * Comprehensive monthly report grouped by job (OFFICE/DRIVER).
+   * Comprehensive monthly report grouped by location.
    */
   router.get("/", async (req, res) => {
     const year = parseInt(req.query.year, 10);
@@ -289,30 +313,33 @@ export default function (pool) {
       return res.status(400).json({ message: "year and month are required" });
     }
     try {
-      const all = await loadYearRows(year);
+      const [all, locationMap] = await Promise.all([
+        loadYearRows(year),
+        loadLocationMap(),
+      ]);
       const rows = all.filter((r) => r.month === month);
 
       const groups = {};
       const grand = emptyTotals();
       for (const r of rows) {
-        if (!groups[r.job_type]) {
-          groups[r.job_type] = {
-            location: r.job_type,
+        if (!groups[r.location_code]) {
+          groups[r.location_code] = {
+            location: r.location_code,
             employees: [],
             totals: emptyTotals(),
           };
         }
-        groups[r.job_type].employees.push({
+        groups[r.location_code].employees.push({
           employee_payroll_id: r.ep_id,
           staff_id: r.employee_id,
           staff_name: r.employee_name,
           ...r.row,
         });
-        addInto(groups[r.job_type].totals, r.row);
+        addInto(groups[r.location_code].totals, r.row);
         addInto(grand, r.row);
       }
       const locations = Object.values(groups).sort(
-        (a, b) => groupRank(a.location) - groupRank(b.location)
+        (a, b) => locationRank(a.location) - locationRank(b.location)
       );
 
       // Employee / Bank / Pinjam tabs list each person once, sorted by name.
@@ -339,6 +366,7 @@ export default function (pool) {
         month,
         locations,
         grand_totals: grand,
+        location_map: locationMap,
         // Pinjam tab
         data: pinjamData,
         total_records: pinjamData.length,
@@ -385,21 +413,24 @@ export default function (pool) {
 
   /**
    * GET /greentarget/api/salary-report/annual?year
-   * Annual summary: per-month totals + per-group totals + grand totals.
+   * Annual summary: per-month totals + per-location totals + grand totals.
    */
   router.get("/annual", async (req, res) => {
     const year = parseInt(req.query.year, 10);
     if (!year) return res.status(400).json({ message: "year is required" });
     try {
-      const rows = await loadYearRows(year);
+      const [rows, locationMap] = await Promise.all([
+        loadYearRows(year),
+        loadLocationMap(),
+      ]);
       const monthlyMap = {};
       const locMap = {};
       const grand = emptyTotals();
       for (const r of rows) {
         if (!monthlyMap[r.month]) monthlyMap[r.month] = emptyTotals();
         addInto(monthlyMap[r.month], r.row);
-        if (!locMap[r.job_type]) locMap[r.job_type] = emptyTotals();
-        addInto(locMap[r.job_type], r.row);
+        if (!locMap[r.location_code]) locMap[r.location_code] = emptyTotals();
+        addInto(locMap[r.location_code], r.row);
         addInto(grand, r.row);
       }
       const monthly = Object.keys(monthlyMap)
@@ -407,8 +438,14 @@ export default function (pool) {
         .sort((a, b) => a.month - b.month);
       const locations = Object.keys(locMap)
         .map((l) => ({ location: l, totals: locMap[l] }))
-        .sort((a, b) => groupRank(a.location) - groupRank(b.location));
-      res.json({ year, monthly, locations, grand_totals: grand });
+        .sort((a, b) => locationRank(a.location) - locationRank(b.location));
+      res.json({
+        year,
+        monthly,
+        locations,
+        grand_totals: grand,
+        location_map: locationMap,
+      });
     } catch (error) {
       console.error("Error building GT annual salary report:", error);
       res.status(500).json({
@@ -420,7 +457,7 @@ export default function (pool) {
 
   /**
    * GET /greentarget/api/salary-report/annual-breakdown?year
-   * Per group, each employee expanded into one row per processed month.
+   * Per location, each employee expanded into one row per processed month.
    */
   router.get("/annual-breakdown", async (req, res) => {
     const year = parseInt(req.query.year, 10);
@@ -430,14 +467,14 @@ export default function (pool) {
       const locMap = {};
       const grand = emptyTotals();
       for (const r of rows) {
-        if (!locMap[r.job_type]) {
-          locMap[r.job_type] = {
-            location: r.job_type,
+        if (!locMap[r.location_code]) {
+          locMap[r.location_code] = {
+            location: r.location_code,
             employees: new Map(),
             totals: emptyTotals(),
           };
         }
-        const loc = locMap[r.job_type];
+        const loc = locMap[r.location_code];
         let emp = loc.employees.get(r.employee_id);
         if (!emp) {
           emp = {
@@ -454,7 +491,7 @@ export default function (pool) {
         addInto(grand, r.row);
       }
       const locations = Object.values(locMap)
-        .sort((a, b) => groupRank(a.location) - groupRank(b.location))
+        .sort((a, b) => locationRank(a.location) - locationRank(b.location))
         .map((loc) => ({
           location: loc.location,
           employees: Array.from(loc.employees.values()).map((e) => ({

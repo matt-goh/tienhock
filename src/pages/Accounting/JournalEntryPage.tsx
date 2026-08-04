@@ -887,6 +887,11 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
 
   // Entry status for edit mode
   const [entryStatus, setEntryStatus] = useState<string>("active");
+  // Source ownership of the loaded entry (edit mode): a source-owned journal is
+  // re-synced by its source document until a hand save detaches it
+  // (manual_override). Used to warn once before that detaching save.
+  const [entrySourceType, setEntrySourceType] = useState<string | null>(null);
+  const [entryManualOverride, setEntryManualOverride] = useState<boolean>(false);
 
   // Initial form data for change detection
   const initialFormDataRef = useRef<JournalEntryFormData | null>(null);
@@ -897,6 +902,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showDetachConfirmation, setShowDetachConfirmation] = useState(false);
   const [quickAddTargetLineIndex, setQuickAddTargetLineIndex] = useState<number | null>(null);
   const [quickAddInitialQuery, setQuickAddInitialQuery] = useState<string>("");
   const [focusedCell, setFocusedCell] = useState<{ row: number; col: string } | null>(null);
@@ -1081,6 +1087,8 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
       setFormData(fetchedFormData);
       initialFormDataRef.current = JSON.parse(JSON.stringify(fetchedFormData));
       setEntryStatus(entry.status);
+      setEntrySourceType(entry.source_type ?? null);
+      setEntryManualOverride(entry.manual_override === true);
     } catch (err: unknown) {
       console.error("Error fetching entry data:", err);
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
@@ -1358,6 +1366,24 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
 
     if (!validateForm()) return;
 
+    // Saving a source-owned Tien Hock journal by hand DETACHES it from its
+    // source document: the source stops re-syncing it, and the re-inserted
+    // lines lose their per-line receipt/cheque references. Warn once — an
+    // already-detached (manual_override) journal saves without asking again.
+    if (
+      !isGreenTarget &&
+      isEditMode &&
+      entrySourceType &&
+      !entryManualOverride
+    ) {
+      setShowDetachConfirmation(true);
+      return;
+    }
+
+    await performSave();
+  };
+
+  const performSave = async () => {
     setIsSaving(true);
 
     try {
@@ -2044,6 +2070,19 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
         title="Discard Changes"
         message="You have unsaved changes. Are you sure you want to go back? All changes will be lost."
         confirmButtonText="Discard"
+      />
+
+      <ConfirmationDialog
+        isOpen={showDetachConfirmation}
+        onClose={() => setShowDetachConfirmation(false)}
+        onConfirm={() => {
+          setShowDetachConfirmation(false);
+          void performSave();
+        }}
+        title="Detach Journal from Its Document?"
+        message={`This journal was created by its source document, which keeps it up to date automatically. Saving entry "${formData.reference_no}" by hand detaches it: the source document will stop updating it, and the per-line receipt and cheque references on its lines will be lost. This cannot be undone.`}
+        confirmButtonText="Save & Detach"
+        variant="danger"
       />
     </div>
   );

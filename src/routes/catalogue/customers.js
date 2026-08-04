@@ -479,12 +479,17 @@ export default function (pool) {
           const memberCount = parseInt(countResult.rows[0].count);
 
           if (memberCount > 1) {
-            // Promote another branch to main
+            // Promote another branch to main. PostgreSQL has no LIMIT on
+            // UPDATE, so the single target row is picked in a subquery.
             const nextMainQuery = `
             UPDATE customer_branch_mappings
             SET is_main_branch = true
-            WHERE group_id = $1 AND customer_id != $2
-            LIMIT 1
+            WHERE id = (
+              SELECT id FROM customer_branch_mappings
+              WHERE group_id = $1 AND customer_id != $2
+              ORDER BY id
+              LIMIT 1
+            )
           `;
             await client.query(nextMainQuery, [group_id, id]);
 

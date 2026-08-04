@@ -1106,7 +1106,10 @@ const InvoiceFormPage: React.FC = () => {
               );
             } catch (pErr) {
               console.error("Payment err:", pErr);
-              toast.error("Invoice created, payment failed.", { id: pTid });
+              toast.error(
+                "Invoice created, payment failed. You can record the payment later from the invoice details page.",
+                { id: pTid }
+              );
             }
           }
           if (navId)
