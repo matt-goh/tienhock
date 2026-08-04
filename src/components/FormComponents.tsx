@@ -13,6 +13,7 @@ import {
   ListboxButton as HeadlessListboxButton,
 } from "@headlessui/react";
 import { IconChevronDown, IconCheck, IconPhone } from "@tabler/icons-react";
+import { useTranslation } from "react-i18next";
 import clsx from "clsx";
 import { StatusIndicator } from "./StatusIndicator"; // Assuming this exists
 
@@ -174,17 +175,18 @@ export const FormListbox: React.FC<ListboxProps> = ({
   options,
   disabled = false,
   required = false,
-  placeholder = "Select...",
+  placeholder,
   optionsPosition = "bottom",
   anchor,
   className = "",
   renderOption,
 }) => {
+  const { t } = useTranslation("common");
   const valueAsString = value?.toString() ?? "";
   const selectedOption = options.find(
     (option) => option.id.toString() === valueAsString
   );
-  const displayValue = selectedOption?.name ?? placeholder;
+  const displayValue = selectedOption?.name ?? placeholder ?? t("Select...");
 
   return (
     <div className={`${label ? "space-y-2" : ""} ${className}`}>
@@ -317,10 +319,11 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
   mode = "multiple", // Default to multiple for backward compatibility
   disabled = false,
   required = false,
-  placeholder = "Search...",
+  placeholder,
   optionsPosition = "bottom",
   maxVisibleOptions,
 }) => {
+  const { t } = useTranslation("common");
   const isMultiple = mode === "multiple";
   const [visibleCount, setVisibleCount] = React.useState<number>(
     maxVisibleOptions ?? 0
@@ -444,7 +447,7 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
               // displayValue tells Headless UI how to render the selected item(s) in the input
               displayValue={getDisplayValue}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder={placeholder}
+              placeholder={placeholder ?? t("Search...")}
               disabled={disabled}
               id={`${name}-input`}
             />
@@ -475,7 +478,7 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
             >
               {filteredOptions.length === 0 && query !== "" ? (
                 <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
-                  Nothing found.
+                  {t("Nothing found.")}
                 </div>
               ) : (
                 visibleOptions.map((option) => (
@@ -562,7 +565,9 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
                   }}
                   className="w-full border-t border-default-200 dark:border-gray-700 py-2 px-3 text-left text-sm font-medium text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30"
                 >
-                  Load more... ({hiddenOptionCount} more)
+                  {t("Load more... ({{hidden}} more)", {
+                    hidden: hiddenOptionCount,
+                  })}
                 </button>
               )}
             </ComboboxOptions>

@@ -5,6 +5,7 @@ import {
   IconChevronRight,
   IconChevronsRight,
 } from "@tabler/icons-react";
+import { useTranslation } from "react-i18next";
 import clsx from "clsx";
 
 interface DateNavigatorProps {
@@ -39,6 +40,8 @@ const DateNavigator: React.FC<DateNavigatorProps> = ({
   size = "md",
   beforeChange,
 }) => {
+  const { t } = useTranslation("common");
+
   // Check if current date is today
   const isToday = useMemo(() => {
     const now = new Date();
@@ -114,8 +117,8 @@ const DateNavigator: React.FC<DateNavigatorProps> = ({
         <button
           onClick={() => navigateDay("prev")}
           className={clsx(buttonClasses, "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700")}
-          title="Previous day"
-          aria-label="Previous day"
+          title={t("Previous day")}
+          aria-label={t("Previous day")}
         >
           <IconChevronLeft size={iconSize} />
         </button>
@@ -132,8 +135,8 @@ const DateNavigator: React.FC<DateNavigatorProps> = ({
               displayClasses,
               "bg-default-50 dark:bg-gray-900/50 hover:bg-sky-50 dark:hover:bg-sky-900/30 hover:border-sky-300 dark:hover:border-sky-700 hover:text-sky-700 dark:hover:text-sky-300 cursor-pointer"
             )}
-            title="Click to go to today"
-            aria-label="Go to today"
+            title={t("Click to go to today")}
+            aria-label={t("Go to today")}
           >
             {displayFormatter(selectedDate)}
           </button>
@@ -149,8 +152,8 @@ const DateNavigator: React.FC<DateNavigatorProps> = ({
               ? "cursor-not-allowed text-default-300 dark:text-gray-600"
               : "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
           )}
-          title="Next day"
-          aria-label="Next day"
+          title={t("Next day")}
+          aria-label={t("Next day")}
         >
           <IconChevronRight size={iconSize} />
         </button>
@@ -160,8 +163,8 @@ const DateNavigator: React.FC<DateNavigatorProps> = ({
           <button
             onClick={goToToday}
             disabled={isToday}
-            title="Go to today"
-            aria-label="Go to today"
+            title={t("Go to today")}
+            aria-label={t("Go to today")}
             className={clsx(
               buttonClasses,
               isToday
