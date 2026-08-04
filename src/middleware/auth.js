@@ -81,7 +81,7 @@ export const authMiddleware = (pool) => async (req, res, next) => {
         st.name as staff_name,
         st.job as staff_job 
       FROM active_sessions s
-      LEFT JOIN staffs st ON s.staff_id = s.staff_id
+      LEFT JOIN staffs st ON st.id = s.staff_id
       WHERE s.session_id = $1 
         AND s.status = 'active'
         AND s.last_active > NOW() - INTERVAL '7 days'
@@ -126,6 +126,11 @@ export const authMiddleware = (pool) => async (req, res, next) => {
           }
         : null,
     };
+
+    // Expose the authenticated staff id for audit columns (created_by /
+    // updated_by / posted_by / cancelled_by) from the same session source.
+    req.staffId = session.staff_id || null;
+    req.user = session.staff_id ? { id: session.staff_id } : null;
 
     // Check if we need to update the timestamp (throttled)
     const shouldUpdateTimestamp = isUpdateNeeded(sessionId);
