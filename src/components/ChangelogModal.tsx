@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-04",
+    ms: "Slip gaji Green Target: lajur \"Rate\" untuk item gaji tetap (Fixed) kini memaparkan amaun gaji yang sebenar diisi — contohnya gaji pengarah GOH THAI HO dan WONG SHUK FUN kini dipaparkan sebagai 1,700.00, bukannya kadar katalog 3,500.00 seperti sebelum ini. Amaun gaji tidak berubah; paparan kadar sahaja yang diperbetulkan.",
+    en: "Green Target payslip: the \"Rate\" column for fixed (Fixed) salary items now shows the actual keyed salary amount — e.g. directors GOH THAI HO and WONG SHUK FUN now show 1,700.00 instead of the 3,500.00 catalogue rate as before. The salary amount is unchanged; only the displayed rate was corrected.",
+  },
+  {
+    date: "2026-08-04",
     ms: "Laporan gaji tahunan (mengikut nama dan mengikut lokasi) kini menggabungkan pekerja yang mempunyai lebih daripada satu ID kakitangan kepada satu baris sahaja — contohnya JASSON_ROLL dan JASSON_PM kini dipaparkan sebagai satu baris JASSON JIEM dengan jumlah yang dicampurkan.",
     en: "The yearly salary report (by name and by location) now combines workers who have more than one staff ID into a single row — e.g. JASSON_ROLL and JASSON_PM now appear as one JASSON JIEM row with the amounts added together.",
   },
