@@ -149,6 +149,7 @@ import jellypollyJobLocationMappingsRouter from "./jellypolly/job-location-mappi
 
 // Excel routes
 import paymentExportRouter from "./excel/payment-export.js";
+import companyPaymentExportRouter from "./excel/company-payment-export.js";
 import staffRecordsExportRouter from "./excel/staff-records-export.js";
 
 import {
@@ -200,6 +201,20 @@ export default function setupRoutes(app, pool) {
 
   // Excel routes (before auth middleware - has its own API key auth)
   app.use("/api/excel/payment-export", paymentExportRouter(pool));
+  app.use(
+    "/jellypolly/api/excel/payment-export",
+    companyPaymentExportRouter(pool, {
+      payrollSchema: "jellypolly",
+      staffSchema: "jellypolly",
+    })
+  );
+  app.use(
+    "/greentarget/api/excel/payment-export",
+    companyPaymentExportRouter(pool, {
+      payrollSchema: "greentarget",
+      staffSchema: "public",
+    })
+  );
   app.use("/api/excel/staff-records-export", staffRecordsExportRouter(pool));
 
   // Add auth middleware to protect other routes

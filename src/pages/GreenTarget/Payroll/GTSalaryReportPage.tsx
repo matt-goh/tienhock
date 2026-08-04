@@ -2,8 +2,22 @@
 // Green Target Salary Report (Phase 5). Monthly + annual views grouped by job
 // (OFFICE / DRIVER) — GT has no locations. Reuses the shared TH PDF generator.
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { IconRefresh, IconPrinter, IconDownload } from "@tabler/icons-react";
+import {
+  IconRefresh,
+  IconPrinter,
+  IconDownload,
+  IconFileExport,
+  IconLink,
+} from "@tabler/icons-react";
+import {
+  Dialog,
+  DialogPanel,
+  DialogTitle,
+  Transition,
+  TransitionChild,
+} from "@headlessui/react";
 import Button from "../../../components/Button";
+import { FormListbox } from "../../../components/FormComponents";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import TimeNavigator, { TimeRange } from "../../../components/TimeNavigator";
 import { api } from "../../../routes/utils/api";
@@ -218,6 +232,14 @@ const GTSalaryReportPage: React.FC = () => {
     );
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingExport, setIsGeneratingExport] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [exportYear, setExportYear] = useState<number>(
+    new Date().getFullYear()
+  );
+  const [exportMonth, setExportMonth] = useState<number>(
+    new Date().getMonth() + 1
+  );
 
   const { staffs: allStaffs } = useStaffsCache();
   const [gtEmployeeIds, setGtEmployeeIds] = useState<Set<string>>(new Set());
@@ -452,6 +474,247 @@ const GTSalaryReportPage: React.FC = () => {
       : activeTab === "bank"
       ? monthly?.summary.total_final ?? 0
       : monthly?.employees_grand_totals?.setelah_digenapkan ?? 0;
+
+  // Bank text export — bank-preference employees with money to pay out.
+  const bankExportRows = useMemo<PinjamReportData[]>(() => {
+    if (!monthly?.data) return [];
+    return monthly.data.filter((row: PinjamReportData): boolean => {
+      const finalTotal: number = parseFloat(row.final_total.toString());
+      return (
+        (row.payment_preference ?? "").trim().toLowerCase() === "bank" &&
+        finalTotal > 0
+      );
+    });
+  }, [monthly]);
+
+  // Generate year and month options
+  const yearOptions = useMemo(() => {
+    const years = [];
+    const startYear = new Date().getFullYear() - 5; // Go back 5 years
+    const endYear = new Date().getFullYear(); // Current year
+    for (let year = endYear; year >= startYear; year--) {
+      years.push({ id: year, name: year.toString() });
+    }
+    return years;
+  }, []);
+
+  const monthOptions = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, i) => ({
+        id: i + 1,
+        name: getMonthName(i + 1),
+      })),
+    []
+  );
+
+  const generateExportURL = () => {
+    // Determine server URL based on environment
+    const isProduction = window.location.hostname === "tienhock.com";
+    const baseURL = isProduction
+      ? "https://api.tienhock.com"
+      : "http://localhost:5001";
+    const url = `${baseURL}/greentarget/api/excel/payment-export?year=${exportYear}&month=${exportMonth}&api_key=foodmaker`;
+
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        toast.success("Export URL copied to clipboard!");
+        setShowExportDialog(false);
+      })
+      .catch(() => {
+        toast.error("Failed to copy URL to clipboard");
+      });
+  };
+
+  const generateTextExport = async () => {
+    if (bankExportRows.length === 0) {
+      toast.error("No bank payment data available to export");
+      return;
+    }
+
+    setIsGeneratingExport(true);
+    try {
+      // Generate payment date (last day of the month)
+      const lastDayOfMonth = new Date(currentYear, currentMonth, 0).getDate();
+      const paymentDate = `${lastDayOfMonth
+        .toString()
+        .padStart(2, "0")}/${currentMonth
+        .toString()
+        .padStart(2, "0")}/${currentYear}`;
+
+      // Define payment date row
+      const paymentDateRow = [
+        "PAYMENT DATE : (DD/MM/YYYY)",
+        paymentDate,
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+      ];
+
+      // Define column headers with 2-row format
+      const headerRow1 = [
+        "Payment Type/ Mode : PBB/IBG/REN",
+        "Bene Acct No.",
+        "BIC",
+        "Bene Full Name",
+        "ID Type: For Intrabank & IBG NI, OI, BR, PL, ML, PP For Rentas NI, OI, BR, OT",
+        "Bene Identification No / Passport",
+        "Payment Amount (with 2 decimal points)",
+        "Recipient Reference (shown in sender and bene statement)",
+        "Other Payment Details (shown in sender and bene statement)",
+        "Bene Email 1",
+        "Bene Email 2",
+        "Bene Mobile No. 1 (charge RM0.20 per number)",
+        "Bene Mobile No. 2 (charge RM0.20 per number)",
+        "Joint Bene Name",
+        "Joint Bene Identification No.",
+        "Joint ID Type: For Intrabank & IBG NI, OI, BR, PL, ML, PP For Rentas NI, OI, BR, OT",
+        "E-mail Content Line 1 (will be shown in bene email)",
+        "E-mail Content Line 2 (will be shown in bene email)",
+        "E-mail Content Line 3 (will be shown in bene email)",
+        "E-mail Content Line 4 (will be shown in bene email)",
+        "E-mail Content Line 5 (will be shown in bene email)",
+      ];
+
+      const headerRow2 = [
+        "(M) - Char: 3 - A",
+        "(M) - Char: 20 - N",
+        "(M) - Char: 11 - A",
+        "(M) - Char: 120 - A",
+        "(M) - Char: 2 - A",
+        "(O) - Char: 29 - AN",
+        "(M) - Char: 18 - N",
+        "(M) - Char: 20 - AN",
+        "(O) - Char: 20 - AN",
+        "(O) - Char: 70 - AN",
+        "(O) - Char: 70 - AN",
+        "(O) - Char: 15 - N",
+        "(O) - Char: 15 - N",
+        "(O) - Char: 120 - A",
+        "(O) - Char: 29 - AN",
+        "(O) - Char: 2 - A",
+        "(O) - Char: 40 - AN",
+        "(O) - Char: 40 - AN",
+        "(O) - Char: 40 - AN",
+        "(O) - Char: 40 - AN",
+        "(O) - Char: 40 - AN",
+      ];
+
+      // Generate data rows
+      const dataRows = bankExportRows.map((row: PinjamReportData) => {
+        const staff = allStaffs?.find((s) => s.id === row.staff_id);
+        const paymentAmount = parseFloat(row.final_total.toString()).toFixed(2);
+
+        const columns = [
+          "PBB", // Column 1
+          (staff?.bankAccountNumber || "").replace(/-/g, ""), // Column 2 - remove hyphens
+          "PBBEMYKL", // Column 3
+          (row.staff_name || "").replace(/,/g, " "), // Column 4 - remove commas
+          staff?.document || "", // Column 5
+          (staff?.icNo || "").replace(/-/g, ""), // Column 6 - remove hyphens
+          paymentAmount, // Column 7 - plain number format
+          "Salary", // Column 8
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "", // Columns 9-16
+          "Content Line 1", // Column 17
+          "Content Line 2", // Column 18
+          "Content Line 3", // Column 19
+          "Content Line 4", // Column 20
+          "Content Line 5", // Column 21
+        ];
+
+        return columns;
+      });
+
+      // Calculate total payment amount
+      const totalAmount = bankExportRows.reduce(
+        (sum: number, row: PinjamReportData): number =>
+          sum + parseFloat(row.final_total.toString()),
+        0
+      );
+
+      // Create total row
+      const totalRow = [
+        "TOTAL:",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        totalAmount.toFixed(2),
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+      ];
+
+      // Combine all rows
+      const allRows = [
+        paymentDateRow,
+        headerRow1,
+        headerRow2,
+        ...dataRows,
+        totalRow,
+      ];
+
+      // Convert to text format (semicolon separated)
+      const textContent = allRows.map((row) => row.join(";")).join("\r\n");
+
+      // Create and download the file
+      const blob = new Blob([textContent], {
+        type: "text/plain;charset=utf-8",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `gt-payment-export-${currentMonth
+        .toString()
+        .padStart(2, "0")}-${currentYear}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Payment export file downloaded successfully");
+    } catch (error) {
+      console.error("Error generating text export:", error);
+      toast.error("Failed to generate text export");
+    } finally {
+      setIsGeneratingExport(false);
+    }
+  };
 
   const handleGenerateBreakdown = async (
     action: "download" | "print"
@@ -779,6 +1042,91 @@ const GTSalaryReportPage: React.FC = () => {
     </thead>
   );
 
+  // Export Dialog Component
+  const ExportDialog = () => (
+    <Transition appear show={showExportDialog} as={React.Fragment}>
+      <Dialog
+        as="div"
+        className="fixed inset-0 z-50"
+        onClose={() => setShowExportDialog(false)}
+      >
+        <div className="min-h-screen px-4 text-center">
+          <TransitionChild
+            as={React.Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <DialogPanel
+              className="fixed inset-0 bg-black opacity-30"
+              onClick={() => setShowExportDialog(false)}
+            />
+          </TransitionChild>
+
+          <span
+            className="inline-block h-screen align-middle"
+            aria-hidden="true"
+          >
+            &#8203;
+          </span>
+
+          <TransitionChild
+            as={React.Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0 scale-95"
+            enterTo="opacity-100 scale-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100 scale-100"
+            leaveTo="opacity-0 scale-95"
+          >
+            <DialogPanel
+              className="inline-block w-full max-w-md p-6 my-8 text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <DialogTitle
+                as="h3"
+                className="text-lg font-medium leading-6 text-default-900 dark:text-gray-100"
+              >
+                Export Link Generator
+              </DialogTitle>
+              <div className="mt-4 space-y-4">
+                <FormListbox
+                  name="exportYear"
+                  label="Year"
+                  value={exportYear.toString()}
+                  onChange={(value) => setExportYear(Number(value))}
+                  options={yearOptions}
+                />
+                <FormListbox
+                  name="exportMonth"
+                  label="Month"
+                  value={exportMonth.toString()}
+                  onChange={(value) => setExportMonth(Number(value))}
+                  options={monthOptions}
+                />
+              </div>
+              <div className="flex justify-end space-x-3 mt-6">
+                <Button
+                  onClick={() => setShowExportDialog(false)}
+                  variant="outline"
+                  size="sm"
+                >
+                  Cancel
+                </Button>
+                <Button onClick={generateExportURL} color="blue" size="sm">
+                  Copy URL
+                </Button>
+              </div>
+            </DialogPanel>
+          </TransitionChild>
+        </div>
+      </Dialog>
+    </Transition>
+  );
+
   return (
     <div className="space-y-3">
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
@@ -915,6 +1263,33 @@ const GTSalaryReportPage: React.FC = () => {
               >
                 Download
               </Button>
+              {activeTab === "bank" && (
+                <>
+                  <Button
+                    onClick={generateTextExport}
+                    icon={IconFileExport}
+                    color="purple"
+                    variant="outline"
+                    disabled={
+                      !monthly ||
+                      bankExportRows.length === 0 ||
+                      isGeneratingExport
+                    }
+                    size="sm"
+                  >
+                    Export
+                  </Button>
+                  <Button
+                    onClick={() => setShowExportDialog(true)}
+                    icon={IconLink}
+                    color="orange"
+                    variant="outline"
+                    size="sm"
+                  >
+                    Export Link
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1240,6 +1615,9 @@ const GTSalaryReportPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Export Dialog */}
+      <ExportDialog />
     </div>
   );
 };
