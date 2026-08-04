@@ -815,7 +815,7 @@ const JPSalaryReportPage: React.FC = () => {
         }
         await generateSalaryReportPDF(
           {
-            reportType: "employee-grouped",
+            reportType: "location",
             periodType: "monthly",
             year: currentYear,
             month: currentMonth,
@@ -1384,53 +1384,29 @@ const JPSalaryReportPage: React.FC = () => {
             ) : (
               <table className="w-full table-fixed">
                 {renderTableColGroup()}
-                {renderSalaryHeader("NAMA PEKERJA")}
+                {renderSalaryHeader("BAHAGIAN KERJA")}
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                  {monthly.locations.map((loc) => (
-                    <React.Fragment key={loc.location}>
-                      <tr className="bg-sky-50 dark:bg-sky-900/20">
-                        <td
-                          colSpan={TABLE_COLUMN_COUNT}
-                          className="px-4 py-2 text-sm font-semibold text-sky-800 dark:text-sky-300 border-y border-default-200 dark:border-gray-700"
-                        >
-                          {loc.location} -{" "}
-                          {(locationMap[loc.location] || loc.location).toUpperCase()}
-                        </td>
-                      </tr>
-                      {loc.employees.map((emp, index: number) => (
-                        <tr
-                          key={emp.employee_payroll_id}
-                          className={
-                            index % 2 === 0
-                              ? "bg-white dark:bg-gray-800"
-                              : "bg-default-25 dark:bg-gray-750"
-                          }
-                        >
-                          <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 text-center">
-                            {index + 1}
-                          </td>
-                          <td className={bodyNameCellClass}>
-                            <span
-                              className="block truncate"
-                              title={`${emp.staff_id.toUpperCase()} - ${emp.staff_name.toUpperCase()}`}
-                            >
-                              {emp.staff_id.toUpperCase()} -{" "}
-                              {emp.staff_name.toUpperCase()}
-                            </span>
-                          </td>
-                          {renderAmountCells(emp)}
-                        </tr>
-                      ))}
-                      <tr>
-                        <td
-                          colSpan={2}
-                          className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600"
-                        >
-                          SUBTOTAL
-                        </td>
-                        {renderAmountCells(loc.totals, true)}
-                      </tr>
-                    </React.Fragment>
+                  {monthly.locations.map((loc, index: number) => (
+                    <tr
+                      key={loc.location}
+                      className={
+                        index % 2 === 0
+                          ? "bg-white dark:bg-gray-800"
+                          : "bg-default-25 dark:bg-gray-750"
+                      }
+                    >
+                      <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 text-center">
+                        {loc.location}
+                      </td>
+                      <td className={bodyNameCellClass}>
+                        <span className="block truncate">
+                          {(
+                            locationMap[loc.location] || loc.location
+                          ).toUpperCase()}
+                        </span>
+                      </td>
+                      {renderAmountCells(loc.totals)}
+                    </tr>
                   ))}
                 </tbody>
                 <tfoot className="sticky bottom-0 z-20">

@@ -1,5 +1,6 @@
 // src/components/Invoice/InvoiceGrid.tsx
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { ExtendedInvoiceData } from "../../types/types";
 import InvoiceCard from "./InvoiceCard";
 import { IconFileInvoice } from "@tabler/icons-react"; // For empty state
@@ -22,6 +23,8 @@ const InvoiceGrid: React.FC<InvoiceGridProps> = ({
   isLoading,
   error,
 }) => {
+  const { t } = useTranslation("invoice");
+
   if (isLoading) {
     // Already handled by parent, but can add a placeholder if needed
     return null;
@@ -39,11 +42,12 @@ const InvoiceGrid: React.FC<InvoiceGridProps> = ({
           <IconFileInvoice size={64} stroke={1.5} className="text-slate-600 dark:text-gray-400" />
         </div>
         <h3 className="text-2xl font-semibold text-slate-700 dark:text-gray-200 mb-3">
-          No Invoices Found
+          {t("No Invoices Found")}
         </h3>
         <p className="text-slate-500 dark:text-gray-400 text-center max-w-md leading-relaxed">
-          No invoices match your current filters or search criteria. Try
-          adjusting the filters to see more results.
+          {t(
+            "No invoices match your current filters or search criteria. Try adjusting the filters to see more results."
+          )}
         </p>
       </div>
     );

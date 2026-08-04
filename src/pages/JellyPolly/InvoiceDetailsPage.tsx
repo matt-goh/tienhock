@@ -204,9 +204,22 @@ const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
   );
 };
 
-const createTodayClearanceRange = (): TimeRange => {
-  const today: Date = new Date();
-  return { start: today, end: today };
+// Default the clearance date to today, or to the payment's date when the
+// cheque was post-dated — the server rejects a clearance earlier than the
+// payment date. yyyy-MM-dd strings are compared, never Date objects
+// (AGENTS.md rule 17).
+const createClearanceRange = (paymentDate?: string | null): TimeRange => {
+  const today: string = format(new Date(), "yyyy-MM-dd");
+  let day: string = today;
+  if (paymentDate) {
+    const received: Date = new Date(paymentDate);
+    if (!Number.isNaN(received.getTime())) {
+      const receivedDay: string = format(received, "yyyy-MM-dd");
+      if (receivedDay > today) day = receivedDay;
+    }
+  }
+  const date: Date = new Date(`${day}T00:00:00`);
+  return { start: date, end: date };
 };
 
 // --- Main Component ---
@@ -258,8 +271,8 @@ const InvoiceDetailsPage: React.FC = () => {
     null
   );
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
-  const [clearanceDateRange, setClearanceDateRange] = useState<TimeRange>(
-    createTodayClearanceRange
+  const [clearanceDateRange, setClearanceDateRange] = useState<TimeRange>(() =>
+    createClearanceRange()
   );
   const [showOverpaymentConfirm, setShowOverpaymentConfirm] = useState(false);
   const [overpaymentDetails, setOverpaymentDetails] = useState<{
@@ -1225,7 +1238,7 @@ const InvoiceDetailsPage: React.FC = () => {
     }
 
     setPaymentToConfirm(payment);
-    setClearanceDateRange(createTodayClearanceRange());
+    setClearanceDateRange(createClearanceRange(payment.payment_date));
     setShowConfirmPaymentDialog(true);
   };
 
@@ -1249,7 +1262,7 @@ const InvoiceDetailsPage: React.FC = () => {
     } finally {
       setIsConfirmingPayment(false);
       setPaymentToConfirm(null);
-      setClearanceDateRange(createTodayClearanceRange());
+      setClearanceDateRange(createClearanceRange());
     }
   };
 
@@ -2459,7 +2472,7 @@ const InvoiceDetailsPage: React.FC = () => {
           onClose={() => {
             setShowConfirmPaymentDialog(false);
             setPaymentToConfirm(null);
-            setClearanceDateRange(createTodayClearanceRange());
+            setClearanceDateRange(createClearanceRange());
           }}
           onConfirm={handleConfirmPaymentConfirm}
           title="Confirm Payment"
@@ -2484,6 +2497,11 @@ const InvoiceDetailsPage: React.FC = () => {
                   showArrows={false}
                   size="sm"
                   disabled={isConfirmingPayment}
+                  minDate={
+                    paymentToConfirm?.payment_date
+                      ? new Date(paymentToConfirm.payment_date)
+                      : undefined
+                  }
                   className="w-full"
                   triggerClassName="w-full justify-between"
                 />

@@ -4,6 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 import { IconChevronDown } from "@tabler/icons-react";
 import { SidebarItem } from "../../pages/pagesRoute";
 import NavbarDropdown from "./NavbarDropdown";
+import { useTranslation } from "react-i18next";
 
 interface NavbarMenuProps {
   items: SidebarItem[];
@@ -25,6 +26,7 @@ export default function NavbarMenu({
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const buttonRefs = useRef<{ [key: string]: React.RefObject<HTMLAnchorElement> }>({});
   const location = useLocation();
+  const { t } = useTranslation("nav");
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Close dropdown when route changes
@@ -135,7 +137,7 @@ export default function NavbarMenu({
             `}
           >
             {item.icon && <item.icon size={18} stroke={1.5} />}
-            <span>{item.name}</span>
+            <span>{t(item.name)}</span>
             <IconChevronDown
               size={16}
               className={`transition-transform duration-200 ${
@@ -180,7 +182,7 @@ export default function NavbarMenu({
           `}
         >
           {item.icon && <item.icon size={18} stroke={1.5} />}
-          <span>{item.name}</span>
+          <span>{t(item.name)}</span>
         </Link>
       );
     }

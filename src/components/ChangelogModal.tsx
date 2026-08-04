@@ -8,6 +8,7 @@ import {
   TransitionChild,
 } from "@headlessui/react";
 import Button from "./Button";
+import i18n from "../i18n";
 
 type Language = "ms" | "en";
 
@@ -18,6 +19,51 @@ type ChangelogEntry = {
 };
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
+  {
+    date: "2026-08-04",
+    ms: "Slip gaji Green Target: lajur \"Rate\" untuk item gaji tetap (Fixed) kini memaparkan amaun gaji yang sebenar diisi — contohnya gaji pengarah GOH THAI HO dan WONG SHUK FUN kini dipaparkan sebagai 1,700.00, bukannya kadar katalog 3,500.00 seperti sebelum ini. Amaun gaji tidak berubah; paparan kadar sahaja yang diperbetulkan.",
+    en: "Green Target payslip: the \"Rate\" column for fixed (Fixed) salary items now shows the actual keyed salary amount — e.g. directors GOH THAI HO and WONG SHUK FUN now show 1,700.00 instead of the 3,500.00 catalogue rate as before. The salary amount is unchanged; only the displayed rate was corrected.",
+  },
+  {
+    date: "2026-08-04",
+    ms: "Laporan gaji tahunan (mengikut nama dan mengikut lokasi) kini menggabungkan pekerja yang mempunyai lebih daripada satu ID kakitangan kepada satu baris sahaja — contohnya JASSON_ROLL dan JASSON_PM kini dipaparkan sebagai satu baris JASSON JIEM dengan jumlah yang dicampurkan.",
+    en: "The yearly salary report (by name and by location) now combines workers who have more than one staff ID into a single row — e.g. JASSON_ROLL and JASSON_PM now appear as one JASSON JIEM row with the amounts added together.",
+  },
+  {
+    date: "2026-08-04",
+    ms: "Laporan Gaji: tab \"Location\" kini tersedia untuk Green Target dan diperbaiki untuk Jelly Polly, sama seperti Tien Hock. Ia memaparkan satu baris jumlah keseluruhan bagi setiap bahagian kerja (contohnya Director's Remuneration, Office, Pengangkutan Habuk) beserta jumlah besar — sebelum ini tab Green Target dihimpunkan mengikut jenis pekerjaan (Office/Driver), manakala tab Jelly Polly menyenaraikan setiap pekerja satu persatu tanpa ringkasan jumlah setiap bahagian. Cetakan PDF tab ini turut menggunakan susun atur ringkasan yang sama.",
+    en: "Salary Report: the \"Location\" tab is now available for Green Target and improved for Jelly Polly, just like Tien Hock. It shows one lump-sum totals row per work section (e.g. Director's Remuneration, Office, Pengangkutan Habuk) plus a grand total — previously the Green Target tab was grouped by job type (Office/Driver), while the Jelly Polly tab listed every employee individually without per-section totals. The tab's PDF printout uses the same summary layout.",
+  },
+  {
+    date: "2026-08-04",
+    ms: "Pembaikan Penjana Baucar (Voucher Generator): jumlah baucar JVSL (gaji pekerja) sebelum ini kurang daripada Ringkasan Payroll apabila Jurujual mempunyai bayaran C/I/O — contohnya Julai 2026 terkurang RM251.37. Jumlah baucar kini sepadan tepat dengan baris JV-WORKERS pada Ringkasan Payroll. Jika baucar bulan ini sudah dijana, sila batalkan dan jana semula.",
+    en: "Voucher Generator fix: the JVSL (workers salary) voucher total previously fell short of the Payroll Summary whenever the Salesman had C/I/O pay — July 2026 was short by exactly RM251.37. The voucher total now matches the JV-WORKERS row of the Payroll Summary exactly. If this month's voucher was already generated, please cancel and regenerate it.",
+  },
+  {
+    date: "2026-08-04",
+    ms: "Sistem kini menyokong tiga bahasa: English, Bahasa Melayu dan 简体中文. Bahasa lalai mengikut tetapan bahasa peranti anda, dan anda boleh menukarnya bila-bila masa melalui menu pengguna di penjuru atas kanan (baris \"Bahasa\"). Buat masa ini bar navigasi, menu dan halaman utama telah diterjemahkan; halaman lain akan menyusul secara berperingkat.",
+    en: "The system now supports three languages: English, Bahasa Melayu and 简体中文. The default language follows your device's language setting, and you can change it anytime from the user menu at the top right (the \"Language\" row). For now the navigation bar, menus and home page are translated; other pages will follow in stages.",
+  },
+  {
+    date: "2026-08-03",
+    ms: "Perlindungan akaun Tien Hock diperketatkan. Jenis bayaran invois (Tunai/Invois) dan butiran barang invois tidak lagi boleh diubah pada invois yang sudah dibatalkan, atau pada invois yang mempunyai Nota Kredit/Debit aktif — sebelum ini perubahan sedemikian boleh menghidupkan semula invois yang dibatalkan atau menjadikan bakinya tidak sepadan dengan nota berkenaan. Menukar jenis bayaran kini meminta pengesahan terlebih dahulu, dan semua ikon pensil edit disorokkan pada invois yang dibatalkan. Jika perubahan barang invois membatalkan bayaran cek yang belum dijelaskan, sistem kini memaklumkan anda. Selain itu, catatan jurnal yang dimiliki oleh sesuatu dokumen (invois, bayaran, bank-in) tidak lagi boleh dibatalkan terus dari halaman Jurnal — batalkan dokumen sumbernya supaya baki dan jurnal kekal sepadan — dan menyimpan perubahan pada jurnal sedemikian kini memaparkan amaran bahawa ia akan terpisah daripada dokumen sumbernya.",
+    en: "Tien Hock accounting safeguards have been tightened. An invoice's payment type (Cash/Invoice) and its line items can no longer be changed on a cancelled invoice, or on an invoice with an active Credit/Debit Note — previously such changes could revive a cancelled invoice or leave its balance disagreeing with the note. Changing the payment type now asks for confirmation first, and all edit pencils are hidden on cancelled invoices. If editing an invoice's items cancels an uncleared cheque payment, the system now tells you. In addition, journal entries owned by a document (invoice, payment, bank-in) can no longer be cancelled directly from the Journal page — cancel the source document instead so balances and the journal stay in sync — and saving changes to such a journal now warns that it will be detached from its source document.",
+  },
+  {
+    date: "2026-08-03",
+    ms: "Bayaran lebih (overpayment) pelanggan kini lebih selamat. Resit yang bayaran lebihnya sudah digunakan untuk melangsaikan invois lain, atau sudah dibayar balik, tidak lagi boleh dibatalkan sehingga penggunaan itu diselesaikan dahulu — sebelum ini pembatalan sedemikian boleh menjadikan akaun deposit pelanggan negatif. Apabila merekod bayaran baru, bayaran lebih yang dipegang kini TIDAK digunakan secara automatik — tandakan kotaknya hanya jika anda mahu menggunakannya. Semasa mengesahkan cek, pemilih tarikh kini bermula dari tarikh cek diterima dan secara lalai memilih hari ini atau tarikh diterima, yang mana lebih lewat.",
+    en: "Customer overpayments are now safer. A receipt whose overpayment has already been used to settle other invoices, or has been refunded, can no longer be cancelled until that usage is dealt with first — previously such a cancellation could drive the customer deposit account negative. When recording a new payment, held overpayment is no longer applied automatically — tick its box only if you want to use it. When confirming a cheque, the date picker now starts from the date the cheque was received and defaults to today or the received date, whichever is later.",
+  },
+  {
+    date: "2026-08-04",
+    ms: "Pengurusan Cawangan (Branch) pelanggan telah diperbaiki. Senarai cawangan kini terus dikemas kini selepas anda menambah, membuang atau menukar cawangan utama — sebelum ini skrin masih memaparkan maklumat lama walaupun tindakan itu berjaya, dan selepas membuat kumpulan baru skrin masih berkata pelanggan itu tiada kumpulan, jadi kumpulan yang sama mudah dibuat dua kali. Menambah cawangan kini meminta pengesahan yang menyenaraikan dengan tepat pelanggan mana yang maklumat e-Invois, nombor telefon dan harga khasnya akan diganti dengan maklumat cawangan utama; membuang cawangan juga meminta pengesahan. Menukar cawangan utama kini menyalin maklumat e-Invois cawangan utama baru ke semua cawangan lain (sebelum ini kumpulan masih menggunakan maklumat cawangan utama lama). Satu pelanggan hanya boleh berada dalam satu kumpulan cawangan sahaja, dan pelanggan yang sudah ada kumpulan tidak lagi dipaparkan dalam senarai pilihan.",
+    en: "Customer Branch management has been fixed. The branch list now updates immediately after you add, remove or change the main branch — previously the screen kept showing the old information even though the action succeeded, and after creating a group it still said the customer had no group, making it easy to create the same group twice. Adding branches now asks for confirmation that lists exactly which customers will have their e-Invoice details, phone number and custom prices replaced by the main branch's; removing a branch now also asks for confirmation. Changing the main branch now copies the new main branch's e-Invoice details to all other branches (previously the group kept using the old main branch's details). A customer can only belong to one branch group, and customers already in a group are no longer offered in the selection lists.",
+  },
+  {
+    date: "2026-08-04",
+    ms: "Halaman Customers kini mempunyai penapis \"Branches\" untuk memaparkan pelanggan mengikut kumpulan cawangan tertentu, atau hanya pelanggan yang ada/tiada kumpulan cawangan. Kotak carian juga kini mencari nama kumpulan cawangan. Pada kad pelanggan, nama kumpulan cawangan boleh diklik terus untuk membuka pengurusan cawangan kumpulan itu, dan bilangan cawangan lain dalam kumpulan dipaparkan di sebelahnya. Butang \"Branch\" telah dinamakan semula kepada \"Branches\" berserta bilangan kumpulan.",
+    en: "The Customers page now has a \"Branches\" filter to show customers in a specific branch group, or only those with/without a branch group. The search box now also searches branch group names. On the customer card, the branch group name can be clicked to open branch management for that group directly, and the number of other branches in the group is shown beside it. The \"Branch\" button is now named \"Branches\" and shows the number of groups.",
+  },
   {
     date: "2026-08-03",
     ms: "Laporan Gaji Jelly Polly dan Green Target kini mempunyai butang \"Export\" dan \"Export Link\" pada bahagian Bank, sama seperti Tien Hock. \"Export\" memuat turun fail teks bayaran gaji bank (format PBB) bagi pekerja yang dibayar melalui bank untuk bulan yang dipaparkan, manakala \"Export Link\" menyalin pautan untuk digunakan dengan Excel Power Query.",
@@ -971,7 +1017,10 @@ const ChangelogModal: React.FC<ChangelogModalProps> = ({ isOpen, onClose }) => {
 
   useEffect(() => {
     if (isOpen) {
-      setLanguage("ms");
+      // Follow the app language; changelog entries only exist in ms/en,
+      // so 简体中文 falls back to English (docs/I18N_HANDOVER.md §8).
+      const appLanguage = i18n.resolvedLanguage || i18n.language;
+      setLanguage(appLanguage === "en" || appLanguage === "zh-Hans" ? "en" : "ms");
     }
   }, [isOpen]);
 

@@ -11,6 +11,7 @@ import {
 } from "@tabler/icons-react";
 import { Bookmark } from "../../hooks/useBookmarks";
 import { SidebarItem, PopoverOption } from "../../pages/pagesRoute";
+import { useTranslation } from "react-i18next";
 
 // Get popover options for an item
 const getPopoverOptions = (item: SidebarItem): PopoverOption[] => {
@@ -61,6 +62,7 @@ export default function NavbarBookmarks({
   const itemHoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const itemRefs = useRef<{ [key: string]: HTMLElement | null }>({});
   const location = useLocation();
+  const { t } = useTranslation("nav");
 
   // Handle hover open/close for the main dropdown
   const handleDropdownMouseEnter = useCallback(() => {
@@ -216,19 +218,17 @@ export default function NavbarBookmarks({
             <div className="px-4 py-6 text-center text-default-500 dark:text-gray-400">
               <IconBookmark size={32} className="mx-auto mb-2 opacity-50" />
               <p className="text-sm font-medium text-default-700 dark:text-gray-300">
-                Tiada penanda buku lagi
+                {t("No bookmarks yet")}
               </p>
               <p className="text-xs mt-2 leading-relaxed">
-                Klik ikon{" "}
                 <IconBookmark
                   size={12}
                   className="inline -mt-0.5 mx-0.5"
                 />{" "}
-                pada mana-mana item menu di sebelah untuk menyimpannya di sini.
+                {t("Click the bookmark icon on any menu item to save it here.")}
               </p>
               <p className="text-xs mt-2 leading-relaxed text-default-400 dark:text-gray-500">
-                Tandakan halaman yang anda kerap gunakan supaya lebih mudah dan
-                pantas untuk diakses pada bila-bila masa.
+                {t("Bookmark the pages you use often so they are quicker to access anytime.")}
               </p>
             </div>
           ) : (
@@ -282,14 +282,14 @@ export default function NavbarBookmarks({
                             <span className="w-3.5" />
                           )
                         )}
-                        <span className="truncate">{bookmark.name}</span>
+                        <span className="truncate">{t(bookmark.name)}</span>
                       </div>
                       <button
                         onClick={(e) => handleRemoveBookmark(e, bookmark.name)}
                         className={`p-1 rounded hover:bg-default-200 dark:hover:bg-gray-600 transition-opacity ${
                           isHovered ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                         }`}
-                        title="Remove bookmark"
+                        title={t("Remove bookmark")}
                       >
                         <IconBookmarkFilled
                           size={14}
@@ -355,7 +355,7 @@ export default function NavbarBookmarks({
             className="flex items-center gap-2 px-3 py-2 text-sm text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 transition-colors"
           >
             <IconPlus size={16} />
-            <span>{option.name}</span>
+            <span>{t(option.name)}</span>
           </Link>
         ))}
       </div>
@@ -384,7 +384,7 @@ export default function NavbarBookmarks({
           ) : (
             <IconBookmark size={18} className="text-default-700 dark:text-gray-200" />
           )}
-          <span className="hidden sm:inline">Bookmarks</span>
+          <span className="hidden sm:inline">{t("Bookmarks")}</span>
         </button>
       </div>
 
