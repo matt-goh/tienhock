@@ -17,6 +17,7 @@ import TimeNavigator, {
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import SubmissionResultsModal from "../../components/Invoice/SubmissionResultsModal";
 import { FormInput, FormListbox } from "../../components/FormComponents";
+import PillSelect, { PillSelectOption } from "../../components/PillSelect";
 import {
   getInvoiceDetailsBundle,
   cancelInvoice,
@@ -71,6 +72,19 @@ import {
   isZeroValueBill,
 } from "../../utils/invoice/invoiceDisplayStatus";
 import type { InvoiceDisplayStatus } from "../../utils/invoice/invoiceDisplayStatus";
+
+const PAYMENT_METHOD_OPTIONS: ReadonlyArray<PillSelectOption<string>> = [
+  { value: "cash", label: "Cash" },
+  { value: "cheque", label: "Cheque" },
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "online", label: "Online" },
+];
+
+const PAYMENT_TYPE_OPTIONS: ReadonlyArray<PillSelectOption<"CASH" | "INVOICE">> =
+  [
+    { value: "CASH", label: "Cash" },
+    { value: "INVOICE", label: "Invoice" },
+  ];
 
 // --- Helper: Read-only Line Items Table ---
 const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
@@ -190,9 +204,22 @@ const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
   );
 };
 
-const createTodayClearanceRange = (): TimeRange => {
-  const today: Date = new Date();
-  return { start: today, end: today };
+// Default the clearance date to today, or to the payment's date when the
+// cheque was post-dated — the server rejects a clearance earlier than the
+// payment date. yyyy-MM-dd strings are compared, never Date objects
+// (AGENTS.md rule 17).
+const createClearanceRange = (paymentDate?: string | null): TimeRange => {
+  const today: string = format(new Date(), "yyyy-MM-dd");
+  let day: string = today;
+  if (paymentDate) {
+    const received: Date = new Date(paymentDate);
+    if (!Number.isNaN(received.getTime())) {
+      const receivedDay: string = format(received, "yyyy-MM-dd");
+      if (receivedDay > today) day = receivedDay;
+    }
+  }
+  const date: Date = new Date(`${day}T00:00:00`);
+  return { start: date, end: date };
 };
 
 // --- Main Component ---
@@ -244,8 +271,8 @@ const InvoiceDetailsPage: React.FC = () => {
     null
   );
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
-  const [clearanceDateRange, setClearanceDateRange] = useState<TimeRange>(
-    createTodayClearanceRange
+  const [clearanceDateRange, setClearanceDateRange] = useState<TimeRange>(() =>
+    createClearanceRange()
   );
   const [showOverpaymentConfirm, setShowOverpaymentConfirm] = useState(false);
   const [overpaymentDetails, setOverpaymentDetails] = useState<{
@@ -1211,7 +1238,7 @@ const InvoiceDetailsPage: React.FC = () => {
     }
 
     setPaymentToConfirm(payment);
-    setClearanceDateRange(createTodayClearanceRange());
+    setClearanceDateRange(createClearanceRange(payment.payment_date));
     setShowConfirmPaymentDialog(true);
   };
 
@@ -1235,7 +1262,7 @@ const InvoiceDetailsPage: React.FC = () => {
     } finally {
       setIsConfirmingPayment(false);
       setPaymentToConfirm(null);
-      setClearanceDateRange(createTodayClearanceRange());
+      setClearanceDateRange(createClearanceRange());
     }
   };
 
@@ -1480,12 +1507,6 @@ const InvoiceDetailsPage: React.FC = () => {
   const isEligibleForEinvoiceByDate = isInvoiceDateEligibleForEinvoice(
     invoiceData.createddate
   );
-  const paymentMethodOptions = [
-    { id: "cash", name: "Cash" },
-    { id: "cheque", name: "Cheque" },
-    { id: "bank_transfer", name: "Bank Transfer" },
-    { id: "online", name: "Online" },
-  ];
 
   const customerNamesForPDF: Record<string, string> =
     invoiceData.customerid && invoiceData.customerName
@@ -1749,13 +1770,19 @@ const InvoiceDetailsPage: React.FC = () => {
                   max={invoiceData.balance_due}
                   disabled={isProcessingPayment}
                 />
-                <FormListbox
-                  name="payment_method"
-                  label="Payment Method"
-                  value={paymentFormData.payment_method}
-                  onChange={handlePaymentMethodChange}
-                  options={paymentMethodOptions}
-                />
+                {/* Spans two columns so the four pills never wrap */}
+                <div className="space-y-2 lg:col-span-2">
+                  <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                    Payment Method
+                  </label>
+                  <PillSelect<string>
+                    value={paymentFormData.payment_method}
+                    onChange={handlePaymentMethodChange}
+                    options={PAYMENT_METHOD_OPTIONS}
+                    ariaLabel="Payment method"
+                  size="md"
+                  />
+                </div>
                 {(paymentFormData.payment_method === "cheque" ||
                   paymentFormData.payment_method === "bank_transfer" ||
                   paymentFormData.payment_method === "online") && (
@@ -2445,7 +2472,7 @@ const InvoiceDetailsPage: React.FC = () => {
           onClose={() => {
             setShowConfirmPaymentDialog(false);
             setPaymentToConfirm(null);
-            setClearanceDateRange(createTodayClearanceRange());
+            setClearanceDateRange(createClearanceRange());
           }}
           onConfirm={handleConfirmPaymentConfirm}
           title="Confirm Payment"
@@ -2470,6 +2497,11 @@ const InvoiceDetailsPage: React.FC = () => {
                   showArrows={false}
                   size="sm"
                   disabled={isConfirmingPayment}
+                  minDate={
+                    paymentToConfirm?.payment_date
+                      ? new Date(paymentToConfirm.payment_date)
+                      : undefined
+                  }
                   className="w-full"
                   triggerClassName="w-full justify-between"
                 />
@@ -2739,20 +2771,19 @@ const InvoiceDetailsPage: React.FC = () => {
                 </button>
               </div>
 
-              <div className="mb-4">
-                <FormListbox
-                  name="paymenttype"
-                  label="Select Payment Type"
+              <div className="mb-4 space-y-2">
+                <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                  Select Payment Type
+                </label>
+                <PillSelect<"CASH" | "INVOICE">
                   value={selectedPaymentType}
-                  onChange={(value) =>
-                    setSelectedPaymentType(value as "CASH" | "INVOICE")
+                  onChange={(value: "CASH" | "INVOICE") =>
+                    setSelectedPaymentType(value)
                   }
-                  options={[
-                    { id: "CASH", name: "Cash" },
-                    { id: "INVOICE", name: "Invoice" },
-                  ]}
-                  placeholder="Select payment type..."
+                  options={PAYMENT_TYPE_OPTIONS}
                   disabled={isUpdatingPaymentType}
+                  ariaLabel="Payment type"
+                size="md"
                 />
               </div>
 

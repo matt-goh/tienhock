@@ -3,6 +3,7 @@ import React, {
   Fragment,
   useState,
   useEffect,
+  useLayoutEffect,
   useRef,
   useCallback,
   useMemo,
@@ -33,10 +34,12 @@ import AccountCodeCombobox from "../../components/Accounting/AccountCodeCombobox
 import ChequeReuseWarning from "../../components/Accounting/ChequeReuseWarning";
 import useAccountCodeFavourites from "../../hooks/useAccountCodeFavourites";
 import {
+  FormCombobox,
   FormInput,
   FormListbox,
   SelectOption,
 } from "../../components/FormComponents";
+import PillSelect, { PillSelectOption } from "../../components/PillSelect";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import TimeNavigator, { type TimeRange } from "../../components/TimeNavigator";
@@ -54,12 +57,18 @@ import {
   IconFileText,
   IconCheck,
 } from "@tabler/icons-react";
+import type {
+  GreenTargetDebtorSubledgerIdentity,
+} from "../../types/greenTargetTypes";
 
 interface JournalLineFormData {
   id?: number;
   line_number: number;
   account_code: string;
   reference: string;
+  cheque_reference: string;
+  debtor_subledger_code: string;
+  debtor_subledger_description: string;
   particulars: string;
   debit_amount: string;
   credit_amount: string;
@@ -83,11 +92,12 @@ const CHEQUE_NO_ENTRY_TYPES: JournalEntryType[] = ["C", "B"];
 const BANK_PAYMENT_CHEQUE_PREFILL = "PBE";
 const HEADER_FIELD_CLASSNAME: string =
   "h-[38px] w-full px-3 text-sm border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 rounded-lg focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:cursor-not-allowed";
-const HEADER_LISTBOX_CLASSNAME: string =
-  "[&>div>button]:h-[38px] [&>div>button]:bg-white dark:[&>div>button]:bg-gray-900/50 [&>div>button]:shadow-none";
 const HEADER_TIME_NAVIGATOR_TRIGGER_CLASSNAME: string =
   "w-full !h-[38px] justify-between !bg-white dark:!bg-gray-900/50 !font-normal disabled:!bg-gray-50 dark:disabled:!bg-gray-800";
 const ACCOUNT_CODE_PATTERN: RegExp = /^[A-Za-z0-9\-_.]+$/;
+const GT_DEBTOR_SUBLEDGER_ENDPOINT: string =
+  "/greentarget/api/account-codes/debtor-subledger";
+const GT_DEBTOR_SEARCH_LIMIT: number = 50;
 
 // Load the last journal type the user selected (shared cache with the list page session)
 const loadLastEntryType = (
@@ -109,10 +119,240 @@ const emptyLine = (lineNumber: number): JournalLineFormData => ({
   line_number: lineNumber,
   account_code: "",
   reference: "",
+  cheque_reference: "",
+  debtor_subledger_code: "",
+  debtor_subledger_description: "",
   particulars: "",
   debit_amount: "",
   credit_amount: "",
 });
+
+const getGTDebtorIdentityLabel = (
+  identity: GreenTargetDebtorSubledgerIdentity
+): string =>
+  `${identity.code} - ${identity.description} (posts to ${identity.control_account_code})`;
+
+const mergeGTDebtorIdentities = (
+  rows: ReadonlyArray<GreenTargetDebtorSubledgerIdentity>
+): GreenTargetDebtorSubledgerIdentity[] => {
+  const identitiesByCode = new Map<
+    string,
+    GreenTargetDebtorSubledgerIdentity
+  >();
+  rows.forEach((identity: GreenTargetDebtorSubledgerIdentity): void => {
+    if (!identitiesByCode.has(identity.code)) {
+      identitiesByCode.set(identity.code, identity);
+    }
+  });
+  return Array.from(identitiesByCode.values());
+};
+
+interface GTJournalDebtorIdentitySelectorProps {
+  lineNumber: number;
+  value: string;
+  description: string;
+  entryDate: string;
+  disabled: boolean;
+  onChange: (code: string, description: string) => void;
+}
+
+const GTJournalDebtorIdentitySelector: React.FC<
+  GTJournalDebtorIdentitySelectorProps
+> = ({
+  lineNumber,
+  value,
+  description,
+  entryDate,
+  disabled,
+  onChange,
+}) => {
+  const [query, setQuery] = useState<string>("");
+  const [searchResults, setSearchResults] = useState<
+    GreenTargetDebtorSubledgerIdentity[]
+  >([]);
+  const [selectedIdentity, setSelectedIdentity] =
+    useState<GreenTargetDebtorSubledgerIdentity | null>(null);
+  const [selectedIdentityUnavailable, setSelectedIdentityUnavailable] =
+    useState<boolean>(false);
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [searchFailed, setSearchFailed] = useState<boolean>(false);
+
+  useEffect((): (() => void) => {
+    let isCurrent: boolean = true;
+    const timer: number = window.setTimeout(
+      (): void => {
+        const loadIdentities = async (): Promise<void> => {
+          setIsSearching(true);
+          setSearchFailed(false);
+          try {
+            const params: URLSearchParams = new URLSearchParams({
+              search: query.trim(),
+              limit: String(GT_DEBTOR_SEARCH_LIMIT),
+            });
+            if (entryDate) params.set("as_of", entryDate);
+            const rows: GreenTargetDebtorSubledgerIdentity[] =
+              await api.get<GreenTargetDebtorSubledgerIdentity[]>(
+                `${GT_DEBTOR_SUBLEDGER_ENDPOINT}?${params.toString()}`
+              );
+            if (isCurrent) setSearchResults(rows);
+          } catch (searchError: unknown) {
+            console.error(
+              "Failed to search Green Target debtor identities:",
+              searchError
+            );
+            if (isCurrent) {
+              setSearchResults([]);
+              setSearchFailed(true);
+            }
+          } finally {
+            if (isCurrent) setIsSearching(false);
+          }
+        };
+        void loadIdentities();
+      },
+      query ? 250 : 0
+    );
+
+    return (): void => {
+      isCurrent = false;
+      window.clearTimeout(timer);
+    };
+  }, [entryDate, query]);
+
+  useEffect((): (() => void) => {
+    let isCurrent: boolean = true;
+    if (!value) {
+      setSelectedIdentity(null);
+      setSelectedIdentityUnavailable(false);
+      return (): void => {
+        isCurrent = false;
+      };
+    }
+
+    setSelectedIdentity(null);
+    setSelectedIdentityUnavailable(false);
+    const loadSelectedIdentity = async (): Promise<void> => {
+      try {
+        const params: URLSearchParams = new URLSearchParams({
+          search: value,
+          limit: String(GT_DEBTOR_SEARCH_LIMIT),
+        });
+        if (entryDate) params.set("as_of", entryDate);
+        const rows: GreenTargetDebtorSubledgerIdentity[] =
+          await api.get<GreenTargetDebtorSubledgerIdentity[]>(
+            `${GT_DEBTOR_SUBLEDGER_ENDPOINT}?${params.toString()}`
+          );
+        if (!isCurrent) return;
+        const exactIdentity: GreenTargetDebtorSubledgerIdentity | null =
+          rows.find(
+            (identity: GreenTargetDebtorSubledgerIdentity): boolean =>
+              identity.code === value
+          ) || null;
+        setSelectedIdentity(exactIdentity);
+        setSelectedIdentityUnavailable(exactIdentity === null);
+      } catch (selectedError: unknown) {
+        console.error(
+          "Failed to load selected Green Target debtor identity:",
+          selectedError
+        );
+        if (isCurrent) {
+          setSelectedIdentity(null);
+          setSelectedIdentityUnavailable(false);
+        }
+      }
+    };
+    void loadSelectedIdentity();
+
+    return (): void => {
+      isCurrent = false;
+    };
+  }, [entryDate, value]);
+
+  const identities: GreenTargetDebtorSubledgerIdentity[] = useMemo(
+    (): GreenTargetDebtorSubledgerIdentity[] =>
+      mergeGTDebtorIdentities([
+        ...(selectedIdentity ? [selectedIdentity] : []),
+        ...searchResults.filter(
+          (identity: GreenTargetDebtorSubledgerIdentity): boolean =>
+            identity.is_selectable
+        ),
+      ]),
+    [searchResults, selectedIdentity]
+  );
+
+  const options: SelectOption[] = useMemo((): SelectOption[] => {
+    const availableOptions: SelectOption[] = identities.map(
+      (identity: GreenTargetDebtorSubledgerIdentity): SelectOption => ({
+        id: identity.code,
+        name: getGTDebtorIdentityLabel(identity),
+      })
+    );
+    if (
+      value &&
+      !availableOptions.some(
+        (option: SelectOption): boolean => option.id === value
+      )
+    ) {
+      availableOptions.unshift({
+        id: value,
+        name: `${value} - ${description || "selected identity"} (posts to CD_SD)`,
+      });
+    }
+    return availableOptions;
+  }, [description, identities, value]);
+
+  return (
+    <div className="mt-1.5 space-y-1">
+      <FormCombobox
+        name={`debtor_subledger_code_${lineNumber}`}
+        label="Trade Debtor Identity"
+        value={value || undefined}
+        onChange={(selected: string | string[] | null): void => {
+          const selectedCode: string =
+            typeof selected === "string" ? selected : "";
+          const identity: GreenTargetDebtorSubledgerIdentity | undefined =
+            identities.find(
+              (candidate: GreenTargetDebtorSubledgerIdentity): boolean =>
+                candidate.code === selectedCode
+            );
+          onChange(
+            selectedCode,
+            identity?.description ||
+              (selectedCode === value ? description : "")
+          );
+          setQuery("");
+        }}
+        options={options}
+        query={query}
+        setQuery={setQuery}
+        mode="single"
+        required
+        disabled={disabled}
+        maxVisibleOptions={GT_DEBTOR_SEARCH_LIMIT}
+        placeholder={
+          isSearching
+            ? "Searching debtor identities..."
+            : "Search debtor code or customer name..."
+        }
+      />
+      <p className="px-1 text-[11px] leading-4 text-default-500 dark:text-gray-400">
+        Required for the Trade Debtors sub-schedule. The general ledger line
+        remains posted to CD_SD.
+      </p>
+      {selectedIdentityUnavailable && (
+        <p className="px-1 text-[11px] leading-4 text-rose-700 dark:text-rose-300">
+          {value} is not selectable for this journal date. Choose another
+          identity before saving.
+        </p>
+      )}
+      {searchFailed && (
+        <p className="px-1 text-[11px] leading-4 text-rose-700 dark:text-rose-300">
+          Debtor identity search could not be loaded.
+        </p>
+      )}
+    </div>
+  );
+};
 
 const parseLocalDateString = (dateString: string): Date | null => {
   const match: RegExpMatchArray | null = dateString.match(
@@ -647,6 +887,11 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
 
   // Entry status for edit mode
   const [entryStatus, setEntryStatus] = useState<string>("active");
+  // Source ownership of the loaded entry (edit mode): a source-owned journal is
+  // re-synced by its source document until a hand save detaches it
+  // (manual_override). Used to warn once before that detaching save.
+  const [entrySourceType, setEntrySourceType] = useState<string | null>(null);
+  const [entryManualOverride, setEntryManualOverride] = useState<boolean>(false);
 
   // Initial form data for change detection
   const initialFormDataRef = useRef<JournalEntryFormData | null>(null);
@@ -657,6 +902,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showDetachConfirmation, setShowDetachConfirmation] = useState(false);
   const [quickAddTargetLineIndex, setQuickAddTargetLineIndex] = useState<number | null>(null);
   const [quickAddInitialQuery, setQuickAddInitialQuery] = useState<string>("");
   const [focusedCell, setFocusedCell] = useState<{ row: number; col: string } | null>(null);
@@ -664,6 +910,33 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
 
   // Combined loading state (page + cache)
   const loading = pageLoading || entryTypesLoading || accountCodesLoading;
+
+  // Sticky bands: the action bar, then the entry fields, then the table column
+  // header. Each measures the one above it so they stack instead of overlap.
+  // A ResizeObserver keeps this right as the entry fields grow and shrink
+  // (Type pills wrapping, Cheque No appearing, the cheque reuse warning).
+  const headerRef = useRef<HTMLDivElement>(null);
+  const entryHeaderRef = useRef<HTMLDivElement>(null);
+  const [headerHeight, setHeaderHeight] = useState<number>(0);
+  const [entryHeaderHeight, setEntryHeaderHeight] = useState<number>(0);
+
+  useLayoutEffect(() => {
+    const measure = (): void => {
+      if (headerRef.current) setHeaderHeight(headerRef.current.offsetHeight);
+      if (entryHeaderRef.current) {
+        setEntryHeaderHeight(entryHeaderRef.current.offsetHeight);
+      }
+    };
+    measure();
+
+    const observer = new ResizeObserver(measure);
+    if (headerRef.current) observer.observe(headerRef.current);
+    if (entryHeaderRef.current) observer.observe(entryHeaderRef.current);
+
+    return () => observer.disconnect();
+  }, [loading]);
+
+  const tableHeaderTop: number = headerHeight + entryHeaderHeight;
 
   const entryDate = useMemo<Date | null>(
     () => parseLocalDateString(formData.entry_date),
@@ -783,6 +1056,10 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
         account_code: line.account_code,
         // Edit the STORED reference, not the resolved display value
         reference: line.internal_reference || line.reference || "",
+        cheque_reference: line.cheque_reference || "",
+        debtor_subledger_code: line.debtor_subledger_code || "",
+        debtor_subledger_description:
+          line.debtor_subledger_description || "",
         particulars: line.particulars || "",
         debit_amount: line.debit_amount > 0 ? line.debit_amount.toString() : "",
         credit_amount:
@@ -810,6 +1087,8 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
       setFormData(fetchedFormData);
       initialFormDataRef.current = JSON.parse(JSON.stringify(fetchedFormData));
       setEntryStatus(entry.status);
+      setEntrySourceType(entry.source_type ?? null);
+      setEntryManualOverride(entry.manual_override === true);
     } catch (err: unknown) {
       console.error("Error fetching entry data:", err);
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
@@ -895,8 +1174,17 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
     value: string
   ) => {
     setFormData((prev) => {
-      const newLines = [...prev.lines];
-      newLines[index] = { ...newLines[index], [field]: value };
+      const newLines: JournalLineFormData[] = [...prev.lines];
+      const previousLine: JournalLineFormData = newLines[index];
+      newLines[index] = { ...previousLine, [field]: value };
+
+      // A debtor tag belongs to one specific GL control account. Keep tags
+      // returned on untouched named-debtor lines, but never carry one across
+      // an account change where it would describe a different posting.
+      if (field === "account_code" && value !== previousLine.account_code) {
+        newLines[index].debtor_subledger_code = "";
+        newLines[index].debtor_subledger_description = "";
+      }
 
       // Auto-clear opposite amount field
       if (field === "debit_amount" && value && parseFloat(value) > 0) {
@@ -905,6 +1193,23 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
         newLines[index].debit_amount = "";
       }
 
+      return { ...prev, lines: newLines };
+    });
+  };
+
+  const handleDebtorSubledgerChange = (
+    index: number,
+    code: string,
+    description: string
+  ): void => {
+    setFormData((prev: JournalEntryFormData): JournalEntryFormData => {
+      if (!prev.lines[index]) return prev;
+      const newLines: JournalLineFormData[] = [...prev.lines];
+      newLines[index] = {
+        ...newLines[index],
+        debtor_subledger_code: code,
+        debtor_subledger_description: description,
+      };
       return { ...prev, lines: newLines };
     });
   };
@@ -945,6 +1250,8 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
       newLines[quickAddTargetLineIndex] = {
         ...newLines[quickAddTargetLineIndex],
         account_code: accountCode.code,
+        debtor_subledger_code: "",
+        debtor_subledger_description: "",
       };
 
       return { ...prev, lines: newLines };
@@ -1022,6 +1329,16 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
         return false;
       }
       if (
+        isGreenTarget &&
+        line.account_code === "CD_SD" &&
+        !line.debtor_subledger_code.trim()
+      ) {
+        toast.error(
+          `Select a Trade Debtor identity for CD_SD line ${line.line_number}`
+        );
+        return false;
+      }
+      if (
         (parseFloat(line.debit_amount) || 0) === 0 &&
         (parseFloat(line.credit_amount) || 0) === 0
       ) {
@@ -1049,6 +1366,24 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
 
     if (!validateForm()) return;
 
+    // Saving a source-owned Tien Hock journal by hand DETACHES it from its
+    // source document: the source stops re-syncing it, and the re-inserted
+    // lines lose their per-line receipt/cheque references. Warn once — an
+    // already-detached (manual_override) journal saves without asking again.
+    if (
+      !isGreenTarget &&
+      isEditMode &&
+      entrySourceType &&
+      !entryManualOverride
+    ) {
+      setShowDetachConfirmation(true);
+      return;
+    }
+
+    await performSave();
+  };
+
+  const performSave = async () => {
     setIsSaving(true);
 
     try {
@@ -1060,12 +1395,21 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
             (parseFloat(line.debit_amount) > 0 ||
               parseFloat(line.credit_amount) > 0)
         )
-        .map((line, index) => ({
+        .map((line, index): JournalEntryLineInput => ({
           line_number: index + 1,
           account_code: line.account_code,
           debit_amount: parseFloat(line.debit_amount) || 0,
           credit_amount: parseFloat(line.credit_amount) || 0,
           reference: line.reference || undefined,
+          cheque_reference: isGreenTarget
+            ? line.cheque_reference || undefined
+            : undefined,
+          ...(isGreenTarget && line.debtor_subledger_code.trim()
+            ? {
+                debtor_subledger_code:
+                  line.debtor_subledger_code.trim(),
+              }
+            : {}),
           particulars: line.particulars || undefined,
         }));
 
@@ -1134,13 +1478,26 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
     }
   };
 
-  // Build options
-  const entryTypeOptions: SelectOption[] = entryTypes
-    .filter((entryType): boolean => entryType.code !== LEGACY_IMPORT_ENTRY_TYPE)
-    .map((entryType): SelectOption => ({
-      id: entryType.code,
-      name: `${entryType.code} - ${entryType.name}`,
-    }));
+  // Build options. There are ~14 types (11 on Green Target), so the pills show
+  // the code only and carry the full name as a tooltip — "C - Cash Payment" on
+  // every pill would be several rows deep.
+  const entryTypeOptions: ReadonlyArray<PillSelectOption<JournalEntryType>> =
+    entryTypes
+      .filter(
+        (entryType): boolean => entryType.code !== LEGACY_IMPORT_ENTRY_TYPE
+      )
+      .map(
+        (entryType): PillSelectOption<JournalEntryType> => ({
+          value: entryType.code,
+          label: entryType.code,
+          title: entryType.name,
+        })
+      );
+
+  const selectedEntryTypeName: string =
+    entryTypes.find(
+      (entryType): boolean => entryType.code === formData.entry_type
+    )?.name ?? "";
 
   // Format amount for display
   const formatAmount = (value: string): string => {
@@ -1171,68 +1528,136 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
   return (
     <div className="space-y-3">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-default-200 dark:border-gray-700">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-default-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <BackButton onClick={handleBackClick} />
-              <div className="h-8 w-px bg-default-300 dark:bg-gray-600"></div>
-              <div className="p-2 bg-sky-50 dark:bg-sky-900/30 rounded-lg">
-                <IconFileText size={24} className="text-sky-600 dark:text-sky-400" />
-              </div>
-              <div>
-                <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
+        {/* The form wraps the sticky header so its Save/Update button submits
+            the same form as the (scrolled-away) body. */}
+        <form onSubmit={handleSubmit} noValidate>
+          {/* Header */}
+          <div
+            ref={headerRef}
+            className="sticky top-0 z-30 px-6 py-3 border-b border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-t-lg"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-4">
+                <BackButton onClick={handleBackClick} />
+                <div className="h-8 w-px bg-default-300 dark:bg-gray-600"></div>
+                <div className="p-2 bg-sky-50 dark:bg-sky-900/30 rounded-lg">
+                  <IconFileText size={24} className="text-sky-600 dark:text-sky-400" />
+                </div>
+                <h1 className="text-lg font-semibold text-default-900 dark:text-gray-100">
                   {isEditMode ? "Edit Journal Entry" : "New Journal Entry"}
                 </h1>
-                <p className="mt-0.5 text-sm text-default-500 dark:text-gray-400">
-                  {isEditMode
-                    ? `Editing ${formData.reference_no}`
-                    : "Create a new journal entry"}
-                </p>
               </div>
-            </div>
-            <div className="flex items-center gap-3">
-              {isFormChanged && (
-                <span className="px-3 py-1 rounded-full text-sm font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
-                  Unsaved changes
-                </span>
-              )}
-              {isEditMode && (
-                <span
-                  className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    entryStatus === "cancelled"
-                      ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
-                      : "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
+              <div className="flex items-center gap-3">
+                {/* Balance sits beside Save: it is the one thing that decides
+                    whether the entry can be saved. */}
+                <div
+                  className={`px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1.5 border ${
+                    isBalanced
+                      ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
+                      : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800"
                   }`}
                 >
-                  {entryStatus === "cancelled" ? "Cancelled" : "Active"}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Form */}
-        <div className="relative">
-          {isSaving && (
-            <div className="absolute inset-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-b-lg">
-              <div className="flex items-center space-x-3 bg-white dark:bg-gray-800 px-6 py-4 rounded-lg shadow-lg border border-default-200 dark:border-gray-700">
-                <LoadingSpinner hideText />
-                <span className="text-sm font-medium text-default-700 dark:text-gray-300">
-                  Saving journal entry...
-                </span>
+                  {isBalanced ? (
+                    <>
+                      <IconCheck size={16} />
+                      <span>Balanced</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Out of Balance:</span>
+                      <span className="font-bold">{difference.toFixed(2)}</span>
+                    </>
+                  )}
+                </div>
+                {isFormChanged && (
+                  <span className="px-3 py-1 rounded-full text-sm font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
+                    Unsaved changes
+                  </span>
+                )}
+                {isEditMode && (
+                  <span
+                    className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      entryStatus === "cancelled"
+                        ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
+                        : "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
+                    }`}
+                  >
+                    {entryStatus === "cancelled" ? "Cancelled" : "Active"}
+                  </span>
+                )}
+                {/* Sticky save: reachable from any scroll position */}
+                <Button
+                  type="submit"
+                  variant="filled"
+                  color="sky"
+                  icon={IconDeviceFloppy}
+                  iconPosition="left"
+                  disabled={isSaving || !isFormChanged || !isBalanced}
+                  title={
+                    !isBalanced
+                      ? "Debits must equal credits before saving"
+                      : undefined
+                  }
+                >
+                  {isEditMode ? "Update" : "Save"}
+                </Button>
               </div>
             </div>
-          )}
+          </div>
 
-          <form onSubmit={handleSubmit} noValidate>
-            {/* Entry Header - Horizontal Row */}
-            <div className="px-6 py-4 border-b border-default-200 dark:border-gray-700 bg-default-50/50 dark:bg-gray-900/30">
+          {/* Form */}
+          <div className="relative">
+            {isSaving && (
+              <div className="absolute inset-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-b-lg">
+                <div className="flex items-center space-x-3 bg-white dark:bg-gray-800 px-6 py-4 rounded-lg shadow-lg border border-default-200 dark:border-gray-700">
+                  <LoadingSpinner hideText />
+                  <span className="text-sm font-medium text-default-700 dark:text-gray-300">
+                    Saving journal entry...
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Entry Header - Horizontal Row. Sticks under the action bar so the
+                type, reference, date and description stay reachable while the
+                line items are keyed. A sticky band must be opaque, so the card
+                colour is painted on the outer div and the original translucent
+                tint sits on the inner one - together they reproduce exactly
+                what this band looked like before it became sticky. */}
+            <div
+              ref={entryHeaderRef}
+              style={{ top: headerHeight }}
+              className="sticky z-20 border-b border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+            >
+              <div className="px-6 py-4 bg-default-50/50 dark:bg-gray-900/30">
+              {/* Type sits on its own full-width row: 14 pills do not fit in a
+                  quarter column, and the type drives the reference prefix and
+                  whether Cheque No appears, so it reads first. */}
+              <div className="mb-4">
+                {/* Larger than the grid labels below: this row spans the whole
+                    header and the resolved type name is the only place the
+                    code's meaning is spelled out. */}
+                <label className="block text-sm font-semibold text-default-700 dark:text-gray-300 uppercase tracking-wide mb-1.5">
+                  Type <span className="text-red-500">*</span>
+                  {selectedEntryTypeName && (
+                    <span className="ml-2 normal-case font-medium text-default-500 dark:text-gray-400">
+                      {selectedEntryTypeName}
+                    </span>
+                  )}
+                </label>
+                <PillSelect<JournalEntryType>
+                  value={formData.entry_type}
+                  onChange={handleEntryTypeChange}
+                  options={entryTypeOptions}
+                  disabled={isSaving}
+                  ariaLabel="Journal entry type"
+                  size="md"
+                />
+              </div>
+
               <div
-                className={`grid grid-cols-4 gap-4 ${
-                  showChequeNo
-                    ? "lg:grid-cols-5"
-                    : ""
+                className={`grid grid-cols-3 gap-4 ${
+                  showChequeNo ? "lg:grid-cols-4" : ""
                 }`}
               >
                 {/* Reference Number */}
@@ -1252,21 +1677,6 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                     placeholder="e.g., PBE001/06"
                     disabled={isSaving}
                     className={`${HEADER_FIELD_CLASSNAME} placeholder:text-gray-400 dark:placeholder:text-gray-500`}
-                  />
-                </div>
-
-                {/* Entry Type */}
-                <div>
-                  <label className="block text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wide mb-1.5">
-                    Type <span className="text-red-500">*</span>
-                  </label>
-                  <FormListbox
-                    name="entry_type"
-                    value={formData.entry_type}
-                    onChange={handleEntryTypeChange}
-                    options={entryTypeOptions}
-                    disabled={isSaving}
-                    className={HEADER_LISTBOX_CLASSNAME}
                   />
                 </div>
 
@@ -1336,11 +1746,12 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                 )}
               </div>
 
-              <ChequeReuseWarning
-                chequeNo={formData.cheque_no.trim()}
-                duplicates={chequeDuplicates}
-                className="mt-3"
-              />
+                <ChequeReuseWarning
+                  chequeNo={formData.cheque_no.trim()}
+                  duplicates={chequeDuplicates}
+                  className="mt-3"
+                />
+              </div>
             </div>
 
             {/* Spreadsheet-Style Line Items Table */}
@@ -1349,25 +1760,46 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                 <table className="min-w-full">
                   <thead>
                     <tr className="bg-default-100 dark:bg-gray-900/50">
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-12">
+                      <th
+                        style={{ top: tableHeaderTop }}
+                        className="sticky z-10 bg-default-100 dark:bg-gray-800 px-3 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-12 rounded-tl-lg"
+                      >
                         #
                       </th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-[30rem]">
+                      <th
+                        style={{ top: tableHeaderTop }}
+                        className="sticky z-10 bg-default-100 dark:bg-gray-800 px-3 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-[30rem]"
+                      >
                         Account
                       </th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-24">
-                        Reference
+                      <th
+                        style={{ top: tableHeaderTop }}
+                        className="sticky z-10 bg-default-100 dark:bg-gray-800 px-3 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-24"
+                      >
+                        {isGreenTarget ? "Chq No" : "Reference"}
                       </th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider">
+                      <th
+                        style={{ top: tableHeaderTop }}
+                        className="sticky z-10 bg-default-100 dark:bg-gray-800 px-3 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider"
+                      >
                         Description
                       </th>
-                      <th className="px-3 py-2.5 text-right text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-32">
+                      <th
+                        style={{ top: tableHeaderTop }}
+                        className="sticky z-10 bg-default-100 dark:bg-gray-800 px-3 py-2.5 text-right text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-32"
+                      >
                         Debit ($)
                       </th>
-                      <th className="px-3 py-2.5 text-right text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-32">
+                      <th
+                        style={{ top: tableHeaderTop }}
+                        className="sticky z-10 bg-default-100 dark:bg-gray-800 px-3 py-2.5 text-right text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-32"
+                      >
                         Credit ($)
                       </th>
-                      <th className="px-3 py-2.5 text-center w-10"></th>
+                      <th
+                        style={{ top: tableHeaderTop }}
+                        className="sticky z-10 bg-default-100 dark:bg-gray-800 px-3 py-2.5 text-center w-10 rounded-tr-lg"
+                      ></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-default-100 dark:divide-gray-800 bg-white dark:bg-gray-800">
@@ -1383,40 +1815,76 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
 
                         {/* Account Code */}
                         <td className="px-1 py-1">
-                          <AccountCodeCombobox
-                            value={line.account_code}
-                            accounts={allAccountCodes}
-                            company={company}
-                            onChange={(value: string) =>
-                              handleLineChange(index, "account_code", value)
-                            }
-                            onAddAccount={
-                              isGreenTarget
-                                ? undefined
-                                : (query: string) =>
-                                    handleOpenQuickAddAccount(index, query)
-                            }
-                            disabled={isSaving}
-                            hierarchical
-                            favouriteCodes={
-                              isGreenTarget ? undefined : favouriteCodes
-                            }
-                            pendingFavouriteCodes={
-                              isGreenTarget ? undefined : pendingFavouriteCodes
-                            }
-                            onToggleFavourite={
-                              isGreenTarget ? undefined : toggleFavourite
-                            }
-                          />
+                          <div>
+                            <AccountCodeCombobox
+                              value={line.account_code}
+                              accounts={allAccountCodes}
+                              company={company}
+                              onChange={(value: string) =>
+                                handleLineChange(index, "account_code", value)
+                              }
+                              onAddAccount={
+                                isGreenTarget
+                                  ? undefined
+                                  : (query: string) =>
+                                      handleOpenQuickAddAccount(index, query)
+                              }
+                              disabled={isSaving}
+                              hierarchical
+                              favouriteCodes={
+                                isGreenTarget ? undefined : favouriteCodes
+                              }
+                              pendingFavouriteCodes={
+                                isGreenTarget
+                                  ? undefined
+                                  : pendingFavouriteCodes
+                              }
+                              onToggleFavourite={
+                                isGreenTarget ? undefined : toggleFavourite
+                              }
+                            />
+                            {isGreenTarget &&
+                              line.account_code === "CD_SD" && (
+                                <GTJournalDebtorIdentitySelector
+                                  lineNumber={line.line_number}
+                                  value={line.debtor_subledger_code}
+                                  description={
+                                    line.debtor_subledger_description
+                                  }
+                                  entryDate={formData.entry_date}
+                                  disabled={isSaving}
+                                  onChange={(
+                                    code: string,
+                                    description: string
+                                  ): void =>
+                                    handleDebtorSubledgerChange(
+                                      index,
+                                      code,
+                                      description
+                                    )
+                                  }
+                                />
+                              )}
+                          </div>
                         </td>
 
-                        {/* Reference */}
+                        {/* General line reference / GT cheque reference */}
                         <td className="px-1 py-1">
                           <input
                             type="text"
-                            value={line.reference}
+                            value={
+                              isGreenTarget
+                                ? line.cheque_reference
+                                : line.reference
+                            }
                             onChange={(e) =>
-                              handleLineChange(index, "reference", e.target.value)
+                              handleLineChange(
+                                index,
+                                isGreenTarget
+                                  ? "cheque_reference"
+                                  : "reference",
+                                e.target.value
+                              )
                             }
                             onFocus={() => setFocusedCell({ row: index, col: "reference" })}
                             onBlur={() => setFocusedCell(null)}
@@ -1545,66 +2013,29 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                   </tfoot>
                 </table>
               </div>
+            </div>
 
-              {/* Balance Indicator */}
-              <div className="mt-4 flex items-center justify-end gap-4">
-                <div
-                  className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${
-                    isBalanced
-                      ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800"
-                      : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800"
-                  }`}
-                >
-                  {isBalanced ? (
-                    <>
-                      <IconCheck size={18} />
-                      <span>Balanced</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Out of Balance: </span>
-                      <span className="font-bold">{difference.toFixed(2)}</span>
-                    </>
-                  )}
+            {/* Form Actions - Save/Update now lives in the sticky header */}
+            {isEditMode &&
+              entryStatus !== "cancelled" &&
+              formData.entry_type !== LEGACY_IMPORT_ENTRY_TYPE &&
+              !isGreenTarget && (
+                <div className="px-6 py-4 flex items-center border-t border-default-200 dark:border-gray-700 bg-default-50/50 dark:bg-gray-900/30">
+                  <Button
+                    type="button"
+                    color="rose"
+                    variant="outline"
+                    onClick={() => setShowDeleteDialog(true)}
+                    disabled={isSaving}
+                    icon={IconTrash}
+                    iconPosition="left"
+                  >
+                    Delete
+                  </Button>
                 </div>
-              </div>
-            </div>
-
-            {/* Form Actions */}
-            <div className="px-6 py-4 flex justify-between items-center border-t border-default-200 dark:border-gray-700 bg-default-50/50 dark:bg-gray-900/30">
-              <div>
-                {isEditMode &&
-                  entryStatus !== "cancelled" &&
-                  formData.entry_type !== LEGACY_IMPORT_ENTRY_TYPE &&
-                  !isGreenTarget && (
-                    <Button
-                      type="button"
-                      color="rose"
-                      variant="outline"
-                      onClick={() => setShowDeleteDialog(true)}
-                      disabled={isSaving}
-                      icon={IconTrash}
-                      iconPosition="left"
-                    >
-                      Delete
-                    </Button>
-                  )}
-              </div>
-              <div className="flex items-center gap-3">
-                <Button
-                  type="submit"
-                  variant="filled"
-                  color="sky"
-                  icon={IconDeviceFloppy}
-                  iconPosition="left"
-                  disabled={isSaving || !isFormChanged || !isBalanced}
-                >
-                  {isEditMode ? "Update" : "Save"}
-                </Button>
-              </div>
-            </div>
-          </form>
-        </div>
+              )}
+          </div>
+        </form>
       </div>
 
       {/* Dialogs */}
@@ -1639,6 +2070,19 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
         title="Discard Changes"
         message="You have unsaved changes. Are you sure you want to go back? All changes will be lost."
         confirmButtonText="Discard"
+      />
+
+      <ConfirmationDialog
+        isOpen={showDetachConfirmation}
+        onClose={() => setShowDetachConfirmation(false)}
+        onConfirm={() => {
+          setShowDetachConfirmation(false);
+          void performSave();
+        }}
+        title="Detach Journal from Its Document?"
+        message={`This journal was created by its source document, which keeps it up to date automatically. Saving entry "${formData.reference_no}" by hand detaches it: the source document will stop updating it, and the per-line receipt and cheque references on its lines will be lost. This cannot be undone.`}
+        confirmButtonText="Save & Detach"
+        variant="danger"
       />
     </div>
   );

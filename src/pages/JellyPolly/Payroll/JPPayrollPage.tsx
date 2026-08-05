@@ -31,6 +31,7 @@ import {
   staffHoldsJPJob,
 } from "../../../configs/jpPayrollJobConfigs";
 import { getMonthName } from "../../../utils/payroll/payrollUtils";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 
 interface JPMonthlyPayroll {
   id: number;
@@ -112,6 +113,15 @@ const JPPayrollPage: React.FC = () => {
   const [expandedSections, setExpandedSections] = useState<
     Record<string, boolean>
   >({});
+
+  // Keyed by year-month so switching months doesn't restore a stale position
+  // from a different month (mirrors the Tien Hock and Green Target pages).
+  useScrollRestoration(
+    `jp-payroll-page:${selectedMonth.getFullYear()}-${
+      selectedMonth.getMonth() + 1
+    }`,
+    !isLoading && !!payroll
+  );
 
   const handleMonthChange = useCallback(
     (newMonth: Date): void => {
@@ -238,12 +248,6 @@ const JPPayrollPage: React.FC = () => {
       }).pdfPayroll
   );
 
-  const totalGross =
-    payroll?.employeePayrolls?.reduce(
-      (sum, employeePayroll) =>
-        sum + parsePayrollAmount(employeePayroll.gross_pay),
-      0
-    ) || 0;
   const totalNet =
     payroll?.employeePayrolls?.reduce(
       (sum, employeePayroll) =>
@@ -351,14 +355,14 @@ const JPPayrollPage: React.FC = () => {
                 <PayrollSectionPrintMenu
                   company="jellypolly"
                   payrolls={batchPayrolls}
-                  companyName="JELLY POLLY"
+                  companyName="JELLY-POLLY FOOD INDUSTRIES"
                   size="sm"
                   buttonLabel="Payslips"
                 />
                 <DownloadBatchPayslipsButton
                   company="jellypolly"
                   payrolls={batchPayrolls}
-                  companyName="JELLY POLLY"
+                  companyName="JELLY-POLLY FOOD INDUSTRIES"
                   size="sm"
                   variant="outline"
                   color="sky"
@@ -410,63 +414,6 @@ const JPPayrollPage: React.FC = () => {
 
         {payroll && (
           <div className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
-                <div className="p-4 flex items-center gap-3">
-                  <div className="p-2 bg-sky-100 dark:bg-sky-900/30 rounded-lg">
-                    <IconUsers
-                      size={20}
-                      className="text-sky-600 dark:text-sky-400"
-                    />
-                  </div>
-                  <div>
-                    <p className="text-sm text-default-500 dark:text-gray-400">
-                      Employees
-                    </p>
-                    <p className="text-xl font-semibold text-default-800 dark:text-gray-100">
-                      {payroll.employeePayrolls?.length || 0}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
-                <div className="p-4 flex items-center gap-3">
-                  <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
-                    <IconCash
-                      size={20}
-                      className="text-emerald-600 dark:text-emerald-400"
-                    />
-                  </div>
-                  <div>
-                    <p className="text-sm text-default-500 dark:text-gray-400">
-                      Total Gross
-                    </p>
-                    <p className="text-xl font-semibold text-default-800 dark:text-gray-100">
-                      {formatCurrency(totalGross)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="border border-sky-200 dark:border-sky-800/50 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
-                <div className="p-4 flex items-center gap-3">
-                  <div className="p-2 bg-sky-100 dark:bg-sky-900/30 rounded-lg">
-                    <IconCash
-                      size={20}
-                      className="text-sky-600 dark:text-sky-400"
-                    />
-                  </div>
-                  <div>
-                    <p className="text-sm text-default-500 dark:text-gray-400">
-                      Jumlah Digenapkan
-                    </p>
-                    <p className="text-xl font-semibold text-sky-700 dark:text-sky-300">
-                      {formatCurrency(totalRounded)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {orderedJobTypes.length === 0 ? (
               <div className="text-center py-8 border border-default-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
                 <p className="text-default-500 dark:text-gray-400">

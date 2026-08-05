@@ -34,10 +34,12 @@ import {
   buildGTPayslipPayroll,
   type GTPayslipDeduction,
   type GTPayslipItem,
+  type GTPayslipLeaveRecord,
 } from "../../../utils/greenTarget/buildGTPayslipPayroll";
 import type { MidMonthPayroll } from "../../../utils/payroll/midMonthPayrollUtils";
 import { getMonthName } from "../../../utils/payroll/payrollUtils";
 import { PrintBatchPayslipsButton } from "../../../utils/payroll/PayslipButtons";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 
 interface GTMonthlyPayroll {
   id: number;
@@ -65,6 +67,10 @@ interface GTEmployeePayroll {
   setelah_digenapkan?: number | string | null;
   items?: GTPayslipItem[];
   deductions?: GTPayslipDeduction[];
+  // Approved leave for the month — already inside gross_pay, and needed here so
+  // the batch payslips print the Cuti block (the print manager never re-fetches
+  // GT payrolls, so whatever this page holds is what gets printed).
+  leave_records?: GTPayslipLeaveRecord[];
 }
 
 interface GTPayrollEmployee {
@@ -324,35 +330,7 @@ const GTPayrollPage: React.FC = () => {
     payroll.year === selectedYear &&
     payroll.month === selectedMonthNumber;
 
-  useEffect(() => {
-    if (!isPayrollScrollReady) return;
-
-    const container: HTMLElement | null = document.querySelector("main");
-    if (!container) return;
-
-    const storageKey: string = `scroll:${scrollStorageKey}`;
-    const savedPosition: string | null = sessionStorage.getItem(storageKey);
-    const parsedScrollPosition: number = Number.parseInt(
-      savedPosition || "",
-      10
-    );
-    const scrollPosition: number = Number.isFinite(parsedScrollPosition)
-      ? parsedScrollPosition
-      : 0;
-    const animationFrameId: number = requestAnimationFrame((): void => {
-      container.scrollTop = scrollPosition;
-    });
-
-    const handleScroll = (): void => {
-      sessionStorage.setItem(storageKey, String(container.scrollTop));
-    };
-    container.addEventListener("scroll", handleScroll, { passive: true });
-
-    return (): void => {
-      cancelAnimationFrame(animationFrameId);
-      container.removeEventListener("scroll", handleScroll);
-    };
-  }, [isPayrollScrollReady, scrollStorageKey]);
+  useScrollRestoration(scrollStorageKey, isPayrollScrollReady);
 
   useEffect(() => {
     const savedListState: GTPayrollListState =
@@ -1022,7 +1000,7 @@ const GTPayrollPage: React.FC = () => {
                 payrolls={selectedBatchPayrolls}
                 midMonthPayrollsMap={midMonthPayrollsMap}
                 disabled={midMonthLoadError}
-                companyName="GREEN TARGET SDN. BHD."
+                companyName="GREEN TARGET WASTE TREATMENT IND. SDN. BHD."
                 size="sm"
                 variant="outline"
                 color="sky"
@@ -1035,7 +1013,7 @@ const GTPayrollPage: React.FC = () => {
                   payrolls={batchPayrolls}
                   midMonthPayrollsMap={midMonthPayrollsMap}
                   disabled={midMonthLoadError}
-                  companyName="GREEN TARGET SDN. BHD."
+                  companyName="GREEN TARGET WASTE TREATMENT IND. SDN. BHD."
                   size="sm"
                   buttonLabel="Payslips"
                 />

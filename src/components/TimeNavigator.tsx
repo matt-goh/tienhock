@@ -6,6 +6,7 @@ import {
   IconCalendar,
   IconSelector,
 } from "@tabler/icons-react";
+import { useTranslation } from "react-i18next";
 import clsx from "clsx";
 
 // --- Public types ---
@@ -205,6 +206,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   allowFuture,
   minDate,
 }) => {
+  const { t } = useTranslation("common");
   const today = startOfDay(new Date());
 
   const cells = useMemo(() => {
@@ -250,7 +252,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
           type="button"
           onClick={() => onViewChange(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))}
           className="p-1 rounded-md text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700 transition-colors"
-          aria-label="Previous month"
+          aria-label={t("Previous month")}
         >
           <IconChevronLeft size={18} />
         </button>
@@ -261,7 +263,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
           type="button"
           onClick={() => onViewChange(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))}
           className="p-1 rounded-md text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700 transition-colors"
-          aria-label="Next month"
+          aria-label={t("Next month")}
         >
           <IconChevronRight size={18} />
         </button>
@@ -274,7 +276,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
             key={w}
             className="text-center text-[11px] font-medium text-default-400 dark:text-gray-500 py-1"
           >
-            {w}
+            {t(w)}
           </div>
         ))}
       </div>
@@ -340,6 +342,7 @@ const MonthGrid: React.FC<MonthGridProps> = ({
   allowFuture,
   minDate,
 }) => {
+  const { t } = useTranslation("common");
   const now = new Date();
   const isMonthDisabled = (year: number, month: number): boolean => {
     if (
@@ -373,7 +376,7 @@ const MonthGrid: React.FC<MonthGridProps> = ({
               ? "cursor-not-allowed text-default-300 dark:text-gray-600"
               : "text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700"
           )}
-          aria-label="Previous year"
+          aria-label={t("Previous year")}
         >
           <IconChevronLeft size={18} />
         </button>
@@ -390,7 +393,7 @@ const MonthGrid: React.FC<MonthGridProps> = ({
               ? "cursor-not-allowed text-default-300 dark:text-gray-600"
               : "text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700"
           )}
-          aria-label="Next year"
+          aria-label={t("Next year")}
         >
           <IconChevronRight size={18} />
         </button>
@@ -417,7 +420,7 @@ const MonthGrid: React.FC<MonthGridProps> = ({
                   : "text-default-700 dark:text-gray-200 hover:bg-sky-50 dark:hover:bg-sky-900/30"
               )}
             >
-              {label}
+              {t(label)}
             </button>
           );
         })}
@@ -447,6 +450,7 @@ const YearGrid: React.FC<YearGridProps> = ({
   allowFuture,
   minDate,
 }) => {
+  const { t } = useTranslation("common");
   const now = new Date();
   const years = Array.from({ length: YEAR_WINDOW }, (_, i) => viewStartYear + i);
 
@@ -476,7 +480,7 @@ const YearGrid: React.FC<YearGridProps> = ({
               ? "cursor-not-allowed text-default-300 dark:text-gray-600"
               : "text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700"
           )}
-          aria-label="Previous years"
+          aria-label={t("Previous years")}
         >
           <IconChevronLeft size={18} />
         </button>
@@ -493,7 +497,7 @@ const YearGrid: React.FC<YearGridProps> = ({
               ? "cursor-not-allowed text-default-300 dark:text-gray-600"
               : "text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700"
           )}
-          aria-label="Next years"
+          aria-label={t("Next years")}
         >
           <IconChevronRight size={18} />
         </button>
@@ -536,11 +540,12 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
   minDate,
   size = "md",
   showArrows = true,
-  placeholder = "All dates",
+  placeholder,
   disabled = false,
   className,
   triggerClassName,
 }) => {
+  const { t } = useTranslation("common");
   const availableModes = useMemo(
     () =>
       (["day", "month", "range", "year"] as TimeMode[]).filter((m) =>
@@ -641,13 +646,13 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
   }, [range.start, range.end, resolvedPresets]);
 
   const triggerLabel = useMemo(() => {
-    if (!hasRange) return placeholder;
-    if (activePreset) return activePreset.label;
+    if (!hasRange) return placeholder ?? t("All dates");
+    if (activePreset) return t(activePreset.label);
     if (displayMode === "day") return fmtDay(range.start!);
     if (displayMode === "month") return fmtMonth(range.start!);
     if (displayMode === "year") return fmtYear(range.start!);
     return fmtRange(range.start!, range.end!);
-  }, [hasRange, activePreset, displayMode, range.start, range.end, placeholder]);
+  }, [hasRange, activePreset, displayMode, range.start, range.end, placeholder, t]);
 
   // --- Arrow stepping (operates on the applied range's granularity) ---
   const today = startOfDay(new Date());
@@ -768,8 +773,8 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
               ? "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
               : "cursor-not-allowed text-default-300 dark:text-gray-600"
           )}
-          aria-label="Previous"
-          title="Previous"
+          aria-label={t("Previous")}
+          title={t("Previous")}
         >
           <IconChevronLeft size={iconSize} />
         </button>
@@ -794,7 +799,7 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
         )}
         aria-haspopup="dialog"
         aria-expanded={isOpen}
-        title="Change time range"
+        title={t("Change time range")}
       >
         <IconCalendar
           size={iconSize}
@@ -818,8 +823,8 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
               ? "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
               : "cursor-not-allowed text-default-300 dark:text-gray-600"
           )}
-          aria-label="Next"
-          title="Next"
+          aria-label={t("Next")}
+          title={t("Next")}
         >
           <IconChevronRight size={iconSize} />
         </button>
@@ -850,7 +855,7 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
                       : "text-default-500 dark:text-gray-400 hover:text-default-800 dark:hover:text-gray-200"
                   )}
                 >
-                  {m}
+                  {t(m)}
                 </button>
               ))}
             </div>
@@ -871,7 +876,7 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
                       : "border-default-200 dark:border-gray-600 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
                   )}
                 >
-                  {p.label}
+                  {t(p.label)}
                 </button>
               ))}
             </div>
@@ -915,8 +920,8 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
           {activeMode === "range" && (
             <p className="mt-2 text-[11px] text-default-400 dark:text-gray-500 text-center">
               {pendingStart
-                ? "Select the end date"
-                : "Select the start date"}
+                ? t("Select the end date")
+                : t("Select the start date")}
             </p>
           )}
         </div>

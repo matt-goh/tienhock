@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 interface LoadingSpinnerProps {
   size?: "sm" | "md" | "lg";
   hideText?: boolean;
@@ -7,6 +9,7 @@ const LoadingSpinner = ({
   size = "md",
   hideText = false,
 }: LoadingSpinnerProps) => {
+  const { t } = useTranslation("common");
   const spinnerSizes = {
     sm: "w-8 h-8",
     md: "w-10 h-10",
@@ -19,7 +22,7 @@ const LoadingSpinner = ({
         className={`${spinnerSizes[size]} border-4 border-gray-100 dark:border-gray-700 border-t-sky-500 dark:border-t-sky-400 rounded-full animate-spin`}
       />
       {!hideText && (
-        <div className="text-sky-500 dark:text-sky-400 text-sm font-medium">Loading...</div>
+        <div className="text-sky-500 dark:text-sky-400 text-sm font-medium">{t("Loading...")}</div>
       )}
     </div>
   );

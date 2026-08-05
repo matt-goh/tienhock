@@ -509,10 +509,10 @@ const InvoiceCard = ({
       <div className="px-4 py-3" onClick={handleClick}>
         {/* Customer section */}
         <div className="mb-3 border-b border-default-200 dark:border-gray-700 pb-3">
-          <div className="flex justify-between items-start">
-            <div className="max-w-[65%]">
+          <div className="flex justify-between items-start gap-3">
+            <div className="min-w-0 flex-1">
               <h3
-                className="w-fit font-semibold text-default-900 dark:text-gray-100 truncate cursor-pointer hover:underline"
+                className="w-fit max-w-full font-semibold text-default-900 dark:text-gray-100 truncate cursor-pointer hover:underline"
                 onClick={(e) => {
                   e.stopPropagation();
                   navigate(`/greentarget/customers/${invoice.customer_id}`);
@@ -550,7 +550,7 @@ const InvoiceCard = ({
                 </p>
               )}
             </div>
-            <div>
+            <div className="flex-shrink-0">
               {/* Add rental ID and driver info in the right side - Multi-rental support */}
               {invoice.rental_details &&
               Array.isArray(invoice.rental_details) &&

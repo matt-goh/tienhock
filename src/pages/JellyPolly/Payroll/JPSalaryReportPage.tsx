@@ -2,8 +2,22 @@
 // Jelly Polly Salary Report. Monthly + annual views grouped by location
 // (jellypolly.locations). Reuses the shared TH PDF generator.
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { IconRefresh, IconPrinter, IconDownload } from "@tabler/icons-react";
+import {
+  IconRefresh,
+  IconPrinter,
+  IconDownload,
+  IconFileExport,
+  IconLink,
+} from "@tabler/icons-react";
+import {
+  Dialog,
+  DialogPanel,
+  DialogTitle,
+  Transition,
+  TransitionChild,
+} from "@headlessui/react";
 import Button from "../../../components/Button";
+import { FormListbox } from "../../../components/FormComponents";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import TimeNavigator, { TimeRange } from "../../../components/TimeNavigator";
 import { api } from "../../../routes/utils/api";
@@ -30,9 +44,11 @@ import {
 } from "../../../components/Payroll/CompanySalaryReportTables";
 import { useJPStaffsCache } from "../../../utils/JellyPolly/useJPStaffsCache";
 import { groupStaffsByName } from "../../../utils/payroll/groupStaffsByName";
+import { usePersistedFilters } from "../../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
 
-const JP_COMPANY = "JELLY POLLY";
+const JP_COMPANY = "JELLY-POLLY FOOD INDUSTRIES";
 
 // Tabs whose data all comes from the single monthly salary-report endpoint.
 const MONTHLY_TABS = ["employee", "monthly", "bank", "pinjam"] as const;
@@ -197,25 +213,66 @@ const getPinjamStaffKey = (
 ): string => (staffName || staffId || "").trim().toUpperCase();
 
 const JPSalaryReportPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabType>("monthly");
-  const [annualView, setAnnualView] = useState<AnnualView>("summary");
+  const [activeTab, setActiveTab] = usePersistedFilters<TabType>(
+    "jpSalaryReportTab",
+    () => "monthly",
+    (cached) => (TABS.includes(cached as TabType) ? (cached as TabType) : null)
+  );
+  const [annualView, setAnnualView] = usePersistedFilters<AnnualView>(
+    "jpSalaryReportAnnualView",
+    () => "summary",
+    (cached) => (cached === "summary" || cached === "breakdown" ? cached : null)
+  );
   const [pinjamViewMode, setPinjamViewMode] =
-    useState<PinjamViewMode>("month_end");
+    usePersistedFilters<PinjamViewMode>(
+      "jpSalaryReportPinjamView",
+      () => "month_end",
+      (cached) =>
+        cached === "month_end" || cached === "mid_month" ? cached : null
+    );
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingExport, setIsGeneratingExport] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [exportYear, setExportYear] = useState<number>(
+    new Date().getFullYear()
+  );
+  const [exportMonth, setExportMonth] = useState<number>(
+    new Date().getMonth() + 1
+  );
 
-  const { staffs } = useJPStaffsCache();
+  const { staffs, allStaffs } = useJPStaffsCache();
   const [cutiEmployees, setCutiEmployees] = useState<CutiBatchEmployee[]>([]);
   const [cutiSummary, setCutiSummary] = useState<any>(null);
 
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
+  const [currentYear, setCurrentYear] = usePersistedFilters<number>(
+    "jpSalaryReportYear",
+    () => new Date().getFullYear(),
+    (cached) => (typeof cached === "number" ? cached : null)
+  );
+  const [currentMonth, setCurrentMonth] = usePersistedFilters<number>(
+    "jpSalaryReportMonth",
+    () => new Date().getMonth() + 1,
+    (cached) =>
+      typeof cached === "number" && cached >= 1 && cached <= 12 ? cached : null
+  );
 
   const [monthly, setMonthly] = useState<Comprehensive | null>(null);
   const [pinjamSummary, setPinjamSummary] = useState<PinjamSummaryEntry[]>([]);
   const [annual, setAnnual] = useState<AnnualSummary | null>(null);
   const [breakdown, setBreakdown] = useState<AnnualBreakdown | null>(null);
   const [locationMap, setLocationMap] = useState<Record<string, string>>({});
+
+  // `isLoading` starts false, so the ready flag also waits for content —
+  // otherwise the restore fires against an empty page and clamps to 0.
+  useScrollRestoration(
+    "jp-salary-report",
+    !isLoading &&
+      (monthly !== null ||
+        annual !== null ||
+        breakdown !== null ||
+        cutiEmployees.length > 0)
+  );
 
   const monthRange = useMemo<TimeRange>(
     () => ({
@@ -405,6 +462,247 @@ const JPSalaryReportPage: React.FC = () => {
       ? monthly?.summary.total_final ?? 0
       : monthly?.employees_grand_totals?.setelah_digenapkan ?? 0;
 
+  // Bank text export — bank-preference employees with money to pay out.
+  const bankExportRows = useMemo<PinjamReportData[]>(() => {
+    if (!monthly?.data) return [];
+    return monthly.data.filter((row: PinjamReportData): boolean => {
+      const finalTotal: number = parseFloat(row.final_total.toString());
+      return (
+        (row.payment_preference ?? "").trim().toLowerCase() === "bank" &&
+        finalTotal > 0
+      );
+    });
+  }, [monthly]);
+
+  // Generate year and month options
+  const yearOptions = useMemo(() => {
+    const years = [];
+    const startYear = new Date().getFullYear() - 5; // Go back 5 years
+    const endYear = new Date().getFullYear(); // Current year
+    for (let year = endYear; year >= startYear; year--) {
+      years.push({ id: year, name: year.toString() });
+    }
+    return years;
+  }, []);
+
+  const monthOptions = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, i) => ({
+        id: i + 1,
+        name: getMonthName(i + 1),
+      })),
+    []
+  );
+
+  const generateExportURL = () => {
+    // Determine server URL based on environment
+    const isProduction = window.location.hostname === "tienhock.com";
+    const baseURL = isProduction
+      ? "https://api.tienhock.com"
+      : "http://localhost:5001";
+    const url = `${baseURL}/jellypolly/api/excel/payment-export?year=${exportYear}&month=${exportMonth}&api_key=REMOVED_SECRET`;
+
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        toast.success("Export URL copied to clipboard!");
+        setShowExportDialog(false);
+      })
+      .catch(() => {
+        toast.error("Failed to copy URL to clipboard");
+      });
+  };
+
+  const generateTextExport = async () => {
+    if (bankExportRows.length === 0) {
+      toast.error("No bank payment data available to export");
+      return;
+    }
+
+    setIsGeneratingExport(true);
+    try {
+      // Generate payment date (last day of the month)
+      const lastDayOfMonth = new Date(currentYear, currentMonth, 0).getDate();
+      const paymentDate = `${lastDayOfMonth
+        .toString()
+        .padStart(2, "0")}/${currentMonth
+        .toString()
+        .padStart(2, "0")}/${currentYear}`;
+
+      // Define payment date row
+      const paymentDateRow = [
+        "PAYMENT DATE : (DD/MM/YYYY)",
+        paymentDate,
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+      ];
+
+      // Define column headers with 2-row format
+      const headerRow1 = [
+        "Payment Type/ Mode : PBB/IBG/REN",
+        "Bene Acct No.",
+        "BIC",
+        "Bene Full Name",
+        "ID Type: For Intrabank & IBG NI, OI, BR, PL, ML, PP For Rentas NI, OI, BR, OT",
+        "Bene Identification No / Passport",
+        "Payment Amount (with 2 decimal points)",
+        "Recipient Reference (shown in sender and bene statement)",
+        "Other Payment Details (shown in sender and bene statement)",
+        "Bene Email 1",
+        "Bene Email 2",
+        "Bene Mobile No. 1 (charge RM0.20 per number)",
+        "Bene Mobile No. 2 (charge RM0.20 per number)",
+        "Joint Bene Name",
+        "Joint Bene Identification No.",
+        "Joint ID Type: For Intrabank & IBG NI, OI, BR, PL, ML, PP For Rentas NI, OI, BR, OT",
+        "E-mail Content Line 1 (will be shown in bene email)",
+        "E-mail Content Line 2 (will be shown in bene email)",
+        "E-mail Content Line 3 (will be shown in bene email)",
+        "E-mail Content Line 4 (will be shown in bene email)",
+        "E-mail Content Line 5 (will be shown in bene email)",
+      ];
+
+      const headerRow2 = [
+        "(M) - Char: 3 - A",
+        "(M) - Char: 20 - N",
+        "(M) - Char: 11 - A",
+        "(M) - Char: 120 - A",
+        "(M) - Char: 2 - A",
+        "(O) - Char: 29 - AN",
+        "(M) - Char: 18 - N",
+        "(M) - Char: 20 - AN",
+        "(O) - Char: 20 - AN",
+        "(O) - Char: 70 - AN",
+        "(O) - Char: 70 - AN",
+        "(O) - Char: 15 - N",
+        "(O) - Char: 15 - N",
+        "(O) - Char: 120 - A",
+        "(O) - Char: 29 - AN",
+        "(O) - Char: 2 - A",
+        "(O) - Char: 40 - AN",
+        "(O) - Char: 40 - AN",
+        "(O) - Char: 40 - AN",
+        "(O) - Char: 40 - AN",
+        "(O) - Char: 40 - AN",
+      ];
+
+      // Generate data rows
+      const dataRows = bankExportRows.map((row: PinjamReportData) => {
+        const staff = allStaffs?.find((s) => s.id === row.staff_id);
+        const paymentAmount = parseFloat(row.final_total.toString()).toFixed(2);
+
+        const columns = [
+          "PBB", // Column 1
+          (staff?.bankAccountNumber || "").replace(/-/g, ""), // Column 2 - remove hyphens
+          "PBBEMYKL", // Column 3
+          (row.staff_name || "").replace(/,/g, " "), // Column 4 - remove commas
+          staff?.document || "", // Column 5
+          (staff?.icNo || "").replace(/-/g, ""), // Column 6 - remove hyphens
+          paymentAmount, // Column 7 - plain number format
+          "Salary", // Column 8
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "", // Columns 9-16
+          "Content Line 1", // Column 17
+          "Content Line 2", // Column 18
+          "Content Line 3", // Column 19
+          "Content Line 4", // Column 20
+          "Content Line 5", // Column 21
+        ];
+
+        return columns;
+      });
+
+      // Calculate total payment amount
+      const totalAmount = bankExportRows.reduce(
+        (sum: number, row: PinjamReportData): number =>
+          sum + parseFloat(row.final_total.toString()),
+        0
+      );
+
+      // Create total row
+      const totalRow = [
+        "TOTAL:",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        totalAmount.toFixed(2),
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+      ];
+
+      // Combine all rows
+      const allRows = [
+        paymentDateRow,
+        headerRow1,
+        headerRow2,
+        ...dataRows,
+        totalRow,
+      ];
+
+      // Convert to text format (semicolon separated)
+      const textContent = allRows.map((row) => row.join(";")).join("\r\n");
+
+      // Create and download the file
+      const blob = new Blob([textContent], {
+        type: "text/plain;charset=utf-8",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `jp-payment-export-${currentMonth
+        .toString()
+        .padStart(2, "0")}-${currentYear}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Payment export file downloaded successfully");
+    } catch (error) {
+      console.error("Error generating text export:", error);
+      toast.error("Failed to generate text export");
+    } finally {
+      setIsGeneratingExport(false);
+    }
+  };
+
   const handleGenerateBreakdown = async (
     action: "download" | "print"
   ): Promise<void> => {
@@ -517,7 +815,7 @@ const JPSalaryReportPage: React.FC = () => {
         }
         await generateSalaryReportPDF(
           {
-            reportType: "employee-grouped",
+            reportType: "location",
             periodType: "monthly",
             year: currentYear,
             month: currentMonth,
@@ -725,6 +1023,91 @@ const JPSalaryReportPage: React.FC = () => {
     </thead>
   );
 
+  // Export Dialog Component
+  const ExportDialog = () => (
+    <Transition appear show={showExportDialog} as={React.Fragment}>
+      <Dialog
+        as="div"
+        className="fixed inset-0 z-50"
+        onClose={() => setShowExportDialog(false)}
+      >
+        <div className="min-h-screen px-4 text-center">
+          <TransitionChild
+            as={React.Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <DialogPanel
+              className="fixed inset-0 bg-black opacity-30"
+              onClick={() => setShowExportDialog(false)}
+            />
+          </TransitionChild>
+
+          <span
+            className="inline-block h-screen align-middle"
+            aria-hidden="true"
+          >
+            &#8203;
+          </span>
+
+          <TransitionChild
+            as={React.Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0 scale-95"
+            enterTo="opacity-100 scale-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100 scale-100"
+            leaveTo="opacity-0 scale-95"
+          >
+            <DialogPanel
+              className="inline-block w-full max-w-md p-6 my-8 text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <DialogTitle
+                as="h3"
+                className="text-lg font-medium leading-6 text-default-900 dark:text-gray-100"
+              >
+                Export Link Generator
+              </DialogTitle>
+              <div className="mt-4 space-y-4">
+                <FormListbox
+                  name="exportYear"
+                  label="Year"
+                  value={exportYear.toString()}
+                  onChange={(value) => setExportYear(Number(value))}
+                  options={yearOptions}
+                />
+                <FormListbox
+                  name="exportMonth"
+                  label="Month"
+                  value={exportMonth.toString()}
+                  onChange={(value) => setExportMonth(Number(value))}
+                  options={monthOptions}
+                />
+              </div>
+              <div className="flex justify-end space-x-3 mt-6">
+                <Button
+                  onClick={() => setShowExportDialog(false)}
+                  variant="outline"
+                  size="sm"
+                >
+                  Cancel
+                </Button>
+                <Button onClick={generateExportURL} color="blue" size="sm">
+                  Copy URL
+                </Button>
+              </div>
+            </DialogPanel>
+          </TransitionChild>
+        </div>
+      </Dialog>
+    </Transition>
+  );
+
   return (
     <div className="space-y-3">
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
@@ -861,6 +1244,33 @@ const JPSalaryReportPage: React.FC = () => {
               >
                 Download
               </Button>
+              {activeTab === "bank" && (
+                <>
+                  <Button
+                    onClick={generateTextExport}
+                    icon={IconFileExport}
+                    color="purple"
+                    variant="outline"
+                    disabled={
+                      !monthly ||
+                      bankExportRows.length === 0 ||
+                      isGeneratingExport
+                    }
+                    size="sm"
+                  >
+                    Export
+                  </Button>
+                  <Button
+                    onClick={() => setShowExportDialog(true)}
+                    icon={IconLink}
+                    color="orange"
+                    variant="outline"
+                    size="sm"
+                  >
+                    Export Link
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -974,53 +1384,29 @@ const JPSalaryReportPage: React.FC = () => {
             ) : (
               <table className="w-full table-fixed">
                 {renderTableColGroup()}
-                {renderSalaryHeader("NAMA PEKERJA")}
+                {renderSalaryHeader("BAHAGIAN KERJA")}
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                  {monthly.locations.map((loc) => (
-                    <React.Fragment key={loc.location}>
-                      <tr className="bg-sky-50 dark:bg-sky-900/20">
-                        <td
-                          colSpan={TABLE_COLUMN_COUNT}
-                          className="px-4 py-2 text-sm font-semibold text-sky-800 dark:text-sky-300 border-y border-default-200 dark:border-gray-700"
-                        >
-                          {loc.location} -{" "}
-                          {(locationMap[loc.location] || loc.location).toUpperCase()}
-                        </td>
-                      </tr>
-                      {loc.employees.map((emp, index: number) => (
-                        <tr
-                          key={emp.employee_payroll_id}
-                          className={
-                            index % 2 === 0
-                              ? "bg-white dark:bg-gray-800"
-                              : "bg-default-25 dark:bg-gray-750"
-                          }
-                        >
-                          <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 text-center">
-                            {index + 1}
-                          </td>
-                          <td className={bodyNameCellClass}>
-                            <span
-                              className="block truncate"
-                              title={`${emp.staff_id.toUpperCase()} - ${emp.staff_name.toUpperCase()}`}
-                            >
-                              {emp.staff_id.toUpperCase()} -{" "}
-                              {emp.staff_name.toUpperCase()}
-                            </span>
-                          </td>
-                          {renderAmountCells(emp)}
-                        </tr>
-                      ))}
-                      <tr>
-                        <td
-                          colSpan={2}
-                          className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600"
-                        >
-                          SUBTOTAL
-                        </td>
-                        {renderAmountCells(loc.totals, true)}
-                      </tr>
-                    </React.Fragment>
+                  {monthly.locations.map((loc, index: number) => (
+                    <tr
+                      key={loc.location}
+                      className={
+                        index % 2 === 0
+                          ? "bg-white dark:bg-gray-800"
+                          : "bg-default-25 dark:bg-gray-750"
+                      }
+                    >
+                      <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 text-center">
+                        {loc.location}
+                      </td>
+                      <td className={bodyNameCellClass}>
+                        <span className="block truncate">
+                          {(
+                            locationMap[loc.location] || loc.location
+                          ).toUpperCase()}
+                        </span>
+                      </td>
+                      {renderAmountCells(loc.totals)}
+                    </tr>
                   ))}
                 </tbody>
                 <tfoot className="sticky bottom-0 z-20">
@@ -1188,6 +1574,9 @@ const JPSalaryReportPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Export Dialog */}
+      <ExportDialog />
     </div>
   );
 };

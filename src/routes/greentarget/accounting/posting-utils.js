@@ -88,7 +88,8 @@ export async function nextGTPostingSequence(client, entryDate) {
  * @param {string|null} [journal.createdBy]
  * @param {Array<{accountCode: string, debit?: number, credit?: number,
  *   reference?: string|null, particulars?: string|null,
- *   chequeReference?: string|null, displayReference?: string|null}>} journal.lines
+ *   chequeReference?: string|null, displayReference?: string|null,
+ *   debtorSubledgerCode?: string|null}>} journal.lines
  * @returns {Promise<number>} The new journal id.
  */
 export async function insertGTJournal(client, journal) {
@@ -148,8 +149,9 @@ export async function insertGTJournalLines(client, journalId, lines) {
       `INSERT INTO greentarget.journal_entry_lines (
          journal_entry_id, line_number, account_code,
          debit_amount, credit_amount, reference, particulars,
-         cheque_reference, display_order, display_reference
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+         cheque_reference, display_order, display_reference,
+         debtor_subledger_code
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
       [
         journalId,
         index + 1,
@@ -161,6 +163,7 @@ export async function insertGTJournalLines(client, journalId, lines) {
         line.chequeReference ?? null,
         index + 1,
         line.displayReference ?? null,
+        line.debtorSubledgerCode ?? null,
       ]
     );
   }

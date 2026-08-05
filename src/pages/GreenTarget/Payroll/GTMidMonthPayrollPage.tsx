@@ -24,11 +24,10 @@ import {
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
-import {
-  FormCombobox,
-  FormInput,
-  FormListbox,
-} from "../../../components/FormComponents";
+import { FormCombobox, FormInput } from "../../../components/FormComponents";
+import PillSelect, {
+  PillSelectOption,
+} from "../../../components/PillSelect";
 import TimeNavigator from "../../../components/TimeNavigator";
 import { api } from "../../../routes/utils/api";
 import { getMonthName } from "../../../utils/payroll/payrollUtils";
@@ -41,6 +40,11 @@ import {
   PinjamBreakdownCard,
   PinjamReportTable,
 } from "../../../components/Payroll/CompanySalaryReportTables";
+import {
+  usePersistedFilters,
+  usePersistedNumber,
+} from "../../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import type {
   PinjamDetail,
   PinjamReportData,
@@ -48,7 +52,7 @@ import type {
 import GreenTargetLogo from "../../../utils/GreenTargetLogo.png";
 import toast from "react-hot-toast";
 
-const GT_COMPANY_NAME = "GREEN TARGET SDN. BHD.";
+const GT_COMPANY_NAME = "GREEN TARGET WASTE TREATMENT IND. SDN. BHD.";
 
 type MidMonthSubview = "summary" | "pinjam";
 
@@ -85,10 +89,14 @@ interface GTPayrollEmployee {
   job_type: string;
 }
 
-const PAYMENT_METHOD_OPTIONS = [
-  { id: "Cash", name: "Cash" },
-  { id: "Bank", name: "Bank" },
-  { id: "Cheque", name: "Cheque" },
+type MidMonthPaymentMethod = "Cash" | "Bank" | "Cheque";
+
+const PAYMENT_METHOD_OPTIONS: ReadonlyArray<
+  PillSelectOption<MidMonthPaymentMethod>
+> = [
+  { value: "Cash", label: "Cash" },
+  { value: "Bank", label: "Bank" },
+  { value: "Cheque", label: "Cheque" },
 ];
 
 interface GTMidMonthPayrollModalProps {
@@ -258,15 +266,20 @@ const GTMidMonthPayrollModal: React.FC<GTMidMonthPayrollModalProps> = ({
                   />
 
                   {/* Payment Method */}
-                  <FormListbox
-                    name="paymentMethod"
-                    label="Payment Method"
-                    value={paymentMethod}
-                    onChange={(value) =>
-                      setPaymentMethod(value as "Cash" | "Bank" | "Cheque")
-                    }
-                    options={PAYMENT_METHOD_OPTIONS}
-                  />
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                      Payment Method
+                    </label>
+                    <PillSelect<MidMonthPaymentMethod>
+                      value={paymentMethod}
+                      onChange={(value: MidMonthPaymentMethod) =>
+                        setPaymentMethod(value)
+                      }
+                      options={PAYMENT_METHOD_OPTIONS}
+                      ariaLabel="Payment method"
+                      size="md"
+                    />
+                  </div>
                 </div>
 
                 {/* Modal Actions */}
@@ -319,15 +332,33 @@ const GTMidMonthPayrollPage: React.FC = () => {
   const [pinjamByEmp, setPinjamByEmp] = useState<
     Record<string, MidMonthPinjamData>
   >({});
-  const [activeSubview, setActiveSubview] =
-    useState<MidMonthSubview>("summary");
+  const [activeSubview, setActiveSubview] = usePersistedFilters<MidMonthSubview>(
+    "gtMidMonthPayrollListSubview",
+    () => "summary",
+    (cached) => (cached === "summary" || cached === "pinjam" ? cached : null)
+  );
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isGeneratingExport, setIsGeneratingExport] = useState(false);
   const { staffs } = useStaffsCache();
 
   // Filters
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
+  const [currentYear, setCurrentYear] = usePersistedNumber(
+    "gtMidMonthPayrollListYear",
+    2000,
+    2100,
+    () => new Date().getFullYear()
+  );
+  const [currentMonth, setCurrentMonth] = usePersistedNumber(
+    "gtMidMonthPayrollListMonth",
+    1,
+    12,
+    () => new Date().getMonth() + 1
+  );
+
+  useScrollRestoration(
+    "gt-mid-month-payroll-list",
+    !isLoading && payrolls.length > 0
+  );
 
   // Month range for the TimeNavigator (the page always targets one month).
   const monthRange = useMemo(

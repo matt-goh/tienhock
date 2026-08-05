@@ -9,6 +9,7 @@ import { TienHockNavData } from "./TienHockNavData";
 import { GreenTargetNavData } from "./GreenTargetNavData";
 import { JellyPollyNavData } from "./JellyPollyNavData";
 import { SidebarItem } from "./pagesRoute";
+import { useTranslation } from "react-i18next";
 
 interface NavigationItem {
   name: string;
@@ -45,6 +46,8 @@ const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { activeCompany, setActiveCompany, companies } = useCompany();
+  const { t } = useTranslation("home");
+  const { t: tNav } = useTranslation("nav");
 
   const excludedSubItemNameParts: string[] = [
     "New",
@@ -124,7 +127,8 @@ const HomePage: React.FC = () => {
       Catalogue: "Manage staff, customers, products, etc",
       Stock: "Manage inventory and stock levels",
     };
-    return descriptions[name] || "";
+    const description: string | undefined = descriptions[name];
+    return description ? t(description) : "";
   };
 
   // Build Tien Hock items with detailed sub-item lists
@@ -143,7 +147,8 @@ const HomePage: React.FC = () => {
       Customers: "Customer management",
       Dumpsters: "Dumpster management",
     };
-    return descriptions[name] || "";
+    const description: string | undefined = descriptions[name];
+    return description ? t(description) : "";
   };
 
   // Build Green Target items as simple navigation cards
@@ -163,7 +168,8 @@ const HomePage: React.FC = () => {
       Payroll: "Manage Jelly Polly payroll and staff work",
       Stock: "Production records and product stock",
     };
-    return descriptions[name] || "";
+    const description: string | undefined = descriptions[name];
+    return description ? t(description) : "";
   };
 
   // Build Jelly Polly items with the same organized category layout as Tien Hock
@@ -273,7 +279,7 @@ const HomePage: React.FC = () => {
       onClick={() => handleNavigate(section.company.id, subItem.path)}
       className="group flex w-full min-w-0 items-center justify-between rounded-md px-2.5 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100 transition-colors duration-150"
     >
-      <span className="min-w-0 truncate pr-1">{subItem.name}</span>
+      <span className="min-w-0 truncate pr-1">{tNav(subItem.name)}</span>
       <IconChevronRight
         size={14}
         className="text-gray-400 dark:text-gray-500 opacity-0 transition-opacity group-hover:opacity-100 flex-shrink-0"
@@ -291,7 +297,7 @@ const HomePage: React.FC = () => {
     if (groups.length === 0) {
       return (
         <p className="px-2.5 py-1.5 text-sm text-gray-400 dark:text-gray-500 italic">
-          No items available.
+          {t("No items available.")}
         </p>
       );
     }
@@ -302,7 +308,7 @@ const HomePage: React.FC = () => {
           <div key={itemGroup.name} className="space-y-0.5">
             {shouldShowGroupHeaders && (
               <p className="px-2.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                {itemGroup.name}
+                {tNav(itemGroup.name)}
               </p>
             )}
             {itemGroup.items.map((subItem: NavigationSubItem) =>
@@ -336,7 +342,7 @@ const HomePage: React.FC = () => {
           )}
           <div className="flex-1 min-w-0">
             <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm">
-              {category.name}
+              {tNav(category.name)}
             </h3>
             {category.description && (
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-tight">
@@ -373,7 +379,7 @@ const HomePage: React.FC = () => {
           )}
           <div className="flex-1 min-w-0">
             <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm flex items-center">
-              <span className="min-w-0 truncate">{item.name}</span>
+              <span className="min-w-0 truncate">{tNav(item.name)}</span>
               <IconChevronRight
                 size={14}
                 className="ml-1 text-gray-400 dark:text-gray-500 opacity-0 transition-opacity group-hover:opacity-100 flex-shrink-0"

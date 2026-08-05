@@ -404,13 +404,20 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
     );
   }
 
-  // Any active, non-migration journal is editable. Editing a system-owned journal
+  // Any active, non-migration Tien Hock journal is editable. Editing a
+  // system-owned journal
   // (sales/purchase/receipt/payment/adjustment/voucher) DETACHES it from its source
   // on the server — it then shows the "Manual" badge and is managed by hand.
   // Migration (IMP) journals stay immutable and cannot be edited or cancelled.
   const isLegacyImport: boolean = isLegacyImportEntry(entry);
   const visibleReference: string = getVisibleReference(entry);
   const displayEntryType: string = getDisplayEntryType(entry);
+  // A source-owned journal is maintained by the document that created it, so
+  // neither server cancels it directly (Tien Hock answers a structured 409;
+  // Green Target already refused) — cancel through the source document. Tien
+  // Hock still allows a hand edit (it detaches the journal); Green Target
+  // refuses edits of source-owned journals outright.
+  const isSourceOwned: boolean = Boolean(entry.source_type);
   const canEdit: boolean = entry.status !== "cancelled" && !isLegacyImport;
   const canCancel: boolean = entry.status !== "cancelled" && !isLegacyImport;
   // Offered on every cancelled entry; the server decides whether this
@@ -530,7 +537,12 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
                   color="sky"
                   icon={IconPencil}
                   iconPosition="left"
-                  disabled={isProcessing}
+                  disabled={isProcessing || (isGreenTarget && isSourceOwned)}
+                  title={
+                    isGreenTarget && isSourceOwned
+                      ? "This journal is owned by its source document - edit that document instead."
+                      : undefined
+                  }
                 >
                   Edit
                 </Button>
@@ -542,7 +554,12 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
                   color="rose"
                   icon={IconX}
                   iconPosition="left"
-                  disabled={isProcessing}
+                  disabled={isProcessing || isSourceOwned}
+                  title={
+                    isSourceOwned
+                      ? "This journal is owned by its source document - cancel that document instead."
+                      : undefined
+                  }
                 >
                   Cancel Entry
                 </Button>

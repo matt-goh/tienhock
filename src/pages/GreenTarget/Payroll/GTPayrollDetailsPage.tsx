@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   IconBuildingBank,
+  IconCalendarEvent,
   IconCash,
   IconCoins,
   IconExternalLink,
@@ -153,6 +154,31 @@ const formatCurrency = (amount: number): string =>
     style: "currency",
     currency: "MYR",
   }).format(parsePayrollAmount(amount));
+
+const formatDisplayDate = (value: string | null | undefined): string => {
+  if (!value) return "-";
+  const text: string = String(value);
+  const match: RegExpMatchArray | null = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return text;
+
+  const [, year, month, day] = match;
+  return `${day}/${month}/${year}`;
+};
+
+const getLeaveTypeLabel = (type: string): string => {
+  switch (type) {
+    case "cuti_umum":
+      return "Cuti Umum";
+    case "cuti_sakit":
+      return "Cuti Sakit";
+    case "cuti_tahunan":
+      return "Cuti Tahunan";
+    case "cuti_rawatan":
+      return "Cuti Rawatan";
+    default:
+      return type;
+  }
+};
 
 const getDeductionCardLabel = (type: string): string => {
   const normalizedType: string = type.toLowerCase();
@@ -588,7 +614,7 @@ const GTPayrollDetailsPage: React.FC = () => {
             payroll={pdfPayroll}
             staffDetails={staffDetails}
             midMonthPayroll={midMonthForPdf}
-            companyName="GREEN TARGET SDN. BHD."
+            companyName="GREEN TARGET WASTE TREATMENT IND. SDN. BHD."
             buttonText="Pay Slip"
             variant="filled"
             color="sky"
@@ -598,7 +624,7 @@ const GTPayrollDetailsPage: React.FC = () => {
             payroll={pdfPayroll}
             staffDetails={staffDetails}
             midMonthPayroll={midMonthForPdf}
-            companyName="GREEN TARGET SDN. BHD."
+            companyName="GREEN TARGET WASTE TREATMENT IND. SDN. BHD."
             buttonText="PDF"
             variant="default"
             color="sky"
@@ -1149,6 +1175,73 @@ const GTPayrollDetailsPage: React.FC = () => {
           )
         )}
       </section>
+
+      {leaveRecords.length > 0 && (
+        <div className="overflow-hidden rounded-lg border border-default-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+          <div className="border-b border-teal-100 bg-teal-50 px-4 py-2 dark:border-teal-800/50 dark:bg-teal-900/20">
+            <h3 className="text-md flex items-center gap-2 font-semibold text-teal-800 dark:text-teal-300">
+              <IconCalendarEvent
+                size={18}
+                className="text-teal-600 dark:text-teal-400"
+              />
+              Leave Pay
+            </h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+              <thead className="bg-default-50 dark:bg-gray-800">
+                <tr>
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-400">
+                    Date
+                  </th>
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-400">
+                    Type
+                  </th>
+                  <th className="px-3 py-2 text-right text-xs font-medium uppercase text-default-500 dark:text-gray-400">
+                    Days
+                  </th>
+                  <th className="px-3 py-2 text-right text-xs font-medium uppercase text-default-500 dark:text-gray-400">
+                    Amount
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-default-100 dark:divide-gray-700">
+                {leaveRecords.map(
+                  (record: GTLeaveRecord, index: number): React.ReactNode => (
+                    <tr key={`${record.id || index}-${record.leave_date || ""}`}>
+                      <td className="px-3 py-2 text-sm text-default-600 dark:text-gray-400">
+                        {formatDisplayDate(record.leave_date)}
+                      </td>
+                      <td className="px-3 py-2 text-sm text-default-800 dark:text-gray-200">
+                        {getLeaveTypeLabel(record.leave_type)}
+                      </td>
+                      <td className="px-3 py-2 text-right text-sm text-default-600 dark:text-gray-400">
+                        {record.days_taken}
+                      </td>
+                      <td className="px-3 py-2 text-right text-sm font-medium text-teal-700 dark:text-teal-300">
+                        {formatCurrency(record.amount_paid)}
+                      </td>
+                    </tr>
+                  )
+                )}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-default-200 dark:border-gray-600">
+                  <td
+                    colSpan={3}
+                    className="px-3 py-2 font-semibold text-default-800 dark:text-gray-200"
+                  >
+                    Total Leave Pay
+                  </td>
+                  <td className="px-3 py-2 text-right font-bold text-teal-700 dark:text-teal-300">
+                    {formatCurrency(leaveTotal)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
 
       {pinjamRecords.length > 0 && (
         <div

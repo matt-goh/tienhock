@@ -293,7 +293,8 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
       setIsTradeDebtorAccount(
         !accountData.is_system &&
           (accountData.ledger_type === "TD" ||
-            accountData.parent_code === "DEBTOR")
+            accountData.parent_code === "DEBTOR" ||
+            accountData.parent_code === "CD_SD")
       );
     } catch (fetchError: unknown) {
       if (accountRequestIdRef.current !== requestId) return;
@@ -502,13 +503,17 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
     }
 
     // Validate code format (alphanumeric and special chars)
-    const codePattern: RegExp = /^[A-Za-z0-9\-_.]+$/;
+    const codePattern: RegExp = isGreenTarget
+      ? /^[A-Za-z0-9 ._-]+$/
+      : /^[A-Za-z0-9._-]+$/;
     if (
       !(isGreenTarget && isEditMode) &&
       !codePattern.test(formData.code.trim())
     ) {
       toast.error(
-        "Account code can only contain letters, numbers, hyphens, underscores, and periods"
+        isGreenTarget
+          ? "Account code can only contain letters, numbers, spaces, hyphens, underscores, and periods"
+          : "Account code can only contain letters, numbers, hyphens, underscores, and periods"
       );
       return false;
     }
@@ -759,6 +764,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
       !unavailableParentCodes.has(account.code) &&
       (!isGreenTarget ||
         account.code === "DEBTOR" ||
+        account.code === "CD_SD" ||
         account.ledger_type !== "TD"),
     [isGreenTarget, unavailableParentCodes]
   );
@@ -1015,7 +1021,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                       <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
                         {isSystem
                           ? "Parent, ledger type and report code are fixed for a system account."
-                          : "Trade debtor accounts must remain direct leaf accounts under DEBTOR with ledger type TD and report code 22."}
+                          : "Trade debtor accounts must remain leaf accounts under DEBTOR or CD_SD with ledger type TD and report code 22."}
                       </p>
                     )}
                   </div>

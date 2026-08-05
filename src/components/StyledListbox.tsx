@@ -8,6 +8,7 @@ import {
   Transition,
 } from "@headlessui/react";
 import { IconChevronDown, IconCheck } from "@tabler/icons-react";
+import { useTranslation } from "react-i18next";
 
 interface SelectOption {
   id: string | number;
@@ -32,13 +33,14 @@ const StyledListbox: React.FC<StyledListboxProps> = ({
   onChange,
   options,
   className = "",
-  placeholder = "Select...",
+  placeholder,
   rounded = "full",
   size = "md",
   anchor = "bottom",
 }) => {
+  const { t } = useTranslation("common");
   const selectedOption = options.find((option) => option.id === value);
-  const displayValue = selectedOption?.name ?? placeholder;
+  const displayValue = selectedOption?.name ?? placeholder ?? t("Select...");
   const roundedClass = rounded === "full" ? "rounded-full" : "rounded-lg";
   const sizeClasses = size === "sm" ? "h-[34px] py-1.5 text-sm" : "h-10 py-2";
 

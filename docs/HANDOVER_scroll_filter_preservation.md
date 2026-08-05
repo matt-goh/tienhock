@@ -11,12 +11,35 @@ returning to a list restores its **filters** (search, month/date range, pills, p
   `main` in `src/App.tsx:111` is the **only** scroll container in the app, so the default
   selector always works. `ready` must be true only once the list has actually rendered,
   otherwise `scrollTop` is clamped to 0 against an empty list.
-- `src/hooks/usePersistedFilters.ts` — **new, created this session**. Exports:
+- `src/hooks/usePersistedFilters.ts`. Exports:
   - `usePersistedFilters<T>(key, getDefaults, revive?)` — localStorage-backed state.
     `revive` rebuilds anything JSON can't represent (Dates!) and returns `null` to fall back
-    to `getDefaults()`.
+    to `getDefaults()`. The returned setter is a full React dispatch, so `setX(prev => …)`
+    call sites keep working.
   - `reviveDate(value)` — ISO string → local `Date`, or `null`.
   - `usePersistedMonth(key)` — month normalised to the 1st, for the monthly reports.
+  - `usePersistedDate(key, getDefault)` — day-granularity date picker.
+  - `usePersistedNumber(key, min, max, getDefault)` / `usePersistedSearch(key)` — the plain
+    single-value cases (year/month numbers, tab indices, search boxes).
+  - `usePersistedUrlNumber(key, param, min, max, getDefault)` /
+    `usePersistedUrlSearch(key)` — same, but a query param on the **current URL wins on
+    mount**. Needed by every payroll add-on list, because `PayrollDetailsPage` /
+    `GTPayrollDetailsPage` / `JPPayrollDetailsPage` deep-link into them with
+    `?year=&month=&search=` and that link must beat the cached value.
+
+    The two differ on purpose. `usePersistedUrlNumber` **persists** the URL-seeded
+    year/month: the month is the page's primary axis, it's always visible in the
+    TimeNavigator and heading, and a stale month shows *different* rows, not *fewer* —
+    you notice immediately. `usePersistedUrlSearch` **never persists** a URL-seeded term:
+    a search silently hides rows, so an old deep link must not leave an employee name
+    filtering the page on the next plain visit. The seeded term applies to that visit only;
+    the moment the user edits the box (including clearing it) their value persists normally.
+    Implemented by comparing against the seeded term rather than skipping the first write
+    with a ref — StrictMode double-invokes effects in dev, which would defeat a ref.
+
+  `JSON.stringify` cannot represent a `Set` (it serialises to `{}`), so never hand one to
+  `usePersistedFilters` — persist a `string[]` and derive the Set, as
+  `AccountCodeListPage` does.
 
 ## Conventions established (follow these)
 
@@ -41,10 +64,61 @@ returning to a list restores its **filters** (search, month/date range, pills, p
    `TrialBalancePage` (debounced variant uses a boolean `searchSeenRef`).
 4. When you replace `useState` with a derived setter over a persisted object, the setter takes
    a **plain value**, so convert any `setX(prev => prev + 1)` call sites (already done in
-   `PayCodePage`, `JPPayCodePage`, `JobCategoryPage` pagination handlers).
+   `PayCodePage`, `JPPayCodePage`, `JobCategoryPage` pagination handlers). The single-value
+   hooks above don't have this problem — they return the real dispatch.
 5. CLAUDE.md rule 17 still applies: never slice an ISO string to get `yyyy-MM-dd`.
+6. **`ready` must be data-dependent, not just `!isLoading`.** Several pages initialise
+   `isLoading` to `false`, so `!isLoading` is true at mount and the restore clamps to 0
+   against an empty page. Use `!isLoading && rows.length > 0` (or `!== null` on the payload).
+7. **One component, several routes** → scope every key by the props that distinguish the
+   instances, or the routes fight over one cache. See `storageScope` in
+   `ProductionListPage` (6 routes), `ProductStockMovementPage` (TH + JP), the `scope` suffix
+   in `SalesSummaryPage`/`SalesByProductsPage`/`SalesBySalesmanPage`, the `jobType` suffix on
+   the work-log lists, and `config.debtorsEndpoint` in `DebtorsReportPage`.
+8. Don't persist state that a `useEffect` recomputes from freshly fetched data — it gets
+   overwritten on the next load, so the cache is dead weight. Both Kerja Luar OT pages
+   re-expand every employee group after each fetch, so their expansion is deliberately
+   **not** persisted.
+9. Pages whose whole body is an internal `overflow-y-auto` box need an `id` on that box and
+   the selector passed as the hook's 3rd argument — `main` never scrolls there. See
+   `#monthly-log-list-scroll` / `#jp-monthly-log-list-scroll`.
 
 ## Done (all typechecked clean with `npx tsc --noEmit`)
+
+### Session 2 (payroll, stock, sales, catalogue leftovers)
+
+| Page | Added |
+|---|---|
+| `Payroll/DailyLog/DailyLogListPage.tsx` / `JellyPolly/Payroll/JPDailyLogListPage.tsx` | scroll (date range was already cached); key suffixed with `jobType` |
+| `Payroll/MonthlyLog/MonthlyLogListPage.tsx` / `JPMonthlyLogListPage.tsx` | year/month/status filters + scroll on the inner `overflow-y-auto` box |
+| `Payroll/SalaryReportPage.tsx` | scroll + Employee/Annual sub-view toggles (month & tab were already cached via `payrollPageStorage`) |
+| `GreenTarget/Payroll/GTSalaryReportPage.tsx` / `JellyPolly/Payroll/JPSalaryReportPage.tsx` | tab + annual view + pinjam view + year + month + scroll |
+| `GreenTarget/Payroll/GTPayrollPage.tsx` | replaced its hand-rolled scroll effect with `useScrollRestoration` (same storage key) |
+| `JellyPolly/Payroll/JPPayrollPage.tsx` | scroll, keyed by year-month (it had none; TH/GT did) |
+| `Payroll/AddOn/BonusPage.tsx` + `GTBonusPage` + `JPBonusPage` | year/month/search now persisted (URL still wins) + scroll |
+| `Payroll/AddOn/OthersAdvancePage.tsx` + GT + JP | same |
+| `Payroll/AddOn/OthersKerjaLuarOtPage.tsx` + GT + JP | same, plus the employee and pay-code filters |
+| `Payroll/AddOn/MidMonthPayrollPage.tsx` + GT + JP | same, plus the Summary/Pinjam sub-view |
+| `Payroll/AddOn/PinjamListPage.tsx` + GT + JP | same |
+| `Payroll/Leave/CutiReportPage.tsx` / `JPCutiReportPage` / `GTCutiReportPage` | search + scroll |
+| `Payroll/Leave/HolidayCalendarPage.tsx` | year + scroll |
+| `Payroll/Leave/CutiManagementPage.tsx` / `JPCutiManagementPage.tsx` | active tab (via `Tab`'s `defaultActiveTab`/`onTabChange`) |
+| `Payroll/Statutory/ContributionRatesPage.tsx` | tab (`?tab=` still wins) + scroll |
+| `Payroll/Statutory/ECarumanPage.tsx` / `GTECarumanPage` / `JPECarumanPage` | month + year |
+| `GreenTarget/Payroll/PayrollRulesPage.tsx` | tab + search + scroll |
+| `Stock/ProductionListPage.tsx` (6 routes) | view mode + day/month/year + product + search + scroll, all scoped per route |
+| `Stock/ProductStockMovementPage.tsx` (TH + JP) | product + view type + month + custom range + scroll, scoped per company |
+| `Stock/Materials/MaterialsListPage.tsx` | search + category + show-inactive + scroll |
+| `Sales/SalesSummaryPage.tsx` (+ `JellyPollySalesSummaryPage`) | active tab, scoped per company |
+| `Sales/SalesByProductsPage.tsx` / `SalesBySalesmanPage.tsx` | month + date range + scroll, scoped per company |
+| `Catalogue/StaffRecords.tsx` | scroll |
+| `Catalogue/OthersPage.tsx` | scroll |
+| `Catalogue/LocationPage.tsx` / `JellyPolly/Catalogue/JPLocationPage.tsx` | search + scroll |
+| `Accounting/LocationAccountMappingsPage.tsx` | search + JVDR/JVSL tab + scroll |
+| `Accounting/VoucherGeneratorPage.tsx` | scroll (month was already cached) |
+| `GreenTarget/Accounting/GTVoucherGeneratorPage.tsx` | month + scroll |
+
+### Session 1
 
 | Page | Added |
 |---|---|
@@ -72,58 +146,35 @@ returning to a list restores its **filters** (search, month/date range, pills, p
 | `GreenTarget/Customers/CustomerListPage.tsx` | signup tab + search + inactive toggle + scroll |
 | `GreenTarget/Dumpsters/DumpsterListPage.tsx` | search/status/month/page + scroll |
 
-Already had scroll restoration before this session (left alone):
-`Invoice/InvoiceListPage`, `GreenTarget/Invoices/InvoiceListPage`,
-`GreenTarget/Rentals/RentalListPage`, `Accounting/Reports/AccountLedgerPage`,
-`Accounting/DebtorsReportPage`, `Accounting/JournalEntryListPage`, `Payroll/PayrollPage`,
-`Payroll/PayrollDetailsPage`, `GreenTarget/Payroll/GTPayrollDetailsPage`.
+Already had it, left alone: `Invoice/InvoiceListPage`,
+`GreenTarget/Invoices/InvoiceListPage`, `GreenTarget/Rentals/RentalListPage`,
+`Accounting/Reports/AccountLedgerPage`, `Accounting/JournalEntryListPage`,
+`Payroll/PayrollPage`, `Payroll/PayrollDetailsPage`,
+`GreenTarget/Payroll/GTPayrollDetailsPage`, plus two already fully covered and re-verified
+this session:
+- `Accounting/DebtorsReportPage` — search / expansion / view mode / hide-zero / page /
+  month / scroll, all keyed by `config.debtorsEndpoint`, so the TH, GT and JP wrappers
+  already have separate caches.
+- `Stock/Materials/StockAdjustmentEntryPage` — month, tab and scroll, keyed by `mode`.
+  `MaterialStockPage` and `GeneralStockPage` are thin wrappers over it, so both are done.
 
-## Remaining — TODO
+## Remaining — deliberately not done
 
-### 1. Payroll lists & reports
-- `Payroll/DailyLog/DailyLogListPage.tsx` and `JellyPolly/Payroll/JPDailyLogListPage.tsx`
-  — both already cache a date range in localStorage (`dateRangeCacheKey`); they need
-  **scroll restoration only**.
-- `Payroll/MonthlyLog/MonthlyLogListPage.tsx`, `JellyPolly/Payroll/JPMonthlyLogListPage.tsx`
-- `Payroll/SalaryReportPage.tsx`, `GreenTarget/Payroll/GTSalaryReportPage.tsx`,
-  `JellyPolly/Payroll/JPSalaryReportPage.tsx` — long reports; persist month + any
-  location/section filter, add scroll.
-- `GreenTarget/Payroll/GTPayrollPage.tsx` — caches recency but has **no** scroll restoration
-  (TH `PayrollPage.tsx` does; copy its call).
-- Add-on lists (persist month + scroll), TH / GT / JP triplets:
-  `Payroll/AddOn/{BonusPage,MidMonthPayrollPage,OthersAdvancePage,OthersKerjaLuarOtPage,PinjamListPage}.tsx`
-  + `GreenTarget/Payroll/GT*` + `JellyPolly/Payroll/JP*` equivalents.
-- Leave: `Payroll/Leave/{CutiManagementPage,CutiReportPage,HolidayCalendarPage}.tsx`,
-  `JellyPolly/Catalogue/{JPCutiManagementPage,JPCutiReportPage}.tsx`,
-  `GreenTarget/Payroll/GTCutiReportPage.tsx`.
-- Statutory: `Payroll/Statutory/{ContributionRatesPage,ECarumanPage}.tsx`,
-  `GTECarumanPage.tsx`, `JPECarumanPage.tsx`.
-- `GreenTarget/Payroll/PayrollRulesPage.tsx`.
-
-### 2. Stock & sales
-- `Stock/ProductionListPage.tsx`, `Stock/ProductStockMovementPage.tsx`
-- `Stock/Materials/{MaterialsListPage,MaterialStockPage,GeneralStockPage}.tsx`
-  (`MaterialStockPage` / `StockAdjustmentEntryPage` already cache the selected month and tab
-  — those two need scroll only.)
-- `Sales/{SalesSummaryPage,SalesByProductsPage,SalesBySalesmanPage,JellyPollySalesSummaryPage}.tsx`
-
-### 3. Lower priority / judgement call
-- `Catalogue/{StaffRecords,OthersPage,LocationPage}.tsx`, `JellyPolly/Catalogue/JPLocationPage.tsx`
-- `Accounting/LocationAccountMappingsPage.tsx`
-- `Catalogue/JobPage.tsx` / `JellyPolly/Catalogue/JPJobPage.tsx` — their `currentPage` is a
-  pay-code sub-list *inside* a selected job, not a list filter. I deliberately skipped these;
-  reassess whether persisting the selected job is actually useful.
-- `Accounting/VoucherGeneratorPage.tsx` (month already cached) and
-  `GreenTarget/Accounting/GTVoucherGeneratorPage.tsx`.
+- `Catalogue/JobPage.tsx` / `JellyPolly/Catalogue/JPJobPage.tsx`. Reassessed and skipped
+  again: the selected job is already round-tripped through the URL (`?id=…`, read back on
+  mount), and `currentPage` is a pay-code sub-list *inside* the selected job, not a list
+  filter. Scroll restoration is the only thing left to add, and one key would have to serve
+  two very different views (the job card grid and a selected job's pay-code table) because
+  `selectedJob` is still `null` on the first render — so a deep scroll in the pay-code table
+  would be replayed onto the card grid. Not worth it.
+- Form / detail / entry pages generally. They are destinations, not lists.
 
 ## Changelog
-A single entry dated `2026-07-30` is **already prepended** to `CHANGELOG_ENTRIES` in
-`src/components/ChangelogModal.tsx` listing the pages covered so far (both `ms` and `en`).
-**Extend that entry's page list** as you finish the rest — do not add a second entry for the
-same feature.
+A single entry dated `2026-07-30` in `CHANGELOG_ENTRIES`
+(`src/components/ChangelogModal.tsx`) covers this whole feature and its page list has been
+extended with the session-2 pages, in both `ms` and `en`. If more pages are ever added,
+**extend that same entry** — do not add a second entry for the same feature.
 
 ## Verification
-`npx tsc --noEmit -p tsconfig.json` was clean at handover. Do not run `npm run build` or lint
-unless the user asks (CLAUDE.md rule 10). Note several files unrelated to this task were
-already modified in the working tree before this session (form pages, entry pages,
-`GreenTargetPaymentTable.tsx`) — leave them alone.
+`npx tsc --noEmit -p tsconfig.json` clean. `npm run build` and lint were not run
+(CLAUDE.md rule 10).

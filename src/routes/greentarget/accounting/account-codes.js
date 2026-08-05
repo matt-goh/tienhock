@@ -8,8 +8,8 @@
 // blocked), and accounting metadata can be maintained. Every query is
 // explicitly schema-qualified so no GT request can touch Tien Hock's chart.
 //
-// GT's chart is flat except the DEBTOR control + its 28 children, and its
-// sort_order IS the printed Trial Balance line number, so the flat list is
+// GT's chart is flat except the DEBTOR control and the CD_SD sub-ledger branch,
+// and its sort_order IS the printed Trial Balance line number, so the flat list is
 // served in printed order. fs_note is a real FK here (unlike TH), so the
 // note name is joined straight from greentarget.financial_statement_notes.
 // Mutations are protected by session auth + the restore guard at the mount in
@@ -17,7 +17,8 @@
 // statement note so a newly-created account cannot disappear from reports.
 import { Router } from "express";
 
-const ACCOUNT_CODE_PATTERN = /^[A-Z0-9._-]+$/;
+const ACCOUNT_CODE_PATTERN = /^[A-Z0-9._ -]+$/;
+const TRADE_DEBTOR_PARENT_CODES = new Set(["DEBTOR", "CD_SD"]);
 const RESERVED_ACCOUNT_CODES = new Set(["NEW", "CHILDREN", ".", ".."]);
 const MAX_ACCOUNT_CODE_LENGTH = 50;
 const MAX_DESCRIPTION_LENGTH = 255;
@@ -145,6 +146,230 @@ export default function createGreenTargetAccountCodesRouter(pool) {
         message: "Error fetching Green Target child accounts",
         error: error.message,
       });
+    }
+  });
+
+  // Logical debtor identities are separate from GL accounts. Named identities
+  // post to themselves; CD/SD identities post to the CD_SD control while the
+  // selected identity is carried on each receivable journal line.
+  router.get("/debtor-subledger", async (req, res) => {
+    const search =
+      typeof req.query.search === "string" ? req.query.search.trim() : "";
+    const asOf =
+      typeof req.query.as_of === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(req.query.as_of)
+        ? req.query.as_of
+        : null;
+    const requestedLimit = Number.parseInt(String(req.query.limit || "50"), 10);
+    const limit = Number.isInteger(requestedLimit)
+      ? Math.min(100, Math.max(1, requestedLimit))
+      : 50;
+
+    try {
+      const result = await pool.query(
+        `SELECT code, description, control_account_code, kind,
+                effective_from, effective_to, sort_order,
+                is_active, is_selectable, source_page, source_row
+           FROM greentarget.debtor_subledger_registry
+          WHERE is_active = true
+            AND is_selectable = true
+            AND ($1::date IS NULL OR (
+              effective_from <= $1::date
+              AND (effective_to IS NULL OR $1::date < effective_to)
+            ))
+            AND ($2::text = '' OR code ILIKE '%' || $2 || '%'
+                 OR description ILIKE '%' || $2 || '%')
+          ORDER BY
+            CASE WHEN kind = 'named' THEN 0 ELSE 1 END,
+            description, code
+          LIMIT $3`,
+        [asOf, search, limit]
+      );
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching Green Target debtor identities:", error);
+      res.status(500).json({
+        message: "Error fetching Green Target debtor identities",
+        error: error.message,
+      });
+    }
+  });
+
+  // GET /debtor-subledger/availability?code=CD-X - Exact-match collision check
+  // for an identity the invoice form is staging. The search endpoint above
+  // cannot answer this: it filters is_active/is_selectable, never looks at
+  // account_codes, and its ILIKE window can crowd the exact match out. This
+  // mirrors the POST's rules exactly - same format validation, same UNION over
+  // both tables with no status filter - so what the user is told while typing
+  // is what the save will do. Advisory only; POST remains the enforcement.
+  router.get("/debtor-subledger/availability", async (req, res) => {
+    const normalizedCode =
+      typeof req.query.code === "string" ? req.query.code.trim().toUpperCase() : "";
+
+    if (!normalizedCode) {
+      return res.status(400).json({ message: "Kod identiti diperlukan" });
+    }
+    if (
+      normalizedCode.length > MAX_ACCOUNT_CODE_LENGTH ||
+      !ACCOUNT_CODE_PATTERN.test(normalizedCode) ||
+      RESERVED_ACCOUNT_CODES.has(normalizedCode)
+    ) {
+      return res.json({
+        code: normalizedCode,
+        available: false,
+        reason: "invalid",
+        message:
+          "Masukkan kod CD/SD yang sah menggunakan huruf, nombor, ruang, sengkang, garis bawah atau titik",
+      });
+    }
+
+    try {
+      // The registry is ranked first so the clash is reported with the name the
+      // user actually sees in the Trade Debtors schedule.
+      const result = await pool.query(
+        `SELECT description, source
+           FROM (
+             SELECT description, 'identity'::text AS source, 0 AS rank
+               FROM greentarget.debtor_subledger_registry
+              WHERE UPPER(BTRIM(code)) = $1
+             UNION ALL
+             SELECT description, 'account'::text AS source, 1 AS rank
+               FROM greentarget.account_codes
+              WHERE UPPER(BTRIM(code)) = $1
+           ) AS matches
+          ORDER BY rank
+          LIMIT 1`,
+        [normalizedCode]
+      );
+
+      if (result.rows.length === 0) {
+        return res.json({ code: normalizedCode, available: true });
+      }
+
+      const clash = result.rows[0];
+      res.json({
+        code: normalizedCode,
+        available: false,
+        reason: "taken",
+        taken_by: clash.description,
+        source: clash.source,
+      });
+    } catch (error) {
+      console.error(
+        "Error checking Green Target debtor identity availability:",
+        error
+      );
+      res.status(500).json({
+        message: "Ralat semasa menyemak kod identiti penghutang",
+        error: error.message,
+      });
+    }
+  });
+
+  router.post("/debtor-subledger", async (req, res) => {
+    const body =
+      req.body && typeof req.body === "object" && !Array.isArray(req.body)
+        ? req.body
+        : {};
+    const normalizedCode =
+      typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
+    const normalizedDescription =
+      typeof body.description === "string" ? body.description.trim() : "";
+    const effectiveFrom =
+      typeof body.effective_from === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(body.effective_from)
+        ? body.effective_from
+        : null;
+
+    if (
+      !normalizedCode ||
+      normalizedCode.length > MAX_ACCOUNT_CODE_LENGTH ||
+      !ACCOUNT_CODE_PATTERN.test(normalizedCode) ||
+      RESERVED_ACCOUNT_CODES.has(normalizedCode)
+    ) {
+      return res.status(400).json({
+        message:
+          "Masukkan kod CD/SD yang sah menggunakan huruf, nombor, ruang, sengkang, garis bawah atau titik",
+      });
+    }
+    if (
+      !normalizedDescription ||
+      normalizedDescription.length > MAX_DESCRIPTION_LENGTH
+    ) {
+      return res.status(400).json({
+        message: `Nama identiti diperlukan dan tidak boleh melebihi ${MAX_DESCRIPTION_LENGTH} aksara`,
+      });
+    }
+    if (!effectiveFrom) {
+      return res.status(400).json({
+        message: "Tarikh berkuat kuasa diperlukan dalam format yyyy-MM-dd",
+      });
+    }
+
+    const actor = getRequestActor(req);
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "LOCK TABLE greentarget.account_codes, greentarget.debtor_subledger_registry IN SHARE ROW EXCLUSIVE MODE"
+      );
+      const duplicate = await client.query(
+        `SELECT code FROM greentarget.account_codes WHERE UPPER(BTRIM(code)) = $1
+         UNION ALL
+         SELECT code FROM greentarget.debtor_subledger_registry WHERE UPPER(BTRIM(code)) = $1
+         LIMIT 1`,
+        [normalizedCode]
+      );
+      if (duplicate.rows.length > 0) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({
+          message: `Identiti penghutang '${normalizedCode}' sudah wujud`,
+        });
+      }
+
+      const sortResult = await client.query(
+        `SELECT COALESCE(MAX(sort_order), 0) + 1 AS next_sort
+           FROM greentarget.debtor_subledger_registry`
+      );
+      const sortOrder = Number(sortResult.rows[0].next_sort);
+      await client.query(
+        `INSERT INTO greentarget.account_codes (
+           code, description, ledger_type, parent_code, level, sort_order,
+           is_active, is_system, fs_note, notes, created_by, updated_by
+         ) VALUES ($1, $2, 'TD', 'CD_SD', 3, $3, false, false, '22',
+                   'CD/SD subledger identity; GL postings use CD_SD', $4, $4)`,
+        [normalizedCode, normalizedDescription, sortOrder, actor]
+      );
+      const result = await client.query(
+        `INSERT INTO greentarget.debtor_subledger_registry (
+           code, description, control_account_code, kind,
+           effective_from, sort_order, is_active, is_selectable,
+           provenance, created_by, updated_by
+         ) VALUES ($1, $2, 'CD_SD', 'sundry', $3, $4, true, true,
+                   'erp_created', $5, $5)
+         RETURNING code, description, control_account_code, kind,
+                   effective_from, effective_to, sort_order,
+                   is_active, is_selectable, source_page, source_row`,
+        [normalizedCode, normalizedDescription, effectiveFrom, sortOrder, actor]
+      );
+      await client.query("COMMIT");
+      res.status(201).json({
+        message: "CD/SD debtor identity created successfully",
+        debtorAccount: result.rows[0],
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error creating Green Target debtor identity:", error);
+      const status = error.code === "23505" ? 409 : 500;
+      res.status(status).json({
+        message:
+          status === 409
+            ? `Identiti penghutang '${normalizedCode}' sudah wujud`
+            : "Ralat semasa mencipta identiti penghutang",
+        error: error.message,
+      });
+    } finally {
+      client.release();
     }
   });
 
@@ -479,7 +704,7 @@ export default function createGreenTargetAccountCodesRouter(pool) {
     if (!ACCOUNT_CODE_PATTERN.test(normalizedCode)) {
       return res.status(400).json({
         message:
-          "Account code can only contain letters, numbers, hyphens, underscores, and periods",
+          "Account code can only contain letters, numbers, spaces, hyphens, underscores, and periods",
       });
     }
     if (RESERVED_ACCOUNT_CODES.has(normalizedCode)) {
@@ -531,14 +756,15 @@ export default function createGreenTargetAccountCodesRouter(pool) {
       });
     }
     if (
-      (normalizedLedgerType === "TD" || normalizedParentCode === "DEBTOR") &&
+      (normalizedLedgerType === "TD" ||
+        TRADE_DEBTOR_PARENT_CODES.has(normalizedParentCode)) &&
       (normalizedLedgerType !== "TD" ||
-        normalizedParentCode !== "DEBTOR" ||
+        !TRADE_DEBTOR_PARENT_CODES.has(normalizedParentCode) ||
         normalizedFsNote !== "22")
     ) {
       return res.status(400).json({
         message:
-          "Trade debtor accounts must use ledger type 'TD', parent 'DEBTOR', and financial statement note '22'",
+          "Trade debtor accounts must use ledger type 'TD', parent 'DEBTOR' or 'CD_SD', and financial statement note '22'",
       });
     }
 
@@ -636,7 +862,7 @@ export default function createGreenTargetAccountCodesRouter(pool) {
           });
         }
         if (
-          normalizedParentCode !== "DEBTOR" &&
+          !TRADE_DEBTOR_PARENT_CODES.has(normalizedParentCode) &&
           parentResult.rows[0].ledger_type === "TD"
         ) {
           await client.query("ROLLBACK");
@@ -661,12 +887,33 @@ export default function createGreenTargetAccountCodesRouter(pool) {
           normalizedParentCode,
           calculatedLevel,
           normalizedSortOrder,
-          is_active !== false,
+          normalizedParentCode === "CD_SD" ? false : is_active !== false,
           normalizedFsNote,
           normalizedNotes,
           actor,
         ]
       );
+
+      if (
+        normalizedLedgerType === "TD" &&
+        (normalizedParentCode === "DEBTOR" || normalizedParentCode === "CD_SD")
+      ) {
+        await client.query(
+          `INSERT INTO greentarget.debtor_subledger_registry (
+             code, description, control_account_code, kind,
+             effective_from, sort_order, is_active, is_selectable,
+             provenance, created_by, updated_by
+           )
+           SELECT $1, $2,
+                  CASE WHEN $3 = 'CD_SD' THEN 'CD_SD' ELSE $1 END,
+                  CASE WHEN $3 = 'CD_SD' THEN 'sundry' ELSE 'named' END,
+                  (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kuala_Lumpur')::date,
+                  COALESCE(MAX(sort_order), 0) + 1,
+                  true, true, 'erp_account_code_page', $4, $4
+             FROM greentarget.debtor_subledger_registry`,
+          [normalizedCode, normalizedDescription, normalizedParentCode, actor]
+        );
+      }
 
       await client.query("COMMIT");
       res.status(201).json({
@@ -813,6 +1060,20 @@ export default function createGreenTargetAccountCodesRouter(pool) {
       }
 
       const existing = accountResult.rows[0];
+      const registryLink = await client.query(
+        `SELECT code
+           FROM greentarget.debtor_subledger_registry
+          WHERE code = $1
+          FOR SHARE`,
+        [existing.code]
+      );
+      if (registryLink.rows.length > 0) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({
+          message:
+            "This account represents a debtor identity and cannot be edited from the Chart of Accounts. Its registry name, routing, and historical report order must stay aligned.",
+        });
+      }
       const expectedUpdatedAt = Date.parse(expected_updated_at);
       const currentUpdatedAt = new Date(existing.updated_at).getTime();
       if (
@@ -874,7 +1135,7 @@ export default function createGreenTargetAccountCodesRouter(pool) {
         });
       }
 
-      // The DEBTOR control is the only current system row. Keep its structural
+      // System control rows (including DEBTOR and CD_SD) keep their structural
       // fields fixed while still allowing harmless description/order/notes edits.
       if (existing.is_system) {
         if (!nextIsActive) {
@@ -900,18 +1161,19 @@ export default function createGreenTargetAccountCodesRouter(pool) {
         !existing.is_system &&
         (existing.ledger_type === "TD" ||
           existing.parent_code === "DEBTOR" ||
+          existing.parent_code === "CD_SD" ||
           nextLedgerType === "TD" ||
-          nextParentCode === "DEBTOR");
+          TRADE_DEBTOR_PARENT_CODES.has(nextParentCode));
       if (
         isDebtorMember &&
         (nextLedgerType !== "TD" ||
-          nextParentCode !== "DEBTOR" ||
+          !TRADE_DEBTOR_PARENT_CODES.has(nextParentCode) ||
           nextFsNote !== "22")
       ) {
         await client.query("ROLLBACK");
         return res.status(400).json({
           message:
-          "Trade debtor accounts must keep ledger type 'TD', parent 'DEBTOR', and financial statement note '22'",
+            "Trade debtor accounts must keep ledger type 'TD', parent 'DEBTOR' or 'CD_SD', and financial statement note '22'",
         });
       }
 
@@ -1023,7 +1285,7 @@ export default function createGreenTargetAccountCodesRouter(pool) {
           });
         }
         if (
-          nextParentCode !== "DEBTOR" &&
+          !TRADE_DEBTOR_PARENT_CODES.has(nextParentCode) &&
           parentResult.rows[0].ledger_type === "TD"
         ) {
           await client.query("ROLLBACK");
@@ -1179,6 +1441,21 @@ export default function createGreenTargetAccountCodesRouter(pool) {
         await client.query("ROLLBACK");
         return res.status(400).json({
           message: "Cannot delete system account code",
+        });
+      }
+
+      const registryLink = await client.query(
+        `SELECT 1
+           FROM greentarget.debtor_subledger_registry
+          WHERE code = $1
+          LIMIT 1`,
+        [code]
+      );
+      if (registryLink.rows.length > 0) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({
+          message:
+            "Cannot delete an account that represents a debtor identity. Its historical sub-schedule identity must remain available.",
         });
       }
 

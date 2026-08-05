@@ -1,5 +1,6 @@
 // src/components/Invoice/Pagination.tsx
 import React from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 
 interface PaginationProps {
@@ -19,6 +20,7 @@ const Pagination: React.FC<PaginationProps> = ({
   totalItems,
   pageSize,
 }) => {
+  const { t } = useTranslation("invoice");
   const startItem = (currentPage - 1) * pageSize + 1;
   const endItem = startItem + itemsCount - 1;
 
@@ -78,10 +80,20 @@ const Pagination: React.FC<PaginationProps> = ({
     <div className="flex justify-between items-center text-sm text-default-600 dark:text-gray-400 pt-3 border-t border-default-200 dark:border-gray-700">
       {/* Items Info */}
       <div>
-        Showing{" "}
-        <span className="font-semibold">{itemsCount > 0 ? startItem : 0}</span>-{" "}
-        <span className="font-semibold">{endItem}</span> of{" "}
-        <span className="font-semibold">{totalItems}</span> results
+        <Trans
+          t={t}
+          i18nKey="Showing <start>{{startItem}}</start>- <end>{{endItem}}</end> of <total>{{totalItems}}</total> results"
+          values={{
+            startItem: itemsCount > 0 ? startItem : 0,
+            endItem,
+            totalItems,
+          }}
+          components={{
+            start: <span className="font-semibold" />,
+            end: <span className="font-semibold" />,
+            total: <span className="font-semibold" />,
+          }}
+        />
       </div>
 
       {/* Pagination Buttons */}
@@ -90,7 +102,7 @@ const Pagination: React.FC<PaginationProps> = ({
           className="px-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 disabled:opacity-50 disabled:pointer-events-none"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          aria-label="Previous page"
+          aria-label={t("Previous page")}
         >
           <IconChevronLeft size={18} />
         </button>
@@ -101,7 +113,7 @@ const Pagination: React.FC<PaginationProps> = ({
           className="px-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 disabled:opacity-50 disabled:pointer-events-none"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          aria-label="Next page"
+          aria-label={t("Next page")}
         >
           <IconChevronRight size={18} />
         </button>

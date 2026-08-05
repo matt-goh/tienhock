@@ -36,6 +36,11 @@ import {
   ListboxOptions,
   ListboxOption,
 } from "@headlessui/react";
+import {
+  usePersistedFilters,
+  usePersistedSearch,
+} from "../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 
 interface LocationDetails {
   jobs: Array<{ job_id: number; job_name: string }>;
@@ -466,8 +471,19 @@ const LocationAccountMappingsPage: React.FC = () => {
   // Get mappings from cache
   const mappings = accountMappings.mappings;
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState<"JVDR" | "JVSL">("JVSL");
+  const [searchTerm, setSearchTerm] = usePersistedSearch(
+    "locationAccountMappingsSearch"
+  );
+  const [activeTab, setActiveTab] = usePersistedFilters<"JVDR" | "JVSL">(
+    "locationAccountMappingsTab",
+    () => "JVSL",
+    (cached) => (cached === "JVDR" || cached === "JVSL" ? cached : null)
+  );
+
+  useScrollRestoration(
+    "location-account-mappings",
+    !loading && locations.length > 0
+  );
 
   // Collapsed sections state
   const [collapsedSections, setCollapsedSections] = useState<

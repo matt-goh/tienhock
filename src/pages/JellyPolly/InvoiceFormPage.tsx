@@ -28,10 +28,18 @@ import {
 import { isZeroValueBill } from "../../utils/invoice/invoiceDisplayStatus";
 import toast from "react-hot-toast";
 import { IconSquare, IconSquareCheckFilled } from "@tabler/icons-react";
-import { FormInput, FormListbox } from "../../components/FormComponents";
+import { FormInput } from "../../components/FormComponents";
+import PillSelect, { PillSelectOption } from "../../components/PillSelect";
 import { api } from "../../routes/utils/api";
 // --- MODAL IMPORT ---
 import SubmissionResultsModal from "../../components/Invoice/SubmissionResultsModal"; // Adjust path if needed
+
+const PAYMENT_METHOD_OPTIONS: ReadonlyArray<PillSelectOption<string>> = [
+  { value: "cash", label: "Cash" },
+  { value: "cheque", label: "Cheque" },
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "online", label: "Online" },
+];
 
 const InvoiceFormPage: React.FC = () => {
   const navigate = useNavigate();
@@ -713,12 +721,6 @@ const InvoiceFormPage: React.FC = () => {
     total: "0.00",
     issubtotal: false,
   }));
-  const paymentMethodOptions = [
-    { id: "cash", name: "Cash" },
-    { id: "cheque", name: "Cheque" },
-    { id: "bank_transfer", name: "Bank Transfer" },
-    { id: "online", name: "Online" },
-  ];
 
   const isInvoiceDateEligibleForEinvoice = (
     createdDateString: string | undefined | null
@@ -872,20 +874,22 @@ const InvoiceFormPage: React.FC = () => {
                 </button>
               </div>
               {isPaid && (
-                <div className="flex items-center gap-3 w-full">
-                  <FormListbox
-                    name="paymentMethod"
-                    label="Payment Method"
-                    value={paymentMethod}
-                    onChange={(value) =>
-                      setPaymentMethod(value as Payment["payment_method"])
-                    }
-                    options={paymentMethodOptions}
-                    disabled={isSaving}
-                    placeholder="Select Method..."
-                    optionsPosition="top"
-                    className="w-2/3"
-                  />
+                <div className="flex flex-wrap items-end gap-3 w-full">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                      Payment Method
+                    </label>
+                    <PillSelect<string>
+                      value={paymentMethod}
+                      onChange={(value: string) =>
+                        setPaymentMethod(value as Payment["payment_method"])
+                      }
+                      options={PAYMENT_METHOD_OPTIONS}
+                      disabled={isSaving}
+                      ariaLabel="Payment method"
+                      size="md"
+                    />
+                  </div>
                   {(paymentMethod === "cheque" ||
                     paymentMethod === "bank_transfer" ||
                     paymentMethod === "online") && (

@@ -1,6 +1,8 @@
 // src/pages/Catalogue/CustomerFormPage.tsx
-import React, { useState, useEffect, useRef, useCallback } from "react"; // Added useCallback
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+// Full editable customer form - one page, one save. Reached from the read-only
+// CustomerDetailsPage via /catalogue/customer/:id/edit.
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { Customer, CustomProduct } from "../../types/types";
@@ -11,7 +13,7 @@ import {
   FormInput,
   FormInputWithStatus,
   FormListbox,
-  SelectOption, // Import SelectOption
+  SelectOption,
 } from "../../components/FormComponents";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -23,57 +25,36 @@ import {
   useCustomersCache,
 } from "../../utils/catalogue/useCustomerCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
+import {
+  closenessOptions,
+  getIdNumberPlaceholder,
+  idTypeOptions,
+  stateOptions,
+} from "../../utils/catalogue/customerOptions";
+import CustomerCreditSection from "../../components/Catalogue/CustomerCreditSection";
 import CustomerProductsTab from "../../components/Catalogue/CustomerProductsTab";
-import CustomerTransactionsTab, {
-  TxnCache,
-  getDefaultTransactionsRange,
-} from "../../components/Catalogue/CustomerTransactionsTab";
-import { TimeRange } from "../../components/TimeNavigator";
-import Tab from "../../components/Tab";
 import { IconBuildingSkyscraper, IconBuildingStore } from "@tabler/icons-react";
+
+// Minimal separator between the form's three sections.
+const Section: React.FC<{ title: string; children: React.ReactNode }> = ({
+  title,
+  children,
+}) => (
+  <div className="border-t border-default-200 dark:border-gray-700 pt-6 mt-6 first:border-t-0 first:pt-0 first:mt-0">
+    <h3 className="text-base font-medium text-default-800 dark:text-gray-100 mb-4">
+      {title}
+    </h3>
+    {children}
+  </div>
+);
 
 const CustomerFormPage: React.FC = () => {
   const navigate = useNavigate();
-  const goBack = useSmartBack("/catalogue/customer");
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
-  // Deep-link to a specific tab via ?tab=credit | ?tab=transactions (from the
-  // customer card shortcut buttons). Defaults to the Info tab.
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tabParam = searchParams.get("tab");
-  const initialTab =
-    tabParam === "credit"
-      ? 1
-      : tabParam === "transactions" && isEditMode
-      ? 2
-      : 0;
-
-  const handleTabChange = useCallback(
-    (tabIndex: number): void => {
-      const nextParams = new URLSearchParams(searchParams);
-      if (tabIndex === 1) {
-        nextParams.set("tab", "credit");
-      } else if (tabIndex === 2 && isEditMode) {
-        nextParams.set("tab", "transactions");
-      } else {
-        nextParams.delete("tab");
-      }
-      setSearchParams(nextParams, { replace: true });
-    },
-    [isEditMode, searchParams, setSearchParams]
+  const goBack = useSmartBack(
+    isEditMode ? `/catalogue/customer/${id}` : "/catalogue/customer"
   );
-
-  // Add this helper function at the component level
-  const getIdNumberPlaceholder = (idType: string) => {
-    switch (idType) {
-      case "BRN":
-        return "Company Business Registration Number";
-      case "NRIC":
-        return "Customer IC Number";
-      default:
-        return "";
-    }
-  };
 
   // --- State ---
   const [formData, setFormData] = useState<EnhancedCustomerList>({
@@ -122,43 +103,6 @@ const CustomerFormPage: React.FC = () => {
     phoneNumber?: boolean;
   }>({});
   const [salesmen, setSalesmen] = useState<SelectOption[]>([]);
-  // Transaction History tab: range + fetched-row cache lifted here so they
-  // survive tab switches within a visit but reset when the page is re-opened.
-  const [txnRange, setTxnRange] = useState<TimeRange>(getDefaultTransactionsRange);
-  const [txnCache, setTxnCache] = useState<TxnCache | null>(null);
-
-  const closenessOptions: SelectOption[] = [
-    { id: "Local", name: "Local" },
-    { id: "Outstation", name: "Outstation" },
-  ];
-
-  const idTypeOptions: SelectOption[] = [
-    { id: "", name: "Select..." }, // Use empty string for value
-    { id: "BRN", name: "BRN" },
-    { id: "NRIC", name: "NRIC" },
-    { id: "PASSPORT", name: "PASSPORT" },
-    { id: "ARMY", name: "ARMY" },
-  ];
-
-  const stateOptions: SelectOption[] = [
-    { id: "01", name: "JOHOR" },
-    { id: "02", name: "KEDAH" },
-    { id: "03", name: "KELANTAN" },
-    { id: "04", name: "MELAKA" },
-    { id: "05", name: "NEGERI SEMBILAN" },
-    { id: "06", name: "PAHANG" },
-    { id: "07", name: "PULAU PINANG" },
-    { id: "08", name: "PERAK" },
-    { id: "09", name: "PERLIS" },
-    { id: "10", name: "SELANGOR" },
-    { id: "11", name: "TERENGGANU" },
-    { id: "12", name: "SABAH" },
-    { id: "13", name: "SARAWAK" },
-    { id: "14", name: "WILAYAH PERSEKUTUAN KUALA LUMPUR" },
-    { id: "15", name: "WILAYAH PERSEKUTUAN LABUAN" },
-    { id: "16", name: "WILAYAH PERSEKUTUAN PUTRAJAYA" },
-    { id: "17", name: "NOT APPLICABLE" },
-  ];
 
   // --- Form Change Detection ---
   useEffect(() => {
@@ -189,7 +133,9 @@ const CustomerFormPage: React.FC = () => {
       const cachedCustomer = customers.find((customer) => customer.id === id);
 
       if (!cachedCustomer) {
-        throw new Error(`Customer with ID ${id} not found in cache, please refresh the customers at Customer page.`);
+        throw new Error(
+          `Customer with ID ${id} not found in cache, please refresh the customers at Customer page.`
+        );
       }
 
       // Create the form data object
@@ -294,13 +240,8 @@ const CustomerFormPage: React.FC = () => {
         name: employee.name || employee.id,
       }));
       setSalesmen(salesmenOptions);
-      // Set default salesman if creating new and options are loaded
-      if (!isEditMode && !formData.salesman && salesmenOptions.length > 0) {
-        // Optional: set a default salesman if desired
-        // setFormData(prev => ({ ...prev, salesman: salesmenOptions[0].id }));
-      }
     }
-  }, [salesmenData, isEditMode, formData.salesman]);
+  }, [salesmenData]);
 
   // --- Event Handlers ---
   const handleBackClick = () => {
@@ -496,8 +437,6 @@ const CustomerFormPage: React.FC = () => {
         phone_number: formData.phone_number || undefined,
         email: formData.email || undefined,
         address: formData.address || undefined,
-        // city: formData.city || undefined, // Keep defaults
-        // state: formData.state || undefined,
         id_number: formData.id_number || undefined,
         id_type: formData.id_type || undefined,
       };
@@ -555,7 +494,6 @@ const CustomerFormPage: React.FC = () => {
             deletedProductIds: deletedProductIds,
           };
           await api.post("/api/customer-products/batch", productPayload);
-          // Optional: Check productResponse.success
         } catch (productError: any) {
           console.error("Failed to save custom products:", productError);
           // Customer was saved, but products failed. Inform the user.
@@ -564,23 +502,17 @@ const CustomerFormPage: React.FC = () => {
               productError?.response?.data?.message || productError.message
             }. Please check the custom products settings.`
           );
-          // Don't navigate away, let user fix product issues maybe? Or navigate but warn?
-          // For now, we'll still proceed to refresh cache and navigate, but the error is logged.
         }
       }
 
       // --- Post-Save Actions ---
       await Promise.all([refreshCustomersCache(), refreshAccountCodesCache()]);
       toast.success(successMessage);
-      if (isEditMode) {
-        goBack();
-      } else {
-        // Show the customer just created. `replace` drops this form from
-        // history, so Back returns to wherever the user started.
-        navigate(`/catalogue/customer/${customerIdForProducts}`, {
-          replace: true,
-        });
-      }
+      // Show the saved customer. `replace` drops this form from history, so
+      // Back returns to wherever the user started.
+      navigate(`/catalogue/customer/${customerIdForProducts}`, {
+        replace: true,
+      });
     } catch (error: any) {
       console.error(
         `Error ${isEditMode ? "updating" : "creating"} customer:`,
@@ -718,14 +650,6 @@ const CustomerFormPage: React.FC = () => {
     );
   };
 
-  const getProgressBarColor = (used: number, limit: number): string => {
-    if (limit <= 0) return "bg-gray-400"; // Indicate unlimited or zero limit
-    const percentage = (used / limit) * 100;
-    if (percentage >= 90) return "bg-rose-500";
-    if (percentage >= 70) return "bg-amber-500";
-    return "bg-emerald-500";
-  };
-
   // --- Render ---
   if (loading && isEditMode) {
     // Only show full page spinner when fetching initial edit data
@@ -781,21 +705,13 @@ const CustomerFormPage: React.FC = () => {
           )}
 
           <form
-            onSubmit={handleSubmit} // No need for preventDefault here if button type is submit
+            onSubmit={handleSubmit}
             noValidate // Prevent browser default validation
           >
-            <div className="px-6 py-3">
-              <Tab
-                defaultActiveTab={initialTab}
-                onTabChange={handleTabChange}
-                labels={
-                  isEditMode
-                    ? ["Info", "Credit & Pricing", "Transaction History"]
-                    : ["Info", "Credit & Pricing"]
-                }
-              >
-                {/* === First tab - Customer Info === */}
-                <div className="space-y-6 mt-5">
+            <div className="px-6 py-5">
+              {/* === Customer === */}
+              <Section title="Customer">
+                <div className="space-y-6">
                   <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
                     {renderInput("id", "Customer ID", "text", "CUST001", true)}
                     {renderInput(
@@ -824,40 +740,9 @@ const CustomerFormPage: React.FC = () => {
                     {renderListbox("closeness", "Closeness", closenessOptions)}
                     {renderListbox("salesman", "Salesman", salesmen, true)}
                   </div>
-                  <hr className="my-4 border-t border-default-200 dark:border-gray-700" />
-                  <h3 className="text-base font-medium text-default-700 dark:text-gray-200 mb-3">
-                    e-Invoice Information (Optional, requires all 3 if provided)
-                  </h3>
-                  <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-3">
-                    <div>
-                      <FormListbox
-                        name="id_type"
-                        label="ID Type"
-                        value={formData.id_type || ""}
-                        onChange={(selectedId) => {
-                          handleListboxChange("id_type", selectedId);
-                        }}
-                        options={idTypeOptions}
-                        disabled={isSaving}
-                        optionsPosition="top"
-                      />
-                    </div>
-                    {renderInput(
-                      "id_number",
-                      "ID Number",
-                      "text",
-                      getIdNumberPlaceholder(formData.id_type)
-                    )}
-                    {renderInput(
-                      "tin_number",
-                      "TIN Number",
-                      "text",
-                      "Company or Individual TIN"
-                    )}
-                  </div>
 
                   {isEditMode && branchInfo && (
-                    <div className="mt-6 p-4 border border-indigo-100 dark:border-indigo-900/50 rounded-lg bg-indigo-50/30 dark:bg-indigo-900/20">
+                    <div className="p-4 border border-indigo-100 dark:border-indigo-900/50 rounded-lg bg-indigo-50/30 dark:bg-indigo-900/20">
                       <div className="flex items-center mb-3">
                         {branchInfo.isMainBranch ? (
                           <IconBuildingSkyscraper
@@ -912,178 +797,60 @@ const CustomerFormPage: React.FC = () => {
                     </div>
                   )}
                 </div>
+              </Section>
 
-                {/* === Second tab - Credit & Pricing === */}
-                <div className="space-y-8 mt-5">
-                  {/* --- Credit Management Section --- */}
-                  <div className="p-4 border border-default-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50">
-                    {/* Subtle background */}
-                    <h3 className="text-lg font-medium text-default-900 dark:text-gray-100 mb-4">
-                      {/* Increased bottom margin */}
-                      Credit Management
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                      {/* Credit Limit Input */}
-                      <div>
-                        <label
-                          htmlFor="credit_limit"
-                          className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1"
-                        >
-                          Credit Limit (RM)
-                        </label>
-                        <input
-                          id="credit_limit"
-                          type="text" // Use text to allow easier input, parse on change/blur
-                          name="credit_limit"
-                          value={formData.credit_limit?.toString() ?? "3000"} // Handle potential null/undefined
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            // Allow empty string, numbers, and one decimal point
-                            if (/^\d*\.?\d{0,2}$/.test(value) || value === "") {
-                              setFormData({
-                                ...formData,
-                                // Store as number, default to 0 if empty becomes NaN
-                                credit_limit:
-                                  value === "" ? 0 : parseFloat(value) || 0,
-                              });
-                            }
-                          }}
-                          onBlur={(e) => {
-                            // Optional: Format or re-validate on blur
-                            const numericValue = parseFloat(e.target.value);
-                            if (!isNaN(numericValue)) {
-                              setFormData({
-                                ...formData,
-                                credit_limit: Math.max(0, numericValue),
-                              }); // Ensure non-negative
-                            } else {
-                              setFormData({ ...formData, credit_limit: 0 }); // Default to 0 if invalid
-                            }
-                          }}
-                          placeholder="0.00"
-                          className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-md shadow-sm text-sm bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 dark:disabled:bg-gray-800"
-                          disabled={isSaving}
-                        />
-                      </div>
-                      {/* Used Credit Input */}
-                      <div>
-                        <label
-                          htmlFor="credit_used"
-                          className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1"
-                        >
-                          Credit Used (RM)
-                        </label>
-                        <input
-                          id="credit_used"
-                          type="text"
-                          name="credit_used"
-                          value={formData.credit_used?.toString() ?? "0"}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            // Allow empty string, numbers, and one decimal point
-                            if (/^\d*\.?\d{0,2}$/.test(value) || value === "") {
-                              setFormData({
-                                ...formData,
-                                // Store as number, default to 0 if empty becomes NaN
-                                credit_used:
-                                  value === "" ? 0 : parseFloat(value) || 0,
-                              });
-                            }
-                          }}
-                          onBlur={(e) => {
-                            // Format and validate on blur
-                            const numericValue = parseFloat(e.target.value);
-                            if (!isNaN(numericValue)) {
-                              setFormData({
-                                ...formData,
-                                credit_used: Math.max(0, numericValue), // Ensure non-negative
-                              });
-                            } else {
-                              setFormData({ ...formData, credit_used: 0 }); // Default to 0 if invalid
-                            }
-                          }}
-                          placeholder="0.00"
-                          className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-md shadow-sm text-sm bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 dark:disabled:bg-gray-800"
-                          disabled={isSaving}
-                        />
-                      </div>
-                      {/* Available Credit Display */}
-                      <div>
-                        <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-                          Available Credit
-                        </label>
-                        <div className="px-3 py-2 border border-default-200 dark:border-gray-600 rounded-md bg-default-100 dark:bg-gray-700 h-[42px] flex items-center">
-                          {/* Match height */}
-                          <span className="font-medium text-default-700 dark:text-gray-200">
-                            {formData.credit_limit === 0
-                              ? "Unlimited"
-                              : `RM ${Math.max(
-                                  0,
-                                  (formData.credit_limit ?? 0) -
-                                    (formData.credit_used ?? 0)
-                                ).toFixed(2)}`}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    {/* Credit Usage Bar (only if limit > 0) */}
-                    {(formData.credit_limit ?? 0) > 0 && (
-                      <div className="mt-4">
-                        <div className="flex justify-between text-xs text-default-600 dark:text-gray-400 mb-1">
-                          <span>Usage</span>
-                          <span>
-                            {Number(formData.credit_used ?? 0).toFixed(2)} /{" "}
-                            {Number(formData.credit_limit ?? 0).toFixed(2)} RM (
-                            {Math.min(
-                              100,
-                              ((formData.credit_used ?? 0) /
-                                (formData.credit_limit || 1)) *
-                                100
-                            ).toFixed(1)}
-                            %)
-                          </span>
-                        </div>
-                        <div className="w-full bg-default-200 dark:bg-gray-700 rounded-full h-2.5">
-                          <div
-                            className={`h-2.5 rounded-full ${getProgressBarColor(
-                              formData.credit_used ?? 0,
-                              formData.credit_limit ?? 1 // Avoid division by zero
-                            )} transition-all duration-300 ease-out`}
-                            style={{
-                              width: `${Math.min(
-                                100,
-                                ((formData.credit_used ?? 0) /
-                                  (formData.credit_limit || 1)) *
-                                  100
-                              )}%`,
-                            }}
-                          ></div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  {/* --- Custom Products Section --- */}
+              {/* === e-Invoice === */}
+              <Section title="e-Invoice">
+                <p className="-mt-2 mb-4 text-sm text-default-500 dark:text-gray-400">
+                  Optional — all three fields are required together.
+                </p>
+                <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-3">
+                  <FormListbox
+                    name="id_type"
+                    label="ID Type"
+                    value={formData.id_type || ""}
+                    onChange={(selectedId) =>
+                      handleListboxChange("id_type", selectedId)
+                    }
+                    options={idTypeOptions}
+                    disabled={isSaving}
+                  />
+                  {renderInput(
+                    "id_number",
+                    "ID Number",
+                    "text",
+                    getIdNumberPlaceholder(formData.id_type)
+                  )}
+                  {renderInput(
+                    "tin_number",
+                    "TIN Number",
+                    "text",
+                    "Company or Individual TIN"
+                  )}
+                </div>
+              </Section>
+
+              {/* === Credit & Pricing === */}
+              <Section title="Credit & Pricing">
+                <div className="space-y-8">
+                  <CustomerCreditSection
+                    creditLimit={formData.credit_limit ?? 0}
+                    creditUsed={formData.credit_used ?? 0}
+                    onCreditLimitChange={(value) =>
+                      setFormData((prev) => ({ ...prev, credit_limit: value }))
+                    }
+                    onCreditUsedChange={(value) =>
+                      setFormData((prev) => ({ ...prev, credit_used: value }))
+                    }
+                    disabled={isSaving}
+                  />
                   <CustomerProductsTab
-                    products={customProducts} // Pass state down
-                    onProductsChange={handleProductsChange} // Pass handler down
-                    disabled={isSaving} // Pass disabled state
+                    products={customProducts}
+                    onProductsChange={handleProductsChange}
+                    disabled={isSaving}
                   />
                 </div>
-
-                {/* === Third tab - Transaction History (edit mode only) === */}
-                {isEditMode && id ? (
-                  <CustomerTransactionsTab
-                    customerId={id}
-                    customerName={formData.name}
-                    range={txnRange}
-                    onRangeChange={setTxnRange}
-                    cache={txnCache}
-                    onCacheChange={setTxnCache}
-                  />
-                ) : (
-                  <></>
-                )}
-              </Tab>
+              </Section>
             </div>
 
             {/* --- Form Actions --- */}

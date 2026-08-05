@@ -1284,7 +1284,7 @@ export default function (pool) {
       await client.query("BEGIN");
 
       const checkQuery =
-        "SELECT status, entry_type, source_type, entry_date, reference_no FROM journal_entries WHERE id = $1";
+        "SELECT status, entry_type, source_type, source_id, entry_date, reference_no FROM journal_entries WHERE id = $1";
       const checkResult = await client.query(checkQuery, [id]);
 
       if (checkResult.rows.length === 0) {
@@ -1303,6 +1303,14 @@ export default function (pool) {
         await client.query("ROLLBACK");
         return res.status(400).json({
           message: "Entry is already cancelled",
+        });
+      }
+
+      if (checkResult.rows[0].source_type !== null) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({
+          message: `This journal is owned by a ${checkResult.rows[0].source_type} document. Cancel the source document or receipt instead so its operational balance and journal remain in sync.`,
+          detail: `source_type: ${checkResult.rows[0].source_type}, source_id: ${checkResult.rows[0].source_id}`,
         });
       }
 

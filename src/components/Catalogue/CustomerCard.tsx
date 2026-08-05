@@ -11,7 +11,7 @@ import {
   IconCheck,
   IconBuildingStore,
   IconBuildingSkyscraper,
-  IconCreditCard,
+  IconPencil,
   IconHistory,
 } from "@tabler/icons-react";
 
@@ -22,13 +22,17 @@ interface CustomerCardProps {
     isInBranchGroup: boolean;
     isMainBranch: boolean;
     groupName?: string;
+    groupId?: number;
+    branches?: { id: string; name: string; isMain: boolean }[];
   };
+  onManageBranchesClick?: (customer: Customer) => void;
 }
 
 const CustomerCard: React.FC<CustomerCardProps> = ({
   customer,
   onDeleteClick,
   branchInfo,
+  onManageBranchesClick,
 }) => {
   const [isCardHovered, setIsCardHovered] = useState(false);
   const navigate = useNavigate();
@@ -43,10 +47,10 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
     onDeleteClick(customer);
   };
 
-  const handleCreditClick = (e: React.MouseEvent) => {
+  const handleEditClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    navigate(`/catalogue/customer/${customer.id}?tab=credit`);
+    navigate(`/catalogue/customer/${customer.id}/edit`);
   };
 
   const handleTransactionsClick = (e: React.MouseEvent) => {
@@ -54,6 +58,18 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
     e.stopPropagation();
     navigate(`/catalogue/customer/${customer.id}?tab=transactions`);
   };
+
+  const handleManageBranchesClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onManageBranchesClick?.(customer);
+  };
+
+  // Branches include this customer, so the siblings are everyone else.
+  const siblingBranchCount = Math.max(
+    (branchInfo?.branches?.length ?? 0) - 1,
+    0
+  );
 
   // Determine e-Invoice status based on having both tin_number and id_number
   const hasEInvoiceInfo =
@@ -89,11 +105,11 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
             }`}
           >
             <button
-              onClick={handleCreditClick}
-              className="p-1.5 rounded-full bg-white dark:bg-gray-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/50 text-default-500 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors duration-150 shadow-sm"
-              title="Credit & Pricing"
+              onClick={handleEditClick}
+              className="p-1.5 rounded-full bg-white dark:bg-gray-700 hover:bg-sky-50 dark:hover:bg-sky-900/50 text-default-500 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors duration-150 shadow-sm"
+              title="Edit customer"
             >
-              <IconCreditCard size={16} stroke={1.5} />
+              <IconPencil size={16} stroke={1.5} />
             </button>
             <button
               onClick={handleTransactionsClick}
@@ -184,22 +200,48 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
                 className="text-indigo-400 flex-shrink-0 mr-2"
               />
             )}
-            <div className="flex items-center space-x-1">
+            <div className="flex items-center space-x-1 min-w-0">
               <span className="text-sm text-default-700 dark:text-gray-200 mr-1">Branch:</span>
-              <span
-                className={`inline-flex items-center text-xs font-medium rounded-full px-2 py-0.5 ${
-                  branchInfo.isMainBranch
-                    ? "bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300"
-                    : "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400"
-                }`}
-              >
-                {branchInfo.groupName}
-              </span>
+              {onManageBranchesClick ? (
+                <button
+                  type="button"
+                  onClick={handleManageBranchesClick}
+                  title={
+                    siblingBranchCount > 0
+                      ? `Manage ${branchInfo.groupName} (${siblingBranchCount} other ${
+                          siblingBranchCount === 1 ? "branch" : "branches"
+                        })`
+                      : `Manage ${branchInfo.groupName}`
+                  }
+                  className={`inline-flex items-center max-w-full truncate text-xs font-medium rounded-full px-2 py-0.5 transition-colors hover:ring-1 hover:ring-indigo-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+                    branchInfo.isMainBranch
+                      ? "bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300"
+                      : "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400"
+                  }`}
+                >
+                  {branchInfo.groupName}
+                </button>
+              ) : (
+                <span
+                  className={`inline-flex items-center max-w-full truncate text-xs font-medium rounded-full px-2 py-0.5 ${
+                    branchInfo.isMainBranch
+                      ? "bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300"
+                      : "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400"
+                  }`}
+                >
+                  {branchInfo.groupName}
+                </span>
+              )}
               {branchInfo.isMainBranch && (
                 <span
-                  className={`inline-flex items-center text-xs font-medium rounded-full px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300`}
+                  className={`inline-flex items-center flex-shrink-0 text-xs font-medium rounded-full px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300`}
                 >
                   Main
+                </span>
+              )}
+              {siblingBranchCount > 0 && (
+                <span className="text-xs text-default-500 dark:text-gray-400 flex-shrink-0 whitespace-nowrap">
+                  +{siblingBranchCount}
                 </span>
               )}
             </div>
