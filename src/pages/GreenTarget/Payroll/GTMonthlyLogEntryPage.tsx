@@ -13,6 +13,12 @@ import { Employee } from "../../../types/types";
 import { useJobPayCodeMappings } from "../../../utils/catalogue/useJobPayCodeMappings";
 import { useJobsCache } from "../../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
+import {
+  groupGTOverridesByEmployee,
+  resolveGTPayRates,
+  GTPayCodeOverride,
+  GTPayRateSchedule,
+} from "../../../utils/greenTarget/gtPayRates";
 import ManageActivitiesModal, {
   ActivityItem,
 } from "../../../components/Payroll/ManageActivitiesModal";
@@ -66,6 +72,22 @@ interface ExistingWorkLog {
 
 const DEFAULT_HOURS = 176; // 22 days × 8 hours (informational; office base pay is usually Fixed)
 const DEFAULT_OVERTIME = 0;
+
+// GT-scoped rates layered over the shared Tien Hock catalogue for the entry
+// month: per-employee overrides plus scheduled changes (see gtPayRates.ts).
+interface GTRateContext {
+  overrides: Record<string, Record<string, GTPayCodeOverride>>;
+  schedules: Record<string, GTPayRateSchedule[]>;
+  year: number;
+  month: number;
+}
+
+const EMPTY_GT_RATE_CONTEXT: GTRateContext = {
+  overrides: {},
+  schedules: {},
+  year: 0,
+  month: 0,
+};
 
 // Identity used to match generated activities against saved/edited ones.
 const getActivityIdentity = (a: {
@@ -136,7 +158,8 @@ const GTMonthlyLogEntryPage: React.FC = () => {
   const buildActivitiesForEmployee = useCallback(
     (
       entry: EmployeeEntry,
-      existing?: ActivityItem[]
+      existing?: ActivityItem[],
+      gtRates: GTRateContext = EMPTY_GT_RATE_CONTEXT
     ): ActivityItem[] => {
       const jobCodes = jobPayCodeDetails[GT_OFFICE_JOB] || [];
       const empCodes = employeeMappings[entry.employeeId] || [];
@@ -150,7 +173,21 @@ const GTMonthlyLogEntryPage: React.FC = () => {
       const hasOvertime = (entry.overtimeHours || 0) > 0;
 
       return Array.from(merged.values()).map((pc: any) => {
-        const rate = Number(pc.override_rate_biasa ?? pc.rate_biasa ?? 0);
+        // GT precedence: GT schedule > GT override > shared TH rate (per
+        // sub-rate; the shared side keeps the existing employee>job>base merge).
+        const resolved = resolveGTPayRates({
+          payCodeId: pc.pay_code_id,
+          shared: {
+            biasa: pc.override_rate_biasa ?? pc.rate_biasa ?? null,
+            ahad: pc.override_rate_ahad ?? pc.rate_ahad ?? null,
+            umum: pc.override_rate_umum ?? pc.rate_umum ?? null,
+          },
+          gtOverride: gtRates.overrides[entry.employeeId]?.[pc.pay_code_id] ?? null,
+          gtSchedules: gtRates.schedules[entry.employeeId] ?? [],
+          year: gtRates.year,
+          month: gtRates.month,
+        });
+        const rate = resolved.rate_biasa;
         const isOvertime = pc.pay_type === "Overtime";
         const isHour = pc.rate_unit === "Hour";
 
@@ -236,6 +273,46 @@ const GTMonthlyLogEntryPage: React.FC = () => {
       }
       setExistingWorkLog(fullWorkLog);
 
+      // GT-scoped overrides + scheduled changes (beat the shared TH rates for
+      // the entry month). A missing/unavailable GT endpoint must not break the
+      // page — fall back to the shared rates.
+      let gtOverrides: GTRateContext["overrides"] = {};
+      let gtSchedules: GTRateContext["schedules"] = {};
+      try {
+        const gtOverridesResponse = await api.get(
+          "/greentarget/api/employee-pay-codes/"
+        );
+        gtOverrides = groupGTOverridesByEmployee(
+          gtOverridesResponse?.mappings || []
+        );
+        gtSchedules = Object.fromEntries(
+          await Promise.all(
+            officeEmployees.map(async (emp: GTPayrollEmployee) => {
+              try {
+                const schedulesResponse = await api.get(
+                  `/greentarget/api/employee-pay-codes/${emp.employee_id}/schedules`
+                );
+                return [emp.employee_id, schedulesResponse?.schedules || []] as [
+                  string,
+                  GTPayRateSchedule[]
+                ];
+              } catch {
+                return [emp.employee_id, []] as [string, GTPayRateSchedule[]];
+              }
+            })
+          )
+        );
+      } catch (gtError) {
+        console.error("Error fetching GT pay rates:", gtError);
+      }
+
+      const gtRates: GTRateContext = {
+        overrides: gtOverrides,
+        schedules: gtSchedules,
+        year: formData.logYear,
+        month: formData.logMonth,
+      };
+
       const entries: Record<string, EmployeeEntry> = {};
       const activities: Record<string, ActivityItem[]> = {};
 
@@ -268,7 +345,7 @@ const GTMonthlyLogEntryPage: React.FC = () => {
           })
         );
 
-        activities[emp.employee_id] = buildActivitiesForEmployee(entry, savedActivities);
+        activities[emp.employee_id] = buildActivitiesForEmployee(entry, savedActivities, gtRates);
       });
 
       setEmployeeEntries(entries);

@@ -36,6 +36,7 @@ import GTDailyLoriHabukEntryPage from "./GreenTarget/Payroll/GTDailyLoriHabukEnt
 import GTSalaryReportPage from "./GreenTarget/Payroll/GTSalaryReportPage";
 import GTCutiReportPage from "./GreenTarget/Payroll/GTCutiReportPage";
 import GTECarumanPage from "./GreenTarget/Payroll/GTECarumanPage";
+import GTPayRatesPage from "./GreenTarget/Payroll/GTPayRatesPage";
 import GTAdjustmentDocsListPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsListPage";
 import GTAdjustmentDocsFormPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsFormPage";
 import GTAdjustmentDocsDetailsPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsDetailsPage";
@@ -228,6 +229,12 @@ export const GreenTargetNavData: SidebarItem[] = [
         path: "/payroll/pinjam",
         component: GTPinjamListPage,
         group: "Add-Ons",
+      },
+      {
+        name: "Employee Pay Rates",
+        path: "/payroll/pay-rates",
+        component: GTPayRatesPage,
+        group: "Payroll",
       },
       {
         name: "Payroll Settings",
