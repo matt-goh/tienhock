@@ -4,6 +4,11 @@ import { Page, StyleSheet, View, Text, Image } from "@react-pdf/renderer";
 import { EInvoicePDFData } from "../../../services/einvoice-pdf.service";
 import TienHockLogo from "../../tienhock.png";
 import { JELLYPOLLY_INFO } from "./companyInfo";
+import {
+  getPaperSizePreference,
+  getReactPdfPageSize,
+  PdfPaperSize,
+} from "../../pdf/paperSize";
 
 // State mapping
 const stateOptions = [
@@ -230,6 +235,7 @@ interface Props {
   qrCodeData: string;
   isConsolidated?: boolean;
   companyContext?: "tienhock" | "jellypolly";
+  paperSize?: PdfPaperSize;
 }
 
 const EInvoicePDF: React.FC<Props> = ({
@@ -237,9 +243,11 @@ const EInvoicePDF: React.FC<Props> = ({
   qrCodeData,
   isConsolidated = false,
   companyContext = "tienhock",
+  paperSize,
 }) => {
+  const effectivePaperSize = paperSize ?? getPaperSizePreference();
   return (
-    <Page size="A4" style={styles.page}>
+    <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
       {/* Header Section */}
       <View style={styles.header}>
         <View style={styles.companySection}>

@@ -17,6 +17,11 @@ import {
 import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfBlob } from "../pdfPrintFallback";
+import {
+  getPaperSizePreference,
+  getReactPdfPageSize,
+  PdfPaperSize,
+} from "../pdf/paperSize";
 
 type ProductLine = "mee" | "bihun";
 
@@ -535,12 +540,13 @@ const PageFooter: React.FC = () => (
   </>
 );
 
-const EstimatedPLPDFPage: React.FC<{ line: ProductLineReport }> = ({
-  line,
-}) => {
+const EstimatedPLPDFPage: React.FC<{
+  line: ProductLineReport;
+  paperSize: PdfPaperSize;
+}> = ({ line, paperSize }) => {
   const pl = line.pl;
   return (
-    <Page size="A4" style={styles.page}>
+    <Page size={getReactPdfPageSize(paperSize)} style={styles.page}>
       <ReportHeader title="ESTIMATED P&L" line={line} />
 
       {/* PRODUCT */}
@@ -758,12 +764,13 @@ const EstimatedPLPDFPage: React.FC<{ line: ProductLineReport }> = ({
   );
 };
 
-const EstimatedUnitCostPDFPage: React.FC<{ line: ProductLineReport }> = ({
-  line,
-}) => {
+const EstimatedUnitCostPDFPage: React.FC<{
+  line: ProductLineReport;
+  paperSize: PdfPaperSize;
+}> = ({ line, paperSize }) => {
   const uc = line.unitCost;
   return (
-    <Page size="A4" style={styles.page}>
+    <Page size={getReactPdfPageSize(paperSize)} style={styles.page}>
       <ReportHeader title="ESTIMATED UNIT COST" line={line} />
 
       {/* Production & sales summary */}
@@ -898,36 +905,55 @@ interface EstimatedReportPDFDocumentProps {
   data: EstimatedReportResponse;
   view: EstimatedReportView;
   productLines: ProductLine[];
+  paperSize?: PdfPaperSize;
 }
 
 const EstimatedReportPDFDocument: React.FC<EstimatedReportPDFDocumentProps> = ({
   data,
   view,
   productLines,
-}) => (
+  paperSize,
+}) => {
+  const effectivePaperSize = paperSize ?? getPaperSizePreference();
+  return (
   <Document>
     {productLines.flatMap((productLine) => {
       const line = data.reports[productLine];
       if (!line) return [];
       return view === "pl"
-        ? [<EstimatedPLPDFPage key={`${productLine}-pl`} line={line} />]
-        : [<EstimatedUnitCostPDFPage key={`${productLine}-uc`} line={line} />];
+        ? [
+            <EstimatedPLPDFPage
+              key={`${productLine}-pl`}
+              line={line}
+              paperSize={effectivePaperSize}
+            />,
+          ]
+        : [
+            <EstimatedUnitCostPDFPage
+              key={`${productLine}-uc`}
+              line={line}
+              paperSize={effectivePaperSize}
+            />,
+          ];
     })}
   </Document>
-);
+  );
+};
 
 // `productLines` selects which product lines are printed: one line for the
 // "Print MEE" / "Print BIHUN" actions, both for "Print All".
 export const generateEstimatedReportPDF = async (
   data: EstimatedReportResponse,
   view: EstimatedReportView,
-  productLines: ProductLine[] = ["mee", "bihun"]
+  productLines: ProductLine[] = ["mee", "bihun"],
+  paperSize?: PdfPaperSize
 ): Promise<void> => {
   const blob = await pdf(
     <EstimatedReportPDFDocument
       data={data}
       view={view}
       productLines={productLines}
+      paperSize={paperSize}
     />
   ).toBlob();
 
