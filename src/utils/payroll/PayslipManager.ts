@@ -230,6 +230,7 @@ export const downloadPayslip = async (
       staffDetails,
       companyName,
       effectiveMidMonthPayroll,
+      "both",
       paperSize
     );
     const defaultFileName = `PaySlip-${completePayroll.employee_id}-${completePayroll.year}-${completePayroll.month}.pdf`;
@@ -336,6 +337,7 @@ export const downloadBatchPayslips = async (
       staffDetailsMap,
       companyName,
       effectiveMidMonthMap,
+      "both",
       paperSize
     );
 
