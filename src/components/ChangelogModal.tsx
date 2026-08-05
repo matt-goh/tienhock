@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-08-05",
+    ms: "Laporan Anggaran (Anggaran Untung/Rugi dan Anggaran Kos Seunit): butang \"Print\" tunggal kini digantikan dengan tiga butang — \"Print MEE\", \"Print BIHUN\" dan \"Print All\" — supaya anda boleh mencetak satu barisan produk sahaja bagi bulan yang dipilih, atau kedua-duanya sekali seperti sebelum ini.",
+    en: "Estimated reports (Estimated P&L and Estimated Unit Cost): the single \"Print\" button is replaced by three buttons — \"Print MEE\", \"Print BIHUN\" and \"Print All\" — so you can print just one product line for the selected month, or both together as before.",
+  },
+  {
     date: "2026-08-04",
     ms: "Slip gaji Green Target: lajur \"Rate\" untuk item gaji tetap (Fixed) kini memaparkan amaun gaji yang sebenar diisi — contohnya gaji pengarah GOH THAI HO dan WONG SHUK FUN kini dipaparkan sebagai 1,700.00, bukannya kadar katalog 3,500.00 seperti sebelum ini. Amaun gaji tidak berubah; paparan kadar sahaja yang diperbetulkan.",
     en: "Green Target payslip: the \"Rate\" column for fixed (Fixed) salary items now shows the actual keyed salary amount — e.g. directors GOH THAI HO and WONG SHUK FUN now show 1,700.00 instead of the 3,500.00 catalogue rate as before. The salary amount is unchanged; only the displayed rate was corrected.",
