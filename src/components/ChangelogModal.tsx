@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-05",
+    ms: "Laporan gaji Green Target dan Jelly Polly: tab \"Employee\" kini mempunyai pilihan \"Individual\" dan \"Location\", sama seperti Tien Hock. Pilihan \"Location\" memaparkan pekerja yang sama tetapi dikumpulkan mengikut lokasi kerja, dengan subjumlah bagi setiap lokasi dan satu jumlah besar di bawah. Tab \"Employee\" dan \"Location\" juga mempunyai pilihan \"Monthly\" dan \"Yearly\" — pilihan Yearly mencampurkan semua bulan yang telah diproses dalam tahun tersebut menjadi satu baris bagi setiap pekerja. Butang Print dan Download mengikut pilihan yang sedang dipaparkan. Tab Bank dan Pinjam kekal mengikut bulan seperti biasa.",
+    en: "Green Target and Jelly Polly salary reports: the \"Employee\" tab now has \"Individual\" and \"Location\" options, just like Tien Hock. The \"Location\" option shows the same employees grouped under their work location, with a subtotal for each location and one grand total at the bottom. The \"Employee\" and \"Location\" tabs also gain \"Monthly\" and \"Yearly\" options — Yearly adds up every processed month of the year into one row per employee. Print and Download follow whichever options are on screen. The Bank and Pinjam tabs stay month-based as before.",
+  },
+  {
+    date: "2026-08-05",
     ms: "Laporan Anggaran (Anggaran Untung/Rugi dan Anggaran Kos Seunit): butang \"Print\" tunggal kini digantikan dengan tiga butang — \"Print MEE\", \"Print BIHUN\" dan \"Print All\" — supaya anda boleh mencetak satu barisan produk sahaja bagi bulan yang dipilih, atau kedua-duanya sekali seperti sebelum ini.",
     en: "Estimated reports (Estimated P&L and Estimated Unit Cost): the single \"Print\" button is replaced by three buttons — \"Print MEE\", \"Print BIHUN\" and \"Print All\" — so you can print just one product line for the selected month, or both together as before.",
   },
