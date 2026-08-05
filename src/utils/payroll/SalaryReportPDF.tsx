@@ -9,6 +9,11 @@ import {
 } from "@react-pdf/renderer";
 import { getMonthName } from "./payrollUtils";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
+import {
+  getPaperSizePreference,
+  getReactPdfPageSize,
+  PdfPaperSize,
+} from "../pdf/paperSize";
 
 // Color palette for professional appearance
 const colors = {
@@ -345,6 +350,7 @@ export interface SalaryReportPDFProps {
   // into 14. Green Target and Jelly Polly read those codes literally, so they
   // opt out and every location prints as its own group.
   mergeCommissionLocations?: boolean;
+  paperSize?: PdfPaperSize;
 }
 
 // Helper functions
@@ -1181,7 +1187,9 @@ const SalaryReportPDF: React.FC<SalaryReportPDFProps> = ({
   companyName = "TIEN HOCK FOOD INDUSTRIES S/B (953309-T)",
   showLocationCodes = true,
   mergeCommissionLocations = true,
+  paperSize,
 }) => {
+  const effectivePaperSize = paperSize ?? getPaperSizePreference();
   const reportTitle = buildReportTitle(periodType, year, month);
   const viewSubtitle = buildViewSubtitle(reportType);
 
@@ -1236,7 +1244,11 @@ const SalaryReportPDF: React.FC<SalaryReportPDFProps> = ({
     <Document
       title={`Salary Report ${periodType === "yearly" ? year : `${getMonthName(month || 1)} ${year}`}`}
     >
-      <Page size="A4" orientation="landscape" style={styles.page}>
+      <Page
+        size={getReactPdfPageSize(effectivePaperSize, true)}
+        orientation="landscape"
+        style={styles.page}
+      >
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.companyName}>{companyName}</Text>
