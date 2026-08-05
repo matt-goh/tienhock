@@ -13,6 +13,11 @@ import {
   TIENHOCK_INFO,
 } from "../invoice/einvoice/companyInfo";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
+import {
+  PdfPaperSize,
+  getPaperSizePreference,
+  getPdfMakePageSize,
+} from "../pdf/paperSize";
 
 // Initialize pdfmake with the bundled fonts (same pattern as PaySlipPDFMake)
 (pdfMake as any).vfs = (pdfFonts as any).pdfMake?.vfs || pdfFonts;
@@ -127,7 +132,8 @@ const buildDocDefinition = (
   companyName: string,
   referenceLabel: string,
   chequeLabel: string,
-  derivedOpeningLabel: string
+  derivedOpeningLabel: string,
+  paperSize: PdfPaperSize
 ): TDocumentDefinitions => {
   // Calendar months keep the "June 2026" label; arbitrary ranges show the dates.
   const periodLabel =
@@ -297,7 +303,7 @@ const buildDocDefinition = (
       title: `${reportTitle} ${data.account.code} ${periodLabel}`,
       author: companyName,
     },
-    pageSize: "A4",
+    pageSize: getPdfMakePageSize(paperSize),
     pageOrientation: "portrait",
     pageMargins: [18, 18, 18, 40],
     defaultStyle: { fontSize: 8, lineHeight: 1.15, color: colors.textPrimary },
@@ -386,6 +392,7 @@ export const generateAccountLedgerPDF = async (
     referenceLabel?: string;
     chequeLabel?: string;
     derivedOpeningLabel?: string;
+    paperSize?: PdfPaperSize;
   }
 ): Promise<void> => {
   const companyInfo: CompanyInfo = options?.companyInfo || TIENHOCK_INFO;
@@ -405,7 +412,8 @@ export const generateAccountLedgerPDF = async (
     companyName,
     referenceLabel,
     chequeLabel,
-    derivedOpeningLabel
+    derivedOpeningLabel,
+    options?.paperSize ?? getPaperSizePreference()
   );
 
   const pdfBlob: Blob = await new Promise<Blob>((resolve) => {

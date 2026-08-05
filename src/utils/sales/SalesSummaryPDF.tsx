@@ -9,6 +9,11 @@ import {
 } from "@react-pdf/renderer";
 import React from "react";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
+import {
+  getPaperSizePreference,
+  getReactPdfPageSize,
+  PdfPaperSize,
+} from "../pdf/paperSize";
 
 interface SummaryData {
   all_sales?: any;
@@ -444,7 +449,8 @@ export const generateSalesSummaryPDF = async (
   year: number,
   action: "download" | "print",
   allProducts: any[] = [],
-  scope: SalesSummaryScope = "tienhock"
+  scope: SalesSummaryScope = "tienhock",
+  paperSize?: PdfPaperSize
 ) => {
   try {
     const dateForMonthName = new Date(year, month);
@@ -454,11 +460,12 @@ export const generateSalesSummaryPDF = async (
 
     // Paginate sections
     const pages = paginateSections(data, allProducts);
+    const effectivePaperSize = paperSize ?? getPaperSizePreference();
 
     const doc = (
       <Document title={`Sales Summary - ${monthYearFormatted}`}>
         {pages.map((pageSections, pageIndex) => (
-          <Page key={`page-${pageIndex}`} size="A4" style={styles.page}>
+          <Page key={`page-${pageIndex}`} size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
             {pageSections.map((section, sectionIndex) => {
               const isLastSection = sectionIndex === pageSections.length - 1;
 

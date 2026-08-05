@@ -17,6 +17,11 @@ import {
 import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfBlob } from "../pdfPrintFallback";
+import {
+  getPaperSizePreference,
+  getReactPdfPageSize,
+  PdfPaperSize,
+} from "../pdf/paperSize";
 
 type ProductLine = "mee" | "bihun";
 
@@ -143,7 +148,7 @@ const colors = {
 const styles = StyleSheet.create({
   page: {
     paddingTop: 20,
-    paddingBottom: 40,
+    paddingBottom: 30,
     paddingLeft: 40,
     paddingRight: 40,
     fontFamily: "Helvetica",
@@ -162,7 +167,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 15,
+    marginBottom: 8,
     gap: 12,
   },
   logo: {
@@ -180,22 +185,22 @@ const styles = StyleSheet.create({
   reportTitle: {
     fontSize: 12,
     fontFamily: "Helvetica-Bold",
-    marginTop: 6,
+    marginTop: 3,
     color: colors.textSecondary,
   },
   periodText: {
     fontSize: 9,
     color: colors.textMuted,
-    marginTop: 3,
+    marginTop: 2,
   },
   section: {
-    marginBottom: 10,
+    marginBottom: 6,
   },
   sectionTitle: {
     fontSize: 9,
     fontFamily: "Helvetica-Bold",
     color: colors.textPrimary,
-    marginBottom: 4,
+    marginBottom: 2,
     textTransform: "uppercase",
   },
   tableHeader: {
@@ -253,8 +258,8 @@ const styles = StyleSheet.create({
   subtotal: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 4,
-    marginTop: 4,
+    paddingVertical: 3,
+    marginTop: 2,
     borderTopWidth: 0.5,
     borderTopColor: colors.border,
   },
@@ -318,7 +323,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     paddingVertical: 3,
-    marginBottom: 10,
+    marginBottom: 6,
   },
   boldRowLabel: {
     flex: 1,
@@ -334,9 +339,9 @@ const styles = StyleSheet.create({
   addBackRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 5,
+    paddingVertical: 4,
     paddingHorizontal: 4,
-    marginBottom: 10,
+    marginBottom: 6,
     backgroundColor: "#f0f9ff",
     borderWidth: 0.5,
     borderColor: "#bae6fd",
@@ -344,8 +349,8 @@ const styles = StyleSheet.create({
   majorTotal: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 6,
-    marginBottom: 10,
+    paddingVertical: 5,
+    marginBottom: 6,
     borderTopWidth: 1.5,
     borderBottomWidth: 1.5,
     borderColor: colors.borderDark,
@@ -376,8 +381,8 @@ const styles = StyleSheet.create({
   finalTotal: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 8,
-    marginBottom: 10,
+    paddingVertical: 6,
+    marginBottom: 6,
     borderTopWidth: 2,
     borderBottomWidth: 2,
     borderColor: colors.textPrimary,
@@ -407,7 +412,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   generatedAt: {
-    marginTop: 15,
+    marginTop: 8,
     fontSize: 7,
     color: colors.textMuted,
     textAlign: "right",
@@ -535,12 +540,13 @@ const PageFooter: React.FC = () => (
   </>
 );
 
-const EstimatedPLPDFPage: React.FC<{ line: ProductLineReport }> = ({
-  line,
-}) => {
+const EstimatedPLPDFPage: React.FC<{
+  line: ProductLineReport;
+  paperSize: PdfPaperSize;
+}> = ({ line, paperSize }) => {
   const pl = line.pl;
   return (
-    <Page size="A4" style={styles.page}>
+    <Page size={getReactPdfPageSize(paperSize)} style={styles.page}>
       <ReportHeader title="ESTIMATED P&L" line={line} />
 
       {/* PRODUCT */}
@@ -758,12 +764,13 @@ const EstimatedPLPDFPage: React.FC<{ line: ProductLineReport }> = ({
   );
 };
 
-const EstimatedUnitCostPDFPage: React.FC<{ line: ProductLineReport }> = ({
-  line,
-}) => {
+const EstimatedUnitCostPDFPage: React.FC<{
+  line: ProductLineReport;
+  paperSize: PdfPaperSize;
+}> = ({ line, paperSize }) => {
   const uc = line.unitCost;
   return (
-    <Page size="A4" style={styles.page}>
+    <Page size={getReactPdfPageSize(paperSize)} style={styles.page}>
       <ReportHeader title="ESTIMATED UNIT COST" line={line} />
 
       {/* Production & sales summary */}
@@ -897,32 +904,57 @@ const EstimatedUnitCostPDFPage: React.FC<{ line: ProductLineReport }> = ({
 interface EstimatedReportPDFDocumentProps {
   data: EstimatedReportResponse;
   view: EstimatedReportView;
+  productLines: ProductLine[];
+  paperSize?: PdfPaperSize;
 }
 
 const EstimatedReportPDFDocument: React.FC<EstimatedReportPDFDocumentProps> = ({
   data,
   view,
+  productLines,
+  paperSize,
 }) => {
-  const productLines: ProductLine[] = ["mee", "bihun"];
+  const effectivePaperSize = paperSize ?? getPaperSizePreference();
   return (
-    <Document>
-      {productLines.flatMap((productLine) => {
-        const line = data.reports[productLine];
-        if (!line) return [];
-        return view === "pl"
-          ? [<EstimatedPLPDFPage key={`${productLine}-pl`} line={line} />]
-          : [<EstimatedUnitCostPDFPage key={`${productLine}-uc`} line={line} />];
-      })}
-    </Document>
+  <Document>
+    {productLines.flatMap((productLine) => {
+      const line = data.reports[productLine];
+      if (!line) return [];
+      return view === "pl"
+        ? [
+            <EstimatedPLPDFPage
+              key={`${productLine}-pl`}
+              line={line}
+              paperSize={effectivePaperSize}
+            />,
+          ]
+        : [
+            <EstimatedUnitCostPDFPage
+              key={`${productLine}-uc`}
+              line={line}
+              paperSize={effectivePaperSize}
+            />,
+          ];
+    })}
+  </Document>
   );
 };
 
+// `productLines` selects which product lines are printed: one line for the
+// "Print MEE" / "Print BIHUN" actions, both for "Print All".
 export const generateEstimatedReportPDF = async (
   data: EstimatedReportResponse,
-  view: EstimatedReportView
+  view: EstimatedReportView,
+  productLines: ProductLine[] = ["mee", "bihun"],
+  paperSize?: PdfPaperSize
 ): Promise<void> => {
   const blob = await pdf(
-    <EstimatedReportPDFDocument data={data} view={view} />
+    <EstimatedReportPDFDocument
+      data={data}
+      view={view}
+      productLines={productLines}
+      paperSize={paperSize}
+    />
   ).toBlob();
 
   printPdfBlob(blob, "estimated report PDF");

@@ -2,7 +2,9 @@
 
 **Created 17 Jul 2026. Updated 21 Jul 2026. Phases V0–V3 are COMPLETE on development: the May books balance at RM8,980,756.68 with keyed monthly closing stock injected (net assets RM6,090,429.60 = scan RM6,097,691.11 less the named GP-202604-0001 drift), the Trade Debtor list/statement matches the legacy scans 150/150 including FIFO aging, and those ±RM7,261.51 GP-drift lines are the only remaining scan differences anywhere. Production V2/V3 remains a separate approval (rollout order OP→LGP then V2, rehearsed on fresh production copies — see §6); V4 (closeout — parity re-run, docs refresh, permanent scan/fixture retention) is complete (§7).**
 Follow-on to the completed Jan–May legacy ledger import
-([LEGACY_JAN_MAY_IMPORT_PLAN.md](LEGACY_JAN_MAY_IMPORT_PLAN.md)). That project ended with an
+(see [ACCOUNTING_PROGRESS.md](ACCOUNTING_PROGRESS.md) §6 — the standalone import plan
+`LEGACY_JAN_MAY_IMPORT_PLAN.md` was removed 5 Aug 2026 after boss sign-off and is recoverable from
+git history). That project ended with an
 exact, hash-pinned `IMP` journal projection but **no independent way to verify it**, and with the
 approved named limitation of a missing **DR RM1,456,480.37** in the opening anchors (the Trial
 Balance / Balance Sheet residue). The user has now exported the requested verification documents
@@ -259,7 +261,8 @@ plus a human-readable diff report doc. Comparisons:
 **Deliverable style:** a `verify-legacy-reports` script that stays green forever (like
 `verify-import.sql` did for the import) so future fs_note edits, anchor changes, or engine
 changes cannot silently break scan parity — plus a findings doc
-(`LEGACY_REPORT_RECONCILIATION.md`, mirroring
+(`LEGACY_REPORT_RECONCILIATION.md` — removed 5 Aug 2026 after boss sign-off, recoverable from git
+history; mirroring
 [LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md](LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md)).
 
 ### V1 step 1 execution record — account-code mapping, completed 20 Jul 2026
@@ -452,8 +455,9 @@ type-check command was run.
 ### V1 step 5 execution record — consolidation and V2 sign-off, completed 20 Jul 2026
 
 **Files changed:** tracked
-[LEGACY_REPORT_RECONCILIATION.md](LEGACY_REPORT_RECONCILIATION.md) (the durable findings and
-sign-off document) and this plan. No database, report-engine, production, or user-facing state
+`LEGACY_REPORT_RECONCILIATION.md` (the durable findings and
+sign-off document — removed 5 Aug 2026 after the boss confirmed the Jan–May TB tally; recoverable
+from git history) and this plan. No database, report-engine, production, or user-facing state
 was changed.
 
 - The reconciliation copies every sign-off-critical row out of the private generated JSON: all
@@ -486,7 +490,8 @@ reconciliation; production remains a later, separate approval after development 
 
 ## 6. Phase V2 — close the opening gap (✅ development complete 20 Jul 2026)
 
-The package in [LEGACY_REPORT_RECONCILIATION.md](LEGACY_REPORT_RECONCILIATION.md) was explicitly
+The package recorded in `LEGACY_REPORT_RECONCILIATION.md` (removed 5 Aug 2026 after boss
+sign-off; recoverable from git history) was explicitly
 approved for development and implemented at the exact boundary below. Production was not changed.
 The evidence and settled §8 choices pin the delivered shape:
 
@@ -514,7 +519,8 @@ The evidence and settled §8 choices pin the delivered shape:
   recon (movement must be unchanged), name the legitimate June TB/BS level changes, and re-prove
   all 1,571 June checkpoint equalities.
 - Update docs ([ACCOUNTING_PROGRESS.md](ACCOUNTING_PROGRESS.md),
-  [LEGACY_JAN_MAY_IMPORT_PLAN.md](LEGACY_JAN_MAY_IMPORT_PLAN.md) §3/§8-1) and add a changelog
+  `LEGACY_JAN_MAY_IMPORT_PLAN.md` §3/§8-1 — doc removed 5 Aug 2026, recoverable from git history)
+  and add a changelog
   entry (user-visible: Balance Sheet now balances / opening stock loaded).
 
 ### V2 development execution record — completed 20 Jul 2026
@@ -775,7 +781,7 @@ the verification harness `verify-legacy-reports.mjs` (tdl + statements stage tra
 **Files changed:** tracked `dev/import/legacy-report-fixtures/README.md` (permanent-retention
 rule + gate runbook); docs refresh across
 [ACCOUNTING_PROGRESS.md](ACCOUNTING_PROGRESS.md),
-[LEGACY_JAN_MAY_IMPORT_PLAN.md](LEGACY_JAN_MAY_IMPORT_PLAN.md),
+`LEGACY_JAN_MAY_IMPORT_PLAN.md` (removed 5 Aug 2026, recoverable from git history),
 [LEGACY_TRIAL_BALANCE_CODE_ANALYSIS.md](LEGACY_TRIAL_BALANCE_CODE_ANALYSIS.md),
 [INVOICE_PAYMENT_ACCOUNTING_PROGRESS.md](INVOICE_PAYMENT_ACCOUNTING_PROGRESS.md),
 [ACCOUNTING_GAP_ANALYSIS.md](ACCOUNTING_GAP_ANALYSIS.md),

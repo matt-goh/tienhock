@@ -39,12 +39,17 @@ findings that were already measured on 25 Jul 2026 so nobody re-derives them.
 accounts, journals, ledgers, Trial Balance, Income Statement, Balance Sheet, debtor parity — seeded
 by importing the legacy system's **January–June 2026** ledger exports as posted journals, and then
 posting organically from **1 July 2026** onward. This mirrors what was already delivered for Tien
-Hock, whose four reference documents are:
+Hock, whose reference documents are:
 
-- [LEGACY_JAN_MAY_IMPORT_PLAN.md](LEGACY_JAN_MAY_IMPORT_PLAN.md) — the ledger import (read §1–§3, §6, §7)
 - [LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md](LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md) — ledger vs operational-invoice bridge
 - [LEGACY_REPORT_VERIFICATION_PLAN.md](LEGACY_REPORT_VERIFICATION_PLAN.md) — scans → fixtures → automated harness (read §4, §5)
-- [LEGACY_REPORT_RECONCILIATION.md](LEGACY_REPORT_RECONCILIATION.md) — the sign-off evidence format
+
+(The TH import plan and scan-reconciliation sign-off docs — `LEGACY_JAN_MAY_IMPORT_PLAN.md` and
+`LEGACY_REPORT_RECONCILIATION.md` — were removed from `docs/Account/` on 5 Aug 2026 after the boss
+confirmed the Jan–May 2026 Trial Balance totals tally exactly between legacy and ERP; their
+load-bearing records (production cutover, date-parsing rule, regression-gate pointers) were
+absorbed into [ACCOUNTING_PROGRESS.md](../Account/ACCOUNTING_PROGRESS.md) §6 and both files remain
+recoverable from git history.)
 
 ## Core principle — isolated data, shared mechanics
 
