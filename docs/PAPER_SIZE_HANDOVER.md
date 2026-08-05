@@ -1,6 +1,20 @@
 # Paper Size Support (A4 / 9.5×11 Computer Form) — Handover
 
-Date: 2026-08-05. Status: **~85% complete, UNTESTED by user**. All changes are staged in git (`git diff --cached`), nothing committed.
+Date: 2026-08-05. Status: **COMPLETE (code-side), awaiting user's manual test-print**. The original 45 files are committed (`230b5703`); the continuation work below is uncommitted in the working tree.
+
+## Continuation result (2026-08-05, second session)
+
+All remaining items done:
+
+1. **4 remaining overlays converted** to the PrintPDFOverlay pattern (auto-print at selected size; post-print panel with PaperSizePicker + "Print Again" + "Close"): `GTPrintPDFOverlay.tsx`, `AdjustmentDocPrintOverlay.tsx`, `GTAdjustmentDocPrintOverlay.tsx`, `EInvoicePrintHandler.tsx`. The old focus-return/60s-timeout auto-close was removed in each — it would have shut the post-print panel the moment the OS print dialog returned focus. `generateAdjustmentDocPDFBlob` / `buildAdjustmentDocPDFDocument` and the GT pair gained an optional trailing `paperSize?: PdfPaperSize` (all pre-existing callers pass 2 args, unaffected).
+2. **Changelog entry prepended** (2026-08-05, en+ms) in `src/components/ChangelogModal.tsx`.
+3. **AGENTS.md rule 19** extended: page sizes must come from `src/utils/pdf/paperSize.ts`, never hardcode `"A4"`.
+4. **Layout verification done** via a throwaway esbuild harness (since removed) that rendered both sizes for every known-risky generator and rasterized the pages for visual inspection. `render-pdf.mjs` gained `standardFontDataUrl` (without it standard-14 Helvetica/Courier text rasterized invisible). Results: InvoicePDF, SalesSummaryPDF, both GT debtor schedules, EstimatedReportPDF all fit the 792pt form with slack — no changes. **Two real fixes:**
+   - `src/utils/pdf/paperSize.ts` — **landscape bug in the feature itself**: @react-pdf/renderer v4 flips page size UNCONDITIONALLY when `orientation="landscape"`, including explicit `[w,h]` arrays, so the pre-swapped `[792,684]` got flipped back to portrait. `getReactPdfPageSize(size, true)` now returns the portrait array `[684,792]` and lets the orientation prop do the one flip. Fixes all 3 landscape callers (SalaryReportPDF, CutiReportPDF, GeneralStatementPDF). A4 path untouched.
+   - `src/utils/accounting/AccountLedgerPDFMake.ts:304` — letterhead rule `x2` was hardcoded 559 (A4 content width); now `ruleWidth = paperSize === "computerForm" ? COMPUTER_FORM_WIDTH - 36 : 559`.
+5. **Final greps clean**: no `size="A4"` / `pageSize: "A4"` left anywhere in `src/`.
+
+User must still: run the app and exercise the 6 print overlays (compile check — no tsc/build was run, per rule 10), and test-print on the LQ-2190 (browser "fit to printable area" handles tractor margins; if edges clip, bump left/right margins for computerForm). Watch: landscape docs rotating correctly in the print dialog (the flip fix), dense invoice pages (~40pt bottom slack), 6.5pt salary-table font legibility on dot-matrix.
 
 ## Goal
 

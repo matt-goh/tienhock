@@ -14,6 +14,7 @@ import {
 } from "../invoice/einvoice/companyInfo";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
 import {
+  COMPUTER_FORM_WIDTH,
   PdfPaperSize,
   getPaperSizePreference,
   getPdfMakePageSize,
@@ -298,6 +299,11 @@ const buildDocDefinition = (
     "0"
   )}:${String(generatedAt.getMinutes()).padStart(2, "0")}`;
 
+  // Full-width rule below the letterhead. A4 keeps its tuned 559pt content
+  // width; the wider computer form spans its own (684 - 2*18 margins).
+  const ruleWidth: number =
+    paperSize === "computerForm" ? COMPUTER_FORM_WIDTH - 36 : 559;
+
   return {
     info: {
       title: `${reportTitle} ${data.account.code} ${periodLabel}`,
@@ -322,7 +328,7 @@ const buildDocDefinition = (
       letterhead,
       {
         canvas: [
-          { type: "line", x1: 0, y1: 0, x2: 559, y2: 0, lineWidth: 1.2, lineColor: colors.borderDark },
+          { type: "line", x1: 0, y1: 0, x2: ruleWidth, y2: 0, lineWidth: 1.2, lineColor: colors.borderDark },
         ],
         margin: [0, 0, 0, 10],
       },

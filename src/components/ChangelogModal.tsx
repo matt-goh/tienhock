@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-05",
+    ms: "Cetakan: anda kini boleh memilih saiz kertas A4 atau borang komputer 9.5×11 dari menu pengguna (atas kanan). Dialog cetak invois dan pelarasan juga membolehkan anda menukar saiz dan mencetak semula.",
+    en: "Printing: you can now choose A4 or 9.5×11 computer form paper size from the user menu (top right). Invoice and adjustment print dialogs also let you switch size and reprint.",
+  },
+  {
+    date: "2026-08-05",
     ms: "Green Target: tetingkap \"Create Invoice\" pada halaman sewaan kini membenarkan anda memasukkan nombor invois sendiri, sama seperti borang invois penuh. Biarkan ruangan itu kosong untuk menjana nombor secara automatik seperti biasa; jika nombor yang dimasukkan sudah digunakan, anda akan diberitahu sebelum invois disimpan.",
     en: "Green Target: the \"Create Invoice\" dialog on the rental page now lets you enter your own invoice number, the same as the full invoice form. Leave it blank to auto-generate the number as before; if the number you type is already in use, you are warned before the invoice is saved.",
   },
