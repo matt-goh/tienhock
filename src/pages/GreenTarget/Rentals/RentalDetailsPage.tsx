@@ -226,6 +226,18 @@ const RentalDetailsPage: React.FC = () => {
   const [isLoadingCustomerRentals, setIsLoadingCustomerRentals] =
     useState(false);
   const [selectedRentalIds, setSelectedRentalIds] = useState<number[]>([]);
+  const [invoiceNumber, setInvoiceNumber] = useState<string>("");
+  const [invoiceNumberValidation, setInvoiceNumberValidation] = useState<{
+    isValidating: boolean;
+    isValid: boolean;
+    isDuplicate: boolean;
+    message: string;
+  }>({
+    isValidating: false,
+    isValid: true,
+    isDuplicate: false,
+    message: "",
+  });
   const [invoiceAmount, setInvoiceAmount] = useState<string>("200.00");
   const [invoiceRevenueSplits, setInvoiceRevenueSplits] = useState<
     GreenTargetRevenueSplit[]
@@ -320,6 +332,13 @@ const RentalDetailsPage: React.FC = () => {
     if (!rental) return;
     setIsInvoiceModalOpen(true);
     setSelectedRentalIds([rental.rental_id]);
+    setInvoiceNumber("");
+    setInvoiceNumberValidation({
+      isValidating: false,
+      isValid: true,
+      isDuplicate: false,
+      message: "",
+    });
     setInvoiceAmount("200.00");
     setInvoiceRevenueSplits([
       {
@@ -393,6 +412,61 @@ const RentalDetailsPage: React.FC = () => {
     }
   }, [selectedRentalIds, isInvoiceModalOpen]);
 
+  // Debounced duplicate check, same rule as the full invoice form: a blank
+  // number is valid because the server then generates one.
+  useEffect(() => {
+    if (!isInvoiceModalOpen) return;
+    const trimmedNumber: string = invoiceNumber.trim();
+    if (!trimmedNumber) {
+      setInvoiceNumberValidation({
+        isValidating: false,
+        isValid: true,
+        isDuplicate: false,
+        message: "",
+      });
+      return;
+    }
+
+    setInvoiceNumberValidation((previous) => ({
+      ...previous,
+      isValidating: true,
+    }));
+
+    const timer = setTimeout((): void => {
+      void greenTargetApi
+        .checkInvoiceNumber(trimmedNumber)
+        .then(
+          (result: {
+            available: boolean;
+            exists: boolean;
+            existing_id?: number | null;
+          }): void => {
+            setInvoiceNumberValidation({
+              isValidating: false,
+              isValid: result.available,
+              isDuplicate: result.exists,
+              message: result.exists
+                ? `Invoice number already exists${
+                    result.existing_id ? ` (ID: ${result.existing_id})` : ""
+                  }`
+                : "",
+            });
+          }
+        )
+        .catch((validationError: unknown): void => {
+          console.error("Error validating invoice number:", validationError);
+          setInvoiceNumberValidation({
+            isValidating: false,
+            isValid: false,
+            isDuplicate: false,
+            message: "Error validating invoice number",
+          });
+        });
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [invoiceNumber, isInvoiceModalOpen]);
+
   const toggleRentalSelection = (rentalId: number): void => {
     if (rentalId === rental?.rental_id) return; // current rental stays pinned
     setSelectedRentalIds((prev) =>
@@ -421,6 +495,16 @@ const RentalDetailsPage: React.FC = () => {
     }
     if (!dateIssued) {
       toast.error("Date issued is required.");
+      return;
+    }
+    if (invoiceNumber.trim() && invoiceNumberValidation.isDuplicate) {
+      toast.error(
+        "Invoice number already exists. Please choose a different number."
+      );
+      return;
+    }
+    if (invoiceNumber.trim() && invoiceNumberValidation.isValidating) {
+      toast.error("Please wait while the invoice number is checked.");
       return;
     }
     const hasInvalidRevenueSplit: boolean =
@@ -507,6 +591,7 @@ const RentalDetailsPage: React.FC = () => {
 
       const response = await greenTargetApi.createInvoice({
         type: "regular",
+        invoice_number: invoiceNumber.trim() || undefined,
         customer_id: rental.customer_id,
         rental_ids: selectedRentalIds,
         amount_before_tax: amount,
@@ -1231,6 +1316,55 @@ const RentalDetailsPage: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* Invoice Number */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-2">
+                      Invoice Number
+                      <span className="ml-1 text-xs font-normal text-default-500 dark:text-gray-400">
+                        (optional - auto-generated if empty)
+                      </span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={invoiceNumber}
+                        onChange={(e) => setInvoiceNumber(e.target.value)}
+                        disabled={isCreatingInvoice}
+                        placeholder="Enter custom invoice number or leave blank"
+                        className={`w-full px-3 py-2 border rounded-lg text-default-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:focus:ring-sky-400 ${
+                          invoiceNumberValidation.isDuplicate
+                            ? "border-rose-500 bg-rose-50 dark:bg-rose-900/30"
+                            : invoiceNumberValidation.isValid
+                            ? "border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50"
+                            : "border-amber-500 bg-amber-50 dark:bg-amber-900/30"
+                        }`}
+                      />
+                      {invoiceNumberValidation.isValidating && (
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-sky-500"></div>
+                        </div>
+                      )}
+                    </div>
+                    {invoiceNumberValidation.message && (
+                      <p
+                        className={`mt-1 text-xs ${
+                          invoiceNumberValidation.isDuplicate
+                            ? "text-rose-600"
+                            : "text-amber-600"
+                        }`}
+                      >
+                        {invoiceNumberValidation.message}
+                      </p>
+                    )}
+                    {invoiceNumber.trim() &&
+                      invoiceNumberValidation.isValid &&
+                      !invoiceNumberValidation.isValidating && (
+                        <p className="mt-1 text-xs text-green-600">
+                          Invoice number is available
+                        </p>
+                      )}
+                  </div>
+
                   {/* Amount + Date */}
                   <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
@@ -1494,6 +1628,7 @@ const RentalDetailsPage: React.FC = () => {
                         isCreatingInvoice ||
                         isLoadingCustomerRentals ||
                         selectedRentalIds.length === 0 ||
+                        invoiceNumberValidation.isDuplicate ||
                         (recordPayment &&
                           (paymentReceiptLookup.isLooking ||
                             Boolean(

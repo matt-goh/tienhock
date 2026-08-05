@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-05",
+    ms: "Green Target: tetingkap \"Create Invoice\" pada halaman sewaan kini membenarkan anda memasukkan nombor invois sendiri, sama seperti borang invois penuh. Biarkan ruangan itu kosong untuk menjana nombor secara automatik seperti biasa; jika nombor yang dimasukkan sudah digunakan, anda akan diberitahu sebelum invois disimpan.",
+    en: "Green Target: the \"Create Invoice\" dialog on the rental page now lets you enter your own invoice number, the same as the full invoice form. Leave it blank to auto-generate the number as before; if the number you type is already in use, you are warned before the invoice is saved.",
+  },
+  {
+    date: "2026-08-05",
     ms: "Green Target: kadar gaji pekerja kini boleh ditetapkan secara berasingan daripada Tien Hock, termasuk perubahan kadar berjadual untuk bulan-bulan akan datang (Payroll → Kadar Gaji Pekerja). Ini membolehkan kakitangan yang berada dalam penggajian kedua-dua syarikat, seperti para pengarah, dibayar pada kadar yang berbeza oleh setiap syarikat.",
     en: "Green Target: employee pay rates can now be set separately from Tien Hock, including scheduled rate changes for future months (Payroll → Employee Pay Rates). This lets staff who are on both companies' payrolls, like the directors, be paid a different rate by each company.",
   },
