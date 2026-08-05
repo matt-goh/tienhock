@@ -10,6 +10,11 @@ import { TDocumentDefinitions, TableCell, Content } from "pdfmake/interfaces";
 import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfBlob } from "../pdfPrintFallback";
+import {
+  PdfPaperSize,
+  getPaperSizePreference,
+  getPdfMakePageSize,
+} from "../pdf/paperSize";
 
 (pdfMake as any).vfs = (pdfFonts as any).pdfMake?.vfs || pdfFonts;
 
@@ -91,7 +96,8 @@ const loadLogoDataUrl = async (): Promise<string | null> => {
 
 const buildDocDefinition = (
   data: PayrollSummaryPDFData,
-  logoDataUrl: string | null
+  logoDataUrl: string | null,
+  paperSize: PdfPaperSize
 ): TDocumentDefinitions => {
   const th = (text: string, extra: HeaderCellOptions = {}): TableCell => ({
     text,
@@ -245,7 +251,7 @@ const buildDocDefinition = (
 
   return {
     info: { title: `Payroll Summary ${data.periodLabel}`, author: TIENHOCK_INFO.name },
-    pageSize: "A4",
+    pageSize: getPdfMakePageSize(paperSize),
     pageOrientation: "landscape",
     pageMargins: [18, 20, 18, 28],
     defaultStyle: { fontSize: 7.5, lineHeight: 1.1, color: colors.textPrimary },
@@ -307,10 +313,15 @@ const buildDocDefinition = (
 };
 
 export const generatePayrollSummaryPDF = async (
-  data: PayrollSummaryPDFData
+  data: PayrollSummaryPDFData,
+  paperSize?: PdfPaperSize
 ): Promise<void> => {
   const logoDataUrl = await loadLogoDataUrl();
-  const docDefinition = buildDocDefinition(data, logoDataUrl);
+  const docDefinition = buildDocDefinition(
+    data,
+    logoDataUrl,
+    paperSize ?? getPaperSizePreference()
+  );
   const pdfBlob: Blob = await new Promise<Blob>((resolve) => {
     pdfMake.createPdf(docDefinition).getBlob(resolve);
   });

@@ -11,6 +11,11 @@ import {
 import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
+import {
+  getPaperSizePreference,
+  getReactPdfPageSize,
+  type PdfPaperSize,
+} from "../pdf/paperSize";
 
 // A refined color palette focusing on text and borders for a classic report look
 const colors = {
@@ -441,7 +446,9 @@ const DebtorsReportPDF: React.FC<{
   data: any;
   companyName?: string;
   filterMonthName?: string;
-}> = ({ data, companyName = TIENHOCK_INFO.name, filterMonthName }) => {
+  paperSize?: PdfPaperSize;
+}> = ({ data, companyName = TIENHOCK_INFO.name, filterMonthName, paperSize }) => {
+  const effectivePaperSize = paperSize ?? getPaperSizePreference();
   const showTienHockLogo = companyName === TIENHOCK_INFO.name;
   const reportTitleText = filterMonthName
     ? `Unpaid Bills (Invoices from ${filterMonthName}) as at ${data.report_date}`
@@ -449,7 +456,7 @@ const DebtorsReportPDF: React.FC<{
 
   return (
     <Document title={`${companyName} Debtors Report ${data.report_date}`}>
-      <Page size="A4" style={styles.page}>
+      <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
         {/* Header with logo and company name - matching InvoicePDF style */}
         <View style={styles.header}>
           {showTienHockLogo && <Image src={TienHockLogo} style={styles.logo} />}
@@ -527,7 +534,8 @@ export const generateDebtorsReportPDF = async (
   action: "download" | "print",
   filterMonthNameOrOptions?:
     | string
-    | { filterMonthName?: string; companyName?: string }
+    | { filterMonthName?: string; companyName?: string },
+  paperSize?: PdfPaperSize
 ) => {
   try {
     const options =
@@ -539,6 +547,7 @@ export const generateDebtorsReportPDF = async (
         data={data}
         companyName={options.companyName}
         filterMonthName={options.filterMonthName}
+        paperSize={paperSize}
       />
     );
     const pdfBlob = await pdf(doc).toBlob();

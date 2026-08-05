@@ -9,6 +9,11 @@ import {
 } from "@react-pdf/renderer";
 import { getMonthName } from "./payrollUtils";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
+import {
+  getPaperSizePreference,
+  getReactPdfPageSize,
+  PdfPaperSize,
+} from "../pdf/paperSize";
 
 // Color palette for professional appearance
 const colors = {
@@ -341,6 +346,11 @@ export interface SalaryReportPDFProps {
   companyName?: string;
   // Hide internal location codes when the friendly label already identifies the group.
   showLocationCodes?: boolean;
+  // Tien Hock's grouped Employee view folds its commission locations (16-24)
+  // into 14. Green Target and Jelly Polly read those codes literally, so they
+  // opt out and every location prints as its own group.
+  mergeCommissionLocations?: boolean;
+  paperSize?: PdfPaperSize;
 }
 
 // Helper functions
@@ -708,12 +718,21 @@ const EmployeeGroupedContent: React.FC<{
   locationMap: Record<string, string>;
   locationOrder: LocationOrderItem[];
   grandTotals: GrandTotals;
-}> = ({ comprehensiveData, locationMap, locationOrder, grandTotals }) => {
-  // Process locations: merge 16-24 into 14
+  mergeCommissionLocations: boolean;
+}> = ({
+  comprehensiveData,
+  locationMap,
+  locationOrder,
+  grandTotals,
+  mergeCommissionLocations,
+}) => {
+  // Process locations: merge 16-24 into 14 (Tien Hock only)
   const locationsCopy = JSON.parse(
     JSON.stringify(comprehensiveData.locations)
   ) as LocationSalaryData[];
-  const commissionLocCodes = ["16", "17", "18", "19", "20", "21", "22", "23", "24"];
+  const commissionLocCodes = mergeCommissionLocations
+    ? ["16", "17", "18", "19", "20", "21", "22", "23", "24"]
+    : [];
   const commissionLocs = locationsCopy.filter((loc) =>
     commissionLocCodes.includes(loc.location)
   );
@@ -1167,7 +1186,10 @@ const SalaryReportPDF: React.FC<SalaryReportPDFProps> = ({
   locationOrder,
   companyName = "TIEN HOCK FOOD INDUSTRIES S/B (953309-T)",
   showLocationCodes = true,
+  mergeCommissionLocations = true,
+  paperSize,
 }) => {
+  const effectivePaperSize = paperSize ?? getPaperSizePreference();
   const reportTitle = buildReportTitle(periodType, year, month);
   const viewSubtitle = buildViewSubtitle(reportType);
 
@@ -1204,6 +1226,7 @@ const SalaryReportPDF: React.FC<SalaryReportPDFProps> = ({
         locationMap={locationMap}
         locationOrder={locationOrder}
         grandTotals={grandTotals}
+        mergeCommissionLocations={mergeCommissionLocations}
       />
     );
   } else if (reportType === "location" && comprehensiveData && comprehensiveData.locations.length > 0) {
@@ -1221,7 +1244,11 @@ const SalaryReportPDF: React.FC<SalaryReportPDFProps> = ({
     <Document
       title={`Salary Report ${periodType === "yearly" ? year : `${getMonthName(month || 1)} ${year}`}`}
     >
-      <Page size="A4" orientation="landscape" style={styles.page}>
+      <Page
+        size={getReactPdfPageSize(effectivePaperSize, true)}
+        orientation="landscape"
+        style={styles.page}
+      >
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.companyName}>{companyName}</Text>

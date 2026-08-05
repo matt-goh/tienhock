@@ -476,6 +476,82 @@ export default function (pool) {
   });
 
   /**
+   * GET /jellypolly/api/salary-report/yearly?year
+   * Same shape as the monthly report, but every processed month of the year
+   * aggregated into one row per employee. Per-month rounding is summed rather
+   * than recomputed, so the yearly figures reconcile with the monthly payrolls
+   * (same convention as /annual). Bank and Pinjam stay monthly-only.
+   */
+  router.get("/yearly", async (req, res) => {
+    const year = parseInt(req.query.year, 10);
+    if (!year) return res.status(400).json({ message: "year is required" });
+    try {
+      const { rows, locationMap } = await loadYearRows(year);
+
+      const newEmployee = (r) => ({
+        employee_payroll_id: null,
+        staff_id: r.employee_id,
+        staff_name: r.employee_name,
+        ...emptyTotals(),
+      });
+
+      const groups = {};
+      const byEmployee = new Map();
+      const grand = emptyTotals();
+      for (const r of rows) {
+        if (!groups[r.location_code]) {
+          groups[r.location_code] = {
+            location: r.location_code,
+            employees: new Map(),
+            totals: emptyTotals(),
+          };
+        }
+        const group = groups[r.location_code];
+        if (!group.employees.has(r.employee_id)) {
+          group.employees.set(r.employee_id, newEmployee(r));
+        }
+        addInto(group.employees.get(r.employee_id), r.row);
+        addInto(group.totals, r.row);
+
+        if (!byEmployee.has(r.employee_id)) {
+          byEmployee.set(r.employee_id, newEmployee(r));
+        }
+        addInto(byEmployee.get(r.employee_id), r.row);
+        addInto(grand, r.row);
+      }
+
+      const locations = Object.values(groups)
+        .sort((a, b) => locationRank(a.location) - locationRank(b.location))
+        .map((g) => ({
+          location: g.location,
+          employees: Array.from(g.employees.values()),
+          totals: g.totals,
+        }));
+
+      const employees = Array.from(byEmployee.values())
+        .sort((a, b) => (a.staff_name || "").localeCompare(b.staff_name || ""))
+        .map((e, index) => ({ no: index + 1, ...e }));
+
+      res.json({
+        year,
+        month: null,
+        locations,
+        grand_totals: grand,
+        location_map: locationMap,
+        employees,
+        employees_grand_totals: grand,
+        total_records: employees.length,
+      });
+    } catch (error) {
+      console.error("Error building JP yearly salary report:", error);
+      res.status(500).json({
+        message: "Error building yearly salary report",
+        error: error.message,
+      });
+    }
+  });
+
+  /**
    * GET /jellypolly/api/salary-report/annual?year
    * Annual summary: per-month totals + per-group totals + grand totals.
    */

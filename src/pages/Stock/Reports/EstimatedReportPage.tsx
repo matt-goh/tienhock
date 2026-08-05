@@ -33,6 +33,9 @@ import {
 
 type ProductLine = "mee" | "bihun";
 
+/** One of the three print actions: a single product line, or both. */
+type PrintTarget = ProductLine | "all";
+
 export type EstimatedReportView = "pl" | "unitCost";
 
 interface ReportPeriod {
@@ -511,7 +514,8 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
   const [isMappingModalOpen, setIsMappingModalOpen] = useState<boolean>(false);
   const [addBackInput, setAddBackInput] = useState<string>("0");
   const [savingAddBack, setSavingAddBack] = useState<boolean>(false);
-  const [exporting, setExporting] = useState<boolean>(false);
+  // Which print action is running: a single product line, "all", or none.
+  const [exporting, setExporting] = useState<PrintTarget | null>(null);
 
   // The selected month persists per view; the report has no data before
   // REPORT_MIN_MONTH, so both the default and a restored value are clamped.
@@ -627,17 +631,24 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
     fetchMappings();
   };
 
-  const handlePrintPDF = async (): Promise<void> => {
+  const handlePrintPDF = async (target: PrintTarget): Promise<void> => {
     if (!report) return;
 
-    setExporting(true);
+    const lines: ProductLine[] =
+      target === "all" ? ["mee", "bihun"] : [target];
+    if (!lines.some((line) => report.reports[line])) {
+      toast.error("No report data to print for this month.");
+      return;
+    }
+
+    setExporting(target);
     try {
-      await generateEstimatedReportPDF(report, view);
+      await generateEstimatedReportPDF(report, view, lines);
     } catch (err) {
       console.error("Error printing PDF:", err);
       toast.error("Failed to generate PDF");
     } finally {
-      setExporting(false);
+      setExporting(null);
     }
   };
 
@@ -708,17 +719,29 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
           >
             Mappings
           </Button>
-          <Button
-            size="sm"
-            variant="filled"
-            color="sky"
-            icon={IconPrinter}
-            iconSize={16}
-            onClick={handlePrintPDF}
-            disabled={exporting || !report}
-          >
-            {exporting ? "Preparing..." : "Print"}
-          </Button>
+          {/* Print the selected month: one product line, or both */}
+          {(["mee", "bihun", "all"] as PrintTarget[]).map((target) => (
+            <Button
+              key={target}
+              size="sm"
+              variant={target === "all" ? "filled" : "outline"}
+              color="sky"
+              icon={IconPrinter}
+              iconSize={16}
+              onClick={() => handlePrintPDF(target)}
+              disabled={
+                exporting !== null ||
+                !report ||
+                (target !== "all" && !report.reports[target])
+              }
+            >
+              {exporting === target
+                ? "Preparing..."
+                : target === "all"
+                ? "Print All"
+                : `Print ${target.toUpperCase()}`}
+            </Button>
+          ))}
         </div>
       </div>
 

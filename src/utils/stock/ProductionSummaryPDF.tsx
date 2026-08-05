@@ -19,6 +19,11 @@ import {
 } from "@react-pdf/renderer";
 import TienHockLogo from "../tienhock.png";
 import { printPdfBlob } from "../pdfPrintFallback";
+import {
+  getPaperSizePreference,
+  getReactPdfPageSize,
+  PdfPaperSize,
+} from "../pdf/paperSize";
 
 export interface ProductionSummaryRow {
   productId: string;
@@ -174,9 +179,12 @@ const formatQuantity = (value: number): string =>
 
 const ProductionSummaryPDFDocument: React.FC<{
   data: ProductionSummaryData;
-}> = ({ data }) => (
+  paperSize?: PdfPaperSize;
+}> = ({ data, paperSize }) => {
+  const effectivePaperSize = paperSize ?? getPaperSizePreference();
+  return (
   <Document title={data.reportTitle} author={data.companyName}>
-    <Page size="A4" style={styles.page}>
+    <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
       <View style={styles.header}>
         <Image src={TienHockLogo} style={styles.logo} />
         <View style={styles.headerTextContainer}>
@@ -228,13 +236,15 @@ const ProductionSummaryPDFDocument: React.FC<{
       />
     </Page>
   </Document>
-);
+  );
+};
 
 export const generateProductionSummaryPDF = async (
-  data: ProductionSummaryData
+  data: ProductionSummaryData,
+  paperSize?: PdfPaperSize
 ): Promise<void> => {
   const blob: Blob = await pdf(
-    <ProductionSummaryPDFDocument data={data} />
+    <ProductionSummaryPDFDocument data={data} paperSize={paperSize} />
   ).toBlob();
   printPdfBlob(blob, "production summary PDF");
 };

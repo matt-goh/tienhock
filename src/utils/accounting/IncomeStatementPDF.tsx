@@ -11,6 +11,11 @@ import {
 import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfBlob } from "../pdfPrintFallback";
+import {
+  getPaperSizePreference,
+  getReactPdfPageSize,
+  type PdfPaperSize,
+} from "../pdf/paperSize";
 
 const colors = {
   textPrimary: "#0f172a",
@@ -211,14 +216,17 @@ const formatCurrency = (amount: number): string => {
 
 interface IncomeStatementPDFDocumentProps {
   data: IncomeStatementData;
+  paperSize?: PdfPaperSize;
 }
 
 const IncomeStatementPDFDocument: React.FC<IncomeStatementPDFDocumentProps> = ({
   data,
+  paperSize,
 }) => {
+  const effectivePaperSize = paperSize ?? getPaperSizePreference();
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
+      <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
           <Image src={TienHockLogo} style={styles.logo} />
@@ -342,10 +350,11 @@ const IncomeStatementPDFDocument: React.FC<IncomeStatementPDFDocumentProps> = ({
 };
 
 export const generateIncomeStatementPDF = async (
-  data: IncomeStatementData
+  data: IncomeStatementData,
+  paperSize?: PdfPaperSize
 ): Promise<void> => {
   const blob = await pdf(
-    <IncomeStatementPDFDocument data={data} />
+    <IncomeStatementPDFDocument data={data} paperSize={paperSize} />
   ).toBlob();
 
   printPdfBlob(blob, "income statement PDF");

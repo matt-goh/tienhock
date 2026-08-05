@@ -8,6 +8,7 @@ import {
   IconHistory,
   IconExternalLink,
   IconLanguage,
+  IconPrinter,
 } from "@tabler/icons-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -21,6 +22,8 @@ import {
 } from "../../i18n";
 import BackupModal from "../BackupModal";
 import ChangelogModal from "../ChangelogModal";
+import PaperSizePicker from "../PaperSizePicker";
+import { usePaperSizePreference } from "../../utils/pdf/paperSize";
 
 const GT_SIGNUP_PREVIEW_PATH = "/greentarget/dev/customer-signup-preview";
 
@@ -28,6 +31,7 @@ export default function NavbarUserMenu() {
   const { user, logout } = useAuth();
   const { isDarkMode, toggleDarkMode } = useTheme();
   const { t, i18n } = useTranslation("nav");
+  const [paperSize, setPaperSize] = usePaperSizePreference();
   const [isOpen, setIsOpen] = useState(false);
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
   const [isChangelogOpen, setIsChangelogOpen] = useState(false);
@@ -170,6 +174,15 @@ export default function NavbarUserMenu() {
                     );
                   })}
                 </div>
+              </div>
+
+              {/* Paper Size Selector */}
+              <div className="px-2 py-1.5">
+                <div className="flex items-center text-sm text-default-700 dark:text-gray-200 mb-1.5">
+                  <IconPrinter className="mr-2 h-5 w-5" stroke={1.5} />
+                  {t("Paper Size")}
+                </div>
+                <PaperSizePicker value={paperSize} onChange={setPaperSize} />
               </div>
 
               {canAccessSignupPreview && (

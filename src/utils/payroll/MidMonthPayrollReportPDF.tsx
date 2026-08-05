@@ -12,6 +12,11 @@ import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
 import type { PinjamDetail } from "./PinjamReportPDF";
+import {
+  getPaperSizePreference,
+  getReactPdfPageSize,
+  PdfPaperSize,
+} from "../pdf/paperSize";
 
 const colors = {
   textPrimary: "#0f172a",
@@ -429,10 +434,12 @@ const PaymentGroup: React.FC<{
 const MidMonthPayrollReportPDF: React.FC<{
   data: MidMonthPayrollReportPDFData;
   companyName?: string;
-}> = ({ data, companyName }) => {
+  paperSize?: PdfPaperSize;
+}> = ({ data, companyName, paperSize }) => {
   const resolvedCompanyName: string =
     companyName ?? data.companyName ?? TIENHOCK_INFO.name;
   const resolvedLogo: string = data.logoSrc ?? TienHockLogo;
+  const effectivePaperSize = paperSize ?? getPaperSizePreference();
   const reportTitle = `${getMonthName(data.month)} ${data.year} Mid-Month Payroll Report`;
 
   const groupedData = groupByPaymentPreference(data.data);
@@ -444,7 +451,7 @@ const MidMonthPayrollReportPDF: React.FC<{
     <Document
       title={`Mid-Month Payroll Report ${getMonthName(data.month)} ${data.year}`}
     >
-      <Page size="A4" style={styles.page}>
+      <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
         <View style={styles.header}>
           <Image src={resolvedLogo} style={styles.logo} />
           <View style={styles.headerTextContainer}>
@@ -529,11 +536,16 @@ const MidMonthPayrollReportPDF: React.FC<{
 
 export const generateMidMonthPayrollReportPDF = async (
   data: MidMonthPayrollReportPDFData,
-  action: "download" | "print"
+  action: "download" | "print",
+  paperSize?: PdfPaperSize
 ) => {
   try {
     const doc = (
-      <MidMonthPayrollReportPDF data={data} companyName={data.companyName} />
+      <MidMonthPayrollReportPDF
+        data={data}
+        companyName={data.companyName}
+        paperSize={paperSize}
+      />
     );
     const pdfBlob = await pdf(doc).toBlob();
 

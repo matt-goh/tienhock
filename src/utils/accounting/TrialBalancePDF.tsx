@@ -11,6 +11,11 @@ import {
 import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfBlob } from "../pdfPrintFallback";
+import {
+  getPaperSizePreference,
+  getReactPdfPageSize,
+  type PdfPaperSize,
+} from "../pdf/paperSize";
 
 const colors = {
   textPrimary: "#0f172a",
@@ -209,6 +214,7 @@ interface TrialBalancePDFDocumentProps {
   data: TrialBalanceData;
   accounts: TrialBalanceAccount[];
   branding?: TrialBalancePDFBranding;
+  paperSize?: PdfPaperSize;
 }
 
 export interface TrialBalancePDFBranding {
@@ -220,7 +226,9 @@ const TrialBalancePDFDocument: React.FC<TrialBalancePDFDocumentProps> = ({
   data,
   accounts,
   branding,
+  paperSize,
 }) => {
+  const effectivePaperSize = paperSize ?? getPaperSizePreference();
   // Calculate totals from filtered accounts
   const filteredTotals = accounts.reduce(
     (acc, account) => ({
@@ -232,7 +240,7 @@ const TrialBalancePDFDocument: React.FC<TrialBalancePDFDocumentProps> = ({
 
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
+      <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
           <Image src={branding?.logoSrc ?? TienHockLogo} style={styles.logo} />
@@ -318,13 +326,15 @@ const TrialBalancePDFDocument: React.FC<TrialBalancePDFDocumentProps> = ({
 export const generateTrialBalancePDF = async (
   data: TrialBalanceData,
   accounts: TrialBalanceAccount[],
-  branding?: TrialBalancePDFBranding
+  branding?: TrialBalancePDFBranding,
+  paperSize?: PdfPaperSize
 ): Promise<void> => {
   const blob = await pdf(
     <TrialBalancePDFDocument
       data={data}
       accounts={accounts}
       branding={branding}
+      paperSize={paperSize}
     />
   ).toBlob();
 

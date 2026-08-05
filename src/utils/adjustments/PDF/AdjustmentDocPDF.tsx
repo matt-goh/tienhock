@@ -8,6 +8,11 @@ import { AdjustmentDocType } from "../../../types/types";
 import { CompanyInfo, JELLYPOLLY_INFO } from "../../invoice/einvoice/companyInfo";
 import TienHockLogo from "../../tienhock.png";
 import { formatAdjustmentDocId } from "../formatDocId";
+import {
+  getPaperSizePreference,
+  getReactPdfPageSize,
+  PdfPaperSize,
+} from "../../pdf/paperSize";
 
 const stateOptions = [
   { id: "01", name: "Johor" },
@@ -281,13 +286,16 @@ interface Props {
   data: AdjustmentDocPDFData;
   qrCodeData?: string | null;
   companyContext?: "tienhock" | "jellypolly";
+  paperSize?: PdfPaperSize;
 }
 
 const AdjustmentDocPDF: React.FC<Props> = ({
   data,
   qrCodeData,
   companyContext = "tienhock",
+  paperSize,
 }) => {
+  const effectivePaperSize = paperSize ?? getPaperSizePreference();
   const isValidated = Boolean(qrCodeData);
   const typeMeta = TYPE_LABEL[data.doc.type];
   const isJP = companyContext === "jellypolly";
@@ -300,7 +308,7 @@ const AdjustmentDocPDF: React.FC<Props> = ({
   const supplierRegNo = isJP ? JELLYPOLLY_INFO.reg_no : data.company.reg_no;
 
   return (
-    <Page size="A4" style={styles.page}>
+    <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.companySection}>

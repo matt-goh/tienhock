@@ -4,8 +4,10 @@ This directory holds the **only independent proof of the Jan–May 2026 books**:
 legacy-system reports (Jan–May monthly Trial Balances, May Balance Sheet / Detail Income
 Statement / CoGM / Trade Debtor List), the deterministic CSV fixtures transcribed from them, and
 the harness that keeps the ERP 1:1 with them. The full record lives in
-`docs/Account/LEGACY_REPORT_VERIFICATION_PLAN.md` (Phases V0–V4) and
-`docs/Account/LEGACY_REPORT_RECONCILIATION.md`.
+`docs/Account/LEGACY_REPORT_VERIFICATION_PLAN.md` (Phases V0–V4). The scan-reconciliation
+findings doc (`docs/Account/LEGACY_REPORT_RECONCILIATION.md`) was removed 5 Aug 2026 after the
+boss confirmed the Jan–May 2026 TB tally — recoverable from git history; summary in
+`docs/Account/ACCOUNTING_PROGRESS.md` §6.
 
 ## Layout
 

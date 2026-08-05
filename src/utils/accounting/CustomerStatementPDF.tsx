@@ -12,6 +12,11 @@ import {
 import TienHockLogo from "../tienhock.png";
 import { type CompanyInfo, TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
+import {
+  getPaperSizePreference,
+  getReactPdfPageSize,
+  type PdfPaperSize,
+} from "../pdf/paperSize";
 
 // Types for the statement data
 interface Transaction {
@@ -307,7 +312,9 @@ const CustomerStatementPDF: React.FC<{
   data: CustomerStatementData;
   companyInfo?: CompanyInfo;
   companyName?: string;
-}> = ({ data, companyInfo = TIENHOCK_INFO, companyName }) => {
+  paperSize?: PdfPaperSize;
+}> = ({ data, companyInfo = TIENHOCK_INFO, companyName, paperSize }) => {
+  const effectivePaperSize = paperSize ?? getPaperSizePreference();
   const { customer, statement_date, previous_balance, transactions, total_amount_due, aging, unapplied_overpayment } = data;
 
   // Build customer address string
@@ -320,7 +327,7 @@ const CustomerStatementPDF: React.FC<{
 
   return (
     <Document title={`Statement of Account - ${customer.id} - ${statement_date}`}>
-      <Page size="A4" style={styles.page}>
+      <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
         {/* Company Header */}
         <CompanyHeader companyInfo={companyInfo} companyName={companyName} />
 
@@ -454,7 +461,8 @@ const CustomerStatementPDF: React.FC<{
 export const generateCustomerStatementPDF = async (
   data: CustomerStatementData,
   action: "download" | "print",
-  options: CustomerStatementPDFOptions = {}
+  options: CustomerStatementPDFOptions = {},
+  paperSize?: PdfPaperSize
 ): Promise<void> => {
   try {
     const doc = (
@@ -462,6 +470,7 @@ export const generateCustomerStatementPDF = async (
         data={data}
         companyInfo={options.companyInfo}
         companyName={options.companyName}
+        paperSize={paperSize}
       />
     );
     const pdfBlob = await pdf(doc).toBlob();

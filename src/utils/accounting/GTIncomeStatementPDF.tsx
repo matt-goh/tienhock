@@ -11,6 +11,11 @@ import {
 import GreenTargetLogo from "../GreenTargetLogo.png";
 import { GREENTARGET_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfBlob } from "../pdfPrintFallback";
+import {
+  getPaperSizePreference,
+  getReactPdfPageSize,
+  type PdfPaperSize,
+} from "../pdf/paperSize";
 
 const colors = {
   textPrimary: "#0f172a",
@@ -287,11 +292,13 @@ const formatLineItemLabel = (item: GTStatementItem): string => {
 
 interface GTIncomeStatementPDFDocumentProps {
   data: GTIncomeStatementData;
+  paperSize?: PdfPaperSize;
 }
 
 const GTIncomeStatementPDFDocument: React.FC<
   GTIncomeStatementPDFDocumentProps
-> = ({ data }) => {
+> = ({ data, paperSize }) => {
+  const effectivePaperSize = paperSize ?? getPaperSizePreference();
   const renderAfterBlockFigure = (
     figure: GTISAfterBlockFigure,
     index: number
@@ -336,7 +343,7 @@ const GTIncomeStatementPDFDocument: React.FC<
 
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
+      <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
           <Image src={GreenTargetLogo} style={styles.logo} />
@@ -405,10 +412,11 @@ const GTIncomeStatementPDFDocument: React.FC<
 };
 
 export const generateGTIncomeStatementPDF = async (
-  data: GTIncomeStatementData
+  data: GTIncomeStatementData,
+  paperSize?: PdfPaperSize
 ): Promise<void> => {
   const blob = await pdf(
-    <GTIncomeStatementPDFDocument data={data} />
+    <GTIncomeStatementPDFDocument data={data} paperSize={paperSize} />
   ).toBlob();
 
   printPdfBlob(blob, "income statement PDF");

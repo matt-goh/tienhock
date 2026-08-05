@@ -4,11 +4,17 @@ import { Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
 import { InvoiceData, ProductItem } from "../../../types/types";
 import { TIENHOCK_INFO } from "../einvoice/companyInfo";
 import TienHockLogo from "../../tienhock.png";
+import {
+  getPaperSizePreference,
+  getReactPdfPageSize,
+  PdfPaperSize,
+} from "../../pdf/paperSize";
 
 interface InvoicePDFProps {
   invoices: InvoiceData[];
   customerNames?: Record<string, string>;
   companyContext?: "tienhock" | "jellypolly";
+  paperSize?: PdfPaperSize;
 }
 
 const ROWS_PER_PAGE = 30;
@@ -234,7 +240,9 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
   invoices,
   customerNames = {},
   companyContext = "tienhock",
+  paperSize,
 }) => {
+  const effectivePaperSize = paperSize ?? getPaperSizePreference();
   const getProcessedProducts = (products: ProductItem[]) => {
     const orderedRows: ProductItem[] = [];
     const regularProductsAggregated = new Map<
@@ -626,7 +634,7 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
           pageInvoices,
           pageIndex
         ) => (
-          <Page key={`page-${pageIndex}`} size="A4" style={styles.page}>
+          <Page key={`page-${pageIndex}`} size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
             {pageIndex === 0 && (
               <View style={styles.header}>
                 <Image src={TienHockLogo} style={styles.logo} />

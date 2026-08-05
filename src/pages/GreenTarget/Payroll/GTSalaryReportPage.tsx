@@ -54,6 +54,10 @@ const GT_COMPANY = "GREEN TARGET WASTE TREATMENT IND. SDN. BHD.";
 // Tabs whose data all comes from the single monthly salary-report endpoint.
 const MONTHLY_TABS = ["employee", "monthly", "bank", "pinjam"] as const;
 
+// Tabs that honour the Monthly/Yearly period toggle. Bank and Pinjam are
+// month-end payout views, so they always stay on the selected month.
+const PERIOD_TABS = ["employee", "monthly"] as const;
+
 // Build the PDF's locationOrder from a location_map (codes sorted ascending).
 const buildLocationOrder = (map: Record<string, string>) =>
   Object.keys(map)
@@ -82,7 +86,8 @@ interface Totals {
 }
 
 interface EmpRow extends Totals {
-  employee_payroll_id: number;
+  // Null on the yearly view, where one row spans several monthly payrolls.
+  employee_payroll_id: number | null;
   staff_id: string;
   staff_name: string;
 }
@@ -93,7 +98,7 @@ interface LocationData {
 }
 interface Comprehensive {
   year: number;
-  month: number;
+  month: number | null;
   locations: LocationData[];
   grand_totals: Totals;
   location_map: Record<string, string>;
@@ -178,6 +183,8 @@ type TabType =
   | "cuti"
   | "annual";
 type AnnualView = "summary" | "breakdown";
+type EmployeeView = "individual" | "location";
+type PeriodType = "monthly" | "yearly";
 
 const TABS: TabType[] = [
   "employee",
@@ -207,6 +214,9 @@ const fmtCurrency = (amount: number): string =>
 const isMonthlyTab = (tab: TabType): boolean =>
   (MONTHLY_TABS as readonly string[]).includes(tab);
 
+const isPeriodTab = (tab: TabType): boolean =>
+  (PERIOD_TABS as readonly string[]).includes(tab);
+
 const getPinjamStaffKey = (
   staffName: string | null | undefined,
   staffId: string | null | undefined
@@ -223,6 +233,13 @@ const GTSalaryReportPage: React.FC = () => {
     () => "summary",
     (cached) => (cached === "summary" || cached === "breakdown" ? cached : null)
   );
+  // Sub-view mode for the Employee tab: one flat list, or grouped by location.
+  const [employeeView, setEmployeeView] = usePersistedFilters<EmployeeView>(
+    "gtSalaryReportEmployeeView",
+    () => "individual",
+    (cached) =>
+      cached === "individual" || cached === "location" ? cached : null
+  );
   const [pinjamViewMode, setPinjamViewMode] =
     usePersistedFilters<PinjamViewMode>(
       "gtSalaryReportPinjamView",
@@ -230,7 +247,14 @@ const GTSalaryReportPage: React.FC = () => {
       (cached) =>
         cached === "month_end" || cached === "mid_month" ? cached : null
     );
+  // Monthly = the selected month; Yearly = every processed month of the year.
+  const [periodType, setPeriodType] = usePersistedFilters<PeriodType>(
+    "gtSalaryReportPeriod",
+    () => "monthly",
+    (cached) => (cached === "monthly" || cached === "yearly" ? cached : null)
+  );
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingYearly, setIsLoadingYearly] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingExport, setIsGeneratingExport] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
@@ -259,6 +283,7 @@ const GTSalaryReportPage: React.FC = () => {
   );
 
   const [monthly, setMonthly] = useState<Comprehensive | null>(null);
+  const [yearly, setYearly] = useState<Comprehensive | null>(null);
   const [pinjamSummary, setPinjamSummary] = useState<PinjamSummaryEntry[]>([]);
   const [annual, setAnnual] = useState<AnnualSummary | null>(null);
   const [breakdown, setBreakdown] = useState<AnnualBreakdown | null>(null);
@@ -370,6 +395,28 @@ const GTSalaryReportPage: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
+  // The yearly aggregate is only needed by the tabs that honour the toggle.
+  const fetchYearly = useCallback(async () => {
+    setIsLoadingYearly(true);
+    try {
+      const res = await api.get(
+        `/greentarget/api/salary-report/yearly?year=${currentYear}`
+      );
+      setYearly(res);
+      if (res?.location_map) setLocationMap(res.location_map);
+    } catch (error) {
+      console.error("Error loading GT yearly salary report:", error);
+      setYearly(null);
+      toast.error("Failed to load yearly salary report");
+    } finally {
+      setIsLoadingYearly(false);
+    }
+  }, [currentYear]);
+
+  useEffect(() => {
+    if (periodType === "yearly" && isPeriodTab(activeTab)) fetchYearly();
+  }, [periodType, activeTab, fetchYearly]);
+
   const handleTimeChange = (range: TimeRange): void => {
     setCurrentYear(range.start.getFullYear());
     setCurrentMonth(range.start.getMonth() + 1);
@@ -469,6 +516,17 @@ const GTSalaryReportPage: React.FC = () => {
   const activePinjamReportLabel: string =
     pinjamViewMode === "mid_month" ? "Mid-Month Pinjam" : "Pinjam";
 
+  // Employee and Location can show a whole year; every other tab is month-bound.
+  const isYearlyView: boolean =
+    periodType === "yearly" && isPeriodTab(activeTab);
+  const activeData: Comprehensive | null = isYearlyView ? yearly : monthly;
+  const isEmployeeLocationView: boolean =
+    activeTab === "employee" && employeeView === "location";
+  const activeLoading: boolean = isYearlyView ? isLoadingYearly : isLoading;
+  const periodLabel: string = isYearlyView
+    ? `${currentYear}`
+    : `${getMonthName(currentMonth)} ${currentYear}`;
+
   // Bank/Pinjam show take-home after advances; the other monthly tabs show the
   // full earned salary, so the header total follows the active tab.
   const headerTotal: number =
@@ -476,7 +534,17 @@ const GTSalaryReportPage: React.FC = () => {
       ? activePinjamSummary.total_final
       : activeTab === "bank"
       ? monthly?.summary.total_final ?? 0
-      : monthly?.employees_grand_totals?.setelah_digenapkan ?? 0;
+      : activeData?.employees_grand_totals?.setelah_digenapkan ?? 0;
+
+  // Employee → Location view: the groups that actually hold people.
+  // The endpoint already returns them in location order.
+  const employeeLocations = useMemo<LocationData[]>(
+    () =>
+      (activeData?.locations ?? []).filter(
+        (loc: LocationData): boolean => loc.employees.length > 0
+      ),
+    [activeData]
+  );
 
   // Bank text export — bank-preference employees with money to pay out.
   const bankExportRows = useMemo<PinjamReportData[]>(() => {
@@ -758,19 +826,39 @@ const GTSalaryReportPage: React.FC = () => {
   ): Promise<void> => {
     setIsGenerating(true);
     try {
-      if (activeTab === "employee") {
-        if (!monthly || monthly.employees.length === 0) {
-          toast.error("No data to print for this month");
+      if (activeTab === "employee" && employeeView === "location") {
+        if (!activeData || employeeLocations.length === 0) {
+          toast.error(`No data to print for ${periodLabel}`);
+          return;
+        }
+        await generateSalaryReportPDF(
+          {
+            reportType: "employee-grouped",
+            periodType,
+            year: currentYear,
+            month: isYearlyView ? undefined : currentMonth,
+            comprehensiveData: activeData as any,
+            grandTotals: activeData.employees_grand_totals as any,
+            locationMap: locationMap,
+            locationOrder: buildLocationOrder(locationMap),
+            companyName: GT_COMPANY,
+            mergeCommissionLocations: false,
+          },
+          action
+        );
+      } else if (activeTab === "employee") {
+        if (!activeData || activeData.employees.length === 0) {
+          toast.error(`No data to print for ${periodLabel}`);
           return;
         }
         await generateSalaryReportPDF(
           {
             reportType: "employee-individual",
-            periodType: "monthly",
+            periodType,
             year: currentYear,
-            month: currentMonth,
-            employees: monthly.employees as any,
-            grandTotals: monthly.employees_grand_totals as any,
+            month: isYearlyView ? undefined : currentMonth,
+            employees: activeData.employees as any,
+            grandTotals: activeData.employees_grand_totals as any,
             locationMap: locationMap,
             locationOrder: buildLocationOrder(locationMap),
             companyName: GT_COMPANY,
@@ -829,18 +917,18 @@ const GTSalaryReportPage: React.FC = () => {
           action
         );
       } else if (activeTab === "monthly") {
-        if (!monthly || monthly.locations.length === 0) {
-          toast.error("No data to print for this month");
+        if (!activeData || activeData.locations.length === 0) {
+          toast.error(`No data to print for ${periodLabel}`);
           return;
         }
         await generateSalaryReportPDF(
           {
             reportType: "location",
-            periodType: "monthly",
+            periodType,
             year: currentYear,
-            month: currentMonth,
-            comprehensiveData: monthly as any,
-            grandTotals: monthly.grand_totals as any,
+            month: isYearlyView ? undefined : currentMonth,
+            comprehensiveData: activeData as any,
+            grandTotals: activeData.grand_totals as any,
             locationMap: locationMap,
             locationOrder: buildLocationOrder(locationMap),
             companyName: GT_COMPANY,
@@ -965,8 +1053,33 @@ const GTSalaryReportPage: React.FC = () => {
       </td>
     ));
 
-  const renderSalaryHeader = (firstLabel: string): React.ReactElement => (
-    <thead className="sticky top-0 z-20 bg-default-50 dark:bg-gray-900">
+  // Standalone grand-total card used by the Employee → Location view.
+  const grandTotalCellClass = (key: keyof Totals): string => {
+    const horizontalPadding: string = narrowAmountColumns.includes(key)
+      ? "px-1"
+      : "px-2";
+    const groupBorder: string = groupedStartColumns.includes(key)
+      ? " border-l border-sky-300 dark:border-sky-700"
+      : "";
+
+    return `${horizontalPadding} py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40${groupBorder}`;
+  };
+
+  const renderGrandTotalCells = (totals: Totals): React.ReactElement[] =>
+    COLUMNS.map((column: { key: keyof Totals; label: string }) => (
+      <td key={column.key} className={grandTotalCellClass(column.key)}>
+        {fmt(totals[column.key])}
+      </td>
+    ));
+
+  // The location cards each own their scroll box, so their headers don't stick.
+  const renderSalaryHeader = (
+    firstLabel: string,
+    sticky: boolean = true
+  ): React.ReactElement => (
+    <thead
+      className={`${sticky ? "sticky top-0 z-20 " : ""}bg-default-50 dark:bg-gray-900`}
+    >
       <tr>
         <th className={headCellClass} title="Bilangan">
           BIL
@@ -1150,6 +1263,36 @@ const GTSalaryReportPage: React.FC = () => {
                   </button>
                 ))}
               </div>
+              {/* Sub-view toggle for the Employee tab - right after tabs */}
+              {activeTab === "employee" && (
+                <>
+                  <span className="text-default-300 dark:text-gray-600">|</span>
+                  <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setEmployeeView("individual")}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                        employeeView === "individual"
+                          ? "bg-sky-500 text-white"
+                          : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      Individual
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEmployeeView("location")}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-default-200 dark:border-gray-600 ${
+                        employeeView === "location"
+                          ? "bg-sky-500 text-white"
+                          : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      Location
+                    </button>
+                  </div>
+                </>
+              )}
               {activeTab === "pinjam" && (
                 <>
                   <span className="text-default-300 dark:text-gray-600">|</span>
@@ -1202,24 +1345,62 @@ const GTSalaryReportPage: React.FC = () => {
                   </div>
                 </>
               )}
+              {/* Period toggle - for the Employee and Location tabs */}
+              {isPeriodTab(activeTab) && (
+                <>
+                  <span className="text-default-300 dark:text-gray-600">|</span>
+                  <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setPeriodType("monthly")}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                        periodType === "monthly"
+                          ? "bg-sky-500 text-white"
+                          : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      Monthly
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPeriodType("yearly")}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-default-200 dark:border-gray-600 ${
+                        periodType === "yearly"
+                          ? "bg-sky-500 text-white"
+                          : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      Yearly
+                    </button>
+                  </div>
+                </>
+              )}
               <span className="text-default-300 dark:text-gray-600">|</span>
               <TimeNavigator
-                range={isMonthlyTab(activeTab) ? monthRange : yearRange}
-                onChange={
-                  isMonthlyTab(activeTab) ? handleTimeChange : handleYearChange
+                range={
+                  isMonthlyTab(activeTab) && !isYearlyView
+                    ? monthRange
+                    : yearRange
                 }
-                modes={isMonthlyTab(activeTab) ? ["month"] : ["year"]}
+                onChange={
+                  isMonthlyTab(activeTab) && !isYearlyView
+                    ? handleTimeChange
+                    : handleYearChange
+                }
+                modes={
+                  isMonthlyTab(activeTab) && !isYearlyView ? ["month"] : ["year"]
+                }
                 presets={false}
-                allowFuture={!isMonthlyTab(activeTab)}
+                allowFuture={!isMonthlyTab(activeTab) || isYearlyView}
               />
-              {monthly && isMonthlyTab(activeTab) && (
+              {activeData && isMonthlyTab(activeTab) && (
                 <>
                   <span className="text-default-300 dark:text-gray-600">|</span>
                   <div className="text-sm text-default-600 dark:text-gray-300">
                     <span className="block font-medium">
                       {activeTab === "pinjam"
                         ? activePinjamData.length
-                        : monthly.total_records} employees
+                        : activeData.total_records} employees
                     </span>
                     <span className="block font-medium">
                       {fmtCurrency(headerTotal)}
@@ -1238,10 +1419,13 @@ const GTSalaryReportPage: React.FC = () => {
                 />
               )}
               <Button
-                onClick={fetchData}
+                onClick={() => {
+                  fetchData();
+                  if (isYearlyView) fetchYearly();
+                }}
                 icon={IconRefresh}
                 variant="outline"
-                disabled={isLoading}
+                disabled={activeLoading}
                 size="sm"
               >
                 Refresh
@@ -1250,7 +1434,7 @@ const GTSalaryReportPage: React.FC = () => {
                 onClick={() => handleGenerate("print")}
                 icon={IconPrinter}
                 variant="outline"
-                disabled={isGenerating || isLoading}
+                disabled={isGenerating || activeLoading}
                 size="sm"
               >
                 Print
@@ -1259,7 +1443,7 @@ const GTSalaryReportPage: React.FC = () => {
                 onClick={() => handleGenerate("download")}
                 icon={IconDownload}
                 variant="outline"
-                disabled={isGenerating || isLoading}
+                disabled={isGenerating || activeLoading}
                 size="sm"
               >
                 Download
@@ -1296,25 +1480,31 @@ const GTSalaryReportPage: React.FC = () => {
         </div>
 
         {/* Content */}
-        {isLoading ? (
+        {activeLoading ? (
           <div className="flex justify-center py-12">
             <LoadingSpinner />
           </div>
         ) : (
-          <div className="overflow-auto max-h-[75vh]">
+          // The Employee → Location cards stack down the page (each scrolls
+          // sideways on its own), so that view opts out of the scroll box.
+          <div
+            className={
+              isEmployeeLocationView ? undefined : "overflow-auto max-h-[75vh]"
+            }
+          >
           {/* EMPLOYEE — same columns as the grouped view, but one flat list. */}
           {activeTab === "employee" &&
-            (!monthly || monthly.employees.length === 0 ? (
+            employeeView === "individual" &&
+            (!activeData || activeData.employees.length === 0 ? (
               <div className="text-center py-12 text-default-500 dark:text-gray-400">
-                No processed payroll for {getMonthName(currentMonth)}{" "}
-                {currentYear}.
+                No processed payroll for {periodLabel}.
               </div>
             ) : (
               <table className="w-full table-fixed">
                 {renderTableColGroup()}
                 {renderSalaryHeader("NAMA PEKERJA")}
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                  {monthly.employees.map((emp, index: number) => (
+                  {activeData.employees.map((emp, index: number) => (
                     <tr
                       key={emp.staff_id}
                       className={
@@ -1347,10 +1537,96 @@ const GTSalaryReportPage: React.FC = () => {
                     >
                       GRAND TOTAL
                     </td>
-                    {renderAmountCells(monthly.employees_grand_totals, true)}
+                    {renderAmountCells(activeData.employees_grand_totals, true)}
                   </tr>
                 </tfoot>
               </table>
+            ))}
+
+          {/* EMPLOYEE → LOCATION — the same people, grouped under their location. */}
+          {activeTab === "employee" &&
+            employeeView === "location" &&
+            (!activeData || employeeLocations.length === 0 ? (
+              <div className="text-center py-12 text-default-500 dark:text-gray-400">
+                No processed payroll for {periodLabel}.
+              </div>
+            ) : (
+              <div className="px-6 pt-2 pb-2 space-y-3">
+                {employeeLocations.map((loc: LocationData) => (
+                  <div
+                    key={loc.location}
+                    className="overflow-auto border border-default-200 dark:border-gray-700 rounded-lg"
+                  >
+                    <div className="bg-sky-50 dark:bg-sky-900/20 px-4 py-2 border-b border-default-200 dark:border-gray-700">
+                      <h3 className="text-sm font-semibold text-sky-800 dark:text-sky-300">
+                        {loc.location} -{" "}
+                        {(
+                          locationMap[loc.location] || loc.location
+                        ).toUpperCase()}
+                      </h3>
+                    </div>
+                    <table className="w-full table-fixed">
+                      {renderTableColGroup()}
+                      {renderSalaryHeader("NAMA PEKERJA", false)}
+                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
+                        {loc.employees.map((emp: EmpRow, index: number) => (
+                          <tr
+                            key={emp.staff_id}
+                            className={
+                              index % 2 === 0
+                                ? "bg-white dark:bg-gray-800"
+                                : "bg-default-25 dark:bg-gray-750"
+                            }
+                          >
+                            <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 text-center">
+                              {index + 1}
+                            </td>
+                            <td className={bodyNameCellClass}>
+                              <span
+                                className="block truncate"
+                                title={`${emp.staff_id.toUpperCase()} - ${emp.staff_name.toUpperCase()}`}
+                              >
+                                {emp.staff_id.toUpperCase()} -{" "}
+                                {emp.staff_name.toUpperCase()}
+                              </span>
+                            </td>
+                            {renderAmountCells(emp)}
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <td
+                            colSpan={2}
+                            className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600"
+                          >
+                            SUBTOTAL
+                          </td>
+                          {renderAmountCells(loc.totals, true)}
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                ))}
+
+                {/* Grand Total Section */}
+                <div className="overflow-auto border-2 border-sky-500 dark:border-sky-600 rounded-lg">
+                  <table className="w-full table-fixed">
+                    {renderTableColGroup()}
+                    <tbody>
+                      <tr>
+                        <td
+                          colSpan={2}
+                          className="px-2 py-3 text-sm font-bold text-white text-center bg-sky-600 dark:bg-sky-700"
+                        >
+                          GRAND TOTAL
+                        </td>
+                        {renderGrandTotalCells(activeData.employees_grand_totals)}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             ))}
 
           {/* BANK */}
@@ -1397,16 +1673,16 @@ const GTSalaryReportPage: React.FC = () => {
 
           {/* MONTHLY */}
           {activeTab === "monthly" &&
-            (!monthly || monthly.locations.length === 0 ? (
+            (!activeData || activeData.locations.length === 0 ? (
               <div className="text-center py-12 text-default-500 dark:text-gray-400">
-                No processed payroll for {getMonthName(currentMonth)} {currentYear}.
+                No processed payroll for {periodLabel}.
               </div>
             ) : (
               <table className="w-full table-fixed">
                 {renderTableColGroup()}
                 {renderSalaryHeader("BAHAGIAN KERJA")}
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                  {monthly.locations.map((loc, index: number) => (
+                  {activeData.locations.map((loc, index: number) => (
                     <tr
                       key={loc.location}
                       className={
@@ -1437,7 +1713,7 @@ const GTSalaryReportPage: React.FC = () => {
                     >
                       GRAND TOTAL
                     </td>
-                    {renderAmountCells(monthly.grand_totals, true)}
+                    {renderAmountCells(activeData.grand_totals, true)}
                   </tr>
                 </tfoot>
               </table>

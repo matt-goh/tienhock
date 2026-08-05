@@ -13,6 +13,11 @@ import type {
 } from "../../types/greenTargetDebtorSubSchedule";
 import { GREENTARGET_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
+import {
+  getPaperSizePreference,
+  getReactPdfPageSize,
+  type PdfPaperSize,
+} from "../pdf/paperSize";
 
 const ROWS_PER_PAGE = 44;
 
@@ -139,11 +144,13 @@ const chunkRows = (
 
 interface GreenTargetDebtorSubSchedulePDFProps {
   data: GreenTargetDebtorSubScheduleResponse;
+  paperSize?: PdfPaperSize;
 }
 
 const GreenTargetDebtorSubSchedulePDF: React.FC<
   GreenTargetDebtorSubSchedulePDFProps
-> = ({ data }) => {
+> = ({ data, paperSize }) => {
+  const effectivePaperSize = paperSize ?? getPaperSizePreference();
   const pages: GreenTargetDebtorSubScheduleRow[][] = chunkRows(data.rows);
   const currentMonthLabel: string = getMovementLabel(
     data.statement_year,
@@ -165,7 +172,7 @@ const GreenTargetDebtorSubSchedulePDF: React.FC<
           pageRows: GreenTargetDebtorSubScheduleRow[],
           pageIndex: number
         ) => (
-          <Page key={pageIndex} size="A4" style={styles.page}>
+          <Page key={pageIndex} size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
             <View style={styles.header}>
               <Text style={styles.companyName}>{GREENTARGET_INFO.name}</Text>
               <Text style={styles.title}>
@@ -248,9 +255,10 @@ const GreenTargetDebtorSubSchedulePDF: React.FC<
 };
 
 export const printGreenTargetDebtorSubSchedulePDF = async (
-  data: GreenTargetDebtorSubScheduleResponse
+  data: GreenTargetDebtorSubScheduleResponse,
+  paperSize?: PdfPaperSize
 ): Promise<void> => {
-  const pdfDocument = <GreenTargetDebtorSubSchedulePDF data={data} />;
+  const pdfDocument = <GreenTargetDebtorSubSchedulePDF data={data} paperSize={paperSize} />;
   const pdfBlob: Blob = await pdf(pdfDocument).toBlob();
   const pdfUrl: string = URL.createObjectURL(pdfBlob);
   const printFrame: HTMLIFrameElement = document.createElement("iframe");

@@ -13,6 +13,11 @@ import type {
   GreenTargetTradeDebtorListTotals,
 } from "../../types/greenTargetTradeDebtorList";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
+import {
+  getPaperSizePreference,
+  getReactPdfPageSize,
+  type PdfPaperSize,
+} from "../pdf/paperSize";
 
 const CHILD_ROWS_PER_PAGE = 44;
 const LEGACY_COMPANY_HEADER =
@@ -192,18 +197,20 @@ const ControlFooter: React.FC<{ totals: GreenTargetTradeDebtorListTotals }> = ({
 
 interface GreenTargetTradeDebtorListPDFProps {
   data: GreenTargetTradeDebtorListResponse;
+  paperSize?: PdfPaperSize;
 }
 
 const GreenTargetTradeDebtorListPDF: React.FC<
   GreenTargetTradeDebtorListPDFProps
-> = ({ data }) => {
+> = ({ data, paperSize }) => {
+  const effectivePaperSize = paperSize ?? getPaperSizePreference();
   const childPages: GreenTargetTradeDebtorListRow[][] = chunkChildRows(
     data.cd_sd.rows
   );
 
   return (
     <Document title={`GT Sub-Schedules as at ${data.statement_date}`}>
-      <Page size="A4" style={styles.page}>
+      <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
         <LegacyPageHeader
           statementDate={data.statement_date}
           previousStatementDate={data.previous_statement_date}
@@ -221,7 +228,7 @@ const GreenTargetTradeDebtorListPDF: React.FC<
           pageRows: GreenTargetTradeDebtorListRow[],
           pageIndex: number
         ) => (
-          <Page key={pageIndex} size="A4" style={styles.page}>
+          <Page key={pageIndex} size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
             <LegacyPageHeader
               statementDate={data.statement_date}
               previousStatementDate={data.previous_statement_date}
@@ -245,10 +252,11 @@ const GreenTargetTradeDebtorListPDF: React.FC<
 };
 
 export const printGreenTargetTradeDebtorListPDF = async (
-  data: GreenTargetTradeDebtorListResponse
+  data: GreenTargetTradeDebtorListResponse,
+  paperSize?: PdfPaperSize
 ): Promise<void> => {
   const pdfBlob: Blob = await pdf(
-    <GreenTargetTradeDebtorListPDF data={data} />
+    <GreenTargetTradeDebtorListPDF data={data} paperSize={paperSize} />
   ).toBlob();
   const pdfUrl: string = URL.createObjectURL(pdfBlob);
   const printFrame: HTMLIFrameElement = document.createElement("iframe");

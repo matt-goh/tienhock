@@ -93,6 +93,7 @@ import greenTargetEInvoiceRouter from "./greentarget/einvoice.js";
 import greenTargetPaymentRouter from "./greentarget/payments.js";
 import greenTargetDashboardRouter from "./greentarget/dashboard.js";
 import greenTargetPayrollEmployeesRouter from "./greentarget/payroll-employees.js";
+import greenTargetEmployeePayCodesRouter from "./greentarget/employee-pay-codes.js";
 import greenTargetMonthlyPayrollsRouter from "./greentarget/monthly-payrolls.js";
 import greenTargetMonthlyWorkLogsRouter from "./greentarget/monthly-work-logs.js";
 import greenTargetEmployeePayrollsRouter from "./greentarget/employee-payrolls.js";
@@ -307,6 +308,10 @@ export default function setupRoutes(app, pool) {
   app.use(
     "/greentarget/api/payroll-employees",
     greenTargetPayrollEmployeesRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/employee-pay-codes",
+    greenTargetEmployeePayCodesRouter(pool)
   );
   app.use(
     "/greentarget/api/monthly-payrolls",
