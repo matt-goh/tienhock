@@ -349,7 +349,7 @@ Full narrative: [Account/INVOICE_PAYMENT_ACCOUNTING_PROGRESS.md](Account/INVOICE
 
 ### C. Jan–May 2026 legacy ledger import
 
-Full narrative: [Account/LEGACY_JAN_MAY_IMPORT_PLAN.md](Account/LEGACY_JAN_MAY_IMPORT_PLAN.md).
+Full narrative: [Account/ACCOUNTING_PROGRESS.md](Account/ACCOUNTING_PROGRESS.md) §6 (the standalone import plan `LEGACY_JAN_MAY_IMPORT_PLAN.md` was removed 5 Aug 2026 after the boss confirmed the Jan–May 2026 TB totals tally exactly between legacy and ERP; recoverable from git history).
 
 | # | File | What it did | Status |
 |---|------|-------------|--------|

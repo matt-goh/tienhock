@@ -49,7 +49,7 @@ So I analyzed them by order from @core_tienhock_acc_docs.pdf, I ignore all the o
 
 ## Verified classification addendum — 20 Jul 2026
 
-The hash-validated January–May Trial Balance scans have now settled the report classifications used by legacy-report Phase V2. The complete account-by-account evidence remains in [LEGACY_REPORT_RECONCILIATION.md](LEGACY_REPORT_RECONCILIATION.md); this section records the reusable prefix conclusions:
+The hash-validated January–May Trial Balance scans have now settled the report classifications used by legacy-report Phase V2. The complete account-by-account evidence was recorded in `LEGACY_REPORT_RECONCILIATION.md` (removed 5 Aug 2026 after the boss confirmed the Jan–May 2026 TB tally; recoverable from git history — the applied set is pinned by the V2 migration and the legacy-report harness); this section records the reusable prefix conclusions:
 
 - `CS_*` is closing-stock presentation under Balance Sheet Notes 14-1 (finished goods), 14-2 (raw materials), or 14-3 (packing materials). The 63 scan-backed January CS rows are explicit RM0.00 fences after V2; they are not opening-stock credits.
 - `OS_*` is opening-stock presentation under Note 3-1 (finished goods), 3-3 (raw materials), or 3-7 (packing materials). The 62 scan-backed 1 January values total RM626,875.15. Note 3-1 belongs to Income Statement cost of sales; only 3-3 and 3-7 appear in the legacy CoGM.
