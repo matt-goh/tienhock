@@ -57,15 +57,18 @@ export const usePaperSizePreference = (): [
 };
 
 // @react-pdf/renderer <Page size={...}>. "A4" keeps using the named size with
-// the Page's own orientation prop; an explicit [width, height] array ignores
-// orientation, so landscape callers get the pre-swapped dimensions.
+// the Page's own orientation prop. Verified against @react-pdf/renderer v4:
+// orientation="landscape" flips the size UNCONDITIONALLY (named sizes AND
+// explicit [width, height] arrays), so landscape callers that also pass
+// orientation="landscape" (they all do) get the pre-flip PORTRAIT array here;
+// the orientation prop then swaps it to the real 792x684 landscape form.
 export const getReactPdfPageSize = (
   size: PdfPaperSize,
   landscape: boolean = false
 ): "A4" | [number, number] => {
   if (size === "computerForm") {
     return landscape
-      ? [COMPUTER_FORM_HEIGHT, COMPUTER_FORM_WIDTH]
+      ? [COMPUTER_FORM_WIDTH, COMPUTER_FORM_HEIGHT]
       : [COMPUTER_FORM_WIDTH, COMPUTER_FORM_HEIGHT];
   }
   return "A4";
