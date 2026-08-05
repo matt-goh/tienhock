@@ -374,7 +374,7 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
   }, [fsNotes]);
 
   // Filter accounts
-  const filteredAccounts = useMemo(() => {
+  const baseFilteredAccounts = useMemo((): AccountCode[] => {
     let filtered = flatAccounts;
 
     // Filter by search term
@@ -397,34 +397,68 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
       filtered = filtered.filter((a) => a.is_active);
     }
 
-    // Tien Hock's compact browsing view shows parents/top-level/favourites only;
-    // while searching, keep every match so leaf children surface. Green Target
-    // keeps every active child in the tree because its legacy hierarchy is the
-    // DEBTOR control plus leaf debtor accounts, and hiding leaves makes it look flat.
-    if (!searchTerm && !isGreenTarget) {
-      filtered = filtered.filter(
-        (account: AccountCode): boolean =>
-          parentCodes.has(account.code) ||
-          !account.parent_code ||
-          effectiveFavouriteCodes.has(account.code)
-      );
-    }
-
     return filtered;
+  }, [flatAccounts, searchTerm, selectedLedgerType, showInactive]);
+
+  // Tien Hock's compact browsing view shows parents/top-level/favourites only;
+  // while searching, keep every match so leaf children surface. Green Target
+  // keeps every active child in the tree because its legacy hierarchy is the
+  // DEBTOR control plus leaf debtor accounts, and hiding leaves makes it look flat.
+  const filteredAccounts = useMemo((): AccountCode[] => {
+    if (searchTerm || isGreenTarget) return baseFilteredAccounts;
+
+    return baseFilteredAccounts.filter(
+      (account: AccountCode): boolean =>
+        parentCodes.has(account.code) ||
+        !account.parent_code ||
+        effectiveFavouriteCodes.has(account.code)
+    );
   }, [
-    flatAccounts,
+    baseFilteredAccounts,
     searchTerm,
-    selectedLedgerType,
-    showInactive,
     parentCodes,
     effectiveFavouriteCodes,
+    isGreenTarget,
+  ]);
+
+  // Parents that still have at least one child passing the filters. Drives the
+  // expand chevron, because the compact view leaves those children out of the
+  // default row set and a parent of leaves would otherwise look unopenable.
+  const expandableCodes = useMemo((): Set<string> => {
+    const codes: Set<string> = new Set<string>();
+    baseFilteredAccounts.forEach((account: AccountCode): void => {
+      if (account.parent_code) codes.add(account.parent_code);
+    });
+    return codes;
+  }, [baseFilteredAccounts]);
+
+  // Rows the tree may render: the compact set plus the children of branches the
+  // user actually opened, so leaves stay hidden until their parent is expanded.
+  const treeAccounts = useMemo((): AccountCode[] => {
+    if (searchTerm || isGreenTarget) return filteredAccounts;
+
+    const compactCodes: Set<string> = new Set<string>(
+      filteredAccounts.map((account: AccountCode): string => account.code)
+    );
+
+    return baseFilteredAccounts.filter(
+      (account: AccountCode): boolean =>
+        compactCodes.has(account.code) ||
+        (account.parent_code !== null &&
+          expandedNodes.has(account.parent_code))
+    );
+  }, [
+    baseFilteredAccounts,
+    filteredAccounts,
+    expandedNodes,
+    searchTerm,
     isGreenTarget,
   ]);
 
   // Filter tree for display
   const filteredTree = useMemo(() => {
     // When filtering, show flat list or filtered tree
-    const filteredCodes = new Set(filteredAccounts.map((a) => a.code));
+    const filteredCodes = new Set(treeAccounts.map((a) => a.code));
 
     const filterTree = (nodes: AccountTreeNode[]): AccountTreeNode[] => {
       return nodes
@@ -445,7 +479,7 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
     };
 
     return filterTree(accountCodes);
-  }, [accountCodes, filteredAccounts]);
+  }, [accountCodes, treeAccounts]);
 
   const revealFilteredBranches: boolean = searchTerm.length > 0;
 
@@ -461,20 +495,45 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
     return [...favourites, ...remainingAccounts];
   }, [filteredAccounts, effectiveFavouriteCodes]);
 
-  // Open the permanent parent-account view by default, while still allowing the
-  // user to collapse individual branches afterwards.
-  useEffect((): void => {
-    const codesToExpand: Set<string> = new Set<string>();
-    const collectFilteredParents = (nodes: AccountTreeNode[]): void => {
-      nodes.forEach((node: AccountTreeNode): void => {
-        if (node.children.length > 0) {
-          codesToExpand.add(node.code);
-          collectFilteredParents(node.children);
-        }
-      });
-    };
+  // Branches opened by default: the ancestors of the parent accounts kept by the
+  // compact browsing filter, so the parent spine is visible on first load while
+  // leaf-only branches stay closed. A favourited leaf is skipped here — it
+  // already has its own shortcut row and must not open a 1,500-row branch.
+  // Derived from the filter set alone — never from the expanded state or the
+  // rendered tree — so collapsing a branch is not immediately undone.
+  const defaultExpandedCodes = useMemo((): Set<string> => {
+    const parentByCode: Map<string, string | null> = new Map<
+      string,
+      string | null
+    >();
+    flatAccounts.forEach((account: AccountCode): void => {
+      parentByCode.set(account.code, account.parent_code);
+    });
 
-    collectFilteredParents(filteredTree);
+    const spineOnly: boolean = !searchTerm && !isGreenTarget;
+    const codes: Set<string> = new Set<string>();
+    filteredAccounts.forEach((account: AccountCode): void => {
+      if (spineOnly && !parentCodes.has(account.code)) return;
+
+      let ancestor: string | null = account.parent_code;
+      while (ancestor && !codes.has(ancestor)) {
+        codes.add(ancestor);
+        ancestor = parentByCode.get(ancestor) ?? null;
+      }
+    });
+    return codes;
+  }, [
+    flatAccounts,
+    filteredAccounts,
+    parentCodes,
+    searchTerm,
+    isGreenTarget,
+  ]);
+
+  // Open those branches by default, while still allowing the user to collapse
+  // individual branches afterwards.
+  useEffect((): void => {
+    const codesToExpand: Set<string> = defaultExpandedCodes;
 
     if (codesToExpand.size === 0) return;
     setExpandedNodes((previousCodes: Set<string>): Set<string> => {
@@ -484,7 +543,7 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
       });
       return nextCodes.size === previousCodes.size ? previousCodes : nextCodes;
     });
-  }, [filteredTree]);
+  }, [defaultExpandedCodes]);
 
   const visibleTreeRows = useMemo((): VisibleTreeRow[] => {
     const rows: VisibleTreeRow[] = [];
@@ -724,7 +783,7 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
     isFavouriteShortcut: boolean = false
   ): React.ReactNode => {
     const hasVisibleChildren: boolean =
-      !isFavouriteShortcut && node.children.length > 0;
+      !isFavouriteShortcut && expandableCodes.has(node.code);
     const isParentAccount: boolean = parentCodes.has(node.code);
     const isExpanded: boolean = expandedNodes.has(node.code);
     const isVisuallyExpanded: boolean =

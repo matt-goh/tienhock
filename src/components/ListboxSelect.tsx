@@ -11,6 +11,7 @@ import {
   ListboxOption,
 } from "@headlessui/react";
 import { IconChevronDown, IconCheck } from "@tabler/icons-react";
+import { useTranslation } from "react-i18next";
 import clsx from "clsx";
 
 export interface ListboxSelectOption {
@@ -34,11 +35,12 @@ const ListboxSelect: React.FC<ListboxSelectProps> = ({
   onChange,
   options,
   disabled = false,
-  placeholder = "Select...",
+  placeholder,
   className = "",
   buttonClassName = "",
   ariaLabel,
 }) => {
+  const { t } = useTranslation("common");
   const selectedOption = options.find((o) => o.value === value);
 
   return (
@@ -52,7 +54,7 @@ const ListboxSelect: React.FC<ListboxSelectProps> = ({
           )}
         >
           <span className="block truncate">
-            {selectedOption?.label ?? placeholder}
+            {selectedOption?.label ?? placeholder ?? t("Select...")}
           </span>
           <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
             <IconChevronDown

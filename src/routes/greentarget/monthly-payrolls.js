@@ -160,8 +160,9 @@ export default function (pool) {
       let itemsByEp = {};
       let deductionsByEp = {};
       let midMonthByEmployee = {};
+      let leaveByEmployee = {};
       if (epIds.length > 0) {
-        const [itemsResult, deductionsResult, midMonthResult] = await Promise.all([
+        const [itemsResult, deductionsResult, midMonthResult, leaveResult] = await Promise.all([
           pool.query(
             `SELECT pi.id, pi.employee_payroll_id, pi.pay_code_id, pi.description,
                     pi.rate, pi.rate_unit, pi.quantity, pi.amount, pi.is_manual,
@@ -191,6 +192,21 @@ export default function (pool) {
              GROUP BY employee_id`,
             [payrollResult.rows[0].year, payrollResult.rows[0].month]
           ),
+          // Approved leave for the month. It is already folded into gross by the
+          // processor, so the batch payslips need it to print the Cuti block —
+          // without it the leave pay silently hides inside Jumlah Gaji Kasar.
+          pool.query(
+            `SELECT id, employee_id,
+                    to_char(leave_date, 'YYYY-MM-DD') AS leave_date,
+                    leave_type, days_taken,
+                    CAST(amount_paid AS NUMERIC(10,2)) AS amount_paid, status
+             FROM greentarget.leave_records
+             WHERE EXTRACT(YEAR FROM leave_date) = $1
+               AND EXTRACT(MONTH FROM leave_date) = $2
+               AND status = 'approved'
+             ORDER BY leave_date`,
+            [payrollResult.rows[0].year, payrollResult.rows[0].month]
+          ),
         ]);
         for (const item of itemsResult.rows) {
           (itemsByEp[item.employee_payroll_id] ||= []).push({
@@ -212,6 +228,13 @@ export default function (pool) {
         for (const midMonth of midMonthResult.rows) {
           midMonthByEmployee[midMonth.employee_id] = parseFloat(midMonth.amount);
         }
+        for (const leave of leaveResult.rows) {
+          (leaveByEmployee[leave.employee_id] ||= []).push({
+            ...leave,
+            days_taken: parseFloat(leave.days_taken),
+            amount_paid: parseFloat(leave.amount_paid),
+          });
+        }
       }
 
       const employeePayrolls = employeePayrollsResult.rows.map((ep) => {
@@ -228,6 +251,7 @@ export default function (pool) {
           setelah_digenapkan: setelahDigenapkan,
           items: itemsByEp[ep.id] || [],
           deductions: deductionsByEp[ep.id] || [],
+          leave_records: leaveByEmployee[ep.employee_id] || [],
         };
       });
 
@@ -352,6 +376,7 @@ export default function (pool) {
               'rate_unit', pc.rate_unit,
               'rate_used', mwla.rate_used,
               'hours_applied', mwla.hours_applied,
+              'units_produced', mwla.units_produced,
               'calculated_amount', mwla.calculated_amount
             )) as activities
           FROM greentarget.monthly_work_logs mwl
@@ -521,6 +546,15 @@ export default function (pool) {
           workLogsByEmployee[key] = { items: [] };
         }
         (log.activities || []).filter((a) => a.pay_code_id).forEach((activity) => {
+          const amount = parseFloat(activity.calculated_amount) || 0;
+          // Units actually keyed on the activity — the qty fallback below is 1 for
+          // every non-Hour pay code, so without this an activity that recorded
+          // nothing and earned nothing (e.g. a 0-rate CUTI code merely ticked on
+          // the log) would be stored and printed as an empty 0.00 payslip row.
+          const recordedUnits =
+            (parseFloat(activity.units_produced) || 0) +
+            (parseFloat(activity.hours_applied) || 0);
+          if (amount === 0 && recordedUnits === 0) return;
           const qty =
             activity.rate_unit === "Hour"
               ? parseFloat(activity.hours_applied) || 0
@@ -529,10 +563,17 @@ export default function (pool) {
             pay_code_id: activity.pay_code_id,
             description: activity.description || "",
             pay_type: activity.pay_type || "Tambahan",
-            rate: parseFloat(activity.rate_used) || 0,
+            // A keyed Fixed activity stores its direct amount in units_produced
+            // (see calculateActivityAmount), so on the quantity-1 payslip row the
+            // rate IS that amount — not the catalogue rate (e.g. a director's
+            // RM1,700 keyed against the shared RM3,500 BULAN_BM override).
+            rate:
+              activity.rate_unit === "Fixed"
+                ? amount
+                : parseFloat(activity.rate_used) || 0,
             rate_unit: activity.rate_unit || "Fixed",
             quantity: qty,
-            amount: parseFloat(activity.calculated_amount) || 0,
+            amount,
             work_log_id: log.id,
             work_log_type: "monthly",
           });

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import { IconPlus, IconSearch } from "@tabler/icons-react";
 import toast from "react-hot-toast";
@@ -60,6 +60,9 @@ const reviveFilters = (cached: any): PaymentFilters | null => {
 };
 
 const getReceiptGroupKey = (payment: GreenTargetPayment): string => {
+  if (payment.receipt_id) {
+    return `receipt_${payment.receipt_id}`;
+  }
   if (!payment.internal_reference) {
     return `single_${payment.payment_id}`;
   }
@@ -81,13 +84,23 @@ const getReceiptGroupKey = (payment: GreenTargetPayment): string => {
   ].join("::");
 };
 
+const parseReceiptId = (value: string | null): number | null => {
+  if (value === null || !/^\d+$/.test(value)) return null;
+  const receiptId: number = Number(value);
+  return Number.isSafeInteger(receiptId) && receiptId > 0 ? receiptId : null;
+};
+
 const GreenTargetPaymentPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [payments, setPayments] = useState<GreenTargetPayment[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [showPaymentForm, setShowPaymentForm] = useState<boolean>(false);
   const [selectedPayment, setSelectedPayment] =
     useState<GreenTargetPayment | null>(null);
+  const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(
+    (): number | null => parseReceiptId(searchParams.get("receipt"))
+  );
 
   // Filters persist across navigation so returning from an invoice lands on
   // the same month, method and status the user was looking at.
@@ -221,6 +234,18 @@ const GreenTargetPaymentPage: React.FC = () => {
     void fetchPayments();
   }, [fetchPayments]);
 
+  useEffect((): void => {
+    const rawReceiptId: string | null = searchParams.get("receipt");
+    const receiptId: number | null = parseReceiptId(rawReceiptId);
+    setSelectedReceiptId(receiptId);
+
+    if (rawReceiptId !== null && receiptId === null) {
+      const nextSearchParams: URLSearchParams = new URLSearchParams(searchParams);
+      nextSearchParams.delete("receipt");
+      setSearchParams(nextSearchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
   // Restore the previous scroll position when returning (e.g. from an invoice).
   useScrollRestoration(SCROLL_RESTORATION_KEY, !loading);
 
@@ -263,6 +288,29 @@ const GreenTargetPaymentPage: React.FC = () => {
       state: { scrollToPayments: true },
     });
   };
+
+  const handleSelectReceipt = useCallback(
+    (receiptId: number | null): void => {
+      setSelectedReceiptId(receiptId);
+
+      const currentReceiptId: string | null = searchParams.get("receipt");
+      if (
+        (receiptId === null && currentReceiptId === null) ||
+        (receiptId !== null && currentReceiptId === String(receiptId))
+      ) {
+        return;
+      }
+
+      const nextSearchParams: URLSearchParams = new URLSearchParams(searchParams);
+      if (receiptId === null) {
+        nextSearchParams.delete("receipt");
+      } else {
+        nextSearchParams.set("receipt", String(receiptId));
+      }
+      setSearchParams(nextSearchParams, { replace: true });
+    },
+    [searchParams, setSearchParams]
+  );
 
   return (
     <div className="space-y-4">
@@ -356,7 +404,7 @@ const GreenTargetPaymentPage: React.FC = () => {
         </div>
       </div>
 
-      {loading ? (
+      {loading && payments.length === 0 ? (
         <div className="flex h-64 items-center justify-center">
           <LoadingSpinner />
         </div>
@@ -365,6 +413,8 @@ const GreenTargetPaymentPage: React.FC = () => {
           payments={filteredAndSortedPayments}
           onViewPayment={handleViewPayment}
           onRefresh={fetchPayments}
+          selectedReceiptId={selectedReceiptId}
+          onSelectReceipt={handleSelectReceipt}
         />
       )}
 

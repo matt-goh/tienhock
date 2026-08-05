@@ -1100,6 +1100,21 @@ export async function cancelReceiptGroup(client, receiptId, reason, userId) {
     );
   }
 
+  const excessCheck = await client.query(
+    `SELECT 1
+       FROM receipt_allocations
+      WHERE receipt_id = ANY($1::int[])
+        AND allocation_type = 'excess'
+        AND (COALESCE(applied_amount, 0) > 0 OR COALESCE(refunded_amount, 0) > 0)
+      LIMIT 1`,
+    [receiptIds]
+  );
+  if (excessCheck.rows.length > 0) {
+    throw new Error(
+      `Payment group ${groupLabel} includes an overpayment excess that has already been applied to invoices or refunded. Reverse those applications/refunds before cancelling this payment.`
+    );
+  }
+
   const cancellationReason =
     reason || `Payment group ${groupLabel} cancelled`;
   for (const memberReceiptId of receiptIds) {
@@ -1272,6 +1287,21 @@ export async function cancelReceipt(client, receiptId, reason, userId) {
   if (adjCheck.rows.length > 0) {
     throw new Error(
       `Cannot cancel this payment: active adjustment document ${adjCheck.rows[0].id} references invoice ${adjCheck.rows[0].original_invoice_id}. Cancel the adjustment document first.`
+    );
+  }
+
+  const excessCheck = await client.query(
+    `SELECT 1
+       FROM receipt_allocations
+      WHERE receipt_id = $1
+        AND allocation_type = 'excess'
+        AND (COALESCE(applied_amount, 0) > 0 OR COALESCE(refunded_amount, 0) > 0)
+      LIMIT 1`,
+    [receiptId]
+  );
+  if (excessCheck.rows.length > 0) {
+    throw new Error(
+      "Cannot cancel this payment: its overpayment excess has already been applied to invoices or refunded. Reverse those applications/refunds before cancelling this payment."
     );
   }
 

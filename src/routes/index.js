@@ -149,6 +149,7 @@ import jellypollyJobLocationMappingsRouter from "./jellypolly/job-location-mappi
 
 // Excel routes
 import paymentExportRouter from "./excel/payment-export.js";
+import companyPaymentExportRouter from "./excel/company-payment-export.js";
 import staffRecordsExportRouter from "./excel/staff-records-export.js";
 
 import {
@@ -200,6 +201,20 @@ export default function setupRoutes(app, pool) {
 
   // Excel routes (before auth middleware - has its own API key auth)
   app.use("/api/excel/payment-export", paymentExportRouter(pool));
+  app.use(
+    "/jellypolly/api/excel/payment-export",
+    companyPaymentExportRouter(pool, {
+      payrollSchema: "jellypolly",
+      staffSchema: "jellypolly",
+    })
+  );
+  app.use(
+    "/greentarget/api/excel/payment-export",
+    companyPaymentExportRouter(pool, {
+      payrollSchema: "greentarget",
+      staffSchema: "public",
+    })
+  );
   app.use("/api/excel/staff-records-export", staffRecordsExportRouter(pool));
 
   // Add auth middleware to protect other routes
@@ -275,9 +290,16 @@ export default function setupRoutes(app, pool) {
   app.use("/greentarget/api/rentals", greenTargetRentalRouter(pool));
   app.use(
     "/greentarget/api/invoices",
+    authMiddleware(pool),
+    checkRestoreState,
     greenTargetInvoiceRouter(pool, myInvoisGTConfig)
   );
-  app.use("/greentarget/api/payments", greenTargetPaymentRouter(pool));
+  app.use(
+    "/greentarget/api/payments",
+    authMiddleware(pool),
+    checkRestoreState,
+    greenTargetPaymentRouter(pool)
+  );
   app.use(
     "/greentarget/api/einvoice",
     greenTargetEInvoiceRouter(pool, myInvoisGTConfig)
@@ -316,6 +338,8 @@ export default function setupRoutes(app, pool) {
   );
   app.use(
     "/greentarget/api/adjustment-docs",
+    authMiddleware(pool),
+    checkRestoreState,
     greenTargetAdjustmentDocsRouter(pool, myInvoisGTConfig)
   );
   app.use("/greentarget/api/incentives", greenTargetIncentivesRouter(pool));
@@ -342,13 +366,16 @@ export default function setupRoutes(app, pool) {
   );
   // Green Target accounting reports (G5). Read-only over the `greentarget`
   // schema; "bank-statement" mirrors Tien Hock's path so the shared Account
-  // Ledger page only needs a base-path swap (handover R7).
+  // Ledger page only needs a base-path swap (handover R7). Session auth like
+  // every other accounting route; no restore guard needed for reads.
   app.use(
     "/greentarget/api/financial-reports",
+    authMiddleware(pool),
     greenTargetFinancialReportsRouter(pool)
   );
   app.use(
     "/greentarget/api/bank-statement",
+    authMiddleware(pool),
     greenTargetAccountLedgerRouter(pool)
   );
   // Green Target accounting lookups (G6) and mutations (G7+). Same
@@ -375,6 +402,7 @@ export default function setupRoutes(app, pool) {
   );
   app.use(
     "/greentarget/api/debtors",
+    authMiddleware(pool),
     createGreenTargetDebtorsRouter(pool)
   );
   // GT salary Voucher Generator (JBSL/JWDR). Mutates the GT books, so it sits

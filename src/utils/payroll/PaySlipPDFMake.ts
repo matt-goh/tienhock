@@ -670,10 +670,17 @@ const formatUnitQuantity = (quantity: number): string => {
 const isDisplayableConsolidatedItem = (
   item: ConsolidatedPayrollItem,
 ): boolean => {
+  if (Math.abs(Number(item.total_amount) || 0) > 0.0001) return true;
+  // A Fixed-rate row prints the payroll month instead of a quantity, so its
+  // amount is the only thing it actually reports — a 0.00 Fixed row has nothing
+  // to show. Payroll processing gives every Fixed activity quantity 1 even when
+  // no units were keyed, so leave pay codes that were merely ticked on the work
+  // log (CUTI SAKIT / CUTI TAHUNAN / CUTI UMUM) would otherwise print as empty
+  // 0.00 lines. Real leave pay is shown in the Cuti block from leave_records.
+  if (item.rate_unit === "Fixed") return false;
   return (
     Math.abs(Number(item.total_quantity) || 0) > 0.0001 ||
-    Math.abs(Number(item.total_foc_units) || 0) > 0.0001 ||
-    Math.abs(Number(item.total_amount) || 0) > 0.0001
+    Math.abs(Number(item.total_foc_units) || 0) > 0.0001
   );
 };
 
@@ -697,7 +704,7 @@ const getOthersRateQuantityDisplay = (
 
   if (!hasConsistentRate) {
     return {
-      rate: "Mixed rates",
+      rate: "Mixed",
       quantity: "",
     };
   }

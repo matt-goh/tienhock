@@ -1,7 +1,9 @@
 // src/components/Invoice/InvoiceHeader.tsx
-import React from "react";
+import React, { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { ExtendedInvoiceData, Customer } from "../../types/types"; // Use updated types
-import { FormInput, FormListbox } from "../FormComponents"; // Reusable components
+import { FormInput } from "../FormComponents"; // Reusable components
+import PillSelect, { PillSelectOption } from "../PillSelect";
 import { CustomerCombobox } from "./CustomerCombobox"; // Reusable component
 import {
   formatDateForInput,
@@ -13,6 +15,9 @@ interface SelectOption {
   id: string;
   name: string;
 }
+
+// "I"/"C" are the invoice-number prefixes; they map to INVOICE/CASH.
+type InvoiceTypeCode = "I" | "C";
 
 interface InvoiceHeaderProps {
   invoice: ExtendedInvoiceData;
@@ -47,6 +52,18 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
   isFetchingCustomers,
   readOnly = false,
 }) => {
+  const { t } = useTranslation("invoice");
+
+  // Only the pill LABELS are translated; the "I"/"C" values stay raw.
+  const invoiceTypeOptions: ReadonlyArray<PillSelectOption<InvoiceTypeCode>> =
+    useMemo(
+      (): ReadonlyArray<PillSelectOption<InvoiceTypeCode>> => [
+        { value: "I", label: t("Invoice") },
+        { value: "C", label: t("Cash") },
+      ],
+      [t]
+    );
+
   const handleDateTimeChange = (field: "date" | "time", value: string) => {
     const currentTimestamp = parseInt(
       invoice.createddate || Date.now().toString()
@@ -72,6 +89,17 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
     }
     onInputChange("createddate", newDate.getTime().toString());
   };
+
+  const salesmanOptions: ReadonlyArray<PillSelectOption<string>> = useMemo(
+    (): ReadonlyArray<PillSelectOption<string>> =>
+      salesmen.map(
+        (salesman): PillSelectOption<string> => ({
+          value: salesman.id,
+          label: salesman.name || salesman.id,
+        })
+      ),
+    [salesmen]
+  );
 
   // --- Prepare props for CustomerCombobox ---
   // Map full customer list to SelectOption format
@@ -107,7 +135,7 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
         <div className="relative">
           <FormInput
             name="invoiceno"
-            label="Invoice No"
+            label={t("Invoice No")}
             value={`${invoice.paymenttype === "CASH" ? "C" : "I"}${
               invoice.id || ""
             }`}
@@ -118,35 +146,35 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
               onInputChange("id", numericPart);
             }}
             disabled={!isNewInvoice || readOnly} // Use readOnly
-            placeholder="Enter Invoice Number"
+            placeholder={t("Enter Invoice Number")}
           />
         </div>
 
         {/* Type */}
-        <FormListbox
-          name="type"
-          label="Type"
-          // Find the name corresponding to the current paymenttype ID
-          value={invoice.paymenttype === "CASH" ? "C" : "I"} // Pass the ID value
-          onChange={(value) => {
-            const newType = value === "C" ? "CASH" : "INVOICE";
-            onInputChange("paymenttype", newType);
-            if (invoice.id) {
-              onInputChange("id", invoice.id);
-            }
-          }}
-          options={[
-            // Ensure options have id/name matching FormListbox expectations
-            { id: "I", name: "Invoice" },
-            { id: "C", name: "Cash" },
-          ]}
-          disabled={readOnly} // Use readOnly
-        />
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+            {t("type", { ns: "common" })}
+          </label>
+          <PillSelect<InvoiceTypeCode>
+            value={invoice.paymenttype === "CASH" ? "C" : "I"}
+            onChange={(value: InvoiceTypeCode) => {
+              const newType = value === "C" ? "CASH" : "INVOICE";
+              onInputChange("paymenttype", newType);
+              if (invoice.id) {
+                onInputChange("id", invoice.id);
+              }
+            }}
+            options={invoiceTypeOptions}
+            disabled={readOnly} // Use readOnly
+            ariaLabel={t("Invoice type")}
+            size="md"
+          />
+        </div>
 
         {/* Date */}
         <FormInput
           name="date"
-          label="Date"
+          label={t("date", { ns: "common" })}
           type="date"
           value={formatDateForInput(invoice.createddate)}
           onChange={(e) => handleDateTimeChange("date", e.target.value)}
@@ -156,7 +184,7 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
         {/* Time */}
         <FormInput
           name="time"
-          label="Time"
+          label={t("Time")}
           type="time"
           value={
             parseDatabaseTimestamp(invoice.createddate).formattedTime?.slice(
@@ -171,24 +199,30 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
 
       {/* Column 2 */}
       <div className="space-y-3">
-        {/* Salesman */}
-        <FormListbox
-          name="salesman"
-          label="Salesman"
-          value={invoice.salespersonid || ""} // Pass the ID value
-          onChange={(selectedId) => {
-            // The FormListbox onChange now correctly passes the ID back
-            onInputChange("salespersonid", selectedId || ""); // Store the ID
-          }}
-          options={salesmen} // Pass array of { id, name }
-          disabled={readOnly} // Use readOnly
-          placeholder="Select Salesman..."
-        />
+        {/* Salesman. The picker only ever lists active staff holding the
+            SALESMAN job (4 of them today) and shows their short id, so the
+            whole set fits in one pill row. An empty salespersonid matches no
+            pill, which is the old "Select Salesman..." placeholder state. */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+            {t("Salesman")}
+          </label>
+          <PillSelect<string>
+            value={invoice.salespersonid || ""}
+            onChange={(selectedId: string) => {
+              onInputChange("salespersonid", selectedId);
+            }}
+            options={salesmanOptions}
+            disabled={readOnly} // Use readOnly
+            ariaLabel={t("Salesman")}
+            size="md"
+          />
+        </div>
 
         {/* Customer */}
         <CustomerCombobox
           name="customer"
-          label="Customer"
+          label={t("customer", { ns: "common" })}
           value={selectedOptionForCombobox} // Pass SelectOption | null
           onChange={handleComboboxChange} // Use updated handler
           options={customerOptionsForCombobox} // Pass mapped options
@@ -202,7 +236,7 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
         {/* Customer ID (Read Only) */}
         <FormInput
           name="customerId"
-          label="Customer ID"
+          label={t("Customer ID")}
           value={invoice.customerid || ""}
           disabled // Always disabled
         />

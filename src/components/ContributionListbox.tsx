@@ -13,6 +13,7 @@ import {
   ListboxOption,
 } from "@headlessui/react";
 import { IconChevronDown, IconCheck } from "@tabler/icons-react";
+import { useTranslation } from "react-i18next";
 import clsx from "clsx";
 
 export interface ContributionOption {
@@ -35,6 +36,7 @@ const ContributionListbox: React.FC<ContributionListboxProps> = ({
   onChange,
   options,
 }) => {
+  const { t } = useTranslation("common");
   const selectedOption = options.find((option) => option.id === value);
 
   return (
@@ -52,7 +54,7 @@ const ContributionListbox: React.FC<ContributionListboxProps> = ({
             className="relative w-full cursor-pointer rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-10 text-left text-gray-900 dark:text-gray-100 shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm"
           >
             <span className="block truncate">
-              {selectedOption?.name ?? "Select..."}
+              {selectedOption?.name ?? t("Select...")}
             </span>
             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
               <IconChevronDown

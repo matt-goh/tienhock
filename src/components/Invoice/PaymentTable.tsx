@@ -12,7 +12,7 @@ import TimeNavigator, {
   type TimeRange,
 } from "../../components/TimeNavigator";
 import { printCashReceiptVoucherPDF } from "../../utils/accounting/CashReceiptVoucherPDF";
-import { FormListbox } from "../../components/FormComponents";
+import PillSelect, { PillSelectOption } from "../../components/PillSelect";
 import {
   IconCircleCheck,
   IconBan,
@@ -33,6 +33,11 @@ import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import { useCustomersCache } from "../../utils/catalogue/useCustomerCache";
 
+const BANK_ACCOUNT_OPTIONS: ReadonlyArray<PillSelectOption<string>> = [
+  { value: "BANK_PBB", label: "Public Bank" },
+  { value: "BANK_ABB", label: "Alliance Bank" },
+];
+
 interface PaymentTableProps {
   payments: Payment[];
   onViewPayment: (payment: Payment) => void;
@@ -44,9 +49,22 @@ interface PaymentTableProps {
   paymentApiEndpoint?: string;
 }
 
-const createTodayClearanceRange = (): TimeRange => {
-  const today: Date = new Date();
-  return { start: today, end: today };
+// Default the clearance date to today, or to the payment's (received) date
+// when the cheque was post-dated — the server rejects a clearance earlier than
+// the received date. yyyy-MM-dd strings are compared, never Date objects
+// (AGENTS.md rule 17).
+const createClearanceRange = (receivedDate?: string | null): TimeRange => {
+  const today: string = format(new Date(), "yyyy-MM-dd");
+  let day: string = today;
+  if (receivedDate) {
+    const received: Date = new Date(receivedDate);
+    if (!Number.isNaN(received.getTime())) {
+      const receivedDay: string = format(received, "yyyy-MM-dd");
+      if (receivedDay > today) day = receivedDay;
+    }
+  }
+  const date: Date = new Date(`${day}T00:00:00`);
+  return { start: date, end: date };
 };
 
 // API date values arrive as timestamps or UTC-midnight `date` columns; go
@@ -58,6 +76,16 @@ const toDayRange = (value: string): TimeRange => {
 
 const toDayString = (value: string): string =>
   format(new Date(value), "yyyy-MM-dd");
+
+/**
+ * The visible reference a payment is grouped under. For a receipt-backed row
+ * this is the RECEIPT's own reference, not the payment row's: a grouped cash
+ * receipt writes `C{invoice}` onto each payment row (the legacy per-invoice
+ * ledger convention), so grouping on the row would split one receipt group into
+ * one row per invoice and hide a payment added to an existing group.
+ */
+const resolveGroupReference = (payment: Payment): string | null =>
+  payment.receipt_reference || payment.payment_reference || null;
 
 const formatPaymentMethodLabel = (
   paymentMethod: Payment["payment_method"]
@@ -87,14 +115,14 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [selectedBankAccount, setSelectedBankAccount] = useState<string>("BANK_PBB"); // Default to Public Bank
-  const [clearanceDateRange, setClearanceDateRange] = useState<TimeRange>(
-    createTodayClearanceRange
+  const [clearanceDateRange, setClearanceDateRange] = useState<TimeRange>(() =>
+    createClearanceRange()
   );
   const [loadingVoucherId, setLoadingVoucherId] = useState<number | null>(null);
   const [showDateDialog, setShowDateDialog] = useState<boolean>(false);
   const [dateEditPayment, setDateEditPayment] = useState<Payment | null>(null);
-  const [paymentDateRange, setPaymentDateRange] = useState<TimeRange>(
-    createTodayClearanceRange
+  const [paymentDateRange, setPaymentDateRange] = useState<TimeRange>(() =>
+    createClearanceRange()
   );
   const [accountingDateRange, setAccountingDateRange] =
     useState<TimeRange | null>(null);
@@ -157,7 +185,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
       setConfirmingPaymentId(null);
       setSelectedPayment(null);
       setSelectedBankAccount("BANK_PBB"); // Reset to default
-      setClearanceDateRange(createTodayClearanceRange());
+      setClearanceDateRange(createClearanceRange());
     }
   };
 
@@ -385,9 +413,10 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
       const bankAccount: string =
         payment.bank_account ||
         (payment.payment_method === "cash" ? "CASH" : "BANK_PBB");
-      const key: string = payment.payment_reference
+      const groupReference: string | null = resolveGroupReference(payment);
+      const key: string = groupReference
         ? [
-            payment.payment_reference,
+            groupReference,
             paymentDate,
             payment.payment_method,
             bankAccount,
@@ -432,6 +461,10 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
   const selectedConfirmationIsReceiptBacked: boolean = Boolean(
     selectedPayment?.receipt_id
   );
+  // The bank cannot clear a cheque before the payment was received.
+  const clearanceMinDate: Date | undefined = selectedPayment?.payment_date
+    ? new Date(selectedPayment.payment_date)
+    : undefined;
   if (payments.length === 0) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center">
@@ -501,9 +534,11 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                 const canManageGroup: boolean = Boolean(
                   onViewPaymentGroup && manageableReceiptId !== null
                 );
+                const groupReference: string | null =
+                  resolveGroupReference(groupTemplate);
                 const canAddToGroup: boolean = Boolean(
                   onAddPaymentToGroup &&
-                    groupTemplate.payment_reference &&
+                    groupReference &&
                     groupTemplate.payment_method !== "contra"
                 );
                 const totalAmount = paymentGroup.reduce(
@@ -529,7 +564,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                                   )
                                 }
                                 className="rounded p-0.5 text-gray-400 transition-colors hover:bg-sky-100 hover:text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:hover:bg-sky-900/50 dark:hover:text-sky-300"
-                                title={`Correct the date for all ${paymentGroup.length} payments under ${groupTemplate.payment_reference}`}
+                                title={`Correct the date for all ${paymentGroup.length} payments under ${groupReference}`}
                                 aria-label="Correct payment date"
                               >
                                 <IconCalendarEvent size={15} stroke={1.75} />
@@ -538,8 +573,8 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                           </div>
                         </td>
                         <td className="px-3 py-3 max-w-[150px]">
-                          <div className="truncate font-mono font-semibold text-gray-900 dark:text-gray-100" title={firstPayment.payment_reference || ''}>
-                            {firstPayment.payment_reference}
+                          <div className="truncate font-mono font-semibold text-gray-900 dark:text-gray-100" title={groupReference || ''}>
+                            {groupReference}
                           </div>
                           <span className="mt-1 inline-flex rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700 dark:bg-sky-900/50 dark:text-sky-300">
                             {paymentGroup.length} invoices
@@ -559,7 +594,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                                     onViewPaymentGroup(manageableReceiptId)
                                   }
                                   className="inline-flex items-center gap-1.5 rounded-md border border-sky-200 bg-white/70 px-2 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-100 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-1 dark:border-sky-800 dark:bg-gray-900/40 dark:text-sky-300 dark:hover:bg-sky-900/50 dark:focus:ring-offset-gray-900"
-                                  title={`Manage payment group ${groupTemplate.payment_reference}`}
+                                  title={`Manage payment group ${groupReference}`}
                                 >
                                   <IconSettings size={14} stroke={1.75} />
                                   <span>Manage Group</span>
@@ -587,7 +622,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                           <div className="flex flex-wrap justify-center gap-1.5">
                             {canAddToGroup &&
                               onAddPaymentToGroup &&
-                              groupTemplate.payment_reference && (
+                              groupReference && (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -596,7 +631,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                                   onClick={() =>
                                     onAddPaymentToGroup(groupTemplate)
                                   }
-                                  title={`Add another payment with reference ${groupTemplate.payment_reference}`}
+                                  title={`Add another payment with reference ${groupReference}`}
                                 >
                                   Add Payment
                                 </Button>
@@ -677,7 +712,9 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                                   onClick={() => {
                                     setSelectedPayment(payment);
                                     setSelectedBankAccount(payment.bank_account || "BANK_PBB");
-                                    setClearanceDateRange(createTodayClearanceRange());
+                                    setClearanceDateRange(
+                                      createClearanceRange(payment.payment_date)
+                                    );
                                     setShowConfirmDialog(true);
                                   }}
                                   disabled={
@@ -811,7 +848,9 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                               onClick={() => {
                                 setSelectedPayment(payment);
                                 setSelectedBankAccount(payment.bank_account || "BANK_PBB");
-                                setClearanceDateRange(createTodayClearanceRange());
+                                setClearanceDateRange(
+                                  createClearanceRange(payment.payment_date)
+                                );
                                 setShowConfirmDialog(true);
                               }}
                               disabled={
@@ -855,7 +894,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
             setShowConfirmDialog(false);
             setSelectedPayment(null);
             setSelectedBankAccount("BANK_PBB");
-            setClearanceDateRange(createTodayClearanceRange());
+            setClearanceDateRange(createClearanceRange());
           }}
           onConfirm={() => void handleConfirmPayment()}
           title={
@@ -902,18 +941,18 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                 </div>
               ) : usesTienHockReceiptAccounting ? (
                 <div>
-                  <FormListbox
-                    name="bank_account"
-                    label="Deposit To"
+                  <label className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300">
+                    Deposit To
+                  </label>
+                  <PillSelect
                     value={selectedBankAccount}
                     onChange={(value: string): void =>
                       setSelectedBankAccount(value)
                     }
-                    options={[
-                      { id: "BANK_PBB", name: "Public Bank" },
-                      { id: "BANK_ABB", name: "Alliance Bank" },
-                    ]}
+                    options={BANK_ACCOUNT_OPTIONS}
                     disabled={confirmingPaymentId !== null}
+                    ariaLabel="Deposit to"
+                  size="md"
                   />
                   <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
                     Choose the bank account for this older pending payment.
@@ -936,6 +975,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                     showArrows={false}
                     size="sm"
                     disabled={confirmingPaymentId !== null}
+                    minDate={clearanceMinDate}
                     className="w-full"
                     triggerClassName="w-full justify-between"
                   />

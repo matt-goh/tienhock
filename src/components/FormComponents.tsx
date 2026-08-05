@@ -13,6 +13,7 @@ import {
   ListboxButton as HeadlessListboxButton,
 } from "@headlessui/react";
 import { IconChevronDown, IconCheck, IconPhone } from "@tabler/icons-react";
+import { useTranslation } from "react-i18next";
 import clsx from "clsx";
 import { StatusIndicator } from "./StatusIndicator"; // Assuming this exists
 
@@ -152,6 +153,12 @@ interface ListboxProps {
   required?: boolean;
   placeholder?: string;
   optionsPosition?: "top" | "bottom";
+  /**
+   * Opt-in: render the options panel in a portal anchored to the button, so it
+   * escapes an ancestor with `overflow` (e.g. a horizontally scrollable table)
+   * instead of being clipped. Overrides `optionsPosition` when set.
+   */
+  anchor?: "top" | "top start" | "top end" | "bottom" | "bottom start" | "bottom end";
   className?: string;
   renderOption?: (
     option: SelectOption,
@@ -168,16 +175,18 @@ export const FormListbox: React.FC<ListboxProps> = ({
   options,
   disabled = false,
   required = false,
-  placeholder = "Select...",
+  placeholder,
   optionsPosition = "bottom",
+  anchor,
   className = "",
   renderOption,
 }) => {
+  const { t } = useTranslation("common");
   const valueAsString = value?.toString() ?? "";
   const selectedOption = options.find(
     (option) => option.id.toString() === valueAsString
   );
-  const displayValue = selectedOption?.name ?? placeholder;
+  const displayValue = selectedOption?.name ?? placeholder ?? t("Select...");
 
   return (
     <div className={`${label ? "space-y-2" : ""} ${className}`}>
@@ -223,9 +232,16 @@ export const FormListbox: React.FC<ListboxProps> = ({
             leaveTo="opacity-0"
           >
             <ListboxOptions
+              {...(anchor ? { anchor } : {})}
               className={clsx(
-                "absolute z-10 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none sm:text-sm",
-                optionsPosition === "top" ? "bottom-full mb-1" : "mt-1"
+                "max-h-60 overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none sm:text-sm",
+                anchor
+                  ? // Portalled: width comes from the button, not the (fixed) panel.
+                    "z-50 w-[var(--button-width)] [--anchor-gap:0.25rem]"
+                  : clsx(
+                      "absolute z-10 w-full",
+                      optionsPosition === "top" ? "bottom-full mb-1" : "mt-1"
+                    )
               )}
             >
               {options.map((option) => (
@@ -283,6 +299,13 @@ interface ComboboxProps {
   required?: boolean;
   placeholder?: string;
   optionsPosition?: "top" | "bottom";
+  /**
+   * Render at most this many options at a time, with a "Load more..." row.
+   * Omit for the default behaviour of rendering every match. Set it on lists
+   * of several hundred options (e.g. Green Target's ~780 trade-debtor leaves)
+   * where rendering them all makes the dropdown visibly lag.
+   */
+  maxVisibleOptions?: number;
 }
 
 export const FormCombobox: React.FC<ComboboxProps> = ({
@@ -296,10 +319,21 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
   mode = "multiple", // Default to multiple for backward compatibility
   disabled = false,
   required = false,
-  placeholder = "Search...",
+  placeholder,
   optionsPosition = "bottom",
+  maxVisibleOptions,
 }) => {
+  const { t } = useTranslation("common");
   const isMultiple = mode === "multiple";
+  const [visibleCount, setVisibleCount] = React.useState<number>(
+    maxVisibleOptions ?? 0
+  );
+
+  // Every new search starts a fresh page, so "Load more" never carries an
+  // earlier query's scroll depth into a different result set.
+  React.useEffect(() => {
+    if (maxVisibleOptions) setVisibleCount(maxVisibleOptions);
+  }, [query, maxVisibleOptions]);
 
   // Normalize value for internal Headless UI state
   // For single mode, Headless UI expects the selected object or null/undefined
@@ -329,6 +363,11 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
             .replace(/\s+/g, "")
             .includes(query.toLowerCase().replace(/\s+/g, ""))
         );
+
+  const visibleOptions = maxVisibleOptions
+    ? filteredOptions.slice(0, visibleCount)
+    : filteredOptions;
+  const hiddenOptionCount = filteredOptions.length - visibleOptions.length;
 
   // Handle change from Headless UI, converting option object(s) back to ID(s)
   const handleChange = (selected: SelectOption | SelectOption[] | null) => {
@@ -408,7 +447,7 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
               // displayValue tells Headless UI how to render the selected item(s) in the input
               displayValue={getDisplayValue}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder={placeholder}
+              placeholder={placeholder ?? t("Search...")}
               disabled={disabled}
               id={`${name}-input`}
             />
@@ -439,10 +478,10 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
             >
               {filteredOptions.length === 0 && query !== "" ? (
                 <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
-                  Nothing found.
+                  {t("Nothing found.")}
                 </div>
               ) : (
-                filteredOptions.map((option) => (
+                visibleOptions.map((option) => (
                   <ComboboxOption
                     key={option.id}
                     className={({ active }) =>
@@ -512,6 +551,24 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
                     )}
                   </ComboboxOption>
                 ))
+              )}
+              {hiddenOptionCount > 0 && (
+                <button
+                  type="button"
+                  // onMouseDown, because Headless UI closes the panel on blur
+                  // before a click would land.
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    setVisibleCount(
+                      (current) => current + (maxVisibleOptions ?? 0)
+                    );
+                  }}
+                  className="w-full border-t border-default-200 dark:border-gray-700 py-2 px-3 text-left text-sm font-medium text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30"
+                >
+                  {t("Load more... ({{hidden}} more)", {
+                    hidden: hiddenOptionCount,
+                  })}
+                </button>
               )}
             </ComboboxOptions>
           </Transition>

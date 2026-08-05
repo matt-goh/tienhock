@@ -9,8 +9,8 @@ import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button";
 import Checkbox from "../../../components/Checkbox";
-import { FormListbox } from "../../../components/FormComponents";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import PillSelect, { PillSelectOption } from "../../../components/PillSelect";
 import TimeNavigator, { type TimeRange } from "../../../components/TimeNavigator";
 import { api } from "../../../routes/utils/api";
 
@@ -61,11 +61,11 @@ interface RowState {
   amountPaid: string;
 }
 
-const LEAVE_OPTIONS: Array<{ id: LeaveType; name: string }> = [
-  { id: "cuti_sakit", name: "Cuti Sakit" },
-  { id: "cuti_tahunan", name: "Cuti Tahunan" },
-  { id: "cuti_umum", name: "Cuti Umum" },
-  { id: "cuti_rawatan", name: "Cuti Rawatan" },
+const LEAVE_OPTIONS: ReadonlyArray<PillSelectOption<LeaveType>> = [
+  { value: "cuti_sakit", label: "Cuti Sakit" },
+  { value: "cuti_tahunan", label: "Cuti Tahunan" },
+  { value: "cuti_umum", label: "Cuti Umum" },
+  { value: "cuti_rawatan", label: "Cuti Rawatan" },
 ];
 
 const DEFAULT_LEAVE_TYPE: LeaveType = "cuti_sakit";
@@ -477,13 +477,12 @@ const PackingCutiEntryPage: React.FC<PackingCutiEntryPageProps> = ({
               )}
             </div>
 
-            <FormListbox
-              name="bulk-leave-type"
+            <PillSelect<LeaveType>
               value={bulkLeaveType}
-              onChange={(value: string) => setBulkLeaveType(value as LeaveType)}
+              onChange={(value: LeaveType) => setBulkLeaveType(value)}
               options={LEAVE_OPTIONS}
               disabled={isSaving}
-              className="w-full sm:w-48"
+              ariaLabel="Leave type to apply to the selected workers"
             />
 
             <Button
@@ -608,15 +607,14 @@ const PackingCutiEntryPage: React.FC<PackingCutiEntryPageProps> = ({
                         </div>
                       </td>
                       <td className="px-4 py-2">
-                        <FormListbox
-                          name={`leave-type-${worker.id}`}
+                        <PillSelect<LeaveType>
                           value={state.leaveType}
-                          onChange={(value: string) =>
-                            handleLeaveTypeChange(worker.id, value as LeaveType)
+                          onChange={(value: LeaveType) =>
+                            handleLeaveTypeChange(worker.id, value)
                           }
                           options={LEAVE_OPTIONS}
                           disabled={isSaving}
-                          className="w-44"
+                          ariaLabel={`Leave type for ${worker.name}`}
                         />
                       </td>
                       <td className="px-4 py-2 text-sm text-default-600 dark:text-gray-300">

@@ -17,6 +17,7 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import SubmissionResultsModal from "../../components/Invoice/SubmissionResultsModal";
 import { FormInput, FormListbox } from "../../components/FormComponents";
+import PillSelect, { PillSelectOption } from "../../components/PillSelect";
 import TimeNavigator, { type TimeRange } from "../../components/TimeNavigator";
 import {
   getInvoiceDetailsBundle,
@@ -82,6 +83,24 @@ import {
   isZeroValueBill,
 } from "../../utils/invoice/invoiceDisplayStatus";
 import type { InvoiceDisplayStatus } from "../../utils/invoice/invoiceDisplayStatus";
+
+const PAYMENT_METHOD_OPTIONS: ReadonlyArray<PillSelectOption<string>> = [
+  { value: "cash", label: "Cash" },
+  { value: "cheque", label: "Cheque" },
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "online", label: "Online" },
+];
+
+const BANK_ACCOUNT_OPTIONS: ReadonlyArray<PillSelectOption<string>> = [
+  { value: "BANK_PBB", label: "Public Bank" },
+  { value: "BANK_ABB", label: "Alliance Bank" },
+];
+
+const PAYMENT_TYPE_OPTIONS: ReadonlyArray<PillSelectOption<"CASH" | "INVOICE">> =
+  [
+    { value: "CASH", label: "Cash" },
+    { value: "INVOICE", label: "Invoice" },
+  ];
 
 // --- Helper: Read-only Line Items Table ---
 const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
@@ -289,9 +308,22 @@ const isCustomerChangeBlockedData = (
   Array.isArray((data as Partial<InvoiceCustomerChangeBlockedData>).blockers);
 
 // --- Main Component ---
-const createTodayClearanceRange = (): TimeRange => {
-  const today: Date = new Date();
-  return { start: today, end: today };
+// Default the clearance date to today, or to the payment's (received) date
+// when the cheque was post-dated — the server rejects a clearance earlier than
+// the received date. yyyy-MM-dd strings are compared, never Date objects
+// (AGENTS.md rule 17).
+const createClearanceRange = (receivedDate?: string | null): TimeRange => {
+  const today: string = format(new Date(), "yyyy-MM-dd");
+  let day: string = today;
+  if (receivedDate) {
+    const received: Date = new Date(receivedDate);
+    if (!Number.isNaN(received.getTime())) {
+      const receivedDay: string = format(received, "yyyy-MM-dd");
+      if (receivedDay > today) day = receivedDay;
+    }
+  }
+  const date: Date = new Date(`${day}T00:00:00`);
+  return { start: date, end: date };
 };
 
 const getPaymentDateRange = (value: string): TimeRange => {
@@ -378,7 +410,7 @@ const InvoiceDetailsPage: React.FC = () => {
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
   const [selectedBankAccountForConfirm, setSelectedBankAccountForConfirm] = useState<string>("BANK_PBB"); // Default to Public Bank for payment confirmation
   const [clearanceDateRangeForConfirm, setClearanceDateRangeForConfirm] =
-    useState<TimeRange>(createTodayClearanceRange);
+    useState<TimeRange>(() => createClearanceRange());
   const paymentConfirmationGroupSize: number = Math.max(
     1,
     Number(paymentToConfirm?.allocation_count) || 1
@@ -386,6 +418,11 @@ const InvoiceDetailsPage: React.FC = () => {
   const paymentConfirmationIsReceiptBacked: boolean = Boolean(
     paymentToConfirm?.receipt_id
   );
+  // The bank cannot clear a cheque before the payment was received.
+  const clearanceMinDateForConfirm: Date | undefined =
+    paymentToConfirm?.payment_date
+      ? new Date(paymentToConfirm.payment_date)
+      : undefined;
   const [isEditingCustomer, setIsEditingCustomer] = useState<boolean>(false);
   const [selectedCustomer, setSelectedCustomer] = useState<{
     id: string;
@@ -418,6 +455,8 @@ const InvoiceDetailsPage: React.FC = () => {
     "CASH" | "INVOICE"
   >("INVOICE");
   const [isUpdatingPaymentType, setIsUpdatingPaymentType] =
+    useState<boolean>(false);
+  const [showPaymentTypeConfirm, setShowPaymentTypeConfirm] =
     useState<boolean>(false);
 
   // Date/time edit states
@@ -1124,6 +1163,13 @@ const InvoiceDetailsPage: React.FC = () => {
           "E-invoice has been cancelled at MyInvois. Please resubmit after all changes are complete."
         );
       }
+      const pendingCancelled =
+        response?.paymentInfo?.paymentsAdjusted?.pendingCancelled ?? 0;
+      if (pendingCancelled > 0) {
+        toast(
+          `${pendingCancelled} pending payment(s) were cancelled due to the invoice changes.`
+        );
+      }
 
       setIsEditingOrderDetails(false);
       setEditedProducts([]);
@@ -1483,7 +1529,9 @@ const InvoiceDetailsPage: React.FC = () => {
     setPaymentToConfirm(payment);
     // Pre-populate with existing bank account or default to BANK_PBB
     setSelectedBankAccountForConfirm(payment.bank_account || "BANK_PBB");
-    setClearanceDateRangeForConfirm(createTodayClearanceRange());
+    setClearanceDateRangeForConfirm(
+      createClearanceRange(payment.payment_date)
+    );
     setShowConfirmPaymentDialog(true);
   };
 
@@ -1519,7 +1567,7 @@ const InvoiceDetailsPage: React.FC = () => {
       setIsConfirmingPayment(false);
       setPaymentToConfirm(null);
       setSelectedBankAccountForConfirm("BANK_PBB"); // Reset to default
-      setClearanceDateRangeForConfirm(createTodayClearanceRange());
+      setClearanceDateRangeForConfirm(createClearanceRange());
     }
   };
 
@@ -1770,12 +1818,6 @@ const InvoiceDetailsPage: React.FC = () => {
   const isEligibleForEinvoiceByDate = isInvoiceDateEligibleForEinvoice(
     invoiceData.createddate
   );
-  const paymentMethodOptions = [
-    { id: "cash", name: "Cash" },
-    { id: "cheque", name: "Cheque" },
-    { id: "bank_transfer", name: "Bank Transfer" },
-    { id: "online", name: "Online" },
-  ];
 
   const customerNamesForPDF: Record<string, string> =
     invoiceData.customerid && invoiceData.customerName
@@ -2030,14 +2072,16 @@ const InvoiceDetailsPage: React.FC = () => {
               >
                 {invoiceData.customerName || invoiceData.customerid}
               </button>
-              <button
-                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded flex-shrink-0"
-                onClick={handleOpenCustomerEdit}
-                title="Edit customer"
-                disabled={isLoading}
-              >
-                <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
-              </button>
+              {!isCancelled && (
+                <button
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded flex-shrink-0"
+                  onClick={handleOpenCustomerEdit}
+                  title="Edit customer"
+                  disabled={isLoading}
+                >
+                  <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -2053,14 +2097,16 @@ const InvoiceDetailsPage: React.FC = () => {
                 {salesmen.find((s) => s.id === invoiceData.salespersonid)?.name ||
                   invoiceData.salespersonid}
               </button>
-              <button
-                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded flex-shrink-0"
-                onClick={handleOpenSalesmanEdit}
-                title="Edit salesman"
-                disabled={isLoading}
-              >
-                <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
-              </button>
+              {!isCancelled && (
+                <button
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded flex-shrink-0"
+                  onClick={handleOpenSalesmanEdit}
+                  title="Edit salesman"
+                  disabled={isLoading}
+                >
+                  <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -2077,14 +2123,16 @@ const InvoiceDetailsPage: React.FC = () => {
                   ) || ""}
                 </span>
               </span>
-              <button
-                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded flex-shrink-0"
-                onClick={handleOpenDateTimeEdit}
-                title="Edit date/time"
-                disabled={isLoading}
-              >
-                <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
-              </button>
+              {!isCancelled && (
+                <button
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded flex-shrink-0"
+                  onClick={handleOpenDateTimeEdit}
+                  title="Edit date/time"
+                  disabled={isLoading}
+                >
+                  <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -2095,14 +2143,16 @@ const InvoiceDetailsPage: React.FC = () => {
               <span className="text-sm font-medium text-gray-900 dark:text-gray-100 capitalize">
                 {invoiceData.paymenttype.toLowerCase()}
               </span>
-              <button
-                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded flex-shrink-0"
-                onClick={handleOpenPaymentTypeEdit}
-                title="Edit payment type"
-                disabled={isLoading}
-              >
-                <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
-              </button>
+              {!isCancelled && (
+                <button
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded flex-shrink-0"
+                  onClick={handleOpenPaymentTypeEdit}
+                  title="Edit payment type"
+                  disabled={isLoading}
+                >
+                  <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -2196,27 +2246,34 @@ const InvoiceDetailsPage: React.FC = () => {
 
                 {/* Row 2: Payment Method and Bank Account */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <FormListbox
-                    name="payment_method"
-                    label="Payment Method"
-                    value={paymentFormData.payment_method}
-                    onChange={handlePaymentMethodChange}
-                    options={paymentMethodOptions}
-                    disabled={isProcessingPayment}
-                  />
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                      Payment Method
+                    </label>
+                    <PillSelect<string>
+                      value={paymentFormData.payment_method}
+                      onChange={handlePaymentMethodChange}
+                      options={PAYMENT_METHOD_OPTIONS}
+                      disabled={isProcessingPayment}
+                      ariaLabel="Payment method"
+                    size="md"
+                    />
+                  </div>
 
                   {paymentFormData.payment_method !== "cash" ? (
-                    <FormListbox
-                      name="bank_account"
-                      label="Deposit To"
-                      value={paymentFormData.bank_account || "BANK_PBB"}
-                      onChange={handleBankAccountChange}
-                      options={[
-                        { id: "BANK_PBB", name: "Public Bank" },
-                        { id: "BANK_ABB", name: "Alliance Bank" },
-                      ]}
-                      disabled={isProcessingPayment}
-                    />
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                        Deposit To
+                      </label>
+                      <PillSelect<string>
+                        value={paymentFormData.bank_account || "BANK_PBB"}
+                        onChange={handleBankAccountChange}
+                        options={BANK_ACCOUNT_OPTIONS}
+                        disabled={isProcessingPayment}
+                        ariaLabel="Deposit to"
+                      size="md"
+                      />
+                    </div>
                   ) : (
                     <div className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
                       <span className="text-sm text-gray-500 dark:text-gray-400 italic">
@@ -2296,17 +2353,19 @@ const InvoiceDetailsPage: React.FC = () => {
         <div className="p-4 group">
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">Line Items</h2>
-            <button
-              className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleOpenOrderDetailsEdit();
-              }}
-              title="Edit line items"
-              disabled={isLoading}
-            >
-              <IconPencil size={16} className="text-sky-600 dark:text-sky-400" />
-            </button>
+            {!isCancelled && (
+              <button
+                className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenOrderDetailsEdit();
+                }}
+                title="Edit line items"
+                disabled={isLoading}
+              >
+                <IconPencil size={16} className="text-sky-600 dark:text-sky-400" />
+              </button>
+            )}
           </div>
           <LineItemsDisplayTable items={invoiceData.products} />
         </div>
@@ -2837,6 +2896,22 @@ const InvoiceDetailsPage: React.FC = () => {
         confirmButtonText="Confirm Cancellation"
         variant="danger"
       />
+      <ConfirmationDialog
+        isOpen={showPaymentTypeConfirm}
+        onClose={() => setShowPaymentTypeConfirm(false)}
+        onConfirm={() => {
+          setShowPaymentTypeConfirm(false);
+          void handlePaymentTypeUpdate();
+        }}
+        title="Update Payment Type"
+        message={`Change this invoice from ${invoiceData.paymenttype} to ${selectedPaymentType}? Its payment records and journal entry will be updated. ${
+          selectedPaymentType === "CASH"
+            ? "An automatic payment will be created for the outstanding balance and the invoice will be marked as paid."
+            : "Any automatic CASH payment will be cancelled and the balance due restored."
+        }`}
+        confirmButtonText="Update Payment Type"
+        variant="default"
+      />
       {paymentToConfirm && (
         <ConfirmationDialog
           isOpen={showConfirmPaymentDialog}
@@ -2844,7 +2919,7 @@ const InvoiceDetailsPage: React.FC = () => {
             setShowConfirmPaymentDialog(false);
             setPaymentToConfirm(null);
             setSelectedBankAccountForConfirm("BANK_PBB");
-            setClearanceDateRangeForConfirm(createTodayClearanceRange());
+            setClearanceDateRangeForConfirm(createClearanceRange());
           }}
           onConfirm={() => void handleConfirmPaymentConfirm()}
           title={
@@ -2890,18 +2965,18 @@ const InvoiceDetailsPage: React.FC = () => {
                 </div>
               ) : (
                 <div>
-                  <FormListbox
-                    name="bank_account"
-                    label="Deposit To"
+                  <label className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300">
+                    Deposit To
+                  </label>
+                  <PillSelect<string>
                     value={selectedBankAccountForConfirm}
                     onChange={(value: string): void =>
                       setSelectedBankAccountForConfirm(value)
                     }
-                    options={[
-                      { id: "BANK_PBB", name: "Public Bank" },
-                      { id: "BANK_ABB", name: "Alliance Bank" },
-                    ]}
+                    options={BANK_ACCOUNT_OPTIONS}
                     disabled={isConfirmingPayment}
+                    ariaLabel="Deposit to"
+                  size="md"
                   />
                   <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
                     Choose the bank account for this older pending payment.
@@ -2923,6 +2998,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   showArrows={false}
                   size="sm"
                   disabled={isConfirmingPayment}
+                  minDate={clearanceMinDateForConfirm}
                   className="w-full"
                   triggerClassName="w-full justify-between"
                 />
@@ -3297,20 +3373,19 @@ const InvoiceDetailsPage: React.FC = () => {
               </button>
             </div>
 
-            <div className="mb-4">
-              <FormListbox
-                name="paymenttype"
-                label="Select Payment Type"
+            <div className="mb-4 space-y-2">
+              <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                Select Payment Type
+              </label>
+              <PillSelect<"CASH" | "INVOICE">
                 value={selectedPaymentType}
-                onChange={(value) =>
-                  setSelectedPaymentType(value as "CASH" | "INVOICE")
+                onChange={(value: "CASH" | "INVOICE") =>
+                  setSelectedPaymentType(value)
                 }
-                options={[
-                  { id: "CASH", name: "Cash" },
-                  { id: "INVOICE", name: "Invoice" },
-                ]}
-                placeholder="Select payment type..."
+                options={PAYMENT_TYPE_OPTIONS}
                 disabled={isUpdatingPaymentType}
+                ariaLabel="Payment type"
+              size="md"
               />
             </div>
 
@@ -3355,7 +3430,14 @@ const InvoiceDetailsPage: React.FC = () => {
               </Button>
               <Button
                 color="amber"
-                onClick={handlePaymentTypeUpdate}
+                onClick={() => {
+                  if (selectedPaymentType === invoiceData?.paymenttype) {
+                    setIsEditingPaymentType(false);
+                    setSelectedPaymentType("INVOICE");
+                    return;
+                  }
+                  setShowPaymentTypeConfirm(true);
+                }}
                 disabled={isUpdatingPaymentType || !selectedPaymentType}
               >
                 {isUpdatingPaymentType ? "Updating..." : "Update Payment Type"}

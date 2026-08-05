@@ -1,5 +1,11 @@
 // src/pages/GreenTarget/Rentals/RentalDetailsPage.tsx
-import React, { Fragment, useCallback, useEffect, useState } from "react";
+import React, {
+  Fragment,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { format } from "date-fns";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
@@ -19,9 +25,27 @@ import toast from "react-hot-toast";
 import BackButton from "../../../components/BackButton";
 import Button from "../../../components/Button";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
+import GreenTargetReceiptDetailsDialog from "../../../components/GreenTarget/GreenTargetReceiptDetailsDialog";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { greenTargetApi } from "../../../routes/greentarget/api";
+import GTInvoiceAccountFields, {
+  GT_DEFAULT_REVENUE_ACCOUNT,
+  GTInvoiceAccountFieldsHandle,
+} from "../../../components/GreenTarget/GTInvoiceAccountFields";
+import GTReceiptJoinPanel, {
+  type GTReceiptJoinConfirmation,
+  type GTReceiptJoinLookupState,
+  useGTReceiptJoinConfirmation,
+  useGTReceiptJoinLookup,
+} from "../../../components/GreenTarget/GTReceiptJoinPanel";
 import { formatLocationDisplay } from "../../../utils/greenTarget/formatLocationDisplay";
+import { toCents } from "../../../utils/moneyUtils";
+import type {
+  GreenTargetPayment,
+  GreenTargetPaymentMutationResponse,
+  GreenTargetReceiptJoinCandidate,
+  GreenTargetRevenueSplit,
+} from "../../../types/greenTargetTypes";
 
 interface PickupDestination {
   id: number;
@@ -51,6 +75,8 @@ interface RentalDetails {
 interface RentalPayment {
   payment_id: number;
   invoice_id: number;
+  receipt_id: number | null;
+  posting_date: string | null;
   payment_date: string;
   amount_paid: number | string;
   payment_method: string;
@@ -173,6 +199,9 @@ const RentalDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
 
   const [rental, setRental] = useState<RentalDetails | null>(null);
+  const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(
+    null
+  );
   const [invoices, setInvoices] = useState<LinkedInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -198,6 +227,24 @@ const RentalDetailsPage: React.FC = () => {
     useState(false);
   const [selectedRentalIds, setSelectedRentalIds] = useState<number[]>([]);
   const [invoiceAmount, setInvoiceAmount] = useState<string>("200.00");
+  const [invoiceRevenueSplits, setInvoiceRevenueSplits] = useState<
+    GreenTargetRevenueSplit[]
+  >([
+    {
+      line_number: 1,
+      account_code: GT_DEFAULT_REVENUE_ACCOUNT,
+      amount: 200,
+    },
+  ]);
+  const [invoiceDebtorAccount, setInvoiceDebtorAccount] = useState<string>("");
+  const accountFieldsRef = useRef<GTInvoiceAccountFieldsHandle | null>(null);
+  // The customer's saved default, loaded when the modal opens. Null means the
+  // customer has never been given one, which is the only case that needs a
+  // human decision here.
+  const [customerDefaultDebtorAccount, setCustomerDefaultDebtorAccount] =
+    useState<string | null>(null);
+  const [isLoadingCustomerDefault, setIsLoadingCustomerDefault] =
+    useState<boolean>(false);
   const [dateIssued, setDateIssued] = useState<string>(
     format(new Date(), "yyyy-MM-dd")
   );
@@ -207,11 +254,22 @@ const RentalDetailsPage: React.FC = () => {
     format(new Date(), "yyyy-MM-dd")
   );
   const [paymentMethod, setPaymentMethod] = useState<
-    "cash" | "cheque" | "bank_transfer" | "online"
+    GreenTargetPayment["payment_method"]
   >("cash");
   const [paymentInternalReference, setPaymentInternalReference] =
     useState<string>("");
   const [paymentReference, setPaymentReference] = useState<string>("");
+  const paymentReceiptLookup: GTReceiptJoinLookupState =
+    useGTReceiptJoinLookup(
+      paymentInternalReference,
+      isInvoiceModalOpen && recordPayment
+    );
+  const paymentReceiptJoin: GTReceiptJoinConfirmation =
+    useGTReceiptJoinConfirmation(paymentReceiptLookup);
+  const confirmedPaymentReceipt: GreenTargetReceiptJoinCandidate | null =
+    paymentReceiptJoin.confirmedReceipt;
+  const effectivePaymentMethod: GreenTargetPayment["payment_method"] =
+    confirmedPaymentReceipt?.payment_method || paymentMethod;
 
   const fetchDetails = useCallback(async () => {
     if (!id) return;
@@ -263,6 +321,15 @@ const RentalDetailsPage: React.FC = () => {
     setIsInvoiceModalOpen(true);
     setSelectedRentalIds([rental.rental_id]);
     setInvoiceAmount("200.00");
+    setInvoiceRevenueSplits([
+      {
+        line_number: 1,
+        account_code: GT_DEFAULT_REVENUE_ACCOUNT,
+        amount: 200,
+      },
+    ]);
+    setInvoiceDebtorAccount("");
+    setCustomerDefaultDebtorAccount(null);
     setDateIssued(format(new Date(), "yyyy-MM-dd"));
     setRecordPayment(false);
     setPaymentDate(format(new Date(), "yyyy-MM-dd"));
@@ -270,6 +337,20 @@ const RentalDetailsPage: React.FC = () => {
     setPaymentInternalReference("");
     setPaymentReference("");
     setIsLoadingCustomerRentals(true);
+    // Preselect the customer's saved logical debtor identity when available;
+    // the shared accounting block still displays where it posts in the GL.
+    setIsLoadingCustomerDefault(true);
+    void greenTargetApi
+      .getCustomer(rental.customer_id)
+      .then((customer: { debtor_account_code?: string | null }): void => {
+        const defaultCode: string = customer?.debtor_account_code || "";
+        setCustomerDefaultDebtorAccount(defaultCode || null);
+        setInvoiceDebtorAccount(defaultCode);
+      })
+      .catch((customerError: unknown): void => {
+        console.error("Error loading the customer's debtor account:", customerError);
+      })
+      .finally((): void => setIsLoadingCustomerDefault(false));
     try {
       const data: CustomerRentalOption[] = await greenTargetApi.getRentals({
         customer_id: rental.customer_id,
@@ -321,6 +402,12 @@ const RentalDetailsPage: React.FC = () => {
     );
   };
 
+  const handlePaymentInternalReferenceChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ): void => {
+    setPaymentInternalReference(event.target.value);
+  };
+
   const handleCreateInvoice = async (): Promise<void> => {
     if (!rental) return;
     const amount = parseFloat(invoiceAmount);
@@ -328,12 +415,31 @@ const RentalDetailsPage: React.FC = () => {
       toast.error("Select at least one rental.");
       return;
     }
-    if (isNaN(amount) || amount < 0) {
+    if (isNaN(amount) || amount <= 0) {
       toast.error("Please enter a valid amount.");
       return;
     }
     if (!dateIssued) {
       toast.error("Date issued is required.");
+      return;
+    }
+    const hasInvalidRevenueSplit: boolean =
+      invoiceRevenueSplits.length === 0 ||
+      invoiceRevenueSplits.some(
+        (split: GreenTargetRevenueSplit): boolean =>
+          !Number.isFinite(Number(split.amount)) || toCents(Number(split.amount)) <= 0
+      );
+    const allocatedRevenueCents: number = invoiceRevenueSplits.reduce(
+      (sum: number, split: GreenTargetRevenueSplit): number =>
+        sum + toCents(Number(split.amount)),
+      0
+    );
+    if (hasInvalidRevenueSplit) {
+      toast.error("Enter an amount greater than RM 0.00 for every revenue line.");
+      return;
+    }
+    if (allocatedRevenueCents !== toCents(amount)) {
+      toast.error("Revenue allocation must equal the invoice total.");
       return;
     }
     if (recordPayment && !paymentInternalReference.trim()) {
@@ -342,32 +448,102 @@ const RentalDetailsPage: React.FC = () => {
       );
       return;
     }
+    if (recordPayment && paymentReceiptLookup.isLooking) {
+      toast.error("Please wait while the reference number is checked.");
+      return;
+    }
+    if (recordPayment && paymentReceiptLookup.receipt) {
+      if (!paymentReceiptLookup.joinable) {
+        toast.error(
+          "This reference belongs to a receipt that cannot accept this payment."
+        );
+        return;
+      }
+      if (!confirmedPaymentReceipt) {
+        toast.error(
+          "Confirm that this payment should join the existing receipt."
+        );
+        return;
+      }
+    }
+    if (recordPayment && confirmedPaymentReceipt) {
+      const inheritedReceivedDate: string = toLocalDateString(
+        confirmedPaymentReceipt.received_date
+      );
+      if (!inheritedReceivedDate || inheritedReceivedDate < dateIssued) {
+        toast.error(
+          "The existing receipt date cannot be before the invoice date."
+        );
+        return;
+      }
+    } else if (recordPayment) {
+      if (!paymentDate) {
+        toast.error("Payment received date is required.");
+        return;
+      }
+      if (paymentDate < dateIssued) {
+        toast.error("Payment received date cannot be before the invoice date.");
+        return;
+      }
+    }
 
     setIsCreatingInvoice(true);
     try {
+      // A staged CD/SD identity is only written once the invoice is actually
+      // being saved, so an abandoned modal never leaves an unused debtor name.
+      let debtorAccountCode: string;
+      try {
+        debtorAccountCode = accountFieldsRef.current
+          ? await accountFieldsRef.current.ensureDebtorIdentity()
+          : invoiceDebtorAccount.trim();
+      } catch (identityError: unknown) {
+        toast.error(
+          identityError instanceof Error
+            ? identityError.message
+            : "Gagal menyediakan identiti penghutang."
+        );
+        return;
+      }
+
       const response = await greenTargetApi.createInvoice({
         type: "regular",
         customer_id: rental.customer_id,
         rental_ids: selectedRentalIds,
         amount_before_tax: amount,
         tax_amount: 0,
+        total_amount: amount,
         date_issued: dateIssued,
+        debtor_account_code: debtorAccountCode,
+        revenue_splits: invoiceRevenueSplits,
       });
       toast.success(`Invoice ${response.invoice.invoice_number} created`);
       if (recordPayment) {
         try {
-          await greenTargetApi.createPayment({
-            invoice_id: response.invoice.invoice_id,
-            payment_date: paymentDate,
-            amount_paid: amount,
-            payment_method: paymentMethod,
-            payment_reference:
-              paymentMethod === "cash"
-                ? null
-                : paymentReference.trim() || null,
-            internal_reference: paymentInternalReference.trim(),
-          });
-          toast.success("Payment recorded");
+          const paymentResponse: GreenTargetPaymentMutationResponse =
+            await greenTargetApi.createPayment({
+              invoice_id: response.invoice.invoice_id,
+              payment_date: confirmedPaymentReceipt
+                ? toLocalDateString(confirmedPaymentReceipt.received_date)
+                : paymentDate,
+              amount_paid: amount,
+              payment_method: effectivePaymentMethod,
+              payment_reference: confirmedPaymentReceipt
+                ? confirmedPaymentReceipt.payment_reference
+                : paymentMethod === "cheque"
+                ? paymentReference.trim() || null
+                : null,
+              internal_reference:
+                confirmedPaymentReceipt?.display_reference ||
+                paymentInternalReference.trim(),
+              ...(confirmedPaymentReceipt
+                ? { receipt_id: confirmedPaymentReceipt.receipt_id }
+                : {}),
+            });
+          toast.success(
+            paymentResponse.receipt?.joined
+              ? `Payment added to receipt ${paymentResponse.receipt.display_reference}`
+              : "Payment recorded"
+          );
         } catch (paymentError: any) {
           console.error("Error recording payment:", paymentError);
           const paymentMessage =
@@ -716,7 +892,25 @@ const RentalDetailsPage: React.FC = () => {
                                   ] || payment.payment_method}
                                 </td>
                                 <td className="py-1.5 pr-3 text-default-600 dark:text-gray-400">
-                                  {payment.internal_reference || "-"}
+                                  {payment.receipt_id ? (
+                                    <button
+                                      type="button"
+                                      onClick={(): void =>
+                                        setSelectedReceiptId(
+                                          payment.receipt_id
+                                        )
+                                      }
+                                      className="text-sky-600 hover:underline dark:text-sky-400"
+                                      title={`View receipt ${
+                                        payment.internal_reference || ""
+                                      } and every invoice it settles`}
+                                    >
+                                      {payment.internal_reference ||
+                                        "View receipt"}
+                                    </button>
+                                  ) : (
+                                    payment.internal_reference || "-"
+                                  )}
                                 </td>
                                 <td className="py-1.5 pr-3 text-right font-medium text-default-800 dark:text-gray-200">
                                   {formatMoney(payment.amount_paid)}
@@ -743,6 +937,15 @@ const RentalDetailsPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* One receipt can settle several invoices, so the reference opens the
+          whole receipt here rather than navigating away from this rental. */}
+      <GreenTargetReceiptDetailsDialog
+        receiptId={selectedReceiptId}
+        isOpen={selectedReceiptId !== null}
+        onClose={(): void => setSelectedReceiptId(null)}
+        onChanged={fetchDetails}
+      />
 
       {/* Delete confirmation */}
       <ConfirmationDialog
@@ -931,7 +1134,7 @@ const RentalDetailsPage: React.FC = () => {
                 leaveFrom="opacity-100 scale-100"
                 leaveTo="opacity-0 scale-95"
               >
-                <Dialog.Panel className="w-full max-w-lg transform rounded-lg bg-white dark:bg-gray-800 p-6 shadow-xl transition-all">
+                <Dialog.Panel className="w-full max-w-3xl transform rounded-lg bg-white dark:bg-gray-800 p-6 shadow-xl transition-all">
                   <div className="flex items-center justify-between mb-4">
                     <Dialog.Title className="text-lg font-semibold text-default-900 dark:text-gray-100">
                       Create Invoice
@@ -1060,11 +1263,36 @@ const RentalDetailsPage: React.FC = () => {
                     </div>
                   </div>
 
+                  <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50/60 p-3 dark:border-sky-900 dark:bg-sky-950/20">
+                    <GTInvoiceAccountFields
+                      ref={accountFieldsRef}
+                      variant="plain"
+                      customerId={rental.customer_id}
+                      customerName={rental.customer_name}
+                      customerDefaultCode={customerDefaultDebtorAccount}
+                      debtorAccountCode={invoiceDebtorAccount}
+                      onDebtorChange={setInvoiceDebtorAccount}
+                      dateIssued={dateIssued}
+                      invoiceTotal={Number(invoiceAmount) || 0}
+                      revenueSplits={invoiceRevenueSplits}
+                      onRevenueSplitsChange={setInvoiceRevenueSplits}
+                      disabled={isCreatingInvoice}
+                      customerDefaultLoading={isLoadingCustomerDefault}
+                    />
+                    <p className="mt-2 text-xs text-default-500 dark:text-gray-400">
+                      Creates the matching Green Target sales journal.
+                    </p>
+                  </div>
+
                   {/* Record Payment */}
                   <div className="mb-4">
                     <button
                       type="button"
-                      onClick={() => setRecordPayment(!recordPayment)}
+                      onClick={(): void => {
+                        setRecordPayment(
+                          (current: boolean): boolean => !current
+                        );
+                      }}
                       className="flex items-center cursor-pointer group p-1"
                     >
                       {recordPayment ? (
@@ -1086,7 +1314,7 @@ const RentalDetailsPage: React.FC = () => {
 
                   {recordPayment && (
                     <div className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg p-4 space-y-4">
-                      {paymentMethod === "cheque" && (
+                      {!confirmedPaymentReceipt && paymentMethod === "cheque" && (
                         <p className="text-xs text-default-500 dark:text-gray-400">
                           Cheque payments remain pending until they are
                           confirmed.
@@ -1099,9 +1327,20 @@ const RentalDetailsPage: React.FC = () => {
                           </label>
                           <input
                             type="date"
-                            value={paymentDate}
+                            value={
+                              confirmedPaymentReceipt
+                                ? toLocalDateString(
+                                    confirmedPaymentReceipt.received_date
+                                  )
+                                : paymentDate
+                            }
                             onChange={(e) => setPaymentDate(e.target.value)}
-                            className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:focus:ring-sky-400"
+                            readOnly={Boolean(confirmedPaymentReceipt)}
+                            className={`w-full rounded-lg border border-default-300 px-3 py-2 dark:border-gray-600 ${
+                              confirmedPaymentReceipt
+                                ? "bg-default-100 text-default-700 dark:bg-gray-900/70 dark:text-gray-300"
+                                : "bg-white text-default-900 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:bg-gray-900/50 dark:text-gray-100 dark:focus:ring-sky-400"
+                            }`}
                           />
                         </div>
                         <div>
@@ -1109,25 +1348,36 @@ const RentalDetailsPage: React.FC = () => {
                             Method <span className="text-rose-500">*</span>
                           </label>
                           <Listbox
-                            value={paymentMethod}
+                            value={effectivePaymentMethod}
                             onChange={(
-                              method: "cash" | "cheque" | "bank_transfer" | "online"
+                              method: GreenTargetPayment["payment_method"]
                             ): void => {
                               setPaymentMethod(method);
-                              if (method === "cash") setPaymentReference("");
+                              if (method !== "cheque") setPaymentReference("");
                             }}
+                            disabled={Boolean(confirmedPaymentReceipt)}
                           >
                             <div className="relative">
-                              <Listbox.Button className="relative w-full cursor-pointer rounded-lg bg-white dark:bg-gray-900/50 py-2 pl-3 pr-10 text-left border border-default-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:focus:ring-sky-400">
-                                <span className="block truncate text-default-800 dark:text-gray-200">
-                                  {paymentMethodLabels[paymentMethod]}
+                              <Listbox.Button
+                                className={`relative w-full rounded-lg border border-default-300 py-2 pl-3 pr-10 text-left dark:border-gray-600 ${
+                                  confirmedPaymentReceipt
+                                    ? "cursor-default bg-default-100 text-default-700 dark:bg-gray-900/70 dark:text-gray-300"
+                                    : "cursor-pointer bg-white text-default-800 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:bg-gray-900/50 dark:text-gray-200 dark:focus:ring-sky-400"
+                                }`}
+                              >
+                                <span className="block truncate">
+                                  {paymentMethodLabels[
+                                    effectivePaymentMethod
+                                  ] || effectivePaymentMethod}
                                 </span>
-                                <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                                  <IconChevronDown
-                                    size={18}
-                                    className="text-default-400 dark:text-gray-500"
-                                  />
-                                </span>
+                                {!confirmedPaymentReceipt && (
+                                  <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                                    <IconChevronDown
+                                      size={18}
+                                      className="text-default-400 dark:text-gray-500"
+                                    />
+                                  </span>
+                                )}
                               </Listbox.Button>
                               <Transition
                                 as={Fragment}
@@ -1178,20 +1428,30 @@ const RentalDetailsPage: React.FC = () => {
                           <input
                             type="text"
                             value={paymentInternalReference}
-                            onChange={(e) =>
-                              setPaymentInternalReference(e.target.value)
-                            }
+                            onChange={handlePaymentInternalReferenceChange}
                             placeholder="e.g. RV26/06/62"
                             maxLength={50}
                             className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:focus:ring-sky-400"
                           />
                         </div>
-                        {paymentMethod !== "cash" && (
+                        {confirmedPaymentReceipt ? (
                           <div>
                             <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-2">
-                              {paymentMethod === "cheque"
-                                ? "Cheque No."
-                                : "Transaction Ref."}
+                              Cheque / Transaction Ref.
+                            </label>
+                            <input
+                              type="text"
+                              value={
+                                confirmedPaymentReceipt.payment_reference || "-"
+                              }
+                              readOnly
+                              className="w-full rounded-lg border border-default-300 bg-default-100 px-3 py-2 text-default-700 dark:border-gray-600 dark:bg-gray-900/70 dark:text-gray-300"
+                            />
+                          </div>
+                        ) : paymentMethod === "cheque" ? (
+                          <div>
+                            <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-2">
+                              Cheque No.
                             </label>
                             <input
                               type="text"
@@ -1203,8 +1463,18 @@ const RentalDetailsPage: React.FC = () => {
                               className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:focus:ring-sky-400"
                             />
                           </div>
-                        )}
+                        ) : null}
                       </div>
+                      <GTReceiptJoinPanel
+                        lookup={paymentReceiptLookup}
+                        joinConfirmed={paymentReceiptJoin.joinConfirmed}
+                        onJoinConfirmedChange={
+                          paymentReceiptJoin.setJoinConfirmed
+                        }
+                        disabled={
+                          isCreatingInvoice || paymentReceiptLookup.isLooking
+                        }
+                      />
                     </div>
                   )}
 
@@ -1223,7 +1493,14 @@ const RentalDetailsPage: React.FC = () => {
                       disabled={
                         isCreatingInvoice ||
                         isLoadingCustomerRentals ||
-                        selectedRentalIds.length === 0
+                        selectedRentalIds.length === 0 ||
+                        (recordPayment &&
+                          (paymentReceiptLookup.isLooking ||
+                            Boolean(
+                              paymentReceiptLookup.receipt &&
+                                (!paymentReceiptLookup.joinable ||
+                                  !confirmedPaymentReceipt)
+                            )))
                       }
                     >
                       {isCreatingInvoice ? "Creating..." : "Create Invoice"}

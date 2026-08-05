@@ -31,6 +31,7 @@ import { api } from "../../../routes/utils/api";
 import clsx from "clsx";
 import { FormCombobox, SelectOption } from "../../../components/FormComponents";
 import AssociatedInvoiceDisplay from "../../../components/GreenTarget/AssociatedInvoiceDisplay";
+import GreenTargetReceiptDetailsDialog from "../../../components/GreenTarget/GreenTargetReceiptDetailsDialog";
 
 // Interfaces (Customer, Location, Dumpster, Rental - unchanged)
 interface Customer {
@@ -58,12 +59,22 @@ interface Dumpster {
   has_future_rental?: boolean;
   next_rental?: { date: string; customer: string; rental_id: number };
 }
+interface InvoicePayment {
+  payment_id: number;
+  payment_date: string;
+  amount_paid: number | string;
+  payment_method: "cash" | "cheque" | "bank_transfer" | "online";
+  internal_reference: string | null;
+  status: "active" | "pending" | "cancelled" | null;
+  receipt_id: number | null;
+}
 interface InvoiceInfo {
   invoice_id: number;
   invoice_number: string;
   status: string;
   amount?: number;
   has_payments?: boolean;
+  payments?: InvoicePayment[];
 }
 
 interface PickupDestination {
@@ -133,6 +144,9 @@ const RentalFormPage: React.FC = () => {
   const [isValidSelection, setIsValidSelection] = useState(false);
   const [drivers, setDrivers] = useState<{ id: string; name: string }[]>([]);
   const [initialFormData, setInitialFormData] = useState<Rental | null>(null);
+  const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(
+    null
+  );
   const [customerLocations, setCustomerLocations] = useState<Location[]>([]);
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -1505,6 +1519,9 @@ const RentalFormPage: React.FC = () => {
                   onViewInvoice={(invoiceId) => {
                     window.open(`/greentarget/invoices/${invoiceId}`, "_blank");
                   }}
+                  onViewReceipt={(receiptId: number): void =>
+                    setSelectedReceiptId(receiptId)
+                  }
                 />
               </div>
             )}
@@ -1512,6 +1529,35 @@ const RentalFormPage: React.FC = () => {
         </form>
       </div>
       {/* Modals & Dialogs */}
+      {/* Opened in place so an unsaved rental edit is never lost to navigation. */}
+      <GreenTargetReceiptDetailsDialog
+        receiptId={selectedReceiptId}
+        isOpen={selectedReceiptId !== null}
+        onClose={(): void => setSelectedReceiptId(null)}
+        onChanged={async (): Promise<void> => {
+          if (!id) return;
+          // Refresh ONLY the invoice block. Re-running the full form fetch
+          // would discard unsaved edits, and touching just formData would
+          // make the JSON change-detection think the form is dirty — so both
+          // snapshots move together.
+          try {
+            const rental = await greenTargetApi.getRental(Number(id));
+            const refreshedInvoiceInfo: InvoiceInfo | null =
+              rental?.invoice_info ?? null;
+            setFormData((current: Rental): Rental => ({
+              ...current,
+              invoice_info: refreshedInvoiceInfo,
+            }));
+            setInitialFormData((current: Rental | null): Rental | null =>
+              current
+                ? { ...current, invoice_info: refreshedInvoiceInfo }
+                : current
+            );
+          } catch (error: unknown) {
+            console.error("Error refreshing the rental's invoice:", error);
+          }
+        }}
+      />
       <LocationFormModal
         isOpen={isNewCustomerModalOpen}
         onClose={() => setIsNewCustomerModalOpen(false)}

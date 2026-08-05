@@ -32,6 +32,8 @@ import {
   CutiReportData,
   CutiBatchReportData,
 } from "../../../utils/payroll/CutiReportPDF";
+import { usePersistedSearch } from "../../../hooks/usePersistedFilters";
+import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
 
 // --- Types for API Data ---
@@ -111,7 +113,8 @@ const EmployeeCard: React.FC<EmployeeCardProps> = ({
 const GTCutiReportPage: React.FC = () => {
   const { staffs: allStaffs, loading: loadingStaffs } = useStaffsCache();
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] =
+    usePersistedSearch("gtCutiReportSearch");
   const [currentYear] = useState(new Date().getFullYear());
 
   // GT payroll-employee ids (OFFICE + DRIVER). The report is scoped to these.
@@ -200,6 +203,11 @@ const GTCutiReportPage: React.FC = () => {
       );
     });
   }, [dedupedStaffs, groupedStaffIdsByEmployeeId, searchQuery]);
+
+  useScrollRestoration(
+    "gt-cuti-report",
+    !loadingStaffs && filteredEmployees.length > 0
+  );
 
   // Handle employee card click
   const handleEmployeeCardClick = (employee: Employee) => {

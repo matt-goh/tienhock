@@ -4,6 +4,7 @@ import { IconPlus, IconPencil, IconTrash, IconCheck, IconX } from "@tabler/icons
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import { useStaffFormOptions } from "../../hooks/useStaffFormOptions";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 import LoadingSpinner from "../../components/LoadingSpinner";
 
 interface EntityItem {
@@ -549,6 +550,8 @@ const OthersPage: React.FC = () => {
   const [entityData, setEntityData] = useState<Record<string, EntityItem[]>>({});
   const [taxes, setTaxes] = useState<TaxItem[]>([]);
   const [taxLoading, setTaxLoading] = useState(true);
+
+  useScrollRestoration("catalogue-others", !optionsLoading && !taxLoading);
 
   // Load entity data from options
   useEffect(() => {

@@ -3325,7 +3325,7 @@ export default function (pool, config) {
 
       // 2. Find and cancel ACTIVE payments associated with this invoice
       const activePaymentsQuery = `
-        SELECT payment_id, amount_paid, journal_entry_id
+        SELECT payment_id, amount_paid, journal_entry_id, payment_method
         FROM payments
         WHERE invoice_id = $1 AND (status IS NULL OR status = 'active')
         FOR UPDATE -- Lock payment rows as well
@@ -3357,6 +3357,29 @@ export default function (pool, config) {
           // Cancel the associated journal entry if it exists
           if (payment.journal_entry_id) {
             await cancelPaymentJournalEntry(client, payment.journal_entry_id);
+          }
+
+          // An overpayment-application row also returns the applied amount to
+          // the customer's unapplied excess (FIFO distribution recorded on
+          // apply; mirrors the single-payment cancel endpoint).
+          if (payment.payment_method === "overpayment") {
+            const applicationsResult = await client.query(
+              `SELECT receipt_allocation_id, amount
+                 FROM overpayment_applications WHERE payment_id = $1`,
+              [payment.payment_id]
+            );
+            for (const application of applicationsResult.rows) {
+              await client.query(
+                `UPDATE receipt_allocations
+                    SET applied_amount = GREATEST(0, applied_amount - $2)
+                  WHERE id = $1`,
+                [application.receipt_allocation_id, application.amount]
+              );
+            }
+            await client.query(
+              `DELETE FROM overpayment_applications WHERE payment_id = $1`,
+              [payment.payment_id]
+            );
           }
 
           // Reverse customer credit adjustment ONLY if the original invoice was an INVOICE type
@@ -3624,6 +3647,36 @@ export default function (pool, config) {
         invoice.createddate,
         `Sales invoice ${id}`
       );
+
+      // A cancelled invoice must never be flipped back to paid or have its
+      // journal re-posted by an order-details edit.
+      if (invoice.invoice_status === "cancelled") {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: `Cannot edit order details: invoice ${id} is cancelled.`,
+        });
+      }
+
+      // Block the edit while active adjustment documents reference this
+      // invoice — the new balance would silently restore the pre-adjustment
+      // amount while the adjustment's journal stays posted. Cancel those
+      // documents first.
+      const adjustmentCheck = await client.query(
+        `SELECT id, type FROM adjustment_documents
+          WHERE original_invoice_id = $1
+            AND status = 'active'
+            AND COALESCE(is_consolidated, false) = false
+          ORDER BY created_at DESC
+          LIMIT 5`,
+        [id]
+      );
+      if (adjustmentCheck.rows.length > 0) {
+        await client.query("ROLLBACK");
+        const refs = adjustmentCheck.rows.map((r) => r.id).join(", ");
+        return res.status(400).json({
+          message: `Cannot edit order details of invoice ${id}: active adjustment document(s) reference it (${refs}). Cancel those documents first.`,
+        });
+      }
 
       // 2. Check if this requires e-Invoice cancellation confirmation
       const requiresConfirmation =
@@ -4787,6 +4840,35 @@ export default function (pool, config) {
         currentInvoice.createddate,
         `Sales invoice ${id}`
       );
+
+      // A cancelled invoice must never be flipped back to paid or have its
+      // journal re-posted by a payment-type conversion.
+      if (currentInvoice.invoice_status === "cancelled") {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: `Cannot change payment type: invoice ${id} is cancelled.`,
+        });
+      }
+
+      // Block conversion while active adjustment documents reference this
+      // invoice — they posted their own accounting against the current
+      // balance semantics and must be cancelled first.
+      const adjustmentCheck = await client.query(
+        `SELECT id, type FROM adjustment_documents
+          WHERE original_invoice_id = $1
+            AND status = 'active'
+            AND COALESCE(is_consolidated, false) = false
+          ORDER BY created_at DESC
+          LIMIT 5`,
+        [id]
+      );
+      if (adjustmentCheck.rows.length > 0) {
+        await client.query("ROLLBACK");
+        const refs = adjustmentCheck.rows.map((r) => r.id).join(", ");
+        return res.status(400).json({
+          message: `Cannot change payment type of invoice ${id}: active adjustment document(s) reference it (${refs}). Cancel those documents first.`,
+        });
+      }
 
       // A pending cheque receipt must be resolved before converting either way —
       // its allocation is validated against the invoice's balance semantics.

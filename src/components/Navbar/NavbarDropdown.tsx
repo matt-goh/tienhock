@@ -10,6 +10,7 @@ import {
   IconPlus,
 } from "@tabler/icons-react";
 import { SidebarItem, PopoverOption } from "../../pages/pagesRoute";
+import { useTranslation } from "react-i18next";
 
 interface NavbarDropdownProps {
   items: SidebarItem[];
@@ -84,6 +85,7 @@ export default function NavbarDropdown({
   const popoverRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
+  const { t } = useTranslation("nav");
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 });
@@ -300,7 +302,7 @@ export default function NavbarDropdown({
             }
           `}
         >
-          <span className="truncate">{item.name}</span>
+          <span className="truncate">{t(item.name)}</span>
           <div className="flex items-center gap-1">
             {showBookmarkIcon && (
               <button
@@ -321,8 +323,8 @@ export default function NavbarDropdown({
                 type="button"
                 title={
                   popoverOptions.length === 1
-                    ? popoverOptions[0].name
-                    : "Quick create"
+                    ? t(popoverOptions[0].name)
+                    : t("Quick create")
                 }
                 onClick={(e) => {
                   e.preventDefault();
@@ -410,7 +412,7 @@ export default function NavbarDropdown({
                   >
                     {group.label && (
                       <div className="px-3 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-default-400 dark:text-gray-500 select-none">
-                        {group.label}
+                        {t(group.label)}
                       </div>
                     )}
                     {group.items.map(renderDropdownItem)}
@@ -473,7 +475,7 @@ export default function NavbarDropdown({
             className="flex items-center gap-2 px-3 py-2 text-sm text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 transition-colors"
           >
             <IconPlus size={16} />
-            <span>{option.name}</span>
+            <span>{t(option.name)}</span>
           </Link>
         ))}
       </div>

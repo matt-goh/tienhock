@@ -9,6 +9,7 @@ import Button from "../../../components/Button";
 import {
   FormInput,
   FormInputWithStatus,
+  FormCombobox,
   FormListbox,
 } from "../../../components/FormComponents";
 import { greenTargetApi } from "../../../routes/greentarget/api";
@@ -24,6 +25,8 @@ import {
   IconTrash,
 } from "@tabler/icons-react";
 import { validateCustomerIdentity } from "../../../utils/greenTarget/customerValidation";
+import { api } from "../../../routes/utils/api";
+import type { GreenTargetDebtorSubledgerIdentity } from "../../../types/greenTargetTypes";
 
 interface CustomerLocation {
   location_id?: number;
@@ -47,6 +50,7 @@ interface Customer {
   state?: string;
   additional_info?: string;
   billing_address?: string;
+  debtor_account_code?: string;
 }
 
 interface SelectOption {
@@ -70,6 +74,7 @@ const CustomerFormPage: React.FC = () => {
     state: "12",
     additional_info: "",
     billing_address: "",
+    debtor_account_code: "",
   });
 
   const [initialFormData, setInitialFormData] = useState<Customer>({
@@ -82,6 +87,7 @@ const CustomerFormPage: React.FC = () => {
     state: "12",
     additional_info: "",
     billing_address: "",
+    debtor_account_code: "",
   });
 
   const [locations, setLocations] = useState<CustomerLocation[]>([]);
@@ -100,6 +106,10 @@ const CustomerFormPage: React.FC = () => {
   const [loading, setLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [debtorAccountOptions, setDebtorAccountOptions] = useState<
+    SelectOption[]
+  >([]);
+  const [debtorAccountQuery, setDebtorAccountQuery] = useState<string>("");
 
   const idTypeOptions = [
     { id: "Select", name: "Select" },
@@ -134,6 +144,43 @@ const CustomerFormPage: React.FC = () => {
       fetchCustomerDetails(parseInt(id));
     }
   }, [id, isEditMode]);
+
+  useEffect((): (() => void) => {
+    let isCurrent = true;
+    const timer = window.setTimeout((): void => {
+      const fetchDebtorAccounts = async (): Promise<void> => {
+        try {
+          const search =
+            debtorAccountQuery.trim() || formData.debtor_account_code || "";
+          const params = new URLSearchParams({ search, limit: "50" });
+          const accounts = await api.get<
+            GreenTargetDebtorSubledgerIdentity[]
+          >(
+            `/greentarget/api/account-codes/debtor-subledger?${params.toString()}`
+          );
+          if (!isCurrent) return;
+          setDebtorAccountOptions(
+            accounts.map(
+              (
+                account: GreenTargetDebtorSubledgerIdentity
+              ): SelectOption => ({
+                id: account.code,
+                name: `${account.code} - ${account.description} (posts to ${account.control_account_code})`,
+              })
+            )
+          );
+        } catch (fetchError: unknown) {
+          console.error("Failed to load GT debtor identities:", fetchError);
+          if (isCurrent) toast.error("Failed to load trade debtor identities");
+        }
+      };
+      void fetchDebtorAccounts();
+    }, debtorAccountQuery ? 250 : 0);
+    return (): void => {
+      isCurrent = false;
+      window.clearTimeout(timer);
+    };
+  }, [debtorAccountQuery, formData.debtor_account_code]);
 
   useEffect(() => {
     const hasChanged =
@@ -171,6 +218,7 @@ const CustomerFormPage: React.FC = () => {
         state: data.state || "12",
         additional_info: data.additional_info || "",
         billing_address: data.billing_address || "",
+        debtor_account_code: data.debtor_account_code || "",
         locations: fetchedLocations,
       };
 
@@ -339,6 +387,7 @@ const CustomerFormPage: React.FC = () => {
             state: formData.state,
             additional_info: formData.additional_info,
             billing_address: formData.billing_address,
+            debtor_account_code: formData.debtor_account_code || null,
           }
         );
       } else {
@@ -356,6 +405,7 @@ const CustomerFormPage: React.FC = () => {
             state: formData.state,
             additional_info: formData.additional_info,
             billing_address: formData.billing_address,
+            debtor_account_code: formData.debtor_account_code || null,
         });
       }
 
@@ -640,6 +690,31 @@ const CustomerFormPage: React.FC = () => {
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             {renderInput("name", "Customer Name")}
             {renderInput("phone_number", "Phone Number", "tel")}
+          </div>
+          <div className="mt-5">
+            <FormCombobox
+              name="debtor_account_code"
+              label="Default Debtor Identity"
+              value={formData.debtor_account_code || undefined}
+              onChange={(selectedId: string | string[] | null): void => {
+                setFormData((current: Customer): Customer => ({
+                  ...current,
+                  debtor_account_code:
+                    typeof selectedId === "string" ? selectedId : "",
+                }));
+                setDebtorAccountQuery("");
+              }}
+              options={debtorAccountOptions}
+              query={debtorAccountQuery}
+              setQuery={setDebtorAccountQuery}
+              placeholder="Search named or CD/SD identity..."
+              mode="single"
+            />
+            <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
+              Optional customer default. Every invoice still snapshots a
+              logical identity; CD/SD identities post to the CD_SD control and
+              remain separately visible in the debtor sub-schedule.
+            </p>
           </div>
           <div className="mt-5">
             {renderTextArea(

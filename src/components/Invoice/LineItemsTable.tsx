@@ -1,5 +1,6 @@
 // src/components/Invoice/LineItemsTable.tsx
 import React, { useState, useCallback, ChangeEvent, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { ProductItem, CustomProduct } from "../../types/types"; // Use Product type from cache
 import { IconTrash } from "@tabler/icons-react";
 import { addMoney, multiplyMoney } from "../../utils/moneyUtils";
@@ -27,6 +28,8 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
   productsCache,
   readOnly = false,
 }) => {
+  const { t } = useTranslation("invoice");
+
   const handleItemChange = useCallback(
     (index: number, field: keyof ProductItem, value: any) => {
       const newItems = [...items];
@@ -228,7 +231,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
               prod?.description || item.description || ""
             }
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search Product..."
+            placeholder={t("Search Product...")}
           />
           {!readOnly && (
             <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
@@ -238,7 +241,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
           <ComboboxOptions className="absolute z-30 mt-1 w-full min-w-[350px] max-h-60 overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none sm:text-sm border border-default-200 dark:border-gray-700">
             {filteredProducts.length === 0 && query !== "" ? (
               <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
-                Nothing found.
+                {t("Nothing found.", { ns: "common" })}
               </div>
             ) : (
               filteredProducts.map((prod) => (
@@ -308,7 +311,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
           handleItemChange(rowIndex, "description", e.target.value);
         }}
         className="w-full py-1 px-2 border border-transparent hover:border-default-300 dark:hover:border-gray-500 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded bg-transparent dark:text-gray-100 text-sm"
-        placeholder="Enter custom description..."
+        placeholder={t("Enter custom description...")}
         disabled={readOnly}
       />
     );
@@ -341,28 +344,28 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
         <thead className="bg-gray-50 dark:bg-gray-900/50">
           <tr>
             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              ID
+              {t("ID")}
             </th>
             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              Product
+              {t("Product")}
             </th>
             <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              QTY
+              {t("QTY")}
             </th>
             <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              Price
+              {t("Price")}
             </th>
             <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              FOC
+              {t("FOC")}
             </th>
             <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              RTN
+              {t("RTN")}
             </th>
             <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              Tax
+              {t("Tax")}
             </th>
             <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              Total
+              {t("total", { ns: "common" })}
             </th>
             {!readOnly && (
               <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"></th>
@@ -380,7 +383,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
                   colSpan={7}
                   className="px-3 py-1.5 text-right text-sm text-gray-700 dark:text-gray-300"
                 >
-                  Subtotal:
+                  {t("Subtotal:")}
                 </td>
                 <td className="px-3 py-1.5 text-right text-sm text-gray-900 dark:text-gray-100">
                   {parseFloat(item.total || "0").toFixed(2)}
@@ -391,7 +394,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
                       type="button"
                       onClick={() => handleDeleteRow(index)}
                       className="flex items-center text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100"
-                      title="Delete Subtotal Row"
+                      title={t("Delete Subtotal Row")}
                       disabled={readOnly}
                     >
                       <IconTrash size={16} />
@@ -470,7 +473,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
                       type="button"
                       onClick={() => handleDeleteRow(index)}
                       className="flex items-center justify-center text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                      title="Delete Row"
+                      title={t("Delete Row")}
                     >
                       <IconTrash size={16} />
                     </button>

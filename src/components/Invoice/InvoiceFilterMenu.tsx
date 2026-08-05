@@ -22,6 +22,7 @@ import {
   IconX,
   IconTrash,
 } from "@tabler/icons-react";
+import { useTranslation } from "react-i18next";
 import { InvoiceFilters } from "../../types/types";
 import Button from "../Button";
 import { CustomerCombobox } from "./CustomerCombobox";
@@ -46,6 +47,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
   activeFilterCount,
   hasViewedFilters,
 }) => {
+  const { t } = useTranslation("invoice");
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -66,19 +68,20 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
   const [customerPage, setCustomerPage] = useState(1);
   const CUSTOMERS_PER_PAGE = 50;
 
+  // Only `name` is translated; every `id` stays the raw filter value.
   const invoiceStatusOptions = [
-    { id: "paid", name: "Paid" },
-    { id: "Unpaid", name: "Unpaid" },
-    { id: "cancelled", name: "Cancelled" },
-    { id: "Overdue", name: "Overdue" },
+    { id: "paid", name: t("Paid") },
+    { id: "Unpaid", name: t("Unpaid") },
+    { id: "cancelled", name: t("Cancelled") },
+    { id: "Overdue", name: t("Overdue") },
   ];
 
   const eInvoiceStatusOptions = [
-    { id: "valid", name: "Valid" },
-    { id: "pending", name: "Pending" },
-    { id: "invalid", name: "Invalid" },
-    { id: "cancelled", name: "Cancelled" },
-    { id: "null", name: "Not Submitted" },
+    { id: "valid", name: t("Valid") },
+    { id: "pending", name: t("Pending") },
+    { id: "invalid", name: t("Invalid") },
+    { id: "cancelled", name: t("Cancelled") },
+    { id: "null", name: t("Not Submitted") },
   ];
 
   // --- Effects to cache options (no change needed) ---
@@ -197,7 +200,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
       >
-        Filter
+        {t("filter", { ns: "common" })}
       </Button>
       {(activeFilterCount ?? 0) > 0 && !hasViewedFilters && (
         <span className="absolute -top-1 -right-1 bg-sky-500 text-white text-[10px] rounded-full h-4 w-4 flex items-center justify-center">
@@ -233,7 +236,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                   as="h3"
                   className="text-xl font-semibold text-default-800 dark:text-gray-100"
                 >
-                  Filter Invoices
+                  {t("Filter Invoices")}
                 </DialogTitle>
                 <button
                   onClick={() => setIsOpen(false)}
@@ -247,7 +250,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                 {/* Salesman Filter */}
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-200">
-                    Salesperson
+                    {t("Salesperson")}
                   </label>
                   <Combobox
                     multiple
@@ -261,8 +264,11 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                             <span className="block truncate">
                               {pendingFilters.salespersonId &&
                               pendingFilters.salespersonId.length > 0
-                                ? `${pendingFilters.salespersonId.length} selected`
-                                : "Select salesman"}
+                                ? t("{{total}} selected", {
+                                    total:
+                                      pendingFilters.salespersonId.length,
+                                  })
+                                : t("Select salesman")}
                             </span>
                             <IconChevronDown
                               className="text-default-400 dark:text-gray-500 ml-2"
@@ -279,7 +285,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                             <ComboboxOptions className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none text-sm">
                               {cachedSalesmanOptions.length === 0 ? (
                                 <div className="relative cursor-default select-none py-2 px-4 text-default-500 dark:text-gray-400">
-                                  No salesmen found
+                                  {t("No salesmen found")}
                                 </div>
                               ) : (
                                 cachedSalesmanOptions.map((option) => (
@@ -348,7 +354,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                 {/* Customer Filter */}
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-200">
-                    Customer
+                    {t("customer", { ns: "common" })}
                   </label>
                   <CustomerCombobox
                     name="customer"
@@ -376,14 +382,14 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                     onLoadMore={() => setCustomerPage((prev) => prev + 1)}
                     hasMore={displayedCustomers.length < customers.length}
                     isLoading={isLoadingCustomers}
-                    placeholder="Search or select customer..."
+                    placeholder={t("Search or select customer...")}
                   />
                 </div>
 
                 {/* Payment Type Filter */}
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-200">
-                    Payment Type
+                    {t("Payment Type")}
                   </label>
                   <div className="flex items-center">
                     <Listbox
@@ -396,10 +402,10 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                         <ListboxButton className="w-full text-left py-2 pl-3 pr-4 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-gray-900 dark:text-gray-100 rounded-lg flex items-center justify-between">
                           <span className="block truncate">
                             {pendingFilters.paymentType === "Cash"
-                              ? "Cash Sales"
+                              ? t("Cash Sales")
                               : pendingFilters.paymentType === "Invoice"
-                              ? "Invoice Sales"
-                              : "All Types"}
+                              ? t("Invoice Sales")
+                              : t("All Types")}
                           </span>
                           <IconChevronDown
                             className="text-default-400 ml-2"
@@ -415,9 +421,9 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                         >
                           <ListboxOptions className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none text-sm">
                             {[
-                              { id: null, name: "All Types" },
-                              { id: "Cash", name: "Cash Sales" },
-                              { id: "Invoice", name: "Invoice Sales" },
+                              { id: null, name: t("All Types") },
+                              { id: "Cash", name: t("Cash Sales") },
+                              { id: "Invoice", name: t("Invoice Sales") },
                             ].map((option) => (
                               <ListboxOption
                                 key={option.id ?? "all"}
@@ -458,7 +464,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                 {/* Invoice Status Filter */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-                    Invoice Status
+                    {t("Invoice Status")}
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {invoiceStatusOptions.map((status) => (
@@ -509,7 +515,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                   {/* E-Invoice Status Filter */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-                      E-Invoice Status
+                      {t("E-Invoice Status")}
                     </label>
                     <div className="flex flex-wrap gap-2">
                       {eInvoiceStatusOptions.map((status) => (
@@ -565,7 +571,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                   {/* Consolidation Filter */}
                   <div>
                     <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">
-                      Consolidation Status
+                      {t("Consolidation Status")}
                     </label>
                     <div className="flex flex-col space-y-3 md:flex-row md:space-y-0 md:space-x-6">
                       <label className="inline-flex items-center cursor-pointer">
@@ -591,7 +597,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                             )}
                           </div>
                         </div>
-                        <span className="text-default-700 dark:text-gray-300">All</span>
+                        <span className="text-default-700 dark:text-gray-300">{t("all", { ns: "common" })}</span>
                       </label>
                       <label className="inline-flex items-center cursor-pointer">
                         <div className="relative flex items-center">
@@ -621,7 +627,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                             )}
                           </div>
                         </div>
-                        <span className="text-default-700 dark:text-gray-300">Individual</span>
+                        <span className="text-default-700 dark:text-gray-300">{t("Individual")}</span>
                       </label>
                       <label className="inline-flex items-center cursor-pointer">
                         <div className="relative flex items-center">
@@ -652,7 +658,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                             )}
                           </div>
                         </div>
-                        <span className="text-default-700 dark:text-gray-300">Consolidated</span>
+                        <span className="text-default-700 dark:text-gray-300">{t("Consolidated")}</span>
                       </label>
                     </div>
                   </div>
@@ -664,7 +670,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                       icon={IconTrash}
                       color="default"
                     >
-                      Clear Filters
+                      {t("Clear Filters")}
                     </Button>
                     <Button
                       onClick={applyFilters}
@@ -672,7 +678,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                       color="sky"
                       icon={IconFilter}
                     >
-                      Apply Filters
+                      {t("Apply Filters")}
                     </Button>
                   </div>
                 </div>

@@ -114,6 +114,7 @@ import StaffRecords from "./Catalogue/StaffRecords";
 // Customer
 import CustomerPage from "./Catalogue/CustomerPage";
 import CustomerAddPage from "./Catalogue/CustomerAddPage";
+import CustomerDetailsPage from "./Catalogue/CustomerDetailsPage";
 import CustomerFormPage from "./Catalogue/CustomerFormPage";
 
 // Other catalogues
@@ -757,8 +758,13 @@ export const TienHockNavData: SidebarItem[] = [
             showInPopover: true,
           },
           {
-            name: "Edit Customer",
+            name: "Customer Details",
             path: "/catalogue/customer/:id",
+            component: CustomerDetailsPage,
+          },
+          {
+            name: "Edit Customer",
+            path: "/catalogue/customer/:id/edit",
             component: CustomerFormPage,
           },
         ],

@@ -6,6 +6,7 @@ import { Employee } from "../../types/types";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
 
 const StaffRecords = () => {
@@ -94,6 +95,11 @@ const StaffRecords = () => {
   const activeEmployees = useMemo(() => {
     return employees.filter((employee) => !employee.dateResigned);
   }, [employees]);
+
+  useScrollRestoration(
+    "staff-records",
+    !loading && activeEmployees.length > 0
+  );
 
   // Export URL Generation
   const generateExportURL = () => {
