@@ -897,32 +897,38 @@ const EstimatedUnitCostPDFPage: React.FC<{ line: ProductLineReport }> = ({
 interface EstimatedReportPDFDocumentProps {
   data: EstimatedReportResponse;
   view: EstimatedReportView;
+  productLines: ProductLine[];
 }
 
 const EstimatedReportPDFDocument: React.FC<EstimatedReportPDFDocumentProps> = ({
   data,
   view,
-}) => {
-  const productLines: ProductLine[] = ["mee", "bihun"];
-  return (
-    <Document>
-      {productLines.flatMap((productLine) => {
-        const line = data.reports[productLine];
-        if (!line) return [];
-        return view === "pl"
-          ? [<EstimatedPLPDFPage key={`${productLine}-pl`} line={line} />]
-          : [<EstimatedUnitCostPDFPage key={`${productLine}-uc`} line={line} />];
-      })}
-    </Document>
-  );
-};
+  productLines,
+}) => (
+  <Document>
+    {productLines.flatMap((productLine) => {
+      const line = data.reports[productLine];
+      if (!line) return [];
+      return view === "pl"
+        ? [<EstimatedPLPDFPage key={`${productLine}-pl`} line={line} />]
+        : [<EstimatedUnitCostPDFPage key={`${productLine}-uc`} line={line} />];
+    })}
+  </Document>
+);
 
+// `productLines` selects which product lines are printed: one line for the
+// "Print MEE" / "Print BIHUN" actions, both for "Print All".
 export const generateEstimatedReportPDF = async (
   data: EstimatedReportResponse,
-  view: EstimatedReportView
+  view: EstimatedReportView,
+  productLines: ProductLine[] = ["mee", "bihun"]
 ): Promise<void> => {
   const blob = await pdf(
-    <EstimatedReportPDFDocument data={data} view={view} />
+    <EstimatedReportPDFDocument
+      data={data}
+      view={view}
+      productLines={productLines}
+    />
   ).toBlob();
 
   printPdfBlob(blob, "estimated report PDF");
