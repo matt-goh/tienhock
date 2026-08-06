@@ -1,6 +1,43 @@
 # I18N (Multi-Language) Rollout Handover
 
-**Status:** Phase 0 **DONE 2026-08-04**. B1 (`common`) **DONE 2026-08-04**. B3 (`invoice`) **DONE 2026-08-07** — all 23 files converted (16 in part 1, 7 in part 2); see §9. BM tone audit applied to all existing ms locales. Next: **B2** (`auth`, `nav`).
+**Status:** Phase 0 **DONE 2026-08-04**. B1 (`common`) **DONE 2026-08-04**. B3 (`invoice`) **DONE 2026-08-07** — all 23 files converted (16 in part 1, 7 in part 2); see §9. BM tone audit applied to all existing ms locales. B2 (`auth`, `nav`) **DONE 2026-08-07**. B4 (`payments`/`adjustments`/`sales`) **DONE 2026-08-07**. B5 (`sales`) **DONE 2026-08-07**. B6 (`catalogue`) **DONE 2026-08-07** – all 15 pages converted. B7 (`catalogue`) **DONE 2026-08-07** – all 27 components under `src/components/Catalogue/**` converted; `catalogue` namespace now has 819 keys per language. B8 (`payroll`) **IN PROGRESS 2026-08-07** – 18 of 24 payroll pages converted; `payroll` namespace has 399 keys per language. Next: finish B8 (PayrollDetailsPage, SalaryReportPage, the 3 entry pages), then **B9** (Payroll components).
+
+---
+
+## 0. CONTINUE HERE (fresh session)
+
+**Pick up exactly here:** finish **B8 part 2** – the last 5 payroll pages:
+
+```text
+src/pages/Payroll/PayrollDetailsPage.tsx            (3443 lines)
+src/pages/Payroll/SalaryReportPage.tsx              (4598 lines)
+src/pages/Payroll/DailyLog/DailyLogEntryPage.tsx    (3711 lines)
+src/pages/Payroll/DailyLog/DailyLogSalesmanEntryPage.tsx (4522 lines)
+src/pages/Payroll/MonthlyLog/MonthlyLogEntryPage.tsx    (2137 lines)
+```
+
+After B8: B9 (`src/components/Payroll/**`, 34 files) → B10 (`src/pages/Stock/**` + `src/components/Stock/**`) → B11/B12 (Accounting) → B13–B16 (GreenTarget + JellyPolly) → B17/B18 (misc + residue). Follow the batch table in §6.
+
+**Current namespace state:** registered in `src/i18n/index.ts`: `common`, `nav`, `home`, `invoice`, `auth`, `payments`, `adjustments`, `sales`, `catalogue` (819 keys/lang), `payroll` (399 keys/lang). `en/` stays sparse (semantic `common.*` only).
+
+**Per-file workflow (proven):**
+1. Add `import { useTranslation } from "react-i18next";` (+ `Trans` when a sentence has inline `<strong>` markup), call `const { t } = useTranslation("payroll");` at the top of the component. Sub-components in the same file need their own hook.
+2. Wrap every user-facing literal (JSX text, placeholder/title/aria-label, toasts, dialogs, empty states). Interpolate with `{{var}}`; never concatenate translated fragments.
+3. Add every new key to BOTH `src/i18n/locales/ms/payroll.json` and `src/i18n/locales/zh-Hans/payroll.json`. English text IS the key. Keep the BM tone rule (§7): plain English loanwords for technical terms (Konsolidasi, Submission, Cancellation, Pending, History, Summary, Range, Results, Check, Window, Preview, Rounding, Subtotal, Journal Entry, Ledger, Debtor, Sync, Transfer, Browser, Dashboard, Payroll, Production, Override), everyday Malay for everyday words (Simpan, Batal, Padam, Cari, Tambah, Hantar, Bayaran, Jumlah, Baki, Amaun, Tarikh, Masa, Sah, Cek, Tunai).
+4. Run `npm run i18n:report` (key symmetry ms/zh) and `npx tsc --noEmit` after each file or small group. Fix immediately.
+5. Update the Batch Log (§9) + Status line after finishing the batch. Do NOT run `git add` unless the user asks (they now manage staging themselves).
+
+**Gotchas learned the hard way (read before editing):**
+- **NEVER pass non-ASCII through a PowerShell here-string into `node -` / `rg`** – the pipe mangles every non-ASCII char to `?` (this corrupted a locale file once; it was rebuilt from the git index). For locale JSON edits use `apply_patch` directly, or write a UTF-8-safe entries JSON via `apply_patch` and merge it with a short ASCII-only Node script.
+- Files are CRLF; `apply_patch` handles them, but the console renders UTF-8 as mojibake. When a patch context line contains a non-ASCII char (em dash U+2014, en dash U+2013, middle dot U+00B7, bullet U+2022), get the exact codepoints with a Node dump first, then type the real character in `apply_patch`, or do that one replacement with a Node regex using `\u2014` etc.
+- JSX attribute strings cannot contain `\"` escapes (`i18nKey="...\"...\""` fails tsc). Use a JS expression: `i18nKey={'...'}` or `i18nKey={"...\"...\""}`.
+- Dynamic keys are invisible to the key-coverage checker: `t(getMonthName(...))`, `t(dayOfWeek)`, `t(view)`, `t(getDisplayDayType(...))`, `t(status)` need their concrete values in the JSON. Already present in `payroll`: January\u2013December, Monday\u2013Sunday, `summary`/`pinjam`, `Sabtu`, `Biasa/Ahad/Umum Rate`, `Hospital Leave`, `Submitted`/`Processed`.
+- Leave-type labels are standardised to `Annual Leave` / `Sick Leave` / `Public Holiday` / `Medical Leave` (ms: Cuti Tahunan / Cuti Sakit / Cuti Umum / Cuti Rawatan) – reuse those keys.
+- `getMonthName` (payrollUtils) returns browser-locale month names – leave those dynamic displays as-is when they are not passed through `t()`; the payroll month-name keys above are for the `t(getMonthName(...))` call sites already converted.
+- Exclusions still in force (§4): PDF generators, DB content, identifiers, statutory acronyms (EPF/SOCSO/SIP/PCB/KWSP/PERKESO), e-Invoice payloads, bank/export file contents.
+- The remaining giant pages contain many repeated table/card/toast strings – many keys already exist in `payroll`; run the coverage extractor before translating to avoid duplicates.
+
+---
 **Created:** 2026-08-04
 **Owner of this document:** update it after EVERY phase/batch. It is the single source of truth for what is done and what is next.
 
@@ -291,6 +328,12 @@ Keep statutory acronyms untranslated (EPF, SOCSO, SIP, PCB, KWSP, PERKESO). Mala
 | 2026-08-07 | B3 part 2 (`invoice`) | `PaymentTable`, `ConsolidatedInvoiceModal`, `PaymentForm`, `ConsolidatedInvoiceDetailsPage`, `InvoiceFormPage`, `InvoiceListPage`, `InvoiceDetailsPage` | invoice +576 keys (ms + zh-Hans each; total 796) | None — no PDF files under the globs | All 7 remaining Invoice files fully converted; `npm run i18n:report` green; `tsc --noEmit` clean. `saleTenders.ts` gained an optional `t` parameter (backward-compatible) so its validation messages translate in the Tien Hock form. |
 | 2026-08-07 | BM tone audit (all ms locales) | `ms/common.json`, `ms/nav.json`, `ms/home.json`, `ms/invoice.json` (values only) | 0 new keys | 窶・| Replaced formal/university-level BM with plain English loanwords (Konsolidasi, Submission, Cancellation, Confirmation, Pending, Eligible, History, Summary, Range, Results, Check, Window, Preview, Rounding, Subtotal, Journal Entry, Ledger, Debtor, Sync, Transfer, Browser, Dashboard, Payroll, Production, etc.) per user decision; everyday BM kept. Keys/behaviour untouched; `npm run i18n:report` green |
 
+| 2026-08-07 | B2 (`auth`, `nav`) | `src/pages/Auth/Login.tsx` | new `auth` namespace: 10 keys (ms + zh-Hans each) | `ProtectedRoute.tsx`, `pagesRoute.tsx` (no user-facing literals) | `auth` wired into `src/i18n/index.ts`; `npm run i18n:report` green; `tsc --noEmit` clean |
+| 2026-08-07 | B4 (`payments`/`adjustments`/`sales`) | `PaymentPage`, `AdjustmentDocsDetailsPage`, `AdjustmentDocsFormPage`, `AdjustmentDocsListPage`, `AdjustmentDocBadge`, `GTInvoiceAdjustmentDocsSection`, `InvoiceAdjustmentDocsSection`, `SalesSummarySelectionTooltip` | new namespaces: payments 16 + adjustments 226 + sales 25 = 267 keys (ms + zh-Hans each) | `useAdjustmentDocsPaths.ts` (no user-facing literals) | Three new namespaces wired into `src/i18n/index.ts`; `npm run i18n:report` green; `tsc --noEmit` clean |
+| 2026-08-07 | B5 (`sales`) | `SalesByProductsPage`, `SalesBySalesmanPage` | sales +68 keys (ms + zh-Hans each; total 93) | `JellyPollySalesSummaryPage`, `SalesSummaryPage` (no user-facing literals) | `npm run i18n:report` green; `tsc --noEmit` clean |
+| 2026-08-07 | B6 (`catalogue`) | All 15 files under `src/pages/Catalogue/**`: `CustomerPage`, `CustomerDetailsPage`, `CustomerAddPage`, `CustomerFormPage`, `StaffPage`, `StaffDetailsPage`, `StaffAddPage`, `StaffFormPage`, `StaffRecords`, `ProductPage`, `JobCategoryPage`, `JobPage`, `LocationPage`, `PayCodePage`, `OthersPage` | catalogue +233 keys (ms + zh-Hans each; 166 → 399) | None | `catalogue` namespace registered in `src/i18n/index.ts`. `npm run i18n:report` green; `tsc --noEmit` clean. Fixed remaining raw strings in `JobPage` (list-view header/cards/combobox) and `JobCategoryPage` (Salary/Follow/JV column headers). `ProductPage` permanent-delete `<Trans>` uses a JS expression for the `i18nKey` (JSX attribute strings cannot contain `\"` escapes) |
+| 2026-08-07 | B7 (`catalogue`) | All 27 files under `src/components/Catalogue/**`: `RefreshPayCodeCacheButton`, `SelectedTagsDisplay`, `StaffLocationsDisplay`, `CustomersUsingProductTooltip`, `JobsAndEmployeesUsingPayCodeTooltip`, `CustomerCreditSection`, `CustomerCard`, `StaffFilterMenu`, `ProductModal`, `JobCategoryModal`, `NewPayCodeModal`, `NewJobModal`, `PayCodeModal`, `PayRateScheduleManager`, `ProductOrderModal`, `AssociateEmployeesWithJobModal`, `AssociatePayCodesWithJobsModal`, `AssociatePayCodesWithEmployeesModal`, `BatchManageJobPayCodesModal`, `BatchManageEmployeePayCodesModal`, `EditEmployeePayCodeRatesModal`, `EditPayCodeRatesModal`, `CustomerProductsTab`, `CustomerTransactionsTab`, `BranchLinkageModal`, `LocationModal`, `StaffPayCodesSection` | catalogue +410 keys (ms + zh-Hans each; 399 → 819, incl. 10 dynamic lookup keys: Paid/Unpaid/Overdue/Overpaid/Pending/Cancelled, Cannot Delete Job/Location, Job category updated successfully, Staff member updated successfully!) | None | `ProductOrderModal` was hardcoded in Malay and is now translated. `PayRateScheduleManager` month names reuse `common` Jan–Dec keys; Trans used for inline-strong sentences. `npm run i18n:report` green; `tsc --noEmit` clean |
+| 2026-08-07 | B8 part 1 (`payroll`) | 18 of 24 files under `src/pages/Payroll/**`: `Leave/CutiManagementPage`, `Statutory/ContributionRatesPage`, `DailyLog/DailyLogEditPage`, `DailyLog/DailyLogSalesmanEditPage`, `MonthlyLog/MonthlyLogEditPage`, `Leave/HolidayCalendarPage`, `Leave/PackingCutiEntryPage`, `AddOn/BonusPage`, `AddOn/OthersAdvancePage`, `AddOn/OthersKerjaLuarOtPage`, `AddOn/PinjamListPage`, `AddOn/MidMonthPayrollPage`, `DailyLog/DailyLogListPage`, `MonthlyLog/MonthlyLogListPage`, `DailyLog/DailyLogDetailsPage`, `MonthlyLog/MonthlyLogDetailsPage`, `Leave/CutiReportPage`, `Statutory/ECarumanPage`, `PayrollPage` | new `payroll` namespace: 399 keys (ms + zh-Hans each) | Remaining 5 files (see next B8 row) | Registered `payroll` in `src/i18n/index.ts`. Leave-type labels standardised to Annual/Sick/Public Holiday/Medical Leave; `CutiReportPage` legend uses Trans; `ECarumanPage` preview tables translated, export file contents left raw. Dynamic lookup keys also added: January\u2013December, Monday\u2013Sunday, `summary`/`pinjam`, `Sabtu`, `Biasa/Ahad/Umum Rate`, `Hospital Leave`. `npm run i18n:report` green; `tsc --noEmit` clean |
 ### Phase 0 implementation notes (for batch workers)
 
 - **Sidebar labels are translated at render time** — `TienHockNavData.tsx` / `GreenTargetNavData.tsx` / `JellyPollyNavData.tsx` were NOT modified. Navbar components call `t(item.name, { ns: "nav" })`; the English name is the key. Same for dropdown `group` labels, popover options and bookmark names (bookmark identity stays English — stored bookmarks keep working).

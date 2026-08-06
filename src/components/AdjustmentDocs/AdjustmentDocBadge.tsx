@@ -1,5 +1,6 @@
 // src/components/AdjustmentDocs/AdjustmentDocBadge.tsx
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
   IconCircleCheck,
   IconClockHour4,
@@ -50,13 +51,14 @@ export const AdjustmentDocTypeBadge: React.FC<TypeBadgeProps> = ({
   type,
   className = "",
 }) => {
+  const { t } = useTranslation("adjustments");
   const meta = TYPE_META[type];
   if (!meta) return null;
   const Icon = meta.icon;
   return (
     <span
       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${meta.color} ${className}`}
-      title={meta.label}
+      title={t(meta.label)}
     >
       <Icon size={12} />
       {meta.short}
@@ -75,6 +77,7 @@ export const AdjustmentDocStatusBadge: React.FC<StatusBadgeProps> = ({
   einvoiceStatus,
   className = "",
 }) => {
+  const { t } = useTranslation("adjustments");
   // Local doc status takes precedence — cancelled means the whole doc is dead.
   if (status === "cancelled") {
     return (
@@ -82,7 +85,7 @@ export const AdjustmentDocStatusBadge: React.FC<StatusBadgeProps> = ({
         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 ${className}`}
       >
         <IconBan size={12} />
-        Cancelled
+        {t("Cancelled")}
       </span>
     );
   }
@@ -93,7 +96,7 @@ export const AdjustmentDocStatusBadge: React.FC<StatusBadgeProps> = ({
       <span
         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-default-100 text-default-700 dark:bg-gray-700 dark:text-gray-200 ${className}`}
       >
-        Not Submitted
+        {t("Not Submitted")}
       </span>
     );
   }
@@ -105,7 +108,7 @@ export const AdjustmentDocStatusBadge: React.FC<StatusBadgeProps> = ({
           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 ${className}`}
         >
           <IconCircleCheck size={12} />
-          Valid
+          {t("Valid")}
         </span>
       );
     case "pending":
@@ -114,7 +117,7 @@ export const AdjustmentDocStatusBadge: React.FC<StatusBadgeProps> = ({
           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 ${className}`}
         >
           <IconClockHour4 size={12} />
-          Pending
+          {t("Pending")}
         </span>
       );
     case "invalid":
@@ -123,7 +126,7 @@ export const AdjustmentDocStatusBadge: React.FC<StatusBadgeProps> = ({
           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300 ${className}`}
         >
           <IconAlertTriangle size={12} />
-          Invalid
+          {t("Invalid")}
         </span>
       );
     case "cancelled":
@@ -132,7 +135,7 @@ export const AdjustmentDocStatusBadge: React.FC<StatusBadgeProps> = ({
           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400 ${className}`}
         >
           <IconBan size={12} />
-          e-Invoice Cancelled
+          {t("e-Invoice Cancelled")}
         </span>
       );
     default:

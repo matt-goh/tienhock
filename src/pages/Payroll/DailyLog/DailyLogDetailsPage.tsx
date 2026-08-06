@@ -22,6 +22,7 @@ import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 import { format } from "date-fns";
 import { getJobConfig } from "../../../configs/payrollJobConfigs";
+import { useTranslation } from "react-i18next";
 
 // Pay codes that are doubled when is_doubled is true for SALESMAN_IKUT
 const DOUBLED_PAY_CODES = [
@@ -112,6 +113,7 @@ const getInitialEmployeeSearch = (): string => {
 const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
   jobType,
 }) => {
+  const { t } = useTranslation("payroll");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const goBack = useSmartBack(`/payroll/${jobType.toLowerCase()}-production`);
@@ -139,7 +141,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
       setWorkLog(response);
     } catch (error) {
       console.error("Error fetching work log details:", error);
-      toast.error("Failed to fetch work log details");
+      toast.error(t("Failed to fetch work log details"));
     } finally {
       setIsLoading(false);
     }
@@ -158,7 +160,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
 
     try {
       await api.delete(`/api/daily-work-logs/${workLog.id}`);
-      toast.success("Work log deleted successfully");
+      toast.success(t("Work log deleted successfully"));
       navigate(`/payroll/${jobType.toLowerCase()}-production`, {
         replace: true,
       });
@@ -166,7 +168,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
       const deleteError = error as ApiError;
       console.error("Error deleting work log:", error);
       toast.error(
-        deleteError.response?.data?.message || "Failed to delete work log"
+        deleteError.response?.data?.message || t("Failed to delete work log")
       );
     } finally {
       setShowDeleteDialog(false);
@@ -253,10 +255,10 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
     return (
       <div className="text-center py-12">
         <p className="text-default-500 dark:text-gray-400">
-          Work log not found
+          {t("Work log not found")}
         </p>
         <Button onClick={handleBack} className="mt-4" variant="outline">
-          Back to List
+          {t("Back to List")}
         </Button>
       </div>
     );
@@ -331,7 +333,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
             <div>
               <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-                {jobConfig?.name} Details
+                {t("{{name}} Details", { name: jobConfig?.name })}
               </h1>
               <p className="text-sm text-default-500 dark:text-gray-400">
                 {format(new Date(workLog.log_date), "EEEE, dd MMM yyyy")}
@@ -354,9 +356,15 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                     workLog.log_date
                   )}`}
                 >
-                  {getDisplayDayType(workLog.day_type, workLog.log_date)}
-                  {getDisplayDayType(workLog.day_type, workLog.log_date) !==
-                    "Sabtu" && " Rate"}
+                  {t(
+                    getDisplayDayType(workLog.day_type, workLog.log_date) ===
+                      "Sabtu"
+                      ? "Sabtu"
+                      : `${getDisplayDayType(
+                          workLog.day_type,
+                          workLog.log_date
+                        )} Rate`
+                  )}
                 </span>
               </div>
               <span className="text-default-300 dark:text-gray-600">•</span>
@@ -373,7 +381,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                   />
                 )}
                 <span className="font-medium text-default-700 dark:text-gray-200">
-                  {workLog.shift === 1 ? "Day" : "Night"}
+                  {workLog.shift === 1 ? t("Day") : t("Night")}
                 </span>
               </div>
               <span className="text-default-300 dark:text-gray-600">•</span>
@@ -387,7 +395,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                 {workLog.status === "Processed" && (
                   <IconLock size={12} className="mr-1" />
                 )}
-                {workLog.status}
+                {t(workLog.status)}
               </span>
 
               {/* Production Details / Context Data - Inline */}
@@ -437,14 +445,14 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   setEmployeeSearchQuery(event.target.value)
                 }
-                placeholder="Search employee..."
+                placeholder={t("Search employee...")}
                 className="w-36 rounded-md border border-default-300 bg-white py-1.5 pl-7 pr-7 text-xs text-default-900 placeholder:text-default-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder:text-gray-400 sm:w-44"
               />
               {employeeSearchQuery && (
                 <button
                   type="button"
                   onClick={() => setEmployeeSearchQuery("")}
-                  aria-label="Clear employee search"
+                  aria-label={t("Clear employee search")}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-600 dark:text-gray-400 dark:hover:text-gray-200"
                 >
                   <IconX size={12} />
@@ -460,7 +468,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                 variant="filled"
                 color="sky"
               >
-                Edit
+                {t("Edit")}
               </Button>
               <Button
                 onClick={() => setShowDeleteDialog(true)}
@@ -468,7 +476,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                 variant="filled"
                 color="rose"
               >
-                Delete
+                {t("Delete")}
               </Button>
               </>
             )}
@@ -540,7 +548,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                           )}
                           {jobType === "SALESMAN" && (
                             <span className="inline-flex items-center px-2 py-1 rounded-md bg-default-100 dark:bg-gray-700 text-xs font-medium text-default-600 dark:text-gray-300">
-                              {entry.location_type || "Local"}
+                              {entry.location_type || t("Local")}
                             </span>
                           )}
                           <span className="inline-flex items-center px-2 py-1 rounded-md bg-sky-100 dark:bg-sky-900/30 text-xs font-semibold text-sky-700 dark:text-sky-300">
@@ -553,19 +561,19 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                       {entry.job_id === "SALESMAN_IKUT" && (
                         <div className="mt-2 pt-2 border-t border-default-200 dark:border-gray-600 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
                           <span className="text-default-500 dark:text-gray-400">
-                            Following:{" "}
+                            {t("Following:")}{" "}
                             <span className="font-medium text-default-700 dark:text-gray-200">
                               {entry.following_salesman_name || "N/A"}
                             </span>
                           </span>
                           <span className="text-default-500 dark:text-gray-400">
-                            Mee Bags:{" "}
+                            {t("Mee Bags:")}{" "}
                             <span className="font-medium text-default-700 dark:text-gray-200">
                               {entry.muat_mee_bags || 0}
                             </span>
                           </span>
                           <span className="text-default-500 dark:text-gray-400">
-                            Bihun Bags:{" "}
+                            {t("Bihun Bags:")}{" "}
                             <span className="font-medium text-default-700 dark:text-gray-200">
                               {entry.muat_bihun_bags || 0}
                             </span>
@@ -585,16 +593,16 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                         <thead>
                           <tr className="text-xs text-default-500 dark:text-gray-400 uppercase tracking-wider">
                             <th className="text-left py-1.5 font-medium">
-                              Activity
+                              {t("Activity")}
                             </th>
                             <th className="text-right py-1.5 font-medium w-20">
-                              Rate
+                              {t("Rate")}
                             </th>
                             <th className="text-right py-1.5 font-medium w-28">
-                              Qty
+                              {t("Qty")}
                             </th>
                             <th className="text-right py-1.5 font-medium w-24">
-                              Amount
+                              {t("Amount")}
                             </th>
                           </tr>
                         </thead>
@@ -618,17 +626,17 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                                     </span>
                                     {activity.source === "employee" && (
                                       <span className="text-xs px-1.5 py-0.5 rounded bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300">
-                                        Staff
+                                        {t("Staff")}
                                       </span>
                                     )}
                                     {activity.source === "job" && (
                                       <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
-                                        Job
+                                        {t("Job")}
                                       </span>
                                     )}
                                     {isContextLinkedActivity && (
                                       <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">
-                                        Prod
+                                        {t("Prod")}
                                       </span>
                                     )}
                                     {entry.is_doubled &&
@@ -650,15 +658,19 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                                 </td>
                                 <td className="py-1.5 text-right text-default-600 dark:text-gray-300 whitespace-nowrap w-28">
                                   {activity.rate_unit === "Fixed"
-                                    ? "Fixed"
+                                    ? t("Fixed")
                                     : activity.rate_unit === "Day" &&
                                       activity.units_produced !== null &&
                                       activity.units_produced > 0
-                                    ? `${activity.units_produced} Day`
+                                    ? t("{{total}} Day", {
+                                        total: activity.units_produced,
+                                      })
                                     : activity.rate_unit === "Hour" &&
                                       activity.hours_applied !== null &&
                                       activity.hours_applied > 0
-                                    ? `${activity.hours_applied} Hour`
+                                    ? t("{{total}} Hour", {
+                                        total: activity.hours_applied,
+                                      })
                                     : activity.units_produced !== null
                                     ? (
                                       <>
@@ -694,10 +706,10 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                           className="mt-2 text-sm font-medium text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
                         >
                           {isExpanded
-                            ? "Show Less"
-                            : `Show ${
-                                totalActivitiesCount - 6
-                              } more activities...`}
+                            ? t("Show Less")
+                            : t("Show {{total}} more activities...", {
+                                total: totalActivitiesCount - 6,
+                              })}
                         </button>
                       )}
                     </div>
@@ -709,10 +721,10 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
           {/* Grand Total Footer */}
           <div className="bg-sky-50 dark:bg-sky-900/20 rounded-lg border border-sky-200 dark:border-sky-800 px-4 py-3 flex justify-between items-center">
             <span className="text-sm font-semibold text-sky-800 dark:text-sky-300">
-              Total Employee Pay
+              {t("Total Employee Pay")}
             </span>
             <div className="flex items-center gap-2 font-bold text-sky-900 dark:text-sky-200">
-              <span>{totalEmployees} employees</span>
+              <span>{t("{{total}} employees", { total: totalEmployees })}</span>
               <span className="text-sky-400 dark:text-sky-600">•</span>
               <span>{formatCurrency(totalAmount)}</span>
             </div>
@@ -731,10 +743,12 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                   size={16}
                   className="text-rose-600 dark:text-rose-400"
                 />
-                Leave Records
+                {t("Leave Records")}
               </h3>
               <span className="text-xs font-medium text-rose-700 dark:text-rose-400">
-                {filteredLeaveRecords.length} employee(s) on leave
+                {t("{{total}} employee(s) on leave", {
+                  total: filteredLeaveRecords.length,
+                })}
               </span>
             </div>
           </div>
@@ -743,16 +757,16 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
             <thead className="bg-default-50 dark:bg-gray-900/50">
               <tr>
                 <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                  Employee
+                  {t("Employee")}
                 </th>
                 <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-32">
-                  Leave Type
+                  {t("Leave Type")}
                 </th>
                 <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-20">
-                  Days
+                  {t("Days")}
                 </th>
                 <th className="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-28">
-                  Amount
+                  {t("Amount")}
                 </th>
               </tr>
             </thead>
@@ -761,13 +775,13 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                 const getLeaveTypeDisplay = (leaveType: string) => {
                   switch (leaveType) {
                     case "cuti_umum":
-                      return "Cuti Umum";
+                      return "Public Holiday";
                     case "cuti_sakit":
-                      return "Cuti Sakit";
+                      return "Sick Leave";
                     case "cuti_tahunan":
-                      return "Cuti Tahunan";
+                      return "Annual Leave";
                     case "cuti_rawatan":
-                      return "Cuti Rawatan";
+                      return "Medical Leave";
                     default:
                       return leaveType;
                   }
@@ -810,7 +824,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                           record.leave_type
                         )}`}
                       >
-                        {getLeaveTypeDisplay(record.leave_type)}
+                        {t(getLeaveTypeDisplay(record.leave_type))}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center font-medium text-default-700 dark:text-gray-200">
@@ -829,7 +843,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                   colSpan={3}
                   className="px-4 py-3 text-right font-semibold text-rose-800 dark:text-rose-300"
                 >
-                  Total Leave Pay
+                  {t("Total Leave Pay")}
                 </td>
                 <td className="px-4 py-3 text-right font-bold text-rose-900 dark:text-rose-200">
                   {formatCurrency(filteredLeaveAmount)}
@@ -844,9 +858,11 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={handleDeleteLog}
-        title="Delete Work Log"
-        message="Are you sure you want to delete this work log? This action cannot be undone."
-        confirmButtonText="Delete"
+        title={t("Delete Work Log")}
+        message={t(
+          "Are you sure you want to delete this work log? This action cannot be undone."
+        )}
+        confirmButtonText={t("Delete")}
         variant="danger"
       />
     </div>

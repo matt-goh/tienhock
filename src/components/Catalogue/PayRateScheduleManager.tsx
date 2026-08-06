@@ -7,6 +7,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import toast from "react-hot-toast";
 import { IconTrash, IconPlus } from "@tabler/icons-react";
+import { useTranslation, Trans } from "react-i18next";
 import { api } from "../../routes/utils/api";
 import { PayRateSchedule, PayRateScheduleScope } from "../../types/types";
 
@@ -53,6 +54,7 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
   baseRates,
   apiBase = "/api",
 }) => {
+  const { t } = useTranslation("catalogue");
   const now = new Date();
   const [schedules, setSchedules] = useState<PayRateSchedule[]>([]);
   const [loading, setLoading] = useState(false);
@@ -113,11 +115,11 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
     );
 
     if (hasInvalidRate) {
-      toast.error("Rates must be valid numbers.");
+      toast.error(t("Rates must be valid numbers."));
       return;
     }
     if (biasa === null && ahad === null && umum === null) {
-      toast.error("Enter at least one rate for the change.");
+      toast.error(t("Enter at least one rate for the change."));
       return;
     }
     setSaving(true);
@@ -133,11 +135,13 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
         rate_ahad: ahad,
         rate_umum: umum,
       });
-      toast.success("Rate change saved");
+      toast.success(t("Rate change saved"));
       setForm((p) => ({ ...p, biasa: "", ahad: "", umum: "" }));
       await fetchSchedules();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Failed to save rate change");
+      toast.error(
+        err?.response?.data?.message || t("Failed to save rate change")
+      );
     } finally {
       setSaving(false);
     }
@@ -146,22 +150,25 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
   const handleDelete = async (id: number): Promise<void> => {
     try {
       await api.delete(`${apiBase}/pay-rate-schedules/${id}`);
-      toast.success("Rate change removed");
+      toast.success(t("Rate change removed"));
       await fetchSchedules();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Failed to remove rate change");
+      toast.error(
+        err?.response?.data?.message || t("Failed to remove rate change")
+      );
     }
   };
 
   const fmt = (v: RateValue, base?: RateValue): string =>
     v === null || v === undefined || v === ""
-      ? `(base ${formatRate(base)})`
+      ? t("(base {{rate}})", { rate: formatRate(base) })
       : formatRate(v);
 
   // Build the effective timeline: months before the first change use the base
   // rate; each change applies from its month until the next change (or onward).
   const monthKey = (y: number, m: number) => y * 12 + m;
-  const monthLabel = (y: number, m: number) => `${MONTHS[m - 1]} ${y}`;
+  const monthLabel = (y: number, m: number) =>
+    `${t(MONTHS[m - 1], { ns: "common" })} ${y}`;
   const prevMonthLabel = (y: number, m: number) => {
     let pm = m - 1;
     let py = y;
@@ -169,7 +176,7 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
       pm = 12;
       py -= 1;
     }
-    return `${MONTHS[pm - 1]} ${py}`;
+    return `${t(MONTHS[pm - 1], { ns: "common" })} ${py}`;
   };
   const sortedAsc = [...schedules].sort(
     (a, b) =>
@@ -180,7 +187,7 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
     const cur = sortedAsc[idx];
     const next = sortedAsc[idx + 1];
     const start = monthLabel(cur.effective_year, cur.effective_month);
-    if (!next) return `${start} onwards`;
+    if (!next) return t("{{start}} onwards", { start });
     const end = prevMonthLabel(next.effective_year, next.effective_month);
     return start === end ? start : `${start} – ${end}`;
   };
@@ -204,38 +211,45 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
     parseInt(form.month, 10) || 0,
   );
   const newUntilLabel = nextAfterNew
-    ? `until ${prevMonthLabel(nextAfterNew.effective_year, nextAfterNew.effective_month)}`
-    : "onwards";
+    ? t("until {{month}}", {
+        month: prevMonthLabel(
+          nextAfterNew.effective_year,
+          nextAfterNew.effective_month
+        ),
+      })
+    : t("onwards");
 
   return (
     <div className="mt-4 border-t pt-4 border-gray-100 dark:border-gray-700">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-default-700 dark:text-gray-200">
-          Rate timeline
+          {t("Rate timeline")}
         </span>
         <span className="text-xs text-gray-500 dark:text-gray-400">
-          Re-process the affected month(s) to apply
+          {t("Re-process the affected month(s) to apply")}
         </span>
       </div>
 
       {/* Effective timeline: base period + each scheduled change with its range */}
       <div className="mt-2 space-y-1">
         {loading ? (
-          <p className="text-xs text-gray-500">Loading…</p>
+          <p className="text-xs text-gray-500">{t("Loading...")}</p>
         ) : (
           <>
             {/* Base period (months before the first scheduled change) */}
             <div className="flex items-center justify-between rounded bg-default-50 dark:bg-gray-700/40 px-2 py-1 text-xs">
               <span className="font-medium text-default-600 dark:text-gray-300 w-40 shrink-0">
                 {firstScheduled
-                  ? `Up to ${prevMonthLabel(
-                      firstScheduled.effective_year,
-                      firstScheduled.effective_month,
-                    )}`
-                  : "All months"}
+                  ? t("Up to {{month}}", {
+                      month: prevMonthLabel(
+                        firstScheduled.effective_year,
+                        firstScheduled.effective_month
+                      ),
+                    })
+                  : t("All months")}
               </span>
               <span className="flex-1 text-default-500 dark:text-gray-400">
-                Base rate — B {formatRate(resolvedBaseRates.biasa)} · A{" "}
+                {t("Base rate")} — B {formatRate(resolvedBaseRates.biasa)} · A{" "}
                 {formatRate(resolvedBaseRates.ahad)} · U{" "}
                 {formatRate(resolvedBaseRates.umum)}
               </span>
@@ -260,7 +274,7 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
                   type="button"
                   onClick={() => handleDelete(s.id)}
                   className="ml-2 p-1 text-gray-400 hover:text-red-600 shrink-0"
-                  title="Remove this change"
+                  title={t("Remove this change")}
                 >
                   <IconTrash size={15} />
                 </button>
@@ -273,7 +287,9 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
       {/* Add a change */}
       <div className="mt-3 grid grid-cols-12 gap-2 items-end">
         <div className="col-span-3">
-          <label className="block text-xs text-default-500 dark:text-gray-400">From</label>
+          <label className="block text-xs text-default-500 dark:text-gray-400">
+            {t("From")}
+          </label>
           <select
             value={form.month}
             onChange={(e) => setForm((p) => ({ ...p, month: e.target.value }))}
@@ -282,13 +298,15 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
           >
             {MONTHS.map((m, i) => (
               <option key={m} value={i + 1}>
-                {m}
+                {t(m, { ns: "common" })}
               </option>
             ))}
           </select>
         </div>
         <div className="col-span-3">
-          <label className="block text-xs text-default-500 dark:text-gray-400">Year</label>
+          <label className="block text-xs text-default-500 dark:text-gray-400">
+            {t("Year")}
+          </label>
           <input
             type="text"
             inputMode="numeric"
@@ -300,7 +318,9 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
           />
         </div>
         <div className="col-span-2">
-          <label className="block text-xs text-default-500 dark:text-gray-400">Biasa</label>
+          <label className="block text-xs text-default-500 dark:text-gray-400">
+            {t("Normal")}
+          </label>
           <input
             type="text"
             inputMode="decimal"
@@ -313,7 +333,9 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
           />
         </div>
         <div className="col-span-2">
-          <label className="block text-xs text-default-500 dark:text-gray-400">Ahad</label>
+          <label className="block text-xs text-default-500 dark:text-gray-400">
+            {t("Sunday")}
+          </label>
           <input
             type="text"
             inputMode="decimal"
@@ -326,7 +348,9 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
           />
         </div>
         <div className="col-span-2">
-          <label className="block text-xs text-default-500 dark:text-gray-400">Umum</label>
+          <label className="block text-xs text-default-500 dark:text-gray-400">
+            {t("Holiday")}
+          </label>
           <input
             type="text"
             inputMode="decimal"
@@ -342,15 +366,27 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
       <div className="mt-2 flex items-center justify-between gap-2">
         {existingForSelected ? (
           <p className="text-xs text-amber-600 dark:text-amber-400">
-            A change already exists for{" "}
-            <span className="font-medium">{newFromLabel}</span> (currently B{" "}
-            {fmt(existingForSelected.rate_biasa, resolvedBaseRates.biasa)}) — saving will
-            replace it.
+            <Trans
+              i18nKey="A change already exists for <strong>{{month}}</strong> (currently B {{rate}}) — saving will replace it."
+              ns="catalogue"
+              values={{
+                month: newFromLabel,
+                rate: fmt(
+                  existingForSelected.rate_biasa,
+                  resolvedBaseRates.biasa
+                ),
+              }}
+              components={{ strong: <strong className="font-medium" /> }}
+            />
           </p>
         ) : (
           <p className="text-xs text-sky-700 dark:text-sky-300">
-            Applies to <span className="font-medium">{newFromLabel}</span>{" "}
-            {newUntilLabel}. Earlier months keep their current rate.
+            <Trans
+              i18nKey="Applies to <strong>{{month}}</strong> {{until}}. Earlier months keep their current rate."
+              ns="catalogue"
+              values={{ month: newFromLabel, until: newUntilLabel }}
+              components={{ strong: <strong className="font-medium" /> }}
+            />
           </p>
         )}
         <button
@@ -364,7 +400,9 @@ const PayRateScheduleManager: React.FC<PayRateScheduleManagerProps> = ({
           }`}
         >
           <IconPlus size={14} />{" "}
-          {existingForSelected ? "Replace rate change" : "Add rate change"}
+          {existingForSelected
+            ? t("Replace rate change")
+            : t("Add rate change")}
         </button>
       </div>
     </div>

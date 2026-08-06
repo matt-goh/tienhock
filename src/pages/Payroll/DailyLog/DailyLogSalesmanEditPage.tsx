@@ -7,8 +7,10 @@ import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 import DailyLogSalesmanEntryPage from "./DailyLogSalesmanEntryPage";
 import Button from "../../../components/Button";
+import { useTranslation } from "react-i18next";
 
 const DailyLogSalesmanEditPage: React.FC = () => {
+  const { t } = useTranslation("payroll");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
@@ -25,14 +27,14 @@ const DailyLogSalesmanEditPage: React.FC = () => {
     try {
       const response = await api.get(`/api/daily-work-logs/${id}`);
       if (response.status === "Processed") {
-        toast.error("Cannot edit processed work log");
+        toast.error(t("Cannot edit processed work log"));
         navigate(`/payroll/salesman-production/${id}`);
         return;
       }
       setWorkLog(response);
     } catch (error) {
       console.error("Error fetching work log details:", error);
-      toast.error("Failed to fetch work log details");
+      toast.error(t("Failed to fetch work log details"));
       navigate(`/payroll/salesman-production`);
     } finally {
       setIsLoading(false);
@@ -54,9 +56,11 @@ const DailyLogSalesmanEditPage: React.FC = () => {
   if (!workLog) {
     return (
       <div className="text-center py-12">
-        <p className="text-default-500 dark:text-gray-400">Work log not found</p>
+        <p className="text-default-500 dark:text-gray-400">
+          {t("Work log not found")}
+        </p>
         <Button onClick={handleBack} className="mt-4" variant="outline">
-          Back to List
+          {t("Back to List")}
         </Button>
       </div>
     );

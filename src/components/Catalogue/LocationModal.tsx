@@ -25,6 +25,7 @@ import {
 import { Location } from "../../utils/catalogue/useLocationMappingsCache";
 import { api } from "../../routes/utils/api";
 import Button from "../Button";
+import { useTranslation } from "react-i18next";
 
 interface JobMapping {
   job_id: string;
@@ -69,6 +70,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
   staffs,
   apiBase = "/api",
 }) => {
+  const { t } = useTranslation("catalogue");
   const [formData, setFormData] = useState<Location>({ id: "", name: "" });
   const [error, setError] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
@@ -351,7 +353,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
       await fetchExclusions();
     } catch (err: any) {
       console.error("Error adding exclusion:", err);
-      setError(err.message || "Failed to add exclusion");
+      setError(err.message || t("Failed to add exclusion"));
     } finally {
       setIsAddingExclusion(false);
     }
@@ -366,7 +368,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
       await fetchExclusions();
     } catch (err: any) {
       console.error("Error removing exclusion:", err);
-      setError(err.message || "Failed to remove exclusion");
+      setError(err.message || t("Failed to remove exclusion"));
     }
   };
 
@@ -376,11 +378,11 @@ const LocationModal: React.FC<LocationModalProps> = ({
 
     // Validation
     if (!formData.id.trim()) {
-      setError("Location ID is required");
+      setError(t("Location ID is required"));
       return;
     }
     if (!formData.name.trim()) {
-      setError("Location name is required");
+      setError(t("Location name is required"));
       return;
     }
 
@@ -389,7 +391,9 @@ const LocationModal: React.FC<LocationModalProps> = ({
       (loc) => loc.id === formData.id.trim() && loc.id !== initialData?.id
     );
     if (isDuplicate) {
-      setError(`Location ID "${formData.id}" already exists`);
+      setError(
+        t('Location ID "{{id}}" already exists', { id: formData.id })
+      );
       return;
     }
 
@@ -447,7 +451,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
       onComplete?.();
       handleClose();
     } catch (err: any) {
-      setError(err.message || "Failed to save location");
+      setError(err.message || t("Failed to save location"));
     } finally {
       setIsSaving(false);
     }
@@ -512,7 +516,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
                     as="h3"
                     className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                   >
-                    {isEditing ? "Edit Location" : "Add New Location"}
+                    {isEditing ? t("Edit Location") : t("Add New Location")}
                   </DialogTitle>
                   <button
                     onClick={handleClose}
@@ -528,7 +532,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
                   <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
                       <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-                        Location ID
+                        {t("Location ID")}
                       </label>
                       <input
                         type="text"
@@ -536,17 +540,17 @@ const LocationModal: React.FC<LocationModalProps> = ({
                         onChange={(e) =>
                           setFormData((prev) => ({ ...prev, id: e.target.value }))
                         }
-                        placeholder="e.g., 25"
+                        placeholder={t("e.g., 25")}
                         className="w-full px-3 py-2 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                         disabled={isSaving}
                       />
                       <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
-                        Two-digit code (e.g., 01, 02)
+                        {t("Two-digit code (e.g., 01, 02)")}
                       </p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-                        Location Name
+                        {t("Location Name")}
                       </label>
                       <input
                         type="text"
@@ -557,7 +561,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
                             name: e.target.value,
                           }))
                         }
-                        placeholder="e.g., New Department"
+                        placeholder={t("e.g., New Department")}
                         className="w-full px-3 py-2 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                         disabled={isSaving}
                       />
@@ -577,7 +581,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
                         }
                       >
                         <IconBriefcase size={16} />
-                        Jobs ({selectedJobs.size})
+                        {t("Jobs ({{total}})", { total: selectedJobs.size })}
                       </Tab>
                       <Tab
                         className={({ selected }) =>
@@ -589,7 +593,9 @@ const LocationModal: React.FC<LocationModalProps> = ({
                         }
                       >
                         <IconUsers size={16} />
-                        Employees ({selectedEmployees.size})
+                        {t("Employees ({{total}})", {
+                          total: selectedEmployees.size,
+                        })}
                       </Tab>
                       {isEditing && (
                         <Tab
@@ -600,7 +606,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
                                 : "text-default-600 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-600/50"
                             }`
                           }
-                          title="Exclusions"
+                          title={t("Exclusions")}
                         >
                           <IconUserMinus size={18} />
                           {exclusions.length > 0 && (
@@ -621,7 +627,9 @@ const LocationModal: React.FC<LocationModalProps> = ({
                             <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
                               <div className="flex items-center gap-2 text-sm font-medium text-default-700 dark:text-gray-200">
                                 <IconBriefcase size={16} />
-                                Mapped Jobs ({selectedJobs.size})
+                                {t("Mapped Jobs ({{total}})", {
+                                  total: selectedJobs.size,
+                                })}
                               </div>
                               <div className="relative mt-2">
                                 <IconSearch
@@ -630,7 +638,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
                                 />
                                 <input
                                   type="text"
-                                  placeholder="Search mapped jobs..."
+                                  placeholder={t("Search mapped jobs...")}
                                   className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder-gray-400"
                                   value={jobSearch}
                                   onChange={(e) => setJobSearch(e.target.value)}
@@ -647,8 +655,8 @@ const LocationModal: React.FC<LocationModalProps> = ({
                                     className="mx-auto mb-2 text-default-300 dark:text-gray-500"
                                   />
                                   {jobSearch
-                                    ? "No jobs found"
-                                    : "No jobs mapped yet"}
+                                    ? t("No jobs found")
+                                    : t("No jobs mapped yet")}
                                 </div>
                               ) : (
                                 <ul className="divide-y divide-default-100 dark:divide-gray-600">
@@ -668,7 +676,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
                                             {job.name}
                                             {isNew && (
                                               <span className="text-xs px-1.5 py-0.5 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 rounded">
-                                                New
+                                                {t("New")}
                                               </span>
                                             )}
                                           </div>
@@ -697,10 +705,12 @@ const LocationModal: React.FC<LocationModalProps> = ({
                             <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
                               <div className="flex items-center justify-between">
                                 <div className="text-sm font-medium text-default-700 dark:text-gray-200">
-                                  Add Job
+                                  {t("Add Job")}
                                 </div>
                                 <span className="text-xs text-default-500 dark:text-gray-400">
-                                  {availableJobs.length} available
+                                  {t("{{total}} available", {
+                                    total: availableJobs.length,
+                                  })}
                                 </span>
                               </div>
                               <div className="relative mt-2">
@@ -710,7 +720,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
                                 />
                                 <input
                                   type="text"
-                                  placeholder="Search available jobs..."
+                                  placeholder={t("Search available jobs...")}
                                   className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder-gray-400"
                                   value={availableJobSearch}
                                   onChange={(e) =>
@@ -729,8 +739,8 @@ const LocationModal: React.FC<LocationModalProps> = ({
                                     className="mx-auto mb-2 text-emerald-400"
                                   />
                                   {availableJobSearch
-                                    ? "No jobs found"
-                                    : "All jobs already mapped"}
+                                    ? t("No jobs found")
+                                    : t("All jobs already mapped")}
                                 </div>
                               ) : (
                                 <ul className="divide-y divide-default-100 dark:divide-gray-600">
@@ -772,7 +782,9 @@ const LocationModal: React.FC<LocationModalProps> = ({
                             <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
                               <div className="flex items-center gap-2 text-sm font-medium text-default-700 dark:text-gray-200">
                                 <IconUsers size={16} />
-                                Mapped Employees ({selectedEmployees.size})
+                                {t("Mapped Employees ({{total}})", {
+                                  total: selectedEmployees.size,
+                                })}
                               </div>
                               <div className="relative mt-2">
                                 <IconSearch
@@ -781,7 +793,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
                                 />
                                 <input
                                   type="text"
-                                  placeholder="Search mapped employees..."
+                                  placeholder={t("Search mapped employees...")}
                                   className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder-gray-400"
                                   value={employeeSearch}
                                   onChange={(e) =>
@@ -800,8 +812,8 @@ const LocationModal: React.FC<LocationModalProps> = ({
                                     className="mx-auto mb-2 text-default-300 dark:text-gray-500"
                                   />
                                   {employeeSearch
-                                    ? "No employees found"
-                                    : "No employees mapped yet"}
+                                    ? t("No employees found")
+                                    : t("No employees mapped yet")}
                                 </div>
                               ) : (
                                 <ul className="divide-y divide-default-100 dark:divide-gray-600">
@@ -821,7 +833,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
                                             {emp.name}
                                             {isNew && (
                                               <span className="text-xs px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded">
-                                                New
+                                                {t("New")}
                                               </span>
                                             )}
                                           </div>
@@ -852,10 +864,12 @@ const LocationModal: React.FC<LocationModalProps> = ({
                             <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
                               <div className="flex items-center justify-between">
                                 <div className="text-sm font-medium text-default-700 dark:text-gray-200">
-                                  Add Employee
+                                  {t("Add Employee")}
                                 </div>
                                 <span className="text-xs text-default-500 dark:text-gray-400">
-                                  {availableEmployees.length} available
+                                  {t("{{total}} available", {
+                                    total: availableEmployees.length,
+                                  })}
                                 </span>
                               </div>
                               <div className="relative mt-2">
@@ -865,7 +879,9 @@ const LocationModal: React.FC<LocationModalProps> = ({
                                 />
                                 <input
                                   type="text"
-                                  placeholder="Search available employees..."
+                                  placeholder={t(
+                                    "Search available employees..."
+                                  )}
                                   className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder-gray-400"
                                   value={availableEmployeeSearch}
                                   onChange={(e) =>
@@ -884,8 +900,8 @@ const LocationModal: React.FC<LocationModalProps> = ({
                                     className="mx-auto mb-2 text-emerald-400"
                                   />
                                   {availableEmployeeSearch
-                                    ? "No employees found"
-                                    : "All employees already mapped"}
+                                    ? t("No employees found")
+                                    : t("All employees already mapped")}
                                 </div>
                               ) : (
                                 <ul className="divide-y divide-default-100 dark:divide-gray-600">
@@ -924,11 +940,9 @@ const LocationModal: React.FC<LocationModalProps> = ({
                         <TabPanel>
                           <div className="mb-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
                             <p className="text-sm text-amber-700 dark:text-amber-300">
-                              Exclusions prevent employees from appearing in
-                              this location's salary report for specific jobs.
-                              This is useful when an employee has a job mapped
-                              to multiple locations but should only appear in
-                              one.
+                              {t(
+                                "Exclusions prevent employees from appearing in this location's salary report for specific jobs. This is useful when an employee has a job mapped to multiple locations but should only appear in one."
+                              )}
                             </p>
                           </div>
                           <div className="grid grid-cols-5 gap-4">
@@ -937,7 +951,9 @@ const LocationModal: React.FC<LocationModalProps> = ({
                               <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
                                 <div className="flex items-center gap-2 text-sm font-medium text-default-700 dark:text-gray-200">
                                   <IconUserMinus size={16} />
-                                  Current Exclusions ({exclusions.length})
+                                  {t("Current Exclusions ({{total}})", {
+                                    total: exclusions.length,
+                                  })}
                                 </div>
                                 <div className="relative mt-2">
                                   <IconSearch
@@ -946,7 +962,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
                                   />
                                   <input
                                     type="text"
-                                    placeholder="Search exclusions..."
+                                    placeholder={t("Search exclusions...")}
                                     className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500 bg-white dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder-gray-400"
                                     value={exclusionSearch}
                                     onChange={(e) =>
@@ -965,8 +981,8 @@ const LocationModal: React.FC<LocationModalProps> = ({
                                       className="mx-auto mb-2 text-default-300 dark:text-gray-500"
                                     />
                                     {exclusionSearch
-                                      ? "No exclusions found"
-                                      : "No exclusions set"}
+                                      ? t("No exclusions found")
+                                      : t("No exclusions set")}
                                   </div>
                                 ) : (
                                   <ul className="divide-y divide-default-100 dark:divide-gray-600">
@@ -980,7 +996,9 @@ const LocationModal: React.FC<LocationModalProps> = ({
                                             {ex.employee_name}
                                           </div>
                                           <div className="text-xs text-amber-600 dark:text-amber-400">
-                                            Excluded from: {ex.job_name}
+                                            {t("Excluded from: {{job}}", {
+                                              job: ex.job_name,
+                                            })}
                                           </div>
                                         </div>
                                         <button
@@ -990,7 +1008,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
                                           }
                                           disabled={isSaving}
                                           className="p-1.5 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:opacity-50"
-                                          title="Remove exclusion"
+                                          title={t("Remove exclusion")}
                                         >
                                           <IconTrash size={16} />
                                         </button>
@@ -1006,10 +1024,12 @@ const LocationModal: React.FC<LocationModalProps> = ({
                               <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
                                 <div className="flex items-center justify-between">
                                   <div className="text-sm font-medium text-default-700 dark:text-gray-200">
-                                    Add Exclusion
+                                    {t("Add Exclusion")}
                                   </div>
                                   <span className="text-xs text-default-500 dark:text-gray-400">
-                                    {availableCandidates.length} available
+                                    {t("{{total}} available", {
+                                      total: availableCandidates.length,
+                                    })}
                                   </span>
                                 </div>
                                 <div className="relative mt-2">
@@ -1019,7 +1039,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
                                   />
                                   <input
                                     type="text"
-                                    placeholder="Search employees/jobs..."
+                                    placeholder={t("Search employees/jobs...")}
                                     className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500 bg-white dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder-gray-400"
                                     value={candidateSearch}
                                     onChange={(e) =>
@@ -1038,11 +1058,12 @@ const LocationModal: React.FC<LocationModalProps> = ({
                                       className="mx-auto mb-2 text-emerald-400"
                                     />
                                     {candidateSearch
-                                      ? "No matches found"
-                                      : "No employees to exclude"}
+                                      ? t("No matches found")
+                                      : t("No employees to exclude")}
                                     <p className="text-xs mt-1 text-default-400 dark:text-gray-500">
-                                      Only employees with jobs mapped to this
-                                      location can be excluded
+                                      {t(
+                                        "Only employees with jobs mapped to this location can be excluded"
+                                      )}
                                     </p>
                                   </div>
                                 ) : (
@@ -1057,7 +1078,9 @@ const LocationModal: React.FC<LocationModalProps> = ({
                                             {c.employee_name}
                                           </div>
                                           <div className="text-xs text-default-500 dark:text-gray-400">
-                                            Job: {c.job_name}
+                                            {t("Job: {{job}}", {
+                                              job: c.job_name,
+                                            })}
                                           </div>
                                         </div>
                                         <button
@@ -1072,7 +1095,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
                                             isSaving || isAddingExclusion
                                           }
                                           className="p-1.5 text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded disabled:opacity-50"
-                                          title="Add exclusion"
+                                          title={t("Add exclusion")}
                                         >
                                           <IconPlus size={18} />
                                         </button>
@@ -1104,11 +1127,15 @@ const LocationModal: React.FC<LocationModalProps> = ({
                         <div className="flex items-center gap-3">
                           <span className="inline-flex items-center gap-1.5">
                             <span className="w-2 h-2 rounded-full bg-sky-500"></span>
-                            Jobs: {selectedJobs.size}
+                            {t("Jobs: {{total}}", {
+                              total: selectedJobs.size,
+                            })}
                           </span>
                           <span className="inline-flex items-center gap-1.5">
                             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                            Employees: {selectedEmployees.size}
+                            {t("Employees: {{total}}", {
+                              total: selectedEmployees.size,
+                            })}
                           </span>
                           <span className="text-amber-600 dark:text-amber-400">
                             ({changesSummary.toAdd > 0 && `+${changesSummary.toAdd}`}
@@ -1117,15 +1144,17 @@ const LocationModal: React.FC<LocationModalProps> = ({
                               ", "}
                             {changesSummary.toRemove > 0 &&
                               `-${changesSummary.toRemove}`}{" "}
-                            changes)
+                            {t("changes")})
                           </span>
                         </div>
                       ) : isEditing ? (
-                        <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
-                          <IconCheck size={14} /> No changes
-                        </span>
+                          <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                            <IconCheck size={14} /> {t("No changes")}
+                          </span>
                       ) : (
-                        <span>Map jobs and employees to this location</span>
+                        <span>
+                          {t("Map jobs and employees to this location")}
+                        </span>
                       )}
                     </div>
                     <div className="flex space-x-3">
@@ -1135,7 +1164,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
                         onClick={handleClose}
                         disabled={isSaving}
                       >
-                        Cancel
+                        {t("Cancel")}
                       </Button>
                       <Button
                         type="submit"
@@ -1144,10 +1173,10 @@ const LocationModal: React.FC<LocationModalProps> = ({
                         disabled={isSaving}
                       >
                         {isSaving
-                          ? "Saving..."
+                          ? t("Saving...")
                           : isEditing
-                          ? "Save Changes"
-                          : "Create Location"}
+                          ? t("Save Changes")
+                          : t("Create Location")}
                       </Button>
                     </div>
                   </div>

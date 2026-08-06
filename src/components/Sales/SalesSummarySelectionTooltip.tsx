@@ -11,6 +11,7 @@ import {
 } from "../../utils/sales/SalesSummaryPDF";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 
 interface SalesSummarySelectionTooltipProps {
@@ -68,6 +69,7 @@ const JP_SUMMARY_OPTIONS: SummaryOption[] = [
 const SalesSummarySelectionTooltip: React.FC<
   SalesSummarySelectionTooltipProps
 > = ({ activeTab, scope = "tienhock" }) => {
+  const { t } = useTranslation("sales");
   const SUMMARY_OPTIONS =
     scope === "jp" ? JP_SUMMARY_OPTIONS : TIENHOCK_SUMMARY_OPTIONS;
   const [isVisible, setIsVisible] = useState(false);
@@ -147,12 +149,12 @@ const SalesSummarySelectionTooltip: React.FC<
 
   const handleGenerate = async (action: "download" | "print") => {
     if (selectedCount === 0) {
-      toast.error("Please select at least one summary to generate");
+      toast.error(t("Please select at least one summary to generate"));
       return;
     }
 
     if (selectedYear === undefined || selectedMonth === undefined) {
-      toast.error("Please select a valid month and year");
+      toast.error(t("Please select a valid month and year"));
       return;
     }
 
@@ -187,13 +189,15 @@ const SalesSummarySelectionTooltip: React.FC<
       );
 
       toast.success(
-        `Sales summary ${
-          action === "print" ? "generated" : "downloaded"
-        } successfully`
+        t(
+          action === "print"
+            ? "Sales summary generated successfully"
+            : "Sales summary downloaded successfully"
+        )
       );
     } catch (error) {
       console.error("Error generating sales summary:", error);
-      toast.error("Failed to generate sales summary");
+      toast.error(t("Failed to generate sales summary"));
     } finally {
       setIsGenerating(false);
     }
@@ -210,7 +214,7 @@ const SalesSummarySelectionTooltip: React.FC<
         type="button"
       >
         <IconFileText size={18} className="mr-2" />
-        Generate PDF Summary
+        {t("Generate PDF Summary")}
       </button>
 
       {isVisible &&
@@ -235,7 +239,7 @@ const SalesSummarySelectionTooltip: React.FC<
             >
               <div className="flex justify-between items-center">
                 <h3 className="text-base font-medium text-default-800 dark:text-gray-100">
-                  Sales Summary Selection
+                  {t("Sales Summary Selection")}
                 </h3>
                 <div className="px-2 py-0.5 bg-sky-100 dark:bg-sky-900/30 text-sky-800 dark:text-sky-300 rounded-full text-xs font-medium">
                   {selectedCount}/{SUMMARY_OPTIONS.length}
@@ -249,7 +253,7 @@ const SalesSummarySelectionTooltip: React.FC<
                   className="mr-1.5"
                   checkedColor="text-sky-700"
                 />
-                {allSelected ? "Deselect All" : "Select All"}
+                {t(allSelected ? "Deselect All" : "Select All")}
               </div>
             </div>
 
@@ -264,10 +268,10 @@ const SalesSummarySelectionTooltip: React.FC<
                   >
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-default-700 dark:text-gray-200">
-                        {option.name}
+                        {t(option.name)}
                       </div>
                       <div className="text-xs text-default-500 dark:text-gray-400">
-                        {option.description}
+                        {t(option.description)}
                       </div>
                     </div>
                     <Checkbox
@@ -286,14 +290,16 @@ const SalesSummarySelectionTooltip: React.FC<
             <div className="flex-shrink-0 border-t border-default-200 dark:border-gray-700 px-4 py-3 bg-default-50 dark:bg-gray-800 rounded-b-lg">
               <div className="text-sm text-default-600 dark:text-gray-300 mb-2">
                 {selectedMonth !== undefined && selectedYear
-                  ? `Generating for: ${new Date(
-                      selectedYear,
-                      selectedMonth
-                    ).toLocaleDateString("en-US", {
-                      month: "long",
-                      year: "numeric",
-                    })}`
-                  : "Select a month to generate summary"}
+                  ? t("Generating for: {{month}}", {
+                      month: new Date(
+                        selectedYear,
+                        selectedMonth
+                      ).toLocaleDateString("en-US", {
+                        month: "long",
+                        year: "numeric",
+                      }),
+                    })
+                  : t("Select a month to generate summary")}
               </div>
               <div className="flex gap-2">
                 <Button
@@ -305,7 +311,7 @@ const SalesSummarySelectionTooltip: React.FC<
                   size="sm"
                   className="flex-1"
                 >
-                  Download
+                  {t("download", { ns: "common" })}
                 </Button>
                 <Button
                   onClick={() => handleGenerate("print")}
@@ -316,7 +322,7 @@ const SalesSummarySelectionTooltip: React.FC<
                   size="sm"
                   className="flex-1"
                 >
-                  Print
+                  {t("print", { ns: "common" })}
                 </Button>
               </div>
             </div>
@@ -332,10 +338,10 @@ const SalesSummarySelectionTooltip: React.FC<
               <LoadingSpinner size="lg" hideText />
               <div className="text-center">
                 <p className="text-lg font-medium text-default-900 dark:text-gray-100">
-                  Generating Sales Summary
+                  {t("Generating Sales Summary")}
                 </p>
                 <p className="text-sm text-default-600 dark:text-gray-300 mt-1">
-                  This may take a few moments...
+                  {t("This may take a few moments...")}
                 </p>
               </div>
             </div>

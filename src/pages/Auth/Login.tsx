@@ -9,11 +9,13 @@ import {
   IconEyeOff,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import Button from "../../components/Button";
 import TienHockLogo from "../../utils/TienHockLogo";
 import { useCompany, COMPANIES } from "../../contexts/CompanyContext";
 
 const Login: React.FC = () => {
+  const { t } = useTranslation("auth");
   const [ic_no, setIcNo] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -26,12 +28,12 @@ const Login: React.FC = () => {
     e.preventDefault();
 
     if (ic_no.length < 14) {
-      toast.error("Please enter a valid IC number");
+      toast.error(t("Please enter a valid IC number"));
       return;
     }
 
     if (!password.trim()) {
-      toast.error("Please enter your password");
+      toast.error(t("Please enter your password"));
       return;
     }
 
@@ -91,9 +93,11 @@ const Login: React.FC = () => {
               <TienHockLogo width={60} height={60} />
             </div>
             <div>
-              <h1 className="text-3xl font-bold mb-1 text-gray-900 dark:text-gray-100">Welcome Back</h1>
+              <h1 className="text-3xl font-bold mb-1 text-gray-900 dark:text-gray-100">
+                {t("Welcome Back")}
+              </h1>
               <p className="text-gray-600 dark:text-gray-400 text-sm">
-                Sign in to your account to continue
+                {t("Sign in to your account to continue")}
               </p>
             </div>
           </div>
@@ -106,7 +110,7 @@ const Login: React.FC = () => {
                 htmlFor="ic_no"
                 className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-2"
               >
-                IC Number
+                {t("IC Number")}
               </label>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 w-12 flex items-center justify-center">
@@ -140,7 +144,7 @@ const Login: React.FC = () => {
                 htmlFor="password"
                 className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-2"
               >
-                Password
+                {t("Password")}
               </label>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 w-12 flex items-center justify-center">
@@ -154,7 +158,7 @@ const Login: React.FC = () => {
                   id="password"
                   name="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
+                  placeholder={t("Enter your password")}
                   required
                   className="pl-10 pr-4 pt-3 pb-[12.5px] h-11 w-full border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:border-sky-400 dark:focus:border-sky-400 transition-colors focus:outline-none font-medium text-default-500 dark:text-gray-100 group-focus-within:text-default-600 dark:group-focus-within:text-gray-100 tracking-wide placeholder-gray-400 dark:placeholder-gray-500"
                   value={password}
@@ -190,10 +194,10 @@ const Login: React.FC = () => {
                 {isLoading ? (
                   <div className="flex items-center justify-center">
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                    Signing in...
+                    {t("Signing in...")}
                   </div>
                 ) : (
-                  "Sign In"
+                  t("Sign In")
                 )}
               </Button>
             </div>
@@ -202,7 +206,7 @@ const Login: React.FC = () => {
           {/* Footer */}
           <div className="mt-8 text-center">
             <p className="text-xs text-default-500 dark:text-gray-400">
-              Need help? Contact system admin
+              {t("Need help? Contact system admin")}
             </p>
           </div>
         </div>

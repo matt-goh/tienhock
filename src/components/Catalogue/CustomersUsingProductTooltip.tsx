@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { IconInfoCircle, IconUser } from "@tabler/icons-react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 interface CustomerProductInfo {
   customer_id: string;
@@ -26,6 +27,7 @@ const CustomersUsingProductTooltip: React.FC<
   className = "",
   disableNavigation = false,
 }) => {
+  const { t } = useTranslation("catalogue");
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const iconRef = useRef<HTMLSpanElement>(null);
@@ -118,15 +120,15 @@ const CustomersUsingProductTooltip: React.FC<
               <div className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2 flex justify-between items-center">
                 <span
                   className="truncate"
-                  title={`Custom Product Prices: ${productId}`}
+                  title={t("Custom Product Prices: {{productId}}", { productId })}
                 >
-                  Custom Product Prices: {productId}
+                  {t("Custom Product Prices: {{productId}}", { productId })}
                 </span>
                 <span
                   className="text-xs text-default-500 dark:text-gray-400 truncate"
-                  title={`Total: ${totalCount} customers`}
+                  title={t("Total: {{total}} customers", { total: totalCount })}
                 >
-                  ({totalCount} customers)
+                  {t("({{total}} customers)", { total: totalCount })}
                 </span>
               </div>
               <div className="border-t border-default-200 dark:border-gray-700"></div>
@@ -140,7 +142,9 @@ const CustomersUsingProductTooltip: React.FC<
                   <div className="flex items-center mb-2">
                     <IconUser size={16} className="text-sky-600 dark:text-sky-400 mr-2" />
                     <span className="text-sm font-medium text-default-700 dark:text-gray-200">
-                      Customers ({customersUsingProduct.length})
+                      {t("Customers ({{total}})", {
+                        total: customersUsingProduct.length,
+                      })}
                     </span>
                   </div>
                   <div className="space-y-1">
@@ -152,7 +156,9 @@ const CustomersUsingProductTooltip: React.FC<
                             ? "cursor-pointer hover:bg-sky-100"
                             : ""
                         } transition-colors duration-200`}
-                        title={`View customer details: ${customerInfo.customer_name}`}
+                        title={t("View customer details: {{name}}", {
+                          name: customerInfo.customer_name,
+                        })}
                         onClick={() => {
                           if (!disableNavigation) {
                             navigate(
@@ -167,7 +173,7 @@ const CustomersUsingProductTooltip: React.FC<
                               {customerInfo.customer_name}
                             </div>
                             <div className="text-xs text-default-500 dark:text-gray-400">
-                              ID: {customerInfo.customer_id}
+                              {t("ID: {{id}}", { id: customerInfo.customer_id })}
                             </div>
                           </div>
                           <div className="text-right ml-2 flex-shrink-0">
@@ -183,8 +189,8 @@ const CustomersUsingProductTooltip: React.FC<
                                 }`}
                               >
                                 {customerInfo.is_available
-                                  ? "Available"
-                                  : "Unavailable"}
+                                  ? t("Available")
+                                  : t("Unavailable")}
                               </span>
                             </div>
                           </div>
@@ -197,7 +203,7 @@ const CustomersUsingProductTooltip: React.FC<
 
               {totalCount === 0 && (
                 <div className="text-center text-sm text-default-500 dark:text-gray-400 py-2">
-                  Not used by any customers
+                  {t("Not used by any customers")}
                 </div>
               )}
             </div>

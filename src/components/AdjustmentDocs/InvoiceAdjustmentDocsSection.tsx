@@ -10,6 +10,7 @@ import {
   IconDownload,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { api } from "../../routes/utils/api";
 import type { AdjustmentDocument } from "../../types/types";
 import {
@@ -67,6 +68,7 @@ const InvoiceAdjustmentDocsSection: React.FC<Props> = ({
   docs: preloadedDocs,
 }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation("adjustments");
   const paths: AdjustmentDocsPaths = getAdjustmentDocsPaths(company);
   const isControlled = preloadedDocs !== undefined;
   const [fetchedDocs, setFetchedDocs] = useState<AdjustmentDocument[]>([]);
@@ -91,7 +93,7 @@ const InvoiceAdjustmentDocsSection: React.FC<Props> = ({
     async (doc: AdjustmentDocument) => {
       if (downloadingId) return;
       setDownloadingId(doc.id);
-      const toastId = toast.loading("Generating PDF...");
+      const toastId = toast.loading(t("Generating PDF..."));
       try {
         const full = await fetchDocWithLines(doc.id);
         const pdfBlob = await generateAdjustmentDocPDFBlob([full], company);
@@ -103,39 +105,41 @@ const InvoiceAdjustmentDocsSection: React.FC<Props> = ({
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(pdfUrl);
-        toast.success("PDF downloaded", { id: toastId });
+        toast.success(t("PDF downloaded"), { id: toastId });
       } catch (error) {
         toast.error(
-          `Failed to generate PDF: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`,
+          t("Failed to generate PDF: {{message}}", {
+            message:
+              error instanceof Error ? error.message : t("Unknown error"),
+          }),
           { id: toastId }
         );
       } finally {
         setDownloadingId(null);
       }
     },
-    [downloadingId, fetchDocWithLines, company]
+    [downloadingId, fetchDocWithLines, company, t]
   );
 
   const handlePrint = useCallback(
     async (doc: AdjustmentDocument) => {
       if (printingDoc) return;
-      const toastId = toast.loading("Loading document...");
+      const toastId = toast.loading(t("Loading document..."));
       try {
         const full = await fetchDocWithLines(doc.id);
         toast.dismiss(toastId);
         setPrintingDoc(full);
       } catch (error) {
         toast.error(
-          `Failed to load document: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`,
+          t("Failed to load document: {{message}}", {
+            message:
+              error instanceof Error ? error.message : t("Unknown error"),
+          }),
           { id: toastId }
         );
       }
     },
-    [printingDoc, fetchDocWithLines]
+    [printingDoc, fetchDocWithLines, t]
   );
 
   const fetchDocs = useCallback(async () => {
@@ -188,7 +192,7 @@ const InvoiceAdjustmentDocsSection: React.FC<Props> = ({
       <div className="px-4 py-3 border-b border-default-200 dark:border-gray-700 flex items-center justify-between">
         <h2 className="text-base font-semibold text-default-900 dark:text-gray-100 flex items-center gap-2">
           <IconFileText size={18} className="text-default-500 dark:text-gray-400" />
-          Adjustment Documents
+          {t("Adjustment Documents")}
           <span className="text-sm font-normal text-default-500 dark:text-gray-400">
             ({docs.length})
           </span>
@@ -199,19 +203,19 @@ const InvoiceAdjustmentDocsSection: React.FC<Props> = ({
           <thead className="bg-default-50 dark:bg-gray-900/50">
             <tr>
               <th className="px-4 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                ID
+                {t("ID")}
               </th>
               <th className="px-4 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                Type
+                {t("Type")}
               </th>
               <th className="px-4 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                Amount
+                {t("amount", { ns: "common" })}
               </th>
               <th className="px-4 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                Status
+                {t("status", { ns: "common" })}
               </th>
               <th className="px-4 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                Paired
+                {t("Paired")}
               </th>
               <th className="px-2 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-300 uppercase w-24">
                 PDF
@@ -261,10 +265,10 @@ const InvoiceAdjustmentDocsSection: React.FC<Props> = ({
                       }}
                       disabled={!!printingDoc || downloadingId === d.id}
                       className="inline-flex items-center justify-center p-1.5 rounded text-default-500 hover:text-sky-600 hover:bg-sky-50 dark:text-gray-400 dark:hover:text-sky-400 dark:hover:bg-sky-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Print PDF"
-                      aria-label={`Print PDF for ${formatAdjustmentDocDisplayId(
-                        d
-                      )}`}
+                      title={t("Print PDF")}
+                      aria-label={t("Print PDF for {{id}}", {
+                        id: formatAdjustmentDocDisplayId(d),
+                      })}
                     >
                       <IconPrinter size={16} stroke={2} />
                     </button>
@@ -276,10 +280,10 @@ const InvoiceAdjustmentDocsSection: React.FC<Props> = ({
                       }}
                       disabled={downloadingId === d.id || !!printingDoc}
                       className="inline-flex items-center justify-center p-1.5 rounded text-default-500 hover:text-sky-600 hover:bg-sky-50 dark:text-gray-400 dark:hover:text-sky-400 dark:hover:bg-sky-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Download PDF"
-                      aria-label={`Download PDF for ${formatAdjustmentDocDisplayId(
-                        d
-                      )}`}
+                      title={t("Download PDF")}
+                      aria-label={t("Download PDF for {{id}}", {
+                        id: formatAdjustmentDocDisplayId(d),
+                      })}
                     >
                       <IconDownload size={16} stroke={2} />
                     </button>

@@ -34,6 +34,7 @@ import {
   usePersistedUrlSearch,
 } from "../../../hooks/usePersistedFilters";
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
+import { useTranslation } from "react-i18next";
 
 interface PinjamRecord {
   id: number;
@@ -112,6 +113,7 @@ const getPinjamActivityTime = (
 };
 
 const PinjamListPage: React.FC = () => {
+  const { t } = useTranslation("payroll");
   const navigate = useNavigate();
 
   // State
@@ -232,7 +234,7 @@ const PinjamListPage: React.FC = () => {
       setEmployeePayrolls(response.employeePayrolls || []);
     } catch (error) {
       console.error("Error fetching data:", error);
-      toast.error("Failed to load data");
+      toast.error(t("Failed to load data"));
     } finally {
       setIsLoading(false);
     }
@@ -248,13 +250,13 @@ const PinjamListPage: React.FC = () => {
 
     try {
       await api.delete(`/api/pinjam-records/${deletingId}`);
-      toast.success("Pinjam record deleted successfully");
+      toast.success(t("Pinjam record deleted successfully"));
       setShowDeleteDialog(false);
       setDeletingId(null);
       await fetchAllData();
     } catch (error) {
       console.error("Error deleting pinjam record:", error);
-      toast.error("Failed to delete pinjam record");
+      toast.error(t("Failed to delete pinjam record"));
     }
   };
 
@@ -425,7 +427,7 @@ const PinjamListPage: React.FC = () => {
   // PDF generation function
   const generatePDFForSelected = async (action: "download" | "print") => {
     if (selectedEmployees.size === 0) {
-      toast.error("Please select at least one employee to generate PDF");
+      toast.error(t("Please select at least one employee to generate PDF"));
       return;
     }
 
@@ -468,11 +470,14 @@ const PinjamListPage: React.FC = () => {
 
       await generatePinjamPDF(pdfData, action);
 
-      const actionText = action === "download" ? "downloaded" : "generated";
-      toast.success(`Pinjam summary ${actionText} successfully`);
+      toast.success(
+        action === "download"
+          ? t("Pinjam summary downloaded successfully")
+          : t("Pinjam summary generated successfully")
+      );
     } catch (error) {
       console.error("Error generating PDF:", error);
-      toast.error("Failed to generate PDF");
+      toast.error(t("Failed to generate PDF"));
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -493,7 +498,7 @@ const PinjamListPage: React.FC = () => {
         <div className="flex flex-col md:flex-row gap-4 items-end justify-between">
           <div className="flex gap-4 items-end">
             <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100 self-center">
-              Pinjam System
+              {t("Pinjam System")}
             </h1>
             <div className="self-center h-8 border-l border-default-300 dark:border-gray-600" />
             <TimeNavigator
@@ -505,7 +510,7 @@ const PinjamListPage: React.FC = () => {
           </div>
           <div className="flex items-center gap-2 whitespace-nowrap">
             <span className="text-sm font-medium text-default-700 dark:text-gray-200">
-              Total Pinjam:
+              {t("Total Pinjam:")}
             </span>
             <span className="font-semibold text-lg text-default-800 dark:text-gray-100">
               {formatCurrency(totalMidMonthPinjam + totalMonthlyPinjam)}
@@ -533,13 +538,19 @@ const PinjamListPage: React.FC = () => {
                 />
               )}
               <span className="text-sm font-medium text-default-700 dark:text-gray-200">
-                Select All ({filteredEmployeeData.length})
+                {t("Select All ({{total}})", {
+                  total: filteredEmployeeData.length,
+                })}
               </span>
             </div>
             {selectedEmployees.size > 0 && (
               <span className="text-sm text-sky-600 dark:text-sky-400 font-medium whitespace-nowrap">
-                {selectedEmployees.size} employee
-                {selectedEmployees.size > 1 ? "s" : ""} selected
+                {t(
+                  selectedEmployees.size === 1
+                    ? "{{total}} employee selected"
+                    : "{{total}} employees selected",
+                  { total: selectedEmployees.size }
+                )}
               </span>
             )}
           </div>
@@ -557,7 +568,7 @@ const PinjamListPage: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search staff"
+                placeholder={t("Search staff")}
                 className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-1.5 pl-8 pr-8 text-sm text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
               />
               {searchQuery && (
@@ -565,7 +576,7 @@ const PinjamListPage: React.FC = () => {
                   type="button"
                   onClick={() => setSearchQuery("")}
                   className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-gray-400 hover:bg-default-100 dark:text-gray-500 dark:hover:bg-gray-700"
-                  title="Clear search"
+                  title={t("Clear search")}
                 >
                   <IconX size={13} />
                 </button>
@@ -578,7 +589,7 @@ const PinjamListPage: React.FC = () => {
               size="sm"
               disabled={isLoading}
             >
-              Refresh
+              {t("Refresh")}
             </Button>
             <Button
               onClick={() => generatePDFForSelected("print")}
@@ -588,7 +599,7 @@ const PinjamListPage: React.FC = () => {
               size="sm"
               disabled={selectedEmployees.size === 0 || isGeneratingPDF}
             >
-              Print ({selectedEmployees.size})
+              {t("Print ({{total}})", { total: selectedEmployees.size })}
             </Button>
             <Button
               onClick={() => generatePDFForSelected("download")}
@@ -598,7 +609,7 @@ const PinjamListPage: React.FC = () => {
               size="sm"
               disabled={selectedEmployees.size === 0 || isGeneratingPDF}
             >
-              Download ({selectedEmployees.size})
+              {t("Download ({{total}})", { total: selectedEmployees.size })}
             </Button>
             <Button
               onClick={() => setShowAddModal(true)}
@@ -607,7 +618,7 @@ const PinjamListPage: React.FC = () => {
               variant="filled"
               size="sm"
             >
-              Record Pinjam
+              {t("Record Pinjam")}
             </Button>
           </div>
         </div>
@@ -621,13 +632,13 @@ const PinjamListPage: React.FC = () => {
               <IconCash className="mx-auto h-12 w-12 text-default-300 mb-4" />
               <p className="text-lg font-medium">
                 {searchQuery
-                  ? "No employees match your search"
-                  : "No employee records found"}
+                  ? t("No employees match your search")
+                  : t("No employee records found")}
               </p>
               <p>
                 {searchQuery
-                  ? "Try a different name or staff ID"
-                  : "No mid-month pay or pinjam records for this period"}
+                  ? t("Try a different name or staff ID")
+                  : t("No mid-month pay or pinjam records for this period")}
               </p>
             </div>
           </div>
@@ -693,7 +704,9 @@ const PinjamListPage: React.FC = () => {
                   onClick={handleCardClick}
                   title={
                     canNavigate
-                      ? `View ${employee.employee_name}'s Payroll Details (Pinjam summary)`
+                      ? t("View {{name}}'s Payroll Details (Pinjam summary)", {
+                          name: employee.employee_name,
+                        })
                       : undefined
                   }
                 >
@@ -738,7 +751,9 @@ const PinjamListPage: React.FC = () => {
                     }`}
                     title={
                       canNavigate
-                        ? `View ${employee.employee_name}'s Payroll Details (Pinjam summary)`
+                        ? t("View {{name}}'s Payroll Details (Pinjam summary)", {
+                            name: employee.employee_name,
+                          })
                         : undefined
                     }
                   >
@@ -759,9 +774,9 @@ const PinjamListPage: React.FC = () => {
                           <div className="mb-3">
                             <p
                               className="text-sm text-default-500 dark:text-gray-400 mb-1 truncate"
-                              title="Mid-month Pay (Before Pinjam)"
+                              title={t("Mid-month Pay (Before Pinjam)")}
                             >
-                              Mid-Month Pay (Before Pinjam)
+                              {t("Mid-Month Pay (Before Pinjam)")}
                             </p>
                             <p className="text-xl font-bold text-default-800 dark:text-gray-100">
                               {formatCurrency(employee.midMonthPay)}
@@ -771,7 +786,7 @@ const PinjamListPage: React.FC = () => {
                           {employee.midMonthPinjamDetails.length > 0 && (
                             <div className="mb-3">
                               <p className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
-                                Pinjam Items:
+                                {t("Pinjam Items:")}
                               </p>
                               <div className="space-y-1 text-sm text-default-600 dark:text-gray-300">
                                 {employee.midMonthPinjamDetails.map(
@@ -794,7 +809,7 @@ const PinjamListPage: React.FC = () => {
                           <div className="text-sm">
                             <div className="flex justify-between mb-2">
                               <span className="text-default-600 dark:text-gray-300">
-                                Jumlah Pinjam:
+                                {t("Total Pinjam:")}
                               </span>
                               <span className="font-semibold text-red-600">
                                 - {formatCurrency(employee.midMonthPinjam)}
@@ -803,9 +818,9 @@ const PinjamListPage: React.FC = () => {
                             <div className="flex justify-between font-semibold">
                               <span
                                 className="text-default-800 dark:text-gray-100 truncate mr-2"
-                                title="Final Mid-month Pay"
+                                title={t("Final Mid-month Pay")}
                               >
-                                Final Mid-month pay:
+                                {t("Final Mid-month pay:")}
                               </span>
                               <span
                                 className="text-lg font-bold truncate text-sky-600 dark:text-sky-400"
@@ -832,9 +847,9 @@ const PinjamListPage: React.FC = () => {
                           <div className="mb-3">
                             <p
                               className="text-sm text-default-500 dark:text-gray-400 mb-1 truncate"
-                              title="Gaji Genap (Before Pinjam)"
+                              title={t("Gaji Genap (Before Pinjam)")}
                             >
-                              Gaji Genap (Before Pinjam)
+                              {t("Gaji Genap (Before Pinjam)")}
                             </p>
                             <p className="text-xl font-bold text-default-800 dark:text-gray-100">
                               {formatCurrency(employee.gajiGenap)}
@@ -844,7 +859,7 @@ const PinjamListPage: React.FC = () => {
                           {employee.monthlyPinjamDetails.length > 0 && (
                             <div className="mb-3">
                               <p className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
-                                Pinjam Items:
+                                {t("Pinjam Items:")}
                               </p>
                               <div className="space-y-1 text-sm text-default-600 dark:text-gray-300">
                                 {employee.monthlyPinjamDetails.map(
@@ -867,7 +882,7 @@ const PinjamListPage: React.FC = () => {
                           <div className="text-sm">
                             <div className="flex justify-between mb-2">
                               <span className="text-default-600 dark:text-gray-300">
-                                Jumlah Pinjam:
+                                {t("Total Pinjam:")}
                               </span>
                               <span className="font-semibold text-red-600">
                                 - {formatCurrency(employee.monthlyPinjam)}
@@ -876,11 +891,11 @@ const PinjamListPage: React.FC = () => {
                             <div className="flex justify-between font-semibold">
                               <span
                                 className="text-default-800 dark:text-gray-100 flex items-center truncate mr-2"
-                                title="Jumlah Masuk Bank"
+                                title={t("Total Banked In")}
                               >
                                 <IconBuildingBank className="w-4 h-4 mr-1.5 flex-shrink-0" />
                                 <span className="truncate">
-                                  Jumlah Masuk Bank:
+                                  {t("Total Banked In:")}
                                 </span>
                               </span>
                               <span className="text-lg font-bold text-sky-600 dark:text-sky-400">
@@ -905,7 +920,7 @@ const PinjamListPage: React.FC = () => {
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
         <div className="px-6 py-4 border-b border-default-200 dark:border-gray-700">
           <h3 className="text-lg font-medium text-default-800 dark:text-gray-100">
-            All Pinjam Records
+            {t("All Pinjam Records")}
           </h3>
         </div>
 
@@ -914,13 +929,13 @@ const PinjamListPage: React.FC = () => {
             <IconCash className="mx-auto h-12 w-12 text-default-300 mb-4" />
             <p className="text-lg font-medium">
               {searchQuery.trim()
-                ? "No pinjam records match your search"
-                : "No pinjam records found"}
+                ? t("No pinjam records match your search")
+                : t("No pinjam records found")}
             </p>
             <p>
               {searchQuery.trim()
-                ? "Try a different name or staff ID"
-                : 'Click "Record Pinjam" to add pinjam records'}
+                ? t("Try a different name or staff ID")
+                : t('Click "Record Pinjam" to add pinjam records')}
             </p>
           </div>
         ) : (
@@ -929,22 +944,22 @@ const PinjamListPage: React.FC = () => {
               <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Employee
+                    {t("Employee")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Type
+                    {t("Type")}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Amount
+                    {t("Amount")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Description
+                    {t("Description")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Last Changed
+                    {t("Last Changed")}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Actions
+                    {t("Actions")}
                   </th>
                 </tr>
               </thead>
@@ -968,8 +983,8 @@ const PinjamListPage: React.FC = () => {
                         }`}
                       >
                         {record.pinjam_type === "mid_month"
-                          ? "Mid-month"
-                          : "Monthly"}
+                          ? t("Mid-month")
+                          : t("Monthly")}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-default-800 dark:text-gray-100">
@@ -989,7 +1004,7 @@ const PinjamListPage: React.FC = () => {
                         <button
                           onClick={() => handleEdit(record)}
                           className="text-sky-600 dark:text-sky-400 hover:text-sky-800"
-                          title="Edit"
+                          title={t("Edit")}
                         >
                           <IconEdit size={18} />
                         </button>
@@ -999,7 +1014,7 @@ const PinjamListPage: React.FC = () => {
                             setShowDeleteDialog(true);
                           }}
                           className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
-                          title="Delete"
+                          title={t("Delete")}
                         >
                           <IconTrash size={18} />
                         </button>
@@ -1031,9 +1046,11 @@ const PinjamListPage: React.FC = () => {
           setDeletingId(null);
         }}
         onConfirm={handleDeleteRecord}
-        title="Delete Pinjam Record"
-        message="Are you sure you want to delete this pinjam record? This action cannot be undone."
-        confirmButtonText="Delete"
+        title={t("Delete Pinjam Record")}
+        message={t(
+          "Are you sure you want to delete this pinjam record? This action cannot be undone."
+        )}
+        confirmButtonText={t("Delete")}
         variant="danger"
       />
     </div>

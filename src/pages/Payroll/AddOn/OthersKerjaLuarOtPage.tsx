@@ -39,8 +39,7 @@ import {
 } from "../../../hooks/usePersistedFilters";
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
-
-const DISPLAY_LABEL = "Others (Kerja Luar OT)";
+import { useTranslation, Trans } from "react-i18next";
 
 interface EmployeeGroup {
   employeeId: string;
@@ -51,6 +50,8 @@ interface EmployeeGroup {
 }
 
 const OthersKerjaLuarOtPage: React.FC = () => {
+  const { t } = useTranslation("payroll");
+  const displayLabel = t("Others (Kerja Luar OT)");
   const [records, setRecords] = useState<OthersRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -133,7 +134,7 @@ const OthersKerjaLuarOtPage: React.FC = () => {
       setRecords(response || []);
     } catch (error) {
       console.error("Error fetching others records:", error);
-      toast.error(`Failed to load ${DISPLAY_LABEL}`);
+      toast.error(t("Failed to load {{label}}", { label: displayLabel }));
     } finally {
       setIsLoading(false);
     }
@@ -148,13 +149,15 @@ const OthersKerjaLuarOtPage: React.FC = () => {
     if (!deletingId) return;
     try {
       await api.delete(`/api/others-records/${deletingId}`);
-      toast.success(`${DISPLAY_LABEL} record deleted successfully`);
+      toast.success(
+        t("{{label}} record deleted successfully", { label: displayLabel })
+      );
       setShowDeleteDialog(false);
       setDeletingId(null);
       await fetchRecords();
     } catch (error) {
       console.error("Error deleting record:", error);
-      toast.error(`Failed to delete ${DISPLAY_LABEL}`);
+      toast.error(t("Failed to delete {{label}}", { label: displayLabel }));
     }
   };
 
@@ -390,7 +393,7 @@ const OthersKerjaLuarOtPage: React.FC = () => {
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row justify-between items-center">
         <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-          {DISPLAY_LABEL}
+          {displayLabel}
         </h1>
         <div className="flex space-x-3 mt-4 md:mt-0">
           <Button
@@ -399,7 +402,7 @@ const OthersKerjaLuarOtPage: React.FC = () => {
             variant="outline"
             disabled={isLoading}
           >
-            Refresh
+            {t("Refresh")}
           </Button>
           <Button
             onClick={() => setShowAddModal(true)}
@@ -407,7 +410,7 @@ const OthersKerjaLuarOtPage: React.FC = () => {
             color="sky"
             variant="filled"
           >
-            Add {DISPLAY_LABEL}
+            {t("Add {{label}}", { label: displayLabel })}
           </Button>
         </div>
       </div>
@@ -434,7 +437,7 @@ const OthersKerjaLuarOtPage: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search name, pay code, date, amount, description..."
+                placeholder={t("Search name, pay code, date, amount, description...")}
                 className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-1.5 pl-8 pr-8 text-sm text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
               />
               {searchQuery && (
@@ -442,7 +445,7 @@ const OthersKerjaLuarOtPage: React.FC = () => {
                   type="button"
                   onClick={() => setSearchQuery("")}
                   className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-gray-400 hover:bg-default-100 dark:text-gray-500 dark:hover:bg-gray-700"
-                  title="Clear search"
+                  title={t("Clear search")}
                 >
                   <IconX size={13} />
                 </button>
@@ -451,18 +454,26 @@ const OthersKerjaLuarOtPage: React.FC = () => {
             <div className="hidden h-6 w-px bg-default-300 dark:bg-gray-600 sm:block" />
             <div className="text-right text-sm text-default-600 dark:text-gray-300">
               <div>
-              <span className="font-medium text-default-800 dark:text-gray-100">
-                {filteredRecords.length}
-              </span>
-              {filteredRecords.length !== records.length && (
-                <span> of {records.length}</span>
-              )}{" "}
-              records ·{" "}
-              <span className="font-medium text-default-800 dark:text-gray-100">
-                {formatCurrency(filteredTotalAmount)}
-              </span>
+                <Trans
+                  i18nKey={
+                    filteredRecords.length !== records.length
+                      ? "<strong>{{shown}}</strong> of <strong>{{total}}</strong> records · <strong>{{amount}}</strong>"
+                      : "<strong>{{shown}}</strong> records · <strong>{{amount}}</strong>"
+                  }
+                  ns="payroll"
+                  values={{
+                    shown: filteredRecords.length,
+                    total: records.length,
+                    amount: formatCurrency(filteredTotalAmount),
+                  }}
+                  components={{
+                    strong: (
+                      <strong className="font-medium text-default-800 dark:text-gray-100" />
+                    ),
+                  }}
+                />
+              </div>
             </div>
-          </div>
           </div>
         </div>
 
@@ -483,7 +494,7 @@ const OthersKerjaLuarOtPage: React.FC = () => {
                     return sel ? `${sel.name} (${sel.id})` : empId;
                   }}
                   onChange={(e) => setEmployeeQuery(e.target.value)}
-                  placeholder="All employees"
+                  placeholder={t("All employees")}
                 />
                 <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
                   <IconChevronDown
@@ -517,7 +528,7 @@ const OthersKerjaLuarOtPage: React.FC = () => {
                     {({ selected }) => (
                       <>
                         <span className={selected ? "font-medium" : "font-normal"}>
-                          All employees
+                          {t("All employees")}
                         </span>
                         {selected && (
                           <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-300">
@@ -529,7 +540,7 @@ const OthersKerjaLuarOtPage: React.FC = () => {
                   </ComboboxOption>
                   {filteredEmployeeOptions.length === 0 ? (
                     <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
-                      No employees in this month.
+                      {t("No employees in this month.")}
                     </div>
                   ) : (
                     filteredEmployeeOptions.map((e) => (
@@ -583,7 +594,7 @@ const OthersKerjaLuarOtPage: React.FC = () => {
                       : code;
                   }}
                   onChange={(e) => setPayCodeQuery(e.target.value)}
-                  placeholder="All pay codes"
+                  placeholder={t("All pay codes")}
                 />
                 <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
                   <IconChevronDown
@@ -617,7 +628,7 @@ const OthersKerjaLuarOtPage: React.FC = () => {
                     {({ selected }) => (
                       <>
                         <span className={selected ? "font-medium" : "font-normal"}>
-                          All pay codes
+                          {t("All pay codes")}
                         </span>
                         {selected && (
                           <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-300">
@@ -629,7 +640,7 @@ const OthersKerjaLuarOtPage: React.FC = () => {
                   </ComboboxOption>
                   {filteredPayCodeOptions.length === 0 ? (
                     <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
-                      No pay codes in this month.
+                      {t("No pay codes in this month.")}
                     </div>
                   ) : (
                     filteredPayCodeOptions.map((p) => (
@@ -671,10 +682,10 @@ const OthersKerjaLuarOtPage: React.FC = () => {
               type="button"
               onClick={clearFilters}
               className="inline-flex items-center gap-1 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2.5 py-1.5 text-sm text-default-700 dark:text-gray-200 hover:bg-default-50 dark:hover:bg-gray-700"
-              title="Clear all filters"
+              title={t("Clear all filters")}
             >
               <IconX size={14} />
-              Clear
+              {t("Clear")}
             </button>
           )}
 
@@ -685,19 +696,19 @@ const OthersKerjaLuarOtPage: React.FC = () => {
                 type="button"
                 onClick={expandAll}
                 className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-default-600 hover:bg-default-100 dark:text-gray-300 dark:hover:bg-gray-700"
-                title="Expand all groups"
+                title={t("Expand all groups")}
               >
                 <IconChevronsDown size={16} />
-                Expand all
+                {t("Expand all")}
               </button>
               <button
                 type="button"
                 onClick={collapseAll}
                 className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-default-600 hover:bg-default-100 dark:text-gray-300 dark:hover:bg-gray-700"
-                title="Collapse all groups"
+                title={t("Collapse all groups")}
               >
                 <IconChevronsUp size={16} />
-                Collapse all
+                {t("Collapse all")}
               </button>
             </div>
           )}
@@ -713,15 +724,19 @@ const OthersKerjaLuarOtPage: React.FC = () => {
           <div className="text-center py-12 text-default-500 dark:text-gray-400">
             <IconClockHour4 className="mx-auto h-12 w-12 text-default-300 mb-4" />
             <p className="text-lg font-medium">
-              No {DISPLAY_LABEL} records found
+              {t("No {{label}} records found", { label: displayLabel })}
             </p>
-            <p>Click &quot;Add {DISPLAY_LABEL}&quot; to create records</p>
+            <p>
+              {t('Click "Add {{label}}" to create records', {
+                label: displayLabel,
+              })}
+            </p>
           </div>
         ) : grouped.length === 0 ? (
           <div className="text-center py-12 text-default-500 dark:text-gray-400">
             <IconSearch className="mx-auto h-12 w-12 text-default-300 mb-4" />
             <p className="text-lg font-medium">
-              No records match the current filters
+              {t("No records match the current filters")}
             </p>
             <button
               type="button"
@@ -729,7 +744,7 @@ const OthersKerjaLuarOtPage: React.FC = () => {
               className="mt-3 inline-flex items-center gap-1 rounded-md bg-sky-50 px-3 py-1.5 text-sm font-medium text-sky-600 hover:bg-sky-100 dark:bg-sky-900/30 dark:text-sky-300 dark:hover:bg-sky-900/50"
             >
               <IconX size={14} />
-              Clear filters
+              {t("Clear filters")}
             </button>
           </div>
         ) : (
@@ -739,25 +754,25 @@ const OthersKerjaLuarOtPage: React.FC = () => {
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider w-8"></th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Employee / Date
+                    {t("Employee / Date")}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Pay Code
+                    {t("Pay Code")}
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Rate
+                    {t("Rate")}
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Qty
+                    {t("Qty")}
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Amount
+                    {t("Amount")}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Description
+                    {t("Description")}
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Actions
+                    {t("Actions")}
                   </th>
                 </tr>
               </thead>
@@ -793,8 +808,12 @@ const OthersKerjaLuarOtPage: React.FC = () => {
                           className="px-4 py-2 text-xs text-default-500 dark:text-gray-400"
                           colSpan={2}
                         >
-                          {group.recordCount} record
-                          {group.recordCount === 1 ? "" : "s"}
+                          {t(
+                            group.recordCount === 1
+                              ? "{{total}} record"
+                              : "{{total}} records",
+                            { total: group.recordCount }
+                          )}
                         </td>
                         <td className="px-4 py-2"></td>
                         <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-semibold text-default-900 dark:text-gray-100">
@@ -821,9 +840,14 @@ const OthersKerjaLuarOtPage: React.FC = () => {
                                 {record.link_id && (
                                   <span
                                     className="inline-flex items-center gap-0.5 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-medium text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
-                                    title={`Linked across ${
-                                      linkedGroupCounts[record.link_id] || 1
-                                    } dates — edits and deletes apply to the whole group`}
+                                    title={t(
+                                      "Linked across {{total}} dates - edits and deletes apply to the whole group",
+                                      {
+                                        total:
+                                          linkedGroupCounts[record.link_id] ||
+                                          1,
+                                      }
+                                    )}
                                   >
                                     <IconLink size={11} />
                                     {linkedGroupCounts[record.link_id] || 1}
@@ -854,7 +878,7 @@ const OthersKerjaLuarOtPage: React.FC = () => {
                                 <button
                                   onClick={() => handleEdit(record)}
                                   className="p-1.5 rounded-full text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors duration-150"
-                                  title="Edit"
+                                  title={t("Edit")}
                                 >
                                   <IconEdit size={18} />
                                 </button>
@@ -864,7 +888,7 @@ const OthersKerjaLuarOtPage: React.FC = () => {
                                     setShowDeleteDialog(true);
                                   }}
                                   className="p-1.5 rounded-full text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors duration-150"
-                                  title="Delete"
+                                  title={t("Delete")}
                                 >
                                   <IconTrash size={18} />
                                 </button>
@@ -888,7 +912,7 @@ const OthersKerjaLuarOtPage: React.FC = () => {
           onSuccess={fetchRecords}
           currentYear={currentYear}
           currentMonth={currentMonth}
-          displayLabel={DISPLAY_LABEL}
+          displayLabel={displayLabel}
         />
       )}
 
@@ -900,7 +924,7 @@ const OthersKerjaLuarOtPage: React.FC = () => {
         }}
         onSuccess={fetchRecords}
         record={editingRecord}
-        displayLabel={DISPLAY_LABEL}
+        displayLabel={displayLabel}
       />
 
       <ConfirmationDialog
@@ -912,18 +936,30 @@ const OthersKerjaLuarOtPage: React.FC = () => {
         onConfirm={handleDelete}
         title={
           deletingLinkedCount > 1
-            ? `Delete ${deletingLinkedCount} linked ${DISPLAY_LABEL} records`
-            : `Delete ${DISPLAY_LABEL}`
+            ? t("Delete {{total}} linked {{label}} records", {
+                total: deletingLinkedCount,
+                label: displayLabel,
+              })
+            : t("Delete {{label}}", { label: displayLabel })
         }
         message={
           deletingLinkedCount > 1
-            ? `This record is linked across ${deletingLinkedCount} dates (${deletingLinkedDates.join(
-                ", ",
-              )}). Deleting will remove all ${deletingLinkedCount} linked records. This action cannot be undone.`
-            : `Are you sure you want to delete this ${DISPLAY_LABEL} record? This action cannot be undone.`
+            ? t(
+                "This record is linked across {{total}} dates ({{dates}}). Deleting will remove all {{total}} linked records. This action cannot be undone.",
+                {
+                  total: deletingLinkedCount,
+                  dates: deletingLinkedDates.join(", "),
+                }
+              )
+            : t(
+                "Are you sure you want to delete this {{label}} record? This action cannot be undone.",
+                { label: displayLabel }
+              )
         }
         confirmButtonText={
-          deletingLinkedCount > 1 ? `Delete all ${deletingLinkedCount}` : "Delete"
+          deletingLinkedCount > 1
+            ? t("Delete all {{total}}", { total: deletingLinkedCount })
+            : t("Delete")
         }
         variant="danger"
       />
