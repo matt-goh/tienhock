@@ -565,15 +565,18 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
                 )}
               </tbody>
               {/* Totals Footer */}
-              <tfoot className="bg-gray-100 dark:bg-gray-900 border-t-2 border-gray-300 dark:border-gray-600">
+              <tfoot className="sticky bottom-0 z-10 bg-gray-100 dark:bg-gray-900">
                 <tr>
-                  <td colSpan={4} className="px-4 py-3 font-bold text-gray-900 dark:text-white text-right">
+                  <td
+                    colSpan={4}
+                    className="px-4 py-3 font-bold text-gray-900 dark:text-white text-right border-t-2 border-gray-300 dark:border-gray-600"
+                  >
                     TOTALS:
                   </td>
-                  <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">
+                  <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white border-t-2 border-gray-300 dark:border-gray-600">
                     {formatCurrency(trialBalance.totals.debit)}
                   </td>
-                  <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">
+                  <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white border-t-2 border-gray-300 dark:border-gray-600">
                     {formatCurrency(trialBalance.totals.credit)}
                   </td>
                 </tr>
