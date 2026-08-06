@@ -287,18 +287,24 @@ const OpeningBalancesPDFDocument: React.FC<{
           </View>
         ))}
 
-        {/* Grand total, double-ruled like the auditor's schedule */}
-        <View style={styles.totalRow} wrap={false}>
-          <Text style={styles.cellCode} />
-          <Text style={styles.cellDescription} />
-          <Text style={styles.totalMoney}>{formatCurrency(totals.debit)}</Text>
-          <Text style={styles.totalMoney}>{formatCurrency(totals.credit)}</Text>
-        </View>
-        <View style={styles.totalRowUnderline}>
-          <View style={styles.cellCode} />
-          <View style={styles.cellDescription} />
-          <View style={styles.doubleRule} />
-          <View style={styles.doubleRule} />
+        {/* Grand total, double-ruled like the auditor's schedule. The rule sits
+            in the same unbreakable block as the figures, otherwise it can spill
+            onto a page of its own. */}
+        <View wrap={false}>
+          <View style={styles.totalRow}>
+            <Text style={styles.cellCode} />
+            <Text style={styles.cellDescription} />
+            <Text style={styles.totalMoney}>{formatCurrency(totals.debit)}</Text>
+            <Text style={styles.totalMoney}>
+              {formatCurrency(totals.credit)}
+            </Text>
+          </View>
+          <View style={styles.totalRowUnderline}>
+            <View style={styles.cellCode} />
+            <View style={styles.cellDescription} />
+            <View style={styles.doubleRule} />
+            <View style={styles.doubleRule} />
+          </View>
         </View>
 
         <Text
