@@ -5,8 +5,9 @@ import { ExtendedInvoiceData, Customer } from "../../types/types"; // Use update
 import { FormInput } from "../FormComponents"; // Reusable components
 import PillSelect, { PillSelectOption } from "../PillSelect";
 import { CustomerCombobox } from "./CustomerCombobox"; // Reusable component
+import TimeNavigator, { TimeRange } from "../TimeNavigator";
 import {
-  formatDateForInput,
+  formatDateForAPI,
   parseDatabaseTimestamp,
 } from "../../utils/invoice/dateUtils";
 
@@ -18,6 +19,19 @@ interface SelectOption {
 
 // "I"/"C" are the invoice-number prefixes; they map to INVOICE/CASH.
 type InvoiceTypeCode = "I" | "C";
+
+// Thin vertical rule between two fields on the same line. It stretches to the
+// row height so it reads as one continuous separator, and disappears below sm
+// where the fields stack and a rule between them would be meaningless.
+// Deliberately absent within a pair that describes one thing - Date/Time are
+// two halves of one timestamp, Customer/Customer ID are two halves of one
+// customer - so each pair reads as a group rather than as separate fields.
+const FieldDivider: React.FC = (): React.ReactElement => (
+  <div
+    aria-hidden="true"
+    className="hidden sm:block self-stretch w-px bg-default-200 dark:bg-gray-700"
+  />
+);
 
 interface InvoiceHeaderProps {
   invoice: ExtendedInvoiceData;
@@ -90,6 +104,18 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
     onInputChange("createddate", newDate.getTime().toString());
   };
 
+  // TimeNavigator works in Date objects; the invoice keeps a ms-timestamp
+  // string, so the picked day is fed back through the same date handler that
+  // preserves the existing time part.
+  const invoiceDate: Date | null = useMemo(
+    () => parseDatabaseTimestamp(invoice.createddate).date,
+    [invoice.createddate]
+  );
+
+  const handleDatePick = (range: TimeRange) => {
+    handleDateTimeChange("date", formatDateForAPI(range.start));
+  };
+
   const salesmanOptions: ReadonlyArray<PillSelectOption<string>> = useMemo(
     (): ReadonlyArray<PillSelectOption<string>> =>
       salesmen.map(
@@ -127,61 +153,77 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
     }
   };
 
+  // One wrapping row for all seven fields. From 2xl they share a single line;
+  // as the window narrows they wrap onto further lines by themselves. Every
+  // control is sized to the value it holds rather than to the card, because a
+  // column grid on a wide screen just spreads seven short fields from edge to
+  // edge. The Date field skips its prev/next arrows here (the calendar still
+  // opens from the trigger) so the row fits at 2xl.
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-      {/* Column 1 (Invoice No, Type, Date, Time) */}
-      <div className="space-y-3">
-        {/* Invoice No */}
-        <div className="relative">
-          <FormInput
-            name="invoiceno"
-            label={t("Invoice No")}
-            value={`${invoice.paymenttype === "CASH" ? "C" : "I"}${
-              invoice.id || ""
-            }`}
-            onChange={(e) => {
-              // Extract numeric part (remove the prefix 'C' or 'I')
-              const value = e.target.value;
-              const numericPart = value.substring(1);
-              onInputChange("id", numericPart);
-            }}
-            disabled={!isNewInvoice || readOnly} // Use readOnly
-            placeholder={t("Enter Invoice Number")}
-          />
-        </div>
-
-        {/* Type */}
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-            {t("type", { ns: "common" })}
-          </label>
-          <PillSelect<InvoiceTypeCode>
-            value={invoice.paymenttype === "CASH" ? "C" : "I"}
-            onChange={(value: InvoiceTypeCode) => {
-              const newType = value === "C" ? "CASH" : "INVOICE";
-              onInputChange("paymenttype", newType);
-              if (invoice.id) {
-                onInputChange("id", invoice.id);
-              }
-            }}
-            options={invoiceTypeOptions}
-            disabled={readOnly} // Use readOnly
-            ariaLabel={t("Invoice type")}
-            size="md"
-          />
-        </div>
-
-        {/* Date */}
+    <div className="flex flex-wrap items-end gap-x-4 gap-y-4">
+      {/* Invoice No */}
+      <div className="w-36 lg:w-28">
         <FormInput
-          name="date"
-          label={t("date", { ns: "common" })}
-          type="date"
-          value={formatDateForInput(invoice.createddate)}
-          onChange={(e) => handleDateTimeChange("date", e.target.value)}
-          disabled={readOnly} // Use readOnly
+          name="invoiceno"
+          label={t("Invoice No")}
+          value={`${invoice.paymenttype === "CASH" ? "C" : "I"}${
+            invoice.id || ""
+          }`}
+          onChange={(e) => {
+            // Extract numeric part (remove the prefix 'C' or 'I')
+            const value = e.target.value;
+            const numericPart = value.substring(1);
+            onInputChange("id", numericPart);
+          }}
+          disabled={!isNewInvoice || readOnly} // Use readOnly
+          placeholder={t("Enter Invoice Number")}
         />
+      </div>
 
-        {/* Time */}
+      <FieldDivider />
+
+      {/* Type */}
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+          {t("type", { ns: "common" })}
+        </label>
+        <PillSelect<InvoiceTypeCode>
+          value={invoice.paymenttype === "CASH" ? "C" : "I"}
+          onChange={(value: InvoiceTypeCode) => {
+            const newType = value === "C" ? "CASH" : "INVOICE";
+            onInputChange("paymenttype", newType);
+            if (invoice.id) {
+              onInputChange("id", invoice.id);
+            }
+          }}
+          options={invoiceTypeOptions}
+          disabled={readOnly} // Use readOnly
+          ariaLabel={t("Invoice type")}
+          size="md"
+        />
+      </div>
+
+      <FieldDivider />
+
+      {/* Date */}
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+          {t("date", { ns: "common" })}
+        </label>
+        <TimeNavigator
+          range={{ start: invoiceDate, end: invoiceDate }}
+          onChange={handleDatePick}
+          modes={["day"]}
+          presets={false}
+          showArrows={false}
+          allowFuture
+          size="md"
+          disabled={readOnly}
+        />
+      </div>
+
+      {/* Time */}
+      <div className="w-32 lg:w-24">
         <FormInput
           name="time"
           label={t("Time")}
@@ -197,49 +239,62 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
         />
       </div>
 
-      {/* Column 2 */}
-      <div className="space-y-3">
-        {/* Salesman. The picker only ever lists active staff holding the
-            SALESMAN job (4 of them today) and shows their short id, so the
-            whole set fits in one pill row. An empty salespersonid matches no
-            pill, which is the old "Select Salesman..." placeholder state. */}
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-            {t("Salesman")}
-          </label>
-          <PillSelect<string>
-            value={invoice.salespersonid || ""}
-            onChange={(selectedId: string) => {
-              onInputChange("salespersonid", selectedId);
-            }}
-            options={salesmanOptions}
-            disabled={readOnly} // Use readOnly
-            ariaLabel={t("Salesman")}
-            size="md"
-          />
+      <FieldDivider />
+
+      {/* Salesman. The picker only ever lists active staff holding the
+          SALESMAN job (4 of them today) and shows their short id, so the
+          whole set fits in one pill row. An empty salespersonid matches no
+          pill, which is the old "Select Salesman..." placeholder state. */}
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+          {t("Salesman")}
+        </label>
+        <PillSelect<string>
+          value={invoice.salespersonid || ""}
+          onChange={(selectedId: string) => {
+            onInputChange("salespersonid", selectedId);
+          }}
+          options={salesmanOptions}
+          disabled={readOnly} // Use readOnly
+          ariaLabel={t("Salesman")}
+          size="md"
+        />
+      </div>
+
+      <FieldDivider />
+
+      {/* Customer + Customer ID are one flex item so they wrap to the next
+          line together - the ID never drops alone while the name stays put.
+          Customer is the only field that earns real width (names run long),
+          so it absorbs the space the compact fields leave, capped so it never
+          stretches across the card. */}
+      <div className="w-full sm:w-auto lg:flex-1 lg:min-w-[20rem] lg:max-w-[32rem]">
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-4">
+          <div className="flex-1 min-w-[11rem] max-w-sm">
+            <CustomerCombobox
+              name="customer"
+              label={t("customer", { ns: "common" })}
+              value={selectedOptionForCombobox} // Pass SelectOption | null
+              onChange={handleComboboxChange} // Use updated handler
+              options={customerOptionsForCombobox} // Pass mapped options
+              query={customerQuery}
+              setQuery={setCustomerQuery}
+              onLoadMore={onLoadMoreCustomers}
+              hasMore={hasMoreCustomers}
+              isLoading={isFetchingCustomers}
+            />
+          </div>
+
+          {/* Customer ID (Read Only) */}
+          <div className="w-40 lg:w-32">
+            <FormInput
+              name="customerId"
+              label={t("Customer ID")}
+              value={invoice.customerid || ""}
+              disabled // Always disabled
+            />
+          </div>
         </div>
-
-        {/* Customer */}
-        <CustomerCombobox
-          name="customer"
-          label={t("customer", { ns: "common" })}
-          value={selectedOptionForCombobox} // Pass SelectOption | null
-          onChange={handleComboboxChange} // Use updated handler
-          options={customerOptionsForCombobox} // Pass mapped options
-          query={customerQuery}
-          setQuery={setCustomerQuery}
-          onLoadMore={onLoadMoreCustomers}
-          hasMore={hasMoreCustomers}
-          isLoading={isFetchingCustomers}
-        />
-
-        {/* Customer ID (Read Only) */}
-        <FormInput
-          name="customerId"
-          label={t("Customer ID")}
-          value={invoice.customerid || ""}
-          disabled // Always disabled
-        />
       </div>
     </div>
   );

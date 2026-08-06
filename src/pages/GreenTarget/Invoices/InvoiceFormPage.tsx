@@ -33,6 +33,7 @@ import {
 } from "@tabler/icons-react";
 import clsx from "clsx";
 import { SelectOption } from "../../../components/FormComponents";
+import TimeNavigator, { TimeRange } from "../../../components/TimeNavigator";
 import GTInvoiceAccountFields, {
   GT_DEFAULT_REVENUE_ACCOUNT,
   GTInvoiceAccountFieldsHandle,
@@ -68,8 +69,9 @@ interface Customer {
 interface Rental {
   rental_id: number;
   customer_id: number;
-  tong_no: string;
-  date_placed: string;
+  // The dumpster and both dates are optional Green Target metadata.
+  tong_no: string | null;
+  date_placed: string | null;
   date_picked: string | null;
   location_address?: string;
   location_site?: string | null;
@@ -126,6 +128,14 @@ const toLocalDateInputValue = (value: string | null | undefined): string => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return format(date, "yyyy-MM-dd");
+};
+
+// TimeNavigator works in Date objects while the form keeps a plain yyyy-MM-dd
+// string, so the string is read back as a LOCAL calendar day, never via UTC.
+const fromLocalDateInputValue = (value: string): Date | null => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
 };
 
 // Payment method options
@@ -196,6 +206,10 @@ const InvoiceFormPage: React.FC = () => {
   const [paymentInternalReference, setPaymentInternalReference] =
     useState<string>("");
   const [paymentReference, setPaymentReference] = useState("");
+  // Blank means "the whole invoice". A smaller figure records a part payment
+  // and leaves the balance outstanding, for the common case where the rest
+  // arrives days later.
+  const [paymentAmount, setPaymentAmount] = useState<string>("");
   const [submitAsEinvoice, setSubmitAsEinvoice] = useState(false);
   const [showSubmissionResultsModal, setShowSubmissionResultsModal] =
     useState(false);
@@ -718,6 +732,13 @@ const InvoiceFormPage: React.FC = () => {
     }
   };
 
+  const handleDateIssuedChange = (range: TimeRange): void => {
+    setFormData((p: Invoice): Invoice => ({
+      ...p,
+      date_issued: format(range.start, "yyyy-MM-dd"),
+    }));
+  };
+
   // Apply a new rental selection and keep the derived customer in sync.
   const applyRentalSelection = (nextSelectedRentals: Rental[]): void => {
     setSelectedRentals(nextSelectedRentals);
@@ -908,6 +929,21 @@ const InvoiceFormPage: React.FC = () => {
         toast.error("Cheque number cannot exceed 50 characters.");
         return false;
       }
+      if (paymentAmount.trim() !== "") {
+        const invoiceTotal =
+          formData.amount_before_tax + formData.tax_amount;
+        const entered = Number(paymentAmount);
+        if (!Number.isFinite(entered) || entered <= 0) {
+          toast.error("Enter a payment amount greater than RM0.");
+          return false;
+        }
+        if (entered > invoiceTotal + 0.005) {
+          toast.error(
+            `Payment cannot exceed the RM${invoiceTotal.toFixed(2)} invoice total.`
+          );
+          return false;
+        }
+      }
     }
     return true;
   };
@@ -1082,7 +1118,10 @@ const InvoiceFormPage: React.FC = () => {
               const pData: CreateGreenTargetPaymentInput = {
                 invoice_id: navId,
                 payment_date: inheritedReceivedDate,
-                amount_paid: totalAmount,
+                amount_paid:
+                  paymentAmount.trim() === ""
+                    ? totalAmount
+                    : Math.round(Number(paymentAmount) * 100) / 100,
                 payment_method: effectivePaymentMethod,
                 payment_reference: joinedPaymentReceipt
                   ? joinedPaymentReceipt.payment_reference
@@ -1270,25 +1309,20 @@ const InvoiceFormPage: React.FC = () => {
 
             {/* Invoice Date */}
             <div className="space-y-2">
-              <label
-                htmlFor="date_issued"
-                className="block text-sm font-medium text-default-700 dark:text-gray-200"
-              >
+              <span className="block text-sm font-medium text-default-700 dark:text-gray-200">
                 Invoice Date <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                id="date_issued"
-                name="date_issued"
-                value={formData.date_issued}
-                onChange={handleInputChange}
+              </span>
+              <TimeNavigator
+                range={{
+                  start: fromLocalDateInputValue(formData.date_issued),
+                  end: fromLocalDateInputValue(formData.date_issued),
+                }}
+                onChange={handleDateIssuedChange}
+                modes={["day"]}
+                presets={false}
+                allowFuture
+                size="md"
                 disabled={isSaving || documentIdentityLocked}
-                required
-                className={clsx(
-                  "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
-                  "bg-white dark:bg-gray-700",
-                  "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
-                )}
               />
             </div>
           </div>
@@ -1476,14 +1510,17 @@ const InvoiceFormPage: React.FC = () => {
                                       </div>
                                       <div>
                                         <div className="font-medium text-gray-900 dark:text-gray-100">
-                                          Rental #{rental.rental_id} - Dumpster{" "}
-                                          {rental.tong_no}
+                                          Rental #{rental.rental_id}
+                                          {rental.tong_no
+                                            ? ` - Dumpster ${rental.tong_no}`
+                                            : ""}
                                         </div>
                                         <div className="text-sm text-gray-500 dark:text-gray-400">
-                                          Placed:{" "}
-                                          {new Date(
-                                            rental.date_placed
-                                          ).toLocaleDateString()}
+                                          {rental.date_placed
+                                            ? `Placed: ${new Date(
+                                                rental.date_placed
+                                              ).toLocaleDateString()}`
+                                            : "No placement date"}
                                           {locationDisplay &&
                                             ` • ${locationDisplay}`}
                                         </div>
@@ -1571,18 +1608,24 @@ const InvoiceFormPage: React.FC = () => {
                           <div className="flex justify-between items-start">
                             <div>
                               <div className="font-medium text-gray-900 dark:text-gray-100">
-                                Rental #{rental.rental_id} - Dumpster{" "}
-                                {rental.tong_no}
+                                Rental #{rental.rental_id}
+                                {rental.tong_no
+                                  ? ` - Dumpster ${rental.tong_no}`
+                                  : ""}
                               </div>
                               <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
                                 <span>Driver: {rental.driver}</span>
-                                <span className="mx-2">•</span>
-                                <span>
-                                  Placed:{" "}
-                                  {new Date(
-                                    rental.date_placed
-                                  ).toLocaleDateString()}
-                                </span>
+                                {rental.date_placed && (
+                                  <>
+                                    <span className="mx-2">•</span>
+                                    <span>
+                                      Placed:{" "}
+                                      {new Date(
+                                        rental.date_placed
+                                      ).toLocaleDateString()}
+                                    </span>
+                                  </>
+                                )}
                                 {rental.date_picked && (
                                   <>
                                     <span className="mx-2">•</span>
@@ -1837,6 +1880,37 @@ const InvoiceFormPage: React.FC = () => {
                       "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                     )}
                   />
+                </div>
+                <div className="space-y-2">
+                  <label
+                    htmlFor="payment_amount_paid"
+                    className="block text-sm font-medium text-default-700 dark:text-gray-200"
+                  >
+                    Amount Received
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    id="payment_amount_paid"
+                    name="payment_amount_paid"
+                    value={paymentAmount}
+                    onChange={(
+                      event: React.ChangeEvent<HTMLInputElement>
+                    ): void => setPaymentAmount(event.target.value)}
+                    placeholder={(
+                      formData.amount_before_tax + formData.tax_amount
+                    ).toFixed(2)}
+                    className={clsx(
+                      "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
+                      "bg-white dark:bg-gray-700",
+                      "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                    )}
+                  />
+                  <p className="text-xs text-default-500 dark:text-gray-400">
+                    Leave blank for the full invoice. Enter less to record a
+                    part payment and leave the balance outstanding.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <label

@@ -47,12 +47,13 @@ for (const group of uc.groups) {
     );
   }
   if (group.key === "expenses") {
+    const sub = group.subtotal.amount;
     const t = targets["EXPENSES SUBTOTAL"];
     console.log(
-      `  SUBTOTAL ${group.total.toFixed(2)} ${
-        Math.abs(group.total - t) < 0.005
+      `  SUBTOTAL ${sub.toFixed(2)} ${
+        Math.abs(sub - t) < 0.005
           ? "OK"
-          : `DIFF legacy=${t} delta=${(group.total - t).toFixed(2)}`
+          : `DIFF legacy=${t} delta=${(sub - t).toFixed(2)}`
       }`
     );
   }
@@ -61,14 +62,14 @@ console.log(`\nMACHINE REPAIR rows:`);
 for (const row of uc.machineRepair.rows ?? []) {
   console.log(`  ${row.code ?? "-"} | ${row.description} | ${row.amount.toFixed(2)}`);
 }
-const mr = uc.machineRepair.total;
+const mr = uc.machineRepair.amount;
 const mrt = targets["MACHINE REPAIR"];
 console.log(
   `  TOTAL ${mr.toFixed(2)} ${Math.abs(mr - mrt) < 0.005 ? "OK" : `DIFF legacy=${mrt} delta=${(mr - mrt).toFixed(2)}`}`
 );
-console.log(`\nTOTAL before repair: ${uc.totalAmount?.toFixed?.(2)}`);
-console.log(`TOTAL incl repair: ${uc.totalWithRepair?.toFixed?.(2)}`);
-console.log(`addBack: ${JSON.stringify(uc.addBack)}`);
+console.log(`\nTOTAL before repair: ${uc.totalBeforeRepair.amount.toFixed(2)}`);
+console.log(`TOTAL incl repair: ${uc.total.amount.toFixed(2)}`);
+console.log(`addBack: ${uc.addBack.amount.toFixed(2)}`);
 console.log(`finalUnitCost: ${uc.finalUnitCost}`);
-console.log(`productionBags: ${rep.productionBags}`);
+console.log(`productionBags: ${uc.production.bags}`);
 await pool.end();

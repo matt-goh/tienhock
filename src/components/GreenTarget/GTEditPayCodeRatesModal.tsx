@@ -11,10 +11,20 @@ import {
   Dialog,
   DialogPanel,
   DialogTitle,
+  Listbox,
+  ListboxButton,
+  ListboxOption,
+  ListboxOptions,
   Transition,
   TransitionChild,
 } from "@headlessui/react";
-import { IconRotateClockwise, IconTrash, IconPlus } from "@tabler/icons-react";
+import {
+  IconCheck,
+  IconChevronDown,
+  IconRotateClockwise,
+  IconTrash,
+  IconPlus,
+} from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 
@@ -62,6 +72,76 @@ const fmtScheduled = (
   return rate === null
     ? `(${inheritedLabel} ${formatRate(base)})`
     : rate.toFixed(2);
+};
+
+interface MonthListboxProps {
+  /** 1-12 as a string, matching the schedule form state. */
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}
+
+/**
+ * Compact month picker sized to match the xs inputs beside it. The options
+ * list is anchored (portalled) so it is not clipped by the modal panel's
+ * overflow-hidden, and it opens upward when there is no room below.
+ */
+const MonthListbox: React.FC<MonthListboxProps> = ({
+  value,
+  onChange,
+  disabled = false,
+}) => {
+  const { t } = useTranslation("common");
+  const selected = MONTHS[parseInt(value, 10) - 1];
+  return (
+    <Listbox value={value} onChange={onChange} disabled={disabled}>
+      <div className="relative">
+        <ListboxButton className="flex w-full items-center justify-between rounded border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-left text-xs text-gray-900 dark:text-gray-100 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-50">
+          <span className="truncate">{selected ? t(selected) : ""}</span>
+          <IconChevronDown
+            size={14}
+            className="ml-1 shrink-0 text-gray-400 dark:text-gray-500"
+            aria-hidden="true"
+          />
+        </ListboxButton>
+        <ListboxOptions
+          anchor="bottom start"
+          className="z-[70] w-[var(--button-width)] [--anchor-gap:0.25rem] max-h-56 overflow-auto rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-1 text-xs shadow-lg focus:outline-none"
+        >
+          {MONTHS.map((month, index) => (
+            <ListboxOption
+              key={month}
+              value={(index + 1).toString()}
+              className={({ focus }) =>
+                `relative cursor-pointer select-none py-1.5 pl-7 pr-3 ${
+                  focus
+                    ? "bg-sky-50 dark:bg-sky-900/30 text-sky-900 dark:text-sky-100"
+                    : "text-default-900 dark:text-gray-100"
+                }`
+              }
+            >
+              {({ selected: isSelected }) => (
+                <>
+                  {isSelected && (
+                    <span className="absolute inset-y-0 left-2 flex items-center text-sky-600 dark:text-sky-300">
+                      <IconCheck size={13} />
+                    </span>
+                  )}
+                  <span
+                    className={`block truncate ${
+                      isSelected ? "font-medium" : "font-normal"
+                    }`}
+                  >
+                    {t(month)}
+                  </span>
+                </>
+              )}
+            </ListboxOption>
+          ))}
+        </ListboxOptions>
+      </div>
+    </Listbox>
+  );
 };
 
 interface GTRateSchedulePanelProps {
@@ -240,18 +320,13 @@ const GTRateSchedulePanel: React.FC<GTRateSchedulePanelProps> = ({
           <label className="block text-xs text-default-500 dark:text-gray-400">
             {t("From")}
           </label>
-          <select
-            value={form.month}
-            onChange={(e) => setForm((p) => ({ ...p, month: e.target.value }))}
-            className="mt-1 w-full rounded border border-default-300 dark:border-gray-600 p-1 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-            disabled={saving}
-          >
-            {MONTHS.map((m, i) => (
-              <option key={m} value={i + 1}>
-                {t(m)}
-              </option>
-            ))}
-          </select>
+          <div className="mt-1">
+            <MonthListbox
+              value={form.month}
+              onChange={(month) => setForm((p) => ({ ...p, month }))}
+              disabled={saving}
+            />
+          </div>
         </div>
         <div className="col-span-3">
           <label className="block text-xs text-default-500 dark:text-gray-400">
@@ -601,7 +676,7 @@ const GTEditPayCodeRatesModal: React.FC<GTEditPayCodeRatesModalProps> = ({
                   )}
                 </div>
 
-                <div className="flex justify-end space-x-3 mt-1">
+                <div className="mt-6 flex justify-end space-x-3 border-t border-gray-100 dark:border-gray-700 pt-4">
                   <Button
                     type="button"
                     variant="outline"

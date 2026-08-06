@@ -39,6 +39,10 @@ import GTReceiptJoinPanel, {
   useGTReceiptJoinLookup,
 } from "../../../components/GreenTarget/GTReceiptJoinPanel";
 import { formatLocationDisplay } from "../../../utils/greenTarget/formatLocationDisplay";
+import {
+  getRentalBillingStatus,
+  RentalBillingStatus,
+} from "../../../utils/greenTarget/rentalBillingStatus";
 import { toCents } from "../../../utils/moneyUtils";
 import type {
   GreenTargetPayment,
@@ -62,10 +66,11 @@ interface RentalDetails {
   location_id: number | null;
   location_site: string | null;
   location_address: string | null;
-  tong_no: string;
-  dumpster_status: string;
+  // The dumpster and both dates are optional Green Target metadata.
+  tong_no: string | null;
+  dumpster_status: string | null;
   driver: string;
-  date_placed: string;
+  date_placed: string | null;
   date_picked: string | null;
   remarks: string | null;
   pickup_destination: string | null;
@@ -104,8 +109,8 @@ interface RentalDetailsResponse {
 
 interface CustomerRentalOption {
   rental_id: number;
-  tong_no: string;
-  date_placed: string;
+  tong_no: string | null;
+  date_placed: string | null;
   date_picked: string | null;
   location_site: string | null;
   location_address: string | null;
@@ -321,10 +326,27 @@ const RentalDetailsPage: React.FC = () => {
     (invoice) => invoice.status !== "cancelled"
   );
 
+  // Still gates "Mark as Picked Up"; the headline badge reports billing status.
   const isActive: boolean = rental
     ? !rental.date_picked ||
       toLocalDateString(rental.date_picked) > format(new Date(), "yyyy-MM-dd")
     : false;
+
+  // The rental dates are optional now, so the rental's headline status reports
+  // where it stands in the invoice -> payment chain. The best (non-cancelled)
+  // linked invoice drives it, matching the rental list's card badge.
+  const billingInvoice: LinkedInvoice | undefined = invoices.find(
+    (invoice) => invoice.status !== "cancelled"
+  );
+  const billingStatus: RentalBillingStatus = getRentalBillingStatus(
+    billingInvoice
+      ? {
+          status: billingInvoice.status,
+          amount: billingInvoice.total_amount,
+          balance_due: billingInvoice.balance_due,
+        }
+      : null
+  );
 
   // --- Create Invoice modal ---
 
@@ -673,7 +695,8 @@ const RentalDetailsPage: React.FC = () => {
     }
 
     const today = format(new Date(), "yyyy-MM-dd");
-    if (toLocalDateString(rental.date_placed) > today) {
+    // A rental with no placement date has no lower bound to check against.
+    if (rental.date_placed && toLocalDateString(rental.date_placed) > today) {
       toast.error("Pickup date cannot be earlier than placement date");
       setIsPickupDialogOpen(false);
       return;
@@ -757,17 +780,14 @@ const RentalDetailsPage: React.FC = () => {
             Rental #{rental.rental_id}
           </h1>
           <span
-            className={`text-sm px-2.5 py-0.5 rounded-full font-medium ${
-              isActive
-                ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400"
-                : "bg-default-100 dark:bg-gray-700 text-default-600 dark:text-gray-400"
-            }`}
+            className={`text-sm px-2.5 py-0.5 rounded-full font-medium ${billingStatus.badgeClassName}`}
           >
-            {isActive ? "Active" : "Picked Up"}
+            {billingStatus.label}
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {isActive && (
+          {/* Only a rental that was actually placed on a date can be picked up. */}
+          {rental.date_placed && isActive && (
             <Button
               onClick={openPickupDialog}
               icon={IconTruck}
@@ -841,7 +861,7 @@ const RentalDetailsPage: React.FC = () => {
               Tong No
             </p>
             <p className="font-medium text-default-800 dark:text-gray-200">
-              {rental.tong_no}
+              {rental.tong_no || "-"}
             </p>
           </div>
           <div>
@@ -1295,7 +1315,10 @@ const RentalDetailsPage: React.FC = () => {
                               )}
                               <div className="min-w-0 flex-1">
                                 <p className="text-sm font-medium text-default-800 dark:text-gray-200 truncate">
-                                  #{option.rental_id} — Tong {option.tong_no}
+                                  #{option.rental_id}
+                                  {option.tong_no
+                                    ? ` — Tong ${option.tong_no}`
+                                    : ""}
                                   {isCurrent && (
                                     <span className="ml-2 text-xs text-default-400 dark:text-gray-500">
                                       (this rental)
@@ -1303,7 +1326,11 @@ const RentalDetailsPage: React.FC = () => {
                                   )}
                                 </p>
                                 <p className="text-xs text-default-500 dark:text-gray-400 truncate">
-                                  Placed {formatDisplayDate(option.date_placed)}
+                                  {option.date_placed
+                                    ? `Placed ${formatDisplayDate(
+                                        option.date_placed
+                                      )}`
+                                    : "No placement date"}
                                   {optionLocation
                                     ? ` • ${optionLocation}`
                                     : ""}

@@ -4,11 +4,6 @@ import { Page, StyleSheet, View, Text, Image } from "@react-pdf/renderer";
 import { InvoiceGT } from "../../../types/types";
 import { GREENTARGET_INFO } from "../../invoice/einvoice/companyInfo";
 import GreenTargetLogo from "../../GreenTargetLogo.png";
-import {
-  getPaperSizePreference,
-  getReactPdfPageSize,
-  type PdfPaperSize,
-} from "../../pdf/paperSize";
 
 // Define styles
 const styles = StyleSheet.create({
@@ -306,7 +301,11 @@ const generateStatementDescription = (invoice: InvoiceGT): string[] => {
       descriptions.push(desc);
     });
 
-    return descriptions;
+    // The dumpster is optional, so an invoice can be linked only to rentals
+    // with no tong. Fall through to the generic description rather than none.
+    if (descriptions.length > 0) {
+      return descriptions;
+    }
   }
   
   // Fallback to legacy single rental fields for backward compatibility (only for regular invoices)
@@ -326,7 +325,6 @@ const generateStatementDescription = (invoice: InvoiceGT): string[] => {
 interface GTStatementPDFProps {
   invoice: InvoiceGT;
   qrCodeData?: string | null;
-  paperSize?: PdfPaperSize;
   statementDetails?: Array<{
     date: string;
     description: string;
@@ -339,9 +337,7 @@ interface GTStatementPDFProps {
 const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
   invoice,
   statementDetails = [],
-  paperSize,
 }) => {
-  const effectivePaperSize = paperSize ?? getPaperSizePreference();
   // Generate dynamic descriptions based on rental details
   const descriptions = generateStatementDescription(invoice);
   
@@ -376,7 +372,7 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
 
   return (
     // Page is the main flex container (column)
-    <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
+    <Page size="A4" style={styles.page}>
       {/* --- Static Header Content (flexShrink: 0) --- */}
       <View style={styles.header}>
         <View style={styles.companySection}>

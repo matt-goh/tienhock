@@ -15,11 +15,6 @@ import {
 import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
-import {
-  getPaperSizePreference,
-  getReactPdfPageSize,
-  PdfPaperSize,
-} from "../pdf/paperSize";
 
 export interface TxnHistoryRow {
   date: string; // formatted dd/mm/yyyy
@@ -163,12 +158,10 @@ const fmt = (amount: number): string =>
     maximumFractionDigits: 2,
   });
 
-const TransactionHistoryPDF: React.FC<{
-  data: TransactionHistoryData;
-  paperSize?: PdfPaperSize;
-}> = ({ data, paperSize }) => {
+const TransactionHistoryPDF: React.FC<{ data: TransactionHistoryData }> = ({
+  data,
+}) => {
   const { customer, periodLabel, rows, summary } = data;
-  const effectivePaperSize = paperSize ?? getPaperSizePreference();
 
   const totalDebit = rows.reduce(
     (s, r) => s + (r.direction === "debit" ? r.amount : 0),
@@ -181,7 +174,7 @@ const TransactionHistoryPDF: React.FC<{
 
   return (
     <Document title={`Transaction History - ${customer.id} - ${periodLabel}`}>
-      <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
+      <Page size="A4" style={styles.page}>
         {/* Company Header */}
         <View style={styles.header}>
           <Image src={TienHockLogo} style={styles.logo} />
@@ -290,10 +283,9 @@ const TransactionHistoryPDF: React.FC<{
 
 export const generateTransactionHistoryPDF = async (
   data: TransactionHistoryData,
-  action: "download" | "print",
-  paperSize?: PdfPaperSize
+  action: "download" | "print"
 ): Promise<void> => {
-  const doc = <TransactionHistoryPDF data={data} paperSize={paperSize} />;
+  const doc = <TransactionHistoryPDF data={data} />;
   const pdfBlob = await pdf(doc).toBlob();
   const url = URL.createObjectURL(pdfBlob);
 

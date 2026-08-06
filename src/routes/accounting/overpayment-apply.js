@@ -92,6 +92,14 @@ export async function applyOverpayment(client, payload, userId) {
         { status: 400 }
       );
     }
+    if (inv.paymenttype === "CASH") {
+      throw Object.assign(
+        new Error(
+          `Cash bill ${a.invoice_id} is already collected and owes nothing — a held overpayment cannot be applied to it`
+        ),
+        { status: 400 }
+      );
+    }
     if (customerId === null) customerId = inv.customerid;
     if (inv.customerid !== customerId) {
       throw Object.assign(

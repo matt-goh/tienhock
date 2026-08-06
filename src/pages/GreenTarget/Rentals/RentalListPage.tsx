@@ -26,6 +26,10 @@ import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import { formatLocationDisplay } from "../../../utils/greenTarget/formatLocationDisplay";
+import {
+  getRentalBillingStatus,
+  RentalBillingStatus,
+} from "../../../utils/greenTarget/rentalBillingStatus";
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
 
@@ -46,10 +50,10 @@ interface Rental {
   location_address: string | null;
   location_site: string | null;
   location_phone_number: string | null;
-  tong_no: string;
-  dumpster_status: string;
+  tong_no: string | null;
+  dumpster_status: string | null;
   driver: string;
-  date_placed: string;
+  date_placed: string | null;
   date_picked: string | null;
   remarks: string | null;
   invoice_info?: {
@@ -57,6 +61,7 @@ interface Rental {
     invoice_number?: string;
     status: string;
     amount?: number;
+    balance_due?: number | string | null;
   } | null;
   pickup_destination?: string | null;
   pickup_destination_name?: string | null;
@@ -97,15 +102,17 @@ const RentalCard = ({
     return `${date.getDate()}/${date.getMonth() + 1}`;
   };
 
-  // Calculate rental duration in days
-  const calculateDuration = () => {
-    if (!rental.date_placed) return 0;
+  // Calculate rental duration in days. Without a placement date there is no
+  // period to measure.
+  const calculateDuration = (): number | null => {
+    if (!rental.date_placed) return null;
     const startDate = new Date(rental.date_placed);
     const endDate = rental.date_picked ? new Date(rental.date_picked) : new Date();
     const differenceInTime = endDate.getTime() - startDate.getTime();
     return Math.max(1, Math.ceil(differenceInTime / (1000 * 3600 * 24)));
   };
 
+  // Still drives the "Mark as Picked Up" action, but no longer the badge.
   const isActive = () => {
     if (!rental.date_picked) return true;
     const todayStr = format(new Date(), "yyyy-MM-dd");
@@ -115,6 +122,11 @@ const RentalCard = ({
 
   const activeStatus = isActive();
   const duration = calculateDuration();
+  // The rental dates are optional now, so the headline status reports where
+  // the rental stands in the invoice -> payment chain instead.
+  const billingStatus: RentalBillingStatus = getRentalBillingStatus(
+    rental.invoice_info
+  );
   const locationLabel = formatLocationDisplay(
     rental.location_site,
     rental.location_address
@@ -127,7 +139,13 @@ const RentalCard = ({
     <div
       className={`relative text-left rounded-lg overflow-hidden transition-all duration-200 cursor-pointer bg-white dark:bg-gray-800 border ${
         isCardHovered ? "shadow-md" : "shadow-sm"
-      } ${activeStatus ? "border-emerald-300 dark:border-emerald-600" : "border-default-200 dark:border-gray-700"}`}
+      } ${
+        billingStatus.key === "paid"
+          ? "border-emerald-300 dark:border-emerald-600"
+          : billingStatus.key === "overdue"
+          ? "border-rose-300 dark:border-rose-700"
+          : "border-default-200 dark:border-gray-700"
+      }`}
       onClick={handleClick}
       onMouseEnter={() => setIsCardHovered(true)}
       onMouseLeave={() => setIsCardHovered(false)}
@@ -139,19 +157,19 @@ const RentalCard = ({
             <span className="text-base font-semibold text-default-700 dark:text-gray-200">
               #{rental.rental_id}
             </span>
-            <span className="text-default-300 dark:text-gray-600">•</span>
-            <span className="font-medium text-default-800 dark:text-gray-100 text-base">
-              Tong {rental.tong_no}
-            </span>
+            {rental.tong_no && (
+              <>
+                <span className="text-default-300 dark:text-gray-600">•</span>
+                <span className="font-medium text-default-800 dark:text-gray-100 text-base">
+                  Tong {rental.tong_no}
+                </span>
+              </>
+            )}
           </div>
           <span
-            className={`text-sm px-2.5 py-0.5 rounded-full font-medium ${
-              activeStatus
-                ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400"
-                : "bg-default-100 dark:bg-gray-700 text-default-600 dark:text-gray-400"
-            }`}
+            className={`text-sm px-2.5 py-0.5 rounded-full font-medium ${billingStatus.badgeClassName}`}
           >
-            {activeStatus ? "Active" : "Completed"}
+            {billingStatus.label}
           </span>
         </div>
       </div>
@@ -206,10 +224,10 @@ const RentalCard = ({
               {formatDateShort(rental.date_picked)}
             </p>
           </div>
-          <div className={`text-center p-2.5 rounded-md border ${activeStatus ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800" : "bg-default-50 dark:bg-gray-900/50 border-default-200 dark:border-gray-700"}`}>
+          <div className={`text-center p-2.5 rounded-md border ${duration !== null && activeStatus ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800" : "bg-default-50 dark:bg-gray-900/50 border-default-200 dark:border-gray-700"}`}>
             <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-500 mb-0.5">Days</p>
-            <p className={`text-sm font-medium ${activeStatus ? "text-emerald-700 dark:text-emerald-400" : "text-default-800 dark:text-gray-200"}`}>
-              {duration}
+            <p className={`text-sm font-medium ${duration !== null && activeStatus ? "text-emerald-700 dark:text-emerald-400" : "text-default-800 dark:text-gray-200"}`}>
+              {duration ?? "-"}
             </p>
           </div>
         </div>
@@ -259,7 +277,8 @@ const RentalCard = ({
 
           {/* Right: Action buttons */}
           <div className="flex items-center gap-1">
-            {activeStatus && (
+            {/* Only a rental that was actually placed on a date can be picked up. */}
+            {rental.date_placed && activeStatus && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -326,7 +345,6 @@ const SCROLL_RESTORATION_KEY: string = "gt-rental-list";
 interface CachedRentalFilters {
   search: string;
   dateRange: RentalDateRange;
-  activeOnly: boolean;
   noInvoiceOnly: boolean;
   page: number;
 }
@@ -337,14 +355,13 @@ const parseCachedDate = (value: unknown): Date | null => {
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
-// Restores the search, date range, "Active Rentals Only" / "No Invoice Only"
-// toggles and page so opening a rental (or an invoice from a card) and coming
-// back lands on the same view.
+// Restores the search, date range, "No Invoice Only" toggle and page so
+// opening a rental (or an invoice from a card) and coming back lands on the
+// same view.
 const loadCachedFilters = (): CachedRentalFilters => {
   const fallback: CachedRentalFilters = {
     search: "",
     dateRange: getDefaultDateRange(),
-    activeOnly: false,
     noInvoiceOnly: false,
     page: 1,
   };
@@ -360,7 +377,6 @@ const loadCachedFilters = (): CachedRentalFilters => {
         start: parseCachedDate(parsed.start),
         end: parseCachedDate(parsed.end),
       },
-      activeOnly: parsed.activeOnly === true,
       noInvoiceOnly: parsed.noInvoiceOnly === true,
       page:
         typeof parsed.page === "number" && parsed.page >= 1 ? parsed.page : 1,
@@ -388,9 +404,6 @@ const RentalListPage = () => {
   );
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [activeOnly, setActiveOnly] = useState<boolean>(
-    () => loadCachedFilters().activeOnly
-  );
   const [noInvoiceOnly, setNoInvoiceOnly] = useState<boolean>(
     () => loadCachedFilters().noInvoiceOnly
   );
@@ -433,7 +446,6 @@ const RentalListPage = () => {
         page: currentPage,
         limit: ITEMS_PER_PAGE,
         ...(appliedSearch ? { search: appliedSearch } : {}),
-        ...(activeOnly ? { active_only: true } : {}),
         ...(noInvoiceOnly ? { no_invoice: true } : {}),
         ...(dateRange.start
           ? { start_date: format(dateRange.start, "yyyy-MM-dd") }
@@ -459,7 +471,7 @@ const RentalListPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, appliedSearch, activeOnly, noInvoiceOnly, dateRange]);
+  }, [currentPage, appliedSearch, noInvoiceOnly, dateRange]);
 
   useEffect(() => {
     fetchRentals();
@@ -477,7 +489,6 @@ const RentalListPage = () => {
           search: appliedSearch,
           start: dateRange.start ? dateRange.start.toISOString() : null,
           end: dateRange.end ? dateRange.end.toISOString() : null,
-          activeOnly,
           noInvoiceOnly,
           page: currentPage,
         })
@@ -485,7 +496,7 @@ const RentalListPage = () => {
     } catch (e) {
       console.error("Error caching rental filters:", e);
     }
-  }, [appliedSearch, dateRange, activeOnly, noInvoiceOnly, currentPage]);
+  }, [appliedSearch, dateRange, noInvoiceOnly, currentPage]);
 
   // Commit the typed search to the backend. Called on blur and on Enter.
   const commitSearch = () => {
@@ -508,11 +519,6 @@ const RentalListPage = () => {
 
   const clearDateRange = (): void => {
     setDateRange({ start: null, end: null });
-    setCurrentPage(1);
-  };
-
-  const handleActiveOnlyToggle = (): void => {
-    setActiveOnly((prev) => !prev);
     setCurrentPage(1);
   };
 
@@ -598,16 +604,18 @@ const RentalListPage = () => {
     // Get today's date in YYYY-MM-DD format
     const today = format(new Date(), "yyyy-MM-dd");
 
-    // Get placement date from the rental
-    const placementDate = new Date(rentalToPickup.date_placed);
-    const todayDate = new Date(today);
+    // Validate: ensure today is not before the placement date. A rental with
+    // no placement date has no lower bound to check against.
+    if (rentalToPickup.date_placed) {
+      const placementDate = new Date(rentalToPickup.date_placed);
+      const todayDate = new Date(today);
 
-    // Validate: ensure today is not before the placement date
-    if (todayDate < placementDate) {
-      toast.error("Pickup date cannot be earlier than placement date");
-      setIsPickupDialogOpen(false);
-      setRentalToPickup(null);
-      return;
+      if (todayDate < placementDate) {
+        toast.error("Pickup date cannot be earlier than placement date");
+        setIsPickupDialogOpen(false);
+        setRentalToPickup(null);
+        return;
+      }
     }
 
     setIsPickingUp(true);
@@ -620,7 +628,7 @@ const RentalListPage = () => {
 
       toast.success("Rental marked as picked up");
 
-      // Refetch: with "Active Rentals Only" on, this rental now drops out
+      // Refetch so the card reflects its new pickup date and destination
       fetchRentals();
     } catch (error) {
       console.error("Error updating rental:", error);
@@ -743,30 +751,6 @@ const RentalListPage = () => {
           Rentals ({totalItems})
         </h1>
         <div className="flex flex-col sm:flex-row gap-3 items-center justify-end ml-auto">
-          <div className="flex items-center">
-            <button
-              type="button"
-              onClick={handleActiveOnlyToggle}
-              className="p-2 rounded-full transition-opacity duration-200 hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 active:bg-default-200 flex items-center"
-            >
-              {activeOnly ? (
-                <IconSquareCheckFilled
-                  className="text-blue-600"
-                  width={20}
-                  height={20}
-                />
-              ) : (
-                <IconSquare
-                  className="text-default-400"
-                  width={20}
-                  height={20}
-                />
-              )}
-              <span className="ml-2 font-medium whitespace-nowrap">
-                Active Rentals Only
-              </span>
-            </button>
-          </div>
           <div className="flex items-center">
             <button
               type="button"
