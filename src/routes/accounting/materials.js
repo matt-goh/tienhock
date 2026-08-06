@@ -430,7 +430,9 @@ export default function (pool) {
 
       if (!product || product.type !== expectedProductType) {
         return res.status(400).json({
-          message: `Product must be a ${expectedProductType} product`,
+          code: "STOCK_KILANG_PRODUCT_MISMATCH",
+          product_ids: [product_id],
+          message: `${product_id} is not a ${expectedProductType} product (or no longer exists)`,
         });
       }
 
@@ -500,7 +502,10 @@ export default function (pool) {
     const client = await pool.connect();
 
     try {
-      const { year, month, product_line, entries } = req.body;
+      // validate_only lets the page check the products BEFORE it writes anything
+      // else, so a rejected Stock Kilang table never leaves the material rows
+      // above it half-saved.
+      const { year, month, product_line, entries, validate_only } = req.body;
       const yearNumber = Number(year);
       const monthNumber = Number(month);
       const expectedProductType = stockKilangProductTypes.get(product_line);
@@ -555,14 +560,24 @@ export default function (pool) {
         ])
       );
 
-      if (
-        normalizedEntries.some(
-          (entry) => productTypes.get(entry.product_id) !== expectedProductType
-        )
-      ) {
+      const mismatchedProductIds = productIds.filter(
+        (productId) => productTypes.get(productId) !== expectedProductType
+      );
+
+      if (mismatchedProductIds.length > 0) {
         return res.status(400).json({
-          message: `Every product must be a ${expectedProductType} product`,
+          code: "STOCK_KILANG_PRODUCT_MISMATCH",
+          product_ids: mismatchedProductIds,
+          message:
+            `Stock Kilang not saved: ${mismatchedProductIds.join(", ")} ` +
+            `${mismatchedProductIds.length === 1 ? "is" : "are"} not ${expectedProductType} ` +
+            `product${mismatchedProductIds.length === 1 ? "" : "s"} (or no longer exist). ` +
+            `The product list has been refreshed - check the table and save again.`,
         });
+      }
+
+      if (validate_only) {
+        return res.json({ message: "Stock Kilang entries are valid", valid: true });
       }
 
       await client.query("BEGIN");

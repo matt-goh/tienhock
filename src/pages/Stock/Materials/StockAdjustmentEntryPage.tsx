@@ -817,7 +817,19 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
   } | null>(null);
 
   const productType = activeTab === "bihun" ? "bh" : "mee";
-  const { products, isLoading: isLoadingProducts } = useProductsCache(productType);
+  const stockKilangProductType = activeTab === "bihun" ? "BH" : "MEE";
+  const {
+    products,
+    isLoading: isLoadingProducts,
+    refreshProducts,
+  } = useProductsCache(productType);
+  const stockKilangRequestRef = useRef<number>(0);
+  // Unsaved Stock Kilang edits carried across a forced product-list refresh. The
+  // key pins them to the tab and month they were keyed on.
+  const pendingStockKilangRef = useRef<{
+    key: string;
+    items: Map<string, StockKilangItem>;
+  } | null>(null);
 
   const year = selectedMonth.getFullYear();
   const month = selectedMonth.getMonth() + 1;
@@ -984,11 +996,22 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
       return;
     }
 
+    // The cached product list is filtered one render AFTER the tab changes, so
+    // right after a switch it still holds the other product line. Keep only this
+    // tab's products: a row of the wrong type would be rejected by the backend
+    // when the page is saved.
+    const lineProducts = products.filter(
+      (product) => product.type === stockKilangProductType
+    );
+    if (lineProducts.length === 0) return;
+
+    const requestId: number = ++stockKilangRequestRef.current;
     setIsLoadingStockKilang(true);
     try {
       const response = await api.get<StockKilangResponse>(
         `/api/materials/stock-kilang?year=${year}&month=${month}&product_line=${activeTab}`
       );
+      if (requestId !== stockKilangRequestRef.current) return;
       const entryMap: Map<string, StockKilangEntryRow> = new Map(
         (response.entries || []).map(
           (entry: StockKilangEntryRow): [string, StockKilangEntryRow] => [
@@ -998,7 +1021,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
         )
       );
 
-      const stockData: StockKilangItem[] = products.map((product) => {
+      const stockData: StockKilangItem[] = lineProducts.map((product) => {
         const entry: StockKilangEntryRow | undefined = entryMap.get(product.id);
         const quantity: number = makeNumber(entry?.quantity);
         const unitCost: number = entry
@@ -1014,16 +1037,42 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
         };
       });
 
-      setStockKilang(stockData);
+      // The server rows are the saved truth; edits kept from a refreshed product
+      // list are re-applied on top and stay marked unsaved.
+      const carried = pendingStockKilangRef.current;
+      pendingStockKilangRef.current = null;
+      const pendingEdits: Map<string, StockKilangItem> | null =
+        carried && carried.key === `${activeTab}-${year}-${month}` ? carried.items : null;
+
       setOriginalStockKilang(stockData.map((item: StockKilangItem) => ({ ...item })));
+      setStockKilang(
+        pendingEdits
+          ? stockData.map((item: StockKilangItem): StockKilangItem => {
+              const pending: StockKilangItem | undefined = pendingEdits.get(
+                item.product_id
+              );
+              return pending
+                ? {
+                    ...item,
+                    quantity: pending.quantity,
+                    unit_cost: pending.unit_cost,
+                    value: pending.quantity * pending.unit_cost,
+                  }
+                : item;
+            })
+          : stockData
+      );
     } catch (error: unknown) {
       console.error("Error fetching stock kilang:", error);
+      if (requestId !== stockKilangRequestRef.current) return;
       setStockKilang([]);
       setOriginalStockKilang([]);
     } finally {
-      setIsLoadingStockKilang(false);
+      if (requestId === stockKilangRequestRef.current) {
+        setIsLoadingStockKilang(false);
+      }
     }
-  }, [activeTab, products, isLoadingProducts, year, month]);
+  }, [activeTab, stockKilangProductType, products, isLoadingProducts, year, month]);
 
   useEffect(() => {
     fetchStockKilang();
@@ -1919,6 +1968,35 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     }
   };
 
+  // A rejected product id means this browser's cached product list is stale (the
+  // product was changed or removed on another machine), so pull a fresh list -
+  // fetchStockKilang then rebuilds the table without the offending row.
+  const refreshProductsAfterMismatch = async (error: unknown): Promise<void> => {
+    const code: string | undefined = (error as { data?: { code?: string } })?.data?.code;
+    if (code !== "STOCK_KILANG_PRODUCT_MISMATCH") return;
+
+    // Only the rejected row is dropped by the refresh; everything the user keyed
+    // is carried over so a whole column does not have to be typed again.
+    pendingStockKilangRef.current = {
+      key: `${activeTab}-${year}-${month}`,
+      items: new Map(
+        stockKilang
+          .filter((item: StockKilangItem) => isStockKilangRowDirty(item))
+          .map((item: StockKilangItem): [string, StockKilangItem] => [
+            item.product_id,
+            { ...item },
+          ])
+      ),
+    };
+
+    try {
+      await refreshProducts();
+    } catch (refreshError: unknown) {
+      console.error("Error refreshing products:", refreshError);
+      pendingStockKilangRef.current = null;
+    }
+  };
+
   const handleSaveStockKilangRow = async (
     item: StockKilangItem,
     event?: React.MouseEvent<HTMLButtonElement>
@@ -1956,6 +2034,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
       toast.error(
         error instanceof Error ? error.message : "Failed to save Stock Kilang row"
       );
+      await refreshProductsAfterMismatch(error);
     } finally {
       setRowSaving(rowKey, false);
     }
@@ -2001,8 +2080,35 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
       return;
     }
 
+    // Tracks whether the material half of the page has already been written, so a
+    // later failure can say what did and did not save.
+    let materialWritesDone = false;
+
     setIsSaving(true);
     try {
+      // Send every row (including zero-quantity price overrides); the backend
+      // keeps only rows with a quantity or a non-default unit cost.
+      const stockKilangEntries: StockKilangSaveEntry[] = hasStockKilangUnsavedChanges
+        ? stockKilang.map((item: StockKilangItem) => ({
+            product_id: item.product_id,
+            quantity: item.quantity,
+            unit_cost: item.unit_cost,
+          }))
+        : [];
+
+      // The two halves of this page are saved through separate endpoints, so the
+      // Stock Kilang products are checked BEFORE anything is written - otherwise
+      // a rejected table would leave the material rows above already saved.
+      if (stockKilangEntries.length > 0) {
+        await api.post("/api/materials/stock-kilang/batch", {
+          year,
+          month,
+          product_line: activeTab,
+          entries: stockKilangEntries,
+          validate_only: true,
+        });
+      }
+
       const variantNameUpdates: Promise<void>[] = [];
       const originalMap = new Map(originalMaterials.map((material) => [material.id, material]));
 
@@ -2030,6 +2136,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
 
       if (variantNameUpdates.length > 0) {
         await Promise.all(variantNameUpdates);
+        materialWritesDone = true;
       }
 
       // Only modified rows are sent. /stock/batch upserts or deletes each entry by
@@ -2068,19 +2175,10 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
 
       const response: MaterialStockBatchResponse =
         entries.length > 0 ? await saveMaterialStockEntries(entries) : {};
+      if (entries.length > 0) materialWritesDone = true;
       let stockKilangSaved = false;
 
-      if (hasStockKilangUnsavedChanges) {
-        // Send every row (including zero-quantity price overrides); the backend
-        // keeps only rows with a quantity or a non-default unit cost.
-        const stockKilangEntries: StockKilangSaveEntry[] = stockKilang.map(
-          (item: StockKilangItem) => ({
-            product_id: item.product_id,
-            quantity: item.quantity,
-            unit_cost: item.unit_cost,
-          })
-        );
-
+      if (stockKilangEntries.length > 0) {
         await api.post("/api/materials/stock-kilang/batch", {
           year,
           month,
@@ -2107,7 +2205,12 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     } catch (error: unknown) {
       console.error("Error saving stock entries:", error);
       const message = error instanceof Error ? error.message : "Failed to save stock adjustments";
-      toast.error(message);
+      toast.error(
+        materialWritesDone
+          ? `${message} The material rows above WERE saved.`
+          : `${message} Nothing was saved.`
+      );
+      await refreshProductsAfterMismatch(error);
     } finally {
       setIsSaving(false);
     }
