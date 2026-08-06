@@ -9,11 +9,6 @@ import {
 } from "../../invoice/einvoice/consolidatedReceiptGrouping";
 import GreenTargetLogo from "../../GreenTargetLogo.png";
 import { formatLocationDisplay } from "../formatLocationDisplay";
-import {
-  getPaperSizePreference,
-  getReactPdfPageSize,
-  PdfPaperSize,
-} from "../../pdf/paperSize";
 
 // Define styles
 const styles = StyleSheet.create({
@@ -412,11 +407,9 @@ const generateLineItems = (invoice: InvoiceGT): LineItem[] => {
 interface GTInvoicePDFProps {
   invoice: InvoiceGT;
   qrCodeData?: string | null;
-  paperSize?: PdfPaperSize;
 }
 
-const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice, qrCodeData, paperSize }) => {
-  const effectivePaperSize = paperSize ?? getPaperSizePreference();
+const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice, qrCodeData }) => {
   const hasValidEInvoice =
     invoice.uuid && invoice.long_id && invoice.einvoice_status === "valid";
   const isConsolidated =
@@ -449,7 +442,7 @@ const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice, qrCodeData, paperS
       : invoice.location_address || "-");
 
   return (
-    <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
+    <Page size={"A4"} style={styles.page}>
       {/* Header Section */}
       <View style={styles.header}>
         <View style={styles.companySection}>

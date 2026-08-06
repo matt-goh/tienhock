@@ -14,11 +14,6 @@ import {
 } from "@react-pdf/renderer";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfBlob } from "../pdfPrintFallback";
-import {
-  getPaperSizePreference,
-  getReactPdfPageSize,
-  type PdfPaperSize,
-} from "../pdf/paperSize";
 
 export interface OpeningBalancesPDFRow {
   code: string;
@@ -204,10 +199,7 @@ const formatLongDate = (iso: string): string => {
 
 const OpeningBalancesPDFDocument: React.FC<{
   data: OpeningBalancesPDFData;
-  paperSize?: PdfPaperSize;
-}> = ({ data, paperSize }) => {
-  const effectivePaperSize: PdfPaperSize =
-    paperSize ?? getPaperSizePreference();
+}> = ({ data }) => {
   const year: string = data.asOfDate.split("-")[0] || "";
 
   const totals = data.sections.reduce(
@@ -223,7 +215,7 @@ const OpeningBalancesPDFDocument: React.FC<{
 
   return (
     <Document>
-      <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
+      <Page size="A4" style={styles.page}>
         {/* Auditor header block */}
         <View style={styles.headerBlock}>
           <View style={styles.headerLine}>
@@ -320,11 +312,10 @@ const OpeningBalancesPDFDocument: React.FC<{
 };
 
 export const generateOpeningBalancesPDF = async (
-  data: OpeningBalancesPDFData,
-  paperSize?: PdfPaperSize
+  data: OpeningBalancesPDFData
 ): Promise<void> => {
   const blob: Blob = await pdf(
-    <OpeningBalancesPDFDocument data={data} paperSize={paperSize} />
+    <OpeningBalancesPDFDocument data={data} />
   ).toBlob();
 
   printPdfBlob(blob, "opening balances PDF");

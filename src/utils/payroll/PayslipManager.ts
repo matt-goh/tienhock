@@ -14,7 +14,6 @@ import {
   PayslipPrintMode,
 } from "./PaySlipPDFMake";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
-import { PdfPaperSize } from "../pdf/paperSize";
 
 export type PayslipCompany = "tienhock" | "jellypolly";
 
@@ -33,7 +32,6 @@ export interface PrintOptions {
   // Which slip(s) to print. Print flows default to "individual" (per-job
   // breakdowns) since that's what HR prints most of the time.
   mode?: PayslipPrintMode;
-  paperSize?: PdfPaperSize;
   onBeforePrint?: () => void;
   onAfterPrint?: () => void;
   onError?: (error: Error) => void;
@@ -45,7 +43,6 @@ export interface DownloadOptions {
   company?: PayslipCompany;
   fileName?: string;
   midMonthPayroll?: MidMonthPayroll | null;
-  paperSize?: PdfPaperSize;
   onBeforeDownload?: () => void;
   onAfterDownload?: () => void;
   onError?: (error: Error) => void;
@@ -57,8 +54,7 @@ const generatePayslipPDF = async (
   staffDetails?: StaffDetails,
   companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
   midMonthPayroll?: MidMonthPayroll | null,
-  mode: PayslipPrintMode = "both",
-  paperSize?: PdfPaperSize
+  mode: PayslipPrintMode = "both"
 ): Promise<Blob> => {
   return await getPaySlipPDFBlob({
     payroll,
@@ -66,7 +62,6 @@ const generatePayslipPDF = async (
     staffDetails,
     midMonthPayroll,
     mode,
-    paperSize,
   });
 };
 
@@ -177,16 +172,14 @@ const generateBatchPayslipPDF = async (
   staffDetailsMap?: Record<string, StaffDetails>,
   companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
   midMonthPayrollsMap?: Record<string, MidMonthPayroll | null>,
-  mode: PayslipPrintMode = "both",
-  paperSize?: PdfPaperSize
+  mode: PayslipPrintMode = "both"
 ): Promise<Blob> => {
   return await getBatchPaySlipPDFBlob(
     payrolls,
     staffDetailsMap,
     companyName,
     midMonthPayrollsMap,
-    mode,
-    paperSize
+    mode
   );
 };
 
@@ -201,7 +194,6 @@ export const downloadPayslip = async (
     company = "tienhock",
     fileName,
     midMonthPayroll,
-    paperSize,
     onBeforeDownload,
     onAfterDownload,
     onError,
@@ -230,8 +222,7 @@ export const downloadPayslip = async (
       staffDetails,
       companyName,
       effectiveMidMonthPayroll,
-      "both",
-      paperSize
+      "both"
     );
     const defaultFileName = `PaySlip-${completePayroll.employee_id}-${completePayroll.year}-${completePayroll.month}.pdf`;
     const finalFileName = fileName || defaultFileName;
@@ -271,7 +262,6 @@ export const downloadBatchPayslips = async (
     company = "tienhock",
     fileName,
     midMonthPayrollsMap,
-    paperSize,
     onBeforeDownload,
     onAfterDownload,
     onError,
@@ -337,8 +327,7 @@ export const downloadBatchPayslips = async (
       staffDetailsMap,
       companyName,
       effectiveMidMonthMap,
-      "both",
-      paperSize
+      "both"
     );
 
     // Get month/year info from the first payroll
@@ -409,7 +398,6 @@ export const printPayslip = async (
     company = "tienhock",
     midMonthPayroll,
     mode = "individual",
-    paperSize,
     onBeforePrint,
     onAfterPrint,
     onError,
@@ -446,8 +434,7 @@ export const printPayslip = async (
       staffDetails,
       companyName,
       effectiveMidMonthPayroll,
-      mode,
-      paperSize
+      mode
     );
     notifyPrintMode(completePayroll, mode);
     pdfUrl = URL.createObjectURL(blob);
@@ -498,7 +485,6 @@ export const printBatchPayslips = async (
     company = "tienhock",
     midMonthPayrollsMap,
     mode = "individual",
-    paperSize,
     onBeforePrint,
     onAfterPrint,
     onError,
@@ -570,8 +556,7 @@ export const printBatchPayslips = async (
       staffDetailsMap,
       companyName,
       effectiveMidMonthMap,
-      mode,
-      paperSize
+      mode
     );
 
     // Mode feedback, only when the batch contains multi-job staff (for everyone

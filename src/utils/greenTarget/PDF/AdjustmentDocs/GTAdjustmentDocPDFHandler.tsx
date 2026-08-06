@@ -10,7 +10,6 @@ import {
   prepareGTAdjustmentDocPDFData,
 } from "../../../../services/gt-adjustment-doc-pdf.service";
 import { generateQRDataUrl } from "../../../invoice/einvoice/generateQRCode";
-import type { PdfPaperSize } from "../../../pdf/paperSize";
 import toast from "react-hot-toast";
 
 /**
@@ -19,8 +18,7 @@ import toast from "react-hot-toast";
  * QR code.
  */
 export const buildGTAdjustmentDocPDFDocument = async (
-  docs: GTAdjustmentDocFull[],
-  paperSize?: PdfPaperSize
+  docs: GTAdjustmentDocFull[]
 ): Promise<React.ReactElement> => {
   const prepared = await Promise.all(
     docs.map(async (doc) => {
@@ -46,22 +44,16 @@ export const buildGTAdjustmentDocPDFDocument = async (
       title={generateGTAdjustmentDocPDFFilename(docs).replace(".pdf", "")}
     >
       {prepared.map(({ doc, data, qrCodeData }) => (
-        <GTAdjustmentDocPDF
-          key={doc.id}
-          data={data}
-          qrCodeData={qrCodeData}
-          paperSize={paperSize}
-        />
+        <GTAdjustmentDocPDF key={doc.id} data={data} qrCodeData={qrCodeData} />
       ))}
     </Document>
   );
 };
 
 export const generateGTAdjustmentDocPDFBlob = async (
-  docs: GTAdjustmentDocFull[],
-  paperSize?: PdfPaperSize
+  docs: GTAdjustmentDocFull[]
 ): Promise<Blob> => {
-  const document = await buildGTAdjustmentDocPDFDocument(docs, paperSize);
+  const document = await buildGTAdjustmentDocPDFDocument(docs);
   return pdf(document).toBlob();
 };
 

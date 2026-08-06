@@ -11,11 +11,6 @@ import {
 import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfBlob } from "../pdfPrintFallback";
-import {
-  getPaperSizePreference,
-  getReactPdfPageSize,
-  type PdfPaperSize,
-} from "../pdf/paperSize";
 
 const colors = {
   textPrimary: "#0f172a",
@@ -196,14 +191,12 @@ const formatCurrency = (amount: number): string => {
 
 interface CogmPDFDocumentProps {
   data: CogmData;
-  paperSize?: PdfPaperSize;
 }
 
-const CogmPDFDocument: React.FC<CogmPDFDocumentProps> = ({ data, paperSize }) => {
-  const effectivePaperSize = paperSize ?? getPaperSizePreference();
+const CogmPDFDocument: React.FC<CogmPDFDocumentProps> = ({ data }) => {
   return (
     <Document>
-      <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
+      <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
           <Image src={TienHockLogo} style={styles.logo} />
@@ -334,13 +327,8 @@ const CogmPDFDocument: React.FC<CogmPDFDocumentProps> = ({ data, paperSize }) =>
   );
 };
 
-export const generateCogmPDF = async (
-  data: CogmData,
-  paperSize?: PdfPaperSize
-): Promise<void> => {
-  const blob = await pdf(
-    <CogmPDFDocument data={data} paperSize={paperSize} />
-  ).toBlob();
+export const generateCogmPDF = async (data: CogmData): Promise<void> => {
+  const blob = await pdf(<CogmPDFDocument data={data} />).toBlob();
 
   printPdfBlob(blob, "COGM PDF");
 };
