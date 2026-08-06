@@ -1,0 +1,10 @@
+{
+  "comment": "Presentation fold for the monthly legacy-vs-ERP tie-out. The legacy Trial Balance print (i) renames a few account codes and (ii) prints one DEBTOR control row where the ERP carries one DEBTOR child per customer. Joining without this fold produces pages of false differences. aliases: legacy printed code -> ERP code. foldIntoParent: ERP accounts whose parent_code is listed here are summed into the parent before comparing.",
+  "aliases": {
+    "PBB_1": "BANK_PBB",
+    "ABB": "BANK_ABB",
+    "HPA_SWJ988": "HPA_SWJ9882",
+    "HPB_SWJ988": "HPB_SWJ9882"
+  },
+  "foldIntoParent": ["DEBTOR"]
+}

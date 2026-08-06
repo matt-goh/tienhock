@@ -1,0 +1,1902 @@
+[
+ {
+  "code": "68-K",
+  "ytd_balance": 1060
+ },
+ {
+  "code": "AA",
+  "ytd_balance": 2430
+ },
+ {
+  "code": "AC",
+  "ytd_balance": 2000
+ },
+ {
+  "code": "ACD_PCB",
+  "ytd_balance": 7231.6
+ },
+ {
+  "code": "ACD_SAL",
+  "ytd_balance": -79261.19
+ },
+ {
+  "code": "ACD_SC",
+  "ytd_balance": -260.35
+ },
+ {
+  "code": "ACD_SIP",
+  "ytd_balance": 474.5
+ },
+ {
+  "code": "AC_LEVY",
+  "ytd_balance": -1323.24
+ },
+ {
+  "code": "AC_SESB",
+  "ytd_balance": -7249.95
+ },
+ {
+  "code": "AC_TM",
+  "ytd_balance": -1210.6
+ },
+ {
+  "code": "ACW_EPF",
+  "ytd_balance": -31301
+ },
+ {
+  "code": "ACW_PCB",
+  "ytd_balance": -9217.82
+ },
+ {
+  "code": "ACW_SAL",
+  "ytd_balance": -59027.75
+ },
+ {
+  "code": "ACW_SC",
+  "ytd_balance": -4415.3
+ },
+ {
+  "code": "ACW_SIP",
+  "ytd_balance": -963.1
+ },
+ {
+  "code": "AD_FB",
+  "ytd_balance": -442765.79
+ },
+ {
+  "code": "AD_FF",
+  "ytd_balance": -44413.97
+ },
+ {
+  "code": "AD_MV",
+  "ytd_balance": -1122950.84
+ },
+ {
+  "code": "AD_OE",
+  "ytd_balance": -240181.55
+ },
+ {
+  "code": "AD_PL",
+  "ytd_balance": -40053.2
+ },
+ {
+  "code": "AD_PM",
+  "ytd_balance": -1137175.87
+ },
+ {
+  "code": "AD_RV",
+  "ytd_balance": -809359.51
+ },
+ {
+  "code": "ALDIE",
+  "ytd_balance": 1860
+ },
+ {
+  "code": "ALI",
+  "ytd_balance": 2470
+ },
+ {
+  "code": "ANM",
+  "ytd_balance": 570
+ },
+ {
+  "code": "AYS",
+  "ytd_balance": 65
+ },
+ {
+  "code": "BANK_ABB",
+  "ytd_balance": 204.26
+ },
+ {
+  "code": "BANK_PBB",
+  "ytd_balance": 212738.37
+ },
+ {
+  "code": "BE_MB",
+  "ytd_balance": 14359
+ },
+ {
+  "code": "BE_PB",
+  "ytd_balance": 17156
+ },
+ {
+  "code": "BEST",
+  "ytd_balance": 10374.01
+ },
+ {
+  "code": "BL_MB",
+  "ytd_balance": 1031.7
+ },
+ {
+  "code": "BL_PB",
+  "ytd_balance": 1357.35
+ },
+ {
+  "code": "BRM",
+  "ytd_balance": 14417.1
+ },
+ {
+  "code": "BSC_MB",
+  "ytd_balance": 2586.6
+ },
+ {
+  "code": "BSC_PB",
+  "ytd_balance": 2212.3
+ },
+ {
+  "code": "BS_IL",
+  "ytd_balance": 18244.7
+ },
+ {
+  "code": "BSIP_MB",
+  "ytd_balance": 194
+ },
+ {
+  "code": "BSIP_PB",
+  "ytd_balance": 223.4
+ },
+ {
+  "code": "BS_MB",
+  "ytd_balance": 143310.1
+ },
+ {
+  "code": "BS_PB",
+  "ytd_balance": 138304.17
+ },
+ {
+  "code": "BS_SM",
+  "ytd_balance": 39225.83
+ },
+ {
+  "code": "BTFS",
+  "ytd_balance": 260
+ },
+ {
+  "code": "BTH135",
+  "ytd_balance": 520
+ },
+ {
+  "code": "BTHT15",
+  "ytd_balance": 260
+ },
+ {
+  "code": "BTISEKI",
+  "ytd_balance": 260
+ },
+ {
+  "code": "BTRA",
+  "ytd_balance": 2739
+ },
+ {
+  "code": "BTS-1B",
+  "ytd_balance": -654.63
+ },
+ {
+  "code": "BTS-BDS",
+  "ytd_balance": 1216.41
+ },
+ {
+  "code": "BTS-GM",
+  "ytd_balance": 1237.63
+ },
+ {
+  "code": "BTS-IP",
+  "ytd_balance": 508.7
+ },
+ {
+  "code": "BTS-ITCC",
+  "ytd_balance": 129.11
+ },
+ {
+  "code": "BTS-K",
+  "ytd_balance": 1290.27
+ },
+ {
+  "code": "BTS-KFS",
+  "ytd_balance": 508.43
+ },
+ {
+  "code": "BTS-KLB",
+  "ytd_balance": -376.62
+ },
+ {
+  "code": "BTS-KM",
+  "ytd_balance": 2298.11
+ },
+ {
+  "code": "BTS-KPY",
+  "ytd_balance": -78.72
+ },
+ {
+  "code": "BTS-KTU",
+  "ytd_balance": -835.29
+ },
+ {
+  "code": "BTS-MGT",
+  "ytd_balance": 172.94
+ },
+ {
+  "code": "BTS-PJ",
+  "ytd_balance": -212.07
+ },
+ {
+  "code": "BTS-PPR",
+  "ytd_balance": -27.2
+ },
+ {
+  "code": "BTS-PTT",
+  "ytd_balance": -672.82
+ },
+ {
+  "code": "BTS-PTTRW",
+  "ytd_balance": -186.83
+ },
+ {
+  "code": "BTS-SBLN",
+  "ytd_balance": 172.03
+ },
+ {
+  "code": "BTS-SK",
+  "ytd_balance": 750
+ },
+ {
+  "code": "BTS-SPN",
+  "ytd_balance": -88.73
+ },
+ {
+  "code": "BTS-TLP",
+  "ytd_balance": 782.1
+ },
+ {
+  "code": "BTS-TPR",
+  "ytd_balance": -15.6
+ },
+ {
+  "code": "BTS-WWS",
+  "ytd_balance": -144.31
+ },
+ {
+  "code": "CA_DPO",
+  "ytd_balance": 8900
+ },
+ {
+  "code": "CA_DSESB",
+  "ytd_balance": 3080
+ },
+ {
+  "code": "CA_HINO",
+  "ytd_balance": 5328
+ },
+ {
+  "code": "CA_MBHJ",
+  "ytd_balance": 7000.8
+ },
+ {
+  "code": "CASH_SALES",
+  "ytd_balance": -1251011.5
+ },
+ {
+  "code": "CA_WA",
+  "ytd_balance": 73070.24
+ },
+ {
+  "code": "C-CARE(1)",
+  "ytd_balance": 11788
+ },
+ {
+  "code": "C-CARE(2)",
+  "ytd_balance": 7443
+ },
+ {
+  "code": "C-CARE(3)",
+  "ytd_balance": 6570
+ },
+ {
+  "code": "C-CARE(4)",
+  "ytd_balance": 6650
+ },
+ {
+  "code": "C-CARE(5)",
+  "ytd_balance": 3645
+ },
+ {
+  "code": "C-CARE(6)",
+  "ytd_balance": 4860
+ },
+ {
+  "code": "C-CARE(7)",
+  "ytd_balance": 9510.2
+ },
+ {
+  "code": "C-CARE(8)",
+  "ytd_balance": 1710
+ },
+ {
+  "code": "C-CARE(9)",
+  "ytd_balance": 4294.5
+ },
+ {
+  "code": "CEMPADAK",
+  "ytd_balance": -0.7
+ },
+ {
+  "code": "CHEN",
+  "ytd_balance": 320
+ },
+ {
+  "code": "CHEONGSENG",
+  "ytd_balance": 8120
+ },
+ {
+  "code": "CH_REV1",
+  "ytd_balance": 34190.55
+ },
+ {
+  "code": "CH_REV2",
+  "ytd_balance": 117.55
+ },
+ {
+  "code": "CITY",
+  "ytd_balance": 870
+ },
+ {
+  "code": "CITY G",
+  "ytd_balance": -18
+ },
+ {
+  "code": "CKS-I",
+  "ytd_balance": 5.6
+ },
+ {
+  "code": "CKS-T",
+  "ytd_balance": -5.6
+ },
+ {
+  "code": "CL_ABB",
+  "ytd_balance": 182600.38
+ },
+ {
+  "code": "CL_AFI",
+  "ytd_balance": -25696.82
+ },
+ {
+  "code": "CL_GF",
+  "ytd_balance": 31696.82
+ },
+ {
+  "code": "CL_GT",
+  "ytd_balance": 12415.6
+ },
+ {
+  "code": "CL_GTH",
+  "ytd_balance": -995260.94
+ },
+ {
+  "code": "CL_GT(SEB)",
+  "ytd_balance": -4115.15
+ },
+ {
+  "code": "CL_JP",
+  "ytd_balance": -3126.15
+ },
+ {
+  "code": "CL_PB20",
+  "ytd_balance": -250095.13
+ },
+ {
+  "code": "CL_TAX",
+  "ytd_balance": 220650.97
+ },
+ {
+  "code": "CL_WSF",
+  "ytd_balance": -1581274.76
+ },
+ {
+  "code": "CR_BF",
+  "ytd_balance": 6500
+ },
+ {
+  "code": "CR_DX",
+  "ytd_balance": 0.02
+ },
+ {
+  "code": "CR_GEN",
+  "ytd_balance": 144.69
+ },
+ {
+  "code": "CR_JB",
+  "ytd_balance": -35000
+ },
+ {
+  "code": "CR_JM",
+  "ytd_balance": 912.5
+ },
+ {
+  "code": "CR_JP",
+  "ytd_balance": 8952
+ },
+ {
+  "code": "CR_KA",
+  "ytd_balance": 496
+ },
+ {
+  "code": "CR_KKR",
+  "ytd_balance": 55435
+ },
+ {
+  "code": "CR_KL",
+  "ytd_balance": 1690.7
+ },
+ {
+  "code": "CR_LD",
+  "ytd_balance": -25452.43
+ },
+ {
+  "code": "CR_MB",
+  "ytd_balance": 280
+ },
+ {
+  "code": "CR_MTT",
+  "ytd_balance": -211.8
+ },
+ {
+  "code": "CR_NS",
+  "ytd_balance": -55435
+ },
+ {
+  "code": "CR_PK",
+  "ytd_balance": 1150
+ },
+ {
+  "code": "CR_PN",
+  "ytd_balance": -24638.3
+ },
+ {
+  "code": "CR_QS",
+  "ytd_balance": 1070.68
+ },
+ {
+  "code": "CR_SALES",
+  "ytd_balance": -2809907.38
+ },
+ {
+  "code": "CR_SGEN",
+  "ytd_balance": 3000.1
+ },
+ {
+  "code": "CR_SSJ",
+  "ytd_balance": -4000
+ },
+ {
+  "code": "CR_SZ",
+  "ytd_balance": 101.25
+ },
+ {
+  "code": "CR_UN",
+  "ytd_balance": 6279.4
+ },
+ {
+  "code": "DF_TAX",
+  "ytd_balance": -26016.16
+ },
+ {
+  "code": "DYNASTY",
+  "ytd_balance": 1341.5
+ },
+ {
+  "code": "DYNASTY-2",
+  "ytd_balance": 828
+ },
+ {
+  "code": "ENZYME",
+  "ytd_balance": 178.4
+ },
+ {
+  "code": "FOOKHING",
+  "ytd_balance": 3348
+ },
+ {
+  "code": "FRESHMART",
+  "ytd_balance": 485
+ },
+ {
+  "code": "GD-KRT",
+  "ytd_balance": -18
+ },
+ {
+  "code": "GD-PPR",
+  "ytd_balance": -71.06
+ },
+ {
+  "code": "GL",
+  "ytd_balance": 6365
+ },
+ {
+  "code": "GOLDEN-D",
+  "ytd_balance": 79.86
+ },
+ {
+  "code": "GUI",
+  "ytd_balance": -0.15
+ },
+ {
+  "code": "GUI(3)",
+  "ytd_balance": 0.15
+ },
+ {
+  "code": "GUI(4)",
+  "ytd_balance": 8269
+ },
+ {
+  "code": "HAPHUAT",
+  "ytd_balance": 1230
+ },
+ {
+  "code": "HAPSENG",
+  "ytd_balance": 47567.39
+ },
+ {
+  "code": "HIAPLEE-K",
+  "ytd_balance": 6603
+ },
+ {
+  "code": "HIAPLEE-M",
+  "ytd_balance": 883.9
+ },
+ {
+  "code": "HIAPLEE-SC",
+  "ytd_balance": 780
+ },
+ {
+  "code": "HOCKSENG",
+  "ytd_balance": 1007
+ },
+ {
+  "code": "HPA_3080",
+  "ytd_balance": 134.5
+ },
+ {
+  "code": "HPA_HINO",
+  "ytd_balance": -21432
+ },
+ {
+  "code": "HPA_QCV920",
+  "ytd_balance": 12000
+ },
+ {
+  "code": "HPA_SWJ9882",
+  "ytd_balance": -112571.68
+ },
+ {
+  "code": "HPB_HINO",
+  "ytd_balance": 4027.87
+ },
+ {
+  "code": "HPB_SWJ9882",
+  "ytd_balance": 18809.47
+ },
+ {
+  "code": "H&R",
+  "ytd_balance": 786
+ },
+ {
+  "code": "IBRAHIM",
+  "ytd_balance": 914.4
+ },
+ {
+  "code": "IMBASJAYA",
+  "ytd_balance": 3420
+ },
+ {
+  "code": "INS1016",
+  "ytd_balance": 1944.22
+ },
+ {
+  "code": "INS6304",
+  "ytd_balance": 416.43
+ },
+ {
+  "code": "INS6389",
+  "ytd_balance": 748.15
+ },
+ {
+  "code": "INS6893",
+  "ytd_balance": 748.15
+ },
+ {
+  "code": "IQBAL",
+  "ytd_balance": 870
+ },
+ {
+  "code": "JL",
+  "ytd_balance": 643.5
+ },
+ {
+  "code": "JOJO",
+  "ytd_balance": 305
+ },
+ {
+  "code": "JP",
+  "ytd_balance": 738.4
+ },
+ {
+  "code": "KELUARGA",
+  "ytd_balance": 1655
+ },
+ {
+  "code": "KENGLEE",
+  "ytd_balance": 6630
+ },
+ {
+  "code": "KLIAS",
+  "ytd_balance": 67882.6
+ },
+ {
+  "code": "LAI",
+  "ytd_balance": 4986.36
+ },
+ {
+  "code": "LILI",
+  "ytd_balance": 12123.9
+ },
+ {
+  "code": "LKS",
+  "ytd_balance": 2982
+ },
+ {
+  "code": "MADINAH-N",
+  "ytd_balance": 3367.2
+ },
+ {
+  "code": "MBADV",
+  "ytd_balance": 300
+ },
+ {
+  "code": "MBBC",
+  "ytd_balance": 253.5
+ },
+ {
+  "code": "MBC",
+  "ytd_balance": 4909.3
+ },
+ {
+  "code": "MBDON",
+  "ytd_balance": 200
+ },
+ {
+  "code": "MBDRE",
+  "ytd_balance": 8814
+ },
+ {
+  "code": "MBDRS",
+  "ytd_balance": 67813.95
+ },
+ {
+  "code": "MBDRSC",
+  "ytd_balance": 963.3
+ },
+ {
+  "code": "MBDRSIP",
+  "ytd_balance": 51
+ },
+ {
+  "code": "MBE_IL",
+  "ytd_balance": 7923
+ },
+ {
+  "code": "MBE_JB",
+  "ytd_balance": 668
+ },
+ {
+  "code": "MBE_M",
+  "ytd_balance": 9468
+ },
+ {
+  "code": "MBE_O",
+  "ytd_balance": 20575
+ },
+ {
+  "code": "MBE_SM",
+  "ytd_balance": 10327
+ },
+ {
+  "code": "MBE_TS",
+  "ytd_balance": 1299
+ },
+ {
+  "code": "MBEW",
+  "ytd_balance": 93405.25
+ },
+ {
+  "code": "MBINS",
+  "ytd_balance": 217.36
+ },
+ {
+  "code": "MBKH",
+  "ytd_balance": 27125.3
+ },
+ {
+  "code": "MBLC",
+  "ytd_balance": 405
+ },
+ {
+  "code": "MBL_IL",
+  "ytd_balance": 604.44
+ },
+ {
+  "code": "MBL_JB",
+  "ytd_balance": 49.02
+ },
+ {
+  "code": "MBL_M",
+  "ytd_balance": 489.03
+ },
+ {
+  "code": "MBL_O",
+  "ytd_balance": 1958
+ },
+ {
+  "code": "MBLP",
+  "ytd_balance": 10
+ },
+ {
+  "code": "MBL_SM",
+  "ytd_balance": 752.19
+ },
+ {
+  "code": "MBL_TS",
+  "ytd_balance": 98.89
+ },
+ {
+  "code": "MBMED",
+  "ytd_balance": 4403.65
+ },
+ {
+  "code": "MBOR",
+  "ytd_balance": 8418.11
+ },
+ {
+  "code": "MBPS",
+  "ytd_balance": 3899.38
+ },
+ {
+  "code": "MBREN",
+  "ytd_balance": 8997.45
+ },
+ {
+  "code": "MBRM",
+  "ytd_balance": 5782.16
+ },
+ {
+  "code": "MBRMB",
+  "ytd_balance": 69796.8
+ },
+ {
+  "code": "MBRMF",
+  "ytd_balance": 35769.39
+ },
+ {
+  "code": "MBRMO",
+  "ytd_balance": 8708.7
+ },
+ {
+  "code": "MBSAF",
+  "ytd_balance": 9457.02
+ },
+ {
+  "code": "MBSC_IL",
+  "ytd_balance": 1064
+ },
+ {
+  "code": "MBSC_JB",
+  "ytd_balance": 66.1
+ },
+ {
+  "code": "MBSC_M",
+  "ytd_balance": 2523.15
+ },
+ {
+  "code": "MBSC_O",
+  "ytd_balance": 2979
+ },
+ {
+  "code": "MBSC_SM",
+  "ytd_balance": 1224.6
+ },
+ {
+  "code": "MBSC_TS",
+  "ytd_balance": 197.7
+ },
+ {
+  "code": "MBSEC",
+  "ytd_balance": 590
+ },
+ {
+  "code": "MBSF",
+  "ytd_balance": 4001.45
+ },
+ {
+  "code": "MBS_ILO",
+  "ytd_balance": 28402.92
+ },
+ {
+  "code": "MBSIP_IL",
+  "ytd_balance": 121.6
+ },
+ {
+  "code": "MBSIP_M",
+  "ytd_balance": 180.75
+ },
+ {
+  "code": "MBSIP_MM",
+  "ytd_balance": 162.2
+ },
+ {
+  "code": "MBSIP_O",
+  "ytd_balance": 340.4
+ },
+ {
+  "code": "MBSIP_PM",
+  "ytd_balance": 114.05
+ },
+ {
+  "code": "MBSIP_SM",
+  "ytd_balance": 100.8
+ },
+ {
+  "code": "MBSIP_TS",
+  "ytd_balance": 22.6
+ },
+ {
+  "code": "MBS_JB",
+  "ytd_balance": 29863.88
+ },
+ {
+  "code": "MBS_M",
+  "ytd_balance": 196739.22
+ },
+ {
+  "code": "MBSM_K",
+  "ytd_balance": 15957.69
+ },
+ {
+  "code": "MBSM_O",
+  "ytd_balance": 11160.8
+ },
+ {
+  "code": "MBSM_SM",
+  "ytd_balance": 14047.35
+ },
+ {
+  "code": "MBS_O",
+  "ytd_balance": 187848.5
+ },
+ {
+  "code": "MBS_SMO",
+  "ytd_balance": 10615.94
+ },
+ {
+  "code": "MBST",
+  "ytd_balance": 1300
+ },
+ {
+  "code": "MBS_TS",
+  "ytd_balance": 11338.8
+ },
+ {
+  "code": "MBTEL",
+  "ytd_balance": 8332.96
+ },
+ {
+  "code": "MBTRA",
+  "ytd_balance": 1538.32
+ },
+ {
+  "code": "MBWP",
+  "ytd_balance": 6815.8
+ },
+ {
+  "code": "MEEWOO-K",
+  "ytd_balance": 4223.25
+ },
+ {
+  "code": "MEEWOO-M",
+  "ytd_balance": 365
+ },
+ {
+  "code": "MEEWOO-W",
+  "ytd_balance": 1710
+ },
+ {
+  "code": "MELAWAR",
+  "ytd_balance": 3540.5
+ },
+ {
+  "code": "ME_MM",
+  "ytd_balance": 11244
+ },
+ {
+  "code": "ME_PM",
+  "ytd_balance": 8568
+ },
+ {
+  "code": "METRO",
+  "ytd_balance": 5035
+ },
+ {
+  "code": "MGT",
+  "ytd_balance": 28139.51
+ },
+ {
+  "code": "ML_MM",
+  "ytd_balance": 783.1
+ },
+ {
+  "code": "ML_PM",
+  "ytd_balance": 672
+ },
+ {
+  "code": "MORE",
+  "ytd_balance": 18164.6
+ },
+ {
+  "code": "MRM",
+  "ytd_balance": 23069.89
+ },
+ {
+  "code": "MSC_MM",
+  "ytd_balance": 1514.75
+ },
+ {
+  "code": "MSC_PM",
+  "ytd_balance": 1229.6
+ },
+ {
+  "code": "MS_IL",
+  "ytd_balance": 12859.43
+ },
+ {
+  "code": "MS_MM",
+  "ytd_balance": 78513.48
+ },
+ {
+  "code": "MS_PM",
+  "ytd_balance": 72131.85
+ },
+ {
+  "code": "MS_SM",
+  "ytd_balance": 29079.93
+ },
+ {
+  "code": "MTRA",
+  "ytd_balance": 607.7
+ },
+ {
+  "code": "MYSHOP",
+  "ytd_balance": 2423.5
+ },
+ {
+  "code": "MYSHOP(1)",
+  "ytd_balance": 2723.5
+ },
+ {
+  "code": "MYSHOP(2)",
+  "ytd_balance": 2335.4
+ },
+ {
+  "code": "MYSHOP(3)",
+  "ytd_balance": 684
+ },
+ {
+  "code": "MYSHOP(B)",
+  "ytd_balance": 2084
+ },
+ {
+  "code": "MYSHOP-BF",
+  "ytd_balance": 1091.7
+ },
+ {
+  "code": "MYSHOP(K)",
+  "ytd_balance": 1942
+ },
+ {
+  "code": "MYSHOP-K",
+  "ytd_balance": 4410
+ },
+ {
+  "code": "MYSHOP(K2)",
+  "ytd_balance": -60
+ },
+ {
+  "code": "MYSHOP(K3)",
+  "ytd_balance": 120
+ },
+ {
+  "code": "MYSHOP(K4)",
+  "ytd_balance": -60
+ },
+ {
+  "code": "MYSHOP-KBR",
+  "ytd_balance": 3768
+ },
+ {
+  "code": "MYSHOP(KM)",
+  "ytd_balance": 1144.65
+ },
+ {
+  "code": "MYSHOP-KM2",
+  "ytd_balance": 803.65
+ },
+ {
+  "code": "MYSHOP-KMB",
+  "ytd_balance": -0.1
+ },
+ {
+  "code": "MYSHOP(KV)",
+  "ytd_balance": 3563.8
+ },
+ {
+  "code": "MYSHOP(L)",
+  "ytd_balance": 1374
+ },
+ {
+  "code": "MYSHOP-LK",
+  "ytd_balance": 1658.7
+ },
+ {
+  "code": "MYSHOP(M)",
+  "ytd_balance": 2227
+ },
+ {
+  "code": "MYSHOP(MB)",
+  "ytd_balance": 684
+ },
+ {
+  "code": "MYSHOP-MB2",
+  "ytd_balance": 1197
+ },
+ {
+  "code": "MYSHOP-MTP",
+  "ytd_balance": 71.5
+ },
+ {
+  "code": "MYSHOP-NBZ",
+  "ytd_balance": 912.5
+ },
+ {
+  "code": "MYSHOP(P)",
+  "ytd_balance": 1638.15
+ },
+ {
+  "code": "MYSHOP-P2",
+  "ytd_balance": 900
+ },
+ {
+  "code": "MYSHOP-P4",
+  "ytd_balance": 2122.2
+ },
+ {
+  "code": "MYSHOP-QL",
+  "ytd_balance": 1911.85
+ },
+ {
+  "code": "MYSHOP(R2)",
+  "ytd_balance": 1026
+ },
+ {
+  "code": "MYSHOP-SKT",
+  "ytd_balance": 1617.65
+ },
+ {
+  "code": "MYSHOP-SP",
+  "ytd_balance": 696.95
+ },
+ {
+  "code": "MYSHOP(T)",
+  "ytd_balance": 5306.6
+ },
+ {
+  "code": "MYSHOP(T1)",
+  "ytd_balance": 0.1
+ },
+ {
+  "code": "MYSHOP(T2)",
+  "ytd_balance": 10192
+ },
+ {
+  "code": "MYSHOP(T3)",
+  "ytd_balance": 1266.5
+ },
+ {
+  "code": "MYSHOP-TBT",
+  "ytd_balance": 3279.2
+ },
+ {
+  "code": "MYSHOP-TLD",
+  "ytd_balance": -71.5
+ },
+ {
+  "code": "NCA_CW",
+  "ytd_balance": 844165.12
+ },
+ {
+  "code": "NCA_FB",
+  "ytd_balance": 3060302.82
+ },
+ {
+  "code": "NCA_FF",
+  "ytd_balance": 47138.82
+ },
+ {
+  "code": "NCA_MV",
+  "ytd_balance": 1326578.1
+ },
+ {
+  "code": "NCA_OE",
+  "ytd_balance": 242543.28
+ },
+ {
+  "code": "NCA_PL",
+  "ytd_balance": 3288992.46
+ },
+ {
+  "code": "NCA_PM",
+  "ytd_balance": 1332021.15
+ },
+ {
+  "code": "NCA_RV",
+  "ytd_balance": 1142934.23
+ },
+ {
+  "code": "OC_CMK",
+  "ytd_balance": 10200
+ },
+ {
+  "code": "OC_MIL",
+  "ytd_balance": -33638.54
+ },
+ {
+  "code": "OIKOS",
+  "ytd_balance": 390
+ },
+ {
+  "code": "OIL1016",
+  "ytd_balance": 1530
+ },
+ {
+  "code": "OIL6323",
+  "ytd_balance": 728.5
+ },
+ {
+  "code": "OIL6389",
+  "ytd_balance": 4176.45
+ },
+ {
+  "code": "OIL6893",
+  "ytd_balance": 2647.5
+ },
+ {
+  "code": "OIL75",
+  "ytd_balance": 308
+ },
+ {
+  "code": "OIL8155",
+  "ytd_balance": 130
+ },
+ {
+  "code": "OIL920",
+  "ytd_balance": 163.3
+ },
+ {
+  "code": "OIL9698",
+  "ytd_balance": 1002.8
+ },
+ {
+  "code": "OIL9882",
+  "ytd_balance": 1292.15
+ },
+ {
+  "code": "OIL9897",
+  "ytd_balance": 2290
+ },
+ {
+  "code": "OIL9901",
+  "ytd_balance": 4000
+ },
+ {
+  "code": "OIL9922",
+  "ytd_balance": 3733.09
+ },
+ {
+  "code": "OILCASE",
+  "ytd_balance": 493
+ },
+ {
+  "code": "OILFORK",
+  "ytd_balance": 1651
+ },
+ {
+  "code": "OILFS",
+  "ytd_balance": 1566
+ },
+ {
+  "code": "OILH135",
+  "ytd_balance": 522
+ },
+ {
+  "code": "OILHT15",
+  "ytd_balance": 1283
+ },
+ {
+  "code": "OILHT18",
+  "ytd_balance": 2687
+ },
+ {
+  "code": "OILISEKI",
+  "ytd_balance": 215
+ },
+ {
+  "code": "OILKE",
+  "ytd_balance": 1512
+ },
+ {
+  "code": "OILOTH",
+  "ytd_balance": 8409.4
+ },
+ {
+  "code": "OS_B21",
+  "ytd_balance": 4306.25
+ },
+ {
+  "code": "OS_B23",
+  "ytd_balance": 2887.5
+ },
+ {
+  "code": "OS_B24",
+  "ytd_balance": 3162.5
+ },
+ {
+  "code": "OS_B31",
+  "ytd_balance": 712.5
+ },
+ {
+  "code": "OS_B32",
+  "ytd_balance": 11275
+ },
+ {
+  "code": "OS_B33",
+  "ytd_balance": 7510.8
+ },
+ {
+  "code": "OS_B34",
+  "ytd_balance": 1939
+ },
+ {
+  "code": "OS_B36",
+  "ytd_balance": 2375
+ },
+ {
+  "code": "OS_B37",
+  "ytd_balance": 16145.6
+ },
+ {
+  "code": "OS_B3UD",
+  "ytd_balance": 18463.5
+ },
+ {
+  "code": "OS_B5KG1",
+  "ytd_balance": 743.75
+ },
+ {
+  "code": "OS_B600G",
+  "ytd_balance": 12276
+ },
+ {
+  "code": "OS_BBER2",
+  "ytd_balance": 22442.5
+ },
+ {
+  "code": "OS_BBER4",
+  "ytd_balance": 122082.5
+ },
+ {
+  "code": "OS_BBER5",
+  "ytd_balance": 113975
+ },
+ {
+  "code": "OS_BJAG4",
+  "ytd_balance": 11872
+ },
+ {
+  "code": "OS_BLS1",
+  "ytd_balance": 52180
+ },
+ {
+  "code": "OS_BNL3",
+  "ytd_balance": 573.5
+ },
+ {
+  "code": "OS_BNL5",
+  "ytd_balance": 3059
+ },
+ {
+  "code": "OS_BP1",
+  "ytd_balance": 2137.5
+ },
+ {
+  "code": "OS_BP2",
+  "ytd_balance": 6375.6
+ },
+ {
+  "code": "OS_BP600",
+  "ytd_balance": 883.4
+ },
+ {
+  "code": "OS_BPB1",
+  "ytd_balance": 5100
+ },
+ {
+  "code": "OS_BPB2",
+  "ytd_balance": 234.6
+ },
+ {
+  "code": "OS_BPT1",
+  "ytd_balance": 4090.63
+ },
+ {
+  "code": "OS_BSDM1",
+  "ytd_balance": 948.75
+ },
+ {
+  "code": "OS_BTAP1",
+  "ytd_balance": 1384.5
+ },
+ {
+  "code": "OS_BTM1",
+  "ytd_balance": 5275
+ },
+ {
+  "code": "OS_BUP1",
+  "ytd_balance": 2493.75
+ },
+ {
+  "code": "OS_M2",
+  "ytd_balance": 2381.25
+ },
+ {
+  "code": "OS_M21",
+  "ytd_balance": 3836.25
+ },
+ {
+  "code": "OS_M25",
+  "ytd_balance": 1061.2
+ },
+ {
+  "code": "OS_M2UD",
+  "ytd_balance": 3763.2
+ },
+ {
+  "code": "OS_M31",
+  "ytd_balance": 3255
+ },
+ {
+  "code": "OS_M32",
+  "ytd_balance": 348.8
+ },
+ {
+  "code": "OS_M33",
+  "ytd_balance": 5775
+ },
+ {
+  "code": "OS_M39",
+  "ytd_balance": 575
+ },
+ {
+  "code": "OS_M3UD",
+  "ytd_balance": 5566
+ },
+ {
+  "code": "OS_M41",
+  "ytd_balance": 1650
+ },
+ {
+  "code": "OS_M42",
+  "ytd_balance": 2709.6
+ },
+ {
+  "code": "OS_M43",
+  "ytd_balance": 9490.26
+ },
+ {
+  "code": "OS_M45",
+  "ytd_balance": 7783.9
+ },
+ {
+  "code": "OS_M46",
+  "ytd_balance": 2256.25
+ },
+ {
+  "code": "OS_M47",
+  "ytd_balance": 2493.75
+ },
+ {
+  "code": "OS_M48",
+  "ytd_balance": 3590.92
+ },
+ {
+  "code": "OS_M49",
+  "ytd_balance": 2612.5
+ },
+ {
+  "code": "OS_M50",
+  "ytd_balance": 15939
+ },
+ {
+  "code": "OS_M51",
+  "ytd_balance": 8844
+ },
+ {
+  "code": "OS_M52",
+  "ytd_balance": 9372
+ },
+ {
+  "code": "OS_MGRM1",
+  "ytd_balance": 195.47
+ },
+ {
+  "code": "OS_MK5",
+  "ytd_balance": 4600
+ },
+ {
+  "code": "OS_ML1",
+  "ytd_balance": 11121.44
+ },
+ {
+  "code": "OS_MM1",
+  "ytd_balance": 9960
+ },
+ {
+  "code": "OS_MM2",
+  "ytd_balance": 132
+ },
+ {
+  "code": "OS_MNL1",
+  "ytd_balance": 36092
+ },
+ {
+  "code": "OS_MP1",
+  "ytd_balance": 1872.3
+ },
+ {
+  "code": "OS_MP2",
+  "ytd_balance": 5720
+ },
+ {
+  "code": "OS_MSOD1",
+  "ytd_balance": 660.96
+ },
+ {
+  "code": "OS_MT1",
+  "ytd_balance": 2062.5
+ },
+ {
+  "code": "OS_MTAP1",
+  "ytd_balance": 104.65
+ },
+ {
+  "code": "OS_MTEP1",
+  "ytd_balance": 16034.4
+ },
+ {
+  "code": "OS_MTEP3",
+  "ytd_balance": 8109.92
+ },
+ {
+  "code": "PM_BPMB",
+  "ytd_balance": 24958
+ },
+ {
+  "code": "PM_BPMS",
+  "ytd_balance": 49426.5
+ },
+ {
+  "code": "PM_BTAP",
+  "ytd_balance": 3744
+ },
+ {
+  "code": "PM_MPMB",
+  "ytd_balance": 15840
+ },
+ {
+  "code": "PM_MPMS",
+  "ytd_balance": 21812.84
+ },
+ {
+  "code": "PT1016",
+  "ytd_balance": 50
+ },
+ {
+  "code": "PT6323",
+  "ytd_balance": 10
+ },
+ {
+  "code": "PTCASE",
+  "ytd_balance": 120
+ },
+ {
+  "code": "PTFORK",
+  "ytd_balance": 85
+ },
+ {
+  "code": "PTFS",
+  "ytd_balance": 145
+ },
+ {
+  "code": "PU_BBER",
+  "ytd_balance": 708905.9
+ },
+ {
+  "code": "PU_BJAG",
+  "ytd_balance": 190320
+ },
+ {
+  "code": "PU_BSAG",
+  "ytd_balance": 575643
+ },
+ {
+  "code": "PU_BSDM",
+  "ytd_balance": 1375
+ },
+ {
+  "code": "PU_MBCHEM",
+  "ytd_balance": 3280
+ },
+ {
+  "code": "PU_MGRM",
+  "ytd_balance": 2212.5
+ },
+ {
+  "code": "PU_MSOD",
+  "ytd_balance": 1200
+ },
+ {
+  "code": "PU_MTEP",
+  "ytd_balance": 399200
+ },
+ {
+  "code": "R1016",
+  "ytd_balance": 283
+ },
+ {
+  "code": "R6323",
+  "ytd_balance": 456
+ },
+ {
+  "code": "R6389",
+  "ytd_balance": 10717.6
+ },
+ {
+  "code": "R6893",
+  "ytd_balance": 2160.6
+ },
+ {
+  "code": "R75",
+  "ytd_balance": 120
+ },
+ {
+  "code": "R8726",
+  "ytd_balance": 520
+ },
+ {
+  "code": "R9698",
+  "ytd_balance": 1747
+ },
+ {
+  "code": "R9882",
+  "ytd_balance": 998
+ },
+ {
+  "code": "R9897",
+  "ytd_balance": 100
+ },
+ {
+  "code": "R9901",
+  "ytd_balance": 1109.6
+ },
+ {
+  "code": "R9922",
+  "ytd_balance": 2839
+ },
+ {
+  "code": "RBFORK",
+  "ytd_balance": 440
+ },
+ {
+  "code": "RCASE",
+  "ytd_balance": 764.5
+ },
+ {
+  "code": "RED",
+  "ytd_balance": 345
+ },
+ {
+  "code": "RFORK",
+  "ytd_balance": 105
+ },
+ {
+  "code": "RFS",
+  "ytd_balance": 270.6
+ },
+ {
+  "code": "RHT15",
+  "ytd_balance": 983.5
+ },
+ {
+  "code": "RHT18",
+  "ytd_balance": 4240.1
+ },
+ {
+  "code": "RISEKI",
+  "ytd_balance": 287
+ },
+ {
+  "code": "RKE",
+  "ytd_balance": 565
+ },
+ {
+  "code": "ROSE",
+  "ytd_balance": 98.6
+ },
+ {
+  "code": "ROTH",
+  "ytd_balance": 5930.05
+ },
+ {
+  "code": "RP",
+  "ytd_balance": -5612866.1
+ },
+ {
+  "code": "SABINDO-K",
+  "ytd_balance": 2874
+ },
+ {
+  "code": "SC",
+  "ytd_balance": -200000
+ },
+ {
+  "code": "SD",
+  "ytd_balance": 19651
+ },
+ {
+  "code": "SEGARRAYA",
+  "ytd_balance": 9229.4
+ },
+ {
+  "code": "SEMBAKO",
+  "ytd_balance": 1550
+ },
+ {
+  "code": "SENANG",
+  "ytd_balance": 870
+ },
+ {
+  "code": "SERVAY-P",
+  "ytd_balance": 10.27
+ },
+ {
+  "code": "SERVAY-PPR",
+  "ytd_balance": 333.69
+ },
+ {
+  "code": "SHAJAHAN",
+  "ytd_balance": 2460
+ },
+ {
+  "code": "SHIFANA",
+  "ytd_balance": 3872
+ },
+ {
+  "code": "SHOP(1)",
+  "ytd_balance": 2426
+ },
+ {
+  "code": "SHOP(2)",
+  "ytd_balance": 1957.4
+ },
+ {
+  "code": "SHOP(3)",
+  "ytd_balance": 3303
+ },
+ {
+  "code": "SHOP(4)",
+  "ytd_balance": 72
+ },
+ {
+  "code": "SHOP(R)",
+  "ytd_balance": 1710
+ },
+ {
+  "code": "SITI MART",
+  "ytd_balance": 675.1
+ },
+ {
+  "code": "SS WHOLESALE",
+  "ytd_balance": 1710
+ },
+ {
+  "code": "SV6323",
+  "ytd_balance": 280
+ },
+ {
+  "code": "SV6389",
+  "ytd_balance": 80
+ },
+ {
+  "code": "SV9698",
+  "ytd_balance": 195
+ },
+ {
+  "code": "SV9901",
+  "ytd_balance": 42
+ },
+ {
+  "code": "SV9922",
+  "ytd_balance": 779
+ },
+ {
+  "code": "SVOTH",
+  "ytd_balance": 389
+ },
+ {
+  "code": "TAX1016",
+  "ytd_balance": 68
+ },
+ {
+  "code": "TAX6304",
+  "ytd_balance": 20
+ },
+ {
+  "code": "TAX9901",
+  "ytd_balance": 73
+ },
+ {
+  "code": "TEO",
+  "ytd_balance": 1563.5
+ },
+ {
+  "code": "TETAPJAYA(I)",
+  "ytd_balance": 5985
+ },
+ {
+  "code": "TETAPJAYA(M)",
+  "ytd_balance": 41147.9
+ },
+ {
+  "code": "TETAPJAYA(N)",
+  "ytd_balance": 4548.6
+ },
+ {
+  "code": "THAISENG",
+  "ytd_balance": 210
+ },
+ {
+  "code": "THJ_CK",
+  "ytd_balance": 1063.2
+ },
+ {
+  "code": "THJ_SM",
+  "ytd_balance": 1014.15
+ },
+ {
+  "code": "TING",
+  "ytd_balance": 16190
+ },
+ {
+  "code": "TONG",
+  "ytd_balance": 2584
+ },
+ {
+  "code": "TONGHING",
+  "ytd_balance": -57.2
+ },
+ {
+  "code": "TSEN",
+  "ytd_balance": 2478.2
+ },
+ {
+  "code": "TY1016",
+  "ytd_balance": 320
+ },
+ {
+  "code": "TY6389",
+  "ytd_balance": 1600
+ },
+ {
+  "code": "TY9922",
+  "ytd_balance": 2560
+ },
+ {
+  "code": "TYFS",
+  "ytd_balance": 735
+ },
+ {
+  "code": "UMART",
+  "ytd_balance": 1795.5
+ },
+ {
+  "code": "VIVIANA",
+  "ytd_balance": 34
+ },
+ {
+  "code": "WHOLEMART-HT",
+  "ytd_balance": 81.9
+ },
+ {
+  "code": "WHOLESALE",
+  "ytd_balance": 4635
+ },
+ {
+  "code": "YAN",
+  "ytd_balance": 34
+ },
+ {
+  "code": "YEEBEE",
+  "ytd_balance": 2460
+ },
+ {
+  "code": "YESOKEY",
+  "ytd_balance": 18168
+ },
+ {
+  "code": "YEW",
+  "ytd_balance": 8715.6
+ },
+ {
+  "code": "YNWA",
+  "ytd_balance": 2500
+ },
+ {
+  "code": "YOLIM",
+  "ytd_balance": 546
+ },
+ {
+  "code": "YONGMAJU",
+  "ytd_balance": 1764
+ },
+ {
+  "code": "YONGSONS",
+  "ytd_balance": 4032
+ },
+ {
+  "code": "YTF",
+  "ytd_balance": 1373.4
+ },
+ {
+  "code": "YUNGSIANG",
+  "ytd_balance": 4793.9
+ },
+ {
+  "code": "ZENITH",
+  "ytd_balance": 1740
+ }
+]
