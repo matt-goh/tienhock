@@ -68,8 +68,9 @@ interface Customer {
 interface Rental {
   rental_id: number;
   customer_id: number;
-  tong_no: string;
-  date_placed: string;
+  // The dumpster and both dates are optional Green Target metadata.
+  tong_no: string | null;
+  date_placed: string | null;
   date_picked: string | null;
   location_address?: string;
   location_site?: string | null;
@@ -1476,14 +1477,17 @@ const InvoiceFormPage: React.FC = () => {
                                       </div>
                                       <div>
                                         <div className="font-medium text-gray-900 dark:text-gray-100">
-                                          Rental #{rental.rental_id} - Dumpster{" "}
-                                          {rental.tong_no}
+                                          Rental #{rental.rental_id}
+                                          {rental.tong_no
+                                            ? ` - Dumpster ${rental.tong_no}`
+                                            : ""}
                                         </div>
                                         <div className="text-sm text-gray-500 dark:text-gray-400">
-                                          Placed:{" "}
-                                          {new Date(
-                                            rental.date_placed
-                                          ).toLocaleDateString()}
+                                          {rental.date_placed
+                                            ? `Placed: ${new Date(
+                                                rental.date_placed
+                                              ).toLocaleDateString()}`
+                                            : "No placement date"}
                                           {locationDisplay &&
                                             ` • ${locationDisplay}`}
                                         </div>
@@ -1571,18 +1575,24 @@ const InvoiceFormPage: React.FC = () => {
                           <div className="flex justify-between items-start">
                             <div>
                               <div className="font-medium text-gray-900 dark:text-gray-100">
-                                Rental #{rental.rental_id} - Dumpster{" "}
-                                {rental.tong_no}
+                                Rental #{rental.rental_id}
+                                {rental.tong_no
+                                  ? ` - Dumpster ${rental.tong_no}`
+                                  : ""}
                               </div>
                               <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
                                 <span>Driver: {rental.driver}</span>
-                                <span className="mx-2">•</span>
-                                <span>
-                                  Placed:{" "}
-                                  {new Date(
-                                    rental.date_placed
-                                  ).toLocaleDateString()}
-                                </span>
+                                {rental.date_placed && (
+                                  <>
+                                    <span className="mx-2">•</span>
+                                    <span>
+                                      Placed:{" "}
+                                      {new Date(
+                                        rental.date_placed
+                                      ).toLocaleDateString()}
+                                    </span>
+                                  </>
+                                )}
                                 {rental.date_picked && (
                                   <>
                                     <span className="mx-2">•</span>
