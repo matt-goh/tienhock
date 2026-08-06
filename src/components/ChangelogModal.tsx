@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-08-06",
+    ms: "Material Stock: membetulkan ralat \"Every product must be a BH product\" yang kadangkala muncul semasa menyimpan jadual Stock Kilang selepas bertukar antara tab Mee dan Bihun — senarai produk tab sebelumnya boleh terbawa sebentar. Jika ralat ini masih berlaku, mesej kini menyatakan produk mana yang bermasalah, senarai produk dimuat semula secara automatik (nombor yang anda taip dikekalkan), dan tiada apa-apa yang disimpan separuh jalan — sebelum ini baris bahan di atas sudah tersimpan walaupun jadual Stock Kilang gagal.",
+    en: "Material Stock: fixed the \"Every product must be a BH product\" error that could appear when saving the Stock Kilang table after switching between the Mee and Bihun tabs — the previous tab's product list could briefly carry over. If the error still happens, the message now names the product causing it, the product list refreshes automatically (the figures you keyed are kept), and nothing is saved halfway — previously the material rows above were already saved even though the Stock Kilang table failed.",
+  },
+  {
     date: "2026-08-05",
     ms: "Cetakan: anda kini boleh memilih saiz kertas A4 atau borang komputer 9.5×11 dari menu pengguna (atas kanan). Dialog cetak invois dan pelarasan juga membolehkan anda menukar saiz dan mencetak semula.",
     en: "Printing: you can now choose A4 or 9.5×11 computer form paper size from the user menu (top right). Invoice and adjustment print dialogs also let you switch size and reprint.",
