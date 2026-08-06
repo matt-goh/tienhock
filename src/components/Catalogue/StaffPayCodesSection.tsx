@@ -35,6 +35,7 @@ import {
   IconSettings2,
 } from "@tabler/icons-react";
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
+import { useTranslation } from "react-i18next";
 import {
   Employee,
   JobPayCodeDetails,
@@ -65,6 +66,7 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
   employee,
   company = "tienhock",
 }) => {
+  const { t } = useTranslation("catalogue");
   const id = employee.id;
   const apiBase = company === "jellypolly" ? "/jellypolly/api" : "/api";
   const { jobs: thJobs } = useJobsCache();
@@ -268,14 +270,18 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
         });
 
         toast.success(
-          `Successfully ${value ? "set" : "cleared"} default for ${
-            payCodes.length
-          } pay code(s)`
+          value
+            ? t("Successfully set default for {{total}} pay code(s)", {
+                total: payCodes.length,
+              })
+            : t("Successfully cleared default for {{total}} pay code(s)", {
+                total: payCodes.length,
+              })
         );
         await refreshPayCodeMappings();
       } catch (error) {
         console.error("Error in batch default update:", error);
-        toast.error("An error occurred while updating defaults");
+        toast.error(t("An error occurred while updating defaults"));
       } finally {
         setBatchDefaultLoading(null);
       }
@@ -304,7 +310,7 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
           }));
 
         if (items.length === 0) {
-          toast.error("No valid job pay codes to update");
+          toast.error(t("No valid job pay codes to update"));
           return;
         }
 
@@ -314,14 +320,18 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
         });
 
         toast.success(
-          `Successfully ${value ? "set" : "cleared"} default for ${
-            items.length
-          } pay code(s)`
+          value
+            ? t("Successfully set default for {{total}} pay code(s)", {
+                total: items.length,
+              })
+            : t("Successfully cleared default for {{total}} pay code(s)", {
+                total: items.length,
+              })
         );
         await refreshPayCodeMappings();
       } catch (error) {
         console.error("Error in batch default update:", error);
-        toast.error("An error occurred while updating defaults");
+        toast.error(t("An error occurred while updating defaults"));
       } finally {
         setBatchDefaultLoading(null);
       }
@@ -351,12 +361,14 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
         }
 
         toast.success(
-          `Successfully cleared customized rates for ${payCodes.length} pay code(s)`
+          t("Successfully cleared customized rates for {{total}} pay code(s)", {
+            total: payCodes.length,
+          })
         );
         await refreshPayCodeMappings();
       } catch (error) {
         console.error("Error clearing customized rates:", error);
-        toast.error("An error occurred while clearing customized rates");
+        toast.error(t("An error occurred while clearing customized rates"));
         // Some rows may already be cleared — resync so the UI matches the DB.
         await refreshPayCodeMappings();
       } finally {
@@ -438,6 +450,9 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
     },
   };
 
+  const payTypeLabel = (payType: PayType | string): string =>
+    payType === "Tambahan" ? t("Additional") : t(payType);
+
   // Render a single pay code card
   const renderPayCodeCard = (
     payCode: EmployeePayCodeDetails | JobPayCodeDetails,
@@ -464,7 +479,9 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
         onClick={() => {
           onClick();
         }}
-        title={`Edit rates for ${payCode.description}`}
+        title={t("Edit rates for {{description}}", {
+          description: payCode.description,
+        })}
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
@@ -496,36 +513,45 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
           <div className="mt-1 text-xs text-default-600 dark:text-gray-300">
             <div className="flex gap-3 flex-wrap">
               <span>
-                Biasa: RM
+                {t("Biasa:")} RM
                 {payCode.override_rate_biasa !== null
                   ? payCode.override_rate_biasa.toFixed(2)
                   : (payCode.rate_biasa ?? 0).toFixed(2)}
                 {payCode.override_rate_biasa !== null && (
-                  <span className={overrideAccentColor} title="Override rate">
+                  <span
+                    className={overrideAccentColor}
+                    title={t("Override rate")}
+                  >
                     {" "}
                     *
                   </span>
                 )}
               </span>
               <span>
-                Ahad: RM
+                {t("Ahad:")} RM
                 {payCode.override_rate_ahad !== null
                   ? payCode.override_rate_ahad.toFixed(2)
                   : (payCode.rate_ahad ?? 0).toFixed(2)}
                 {payCode.override_rate_ahad !== null && (
-                  <span className={overrideAccentColor} title="Override rate">
+                  <span
+                    className={overrideAccentColor}
+                    title={t("Override rate")}
+                  >
                     {" "}
                     *
                   </span>
                 )}
               </span>
               <span>
-                Umum: RM
+                {t("Umum:")} RM
                 {payCode.override_rate_umum !== null
                   ? payCode.override_rate_umum.toFixed(2)
                   : (payCode.rate_umum ?? 0).toFixed(2)}
                 {payCode.override_rate_umum !== null && (
-                  <span className={overrideAccentColor} title="Override rate">
+                  <span
+                    className={overrideAccentColor}
+                    title={t("Override rate")}
+                  >
                     {" "}
                     *
                   </span>
@@ -537,7 +563,7 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
                 <span
                   className={`px-2 py-0.5 ${colorScheme.headerBg} ${colorScheme.headerText} rounded-full font-medium`}
                 >
-                  {payCode.pay_type}
+                  {payTypeLabel(payCode.pay_type)}
                 </span>
               )}
               <span className="px-2 py-0.5 bg-default-200 dark:bg-gray-700 text-default-700 dark:text-gray-200 rounded-full">
@@ -545,12 +571,12 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
               </span>
               {payCode.override_rate_biasa !== null && (
                 <span className="px-2 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 rounded-full font-medium">
-                  Customized rate
+                  {t("Customized rate")}
                 </span>
               )}
               {payCode.is_default_setting && (
                 <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 rounded-full font-medium">
-                  Default
+                  {t("Default")}
                 </span>
               )}
             </div>
@@ -615,7 +641,7 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
             ) : (
               <IconChevronDown size={16} />
             )}
-            <span className="font-medium text-sm">{payType}</span>
+            <span className="font-medium text-sm">{payTypeLabel(payType)}</span>
             <span className="text-xs opacity-75">
               ({filteredPayCodes.length})
             </span>
@@ -634,18 +660,18 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
                     onClick={() => onBatchSetDefault(filteredPayCodes, true)}
                     disabled={isBatchLoading}
                     className="px-2 py-0.5 text-xs font-medium rounded bg-emerald-200 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-300 dark:hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    title="Set all as default"
+                    title={t("Set all as default")}
                   >
-                    {isBatchLoading ? "..." : "All Default"}
+                    {isBatchLoading ? "..." : t("All Default")}
                   </button>
                   <button
                     type="button"
                     onClick={() => onBatchSetDefault(filteredPayCodes, false)}
                     disabled={isBatchLoading}
                     className="px-2 py-0.5 text-xs font-medium rounded bg-default-200 dark:bg-gray-700 text-default-700 dark:text-gray-200 hover:bg-default-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    title="Clear all defaults"
+                    title={t("Clear all defaults")}
                   >
-                    {isBatchLoading ? "..." : "Clear All Default"}
+                    {isBatchLoading ? "..." : t("Clear All Default")}
                   </button>
                 </>
               )}
@@ -655,11 +681,16 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
                   onClick={() => onBatchClearRates(customizedPayCodes)}
                   disabled={isClearRatesLoading}
                   className="px-2 py-0.5 text-xs font-medium rounded bg-rose-200 dark:bg-rose-900/50 text-rose-800 dark:text-rose-200 hover:bg-rose-300 dark:hover:bg-rose-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  title={`Reset ${customizedPayCodes.length} customized rate(s) in this group back to the default rate`}
+                  title={t(
+                    "Reset {{total}} customized rate(s) in this group back to the default rate",
+                    { total: customizedPayCodes.length }
+                  )}
                 >
                   {isClearRatesLoading
                     ? "..."
-                    : `Clear All Customized Rates (${customizedPayCodes.length})`}
+                    : t("Clear All Customized Rates ({{total}})", {
+                        total: customizedPayCodes.length,
+                      })}
                 </button>
               )}
             </div>
@@ -692,13 +723,13 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
     <div className="border-t border-default-200 dark:border-gray-700 pt-6 mt-6">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-base font-medium text-default-800 dark:text-gray-100">
-          Associated Pay Codes
+          {t("Associated Pay Codes")}
         </h3>
         <div className="flex items-center gap-2">
           <div className="relative">
             <input
               type="text"
-              placeholder="Search pay codes..."
+              placeholder={t("Search pay codes...")}
               value={payCodeSearchQuery}
               onChange={(e) => setPayCodeSearchQuery(e.target.value)}
               className="px-3 py-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 min-w-[200px]"
@@ -707,7 +738,7 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
               <button
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-200"
                 onClick={() => setPayCodeSearchQuery("")}
-                title="Clear search"
+                title={t("Clear search")}
               >
                 ×
               </button>
@@ -727,19 +758,19 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
             }`}
             title={
               payCodeViewMode === "grouped"
-                ? "Switch to flat view"
-                : "Switch to grouped view"
+                ? t("Switch to flat view")
+                : t("Switch to grouped view")
             }
           >
             {payCodeViewMode === "grouped" ? (
               <>
                 <IconLayoutGrid size={16} />
-                Grouped
+                {t("Grouped")}
               </>
             ) : (
               <>
                 <IconLayoutList size={16} />
-                Flat
+                {t("Flat")}
               </>
             )}
           </button>
@@ -749,18 +780,20 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
               onClick={areAllGroupsCollapsed ? expandAllGroups : collapseAllGroups}
               className="flex items-center gap-1.5 px-3 py-1 border border-default-300 dark:border-gray-600 rounded-full text-sm font-medium text-default-700 dark:text-gray-200 bg-default-50 dark:bg-gray-900/50 hover:bg-default-100 dark:hover:bg-gray-700 transition-colors"
               title={
-                areAllGroupsCollapsed ? "Expand all groups" : "Collapse all groups"
+                areAllGroupsCollapsed
+                  ? t("Expand all groups")
+                  : t("Collapse all groups")
               }
             >
               {areAllGroupsCollapsed ? (
                 <>
                   <IconChevronsDown size={16} />
-                  Expand All
+                  {t("Expand All")}
                 </>
               ) : (
                 <>
                   <IconChevronsUp size={16} />
-                  Collapse All
+                  {t("Collapse All")}
                 </>
               )}
             </button>
@@ -776,7 +809,7 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
             size="sm"
             icon={IconLink}
           >
-            Manage Employee Pay Codes
+            {t("Manage Employee Pay Codes")}
           </Button>
         </div>
       </div>
@@ -790,7 +823,7 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
           {/* Employee-specific Pay Codes Section */}
           <div>
             <h4 className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
-              Employee-Specific Pay Codes
+              {t("Employee-Specific Pay Codes")}
             </h4>
             {id && employeeMappings[id] && employeeMappings[id].length > 0 ? (
               payCodeViewMode === "grouped" ? (
@@ -856,7 +889,7 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
               )
             ) : (
               <div className="text-sm text-default-500 dark:text-gray-400 py-4">
-                No employee-specific pay codes
+                {t("No employee-specific pay codes")}
               </div>
             )}
           </div>
@@ -865,7 +898,7 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
           <div>
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-medium text-default-700 dark:text-gray-200">
-                Job-Linked Pay Codes
+                {t("Job-Linked Pay Codes")}
               </h4>
               {employee.job && employee.job.length === 1 && (
                 <Button
@@ -881,7 +914,7 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
                     }
                   }}
                 >
-                  Batch Manage
+                  {t("Batch Manage")}
                 </Button>
               )}
               {employee.job && employee.job.length > 1 && (
@@ -893,12 +926,12 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
                     size="sm"
                     icon={IconSettings2}
                   >
-                    Batch Manage
+                    {t("Batch Manage")}
                   </MenuButton>
                   <MenuItems className="absolute right-0 mt-1 w-56 origin-top-right rounded-lg bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black/5 dark:ring-white/10 focus:outline-none z-10">
                     <div className="p-1">
                       <div className="px-3 py-1.5 text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                        Select Job
+                        {t("Select Job")}
                       </div>
                       {employee.job.map((jobId) => {
                         const jobData = jobs.find((j) => j.id === jobId);
@@ -991,7 +1024,7 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
                 )
               ) : (
                 <div className="text-sm text-default-500 dark:text-gray-400 py-4">
-                  No job-linked pay codes
+                  {t("No job-linked pay codes")}
                 </div>
               );
             })()}
@@ -1000,7 +1033,7 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
           {/* Shared Pay Codes Section (duplicates) */}
           <div>
             <h4 className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
-              Shared Pay Codes (Across Multiple Jobs)
+              {t("Shared Pay Codes (Across Multiple Jobs)")}
             </h4>
             {(() => {
               const { duplicatePayCodes } = getAllPayCodesForEmployee();
@@ -1067,7 +1100,7 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
                 )
               ) : (
                 <div className="text-sm text-default-500 dark:text-gray-400 py-4">
-                  No shared pay codes across multiple jobs
+                  {t("No shared pay codes across multiple jobs")}
                 </div>
               );
             })()}
@@ -1152,26 +1185,36 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
           }}
           title={
             batchConfirmDialog.action === "set"
-              ? "Set All as Default"
+              ? t("Set All as Default")
               : batchConfirmDialog.action === "clear-rates"
-              ? "Clear All Customized Rates"
-              : "Clear All Defaults"
+              ? t("Clear All Customized Rates")
+              : t("Clear All Defaults")
           }
           message={
             batchConfirmDialog.action === "clear-rates"
-              ? `Are you sure you want to clear the customized rates for ${batchConfirmDialog.payCodes.length} ${batchConfirmDialog.payType} pay code(s)? They will go back to their default rate. This cannot be undone.`
-              : `Are you sure you want to ${
-                  batchConfirmDialog.action === "set" ? "set" : "clear"
-                } default for all ${batchConfirmDialog.payCodes.length} ${
-                  batchConfirmDialog.payType
-                } pay codes?`
+              ? t(
+                  "Are you sure you want to clear the customized rates for {{total}} {{payType}} pay code(s)? They will go back to their default rate. This cannot be undone.",
+                  {
+                    total: batchConfirmDialog.payCodes.length,
+                    payType: payTypeLabel(batchConfirmDialog.payType),
+                  }
+                )
+              : t(
+                  batchConfirmDialog.action === "set"
+                    ? "Are you sure you want to set default for all {{total}} {{payType}} pay codes?"
+                    : "Are you sure you want to clear default for all {{total}} {{payType}} pay codes?",
+                  {
+                    total: batchConfirmDialog.payCodes.length,
+                    payType: payTypeLabel(batchConfirmDialog.payType),
+                  }
+                )
           }
           confirmButtonText={
             batchConfirmDialog.action === "set"
-              ? "Set Default"
+              ? t("Set Default")
               : batchConfirmDialog.action === "clear-rates"
-              ? "Clear Rates"
-              : "Clear Default"
+              ? t("Clear Rates")
+              : t("Clear Default")
           }
           variant={
             batchConfirmDialog.action === "set"

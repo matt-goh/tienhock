@@ -8,8 +8,10 @@ import IncomeTaxRatesTab from "../../../components/Payroll/ContributionRates/Inc
 import { usePersistedUrlNumber } from "../../../hooks/usePersistedFilters";
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import { useContributionRatesCache } from "../../../utils/payroll/useContributionRatesCache";
+import { useTranslation } from "react-i18next";
 
 const ContributionRatesPage: React.FC = () => {
+  const { t } = useTranslation("payroll");
   // A ?tab= param wins on mount, otherwise the last tab used
   const [activeTab, setActiveTab] = usePersistedUrlNumber(
     "contributionRatesTab",
@@ -28,7 +30,12 @@ const ContributionRatesPage: React.FC = () => {
     <div className="space-y-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm px-6 py-4">
         <Tab
-          labels={["EPF Rates", "SOCSO Rates", "SIP Rates", "Income Tax Rates"]}
+          labels={[
+            t("EPF Rates"),
+            t("SOCSO Rates"),
+            t("SIP Rates"),
+            t("Income Tax Rates"),
+          ]}
           tabWidth="w-40"
           defaultActiveTab={activeTab}
           onTabChange={setActiveTab}

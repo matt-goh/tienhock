@@ -7,6 +7,7 @@ import React, {
   useRef,
 } from "react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import {
   Listbox,
   ListboxButton,
@@ -59,6 +60,7 @@ const reviveFilters = (cached: any): JobCategoryListFilters => ({
 });
 
 const JobCategoryPage: React.FC = () => {
+  const { t } = useTranslation("catalogue");
   // Cached data and state
   const { jobCategories, isLoading, error, refreshJobCategories } =
     useJobCategoriesCache(); // Use refreshJobCategories for refresh
@@ -109,7 +111,7 @@ const JobCategoryPage: React.FC = () => {
       setSections(uniqueSections);
     } catch (error) {
       console.error("Error fetching sections:", error);
-      toast.error("Failed to fetch sections. Please try again.");
+      toast.error(t("Failed to fetch sections. Please try again."));
     }
   }, []);
 
@@ -214,9 +216,11 @@ const JobCategoryPage: React.FC = () => {
         }
 
         toast.success(
-          isEditing
-            ? "Job category updated successfully"
-            : "Job category added successfully"
+          t(
+            isEditing
+              ? "Job category updated successfully"
+              : "Job category added successfully"
+          )
         );
         handleModalClose();
         refreshJobCategories();
@@ -224,7 +228,7 @@ const JobCategoryPage: React.FC = () => {
         console.error("Error saving job category:", error);
         // Re-throw the error so the modal can display it
         throw new Error(
-          error.message || "Failed to save job category. Please try again."
+          error.message || t("Failed to save job category. Please try again.")
         );
       }
     },
@@ -251,14 +255,14 @@ const JobCategoryPage: React.FC = () => {
         jobCategoryIds: [categoryToDelete.id],
       }); // Adjust payload based on backend ('job-categories' vs 'jobCategoryIds')
 
-      toast.success("Job category deleted successfully");
+      toast.success(t("Job category deleted successfully"));
       setShowDeleteDialog(false);
       setCategoryToDelete(null);
       // refreshJobCategoriesCache(); // Use SWR's mutate
       refreshJobCategories(); // Trigger cache revalidation
     } catch (error) {
       console.error("Error deleting job category:", error);
-      toast.error("Failed to delete job category. Please try again.");
+      toast.error(t("Failed to delete job category. Please try again."));
       // Keep dialog open on error? Or close? For now, keep it open.
     }
   }, [categoryToDelete, refreshJobCategories]); // Depend on refreshJobCategories
@@ -271,11 +275,17 @@ const JobCategoryPage: React.FC = () => {
   // --- Render Section Listbox ---
   const renderSectionListbox = () => (
     <div className="flex items-center space-x-2">
-      <span className="font-semibold text-sm text-default-700 dark:text-gray-200">Section:</span>
+      <span className="font-semibold text-sm text-default-700 dark:text-gray-200">
+        {t("Section:")}
+      </span>
       <Listbox value={selectedSection} onChange={setSelectedSection}>
         <div className="relative">
           <ListboxButton className="relative w-48 cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-default-900 dark:text-gray-100">
-            <span className="block truncate">{selectedSection}</span>
+            <span className="block truncate">
+              {selectedSection === "All Section"
+                ? t("All Section")
+                : selectedSection}
+            </span>
             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
               <IconChevronDown
                 size={20}
@@ -302,7 +312,9 @@ const JobCategoryPage: React.FC = () => {
                         selected ? "font-medium" : "font-normal"
                       }`}
                     >
-                      {section.name}
+                      {section.name === "All Section"
+                        ? t("All Section")
+                        : section.name}
                     </span>
                     {selected ? (
                       <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-400">
@@ -331,7 +343,9 @@ const JobCategoryPage: React.FC = () => {
   if (error) {
     return (
       <div className="mt-20 flex w-full items-center justify-center text-red-600">
-        Error loading job categories: {error.message}
+        {t("Error loading job categories: {{message}}", {
+          message: error.message,
+        })}
       </div>
     );
   }
@@ -373,20 +387,15 @@ const JobCategoryPage: React.FC = () => {
       <div className="flex items-center justify-between pt-3 border-t border-default-200 dark:border-gray-700">
         <div>
           <p className="text-sm text-default-600 dark:text-gray-400">
-            Showing{" "}
-            <span className="font-medium">
-              {(currentPage - 1) * itemsPerPage + 1}
-            </span>{" "}
-            to{" "}
-            <span className="font-medium">
-              {Math.min(
+            {t("Showing {{from}} to {{to}} of {{total}} results", {
+              from: (currentPage - 1) * itemsPerPage + 1,
+              to: Math.min(
                 currentPage * itemsPerPage,
                 filteredJobCategories.length
-              )}
-            </span>{" "}
-            of{" "}
-            <span className="font-medium">{filteredJobCategories.length}</span>{" "}
-            results
+              ),
+              total: filteredJobCategories.length,
+            })}
+            {""}
           </p>
         </div>
 
@@ -406,7 +415,7 @@ const JobCategoryPage: React.FC = () => {
                   : "text-default-500 dark:text-gray-400 hover:bg-default-50 dark:hover:bg-gray-700"
               }`}
             >
-              <span className="sr-only">Previous</span>
+              <span className="sr-only">{t("Previous")}</span>
               <IconChevronLeft size={18} aria-hidden="true" />
             </button>
 
@@ -471,7 +480,7 @@ const JobCategoryPage: React.FC = () => {
                   : "text-default-500 dark:text-gray-400 hover:bg-default-50 dark:hover:bg-gray-700"
               }`}
             >
-              <span className="sr-only">Next</span>
+              <span className="sr-only">{t("Next")}</span>
               <IconChevronRight size={18} aria-hidden="true" />
             </button>
           </nav>
@@ -486,7 +495,7 @@ const JobCategoryPage: React.FC = () => {
       {/* Header Area */}
       <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
         <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-          Job Category Catalogue
+          {t("Job Category Catalogue")}
         </h1>
         <div className="flex w-full flex-col items-center justify-end gap-4 md:w-auto md:flex-row">
           {renderSectionListbox()}
@@ -497,7 +506,7 @@ const JobCategoryPage: React.FC = () => {
             />
             <input
               type="text"
-              placeholder="Search ID or Category..."
+              placeholder={t("Search ID or Category...")}
               className="w-full rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 py-2 pl-10 pr-4 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 placeholder:text-default-400 dark:placeholder:text-gray-400"
               value={searchTerm}
               onChange={handleSearchChange}
@@ -512,7 +521,7 @@ const JobCategoryPage: React.FC = () => {
             size="md"
             className="w-full md:w-auto"
           >
-            Add Category
+            {t("Add Category")}
           </Button>
         </div>
       </div>
@@ -523,28 +532,28 @@ const JobCategoryPage: React.FC = () => {
           <thead className="bg-default-100 dark:bg-gray-800">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                ID
+                {t("ID")}
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                Category
+                {t("Category")}
               </th>
               {/* Conditionally show section if 'All Section' is selected */}
               {selectedSection === "All Section" && (
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                  Section
+                  {t("Section")}
                 </th>
               )}
               <th className="w-10 px-2 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                Gaji
+                {t("Salary")}
               </th>
               <th className="w-10 px-2 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                Ikut
+                {t("Follow")}
               </th>
               <th className="w-10 px-2 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                JV
+                {t("JV")}
               </th>
               <th className="w-28 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                Actions
+                {t("actions", { ns: "common" })}
               </th>
             </tr>
           </thead>
@@ -584,7 +593,7 @@ const JobCategoryPage: React.FC = () => {
                           handleEditClick(category);
                         }}
                         className="text-sky-600 dark:text-sky-400 hover:text-sky-800dark:hover:text-sky-300"
-                        title="Edit"
+                        title={t("Edit")}
                       >
                         <IconPencil size={18} />
                       </button>
@@ -594,7 +603,7 @@ const JobCategoryPage: React.FC = () => {
                           handleDeleteClick(category);
                         }}
                         className="text-rose-600 hover:text-rose-800 dark:text-rose-400 dark:hover:text-rose-300"
-                        title="Delete"
+                        title={t("delete", { ns: "common" })}
                       >
                         <IconTrash size={18} />
                       </button>
@@ -608,7 +617,7 @@ const JobCategoryPage: React.FC = () => {
                   colSpan={selectedSection === "All Section" ? 7 : 6} // Adjust colspan based on section visibility
                   className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                 >
-                  No job categories found matching your criteria.
+                  {t("No job categories found matching your criteria.")}
                 </td>
               </tr>
             )}
@@ -628,8 +637,14 @@ const JobCategoryPage: React.FC = () => {
         isOpen={showDeleteDialog}
         onClose={handleCancelDelete}
         onConfirm={handleConfirmDelete}
-        title="Delete Job Category"
-        message={`Are you sure you want to delete the category "${categoryToDelete?.category}" (ID: ${categoryToDelete?.id})? This action cannot be undone.`}
+        title={t("Delete Job Category")}
+        message={t(
+          "Are you sure you want to delete the category \"{{category}}\" (ID: {{id}})? This action cannot be undone.",
+          {
+            category: categoryToDelete?.category,
+            id: categoryToDelete?.id,
+          }
+        )}
         variant="danger"
       />
       {/* Pagination - only show if we have more than one page */}

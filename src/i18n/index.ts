@@ -8,10 +8,22 @@ import msCommon from "./locales/ms/common.json";
 import msNav from "./locales/ms/nav.json";
 import msHome from "./locales/ms/home.json";
 import msInvoice from "./locales/ms/invoice.json";
+import msAuth from "./locales/ms/auth.json";
+import msPayments from "./locales/ms/payments.json";
+import msAdjustments from "./locales/ms/adjustments.json";
+import msSales from "./locales/ms/sales.json";
+import msCatalogue from "./locales/ms/catalogue.json";
+import msPayroll from "./locales/ms/payroll.json";
 import zhHansCommon from "./locales/zh-Hans/common.json";
 import zhHansNav from "./locales/zh-Hans/nav.json";
 import zhHansHome from "./locales/zh-Hans/home.json";
 import zhHansInvoice from "./locales/zh-Hans/invoice.json";
+import zhHansAuth from "./locales/zh-Hans/auth.json";
+import zhHansPayments from "./locales/zh-Hans/payments.json";
+import zhHansAdjustments from "./locales/zh-Hans/adjustments.json";
+import zhHansSales from "./locales/zh-Hans/sales.json";
+import zhHansCatalogue from "./locales/zh-Hans/catalogue.json";
+import zhHansPayroll from "./locales/zh-Hans/payroll.json";
 
 export const SUPPORTED_LANGUAGES = ["en", "ms", "zh-Hans"] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
@@ -47,12 +59,29 @@ void i18n
   .init({
     resources: {
       en: { common: enCommon },
-      ms: { common: msCommon, nav: msNav, home: msHome, invoice: msInvoice },
+      ms: {
+        common: msCommon,
+        nav: msNav,
+        home: msHome,
+        invoice: msInvoice,
+        auth: msAuth,
+        payments: msPayments,
+        adjustments: msAdjustments,
+        sales: msSales,
+        catalogue: msCatalogue,
+        payroll: msPayroll,
+      },
       "zh-Hans": {
         common: zhHansCommon,
         nav: zhHansNav,
         home: zhHansHome,
         invoice: zhHansInvoice,
+        auth: zhHansAuth,
+        payments: zhHansPayments,
+        adjustments: zhHansAdjustments,
+        sales: zhHansSales,
+        catalogue: zhHansCatalogue,
+        payroll: zhHansPayroll,
       },
     },
     defaultNS: "common",

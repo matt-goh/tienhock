@@ -4,6 +4,7 @@
 // InvoiceAdjustmentDocsSection because GT field names diverge.
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { IconFileText, IconExternalLink } from "@tabler/icons-react";
 import { api } from "../../routes/utils/api";
 import {
@@ -53,6 +54,7 @@ const GTInvoiceAdjustmentDocsSection: React.FC<Props> = ({
   docs: preloadedDocs,
 }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation("adjustments");
   const isControlled = preloadedDocs !== undefined;
   const [fetchedDocs, setFetchedDocs] = useState<GTAdjDocRow[]>([]);
   const [loading, setLoading] = useState(!isControlled);
@@ -108,7 +110,7 @@ const GTInvoiceAdjustmentDocsSection: React.FC<Props> = ({
       <div className="px-4 py-3 border-b border-default-200 dark:border-gray-700 flex items-center justify-between">
         <h2 className="text-base font-semibold text-default-900 dark:text-gray-100 flex items-center gap-2">
           <IconFileText size={18} className="text-default-500 dark:text-gray-400" />
-          Adjustment Documents
+          {t("Adjustment Documents")}
           <span className="text-sm font-normal text-default-500 dark:text-gray-400">
             ({docs.length})
           </span>
@@ -119,19 +121,19 @@ const GTInvoiceAdjustmentDocsSection: React.FC<Props> = ({
           <thead className="bg-default-50 dark:bg-gray-900/50">
             <tr>
               <th className="px-4 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                ID
+                {t("ID")}
               </th>
               <th className="px-4 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                Type
+                {t("Type")}
               </th>
               <th className="px-4 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                Amount
+                {t("amount", { ns: "common" })}
               </th>
               <th className="px-4 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                Status
+                {t("status", { ns: "common" })}
               </th>
               <th className="px-4 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                Paired
+                {t("Paired")}
               </th>
               <th className="w-10" />
             </tr>
