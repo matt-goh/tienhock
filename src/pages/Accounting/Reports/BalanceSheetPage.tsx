@@ -242,7 +242,7 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
   return (
     <div className="w-full">
       {/* Header: period on the left, actions on the right */}
-      <div className="mb-4 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
+      <div className="mb-2 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <MonthNavigator
             selectedMonth={selectedMonth}
@@ -289,7 +289,7 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
       {/* Balance Status Banner */}
       {!isGT && data && (
         <div
-          className={`mb-6 p-4 rounded-lg border ${
+          className={`mb-2 p-2 rounded-lg border ${
             data.totals.is_balanced
               ? "bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800"
               : "bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800"

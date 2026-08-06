@@ -30,7 +30,7 @@ const colors = {
 const styles = StyleSheet.create({
   page: {
     paddingTop: 15,
-    paddingBottom: 40,
+    paddingBottom: 30,
     paddingLeft: 30,
     paddingRight: 30,
     fontFamily: "Helvetica",
@@ -49,7 +49,6 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
     gap: 12,
   },
   headerTextContainer: {
@@ -76,7 +75,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   table: {
-    marginTop: 8,
+    marginTop: 4,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -158,7 +157,7 @@ const styles = StyleSheet.create({
     fontSize: 8,
   },
   generatedAt: {
-    marginTop: 10,
+    marginTop: 4,
     fontSize: 7,
     color: colors.textMuted,
     textAlign: "right",

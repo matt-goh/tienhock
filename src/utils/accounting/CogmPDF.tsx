@@ -24,7 +24,7 @@ const colors = {
 const styles = StyleSheet.create({
   page: {
     paddingTop: 20,
-    paddingBottom: 40,
+    paddingBottom: 30,
     paddingLeft: 40,
     paddingRight: 40,
     fontFamily: "Helvetica",
@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 15,
+    marginBottom: 7,
     gap: 12,
   },
   logo: {
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
   },
   finalTotalAmount: {
-    width: 100,
+    width: 140,
     textAlign: "right",
     fontSize: 11,
     fontFamily: "Courier-Bold",
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
     paddingRight: 4,
   },
   generatedAt: {
-    marginTop: 15,
+    marginTop: 9,
     fontSize: 7,
     color: colors.textMuted,
     textAlign: "right",
