@@ -85,7 +85,6 @@ export default function (pool) {
       customer_id,
       location_id,
       tong_no,
-      active_only,
       no_invoice,
       search,
       start_date,
@@ -157,14 +156,6 @@ export default function (pool) {
       if (tong_no) {
         whereClause += ` AND r.tong_no = $${paramCounter}`;
         filterParams.push(tong_no);
-        paramCounter++;
-      }
-
-      if (active_only === "true") {
-        // A rental stays active until its pickup date has passed, so a
-        // future-dated pickup still counts as active.
-        whereClause += ` AND (r.date_picked IS NULL OR r.date_picked > $${paramCounter}::date)`;
-        filterParams.push(localToday());
         paramCounter++;
       }
 

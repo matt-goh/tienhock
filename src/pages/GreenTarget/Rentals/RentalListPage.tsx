@@ -345,7 +345,6 @@ const SCROLL_RESTORATION_KEY: string = "gt-rental-list";
 interface CachedRentalFilters {
   search: string;
   dateRange: RentalDateRange;
-  activeOnly: boolean;
   noInvoiceOnly: boolean;
   page: number;
 }
@@ -356,14 +355,13 @@ const parseCachedDate = (value: unknown): Date | null => {
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
-// Restores the search, date range, "Active Rentals Only" / "No Invoice Only"
-// toggles and page so opening a rental (or an invoice from a card) and coming
-// back lands on the same view.
+// Restores the search, date range, "No Invoice Only" toggle and page so
+// opening a rental (or an invoice from a card) and coming back lands on the
+// same view.
 const loadCachedFilters = (): CachedRentalFilters => {
   const fallback: CachedRentalFilters = {
     search: "",
     dateRange: getDefaultDateRange(),
-    activeOnly: false,
     noInvoiceOnly: false,
     page: 1,
   };
@@ -379,7 +377,6 @@ const loadCachedFilters = (): CachedRentalFilters => {
         start: parseCachedDate(parsed.start),
         end: parseCachedDate(parsed.end),
       },
-      activeOnly: parsed.activeOnly === true,
       noInvoiceOnly: parsed.noInvoiceOnly === true,
       page:
         typeof parsed.page === "number" && parsed.page >= 1 ? parsed.page : 1,
@@ -407,9 +404,6 @@ const RentalListPage = () => {
   );
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [activeOnly, setActiveOnly] = useState<boolean>(
-    () => loadCachedFilters().activeOnly
-  );
   const [noInvoiceOnly, setNoInvoiceOnly] = useState<boolean>(
     () => loadCachedFilters().noInvoiceOnly
   );
@@ -452,7 +446,6 @@ const RentalListPage = () => {
         page: currentPage,
         limit: ITEMS_PER_PAGE,
         ...(appliedSearch ? { search: appliedSearch } : {}),
-        ...(activeOnly ? { active_only: true } : {}),
         ...(noInvoiceOnly ? { no_invoice: true } : {}),
         ...(dateRange.start
           ? { start_date: format(dateRange.start, "yyyy-MM-dd") }
@@ -478,7 +471,7 @@ const RentalListPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, appliedSearch, activeOnly, noInvoiceOnly, dateRange]);
+  }, [currentPage, appliedSearch, noInvoiceOnly, dateRange]);
 
   useEffect(() => {
     fetchRentals();
@@ -496,7 +489,6 @@ const RentalListPage = () => {
           search: appliedSearch,
           start: dateRange.start ? dateRange.start.toISOString() : null,
           end: dateRange.end ? dateRange.end.toISOString() : null,
-          activeOnly,
           noInvoiceOnly,
           page: currentPage,
         })
@@ -504,7 +496,7 @@ const RentalListPage = () => {
     } catch (e) {
       console.error("Error caching rental filters:", e);
     }
-  }, [appliedSearch, dateRange, activeOnly, noInvoiceOnly, currentPage]);
+  }, [appliedSearch, dateRange, noInvoiceOnly, currentPage]);
 
   // Commit the typed search to the backend. Called on blur and on Enter.
   const commitSearch = () => {
@@ -527,11 +519,6 @@ const RentalListPage = () => {
 
   const clearDateRange = (): void => {
     setDateRange({ start: null, end: null });
-    setCurrentPage(1);
-  };
-
-  const handleActiveOnlyToggle = (): void => {
-    setActiveOnly((prev) => !prev);
     setCurrentPage(1);
   };
 
@@ -641,7 +628,7 @@ const RentalListPage = () => {
 
       toast.success("Rental marked as picked up");
 
-      // Refetch: with "Active Rentals Only" on, this rental now drops out
+      // Refetch so the card reflects its new pickup date and destination
       fetchRentals();
     } catch (error) {
       console.error("Error updating rental:", error);
@@ -764,30 +751,6 @@ const RentalListPage = () => {
           Rentals ({totalItems})
         </h1>
         <div className="flex flex-col sm:flex-row gap-3 items-center justify-end ml-auto">
-          <div className="flex items-center">
-            <button
-              type="button"
-              onClick={handleActiveOnlyToggle}
-              className="p-2 rounded-full transition-opacity duration-200 hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 active:bg-default-200 flex items-center"
-            >
-              {activeOnly ? (
-                <IconSquareCheckFilled
-                  className="text-blue-600"
-                  width={20}
-                  height={20}
-                />
-              ) : (
-                <IconSquare
-                  className="text-default-400"
-                  width={20}
-                  height={20}
-                />
-              )}
-              <span className="ml-2 font-medium whitespace-nowrap">
-                Active Rentals Only
-              </span>
-            </button>
-          </div>
           <div className="flex items-center">
             <button
               type="button"
