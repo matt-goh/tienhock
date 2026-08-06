@@ -163,57 +163,64 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
           />
         </div>
 
-        {/* Type */}
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-            {t("type", { ns: "common" })}
-          </label>
-          <PillSelect<InvoiceTypeCode>
-            value={invoice.paymenttype === "CASH" ? "C" : "I"}
-            onChange={(value: InvoiceTypeCode) => {
-              const newType = value === "C" ? "CASH" : "INVOICE";
-              onInputChange("paymenttype", newType);
-              if (invoice.id) {
-                onInputChange("id", invoice.id);
+        {/* Type, Date & Time. The pills and the navigator size themselves to
+            their content, so all three share one row instead of each leaving a
+            wide empty gap beside it. They wrap on narrow screens. */}
+        <div className="flex flex-wrap items-end gap-4">
+          {/* Type */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+              {t("type", { ns: "common" })}
+            </label>
+            <PillSelect<InvoiceTypeCode>
+              value={invoice.paymenttype === "CASH" ? "C" : "I"}
+              onChange={(value: InvoiceTypeCode) => {
+                const newType = value === "C" ? "CASH" : "INVOICE";
+                onInputChange("paymenttype", newType);
+                if (invoice.id) {
+                  onInputChange("id", invoice.id);
+                }
+              }}
+              options={invoiceTypeOptions}
+              disabled={readOnly} // Use readOnly
+              ariaLabel={t("Invoice type")}
+              size="md"
+            />
+          </div>
+
+          {/* Date */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+              {t("date", { ns: "common" })}
+            </label>
+            <TimeNavigator
+              range={{ start: invoiceDate, end: invoiceDate }}
+              onChange={handleDatePick}
+              modes={["day"]}
+              presets={false}
+              allowFuture
+              size="md"
+              disabled={readOnly}
+            />
+          </div>
+
+          {/* Time */}
+          <div className="w-32">
+            <FormInput
+              name="time"
+              label={t("Time")}
+              type="time"
+              value={
+                parseDatabaseTimestamp(invoice.createddate).formattedTime?.slice(
+                  0,
+                  5
+                ) ?? ""
               }
-            }}
-            options={invoiceTypeOptions}
-            disabled={readOnly} // Use readOnly
-            ariaLabel={t("Invoice type")}
-            size="md"
-          />
+              onChange={(e) => handleDateTimeChange("time", e.target.value)}
+              disabled={readOnly} // Use readOnly
+            />
+          </div>
         </div>
-
-        {/* Date */}
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-            {t("date", { ns: "common" })}
-          </label>
-          <TimeNavigator
-            range={{ start: invoiceDate, end: invoiceDate }}
-            onChange={handleDatePick}
-            modes={["day"]}
-            presets={false}
-            allowFuture
-            size="md"
-            disabled={readOnly}
-          />
-        </div>
-
-        {/* Time */}
-        <FormInput
-          name="time"
-          label={t("Time")}
-          type="time"
-          value={
-            parseDatabaseTimestamp(invoice.createddate).formattedTime?.slice(
-              0,
-              5
-            ) ?? ""
-          }
-          onChange={(e) => handleDateTimeChange("time", e.target.value)}
-          disabled={readOnly} // Use readOnly
-        />
       </div>
 
       {/* Column 2 */}
@@ -238,27 +245,34 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
           />
         </div>
 
-        {/* Customer */}
-        <CustomerCombobox
-          name="customer"
-          label={t("customer", { ns: "common" })}
-          value={selectedOptionForCombobox} // Pass SelectOption | null
-          onChange={handleComboboxChange} // Use updated handler
-          options={customerOptionsForCombobox} // Pass mapped options
-          query={customerQuery}
-          setQuery={setCustomerQuery}
-          onLoadMore={onLoadMoreCustomers}
-          hasMore={hasMoreCustomers}
-          isLoading={isFetchingCustomers}
-        />
+        {/* Customer & Customer ID. The id is short and read-only, so it sits
+            beside the picker rather than on a row of its own. */}
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="flex-1 min-w-[16rem]">
+            <CustomerCombobox
+              name="customer"
+              label={t("customer", { ns: "common" })}
+              value={selectedOptionForCombobox} // Pass SelectOption | null
+              onChange={handleComboboxChange} // Use updated handler
+              options={customerOptionsForCombobox} // Pass mapped options
+              query={customerQuery}
+              setQuery={setCustomerQuery}
+              onLoadMore={onLoadMoreCustomers}
+              hasMore={hasMoreCustomers}
+              isLoading={isFetchingCustomers}
+            />
+          </div>
 
-        {/* Customer ID (Read Only) */}
-        <FormInput
-          name="customerId"
-          label={t("Customer ID")}
-          value={invoice.customerid || ""}
-          disabled // Always disabled
-        />
+          {/* Customer ID (Read Only) */}
+          <div className="w-44">
+            <FormInput
+              name="customerId"
+              label={t("Customer ID")}
+              value={invoice.customerid || ""}
+              disabled // Always disabled
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
